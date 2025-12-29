@@ -1,0 +1,614 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Shared infrastructure for dynamic module loading with hot-reload support.
+
+This module provides the DynamicModuleLoader base class that encapsulates
+common module loading infrastructure used by:
+- CapabilityLoader (victor/framework/capability_loader.py)
+- ToolPluginRegistry (victor/tools/plugin_registry.py)
+
+Key features:
+- Module cache invalidation for hot-reload
+- File watching with watchdog
+- Debounced reload timers
+- Submodule discovery and invalidation
+
+Design Pattern: Template Method
+==============================
+DynamicModuleLoader provides the infrastructure for module loading,
+while subclasses implement the specific loading/registration logic.
+
+Usage:
+    from victor.framework.module_loader import DynamicModuleLoader
+
+    class MyLoader(DynamicModuleLoader):
+        def __init__(self):
+            super().__init__(watch_dirs=[Path("~/.myapp/plugins")])
+
+        def _on_module_reloaded(self, module_name: str) -> None:
+            # Handle module reload
+            self.reload_my_resources(module_name)
+"""
+
+from __future__ import annotations
+
+import importlib
+import logging
+import sys
+import threading
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from watchdog.observers import Observer
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Debounced Reload Timer
+# =============================================================================
+
+
+class DebouncedReloadTimer:
+    """Timer that debounces rapid file changes.
+
+    This prevents multiple reloads when multiple files change in quick
+    succession (e.g., during a batch save operation).
+
+    Attributes:
+        delay: Debounce delay in seconds (default 0.5s)
+    """
+
+    def __init__(self, delay: float = 0.5):
+        """Initialize debounced timer.
+
+        Args:
+            delay: Debounce delay in seconds
+        """
+        self.delay = delay
+        self._timers: Dict[str, threading.Timer] = {}
+        self._lock = threading.Lock()
+
+    def schedule(
+        self,
+        key: str,
+        callback: Callable[[], None],
+    ) -> None:
+        """Schedule a debounced callback.
+
+        If a callback is already scheduled for this key, it will be
+        cancelled and rescheduled.
+
+        Args:
+            key: Unique key for this callback (usually module name)
+            callback: Callable to invoke after debounce delay
+        """
+        with self._lock:
+            # Cancel existing timer
+            if key in self._timers:
+                self._timers[key].cancel()
+
+            # Create new timer
+            timer = threading.Timer(self.delay, self._execute, args=(key, callback))
+            timer.daemon = True
+            timer.start()
+            self._timers[key] = timer
+
+    def _execute(self, key: str, callback: Callable[[], None]) -> None:
+        """Execute callback and cleanup timer.
+
+        Args:
+            key: Timer key
+            callback: Callback to execute
+        """
+        with self._lock:
+            self._timers.pop(key, None)
+
+        try:
+            callback()
+        except Exception as e:
+            logger.error(f"Debounced callback failed for '{key}': {e}")
+
+    def cancel(self, key: str) -> bool:
+        """Cancel a scheduled callback.
+
+        Args:
+            key: Timer key to cancel
+
+        Returns:
+            True if timer was cancelled
+        """
+        with self._lock:
+            timer = self._timers.pop(key, None)
+            if timer:
+                timer.cancel()
+                return True
+            return False
+
+    def cancel_all(self) -> int:
+        """Cancel all pending timers.
+
+        Returns:
+            Number of timers cancelled
+        """
+        with self._lock:
+            count = len(self._timers)
+            for timer in self._timers.values():
+                timer.cancel()
+            self._timers.clear()
+            return count
+
+
+# =============================================================================
+# Dynamic Module Loader Base Class
+# =============================================================================
+
+
+class DynamicModuleLoader:
+    """Base class for dynamic module loading with hot-reload support.
+
+    This class provides shared infrastructure for:
+    - Module cache invalidation
+    - File watching with debounced reloads
+    - Submodule tracking and invalidation
+
+    Subclasses should implement:
+    - _on_module_reloaded(module_name): Handle module reload
+    - _get_module_path(module_name): Get file path for a module
+
+    Thread Safety:
+        The module invalidation and file watching are thread-safe.
+        Subclasses should use appropriate synchronization for their
+        own state.
+
+    Attributes:
+        watch_dirs: Directories being watched for file changes
+        debounce_delay: Delay before triggering reload (default 0.5s)
+    """
+
+    def __init__(
+        self,
+        watch_dirs: Optional[List[Path]] = None,
+        debounce_delay: float = 0.5,
+    ) -> None:
+        """Initialize the module loader.
+
+        Args:
+            watch_dirs: Directories to watch for file changes
+            debounce_delay: Delay before triggering reload (default 0.5s)
+        """
+        self._watch_dirs: List[Path] = []
+        if watch_dirs:
+            for dir_path in watch_dirs:
+                expanded = Path(dir_path).expanduser()
+                if expanded.exists():
+                    self._watch_dirs.append(expanded)
+
+        self._debounce_delay = debounce_delay
+        self._debounce_timer = DebouncedReloadTimer(delay=debounce_delay)
+
+        # File watcher state
+        self._observer: Optional["Observer"] = None
+        self._file_handler: Optional[Any] = None
+
+        # Module tracking
+        self._loaded_modules: Dict[str, Any] = {}
+        self._module_paths: Dict[str, Path] = {}  # module -> file path
+
+    @property
+    def watch_dirs(self) -> List[Path]:
+        """Get list of watched directories."""
+        return list(self._watch_dirs)
+
+    @property
+    def debounce_delay(self) -> float:
+        """Get debounce delay in seconds."""
+        return self._debounce_delay
+
+    # =========================================================================
+    # Module Cache Invalidation
+    # =========================================================================
+
+    def invalidate_module(self, module_name: str) -> int:
+        """Invalidate Python module cache for hot-reload.
+
+        This removes the module and all its submodules from sys.modules,
+        ensuring subsequent imports will load fresh code from disk.
+
+        Args:
+            module_name: Module name to invalidate
+
+        Returns:
+            Number of modules invalidated (including submodules)
+        """
+        invalidated = 0
+
+        # Remove from internal tracking
+        self._loaded_modules.pop(module_name, None)
+
+        # Remove main module
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+            invalidated += 1
+            logger.debug(f"Invalidated module: {module_name}")
+
+        # Remove submodules
+        prefix = f"{module_name}."
+        to_remove = [name for name in sys.modules if name.startswith(prefix)]
+        for name in to_remove:
+            del sys.modules[name]
+            invalidated += 1
+            logger.debug(f"Invalidated submodule: {name}")
+
+        # Clear import caches
+        importlib.invalidate_caches()
+
+        return invalidated
+
+    def invalidate_modules_in_path(
+        self,
+        base_module_name: str,
+        directory_path: Path,
+    ) -> int:
+        """Invalidate all modules loaded from a directory.
+
+        This is useful for plugin directories where multiple modules
+        may be loaded from the same directory tree.
+
+        Args:
+            base_module_name: Base module name for the plugin
+            directory_path: Path to plugin directory
+
+        Returns:
+            Number of modules invalidated
+        """
+        invalidated = 0
+        path_str = str(directory_path.resolve())
+
+        # Remove the main module
+        if base_module_name in sys.modules:
+            del sys.modules[base_module_name]
+            invalidated += 1
+            logger.debug(f"Invalidated module: {base_module_name}")
+
+        # Remove any modules that came from this directory
+        modules_to_remove = []
+        for mod_name, mod in list(sys.modules.items()):
+            if mod is None:
+                continue
+
+            try:
+                mod_file = getattr(mod, "__file__", None)
+                if mod_file and path_str in str(Path(mod_file).resolve()):
+                    modules_to_remove.append(mod_name)
+            except Exception:
+                continue
+
+        for mod_name in modules_to_remove:
+            del sys.modules[mod_name]
+            invalidated += 1
+            logger.debug(f"Invalidated module from path: {mod_name}")
+
+        # Clear import caches
+        importlib.invalidate_caches()
+
+        return invalidated
+
+    # =========================================================================
+    # File Watching
+    # =========================================================================
+
+    def setup_file_watcher(
+        self,
+        dirs: Optional[List[Path]] = None,
+        on_change: Optional[Callable[[str, str], None]] = None,
+        recursive: bool = True,
+    ) -> bool:
+        """Set up file watching with debounced reloads.
+
+        Args:
+            dirs: Directories to watch (defaults to self._watch_dirs)
+            on_change: Callback(file_path, event_type) for file changes.
+                      event_type is one of: "modified", "created", "deleted"
+            recursive: Watch directories recursively (default True)
+
+        Returns:
+            True if watching started successfully
+        """
+        try:
+            from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
+        except ImportError:
+            logger.warning(
+                "watchdog not installed - file watching unavailable. "
+                "Install with: pip install watchdog"
+            )
+            return False
+
+        if self._observer is not None:
+            logger.warning("File watcher already running")
+            return False
+
+        watch_dirs = dirs if dirs is not None else self._watch_dirs
+        if not watch_dirs:
+            logger.warning("No directories configured for watching")
+            return False
+
+        # Create file event handler
+        loader = self
+
+        class ModuleFileHandler(FileSystemEventHandler):
+            """Handler for module file changes."""
+
+            def __init__(handler_self):
+                super().__init__()
+
+            def _handle_change(
+                handler_self,
+                file_path: str,
+                event_type: str,
+            ) -> None:
+                """Handle file change with debouncing."""
+                if not file_path.endswith(".py"):
+                    return
+
+                path_obj = Path(file_path)
+
+                # Find which module this file belongs to
+                module_name = loader._find_module_for_file(path_obj)
+
+                if module_name:
+                    # Schedule debounced reload
+                    def do_reload():
+                        try:
+                            loader._on_module_changed(
+                                module_name,
+                                path_obj,
+                                event_type,
+                            )
+                            if on_change:
+                                on_change(file_path, event_type)
+                        except Exception as e:
+                            logger.error(
+                                f"Error handling {event_type} for '{module_name}': {e}"
+                            )
+
+                    loader._debounce_timer.schedule(module_name, do_reload)
+
+            def on_modified(handler_self, event) -> None:
+                if not event.is_directory:
+                    handler_self._handle_change(event.src_path, "modified")
+
+            def on_created(handler_self, event) -> None:
+                if not event.is_directory:
+                    handler_self._handle_change(event.src_path, "created")
+
+            def on_deleted(handler_self, event) -> None:
+                if not event.is_directory:
+                    handler_self._handle_change(event.src_path, "deleted")
+
+        self._observer = Observer()
+        self._file_handler = ModuleFileHandler()
+
+        # Watch all directories
+        watched_count = 0
+        for watch_dir in watch_dirs:
+            if watch_dir.exists():
+                self._observer.schedule(
+                    self._file_handler,
+                    str(watch_dir),
+                    recursive=recursive,
+                )
+                watched_count += 1
+                logger.debug(f"Watching directory: {watch_dir}")
+
+        if watched_count == 0:
+            logger.warning("No valid directories to watch")
+            self._observer = None
+            self._file_handler = None
+            return False
+
+        self._observer.start()
+        logger.info(f"Started file watcher for {watched_count} directories")
+        return True
+
+    def stop_file_watcher(self) -> None:
+        """Stop the file watcher."""
+        # Cancel pending debounced reloads
+        cancelled = self._debounce_timer.cancel_all()
+        if cancelled:
+            logger.debug(f"Cancelled {cancelled} pending reload(s)")
+
+        # Stop observer
+        if self._observer is not None:
+            self._observer.stop()
+            self._observer.join(timeout=2.0)
+            self._observer = None
+            self._file_handler = None
+            logger.info("Stopped file watcher")
+
+    @property
+    def is_watching(self) -> bool:
+        """Check if file watcher is running."""
+        return self._observer is not None
+
+    # =========================================================================
+    # Template Methods (Override in Subclasses)
+    # =========================================================================
+
+    def _find_module_for_file(self, file_path: Path) -> Optional[str]:
+        """Find which loaded module a file belongs to.
+
+        Override this method to implement module discovery logic.
+
+        Args:
+            file_path: Path to the changed file
+
+        Returns:
+            Module name or None if not found
+        """
+        file_path = file_path.resolve()
+
+        for mod_name, mod in self._loaded_modules.items():
+            mod_file = getattr(mod, "__file__", None)
+            if mod_file and Path(mod_file).resolve() == file_path:
+                return mod_name
+
+        return None
+
+    def _on_module_changed(
+        self,
+        module_name: str,
+        file_path: Path,
+        event_type: str,
+    ) -> None:
+        """Handle a module file change.
+
+        Override this method to implement reload logic.
+
+        Args:
+            module_name: Name of the changed module
+            file_path: Path to the changed file
+            event_type: Type of change ("modified", "created", "deleted")
+        """
+        logger.debug(f"Module '{module_name}' {event_type}: {file_path}")
+
+    # =========================================================================
+    # Module Tracking
+    # =========================================================================
+
+    def track_module(
+        self,
+        module_name: str,
+        module: Any,
+        file_path: Optional[Path] = None,
+    ) -> None:
+        """Track a loaded module for hot-reload support.
+
+        Args:
+            module_name: Name of the module
+            module: The module object
+            file_path: Optional file path (defaults to module.__file__)
+        """
+        self._loaded_modules[module_name] = module
+
+        if file_path:
+            self._module_paths[module_name] = file_path
+        elif hasattr(module, "__file__") and module.__file__:
+            self._module_paths[module_name] = Path(module.__file__)
+
+    def untrack_module(self, module_name: str) -> bool:
+        """Untrack a loaded module.
+
+        Args:
+            module_name: Name of the module to untrack
+
+        Returns:
+            True if module was tracked
+        """
+        was_tracked = module_name in self._loaded_modules
+        self._loaded_modules.pop(module_name, None)
+        self._module_paths.pop(module_name, None)
+        return was_tracked
+
+    def get_tracked_modules(self) -> List[str]:
+        """Get list of tracked module names.
+
+        Returns:
+            List of module names
+        """
+        return list(self._loaded_modules.keys())
+
+    def get_module_path(self, module_name: str) -> Optional[Path]:
+        """Get file path for a tracked module.
+
+        Args:
+            module_name: Name of the module
+
+        Returns:
+            Path or None if not tracked
+        """
+        return self._module_paths.get(module_name)
+
+    # =========================================================================
+    # Watch Directory Management
+    # =========================================================================
+
+    def add_watch_dir(self, path: Path) -> bool:
+        """Add a directory to watch.
+
+        If file watching is active, the new directory will be added
+        to the watcher.
+
+        Args:
+            path: Directory path to add
+
+        Returns:
+            True if directory was added
+        """
+        path = Path(path).expanduser()
+        if path in self._watch_dirs:
+            return False
+
+        self._watch_dirs.append(path)
+
+        # Add to active watcher if running
+        if self._observer is not None and path.exists():
+            self._observer.schedule(
+                self._file_handler,
+                str(path),
+                recursive=True,
+            )
+            logger.debug(f"Added watch directory: {path}")
+
+        return True
+
+    def remove_watch_dir(self, path: Path) -> bool:
+        """Remove a directory from watching.
+
+        Note: This doesn't immediately stop watching the directory
+        if the watcher is running. Call stop_file_watcher() and
+        setup_file_watcher() to apply the change.
+
+        Args:
+            path: Directory path to remove
+
+        Returns:
+            True if directory was removed
+        """
+        path = Path(path).expanduser()
+        if path in self._watch_dirs:
+            self._watch_dirs.remove(path)
+            return True
+        return False
+
+    # =========================================================================
+    # Context Manager
+    # =========================================================================
+
+    def __enter__(self) -> "DynamicModuleLoader":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - cleanup."""
+        self.stop_file_watcher()
+
+
+__all__ = [
+    "DynamicModuleLoader",
+    "DebouncedReloadTimer",
+]

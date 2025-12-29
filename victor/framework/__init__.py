@@ -539,6 +539,20 @@ try:
 except ImportError:
     _GRAPH_EXPORTS = []
 
+# Module Loader (Shared infrastructure for dynamic module loading)
+try:
+    from victor.framework.module_loader import (
+        DynamicModuleLoader,
+        DebouncedReloadTimer,
+    )
+
+    _MODULE_LOADER_EXPORTS = [
+        "DynamicModuleLoader",
+        "DebouncedReloadTimer",
+    ]
+except ImportError:
+    _MODULE_LOADER_EXPORTS = []
+
 # Capability Loader (Phase 4.4 - Dynamic capability loading for plugins)
 try:
     from victor.framework.capability_loader import (
@@ -560,6 +574,102 @@ try:
     ]
 except ImportError:
     _CAPABILITY_LOADER_EXPORTS = []
+
+# Tool Naming (Canonical tool name enforcement)
+try:
+    from victor.framework.tool_naming import (
+        CANONICAL_TO_ALIASES,
+        TOOL_ALIASES,
+        ToolNameEntry,
+        ToolNames,
+        canonicalize_dependencies,
+        canonicalize_tool_dict,
+        canonicalize_tool_list,
+        canonicalize_tool_set,
+        canonicalize_transitions,
+        get_aliases,
+        get_all_canonical_names,
+        get_canonical_name,
+        get_legacy_names_report,
+        get_name_mapping,
+        is_valid_tool_name,
+        validate_tool_names,
+    )
+
+    _TOOL_NAMING_EXPORTS = [
+        "CANONICAL_TO_ALIASES",
+        "TOOL_ALIASES",
+        "ToolNameEntry",
+        "ToolNames",
+        "canonicalize_dependencies",
+        "canonicalize_tool_dict",
+        "canonicalize_tool_list",
+        "canonicalize_tool_set",
+        "canonicalize_transitions",
+        "get_aliases",
+        "get_all_canonical_names",
+        "get_canonical_name",
+        "get_legacy_names_report",
+        "get_name_mapping",
+        "is_valid_tool_name",
+        "validate_tool_names",
+    ]
+except ImportError:
+    _TOOL_NAMING_EXPORTS = []
+
+# Framework Middleware (common middleware for all verticals)
+try:
+    from victor.framework.middleware import (
+        GitSafetyMiddleware,
+        LoggingMiddleware,
+        MetricsMiddleware,
+        SecretMaskingMiddleware,
+        ToolMetrics,
+    )
+
+    _MIDDLEWARE_EXPORTS = [
+        "GitSafetyMiddleware",
+        "LoggingMiddleware",
+        "MetricsMiddleware",
+        "SecretMaskingMiddleware",
+        "ToolMetrics",
+    ]
+except ImportError:
+    _MIDDLEWARE_EXPORTS = []
+
+# Task Type Registry (Unified task type definitions with hints/budgets)
+try:
+    from victor.framework.task_types import (
+        TaskCategory,
+        TaskTypeDefinition,
+        TaskTypeRegistry,
+        get_task_budget,
+        get_task_hint,
+        get_task_type_registry,
+        register_vertical_task_type,
+        register_coding_task_types,
+        register_data_analysis_task_types,
+        register_devops_task_types,
+        register_research_task_types,
+        setup_vertical_task_types,
+    )
+
+    _TASK_TYPES_EXPORTS = [
+        "TaskCategory",
+        "TaskTypeDefinition",
+        "TaskTypeRegistry",
+        "get_task_budget",
+        "get_task_hint",
+        "get_task_type_registry",
+        "register_vertical_task_type",
+        "register_coding_task_types",
+        "register_data_analysis_task_types",
+        "register_devops_task_types",
+        "register_research_task_types",
+        "setup_vertical_task_types",
+    ]
+except ImportError:
+    _TASK_TYPES_EXPORTS = []
 
 # Checkpointing is handled by victor.agent.rl.checkpoint_store.CheckpointStore
 # which provides versioning, rollback, and diff capabilities.
@@ -645,7 +755,11 @@ __all__ = (
     + _GRAPH_EXPORTS
     + _CHECKPOINTER_EXPORTS
     + _CREW_EXPORTS
+    + _MODULE_LOADER_EXPORTS
     + _CAPABILITY_LOADER_EXPORTS
+    + _TOOL_NAMING_EXPORTS
+    + _MIDDLEWARE_EXPORTS
+    + _TASK_TYPES_EXPORTS
 )
 
 # Vertical Integration (Phase 3.1 - Step Handlers)
