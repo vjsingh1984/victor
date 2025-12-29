@@ -302,7 +302,9 @@ class SemanticThresholdLearner(BaseLearner):
             # No data yet - return None (caller will use default)
             return None
 
-        stats = dict(row)
+        # Convert row tuple to dict using column names from cursor description
+        column_names = [description[0] for description in cursor.description]
+        stats = dict(zip(column_names, row))
 
         # Need at least 5 searches for confidence
         if stats["total_searches"] < 5:
