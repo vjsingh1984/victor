@@ -21,6 +21,9 @@ The learner tracks:
 - Best formation per task type (sequential vs parallel vs hierarchical)
 - Optimal role distributions (researchers vs executors vs reviewers)
 - Budget allocation patterns that maximize success and quality
+
+Database:
+    Uses the unified database at ~/.victor/victor.db via victor.core.database.
 """
 
 from __future__ import annotations
@@ -42,6 +45,8 @@ from victor.agent.teams.metrics import (
     CompositionStats,
     categorize_task,
 )
+from victor.core.database import get_database
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +253,7 @@ class TeamCompositionLearner:
         """Initialize the learner.
 
         Args:
-            db_path: Path to SQLite database (default: ~/.victor/team_learning.db)
+            db_path: Path to SQLite database - legacy, now uses unified database
             learning_rate: Q-learning alpha (how fast to update)
             discount_factor: Q-learning gamma (future reward weight)
             epsilon: Exploration probability for epsilon-greedy
@@ -259,72 +264,71 @@ class TeamCompositionLearner:
         self.epsilon = epsilon
         self.min_samples = min_samples_for_confidence
 
-        # Set up database
-        if db_path is None:
-            db_path = Path.home() / ".victor" / "team_learning.db"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db_path = db_path
-        self.db = sqlite3.connect(str(db_path))
+        # Use unified database from victor.core.database
+        self._db_manager = get_database()
+        self.db = self._db_manager.get_connection()
+        self.db_path = self._db_manager.db_path
         self._ensure_tables()
 
-        logger.info(f"TeamCompositionLearner initialized (db={db_path})")
+        logger.info(f"TeamCompositionLearner initialized (unified db={self.db_path})")
 
     def _ensure_tables(self) -> None:
-        """Create database tables if they don't exist."""
+        """Create database tables if they don't exist.
+
+        Uses Tables constants from victor.core.schema for consistent naming.
+        """
         cursor = self.db.cursor()
 
-        # Composition stats table
+        # Composition stats table (agent_team_config)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS team_composition_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_TEAM_CONFIG} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                composition_key TEXT UNIQUE NOT NULL,
+                config_key TEXT UNIQUE NOT NULL,
                 formation TEXT NOT NULL,
                 role_counts TEXT NOT NULL,
-                task_category TEXT NOT NULL,
-                total_executions INTEGER DEFAULT 0,
-                successes INTEGER DEFAULT 0,
-                total_quality REAL DEFAULT 0.0,
-                total_duration REAL DEFAULT 0.0,
-                total_tools_used INTEGER DEFAULT 0,
-                total_budget INTEGER DEFAULT 0,
+                task_category TEXT,
+                execution_count INTEGER DEFAULT 0,
+                success_count INTEGER DEFAULT 0,
+                avg_quality REAL DEFAULT 0.5,
+                avg_duration REAL DEFAULT 0,
                 q_value REAL DEFAULT 0.5,
-                last_updated TEXT
+                updated_at TEXT DEFAULT (datetime('now'))
             )
             """
         )
 
-        # Execution history table
+        # Execution history table (agent_team_run)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS team_execution_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_TEAM_RUN} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT NOT NULL,
-                task_category TEXT NOT NULL,
-                formation TEXT NOT NULL,
-                role_counts TEXT NOT NULL,
+                task_category TEXT,
+                formation TEXT,
+                role_counts TEXT,
                 member_count INTEGER,
-                total_budget INTEGER,
+                budget_used INTEGER,
                 tools_used INTEGER,
                 success INTEGER,
                 quality_score REAL,
                 duration_seconds REAL,
-                timestamp TEXT
+                created_at TEXT DEFAULT (datetime('now'))
             )
             """
         )
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_stats_category
-            ON team_composition_stats(task_category)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_team_config_category
+            ON {Tables.AGENT_TEAM_CONFIG}(task_category)
             """
         )
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_history_category
-            ON team_execution_history(task_category)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_team_run_category
+            ON {Tables.AGENT_TEAM_RUN}(task_category)
             """
         )
 
@@ -376,10 +380,10 @@ class TeamCompositionLearner:
 
         # Get compositions for this category, ordered by Q-value
         cursor.execute(
-            """
-            SELECT composition_key, formation, role_counts, q_value,
-                   total_executions, total_budget, total_quality, successes
-            FROM team_composition_stats
+            f"""
+            SELECT config_key, formation, role_counts, q_value,
+                   execution_count, avg_quality, success_count
+            FROM {Tables.AGENT_TEAM_CONFIG}
             WHERE task_category = ?
             ORDER BY q_value DESC
             LIMIT 1
@@ -400,13 +404,13 @@ class TeamCompositionLearner:
             role_counts,
             q_value,
             total_exec,
-            total_budget,
-            total_quality,
+            avg_quality,
             successes,
         ) = row
 
         role_counts = json.loads(role_counts)
-        avg_budget = total_budget // max(total_exec, 1)
+        # Estimate budget based on execution count and typical team size
+        avg_budget = 40  # Default budget
 
         # Compute confidence based on sample size
         confidence = min(1.0, total_exec / (self.min_samples * 2))
@@ -497,14 +501,136 @@ class TeamCompositionLearner:
             is_baseline=False,
         )
 
-    def record_outcome(
+    @property
+    def name(self) -> str:
+        """Learner name for BaseLearner compatibility."""
+        return "team_composition"
+
+    def record_outcome(self, outcome: Any) -> None:
+        """Record outcome from RLOutcome (BaseLearner interface).
+
+        This method accepts an RLOutcome object from the RLCoordinator
+        and extracts team-specific data from its metadata.
+
+        Args:
+            outcome: RLOutcome object with team metadata
+        """
+        from victor.agent.rl.base import RLOutcome
+
+        if isinstance(outcome, RLOutcome):
+            # Extract team info from metadata
+            metadata = outcome.metadata or {}
+            team_name = metadata.get("team_name", "unknown")
+            formation_str = metadata.get("formation", "sequential")
+            member_count = metadata.get("member_count", 1)
+            tool_calls = metadata.get("tool_calls", 0)
+            duration = metadata.get("duration_seconds", 0.0)
+
+            # Create a simplified metrics record
+            category = categorize_task(outcome.task_type)
+
+            # Compute composition key from formation
+            role_str = f"executor={member_count}"
+            comp_key = f"{formation_str}:{role_str}"
+
+            cursor = self.db.cursor()
+
+            # Store in run history
+            cursor.execute(
+                f"""
+                INSERT INTO {Tables.AGENT_TEAM_RUN}
+                (team_id, task_category, formation, role_counts, member_count,
+                 budget_used, tools_used, success, quality_score, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    team_name,
+                    category.value,
+                    formation_str,
+                    json.dumps({"executor": member_count}),
+                    member_count,
+                    tool_calls,  # Approximate budget as tool calls
+                    tool_calls,
+                    1 if outcome.success else 0,
+                    outcome.quality_score,
+                    duration,
+                ),
+            )
+
+            # Update Q-values
+            reward = outcome.quality_score - 0.5 if outcome.success else -0.5
+
+            cursor.execute(
+                f"""
+                SELECT q_value, execution_count, success_count
+                FROM {Tables.AGENT_TEAM_CONFIG}
+                WHERE config_key = ? AND task_category = ?
+                """,
+                (comp_key, category.value),
+            )
+            row = cursor.fetchone()
+
+            if row:
+                q_value, exec_count, success_count = row
+            else:
+                q_value, exec_count, success_count = 0.5, 0, 0
+
+            # Q-learning update
+            new_q = q_value + self.learning_rate * (reward - q_value)
+            new_q = max(0.0, min(1.0, new_q))
+
+            cursor.execute(
+                f"""
+                INSERT INTO {Tables.AGENT_TEAM_CONFIG}
+                (config_key, formation, role_counts, task_category,
+                 execution_count, success_count, avg_quality, avg_duration, q_value)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(config_key) DO UPDATE SET
+                    execution_count = execution_count + 1,
+                    success_count = success_count + ?,
+                    avg_quality = (avg_quality * execution_count + ?) / (execution_count + 1),
+                    avg_duration = (avg_duration * execution_count + ?) / (execution_count + 1),
+                    q_value = ?,
+                    updated_at = datetime('now')
+                """,
+                (
+                    comp_key,
+                    formation_str,
+                    json.dumps({"executor": member_count}),
+                    category.value,
+                    1,
+                    1 if outcome.success else 0,
+                    outcome.quality_score,
+                    duration,
+                    new_q,
+                    # For UPDATE clause
+                    1 if outcome.success else 0,
+                    outcome.quality_score,
+                    duration,
+                    new_q,
+                ),
+            )
+            self.db.commit()
+
+            logger.debug(
+                f"RL: Team {team_name} outcome: Q={q_value:.3f}->{new_q:.3f}, "
+                f"success={outcome.success}"
+            )
+        else:
+            # Fallback: assume old-style call
+            logger.warning(
+                "TeamCompositionLearner.record_outcome received non-RLOutcome; "
+                "use record_team_outcome for direct team recording"
+            )
+
+    def record_team_outcome(
         self,
         task_type: str,
         config: TeamConfig,
         result: Any,  # TeamResult
         quality_override: Optional[float] = None,
     ) -> None:
-        """Record outcome and update Q-values.
+        """Record outcome and update Q-values (direct team interface).
 
         Args:
             task_type: Task type or description
@@ -538,12 +664,11 @@ class TeamCompositionLearner:
         """
         cursor = self.db.cursor()
         cursor.execute(
-            """
-            INSERT INTO team_execution_history
+            f"""
+            INSERT INTO {Tables.AGENT_TEAM_RUN}
             (team_id, task_category, formation, role_counts, member_count,
-             total_budget, tools_used, success, quality_score, duration_seconds,
-             timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             budget_used, tools_used, success, quality_score, duration_seconds)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 metrics.team_id,
@@ -556,7 +681,6 @@ class TeamCompositionLearner:
                 1 if metrics.success else 0,
                 metrics.quality_score,
                 metrics.duration_seconds,
-                metrics.timestamp,
             ),
         )
         self.db.commit()
@@ -583,11 +707,10 @@ class TeamCompositionLearner:
 
         # Get current Q-value
         cursor.execute(
-            """
-            SELECT q_value, total_executions, successes, total_quality,
-                   total_duration, total_tools_used, total_budget
-            FROM team_composition_stats
-            WHERE composition_key = ? AND task_category = ?
+            f"""
+            SELECT q_value, execution_count, success_count, avg_quality, avg_duration
+            FROM {Tables.AGENT_TEAM_CONFIG}
+            WHERE config_key = ? AND task_category = ?
             """,
             (comp_key, metrics.task_category.value),
         )
@@ -598,25 +721,15 @@ class TeamCompositionLearner:
             q_value = 0.5  # Neutral starting point
             total_exec = 0
             successes = 0
-            total_quality = 0.0
-            total_duration = 0.0
-            total_tools = 0
-            total_budget = 0
+            avg_quality = 0.5
+            avg_duration = 0.0
         else:
-            (
-                q_value,
-                total_exec,
-                successes,
-                total_quality,
-                total_duration,
-                total_tools,
-                total_budget,
-            ) = row
+            (q_value, total_exec, successes, avg_quality, avg_duration) = row
 
         # Get max Q-value for this category (for Q-learning update)
         cursor.execute(
-            """
-            SELECT MAX(q_value) FROM team_composition_stats
+            f"""
+            SELECT MAX(q_value) FROM {Tables.AGENT_TEAM_CONFIG}
             WHERE task_category = ?
             """,
             (metrics.task_category.value,),
@@ -630,31 +743,28 @@ class TeamCompositionLearner:
         )
         new_q = max(0.0, min(1.0, new_q))
 
-        # Update stats
+        # Update stats using exponential moving average
         new_total_exec = total_exec + 1
         new_successes = successes + (1 if metrics.success else 0)
-        new_total_quality = total_quality + metrics.quality_score
-        new_total_duration = total_duration + metrics.duration_seconds
-        new_total_tools = total_tools + metrics.tools_used
-        new_total_budget = total_budget + metrics.total_tool_budget
+        # EMA with alpha=0.2 for quality and duration
+        alpha = 0.2
+        new_avg_quality = alpha * metrics.quality_score + (1 - alpha) * avg_quality
+        new_avg_duration = alpha * metrics.duration_seconds + (1 - alpha) * avg_duration
 
         # Upsert
         cursor.execute(
-            """
-            INSERT INTO team_composition_stats
-            (composition_key, formation, role_counts, task_category,
-             total_executions, successes, total_quality, total_duration,
-             total_tools_used, total_budget, q_value, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(composition_key) DO UPDATE SET
-                total_executions = excluded.total_executions,
-                successes = excluded.successes,
-                total_quality = excluded.total_quality,
-                total_duration = excluded.total_duration,
-                total_tools_used = excluded.total_tools_used,
-                total_budget = excluded.total_budget,
+            f"""
+            INSERT INTO {Tables.AGENT_TEAM_CONFIG}
+            (config_key, formation, role_counts, task_category,
+             execution_count, success_count, avg_quality, avg_duration, q_value)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(config_key) DO UPDATE SET
+                execution_count = excluded.execution_count,
+                success_count = excluded.success_count,
+                avg_quality = excluded.avg_quality,
+                avg_duration = excluded.avg_duration,
                 q_value = excluded.q_value,
-                last_updated = excluded.last_updated
+                updated_at = datetime('now')
             """,
             (
                 comp_key,
@@ -663,12 +773,9 @@ class TeamCompositionLearner:
                 metrics.task_category.value,
                 new_total_exec,
                 new_successes,
-                new_total_quality,
-                new_total_duration,
-                new_total_tools,
-                new_total_budget,
+                new_avg_quality,
+                new_avg_duration,
                 new_q,
-                datetime.now().isoformat(),
             ),
         )
         self.db.commit()
@@ -718,18 +825,18 @@ class TeamCompositionLearner:
 
         if task_category:
             cursor.execute(
-                """
-                SELECT COUNT(*), SUM(total_executions), AVG(q_value)
-                FROM team_composition_stats
+                f"""
+                SELECT COUNT(*), SUM(execution_count), AVG(q_value)
+                FROM {Tables.AGENT_TEAM_CONFIG}
                 WHERE task_category = ?
                 """,
                 (task_category.value,),
             )
         else:
             cursor.execute(
-                """
-                SELECT COUNT(*), SUM(total_executions), AVG(q_value)
-                FROM team_composition_stats
+                f"""
+                SELECT COUNT(*), SUM(execution_count), AVG(q_value)
+                FROM {Tables.AGENT_TEAM_CONFIG}
                 """
             )
 
@@ -739,9 +846,9 @@ class TeamCompositionLearner:
         # Get top compositions
         if task_category:
             cursor.execute(
-                """
-                SELECT composition_key, q_value, total_executions
-                FROM team_composition_stats
+                f"""
+                SELECT config_key, q_value, execution_count
+                FROM {Tables.AGENT_TEAM_CONFIG}
                 WHERE task_category = ?
                 ORDER BY q_value DESC
                 LIMIT 5
@@ -750,9 +857,9 @@ class TeamCompositionLearner:
             )
         else:
             cursor.execute(
-                """
-                SELECT composition_key, q_value, total_executions
-                FROM team_composition_stats
+                f"""
+                SELECT config_key, q_value, execution_count
+                FROM {Tables.AGENT_TEAM_CONFIG}
                 ORDER BY q_value DESC
                 LIMIT 5
                 """
@@ -775,8 +882,8 @@ class TeamCompositionLearner:
     def reset(self) -> None:
         """Reset all learned data."""
         cursor = self.db.cursor()
-        cursor.execute("DELETE FROM team_composition_stats")
-        cursor.execute("DELETE FROM team_execution_history")
+        cursor.execute(f"DELETE FROM {Tables.AGENT_TEAM_CONFIG}")
+        cursor.execute(f"DELETE FROM {Tables.AGENT_TEAM_RUN}")
         self.db.commit()
         logger.info("TeamCompositionLearner reset")
 
