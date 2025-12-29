@@ -539,50 +539,15 @@ try:
 except ImportError:
     _GRAPH_EXPORTS = []
 
-# Checkpointer - Reuse existing RL CheckpointStore
-# Note: SQLiteCheckpointer and JSONFileCheckpointer are available via
-# victor.framework.checkpointer for backwards compatibility, but prefer
-# using RLCheckpointerAdapter which integrates with the unified RL checkpoint store
-try:
-    from victor.framework.checkpointer import (
-        SQLiteCheckpointer,
-        JSONFileCheckpointer,
-    )
+# Checkpointing is handled by victor.agent.rl.checkpoint_store.CheckpointStore
+# which provides versioning, rollback, and diff capabilities.
+# WorkflowExecutor and StateGraph integrate with it via optional parameters.
+_CHECKPOINTER_EXPORTS = []
 
-    _CHECKPOINTER_EXPORTS = [
-        "SQLiteCheckpointer",
-        "JSONFileCheckpointer",
-    ]
-except ImportError:
-    _CHECKPOINTER_EXPORTS = []
-
-# Crew System (CrewAI-compatible multi-agent orchestration)
-try:
-    from victor.framework.crew import (
-        Crew,
-        CrewAgent,
-        CrewTask,
-        CrewOutput,
-        Process,
-        VerbosityLevel,
-        CrewAgentProtocol,
-        create_agent,
-        create_task,
-    )
-
-    _CREW_EXPORTS = [
-        "Crew",
-        "CrewAgent",
-        "CrewTask",
-        "CrewOutput",
-        "Process",
-        "VerbosityLevel",
-        "CrewAgentProtocol",
-        "create_agent",
-        "create_task",
-    ]
-except ImportError:
-    _CREW_EXPORTS = []
+# Multi-agent teams are handled by AgentTeam with extended TeamMember
+# supporting backstory, memory, cache attributes (CrewAI-compatible features).
+# Use victor.framework.teams.AgentTeam instead of a separate Crew class.
+_CREW_EXPORTS = []
 
 __all__ = (
     [
