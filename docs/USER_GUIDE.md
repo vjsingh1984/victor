@@ -11,6 +11,10 @@
 - [Using Tools](#using-tools)
 - [Advanced Features](#advanced-features)
 - [Workflows](#workflows)
+  - [StateGraph DSL](#stategraph-dsl-phase-4)
+  - [Multi-Agent Teams](#multi-agent-teams)
+  - [Enhanced TeamMember Personas](#enhanced-teammember-personas)
+  - [Dynamic Capability Loading](#dynamic-capability-loading)
 - [Tips & Tricks](#tips--tricks)
 - [Troubleshooting](#troubleshooting)
 
@@ -561,6 +565,203 @@ stateDiagram-v2
 - **Search history**: Find previous discussions
 
 ## Workflows
+
+### StateGraph DSL (Phase 4)
+
+Victor provides a LangGraph-compatible StateGraph DSL for building stateful, cyclic agent workflows. This allows you to define complex multi-step processes with conditional branching and checkpointing.
+
+**Basic StateGraph Usage**:
+
+```python
+from victor.framework import StateGraph, END
+from typing import TypedDict, Optional
+
+# Define typed state
+class TaskState(TypedDict):
+    messages: list[str]
+    task: str
+    result: Optional[str]
+    needs_retry: bool
+
+# Define node functions
+async def analyze(state: TaskState) -> TaskState:
+    state["messages"].append("Analyzed task")
+    return state
+
+async def execute(state: TaskState) -> TaskState:
+    state["result"] = "Completed execution"
+    return state
+
+async def review(state: TaskState) -> TaskState:
+    state["messages"].append("Reviewed result")
+    return state
+
+# Condition function for branching
+def should_retry(state: TaskState) -> str:
+    return "retry" if state.get("needs_retry") else "done"
+
+# Create graph
+graph = StateGraph(TaskState)
+
+# Add nodes
+graph.add_node("analyze", analyze)
+graph.add_node("execute", execute)
+graph.add_node("review", review)
+
+# Add edges (including cycles for retry logic)
+graph.add_edge("analyze", "execute")
+graph.add_conditional_edge(
+    "execute",
+    should_retry,
+    {"retry": "analyze", "done": "review"}
+)
+graph.add_edge("review", END)
+
+# Set entry point
+graph.set_entry_point("analyze")
+
+# Compile and run
+app = graph.compile()
+result = await app.invoke({"messages": [], "task": "Fix bug", "result": None, "needs_retry": False})
+print(result.state)  # Final state
+print(result.node_history)  # ["analyze", "execute", "review"]
+```
+
+**StateGraph Features**:
+
+| Feature | Description |
+|---------|-------------|
+| Typed State | TypedDict-based state schemas for type safety |
+| Conditional Edges | Branch execution based on state conditions |
+| Cycles | Support for retry loops and iterative workflows |
+| Checkpointing | Resume workflows from saved checkpoints |
+| Streaming | Stream intermediate states during execution |
+
+See [docs/guides/WORKFLOW_DSL.md](guides/WORKFLOW_DSL.md) for the complete guide.
+
+### Multi-Agent Teams
+
+Victor supports multi-agent teams with different coordination patterns:
+
+```python
+from victor.framework import Agent
+from victor.framework.teams import TeamMemberSpec, TeamFormation
+
+# Create a pipeline team for feature implementation
+team = await Agent.create_team(
+    name="Feature Team",
+    goal="Implement user authentication",
+    members=[
+        TeamMemberSpec(
+            role="researcher",
+            goal="Find existing auth patterns",
+            backstory="Senior developer with security expertise",
+            tool_budget=20,
+        ),
+        TeamMemberSpec(
+            role="planner",
+            goal="Design implementation approach",
+            backstory="Architect specializing in API design",
+        ),
+        TeamMemberSpec(
+            role="executor",
+            goal="Write the code",
+            backstory="Full-stack developer",
+            tool_budget=30,
+        ),
+        TeamMemberSpec(
+            role="reviewer",
+            goal="Review and improve code",
+            backstory="QA engineer focused on security",
+        ),
+    ],
+    formation=TeamFormation.PIPELINE,
+)
+
+# Run the team
+result = await team.run()
+print(result.final_output)
+
+# Or stream team events
+async for event in team.stream():
+    if event.type == TeamEventType.MEMBER_START:
+        print(f"Starting: {event.member_name}")
+    elif event.type == TeamEventType.MEMBER_COMPLETE:
+        print(f"Completed: {event.member_name}")
+```
+
+**Team Formations**:
+
+| Formation | Description | Use Case |
+|-----------|-------------|----------|
+| SEQUENTIAL | Members work one after another | Simple handoffs |
+| PARALLEL | Members work simultaneously | Independent tasks |
+| PIPELINE | Output flows through stages | Feature implementation |
+| HIERARCHICAL | Manager coordinates workers | Complex projects |
+
+### Enhanced TeamMember Personas
+
+TeamMembers support rich persona attributes for better agent characterization:
+
+```python
+TeamMemberSpec(
+    role="researcher",
+    goal="Find authentication vulnerabilities",
+    name="Security Analyst",
+    # Rich persona attributes (CrewAI-compatible)
+    backstory="10 years of security experience at major tech companies. "
+              "Previously led red team exercises at a Fortune 500 company.",
+    expertise=["security", "authentication", "oauth", "jwt"],
+    personality="methodical and thorough; communicates findings with severity ratings",
+    # Capabilities
+    max_delegation_depth=2,  # Can delegate to sub-agents
+    memory=True,             # Persist discoveries across tasks
+    cache=True,              # Cache tool results
+    verbose=True,            # Show detailed logs
+    # Budget controls
+    tool_budget=25,
+    max_iterations=50,
+)
+```
+
+### Dynamic Capability Loading
+
+Load custom capabilities at runtime for plugins and extensions:
+
+```python
+from victor.framework import CapabilityLoader, capability, CapabilityType
+
+# Method 1: Using the @capability decorator
+@capability(
+    name="custom_safety",
+    capability_type=CapabilityType.SAFETY,
+    version="1.0",
+    description="Apply custom safety patterns",
+)
+def apply_custom_safety(patterns: list[str]) -> None:
+    for pattern in patterns:
+        # Apply pattern logic
+        pass
+
+# Method 2: Load from a module
+loader = CapabilityLoader()
+loader.load_from_module("my_plugin.capabilities")
+
+# Method 3: Manual registration
+loader.register_capability(
+    name="custom_tool",
+    handler=my_tool_function,
+    capability_type=CapabilityType.TOOL,
+    version="1.0",
+)
+
+# Apply to orchestrator
+agent = await Agent.create(provider="anthropic")
+loader.apply_to(agent.get_orchestrator())
+
+# Hot-reload during development
+loader.watch_for_changes()  # Requires watchdog package
+```
 
 ### Workflow 1: Building a New Feature
 

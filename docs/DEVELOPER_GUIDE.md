@@ -9,6 +9,11 @@
 - [System Design](#system-design)
 - [Module Deep Dives](#module-deep-dives)
 - [Adding New Features](#adding-new-features)
+- [Phase 4 Features](#phase-4-features)
+  - [StateGraph DSL](#stategraph-dsl)
+  - [Multi-Agent Teams](#multi-agent-teams)
+  - [Rich Agent Personas](#rich-agent-personas)
+  - [Dynamic Capability Loading](#dynamic-capability-loading)
 - [Development Workflow](#development-workflow)
 - [Best Practices](#best-practices)
 
@@ -603,6 +608,417 @@ class MyCustomTool(BaseTool):
             error=f"Unknown operation: {operation}"
         )
 ```
+
+## Phase 4 Features
+
+Phase 4 introduces advanced workflow and multi-agent capabilities. This section covers implementation details for developers extending these features.
+
+### StateGraph DSL
+
+The StateGraph DSL (victor/framework/graph.py) provides a LangGraph-compatible API for building stateful, cyclic agent workflows.
+
+**Architecture**:
+
+```mermaid
+classDiagram
+    class StateGraph~T~ {
+        -_nodes: Dict[str, Node]
+        -_edges: Dict[str, List[Edge]]
+        -_entry_point: str
+        +add_node(id, func) StateGraph
+        +add_edge(source, target) StateGraph
+        +add_conditional_edge(source, condition, branches) StateGraph
+        +set_entry_point(node_id) StateGraph
+        +compile() CompiledGraph
+    }
+
+    class CompiledGraph~T~ {
+        -_nodes: Dict[str, Node]
+        -_edges: Dict[str, List[Edge]]
+        +invoke(state) ExecutionResult
+        +stream(state) AsyncIterator
+    }
+
+    class Node {
+        +id: str
+        +func: Callable
+        +execute(state) Any
+    }
+
+    class Edge {
+        +source: str
+        +target: Union[str, Dict]
+        +edge_type: EdgeType
+        +condition: Optional[Callable]
+        +get_target(state) str
+    }
+
+    StateGraph --> CompiledGraph : compile()
+    CompiledGraph --> Node
+    CompiledGraph --> Edge
+```
+
+**Creating Custom Workflows**:
+
+```python
+from victor.framework.graph import StateGraph, END, GraphConfig, MemoryCheckpointer
+from typing import TypedDict
+
+# 1. Define your state schema
+class MyWorkflowState(TypedDict):
+    input: str
+    intermediate: list[str]
+    output: str
+    iteration_count: int
+
+# 2. Create node functions (sync or async)
+async def process_input(state: MyWorkflowState) -> MyWorkflowState:
+    """Node functions receive state and return modified state."""
+    state["intermediate"].append(f"Processed: {state['input']}")
+    return state
+
+async def validate_output(state: MyWorkflowState) -> MyWorkflowState:
+    state["iteration_count"] += 1
+    # Logic to determine if output is valid
+    return state
+
+# 3. Create condition functions for branching
+def needs_more_processing(state: MyWorkflowState) -> str:
+    """Returns branch name based on state."""
+    if state["iteration_count"] < 3 and not state.get("output"):
+        return "retry"
+    return "complete"
+
+# 4. Build the graph
+graph = StateGraph(MyWorkflowState)
+
+# Add nodes
+graph.add_node("process", process_input)
+graph.add_node("validate", validate_output)
+
+# Add edges
+graph.add_edge("process", "validate")
+graph.add_conditional_edge(
+    "validate",
+    needs_more_processing,
+    {"retry": "process", "complete": END}
+)
+
+# Set entry point
+graph.set_entry_point("process")
+
+# 5. Compile with optional checkpointing
+checkpointer = MemoryCheckpointer()  # Or RLCheckpointerAdapter for persistence
+app = graph.compile(
+    checkpointer=checkpointer,
+    max_iterations=25,  # Cycle limit
+    timeout=60.0,       # Overall timeout
+)
+
+# 6. Execute
+result = await app.invoke({
+    "input": "Hello",
+    "intermediate": [],
+    "output": "",
+    "iteration_count": 0
+})
+
+# Access results
+print(result.success)       # True/False
+print(result.state)         # Final state
+print(result.node_history)  # ["process", "validate", "process", ...]
+print(result.iterations)    # Number of iterations
+```
+
+**Integration with RL System**:
+
+```python
+from victor.framework.graph import RLCheckpointerAdapter
+
+# Use existing RL checkpoint store for workflow persistence
+checkpointer = RLCheckpointerAdapter(learner_name="my_workflow")
+app = graph.compile(checkpointer=checkpointer)
+
+# Workflow completions emit RL events automatically
+# See victor/agent/rl/hooks.py for event types
+```
+
+### Multi-Agent Teams
+
+The Teams module (victor/framework/teams.py) provides a high-level API for multi-agent coordination.
+
+**Architecture**:
+
+```mermaid
+flowchart TD
+    subgraph "Framework Layer"
+        AgentTeam[AgentTeam]
+        TeamMemberSpec[TeamMemberSpec]
+    end
+
+    subgraph "Infrastructure Layer"
+        TeamCoordinator[TeamCoordinator]
+        TeamConfig[TeamConfig]
+        TeamMember[TeamMember]
+    end
+
+    subgraph "Formations"
+        Sequential[SEQUENTIAL]
+        Parallel[PARALLEL]
+        Pipeline[PIPELINE]
+        Hierarchical[HIERARCHICAL]
+    end
+
+    AgentTeam --> TeamCoordinator
+    TeamMemberSpec --> TeamMember
+    TeamCoordinator --> TeamConfig
+    TeamConfig --> Sequential
+    TeamConfig --> Parallel
+    TeamConfig --> Pipeline
+    TeamConfig --> Hierarchical
+```
+
+**Creating Custom Team Workflows**:
+
+```python
+from victor.framework.teams import (
+    AgentTeam,
+    TeamMemberSpec,
+    TeamFormation,
+    TeamEvent,
+    TeamEventType,
+)
+from victor.agent.orchestrator import AgentOrchestrator
+
+# Create orchestrator first
+orchestrator = await AgentOrchestrator.from_settings(settings)
+
+# Define team members with rich specs
+members = [
+    TeamMemberSpec(
+        role="researcher",
+        goal="Find relevant code patterns",
+        name="Code Researcher",
+        tool_budget=20,
+        priority=0,  # Runs first in sequential/pipeline
+    ),
+    TeamMemberSpec(
+        role="executor",
+        goal="Implement the solution",
+        name="Implementation Agent",
+        tool_budget=30,
+        priority=1,
+    ),
+]
+
+# Create team
+team = await AgentTeam.create(
+    orchestrator=orchestrator,
+    name="Implementation Team",
+    goal="Implement feature X",
+    members=members,
+    formation=TeamFormation.PIPELINE,
+    total_tool_budget=100,
+    max_iterations=50,
+    timeout_seconds=600,
+    shared_context={"feature": "authentication"},
+)
+
+# Execute with event handling
+async for event in team.stream():
+    match event.type:
+        case TeamEventType.TEAM_START:
+            print(f"Team started: {event.team_name}")
+        case TeamEventType.MEMBER_START:
+            print(f"Member started: {event.member_name}")
+        case TeamEventType.MEMBER_COMPLETE:
+            print(f"Member completed: {event.member_name}")
+            if event.result:
+                print(f"  Output: {event.result.output[:100]}...")
+        case TeamEventType.TEAM_COMPLETE:
+            print(f"Team completed: {event.message}")
+```
+
+**Formation Selection Guide**:
+
+| Formation | When to Use | How It Works |
+|-----------|-------------|--------------|
+| SEQUENTIAL | Simple task handoffs | Members run one-by-one in priority order |
+| PARALLEL | Independent subtasks | All members run concurrently |
+| PIPELINE | Staged workflows | Output flows as input to next stage |
+| HIERARCHICAL | Complex coordination | Manager delegates and aggregates |
+
+### Rich Agent Personas
+
+TeamMember supports CrewAI-compatible rich persona attributes for natural agent characterization.
+
+**Persona Attributes**:
+
+```python
+from victor.framework.teams import TeamMemberSpec
+from victor.agent.teams.team import MemoryConfig
+
+# Full persona specification
+spec = TeamMemberSpec(
+    # Core attributes
+    role="researcher",
+    goal="Find security vulnerabilities in authentication code",
+    name="Security Analyst",
+
+    # Rich persona (affects prompt construction)
+    backstory="""Senior security researcher with 10 years experience.
+    Previously led red team exercises at Fortune 500 companies.
+    Specializes in OAuth vulnerabilities and JWT implementation flaws.""",
+
+    expertise=["security", "oauth", "jwt", "penetration-testing"],
+
+    personality="""Methodical and thorough. Always provides severity ratings.
+    Prefers to over-communicate findings rather than miss issues.""",
+
+    # Capabilities
+    max_delegation_depth=2,  # Can spawn sub-agents
+
+    # Memory configuration
+    memory=True,  # Simple flag
+    memory_config=MemoryConfig(  # Detailed config (overrides simple flag)
+        enabled=True,
+        persist_across_sessions=True,
+        memory_types={"entity", "semantic"},
+        relevance_threshold=0.7,
+    ),
+
+    # Tool management
+    cache=True,           # Cache tool results
+    tool_budget=25,       # Max tool calls
+    max_iterations=50,    # Per-member iteration limit
+
+    # Debugging
+    verbose=True,         # Show detailed logs
+)
+```
+
+**Memory Integration**:
+
+```python
+# Memory coordinator auto-attaches when memory=True
+member = spec.to_team_member()
+
+# Access memory coordinator
+if member.memory_enabled:
+    coordinator = member.get_memory_coordinator()
+    # Stores discoveries across tasks
+```
+
+### Dynamic Capability Loading
+
+The CapabilityLoader (victor/framework/capability_loader.py) enables runtime capability discovery and hot-reload.
+
+**Creating Capability Modules**:
+
+```python
+# my_plugin/capabilities.py
+from victor.framework import capability, CapabilityType
+from victor.framework.protocols import OrchestratorCapability
+
+# Method 1: Decorator-based definition
+@capability(
+    name="custom_safety_check",
+    capability_type=CapabilityType.SAFETY,
+    version="1.0",
+    description="Apply custom safety patterns to agent responses",
+)
+def custom_safety_check(patterns: list[str]) -> None:
+    """Handler function for the capability."""
+    for pattern in patterns:
+        # Apply pattern logic
+        pass
+
+# Method 2: CAPABILITIES list
+from victor.framework.capability_loader import CapabilityEntry
+
+CAPABILITIES = [
+    CapabilityEntry(
+        capability=OrchestratorCapability(
+            name="custom_tool",
+            capability_type=CapabilityType.TOOL,
+            version="1.0",
+            setter="set_custom_tool",
+        ),
+        handler=my_tool_handler,
+        getter_handler=get_custom_tool,
+    ),
+]
+
+# Method 3: Capability classes
+class CustomAnalyzer:
+    def get_capability(self) -> OrchestratorCapability:
+        return OrchestratorCapability(
+            name="analyzer",
+            capability_type=CapabilityType.TOOL,
+            version="2.0",
+        )
+
+    def execute(self, **kwargs):
+        return {"analysis": "result"}
+```
+
+**Loading and Hot-Reloading**:
+
+```python
+from victor.framework import (
+    CapabilityLoader,
+    create_capability_loader,
+    get_default_capability_loader,
+)
+from pathlib import Path
+
+# Create loader with plugin directories
+loader = create_capability_loader(
+    plugin_dirs=[Path("~/.victor/capabilities"), Path("./plugins")],
+    auto_discover=True,  # Scan directories on init
+)
+
+# Or get the default loader (~/.victor/capabilities/)
+loader = get_default_capability_loader()
+
+# Load from specific module
+loaded = loader.load_from_module("my_plugin.capabilities")
+print(f"Loaded: {loaded}")  # ["custom_safety_check", "custom_tool", "analyzer"]
+
+# Load from file path
+loader.load_from_path("./custom_capabilities.py")
+
+# Hot-reload during development
+loader.reload_module("my_plugin.capabilities")  # Invalidates cache, reloads
+
+# File watching (requires watchdog)
+loader.watch_for_changes(callback=lambda mod: print(f"Reloaded: {mod}"))
+
+# Apply to orchestrator
+from victor.agent.orchestrator import AgentOrchestrator
+
+orchestrator = await AgentOrchestrator.from_settings(settings)
+applied = loader.apply_to(orchestrator)
+print(f"Applied {len(applied)} capabilities")
+
+# Query loaded capabilities
+print(loader.list_capabilities())
+print(loader.get_capabilities_by_type(CapabilityType.SAFETY))
+print(loader.list_loaded_modules())
+
+# Cleanup
+loader.stop_watching()
+```
+
+**Capability Types**:
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| TOOL | Add new tools | Custom code analyzer |
+| SAFETY | Safety checks | Custom content filter |
+| PROMPT | Prompt modifications | Domain-specific context |
+| MIDDLEWARE | Request/response hooks | Logging, metrics |
+| CONFIG | Configuration overrides | Provider settings |
 
 ## Development Workflow
 

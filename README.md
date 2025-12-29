@@ -509,6 +509,45 @@ Comprehensive tool classification for intelligent selection (victor/tools/base.p
 - SEMANTIC: Embeddings-based relevance
 - HYBRID: Combined scoring
 
+### Phase 4 Framework Features
+
+Victor's framework includes advanced workflow and multi-agent capabilities:
+
+| Feature | Description | Location |
+|---------|-------------|----------|
+| **StateGraph DSL** | LangGraph-compatible workflow engine with typed state, conditional edges, and checkpointing | `victor/framework/graph.py` |
+| **Multi-Agent Teams** | Coordinate agents in Sequential, Parallel, Pipeline, or Hierarchical formations | `victor/framework/teams.py` |
+| **Rich Personas** | CrewAI-compatible agent personas with backstory, expertise, and memory | `TeamMemberSpec` |
+| **Dynamic Capabilities** | Runtime capability loading and hot-reload for plugins | `victor/framework/capability_loader.py` |
+
+```python
+# StateGraph workflow example
+from victor.framework import StateGraph, END
+
+graph = StateGraph(MyState)
+graph.add_node("analyze", analyze_fn)
+graph.add_node("execute", execute_fn)
+graph.add_conditional_edge("execute", retry_condition, {"retry": "analyze", "done": END})
+app = graph.compile()
+result = await app.invoke(initial_state)
+
+# Multi-agent team example
+from victor.framework.teams import TeamMemberSpec, TeamFormation
+
+team = await Agent.create_team(
+    name="Feature Team",
+    goal="Implement authentication",
+    members=[
+        TeamMemberSpec(role="researcher", goal="Find patterns", backstory="Senior dev"),
+        TeamMemberSpec(role="executor", goal="Write code", tool_budget=30),
+    ],
+    formation=TeamFormation.PIPELINE,
+)
+result = await team.run()
+```
+
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md#stategraph-dsl-phase-4) and [docs/guides/WORKFLOW_DSL.md](docs/guides/WORKFLOW_DSL.md) for complete documentation.
+
 ### Framework Architecture Strengths
 
 Victor's framework is built on SOLID principles for extensibility and maintainability:

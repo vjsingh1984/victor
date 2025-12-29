@@ -1,5 +1,13 @@
 # Tool Catalog (auto-generated)
 
+## Table of Contents
+
+- [Tool List](#tool-list)
+- [Tool Composition](#tool-composition)
+- [Tool Categories](#tool-categories)
+
+## Tool List
+
 | Tool | Description |
 | --- | --- |
 | `audit` | Access audit logs and compliance reports. Supported frameworks: - SOC 2 Type II - GDPR - HIPAA - PCI DSS - ISO 27001 Actions: - summary: Get audit activity summary - report: Generate compliance report - query: Query audit events - compliance: Check compliance status for a framework - export: Export audit logs to file |
@@ -47,3 +55,171 @@
 | `web` | Search the web using DuckDuckGo. Optionally summarize with AI. Purpose: - Find links, docs, references on the public web. - Return titles, URLs, and snippets for relevance checking. - Optionally use AI to summarize search results. - Ideal when the user says "search the web", "find online", "lookup", "docs", "articles". |
 | `workflow` | Runs a pre-defined, multi-step workflow to automate a complex task. |
 | `write` | Write file. Creates parent dirs. Use edit_files for partial edits. |
+
+## Tool Composition
+
+Victor supports composing tools together using ToolSets for declarative configuration. This allows you to create custom tool configurations for different use cases.
+
+### Using ToolSets
+
+```python
+from victor.framework import Agent
+from victor.framework.tools import ToolSet, ToolCategory
+
+# Use preset configurations
+agent = await Agent.create(tools=ToolSet.default())     # Core + filesystem + git
+agent = await Agent.create(tools=ToolSet.minimal())     # Just core tools
+agent = await Agent.create(tools=ToolSet.full())        # All 45+ tools
+agent = await Agent.create(tools=ToolSet.airgapped())   # No network tools
+agent = await Agent.create(tools=ToolSet.coding())      # Optimized for coding
+agent = await Agent.create(tools=ToolSet.research())    # Web + filesystem
+
+# Custom category selection
+tools = ToolSet.from_categories(["core", "git", "testing"])
+agent = await Agent.create(tools=tools)
+
+# Specific tool selection
+tools = ToolSet.from_tools(["read", "write", "git", "test"])
+agent = await Agent.create(tools=tools)
+```
+
+### Chaining Tool Configurations
+
+ToolSets are immutable and support fluent chaining:
+
+```python
+# Start with a base and add/remove tools
+tools = (
+    ToolSet.default()
+    .include("docker", "test")           # Add specific tools
+    .include_category("database")        # Add entire category
+    .exclude_tools("shell", "rm")        # Remove dangerous tools
+)
+
+agent = await Agent.create(tools=tools)
+
+# Check what tools are available
+print(tools.get_tool_names())
+# {'read', 'write', 'edit', 'ls', 'git', 'docker', 'test', 'sql_query', ...}
+
+# Check if a specific tool is included
+if "docker" in tools:
+    print("Docker tools available")
+```
+
+### Tool Chaining in Workflows
+
+For complex multi-step operations, use StateGraph to chain tool executions:
+
+```python
+from victor.framework import StateGraph, END, Agent
+from typing import TypedDict
+
+class CodeReviewState(TypedDict):
+    files: list[str]
+    review_results: dict
+    test_results: dict
+    commit_ready: bool
+
+async def find_changed_files(state: CodeReviewState) -> CodeReviewState:
+    """Step 1: Use git tool to find changed files."""
+    agent = state.get("_agent")
+    result = await agent.run("List all changed Python files")
+    state["files"] = parse_files(result.content)
+    return state
+
+async def review_files(state: CodeReviewState) -> CodeReviewState:
+    """Step 2: Use review tool on each file."""
+    agent = state.get("_agent")
+    for file in state["files"]:
+        result = await agent.run(f"Review {file} for security issues")
+        state["review_results"][file] = result.content
+    return state
+
+async def run_tests(state: CodeReviewState) -> CodeReviewState:
+    """Step 3: Use test tool to run related tests."""
+    agent = state.get("_agent")
+    result = await agent.run("Run tests for the changed files")
+    state["test_results"] = parse_test_results(result.content)
+    return state
+
+def check_if_ready(state: CodeReviewState) -> str:
+    """Condition: Check if ready to commit."""
+    if all_tests_pass(state["test_results"]) and no_critical_issues(state["review_results"]):
+        return "ready"
+    return "needs_work"
+
+# Build the workflow
+graph = StateGraph(CodeReviewState)
+graph.add_node("find_files", find_changed_files)
+graph.add_node("review", review_files)
+graph.add_node("test", run_tests)
+
+graph.add_edge("find_files", "review")
+graph.add_edge("review", "test")
+graph.add_conditional_edge("test", check_if_ready, {"ready": END, "needs_work": "review"})
+graph.set_entry_point("find_files")
+
+app = graph.compile()
+result = await app.invoke({"files": [], "review_results": {}, "test_results": {}, "commit_ready": False})
+```
+
+### Tool Pipelines with Teams
+
+For multi-agent tool composition, use Teams:
+
+```python
+from victor.framework import Agent
+from victor.framework.teams import TeamMemberSpec, TeamFormation
+
+# Each member uses different tool subsets
+team = await Agent.create_team(
+    name="Code Quality Pipeline",
+    goal="Analyze and improve code quality",
+    members=[
+        TeamMemberSpec(
+            role="researcher",
+            goal="Find all code files needing review",
+            # Researcher uses search/git tools
+        ),
+        TeamMemberSpec(
+            role="analyzer",
+            goal="Analyze code for issues",
+            # Analyzer uses review/metrics tools
+        ),
+        TeamMemberSpec(
+            role="executor",
+            goal="Fix identified issues",
+            # Executor uses edit/refactor tools
+        ),
+        TeamMemberSpec(
+            role="reviewer",
+            goal="Verify fixes and run tests",
+            # Reviewer uses test/git tools
+        ),
+    ],
+    formation=TeamFormation.PIPELINE,
+)
+
+result = await team.run()
+```
+
+## Tool Categories
+
+Tools are organized into categories for easy selection:
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| `core` | read, write, edit, shell, search, code_search, ls | Essential operations |
+| `filesystem` | read, write, edit, ls, list_directory, glob, find_files, file_info, mkdir, rm, mv, cp | File operations |
+| `git` | git, git_status, git_diff, git_commit, git_branch, git_log | Version control |
+| `search` | grep, glob, code_search, semantic_code_search, search | Code search |
+| `web` | web_search, web_fetch, http_request, fetch_url | Network tools |
+| `database` | sql_query, db_schema, database | Database operations |
+| `docker` | docker, docker_run, docker_build, docker_compose | Container management |
+| `testing` | run_tests, pytest, test_runner, test | Test execution |
+| `refactoring` | refactor, rename_symbol, extract_function, rename | Code refactoring |
+| `documentation` | generate_docs, update_readme, documentation, docstring | Documentation generation |
+| `analysis` | analyze, complexity | Code analysis |
+
+See [victor/framework/tools.py](/victor/framework/tools.py) for the canonical category definitions.
