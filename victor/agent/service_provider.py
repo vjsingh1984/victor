@@ -177,6 +177,8 @@ class OrchestratorServiceProvider:
             ChunkGeneratorProtocol,
             ToolPlannerProtocol,
             TaskCoordinatorProtocol,
+            # Memory protocols
+            UnifiedMemoryCoordinatorProtocol,
         )
 
         # ToolRegistry - shared tool definitions
@@ -500,6 +502,9 @@ class OrchestratorServiceProvider:
         # PathResolver - singleton for centralized path resolution
         self._register_path_resolver(container)
 
+        # UnifiedMemoryCoordinator - singleton for federated memory search
+        self._register_unified_memory_coordinator(container)
+
         logger.debug("Registered singleton orchestrator services")
 
     def register_scoped_services(self, container: ServiceContainer) -> None:
@@ -767,6 +772,30 @@ class OrchestratorServiceProvider:
         container.register(
             IPathResolver,
             lambda c: PathResolver(),
+            ServiceLifetime.SINGLETON,
+        )
+
+    def _register_unified_memory_coordinator(self, container: ServiceContainer) -> None:
+        """Register UnifiedMemoryCoordinator as singleton.
+
+        The UnifiedMemoryCoordinator provides federated search across all
+        memory backends (entity, conversation, graph, embeddings) with
+        pluggable ranking strategies.
+        """
+        from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
+
+        def create_memory_coordinator(_: ServiceContainer) -> Any:
+            try:
+                from victor.memory.unified import get_memory_coordinator
+
+                return get_memory_coordinator()
+            except ImportError as e:
+                logger.warning(f"UnifiedMemoryCoordinator not available: {e}")
+                return _NullMemoryCoordinator()
+
+        container.register(
+            UnifiedMemoryCoordinatorProtocol,
+            create_memory_coordinator,
             ServiceLifetime.SINGLETON,
         )
 
@@ -1474,6 +1503,58 @@ class _NullRecoveryHandler:
 
     def get_diagnostics(self) -> dict:
         return {"enabled": False}
+
+
+class _NullMemoryCoordinator:
+    """No-op memory coordinator implementation for disabled mode."""
+
+    async def search_all(
+        self,
+        query: str,
+        limit: int = 20,
+        memory_types: Optional[list] = None,
+        session_id: Optional[str] = None,
+        filters: Optional[dict] = None,
+        min_relevance: float = 0.0,
+    ) -> list:
+        return []
+
+    async def search_type(
+        self,
+        memory_type: Any,
+        query: str,
+        limit: int = 20,
+        **kwargs: Any,
+    ) -> list:
+        return []
+
+    async def store(
+        self,
+        memory_type: Any,
+        key: str,
+        value: Any,
+        metadata: Optional[dict] = None,
+    ) -> bool:
+        return False
+
+    async def get(
+        self,
+        memory_type: Any,
+        key: str,
+    ) -> Optional[Any]:
+        return None
+
+    def register_provider(self, provider: Any) -> None:
+        pass
+
+    def unregister_provider(self, memory_type: Any) -> bool:
+        return False
+
+    def get_registered_types(self) -> list:
+        return []
+
+    def get_stats(self) -> dict:
+        return {"enabled": False, "providers": []}
 
 
 # =============================================================================

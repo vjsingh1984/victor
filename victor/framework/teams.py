@@ -249,7 +249,7 @@ class TeamMemberSpec:
             index: Member index for ID generation
 
         Returns:
-            TeamMember instance
+            TeamMember instance with memory coordinator attached if memory=True
         """
         # Resolve role
         role_lower = self.role.lower()
@@ -274,7 +274,7 @@ class TeamMemberSpec:
         }
         tool_budget = self.tool_budget or default_budgets.get(sub_role, 15)
 
-        return TeamMember(
+        member = TeamMember(
             id=member_id,
             role=sub_role,
             name=name,
@@ -289,6 +289,16 @@ class TeamMemberSpec:
             verbose=self.verbose,
             max_iterations=self.max_iterations,
         )
+
+        # Auto-attach memory coordinator if memory is enabled
+        if self.memory:
+            try:
+                from victor.memory import get_memory_coordinator
+                member.attach_memory_coordinator(get_memory_coordinator())
+            except ImportError:
+                pass  # Memory module not available, skip
+
+        return member
 
 
 class AgentTeam:

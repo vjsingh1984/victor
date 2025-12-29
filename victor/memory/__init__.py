@@ -12,15 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entity memory system for Victor.
+"""Memory systems for Victor.
 
-Provides 4-tier entity memory architecture:
-- Short-term: Current session entities
-- Working memory: LRU cache of active entities
-- Long-term: Persistent SQLite + vector storage
-- Entity graph: Relationship tracking and traversal
+Provides multi-tier memory architecture with unified coordinator:
 
-Example:
+1. Entity Memory (4-tier):
+   - Short-term: Current session entities
+   - Working memory: LRU cache of active entities
+   - Long-term: Persistent SQLite + vector storage
+   - Entity graph: Relationship tracking and traversal
+
+2. Unified Memory Coordinator:
+   - Federated search across all memory systems
+   - Pluggable ranking strategies
+   - Automatic deduplication
+   - Protocol-based adapter pattern
+
+Example - Entity Memory:
     from victor.memory import EntityMemory, EntityType, CompositeExtractor
 
     # Create memory with extraction
@@ -37,6 +45,28 @@ Example:
 
     # Get related entities via graph
     related = await memory.get_related("ent_abc123")
+
+Example - Unified Memory Coordinator:
+    from victor.memory import (
+        get_memory_coordinator,
+        EntityMemoryAdapter,
+        ConversationMemoryAdapter,
+        MemoryType,
+    )
+
+    # Register adapters with coordinator
+    coordinator = get_memory_coordinator()
+    coordinator.register_provider(EntityMemoryAdapter(entity_memory))
+    coordinator.register_provider(ConversationMemoryAdapter(conv_store))
+
+    # Federated search across all memory
+    results = await coordinator.search_all("authentication")
+
+    # Filter by memory type
+    results = await coordinator.search_all(
+        query="login",
+        memory_types=[MemoryType.ENTITY, MemoryType.CONVERSATION],
+    )
 """
 
 from victor.memory.entity_types import (
@@ -74,6 +104,30 @@ from victor.memory.integration import (
     EntityMemoryIntegration,
     create_entity_integration,
 )
+from victor.memory.unified import (
+    MemoryType,
+    MemoryResult,
+    MemoryQuery,
+    MemoryProviderProtocol,
+    RankingStrategyProtocol,
+    RelevanceRankingStrategy,
+    RecencyRankingStrategy,
+    HybridRankingStrategy,
+    UnifiedMemoryCoordinator,
+    create_memory_coordinator,
+    get_memory_coordinator,
+    reset_memory_coordinator,
+)
+from victor.memory.adapters import (
+    EntityMemoryAdapter,
+    ConversationMemoryAdapter,
+    GraphMemoryAdapter,
+    ToolResultsMemoryAdapter,
+    create_entity_adapter,
+    create_conversation_adapter,
+    create_graph_adapter,
+    create_tool_results_adapter,
+)
 
 __all__ = [
     # Entity types
@@ -107,4 +161,26 @@ __all__ = [
     # Integration
     "EntityMemoryIntegration",
     "create_entity_integration",
+    # Unified Memory Coordinator
+    "MemoryType",
+    "MemoryResult",
+    "MemoryQuery",
+    "MemoryProviderProtocol",
+    "RankingStrategyProtocol",
+    "RelevanceRankingStrategy",
+    "RecencyRankingStrategy",
+    "HybridRankingStrategy",
+    "UnifiedMemoryCoordinator",
+    "create_memory_coordinator",
+    "get_memory_coordinator",
+    "reset_memory_coordinator",
+    # Memory Adapters
+    "EntityMemoryAdapter",
+    "ConversationMemoryAdapter",
+    "GraphMemoryAdapter",
+    "ToolResultsMemoryAdapter",
+    "create_entity_adapter",
+    "create_conversation_adapter",
+    "create_graph_adapter",
+    "create_tool_results_adapter",
 ]

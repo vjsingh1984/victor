@@ -32,9 +32,12 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.agent.subagents.base import SubAgentRole
+
+if TYPE_CHECKING:
+    from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
 
 class TeamFormation(Enum):
@@ -129,6 +132,10 @@ class TeamMember:
     cache: bool = True
     verbose: bool = False
     max_iterations: Optional[int] = None
+    # Memory coordinator for persistent memory across tasks
+    memory_coordinator: Optional["UnifiedMemoryCoordinatorProtocol"] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self):
         """Generate ID if not provided."""
@@ -173,6 +180,93 @@ class TeamMember:
                 ])
 
         return "\n".join(lines)
+
+    async def remember(self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None) -> bool:
+        """Store a discovery in memory for future tasks.
+
+        Only works if memory=True and a memory_coordinator is attached.
+
+        Args:
+            key: Unique key for the memory
+            value: Value to store (discovery, finding, etc.)
+            metadata: Optional metadata about the discovery
+
+        Returns:
+            True if stored successfully, False otherwise
+
+        Example:
+            await member.remember(
+                "auth_patterns",
+                {"patterns": ["JWT", "OAuth2"], "files": ["auth.py"]},
+                metadata={"task": "authentication_review"}
+            )
+        """
+        if not self.memory or not self.memory_coordinator:
+            return False
+
+        try:
+            from victor.memory.unified import MemoryType
+
+            full_metadata = {"member_id": self.id, "member_name": self.name}
+            if metadata:
+                full_metadata.update(metadata)
+
+            return await self.memory_coordinator.store(
+                MemoryType.ENTITY,
+                f"{self.id}:{key}",
+                value,
+                metadata=full_metadata,
+            )
+        except Exception:
+            return False
+
+    async def recall(self, query: str, limit: int = 10) -> list:
+        """Recall memories relevant to a query.
+
+        Searches across all memory types for relevant discoveries
+        from this member's previous tasks.
+
+        Args:
+            query: Search query
+            limit: Maximum results to return
+
+        Returns:
+            List of memory results
+
+        Example:
+            memories = await member.recall("authentication patterns")
+            for mem in memories:
+                print(f"Found: {mem.content}")
+        """
+        if not self.memory or not self.memory_coordinator:
+            return []
+
+        try:
+            results = await self.memory_coordinator.search_all(
+                query=query,
+                limit=limit,
+                filters={"member_id": self.id},
+            )
+            return results
+        except Exception:
+            return []
+
+    def attach_memory_coordinator(
+        self,
+        coordinator: "UnifiedMemoryCoordinatorProtocol",
+    ) -> None:
+        """Attach a memory coordinator to this member.
+
+        Call this to enable persistent memory when memory=True.
+
+        Args:
+            coordinator: UnifiedMemoryCoordinator instance
+
+        Example:
+            from victor.memory import get_memory_coordinator
+            member.attach_memory_coordinator(get_memory_coordinator())
+        """
+        self.memory_coordinator = coordinator
 
 
 @dataclass
