@@ -74,11 +74,11 @@ class MemberStatus(Enum):
 
 @dataclass
 class TeamMember:
-    """Represents an agent in a team.
+    """Represents an agent in a team with rich persona support.
 
-    Each member has a specific role and goal within the team context.
-    Members can optionally delegate to other team members (in hierarchical
-    formations) or be designated as the team manager.
+    Each member has a specific role, goal, and optional persona (backstory)
+    within the team context. Members can delegate to other team members
+    (in hierarchical formations) or be designated as the team manager.
 
     Attributes:
         id: Unique identifier for this member within the team
@@ -88,9 +88,15 @@ class TeamMember:
         tool_budget: Maximum tool calls for this member (default: role-based)
         allowed_tools: Override for allowed tools (default: role-based)
         can_delegate: Whether this member can delegate to others
+        delegation_targets: Specific member IDs this member can delegate to
         reports_to: ID of the manager this member reports to (hierarchical)
         is_manager: Whether this member is the team manager
         priority: Execution priority (lower = earlier, for sequential/pipeline)
+        backstory: Rich persona description defining agent's personality
+        memory: Whether to persist discoveries across tasks
+        cache: Whether to cache tool results
+        verbose: Whether to show detailed execution logs
+        max_iterations: Per-member iteration limit (None = use team default)
 
     Example:
         researcher = TeamMember(
@@ -98,7 +104,11 @@ class TeamMember:
             role=SubAgentRole.RESEARCHER,
             name="Authentication Researcher",
             goal="Find all authentication code and patterns",
+            backstory="You are a security expert with 10 years experience "
+                      "analyzing authentication systems. You notice subtle "
+                      "patterns that others miss.",
             tool_budget=20,
+            memory=True,
         )
     """
 
@@ -109,14 +119,60 @@ class TeamMember:
     tool_budget: int = 15
     allowed_tools: Optional[List[str]] = None
     can_delegate: bool = False
+    delegation_targets: Optional[List[str]] = None
     reports_to: Optional[str] = None
     is_manager: bool = False
     priority: int = 0
+    # Rich persona attributes (CrewAI-compatible)
+    backstory: str = ""
+    memory: bool = False
+    cache: bool = True
+    verbose: bool = False
+    max_iterations: Optional[int] = None
 
     def __post_init__(self):
         """Generate ID if not provided."""
         if not self.id:
             self.id = f"{self.role.value}_{uuid.uuid4().hex[:8]}"
+
+    def to_system_prompt(self) -> str:
+        """Generate system prompt from member persona.
+
+        Returns:
+            System prompt incorporating role, goal, and backstory
+        """
+        lines = [
+            f"# Role: {self.name}",
+            f"You are a {self.role.value} agent.",
+            "",
+            "## Goal",
+            self.goal,
+            "",
+        ]
+
+        if self.backstory:
+            lines.extend([
+                "## Background",
+                self.backstory,
+                "",
+            ])
+
+        if self.can_delegate:
+            targets = self.delegation_targets or []
+            if targets:
+                lines.extend([
+                    "## Delegation",
+                    f"You can delegate tasks to: {', '.join(targets)}",
+                    "",
+                ])
+            else:
+                lines.extend([
+                    "## Delegation",
+                    "You can delegate tasks to other team members when appropriate.",
+                    "",
+                ])
+
+        return "\n".join(lines)
 
 
 @dataclass
@@ -207,9 +263,16 @@ class TeamConfig:
                     "goal": m.goal,
                     "tool_budget": m.tool_budget,
                     "can_delegate": m.can_delegate,
+                    "delegation_targets": m.delegation_targets,
                     "reports_to": m.reports_to,
                     "is_manager": m.is_manager,
                     "priority": m.priority,
+                    # Rich persona attributes
+                    "backstory": m.backstory,
+                    "memory": m.memory,
+                    "cache": m.cache,
+                    "verbose": m.verbose,
+                    "max_iterations": m.max_iterations,
                 }
                 for m in self.members
             ],

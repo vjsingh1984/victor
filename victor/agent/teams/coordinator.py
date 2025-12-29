@@ -900,6 +900,29 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             member.goal,
         ]
 
+        # Add backstory/persona if provided (CrewAI-compatible)
+        if member.backstory:
+            lines.extend([
+                "",
+                "## Background",
+                member.backstory,
+            ])
+
+        # Add delegation info if applicable
+        if member.can_delegate:
+            if member.delegation_targets:
+                lines.extend([
+                    "",
+                    "## Delegation",
+                    f"You can delegate tasks to: {', '.join(member.delegation_targets)}",
+                ])
+            else:
+                lines.extend([
+                    "",
+                    "## Delegation",
+                    "You can delegate tasks to other team members when appropriate.",
+                ])
+
         # Add shared context
         if config.shared_context:
             lines.extend([
