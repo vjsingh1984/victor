@@ -84,6 +84,11 @@ class TestCLIFrameworkIntegration:
             side_effect=lambda tools: setattr(orch, "_enabled_tools", tools)
         )
         orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
+        # Add vertical context support
+        orch._vertical_context = None
+        orch.set_vertical_context = MagicMock(
+            side_effect=lambda ctx: setattr(orch, "_vertical_context", ctx)
+        )
         return orch
 
     @pytest.fixture(autouse=True)
@@ -178,9 +183,10 @@ class TestCLIFrameworkIntegration:
                 "You are an integration test assistant."
             )
 
-            # Verify stages were applied
-            assert "INITIAL" in mock_orchestrator._vertical_stages
-            assert "TESTING" in mock_orchestrator._vertical_stages
+            # Verify stages were applied via vertical context
+            assert mock_orchestrator._vertical_context is not None
+            assert "INITIAL" in mock_orchestrator._vertical_context.stages
+            assert "TESTING" in mock_orchestrator._vertical_context.stages
 
     @pytest.mark.asyncio
     async def test_vertical_lookup_by_string_name(self, mock_settings, mock_orchestrator):
