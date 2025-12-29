@@ -150,6 +150,7 @@ from victor.agent.recovery import (
     FailureType,
     RecoveryAction,
 )
+from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.protocols import RecoveryHandlerProtocol
 from victor.agent.orchestrator_recovery import (
     OrchestratorRecoveryIntegration,
@@ -736,12 +737,16 @@ class AgentOrchestrator(ModeAwareMixin):
             conversation_state=self.conversation_state,
         )
 
+        # Initialize VerticalContext for unified vertical state management
+        # This replaces scattered _vertical_* attributes with a proper container
+        self._vertical_context: VerticalContext = create_vertical_context()
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
             "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
             "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration, WorkflowOptimization"
+            "ObservabilityIntegration, WorkflowOptimization, VerticalContext"
         )
 
     # =====================================================================
@@ -1165,6 +1170,87 @@ class AgentOrchestrator(ModeAwareMixin):
             CheckpointManager instance or None if disabled
         """
         return self._checkpoint_manager
+
+    @property
+    def vertical_context(self) -> VerticalContext:
+        """Get the vertical context for unified vertical state access.
+
+        The VerticalContext provides structured access to all vertical-related
+        configuration, replacing scattered _vertical_* attributes.
+
+        Use this for:
+        - Accessing vertical name and configuration
+        - Querying enabled tools from vertical
+        - Getting middleware, safety patterns, task hints
+        - Mode configuration and tool dependencies
+
+        Returns:
+            VerticalContext instance (never None, may be empty)
+        """
+        return self._vertical_context
+
+    # =========================================================================
+    # Vertical Protocol Methods
+    # These implement OrchestratorVerticalProtocol for proper vertical integration
+    # =========================================================================
+
+    def set_vertical_context(self, context: VerticalContext) -> None:
+        """Set the vertical context (OrchestratorVerticalProtocol).
+
+        This replaces direct assignment to _vertical_context and provides
+        a proper API for framework integration.
+
+        Args:
+            context: VerticalContext to set
+        """
+        self._vertical_context = context
+        logger.debug(f"Vertical context set: {context.vertical_name}")
+
+    def set_enabled_tools(self, tools: Set[str]) -> None:
+        """Set enabled tools from vertical (OrchestratorVerticalProtocol).
+
+        This configures the tool access controller with vertical-specific
+        tool filters.
+
+        Args:
+            tools: Set of tool names to enable
+        """
+        self._vertical_context.apply_enabled_tools(tools)
+
+        # Apply to tool access controller if available
+        if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
+            self._tool_access_controller.set_vertical_tools(tools)
+        logger.debug(f"Enabled {len(tools)} tools from vertical")
+
+    def apply_vertical_middleware(self, middleware: List[Any]) -> None:
+        """Apply middleware from vertical (OrchestratorVerticalProtocol).
+
+        Args:
+            middleware: List of MiddlewareProtocol implementations
+        """
+        self._vertical_context.apply_middleware(middleware)
+
+        # Apply to middleware chain if available
+        if hasattr(self, "_middleware_chain") and self._middleware_chain:
+            for mw in middleware:
+                self._middleware_chain.add(mw)
+        logger.debug(f"Applied {len(middleware)} middleware from vertical")
+
+    def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
+        """Apply safety patterns from vertical (OrchestratorVerticalProtocol).
+
+        Args:
+            patterns: List of SafetyPattern instances
+        """
+        self._vertical_context.apply_safety_patterns(patterns)
+
+        # Apply to safety checker if available
+        if hasattr(self, "_safety_checker") and self._safety_checker:
+            if hasattr(self._safety_checker, "add_patterns"):
+                self._safety_checker.add_patterns(patterns)
+            elif hasattr(self._safety_checker, "_custom_patterns"):
+                self._safety_checker._custom_patterns.extend(patterns)
+        logger.debug(f"Applied {len(patterns)} safety patterns from vertical")
 
     async def save_checkpoint(
         self,

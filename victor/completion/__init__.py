@@ -12,23 +12,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Code completion providers.
+"""Code completion providers for IDE integration.
 
-.. deprecated:: 0.3.0
-    This module has moved to ``victor_coding.completion``.
-    Please update your imports.
+This module provides inline code completion capabilities using LSP servers,
+AI models, and snippet templates. Supports both standard LSP completion
+and Copilot-style ghost text.
+
+Example:
+    from victor.completion import CompletionManager, CompletionParams
+
+    manager = CompletionManager()
+    manager.register(AICompletionProvider(client))
+
+    params = CompletionParams(file_path=Path("test.py"), position=Position(10, 5))
+    completions = await manager.get_completions(params)
 """
 
-import warnings
-
-warnings.warn(
-    "Importing from 'victor.completion' is deprecated. "
-    "Please use 'victor_coding.completion' instead. "
-    "This compatibility shim will be removed in version 0.5.0.",
-    DeprecationWarning,
-    stacklevel=2,
+from victor.completion.protocol import (
+    CompletionCapabilities,
+    CompletionContext,
+    CompletionItem,
+    CompletionItemKind,
+    CompletionItemLabelDetails,
+    CompletionList,
+    CompletionMetrics,
+    CompletionParams,
+    CompletionTriggerKind,
+    InlineCompletionItem,
+    InlineCompletionList,
+    InlineCompletionParams,
+    InsertTextFormat,
+    Position,
+    Range,
+    TextEdit,
+)
+from victor.completion.provider import (
+    BaseCompletionProvider,
+    CompletionProvider,
+)
+from victor.completion.registry import CompletionProviderRegistry
+from victor.completion.manager import CompletionManager
+from victor.completion.providers import (
+    AICompletionProvider,
+    LSPCompletionProvider,
+    SnippetCompletionProvider,
 )
 
-# Re-export from victor_coding for backward compatibility
-from victor_coding.completion import *  # noqa: F401, F403
-from victor_coding.completion import __all__  # noqa: F401
+__all__ = [
+    # Protocol types
+    "CompletionCapabilities",
+    "CompletionContext",
+    "CompletionItem",
+    "CompletionItemKind",
+    "CompletionItemLabelDetails",
+    "CompletionList",
+    "CompletionMetrics",
+    "CompletionParams",
+    "CompletionTriggerKind",
+    "InlineCompletionItem",
+    "InlineCompletionList",
+    "InlineCompletionParams",
+    "InsertTextFormat",
+    "Position",
+    "Range",
+    "TextEdit",
+    # Provider interface
+    "BaseCompletionProvider",
+    "CompletionProvider",
+    # Registry and manager
+    "CompletionProviderRegistry",
+    "CompletionManager",
+    # Built-in providers
+    "AICompletionProvider",
+    "LSPCompletionProvider",
+    "SnippetCompletionProvider",
+]

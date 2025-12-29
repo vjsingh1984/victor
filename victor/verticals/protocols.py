@@ -67,6 +67,10 @@ if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
     from victor.config.settings import Settings
 
+# Import SafetyPattern from safety.types for backward compatibility
+# (it was originally defined here but moved to break circular imports)
+from victor.safety.types import SafetyPattern
+
 
 # =============================================================================
 # Data Types
@@ -102,23 +106,6 @@ class MiddlewareResult:
     modified_arguments: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class SafetyPattern:
-    """A safety pattern for detecting dangerous operations.
-
-    Attributes:
-        pattern: Regex pattern to match
-        description: Human-readable description
-        risk_level: Risk level (use string for flexibility)
-        category: Category of the pattern (e.g., "git", "filesystem")
-    """
-
-    pattern: str
-    description: str
-    risk_level: str = "HIGH"  # "CRITICAL", "HIGH", "MEDIUM", "LOW"
-    category: str = "general"
 
 
 @dataclass
