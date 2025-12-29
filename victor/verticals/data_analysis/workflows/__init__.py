@@ -342,10 +342,29 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
         return f"DataAnalysisWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
+from victor.verticals.data_analysis.workflows.graph_workflows import (
+    EDAState,
+    CleaningState,
+    MLPipelineState,
+    create_eda_workflow,
+    create_cleaning_workflow,
+    create_ml_pipeline_workflow,
+    DataAnalysisGraphExecutor,
+)
+
 __all__ = [
+    # WorkflowBuilder-based workflows
     "DataAnalysisWorkflowProvider",
     "eda_workflow",
     "data_cleaning_workflow",
     "statistical_analysis_workflow",
     "ml_pipeline_workflow",
+    # StateGraph-based workflows
+    "EDAState",
+    "CleaningState",
+    "MLPipelineState",
+    "create_eda_workflow",
+    "create_cleaning_workflow",
+    "create_ml_pipeline_workflow",
+    "DataAnalysisGraphExecutor",
 ]

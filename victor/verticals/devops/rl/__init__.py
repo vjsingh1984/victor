@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RL integration for DevOps vertical."""
+"""RL integration for DevOps vertical.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
+"""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
@@ -32,13 +37,14 @@ class DevOpsRLConfig:
         ]
     )
 
+    # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
-            "deployment": ["bash", "docker", "git_status", "read_file", "edit_files"],
-            "containerization": ["docker", "bash", "read_file", "write_file"],
-            "monitoring": ["bash", "read_file", "write_file", "grep"],
-            "configuration": ["read_file", "write_file", "edit_files", "grep"],
-            "troubleshooting": ["bash", "read_file", "grep", "docker"],
+            "deployment": [ToolNames.SHELL, ToolNames.DOCKER, ToolNames.GIT, ToolNames.READ, ToolNames.EDIT],
+            "containerization": [ToolNames.DOCKER, ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
+            "monitoring": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE, ToolNames.GREP],
+            "configuration": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.GREP],
+            "troubleshooting": [ToolNames.SHELL, ToolNames.READ, ToolNames.GREP, ToolNames.DOCKER],
         }
     )
 

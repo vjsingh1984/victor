@@ -55,6 +55,11 @@ from victor.verticals.coding.prompts import CodingPromptContributor
 from victor.verticals.coding.mode_config import CodingModeConfigProvider
 from victor.verticals.coding.tool_dependencies import CodingToolDependencyProvider
 from victor.verticals.coding.service_provider import CodingServiceProvider
+from victor.verticals.coding.capabilities import (
+    CodingCapabilityProvider,
+    get_coding_capabilities,
+    create_coding_capability_loader,
+)
 
 __all__ = [
     # Main vertical
@@ -67,4 +72,8 @@ __all__ = [
     "CodingModeConfigProvider",
     "CodingToolDependencyProvider",
     "CodingServiceProvider",
+    # Phase 4 - Dynamic Capabilities
+    "CodingCapabilityProvider",
+    "get_coding_capabilities",
+    "create_coding_capability_loader",
 ]

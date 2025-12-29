@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RL integration for Data Analysis vertical."""
+"""RL integration for Data Analysis vertical.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
+"""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
@@ -36,15 +41,16 @@ class DataAnalysisRLConfig:
         ]
     )
 
+    # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
-            "eda": ["read_file", "shell", "write_file", "ls"],
-            "cleaning": ["shell", "read_file", "write_file"],
-            "visualization": ["shell", "write_file"],
-            "statistics": ["shell", "read_file", "write_file"],
-            "ml": ["shell", "read_file", "write_file"],
-            "profiling": ["read_file", "shell", "ls"],
-            "reporting": ["write_file", "read_file", "shell"],
+            "eda": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE, ToolNames.LS],
+            "cleaning": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
+            "visualization": [ToolNames.SHELL, ToolNames.WRITE],
+            "statistics": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
+            "ml": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
+            "profiling": [ToolNames.READ, ToolNames.SHELL, ToolNames.LS],
+            "reporting": [ToolNames.WRITE, ToolNames.READ, ToolNames.SHELL],
         }
     )
 

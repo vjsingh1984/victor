@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RL integration for Research vertical."""
+"""RL integration for Research vertical.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
+"""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
@@ -36,14 +41,15 @@ class ResearchRLConfig:
         ]
     )
 
+    # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
-            "research": ["web_search", "web_fetch", "read_file", "write_file"],
-            "fact_check": ["web_search", "web_fetch", "grep"],
-            "literature": ["web_search", "web_fetch", "read_file"],
-            "competitive": ["web_search", "web_fetch", "write_file"],
-            "synthesis": ["read_file", "write_file", "edit_files"],
-            "exploration": ["web_search", "read_file", "grep", "overview"],
+            "research": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.READ, ToolNames.WRITE],
+            "fact_check": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.GREP],
+            "literature": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.READ],
+            "competitive": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.WRITE],
+            "synthesis": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT],
+            "exploration": [ToolNames.WEB_SEARCH, ToolNames.READ, ToolNames.GREP, ToolNames.OVERVIEW],
         }
     )
 

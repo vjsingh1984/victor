@@ -318,10 +318,29 @@ class ResearchWorkflowProvider(WorkflowProviderProtocol):
         return f"ResearchWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
+from victor.verticals.research.workflows.graph_workflows import (
+    ResearchState,
+    FactCheckState,
+    LiteratureState,
+    create_deep_research_workflow,
+    create_fact_check_workflow,
+    create_literature_review_workflow,
+    ResearchGraphExecutor,
+)
+
 __all__ = [
+    # WorkflowBuilder-based workflows
     "ResearchWorkflowProvider",
     "deep_research_workflow",
     "fact_check_workflow",
     "literature_review_workflow",
     "competitive_analysis_workflow",
+    # StateGraph-based workflows
+    "ResearchState",
+    "FactCheckState",
+    "LiteratureState",
+    "create_deep_research_workflow",
+    "create_fact_check_workflow",
+    "create_literature_review_workflow",
+    "ResearchGraphExecutor",
 ]

@@ -18,6 +18,9 @@ This module defines tool execution patterns and transition probabilities
 for intelligent tool selection in software development tasks.
 
 Extends the core BaseToolDependencyProvider with coding-specific data.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
 """
 
 from __future__ import annotations
@@ -26,164 +29,158 @@ from typing import Dict, List, Set, Tuple
 
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_types import ToolDependency
+from victor.framework.tool_naming import ToolNames
 
 
 # Tool dependencies for coding tasks
+# Uses canonical ToolNames constants for consistency
 CODING_TOOL_DEPENDENCIES: List[ToolDependency] = [
     # Edit should be preceded by read
     ToolDependency(
-        tool_name="edit_files",
-        depends_on={"read_file"},
-        enables={"run_tests", "git"},
+        tool_name=ToolNames.EDIT,
+        depends_on={ToolNames.READ},
+        enables={ToolNames.TEST, ToolNames.GIT},
         weight=0.9,
     ),
     ToolDependency(
-        tool_name="write_file",
-        depends_on={"read_file", "list_directory"},
-        enables={"run_tests", "git"},
+        tool_name=ToolNames.WRITE,
+        depends_on={ToolNames.READ, ToolNames.LS},
+        enables={ToolNames.TEST, ToolNames.GIT},
         weight=0.8,
     ),
     # Refactoring depends on understanding code
     ToolDependency(
-        tool_name="refactor_rename_symbol",
-        depends_on={"read_file", "symbols"},
-        enables={"run_tests"},
+        tool_name=ToolNames.RENAME,
+        depends_on={ToolNames.READ, ToolNames.SYMBOL},
+        enables={ToolNames.TEST},
         weight=0.7,
     ),
     ToolDependency(
-        tool_name="refactor_extract_function",
-        depends_on={"read_file"},
-        enables={"run_tests"},
+        tool_name=ToolNames.EXTRACT,
+        depends_on={ToolNames.READ},
+        enables={ToolNames.TEST},
         weight=0.6,
     ),
-    # Git operations
+    # Git operations (git_commit, git_diff resolve to "git" canonical)
     ToolDependency(
-        tool_name="git_commit",
-        depends_on={"git_status", "git_diff"},
+        tool_name=ToolNames.GIT,  # Unified git tool
+        depends_on=set(),  # Git status/diff are operations on the same tool
         enables=set(),
         weight=0.9,
     ),
-    ToolDependency(
-        tool_name="git_push",
-        depends_on={"git_commit", "run_tests"},
-        enables=set(),
-        weight=0.8,
-    ),
     # Testing
     ToolDependency(
-        tool_name="run_tests",
+        tool_name=ToolNames.TEST,
         depends_on=set(),
-        enables={"git_commit"},
+        enables={ToolNames.GIT},
         weight=0.7,
     ),
     # Search enables read
     ToolDependency(
-        tool_name="code_search",
+        tool_name=ToolNames.GREP,  # Keyword code search
         depends_on=set(),
-        enables={"read_file"},
+        enables={ToolNames.READ},
         weight=0.8,
     ),
     ToolDependency(
-        tool_name="semantic_code_search",
+        tool_name=ToolNames.CODE_SEARCH,  # Semantic code search
         depends_on=set(),
-        enables={"read_file"},
+        enables={ToolNames.READ},
         weight=0.8,
     ),
     # List enables read
     ToolDependency(
-        tool_name="list_directory",
+        tool_name=ToolNames.LS,
         depends_on=set(),
-        enables={"read_file"},
+        enables={ToolNames.READ},
         weight=0.7,
     ),
 ]
 
 # Tool transition probabilities for coding workflows
+# Uses canonical ToolNames constants for consistency
 CODING_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
-    "read_file": [
-        ("edit_files", 0.4),
-        ("code_search", 0.3),
-        ("write_file", 0.2),
-        ("run_tests", 0.1),
+    ToolNames.READ: [
+        (ToolNames.EDIT, 0.4),
+        (ToolNames.GREP, 0.3),
+        (ToolNames.WRITE, 0.2),
+        (ToolNames.TEST, 0.1),
     ],
-    "code_search": [
-        ("read_file", 0.6),
-        ("semantic_code_search", 0.2),
-        ("list_directory", 0.2),
+    ToolNames.GREP: [
+        (ToolNames.READ, 0.6),
+        (ToolNames.CODE_SEARCH, 0.2),
+        (ToolNames.LS, 0.2),
     ],
-    "list_directory": [
-        ("read_file", 0.5),
-        ("code_search", 0.3),
-        ("write_file", 0.2),
+    ToolNames.LS: [
+        (ToolNames.READ, 0.5),
+        (ToolNames.GREP, 0.3),
+        (ToolNames.WRITE, 0.2),
     ],
-    "edit_files": [
-        ("run_tests", 0.5),
-        ("read_file", 0.3),
-        ("git_status", 0.2),
+    ToolNames.EDIT: [
+        (ToolNames.TEST, 0.5),
+        (ToolNames.READ, 0.3),
+        (ToolNames.GIT, 0.2),
     ],
-    "write_file": [
-        ("run_tests", 0.4),
-        ("read_file", 0.3),
-        ("git_status", 0.3),
+    ToolNames.WRITE: [
+        (ToolNames.TEST, 0.4),
+        (ToolNames.READ, 0.3),
+        (ToolNames.GIT, 0.3),
     ],
-    "run_tests": [
-        ("edit_files", 0.4),
-        ("git_status", 0.3),
-        ("read_file", 0.3),
+    ToolNames.TEST: [
+        (ToolNames.EDIT, 0.4),
+        (ToolNames.GIT, 0.3),
+        (ToolNames.READ, 0.3),
     ],
-    "git_status": [
-        ("git_diff", 0.5),
-        ("git_commit", 0.3),
-        ("read_file", 0.2),
-    ],
-    "git_diff": [
-        ("git_commit", 0.5),
-        ("edit_files", 0.3),
-        ("git_status", 0.2),
+    ToolNames.GIT: [
+        (ToolNames.READ, 0.5),
+        (ToolNames.EDIT, 0.3),
+        (ToolNames.TEST, 0.2),
     ],
 }
 
 # Tool clusters for coding
+# Uses canonical ToolNames constants for consistency
 CODING_TOOL_CLUSTERS: Dict[str, Set[str]] = {
-    "file_operations": {"read_file", "write_file", "edit_files", "list_directory"},
-    "search_operations": {"code_search", "semantic_code_search", "symbols"},
-    "git_operations": {"git_status", "git_diff", "git_commit", "git_push"},
-    "testing": {"run_tests", "execute_bash"},
-    "refactoring": {"refactor_rename_symbol", "refactor_extract_function"},
+    "file_operations": {ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.LS},
+    "search_operations": {ToolNames.GREP, ToolNames.CODE_SEARCH, ToolNames.SYMBOL},
+    "git_operations": {ToolNames.GIT},  # Unified git tool handles all git operations
+    "testing": {ToolNames.TEST, ToolNames.SHELL},
+    "refactoring": {ToolNames.RENAME, ToolNames.EXTRACT},
 }
 
 # Common tool sequences for coding workflows
+# Uses canonical ToolNames constants for consistency
 CODING_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "exploration": ["list_directory", "read_file", "code_search"],
-    "edit": ["read_file", "edit_files", "run_tests"],
-    "create": ["list_directory", "read_file", "write_file", "run_tests"],
-    "refactor": ["read_file", "symbols", "refactor_rename_symbol", "run_tests"],
-    "git": ["git_status", "git_diff", "git_commit"],
-    "debug": ["read_file", "code_search", "execute_bash"],
-    "architecture": ["list_directory", "read_file", "semantic_code_search", "read_file"],
-    "test_fix": ["read_file", "run_tests", "edit_files", "run_tests"],
+    "exploration": [ToolNames.LS, ToolNames.READ, ToolNames.GREP],
+    "edit": [ToolNames.READ, ToolNames.EDIT, ToolNames.TEST],
+    "create": [ToolNames.LS, ToolNames.READ, ToolNames.WRITE, ToolNames.TEST],
+    "refactor": [ToolNames.READ, ToolNames.SYMBOL, ToolNames.RENAME, ToolNames.TEST],
+    "git": [ToolNames.GIT],  # Unified git tool handles status/diff/commit
+    "debug": [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL],
+    "architecture": [ToolNames.LS, ToolNames.READ, ToolNames.CODE_SEARCH, ToolNames.READ],
+    "test_fix": [ToolNames.READ, ToolNames.TEST, ToolNames.EDIT, ToolNames.TEST],
 }
 
 # Required tools for coding vertical
+# Uses canonical ToolNames constants for consistency
 CODING_REQUIRED_TOOLS: Set[str] = {
-    "read_file",
-    "write_file",
-    "edit_files",
-    "list_directory",
-    "code_search",
+    ToolNames.READ,
+    ToolNames.WRITE,
+    ToolNames.EDIT,
+    ToolNames.LS,
+    ToolNames.GREP,
 }
 
 # Optional tools that enhance coding
+# Uses canonical ToolNames constants for consistency
 CODING_OPTIONAL_TOOLS: Set[str] = {
-    "semantic_code_search",
-    "symbols",
-    "run_tests",
-    "git_status",
-    "git_diff",
-    "git_commit",
-    "refactor_rename_symbol",
-    "refactor_extract_function",
-    "execute_bash",
+    ToolNames.CODE_SEARCH,
+    ToolNames.SYMBOL,
+    ToolNames.TEST,
+    ToolNames.GIT,
+    ToolNames.RENAME,
+    ToolNames.EXTRACT,
+    ToolNames.SHELL,
 }
 
 
@@ -219,6 +216,7 @@ class CodingToolDependencyProvider(BaseToolDependencyProvider):
             sequences.update(additional_sequences)
 
         # Initialize base class with coding-specific config
+        # Uses canonical ToolNames constants for consistency
         super().__init__(
             ToolDependencyConfig(
                 dependencies=dependencies,
@@ -227,7 +225,7 @@ class CodingToolDependencyProvider(BaseToolDependencyProvider):
                 sequences=sequences,
                 required_tools=CODING_REQUIRED_TOOLS.copy(),
                 optional_tools=CODING_OPTIONAL_TOOLS.copy(),
-                default_sequence=["read_file", "edit_files", "run_tests"],
+                default_sequence=[ToolNames.READ, ToolNames.EDIT, ToolNames.TEST],
             )
         )
 

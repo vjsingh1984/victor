@@ -485,6 +485,42 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Get RL configuration provider for this vertical.
+
+        Override to provide vertical-specific RL learner configurations,
+        task type mappings, and quality thresholds.
+
+        Returns:
+            RL config provider (RLConfigProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for outcome recording.
+
+        Override to provide vertical-specific RL hooks for
+        recording task outcomes and updating learners.
+
+        Returns:
+            RLHooks instance or None
+        """
+        return None
+
+    @classmethod
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Get team specification provider for this vertical.
+
+        Override to provide vertical-specific multi-agent team
+        configurations for complex task execution.
+
+        Returns:
+            Team spec provider (TeamSpecProviderProtocol) or None
+        """
+        return None
+
+    @classmethod
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 
@@ -539,6 +575,8 @@ class VerticalBase(ABC):
                 tool_dependency_provider=cls.get_tool_dependency_provider(),
                 workflow_provider=cls.get_workflow_provider(),
                 service_provider=cls.get_service_provider(),
+                rl_config_provider=cls.get_rl_config_provider(),
+                team_spec_provider=cls.get_team_spec_provider(),
             )
 
             # Cache the extensions

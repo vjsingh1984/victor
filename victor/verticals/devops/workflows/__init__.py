@@ -216,9 +216,32 @@ class DevOpsWorkflowProvider(WorkflowProviderProtocol):
         return f"DevOpsWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
+from victor.verticals.devops.workflows.graph_workflows import (
+    DeploymentState,
+    ContainerState,
+    CICDState,
+    SecurityAuditState,
+    create_deployment_workflow,
+    create_container_workflow,
+    create_cicd_workflow,
+    create_security_audit_workflow,
+    DevOpsGraphExecutor,
+)
+
 __all__ = [
+    # WorkflowBuilder-based workflows
     "DevOpsWorkflowProvider",
     "deploy_infrastructure_workflow",
     "container_setup_workflow",
     "cicd_pipeline_workflow",
+    # StateGraph-based workflows
+    "DeploymentState",
+    "ContainerState",
+    "CICDState",
+    "SecurityAuditState",
+    "create_deployment_workflow",
+    "create_container_workflow",
+    "create_cicd_workflow",
+    "create_security_audit_workflow",
+    "DevOpsGraphExecutor",
 ]

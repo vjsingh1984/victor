@@ -16,12 +16,16 @@
 
 Provides coding-specific configuration for the RL system including
 learner activations, task type mappings, and quality thresholds.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
 """
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
@@ -57,71 +61,67 @@ class CodingRLConfig:
     )
 
     # Task type to tool mappings for tool selection learning
+    # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
             # Analysis tasks
             "refactoring": [
-                "refactor",
-                "rename_symbol",
-                "extract_function",
-                "edit_files",
-                "read_file",
+                ToolNames.RENAME,
+                ToolNames.EXTRACT,
+                ToolNames.EDIT,
+                ToolNames.READ,
             ],
             "debugging": [
-                "read_file",
-                "grep",
-                "bash",
-                "run_tests",
-                "git_log",
-                "symbols",
-                "references",
+                ToolNames.READ,
+                ToolNames.GREP,
+                ToolNames.SHELL,
+                ToolNames.TEST,
+                ToolNames.GIT,
+                ToolNames.SYMBOL,
+                ToolNames.REFS,
             ],
             "exploration": [
-                "read_file",
-                "grep",
-                "code_search",
-                "semantic_code_search",
-                "project_overview",
-                "symbols",
-                "list_directory",
+                ToolNames.READ,
+                ToolNames.GREP,
+                ToolNames.CODE_SEARCH,
+                ToolNames.OVERVIEW,
+                ToolNames.SYMBOL,
+                ToolNames.LS,
             ],
             # Implementation tasks
             "feature": [
-                "read_file",
-                "write_file",
-                "edit_files",
-                "bash",
-                "git_status",
-                "git_diff",
+                ToolNames.READ,
+                ToolNames.WRITE,
+                ToolNames.EDIT,
+                ToolNames.SHELL,
+                ToolNames.GIT,
             ],
             "implementation": [
-                "read_file",
-                "write_file",
-                "edit_files",
-                "bash",
-                "run_tests",
+                ToolNames.READ,
+                ToolNames.WRITE,
+                ToolNames.EDIT,
+                ToolNames.SHELL,
+                ToolNames.TEST,
             ],
             "testing": [
-                "run_tests",
-                "test_file",
-                "bash",
-                "read_file",
-                "write_file",
+                ToolNames.TEST,
+                ToolNames.SHELL,
+                ToolNames.READ,
+                ToolNames.WRITE,
             ],
             # Documentation tasks
             "documentation": [
-                "read_file",
-                "write_file",
-                "edit_files",
-                "grep",
+                ToolNames.READ,
+                ToolNames.WRITE,
+                ToolNames.EDIT,
+                ToolNames.GREP,
             ],
             # Review tasks
             "review": [
-                "read_file",
-                "grep",
-                "git_diff",
-                "git_log",
-                "references",
+                ToolNames.READ,
+                ToolNames.GREP,
+                ToolNames.GIT,
+                ToolNames.REFS,
             ],
         }
     )
@@ -157,10 +157,11 @@ class CodingRLConfig:
     exploration_bonus: float = 0.15
 
     # Tools that should never be recommended together (conflicting)
+    # Uses canonical ToolNames constants for consistency
     conflicting_tools: Dict[str, Set[str]] = field(
         default_factory=lambda: {
-            "write_file": {"edit_files"},  # Use one or the other
-            "edit_files": {"write_file"},
+            ToolNames.WRITE: {ToolNames.EDIT},  # Use one or the other
+            ToolNames.EDIT: {ToolNames.WRITE},
         }
     )
 

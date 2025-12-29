@@ -492,6 +492,73 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return CODING_TEAM_SPECS
 
     @classmethod
+    def get_capability_provider(cls) -> Any:
+        """Get capability provider for dynamic capability loading.
+
+        Provides CodingCapabilityProvider for runtime configuration
+        of coding-specific capabilities like:
+        - git_safety: Git operation safety rules
+        - code_style: Code formatting preferences
+        - test_requirements: Test configuration
+        - language_server: LSP settings
+        - refactoring: Refactoring capabilities
+
+        Returns:
+            CodingCapabilityProvider instance
+        """
+        from victor.verticals.coding.capabilities import CodingCapabilityProvider
+
+        return CodingCapabilityProvider()
+
+    @classmethod
+    def get_composed_chains(cls) -> Dict[str, Any]:
+        """Get pre-built LCEL-composed tool chains.
+
+        Provides LCEL composition chains for common coding tasks:
+        - explore_file: Read file and analyze symbols
+        - analyze_function: Get function details with references
+        - safe_edit: Edit with verification
+        - git_status: Parallel git state collection
+        - search_with_context: Code search with result context
+        - lint: Language-aware linting
+        - test_discovery: Find test files
+        - review_analysis: Parallel review data collection
+
+        Returns:
+            Dict mapping chain names to Runnable instances
+        """
+        from victor.verticals.coding.composed_chains import CODING_CHAINS
+
+        return CODING_CHAINS
+
+    @classmethod
+    def get_personas(cls) -> Dict[str, Any]:
+        """Get persona definitions for team members.
+
+        Provides rich persona definitions with:
+        - Expertise categories
+        - Communication styles
+        - Decision-making preferences
+        - Behavioral traits
+
+        Available personas:
+        - code_archaeologist: Deep code analysis expert
+        - security_auditor: Security-focused reviewer
+        - architect: Solution designer
+        - refactoring_strategist: Safe refactoring planner
+        - craftsman: Clean code implementer
+        - debugger: Bug hunting specialist
+        - quality_guardian: Code review expert
+        - test_specialist: Testing expert
+
+        Returns:
+            Dict mapping persona names to CodingPersona instances
+        """
+        from victor.verticals.coding.teams import CODING_PERSONAS
+
+        return CODING_PERSONAS
+
+    @classmethod
     def get_extensions(cls) -> VerticalExtensions:
         """Get all coding vertical extensions.
 

@@ -85,6 +85,30 @@ from victor.verticals.coding.workflows.graph_workflows import (
     GraphWorkflowExecutor,
 )
 
+# LCEL-composed tool chains
+from victor.verticals.coding.composed_chains import (
+    # Pre-built chains
+    explore_file_chain,
+    analyze_function_chain,
+    safe_edit_chain,
+    git_status_chain,
+    search_with_context_chain,
+    lint_chain,
+    test_discovery_chain,
+    review_analysis_chain,
+    # Factories
+    create_exploration_chain,
+    create_edit_verify_chain,
+    create_refactor_chain,
+    # Registry
+    CODING_CHAINS,
+    get_chain,
+    list_chains,
+    # Lazy tool loading
+    lazy_tool,
+    LazyToolRunnable,
+)
+
 __all__ = [
     # Provider
     "CodingWorkflowProvider",
@@ -109,4 +133,24 @@ __all__ = [
     "create_code_review_workflow",
     # StateGraph executor
     "GraphWorkflowExecutor",
+    # LCEL-composed chains
+    "explore_file_chain",
+    "analyze_function_chain",
+    "safe_edit_chain",
+    "git_status_chain",
+    "search_with_context_chain",
+    "lint_chain",
+    "test_discovery_chain",
+    "review_analysis_chain",
+    # Chain factories
+    "create_exploration_chain",
+    "create_edit_verify_chain",
+    "create_refactor_chain",
+    # Chain registry
+    "CODING_CHAINS",
+    "get_chain",
+    "list_chains",
+    # Lazy tool loading
+    "lazy_tool",
+    "LazyToolRunnable",
 ]

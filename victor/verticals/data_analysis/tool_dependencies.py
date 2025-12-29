@@ -15,107 +15,117 @@
 """Data Analysis Tool Dependencies - Tool relationships for analysis workflows.
 
 Extends the core BaseToolDependencyProvider with data analysis-specific data.
+
+Uses canonical tool names from ToolNames to ensure consistent naming
+across RL Q-values, workflow patterns, and vertical configurations.
 """
 
 from typing import Dict, List, Set, Tuple
 
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_types import ToolDependency
+from victor.framework.tool_naming import ToolNames
 
 
 # Tool dependency graph for data analysis workflows
+# Uses canonical ToolNames constants for consistency
 DATA_ANALYSIS_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
     # Reading data files
-    "read_file": [
-        ("bash", 0.5),  # Run Python for analysis
-        ("write_file", 0.2),  # Save processed data
-        ("code_search", 0.2),  # Find related analysis
-        ("read_file", 0.1),  # Read more files
+    ToolNames.READ: [
+        (ToolNames.SHELL, 0.5),  # Run Python for analysis
+        (ToolNames.WRITE, 0.2),  # Save processed data
+        (ToolNames.GREP, 0.2),  # Find related analysis
+        (ToolNames.READ, 0.1),  # Read more files
     ],
-    # Python/bash for analysis
-    "bash": [
-        ("write_file", 0.3),  # Save results/charts
-        ("bash", 0.3),  # Continue analysis
-        ("read_file", 0.2),  # Check outputs
-        ("edit_files", 0.2),  # Modify scripts
+    # Python/shell for analysis
+    ToolNames.SHELL: [
+        (ToolNames.WRITE, 0.3),  # Save results/charts
+        (ToolNames.SHELL, 0.3),  # Continue analysis
+        (ToolNames.READ, 0.2),  # Check outputs
+        (ToolNames.EDIT, 0.2),  # Modify scripts
     ],
     # Writing results
-    "write_file": [
-        ("bash", 0.4),  # Run more analysis
-        ("read_file", 0.3),  # Verify written
-        ("write_file", 0.2),  # Write more outputs
-        ("edit_files", 0.1),  # Refine
+    ToolNames.WRITE: [
+        (ToolNames.SHELL, 0.4),  # Run more analysis
+        (ToolNames.READ, 0.3),  # Verify written
+        (ToolNames.WRITE, 0.2),  # Write more outputs
+        (ToolNames.EDIT, 0.1),  # Refine
     ],
     # Code search for patterns
-    "code_search": [
-        ("read_file", 0.5),  # Read found code
-        ("bash", 0.3),  # Run found analysis
-        ("semantic_code_search", 0.2),  # Refine search
+    ToolNames.GREP: [
+        (ToolNames.READ, 0.5),  # Read found code
+        (ToolNames.SHELL, 0.3),  # Run found analysis
+        (ToolNames.CODE_SEARCH, 0.2),  # Refine search
     ],
     # Web for documentation
-    "web_search": [
-        ("web_fetch", 0.6),  # Fetch documentation
-        ("bash", 0.2),  # Try example code
-        ("web_search", 0.2),  # Refine search
+    ToolNames.WEB_SEARCH: [
+        (ToolNames.WEB_FETCH, 0.6),  # Fetch documentation
+        (ToolNames.SHELL, 0.2),  # Try example code
+        (ToolNames.WEB_SEARCH, 0.2),  # Refine search
     ],
-    "web_fetch": [
-        ("bash", 0.4),  # Apply learnings
-        ("write_file", 0.3),  # Save reference
-        ("web_fetch", 0.2),  # Fetch more
-        ("web_search", 0.1),  # Find related
+    ToolNames.WEB_FETCH: [
+        (ToolNames.SHELL, 0.4),  # Apply learnings
+        (ToolNames.WRITE, 0.3),  # Save reference
+        (ToolNames.WEB_FETCH, 0.2),  # Fetch more
+        (ToolNames.WEB_SEARCH, 0.1),  # Find related
     ],
 }
 
 # Tools that work well together in data analysis
+# Uses canonical ToolNames constants for consistency
 DATA_ANALYSIS_TOOL_CLUSTERS: Dict[str, Set[str]] = {
-    "file_operations": {"read_file", "write_file", "edit_files", "list_directory"},
-    "code_execution": {"bash"},  # Python runs through bash
-    "code_exploration": {"code_search", "semantic_code_search", "codebase_overview"},
-    "documentation": {"web_search", "web_fetch"},
+    "file_operations": {ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.LS},
+    "code_execution": {ToolNames.SHELL},  # Python runs through shell
+    "code_exploration": {ToolNames.GREP, ToolNames.CODE_SEARCH, ToolNames.OVERVIEW},
+    "documentation": {ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
 }
 
 # Recommended sequences for common analysis patterns
+# Uses canonical ToolNames constants for consistency
 DATA_ANALYSIS_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "data_profiling": ["read_file", "bash", "bash", "write_file"],
-    "visualization": ["read_file", "bash", "write_file"],
-    "statistical_test": ["read_file", "bash", "bash", "write_file"],
-    "ml_pipeline": ["read_file", "bash", "bash", "bash", "write_file"],
-    "report_generation": ["read_file", "bash", "write_file", "write_file"],
+    "data_profiling": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
+    "visualization": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE],
+    "statistical_test": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
+    "ml_pipeline": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
+    "report_generation": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE, ToolNames.WRITE],
 }
 
 # Tool dependencies for data analysis
+# Uses canonical ToolNames constants for consistency
 DATA_ANALYSIS_TOOL_DEPENDENCIES: List[ToolDependency] = [
     ToolDependency(
-        tool_name="bash",
-        depends_on={"read_file"},
-        enables={"write_file", "bash"},
+        tool_name=ToolNames.SHELL,
+        depends_on={ToolNames.READ},
+        enables={ToolNames.WRITE, ToolNames.SHELL},
         weight=0.6,
     ),
     ToolDependency(
-        tool_name="write_file",
-        depends_on={"bash"},
-        enables={"read_file"},
+        tool_name=ToolNames.WRITE,
+        depends_on={ToolNames.SHELL},
+        enables={ToolNames.READ},
         weight=0.5,
     ),
     ToolDependency(
-        tool_name="code_search",
+        tool_name=ToolNames.GREP,
         depends_on=set(),
-        enables={"read_file", "bash"},
+        enables={ToolNames.READ, ToolNames.SHELL},
         weight=0.4,
     ),
 ]
 
 # Required tools for data analysis
-DATA_ANALYSIS_REQUIRED_TOOLS: Set[str] = {"read_file", "write_file", "bash"}
+# Uses canonical ToolNames constants for consistency
+DATA_ANALYSIS_REQUIRED_TOOLS: Set[str] = {ToolNames.READ, ToolNames.WRITE, ToolNames.SHELL}
 
 # Optional tools that enhance data analysis
+# Uses canonical ToolNames constants for consistency
 DATA_ANALYSIS_OPTIONAL_TOOLS: Set[str] = {
-    "code_search",
-    "semantic_code_search",
-    "edit_files",
-    "list_directory",
-    "web_search",
-    "web_fetch",
+    ToolNames.GREP,
+    ToolNames.CODE_SEARCH,
+    ToolNames.EDIT,
+    ToolNames.LS,
+    ToolNames.WEB_SEARCH,
+    ToolNames.WEB_FETCH,
 }
 
 
@@ -124,6 +134,8 @@ class DataAnalysisToolDependencyProvider(BaseToolDependencyProvider):
 
     Extends BaseToolDependencyProvider with data analysis-specific tool
     relationships for data profiling, visualization, and ML workflows.
+
+    Uses canonical ToolNames constants for consistency.
     """
 
     def __init__(self):
@@ -136,7 +148,7 @@ class DataAnalysisToolDependencyProvider(BaseToolDependencyProvider):
                 sequences=DATA_ANALYSIS_TOOL_SEQUENCES,
                 required_tools=DATA_ANALYSIS_REQUIRED_TOOLS,
                 optional_tools=DATA_ANALYSIS_OPTIONAL_TOOLS,
-                default_sequence=["read_file", "bash", "write_file"],
+                default_sequence=[ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE],
             )
         )
 

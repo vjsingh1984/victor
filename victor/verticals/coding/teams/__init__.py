@@ -32,7 +32,15 @@ Example:
 
     # Or access directly
     feature_team = CODING_TEAM_SPECS["feature_team"]
+
+Teams are auto-registered with the global TeamSpecRegistry on import,
+enabling cross-vertical team discovery via:
+    from victor.framework.team_registry import get_team_registry
+    registry = get_team_registry()
+    coding_teams = registry.find_by_vertical("coding")
 """
+
+import logging
 
 from victor.verticals.coding.teams.specs import (
     # Types
@@ -49,17 +57,72 @@ from victor.verticals.coding.teams.specs import (
     list_roles,
 )
 
-__all__ = [
+from victor.verticals.coding.teams.personas import (
     # Types
+    ExpertiseCategory,
+    CommunicationStyle,
+    DecisionStyle,
+    PersonaTraits,
+    CodingPersona,
+    # Pre-defined personas
+    CODING_PERSONAS,
+    # Helper functions
+    get_persona,
+    get_personas_for_role,
+    get_persona_by_expertise,
+    apply_persona_to_spec,
+    list_personas,
+)
+
+__all__ = [
+    # Types from specs
     "CodingRoleConfig",
     "CodingTeamSpec",
     # Role configurations
     "CODING_ROLES",
     # Team specifications
     "CODING_TEAM_SPECS",
-    # Helper functions
+    # Helper functions from specs
     "get_team_for_task",
     "get_role_config",
     "list_team_types",
     "list_roles",
+    # Types from personas
+    "ExpertiseCategory",
+    "CommunicationStyle",
+    "DecisionStyle",
+    "PersonaTraits",
+    "CodingPersona",
+    # Pre-defined personas
+    "CODING_PERSONAS",
+    # Helper functions from personas
+    "get_persona",
+    "get_personas_for_role",
+    "get_persona_by_expertise",
+    "apply_persona_to_spec",
+    "list_personas",
 ]
+
+logger = logging.getLogger(__name__)
+
+
+def _auto_register_teams() -> int:
+    """Auto-register coding teams with global registry.
+
+    Returns:
+        Number of teams registered.
+    """
+    try:
+        from victor.framework.team_registry import get_team_registry
+
+        registry = get_team_registry()
+        count = registry.register_from_vertical("coding", CODING_TEAM_SPECS)
+        logger.debug(f"Auto-registered {count} coding teams")
+        return count
+    except Exception as e:
+        logger.warning(f"Failed to auto-register coding teams: {e}")
+        return 0
+
+
+# Auto-register on import
+_auto_register_teams()
