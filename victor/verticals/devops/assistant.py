@@ -5,8 +5,9 @@ Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s 
 
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.verticals.base import StageDefinition, VerticalBase
 from victor.verticals.protocols import (
+    MiddlewareProtocol,
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,
@@ -61,41 +62,36 @@ class DevOpsAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_config(cls) -> VerticalConfig:
-        """Get the complete configuration for DevOps vertical.
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Get DevOps-specific provider hints.
 
-        Uses base class implementation with DevOps-specific customizations.
+        Override base class to specify preferred providers and features.
         """
-        from victor.framework.tools import ToolSet
-
-        return VerticalConfig(
-            tools=ToolSet.from_tools(cls.get_tools()),
-            system_prompt=cls._get_system_prompt(),
-            stages=cls._get_stages(),
-            provider_hints={
-                "preferred_providers": ["anthropic", "openai"],
-                "min_context_window": 100000,
-                "features": ["tool_calling", "large_context"],
-                "requires_tool_calling": True,
-            },
-            evaluation_criteria=[
-                "configuration_correctness",
-                "security_best_practices",
-                "idempotency",
-                "documentation_completeness",
-                "resource_efficiency",
-                "disaster_recovery",
-                "monitoring_coverage",
-            ],
-            metadata={
-                "vertical_name": cls.name,
-                "vertical_version": cls.version,
-                "description": cls.description,
-            },
-        )
+        return {
+            "preferred_providers": ["anthropic", "openai"],
+            "min_context_window": 100000,
+            "features": ["tool_calling", "large_context"],
+            "requires_tool_calling": True,
+        }
 
     @classmethod
-    def _get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Get DevOps-specific evaluation criteria.
+
+        Override base class with infrastructure-focused criteria.
+        """
+        return [
+            "configuration_correctness",
+            "security_best_practices",
+            "idempotency",
+            "documentation_completeness",
+            "resource_efficiency",
+            "disaster_recovery",
+            "monitoring_coverage",
+        ]
+
+    @classmethod
+    def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -226,6 +222,45 @@ When creating configurations:
         return DevOpsSafetyExtension()
 
     @classmethod
+    def get_middleware(cls) -> List[MiddlewareProtocol]:
+        """Get DevOps-specific middleware.
+
+        Uses framework-level middleware for common functionality:
+        - GitSafetyMiddleware: Block dangerous git operations (force push, hard reset)
+        - SecretMaskingMiddleware: Mask secrets in tool results
+        - LoggingMiddleware: Audit logging for tool calls
+
+        DevOps has stricter git safety since infrastructure changes are critical.
+
+        Returns:
+            List of middleware implementations
+        """
+        from victor.framework.middleware import (
+            GitSafetyMiddleware,
+            LoggingMiddleware,
+            SecretMaskingMiddleware,
+        )
+
+        return [
+            # Git safety is critical for DevOps - block dangerous operations
+            GitSafetyMiddleware(
+                block_dangerous=True,  # Strict for infrastructure
+                warn_on_risky=True,
+                protected_branches={"production", "staging"},  # Additional protected branches
+            ),
+            # Always mask secrets in infrastructure output
+            SecretMaskingMiddleware(
+                replacement="[REDACTED]",
+                mask_in_arguments=True,  # Also mask secrets in inputs
+            ),
+            # Audit logging for compliance
+            LoggingMiddleware(
+                include_arguments=True,
+                sanitize_arguments=True,
+            ),
+        ]
+
+    @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         from victor.verticals.devops.tool_dependencies import DevOpsToolDependencyProvider
 
@@ -287,11 +322,11 @@ When creating configurations:
         return DevOpsWorkflowProvider()
 
     @classmethod
-    def get_rl_config(cls) -> Optional[Any]:
-        """Get RL configuration for DevOps vertical.
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Get RL configuration provider for DevOps vertical.
 
         Returns:
-            DevOpsRLConfig instance
+            DevOpsRLConfig instance (implements RLConfigProviderProtocol)
         """
         from victor.verticals.devops.rl import DevOpsRLConfig
 
@@ -309,8 +344,8 @@ When creating configurations:
         return DevOpsRLHooks()
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
-        """Get team specifications for DevOps tasks.
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Get team specification provider for DevOps tasks.
 
         Provides pre-configured team specifications for:
         - deployment_team: Infrastructure deployment
@@ -318,8 +353,8 @@ When creating configurations:
         - monitoring_team: Observability setup
 
         Returns:
-            Dict mapping team names to DevOpsTeamSpec instances
+            DevOpsTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        from victor.verticals.devops.teams import DEVOPS_TEAM_SPECS
+        from victor.verticals.devops.teams import DevOpsTeamSpecProvider
 
-        return DEVOPS_TEAM_SPECS
+        return DevOpsTeamSpecProvider()

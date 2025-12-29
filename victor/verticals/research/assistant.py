@@ -5,7 +5,7 @@ Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Bro
 
 from typing import Any, Dict, List, Optional
 
-from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.verticals.base import StageDefinition, VerticalBase
 from victor.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
@@ -54,32 +54,32 @@ class ResearchAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_config(cls) -> VerticalConfig:
-        from victor.framework.tools import ToolSet
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Get Research-specific provider hints.
 
-        return VerticalConfig(
-            tools=ToolSet.from_tools(cls.get_tools()),
-            system_prompt=cls._get_system_prompt(),
-            stages=cls.get_stages(),
-            provider_hints={
-                "preferred_providers": ["anthropic", "openai", "google"],
-                "min_context_window": 100000,
-                "features": ["web_search", "large_context"],
-            },
-            evaluation_criteria=[
-                "accuracy",
-                "source_quality",
-                "comprehensiveness",
-                "clarity",
-                "attribution",
-                "objectivity",
-                "timeliness",
-            ],
-            metadata={
-                "vertical_name": cls.name,
-                "vertical_description": cls.description,
-            },
-        )
+        Override base class to specify preferred providers and features.
+        """
+        return {
+            "preferred_providers": ["anthropic", "openai", "google"],
+            "min_context_window": 100000,
+            "features": ["web_search", "large_context"],
+        }
+
+    @classmethod
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Get Research-specific evaluation criteria.
+
+        Override base class with research-focused criteria.
+        """
+        return [
+            "accuracy",
+            "source_quality",
+            "comprehensiveness",
+            "clarity",
+            "attribution",
+            "objectivity",
+            "timeliness",
+        ]
 
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
@@ -275,11 +275,11 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         return ResearchWorkflowProvider()
 
     @classmethod
-    def get_rl_config(cls) -> Optional[Any]:
-        """Get RL configuration for Research vertical.
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Get RL configuration provider for Research vertical.
 
         Returns:
-            ResearchRLConfig instance
+            ResearchRLConfig instance (implements RLConfigProviderProtocol)
         """
         from victor.verticals.research.rl import ResearchRLConfig
 
@@ -297,8 +297,8 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         return ResearchRLHooks()
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
-        """Get team specifications for Research tasks.
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Get team specification provider for Research tasks.
 
         Provides pre-configured team specifications for:
         - deep_research_team: Comprehensive multi-source research
@@ -308,8 +308,8 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         - synthesis_team: Report synthesis
 
         Returns:
-            Dict mapping team names to ResearchTeamSpec instances
+            ResearchTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        from victor.verticals.research.teams import RESEARCH_TEAM_SPECS
+        from victor.verticals.research.teams import ResearchTeamSpecProvider
 
-        return RESEARCH_TEAM_SPECS
+        return ResearchTeamSpecProvider()

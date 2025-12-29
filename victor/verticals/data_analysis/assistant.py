@@ -5,7 +5,7 @@ Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 
 from typing import Any, Dict, List, Optional, Set
 
-from victor.verticals.base import StageDefinition, VerticalBase, VerticalConfig
+from victor.verticals.base import StageDefinition, VerticalBase
 from victor.verticals.protocols import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
@@ -57,39 +57,34 @@ class DataAnalysisAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_config(cls) -> VerticalConfig:
-        """Get the complete configuration for Data Analysis vertical.
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Get Data Analysis-specific provider hints.
 
-        Uses base class implementation with Data Analysis-specific customizations.
+        Override base class to specify preferred providers and features.
         """
-        from victor.framework.tools import ToolSet
-
-        return VerticalConfig(
-            tools=ToolSet.from_tools(cls.get_tools()),
-            system_prompt=cls._get_system_prompt(),
-            stages=cls._get_stages(),
-            provider_hints={
-                "preferred_providers": ["anthropic", "openai"],
-                "min_context_window": 128000,  # Large context for data descriptions
-                "features": ["tool_calling", "large_context", "code_execution"],
-            },
-            evaluation_criteria=[
-                "statistical_correctness",
-                "visualization_quality",
-                "insight_clarity",
-                "reproducibility",
-                "data_privacy",
-                "methodology_transparency",
-            ],
-            metadata={
-                "vertical_name": cls.name,
-                "vertical_version": cls.version,
-                "description": cls.description,
-            },
-        )
+        return {
+            "preferred_providers": ["anthropic", "openai"],
+            "min_context_window": 128000,  # Large context for data descriptions
+            "features": ["tool_calling", "large_context", "code_execution"],
+        }
 
     @classmethod
-    def _get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Get Data Analysis-specific evaluation criteria.
+
+        Override base class with data analysis-focused criteria.
+        """
+        return [
+            "statistical_correctness",
+            "visualization_quality",
+            "insight_clarity",
+            "reproducibility",
+            "data_privacy",
+            "methodology_transparency",
+        ]
+
+    @classmethod
+    def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get Data Analysis-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -285,11 +280,11 @@ When presenting analysis:
         return DataAnalysisWorkflowProvider()
 
     @classmethod
-    def get_rl_config(cls) -> Optional[Any]:
-        """Get RL configuration for Data Analysis vertical.
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Get RL configuration provider for Data Analysis vertical.
 
         Returns:
-            DataAnalysisRLConfig instance
+            DataAnalysisRLConfig instance (implements RLConfigProviderProtocol)
         """
         from victor.verticals.data_analysis.rl import DataAnalysisRLConfig
 
@@ -307,8 +302,8 @@ When presenting analysis:
         return DataAnalysisRLHooks()
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
-        """Get team specifications for Data Analysis tasks.
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Get team specification provider for Data Analysis tasks.
 
         Provides pre-configured team specifications for:
         - eda_team: Exploratory data analysis
@@ -318,8 +313,8 @@ When presenting analysis:
         - visualization_team: Charts and dashboards
 
         Returns:
-            Dict mapping team names to DataAnalysisTeamSpec instances
+            DataAnalysisTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        from victor.verticals.data_analysis.teams import DATA_ANALYSIS_TEAM_SPECS
+        from victor.verticals.data_analysis.teams import DataAnalysisTeamSpecProvider
 
-        return DATA_ANALYSIS_TEAM_SPECS
+        return DataAnalysisTeamSpecProvider()

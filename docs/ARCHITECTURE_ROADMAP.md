@@ -64,11 +64,32 @@
 - `victor/framework/capability_loader.py` - Dynamic capability loading (23 tests)
 - 437 tests pass
 
+### Phase 5: SOLID Compliance & Framework Promotions ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| SRP: Remove get_config() overrides | ✅ | DevOps, DataAnalysis, Research now use base template method |
+| OCP: Protocol-based extension | ✅ | Verified - no hardcoded vertical checks in pipeline |
+| LSP: Central format adapter | ✅ | Created victor/verticals/format_adapter.py |
+| ISP: Fix method signatures | ✅ | Renamed get_rl_config→get_rl_config_provider, get_team_specs→get_team_spec_provider |
+| DIP: Protocol dependencies | ✅ | Orchestrator depends on protocols, not concrete verticals |
+| Canonical tool naming | ✅ | Created framework/tool_naming.py with ToolNames constants |
+| TaskTypeRegistry | ✅ | Created framework/task_types.py consolidating 5 enums |
+| Framework middleware | ✅ | LoggingMiddleware, SecretMaskingMiddleware, GitSafetyMiddleware |
+
+**Key Changes**:
+- `victor/verticals/format_adapter.py` - Central LSP-compliant format normalization
+- `victor/framework/tool_naming.py` - Canonical tool names to prevent Q-value fragmentation
+- `victor/framework/task_types.py` - Unified TaskTypeRegistry (19 core types)
+- `victor/framework/middleware.py` - Common middleware baseline for all verticals
+- TeamSpecProvider classes added to DevOps, DataAnalysis, Research teams
+- Method signature standardization across all verticals
+
 ---
 
 ## Roadmap Complete 🎉
 
-All four phases of the architecture roadmap have been completed:
+All five phases of the architecture roadmap have been completed:
 
 | Phase | Description | Status |
 |-------|-------------|--------|
@@ -76,18 +97,19 @@ All four phases of the architecture roadmap have been completed:
 | Phase 2 | Core Extraction | ✅ Complete |
 | Phase 3 | Architecture Improvements | ✅ Complete |
 | Phase 4 | Advanced Patterns | ✅ Complete |
+| Phase 5 | SOLID Compliance & Framework Promotions | ✅ Complete |
 
 ---
 
 ## Technical Debt Tracker
 
-### High Priority
+### Resolved (December 2025)
 
-| Issue | Location | Impact | Effort |
-|-------|----------|--------|--------|
-| UI layer protocol violations | victor/ui/*.py | ISP violation | Medium |
-| Workflow caching needed | victor/workflows/ | Performance | Medium |
-| MCP client resource leak | victor/mcp/client.py | Resource leak | Low |
+| Issue | Resolution | Evidence |
+|-------|------------|----------|
+| MCP client resource leak | ✅ Fixed | Added async context manager to victor/mcp/client.py |
+| Async blocking in MCP | ✅ Fixed | Replaced readline with asyncio.StreamReader in victor/mcp/server.py |
+| Workflow caching needed | ✅ Fixed | Created victor/workflows/cache.py with TTL-based caching |
 
 ### Medium Priority
 
@@ -95,7 +117,6 @@ All four phases of the architecture roadmap have been completed:
 |-------|----------|--------|--------|
 | Tool DI still uses global state | victor/tools/*.py | Testing difficulty | High |
 | Orchestrator size (3,178 lines) | victor/agent/orchestrator.py | Maintainability | High |
-| Async blocking in MCP | victor/mcp/server.py | Performance | Medium |
 
 ---
 
@@ -103,11 +124,11 @@ All four phases of the architecture roadmap have been completed:
 
 | Principle | Status | Evidence | Remaining Work |
 |-----------|--------|----------|----------------|
-| SRP | ✅ | Pipeline methods focused | - |
-| OCP | ✅ | Capability registry extensible | - |
-| LSP | ✅ | TaskTypeHint return types fixed | - |
-| ISP | ⚠️ | Protocols are focused | UI layer still accesses private attrs |
-| DIP | ✅ | Uses CapabilityRegistryProtocol | - |
+| SRP | ✅ | Verticals are declarative, pipeline handles integration | - |
+| OCP | ✅ | Extension via protocols + registries, no pipeline edits | - |
+| LSP | ✅ | Central VerticalFormatAdapter for format normalization | - |
+| ISP | ✅ | Provider protocols segregated (RL, Teams, Workflows, Prompts) | - |
+| DIP | ✅ | Orchestrator depends on VerticalContext + protocols | - |
 
 ---
 
