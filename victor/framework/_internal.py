@@ -32,6 +32,9 @@ from victor.framework.events import (
 )
 from victor.framework.tools import ToolSet
 
+# Import capability helpers for protocol-based access
+from victor.framework.vertical_integration import _check_capability, _invoke_capability
+
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
     from victor.verticals.base import VerticalBase
@@ -115,11 +118,13 @@ async def create_orchestrator_from_options(
 
     # Override provider/model if specified
     if provider != "anthropic" or model:
-        # Need to switch provider/model
-        if hasattr(orchestrator, "provider_manager"):
-            await orchestrator.provider_manager.switch_provider(
-                provider, model or orchestrator.model
+        # Need to switch provider/model - use capability-based check
+        if hasattr(orchestrator, "_provider_manager") or hasattr(orchestrator, "provider_manager"):
+            pm = getattr(orchestrator, "_provider_manager", None) or getattr(
+                orchestrator, "provider_manager", None
             )
+            if pm:
+                await pm.switch_provider(provider, model or orchestrator.model)
 
     # Apply vertical configuration using unified pipeline
     # This achieves parity with FrameworkShim CLI path
@@ -221,13 +226,17 @@ def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
     # The orchestrator's prompt_builder will use this if available
     orchestrator._framework_system_prompt = system_prompt
 
-    # If orchestrator has a prompt_builder, configure it
-    if hasattr(orchestrator, "prompt_builder"):
-        # Add vertical prompt as additional context
-        if hasattr(orchestrator.prompt_builder, "set_custom_prompt"):
-            orchestrator.prompt_builder.set_custom_prompt(system_prompt)
-        elif hasattr(orchestrator.prompt_builder, "_custom_prompt"):
-            orchestrator.prompt_builder._custom_prompt = system_prompt
+    # Use capability-based approach (protocol-first, fallback to hasattr)
+    if _check_capability(orchestrator, "custom_prompt"):
+        _invoke_capability(orchestrator, "custom_prompt", system_prompt)
+    elif _check_capability(orchestrator, "prompt_builder"):
+        # Fallback: try direct prompt builder access
+        prompt_builder = getattr(orchestrator, "prompt_builder", None)
+        if prompt_builder:
+            if hasattr(prompt_builder, "set_custom_prompt"):
+                prompt_builder.set_custom_prompt(system_prompt)
+            elif hasattr(prompt_builder, "_custom_prompt"):
+                prompt_builder._custom_prompt = system_prompt
 
 
 def configure_tools(

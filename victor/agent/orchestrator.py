@@ -96,6 +96,9 @@ from victor.agent.protocols import (
 # Mode-aware mixin for consistent mode controller access
 from victor.protocols.mode_aware import ModeAwareMixin
 
+# Capability registry mixin for explicit capability discovery (replaces hasattr)
+from victor.agent.capability_registry import CapabilityRegistryMixin
+
 # Config loaders for externalized configuration
 from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import (
@@ -321,11 +324,14 @@ def _detect_mentioned_tools(text: str) -> List[str]:
     return mentioned
 
 
-class AgentOrchestrator(ModeAwareMixin):
+class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     """Orchestrates agent interactions, tool execution, and provider communication.
 
     Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
     self.mode_controller, self.exploration_multiplier, etc.).
+
+    Uses CapabilityRegistryMixin for explicit capability discovery, replacing hasattr
+    duck-typing with type-safe protocol conformance. See capability_registry.py.
     """
 
     @staticmethod
@@ -745,12 +751,17 @@ class AgentOrchestrator(ModeAwareMixin):
         # Lazy initialization pattern - coordinator is created on first access
         self._mode_workflow_team_coordinator: Optional[Any] = None
 
+        # Initialize capability registry for explicit capability discovery
+        # This replaces hasattr duck-typing with type-safe protocol conformance
+        self.__init_capability_registry__()
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
             "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
             "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration, WorkflowOptimization, VerticalContext, ModeWorkflowTeamCoordinator"
+            "ObservabilityIntegration, WorkflowOptimization, VerticalContext, ModeWorkflowTeamCoordinator, "
+            "CapabilityRegistry"
         )
 
     # =====================================================================

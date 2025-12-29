@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 # Import canonical ToolCategory from tools.py (single source of truth)
 from victor.framework.tools import ToolCategory, _CATEGORY_TOOLS
 
+# Import capability helpers for protocol-based access
+from victor.framework.vertical_integration import _check_capability, _invoke_capability
+
 
 # =============================================================================
 # Protocols
@@ -347,8 +350,10 @@ class ToolConfigurator:
         Returns:
             Set of available tool names
         """
-        if hasattr(orchestrator, "tools") and orchestrator.tools:
-            return set(orchestrator.tools.keys())
+        # Check for tools attribute
+        tools = getattr(orchestrator, "tools", None)
+        if tools:
+            return set(tools.keys())
         return set()
 
     def _get_current_tools(self, orchestrator: "AgentOrchestrator") -> Set[str]:
@@ -360,7 +365,7 @@ class ToolConfigurator:
         Returns:
             Set of enabled tool names
         """
-        # Use ToolsProtocol method if available (proper API)
+        # Use capability-based check first (protocol-first approach)
         if hasattr(orchestrator, "get_enabled_tools") and callable(orchestrator.get_enabled_tools):
             return orchestrator.get_enabled_tools()
 
@@ -378,15 +383,17 @@ class ToolConfigurator:
             orchestrator: Target orchestrator
             tools: Tools to enable
         """
-        # Use ToolsProtocol method if available (proper API)
-        if hasattr(orchestrator, "set_enabled_tools") and callable(orchestrator.set_enabled_tools):
+        # Use capability-based approach (protocol-first, fallback to hasattr)
+        if _check_capability(orchestrator, "enabled_tools"):
+            _invoke_capability(orchestrator, "enabled_tools", tools)
+        elif hasattr(orchestrator, "set_enabled_tools") and callable(orchestrator.set_enabled_tools):
             orchestrator.set_enabled_tools(tools)
         else:
             # Fallback: log warning as this indicates protocol non-compliance
             import logging
 
             logging.getLogger(__name__).warning(
-                "Orchestrator does not implement set_enabled_tools(); "
+                "Orchestrator does not implement enabled_tools capability; "
                 "tool configuration may not be applied properly"
             )
 

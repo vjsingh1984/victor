@@ -538,6 +538,174 @@ class OrchestratorProtocol(Protocol):
 
 
 # =============================================================================
+# Capability Discovery Protocol
+# =============================================================================
+
+
+class CapabilityType(str, Enum):
+    """Types of orchestrator capabilities.
+
+    Categorizes capabilities for discovery and documentation.
+    """
+
+    TOOL = "tool"
+    """Tool-related capabilities (enable, disable, budget)."""
+
+    PROMPT = "prompt"
+    """Prompt building capabilities (system prompt, hints)."""
+
+    MODE = "mode"
+    """Mode/configuration capabilities (adaptive mode, budgets)."""
+
+    SAFETY = "safety"
+    """Safety-related capabilities (patterns, middleware)."""
+
+    RL = "rl"
+    """Reinforcement learning capabilities (hooks, learners)."""
+
+    TEAM = "team"
+    """Team/multi-agent capabilities (specs, coordination)."""
+
+    WORKFLOW = "workflow"
+    """Workflow capabilities (sequences, dependencies)."""
+
+    VERTICAL = "vertical"
+    """Vertical integration capabilities (context, extensions)."""
+
+
+@dataclass
+class OrchestratorCapability:
+    """Explicit capability declaration for orchestrator features.
+
+    Replaces hasattr/getattr duck-typing with explicit contracts.
+    Each capability declares how to interact with it.
+
+    Attributes:
+        name: Unique capability identifier
+        capability_type: Category of capability
+        setter: Method name to set/configure (if settable)
+        getter: Method name to get current value (if gettable)
+        attribute: Direct attribute name (if attribute access)
+        description: Human-readable description
+        required: Whether this capability is mandatory
+    """
+
+    name: str
+    capability_type: CapabilityType
+    setter: Optional[str] = None
+    getter: Optional[str] = None
+    attribute: Optional[str] = None
+    description: str = ""
+    required: bool = False
+
+    def __post_init__(self):
+        """Validate that at least one access method is specified."""
+        if not any([self.setter, self.getter, self.attribute]):
+            raise ValueError(
+                f"Capability '{self.name}' must specify at least one of: "
+                "setter, getter, or attribute"
+            )
+
+
+@runtime_checkable
+class CapabilityRegistryProtocol(Protocol):
+    """Protocol for capability discovery and invocation.
+
+    Enables explicit capability checking instead of hasattr duck-typing.
+    Implementations should register all capabilities at initialization.
+
+    Example:
+        # Instead of:
+        if hasattr(orch, "set_enabled_tools") and callable(orch.set_enabled_tools):
+            orch.set_enabled_tools(tools)
+
+        # Use:
+        if orch.has_capability("enabled_tools"):
+            orch.invoke_capability("enabled_tools", tools)
+    """
+
+    def get_capabilities(self) -> Dict[str, OrchestratorCapability]:
+        """Get all registered capabilities.
+
+        Returns:
+            Dict mapping capability names to their declarations
+        """
+        ...
+
+    def has_capability(self, name: str) -> bool:
+        """Check if a capability is available.
+
+        Args:
+            name: Capability name to check
+
+        Returns:
+            True if capability is registered and functional
+        """
+        ...
+
+    def get_capability(self, name: str) -> Optional[OrchestratorCapability]:
+        """Get a specific capability declaration.
+
+        Args:
+            name: Capability name
+
+        Returns:
+            Capability declaration or None if not found
+        """
+        ...
+
+    def invoke_capability(
+        self,
+        name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Invoke a capability's setter method.
+
+        Args:
+            name: Capability name
+            *args: Positional arguments for setter
+            **kwargs: Keyword arguments for setter
+
+        Returns:
+            Result from setter method
+
+        Raises:
+            KeyError: If capability not found
+            TypeError: If capability has no setter
+        """
+        ...
+
+    def get_capability_value(self, name: str) -> Any:
+        """Get a capability's current value via getter or attribute.
+
+        Args:
+            name: Capability name
+
+        Returns:
+            Current value
+
+        Raises:
+            KeyError: If capability not found
+            TypeError: If capability has no getter/attribute
+        """
+        ...
+
+    def get_capabilities_by_type(
+        self, capability_type: CapabilityType
+    ) -> Dict[str, OrchestratorCapability]:
+        """Get all capabilities of a specific type.
+
+        Args:
+            capability_type: Type to filter by
+
+        Returns:
+            Dict of matching capabilities
+        """
+        ...
+
+
+# =============================================================================
 # Protocol Utilities
 # =============================================================================
 
