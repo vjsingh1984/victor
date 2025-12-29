@@ -40,6 +40,7 @@ from victor.workflows.definition import (
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents import SubAgentOrchestrator
+    from victor.agent.rl.checkpoint_store import CheckpointStore
 
 logger = logging.getLogger(__name__)
 
@@ -182,15 +183,17 @@ class WorkflowResult:
 
 
 class WorkflowExecutor:
-    """Executes workflow definitions.
+    """Executes workflow definitions with optional checkpointing.
 
     Traverses the workflow DAG and executes nodes using the
-    SubAgent infrastructure.
+    SubAgent infrastructure. Supports checkpointing for workflow
+    resumption via the existing RL CheckpointStore.
 
     Attributes:
         orchestrator: Agent orchestrator for spawning agents
         max_parallel: Maximum parallel node executions
         default_timeout: Default timeout per node (seconds)
+        checkpointer: Optional CheckpointStore for persistence
 
     Example:
         executor = WorkflowExecutor(orchestrator)
@@ -198,6 +201,15 @@ class WorkflowExecutor:
 
         if result.success:
             print(result.get_output("analyze"))
+
+        # With checkpointing for resumption:
+        from victor.agent.rl.checkpoint_store import get_checkpoint_store
+        executor = WorkflowExecutor(orchestrator, checkpointer=get_checkpoint_store())
+        result = await executor.execute(
+            workflow,
+            initial_context={"files": ["main.py"]},
+            thread_id="my-workflow-123",
+        )
     """
 
     def __init__(
@@ -206,6 +218,7 @@ class WorkflowExecutor:
         *,
         max_parallel: int = 4,
         default_timeout: float = 300.0,
+        checkpointer: Optional["CheckpointStore"] = None,
     ):
         """Initialize executor.
 
@@ -213,10 +226,12 @@ class WorkflowExecutor:
             orchestrator: Agent orchestrator instance
             max_parallel: Maximum parallel executions
             default_timeout: Default timeout per node
+            checkpointer: Optional CheckpointStore for persistence
         """
         self.orchestrator = orchestrator
         self.max_parallel = max_parallel
         self.default_timeout = default_timeout
+        self._checkpointer = checkpointer
         self._sub_agents: Optional["SubAgentOrchestrator"] = None
         self._active_executions: Dict[str, asyncio.Task] = {}
 
@@ -235,25 +250,42 @@ class WorkflowExecutor:
         initial_context: Optional[Dict[str, Any]] = None,
         *,
         timeout: Optional[float] = None,
+        thread_id: Optional[str] = None,
     ) -> WorkflowResult:
-        """Execute a workflow.
+        """Execute a workflow with optional checkpointing.
 
         Args:
             workflow: Workflow definition to execute
             initial_context: Initial context data
             timeout: Overall timeout (None = no limit)
+            thread_id: Thread ID for checkpointing (enables resume)
 
         Returns:
             WorkflowResult with execution outcome
         """
         execution_id = uuid.uuid4().hex[:8]
+        thread_id = thread_id or execution_id
+
         logger.info(
-            f"Starting workflow '{workflow.name}' (execution_id={execution_id})"
+            f"Starting workflow '{workflow.name}' (execution_id={execution_id}, thread_id={thread_id})"
         )
+
+        # Check for checkpoint to resume from
+        resume_from_node: Optional[str] = None
+        if self._checkpointer:
+            checkpoint = self._checkpointer.get_latest_checkpoint(f"workflow_{thread_id}")
+            if checkpoint:
+                logger.info(f"Resuming from checkpoint at node: {checkpoint.state.get('last_node')}")
+                initial_context = checkpoint.state.get("context", {})
+                resume_from_node = checkpoint.state.get("next_node")
 
         context = WorkflowContext(
             data=initial_context.copy() if initial_context else {},
-            metadata={"execution_id": execution_id, "workflow_name": workflow.name},
+            metadata={
+                "execution_id": execution_id,
+                "workflow_name": workflow.name,
+                "thread_id": thread_id,
+            },
         )
 
         start_time = time.time()
@@ -261,11 +293,15 @@ class WorkflowExecutor:
         try:
             if timeout:
                 await asyncio.wait_for(
-                    self._execute_workflow(workflow, context),
+                    self._execute_workflow(
+                        workflow, context, thread_id, resume_from_node
+                    ),
                     timeout=timeout,
                 )
             else:
-                await self._execute_workflow(workflow, context)
+                await self._execute_workflow(
+                    workflow, context, thread_id, resume_from_node
+                )
 
             total_duration = time.time() - start_time
             total_tool_calls = sum(
@@ -319,19 +355,26 @@ class WorkflowExecutor:
         self,
         workflow: WorkflowDefinition,
         context: WorkflowContext,
+        thread_id: str = "",
+        resume_from_node: Optional[str] = None,
     ) -> None:
-        """Execute the workflow DAG.
+        """Execute the workflow DAG with optional checkpoint resume.
 
         Args:
             workflow: Workflow to execute
             context: Execution context
+            thread_id: Thread ID for checkpointing
+            resume_from_node: Node to resume from (if resuming)
         """
         if not workflow.start_node:
             raise ValueError("Workflow has no start node")
 
         # Track executed nodes to prevent loops
         executed: Set[str] = set()
-        to_execute: List[str] = [workflow.start_node]
+
+        # Resume from checkpoint node or start
+        start_node = resume_from_node or workflow.start_node
+        to_execute: List[str] = [start_node]
 
         while to_execute:
             node_id = to_execute.pop(0)
@@ -349,6 +392,19 @@ class WorkflowExecutor:
             context.add_result(result)
             executed.add(node_id)
 
+            # Determine next nodes
+            next_nodes = self._get_next_nodes(node, context)
+
+            # Save checkpoint after each node (for resumption)
+            if self._checkpointer and thread_id:
+                self._save_workflow_checkpoint(
+                    thread_id=thread_id,
+                    workflow_name=workflow.name,
+                    last_node=node_id,
+                    next_node=next_nodes[0] if next_nodes else None,
+                    context_data=dict(context.data),
+                )
+
             # Emit RL event for workflow step
             self._emit_workflow_step_event(
                 workflow_name=workflow.name,
@@ -364,8 +420,6 @@ class WorkflowExecutor:
                     logger.warning(f"Stopping workflow due to node failure: {node_id}")
                     break
 
-            # Determine next nodes
-            next_nodes = self._get_next_nodes(node, context)
             to_execute.extend(next_nodes)
 
     def _get_next_nodes(
@@ -798,6 +852,48 @@ class WorkflowExecutor:
 
         except Exception as e:
             logger.debug(f"Workflow completed event emission failed: {e}")
+
+    def _save_workflow_checkpoint(
+        self,
+        thread_id: str,
+        workflow_name: str,
+        last_node: str,
+        next_node: Optional[str],
+        context_data: Dict[str, Any],
+    ) -> None:
+        """Save workflow checkpoint using existing RL CheckpointStore.
+
+        Args:
+            thread_id: Thread identifier for this workflow execution
+            workflow_name: Name of the workflow
+            last_node: ID of the last completed node
+            next_node: ID of the next node to execute (if any)
+            context_data: Current context state
+        """
+        if not self._checkpointer:
+            return
+
+        try:
+            import time
+
+            version = f"{last_node}_{int(time.time())}"
+            self._checkpointer.create_checkpoint(
+                learner_name=f"workflow_{thread_id}",
+                version=version,
+                state={
+                    "workflow_name": workflow_name,
+                    "last_node": last_node,
+                    "next_node": next_node,
+                    "context": context_data,
+                },
+                metadata={
+                    "checkpoint_type": "workflow",
+                },
+            )
+            logger.debug(f"Saved workflow checkpoint: {thread_id}/{last_node}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save workflow checkpoint: {e}")
 
 
 __all__ = [
