@@ -15,7 +15,7 @@
 """Time-travel debugging via conversation state checkpoints.
 
 This module provides LangGraph-style checkpoint functionality for conversation
-state persistence, enabling replay, forking, and debugging of agent sessions.
+state persistence, enabling replay, forking, branching, and debugging of agent sessions.
 
 Key Features:
 - Save/restore conversation state at any point
@@ -23,8 +23,11 @@ Key Features:
 - Diff checkpoints to understand state changes
 - Auto-checkpoint every N tool calls
 - SQLite backend for embedded persistence
+- Tree-structured checkpoint navigation
+- Named branches with merge capabilities
+- Replay from any checkpoint
 
-Usage:
+Usage - Basic Checkpointing:
     from victor.checkpoints import CheckpointManager, SQLiteCheckpointBackend
 
     backend = SQLiteCheckpointBackend(storage_path)
@@ -41,24 +44,77 @@ Usage:
 
     # Fork session
     new_state = await manager.fork_from_checkpoint(checkpoint_id, new_session_id)
+
+Usage - Multi-Branch Workflows:
+    from victor.checkpoints import SQLiteCheckpointBackend
+    from victor.checkpoints.tree import BranchManager, CheckpointTree, MergeStrategy
+
+    backend = SQLiteCheckpointBackend(storage_path)
+    branch_mgr = BranchManager(backend)
+
+    # Create experiment branch
+    await branch_mgr.create_branch("experiment", session_id)
+    await branch_mgr.checkout("experiment")
+
+    # ... make changes, create checkpoints ...
+
+    # Merge back to main
+    result = await branch_mgr.merge("experiment", "main", session_id)
+
+    # Visualize tree
+    tree = await branch_mgr.get_tree(session_id)
+    print(tree.to_ascii())
 """
 
 from victor.checkpoints.protocol import (
     CheckpointMetadata,
     CheckpointDiff,
+    CheckpointData,
     CheckpointManagerProtocol,
     CheckpointError,
     CheckpointNotFoundError,
+    CheckpointStorageError,
+    DiffType,
+    FieldDiff,
 )
 from victor.checkpoints.manager import CheckpointManager
 from victor.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+from victor.checkpoints.tree import (
+    BranchStatus,
+    MergeStrategy,
+    ConflictResolution,
+    BranchMetadata,
+    CheckpointNode,
+    MergeResult,
+    ReplayStep,
+    CheckpointTree,
+    BranchManager,
+    BranchStorageProtocol,
+)
 
 __all__ = [
+    # Protocol types
     "CheckpointMetadata",
     "CheckpointDiff",
+    "CheckpointData",
     "CheckpointManagerProtocol",
     "CheckpointError",
     "CheckpointNotFoundError",
+    "CheckpointStorageError",
+    "DiffType",
+    "FieldDiff",
+    # Core manager
     "CheckpointManager",
     "SQLiteCheckpointBackend",
+    # Tree/Branch types
+    "BranchStatus",
+    "MergeStrategy",
+    "ConflictResolution",
+    "BranchMetadata",
+    "CheckpointNode",
+    "MergeResult",
+    "ReplayStep",
+    "CheckpointTree",
+    "BranchManager",
+    "BranchStorageProtocol",
 ]
