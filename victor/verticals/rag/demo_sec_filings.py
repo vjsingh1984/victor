@@ -299,42 +299,44 @@ async def ingest_sec_filings(
     return results
 
 
-async def query_filings(query: str, top_k: int = 5) -> None:
+async def query_filings(
+    query: str,
+    top_k: int = 5,
+    synthesize: bool = False,
+    provider: str = "ollama",
+    model: str = None,
+) -> None:
     """Query ingested SEC filings.
 
     Args:
         query: Search query
         top_k: Number of results to return
+        synthesize: Use LLM to synthesize answer
+        provider: LLM provider for synthesis
+        model: Model name for synthesis
     """
-    from victor.verticals.rag.document_store import DocumentStore
+    from victor.verticals.rag.tools.query import RAGQueryTool
 
-    store = DocumentStore()
-    await store.initialize()
+    tool = RAGQueryTool()
 
-    logger.info(f"\nSearching for: {query}\n")
+    logger.info(f"\nQuerying: {query}\n")
+    if synthesize:
+        logger.info(f"Using {provider} for answer synthesis...")
 
-    results = await store.search(query, k=top_k)
+    result = await tool.execute(
+        question=query,
+        k=top_k,
+        synthesize=synthesize,
+        provider=provider if synthesize else None,
+        model=model if synthesize else None,
+    )
 
-    if not results:
-        logger.info("No results found. Have you ingested any filings?")
+    if not result.success:
+        logger.error(f"Query failed: {result.output}")
         return
 
     print("=" * 80)
-    print(f"Found {len(results)} relevant chunks:\n")
-
-    for i, result in enumerate(results, 1):
-        metadata = result.metadata
-        company = metadata.get("company", "Unknown")
-        filing_type = metadata.get("filing_type", "N/A")
-        filing_date = metadata.get("filing_date", "N/A")
-
-        print(f"[{i}] {company} - {filing_type} ({filing_date})")
-        print(f"    Score: {result.score:.4f}")
-        print(f"    Content preview:")
-        preview = result.content[:300].replace("\n", " ")
-        print(f"    {preview}...")
-        print()
-
+    print(result.output)
     print("=" * 80)
 
 
@@ -400,6 +402,25 @@ def main():
         help="Query the ingested filings instead of ingesting",
     )
     parser.add_argument(
+        "--synthesize",
+        "-S",
+        action="store_true",
+        help="Use LLM to synthesize answer (requires provider)",
+    )
+    parser.add_argument(
+        "--provider",
+        "-p",
+        type=str,
+        default="ollama",
+        help="LLM provider for synthesis (default: ollama)",
+    )
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        help="Model name for synthesis (provider-specific)",
+    )
+    parser.add_argument(
         "--stats",
         "-s",
         action="store_true",
@@ -427,7 +448,12 @@ def main():
         return
 
     if args.query:
-        asyncio.run(query_filings(args.query))
+        asyncio.run(query_filings(
+            args.query,
+            synthesize=args.synthesize,
+            provider=args.provider,
+            model=args.model,
+        ))
         return
 
     # Ingest filings
@@ -457,8 +483,14 @@ def main():
         print(f"  {company_name}: {chunks} chunks")
     print(f"{'=' * 60}")
     print("\nYou can now query the filings:")
+    print('  # Context only (default):')
     print('  python -m victor.verticals.rag.demo_sec_filings --query "What is Apple\'s revenue?"')
-    print('  python -m victor.verticals.rag.demo_sec_filings --query "Risk factors for Amazon"')
+    print('')
+    print('  # With LLM synthesis (using Ollama):')
+    print('  python -m victor.verticals.rag.demo_sec_filings --query "What is Apple\'s revenue?" --synthesize')
+    print('')
+    print('  # With specific provider/model:')
+    print('  python -m victor.verticals.rag.demo_sec_filings --query "Risk factors" -S -p anthropic -m claude-sonnet-4-20250514')
     print()
 
 

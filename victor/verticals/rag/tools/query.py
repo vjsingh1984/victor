@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RAG Query Tool - Query with automatic context retrieval."""
+"""RAG Query Tool - Query with automatic context retrieval and LLM synthesis."""
 
 import logging
 from typing import Any, Dict, List, Optional
@@ -22,23 +22,45 @@ from victor.tools.base import BaseTool, CostTier, ToolResult
 logger = logging.getLogger(__name__)
 
 
-class RAGQueryTool(BaseTool):
-    """Query the RAG knowledge base with automatic context retrieval.
+# Default RAG system prompt for answer synthesis
+RAG_SYSTEM_PROMPT = """You are a helpful assistant answering questions based on retrieved documents.
 
-    Retrieves relevant context and formats it for LLM consumption,
+Instructions:
+1. Base your answer ONLY on the provided context
+2. If the context doesn't contain enough information, say so clearly
+3. Cite sources using [Source N] format
+4. Be concise but comprehensive
+5. If multiple sources agree, synthesize them into a coherent answer
+6. If sources conflict, acknowledge the discrepancy
+
+Do NOT make up information not present in the context."""
+
+
+class RAGQueryTool(BaseTool):
+    """Query the RAG knowledge base with automatic context retrieval and LLM synthesis.
+
+    Retrieves relevant context and uses an LLM to synthesize an answer,
     including source citations.
 
     Example:
+        # Get context only
+        result = await tool.execute(question="What is the auth flow?", synthesize=False)
+
+        # Get synthesized answer (default)
+        result = await tool.execute(question="What is the auth flow?")
+
+        # Use specific provider/model
         result = await tool.execute(
-            question="What is the authentication flow?",
-            k=5,
+            question="What is the auth flow?",
+            provider="ollama",
+            model="llama3.2:3b"
         )
     """
 
     name = "rag_query"
     description = (
-        "Query the RAG knowledge base and retrieve relevant context for answering. "
-        "Returns formatted context with source citations."
+        "Query the RAG knowledge base and synthesize an answer using an LLM. "
+        "Returns an answer with source citations grounded in retrieved documents."
     )
 
     parameters = {
@@ -53,9 +75,22 @@ class RAGQueryTool(BaseTool):
                 "description": "Number of context chunks to retrieve (default: 5)",
                 "default": 5,
             },
+            "synthesize": {
+                "type": "boolean",
+                "description": "Use LLM to synthesize answer (default: True)",
+                "default": True,
+            },
+            "provider": {
+                "type": "string",
+                "description": "LLM provider to use (e.g., 'ollama', 'anthropic', 'openai')",
+            },
+            "model": {
+                "type": "string",
+                "description": "Model to use for synthesis (provider-specific)",
+            },
             "max_context_chars": {
                 "type": "integer",
-                "description": "Maximum characters of context to return",
+                "description": "Maximum characters of context to use",
                 "default": 4000,
             },
         },
@@ -64,24 +99,31 @@ class RAGQueryTool(BaseTool):
 
     @property
     def cost_tier(self) -> CostTier:
-        return CostTier.LOW
+        # MEDIUM when synthesizing (LLM call), LOW for context-only
+        return CostTier.MEDIUM
 
     async def execute(
         self,
         question: str,
         k: int = 5,
+        synthesize: bool = True,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
         max_context_chars: int = 4000,
         **kwargs,
     ) -> ToolResult:
-        """Execute RAG query.
+        """Execute RAG query with optional LLM synthesis.
 
         Args:
             question: Question to answer
             k: Number of context chunks
+            synthesize: Whether to use LLM to synthesize answer
+            provider: LLM provider (e.g., 'ollama', 'anthropic')
+            model: Model name for synthesis
             max_context_chars: Maximum context length
 
         Returns:
-            ToolResult with formatted context and citations
+            ToolResult with synthesized answer or formatted context
         """
         from victor.verticals.rag.document_store import DocumentStore
 
@@ -131,28 +173,135 @@ class RAGQueryTool(BaseTool):
                 sources.append(f"{i}. {source} (relevance: {result.score:.2f})")
                 total_chars += len(chunk_text)
 
-            # Format output
-            output = (
-                f"QUESTION: {question}\n\n"
-                f"RETRIEVED CONTEXT ({len(context_parts)} sources):\n"
-                f"{'=' * 50}\n\n"
-                + "\n\n---\n\n".join(context_parts)
-                + f"\n\n{'=' * 50}\n"
-                f"SOURCES:\n" + "\n".join(sources)
-                + "\n\nUse this context to answer the question. "
-                "Cite sources by their number (e.g., [1], [2])."
+            # Build context string
+            context_str = "\n\n---\n\n".join(context_parts)
+
+            # If not synthesizing, return context only
+            if not synthesize:
+                output = (
+                    f"QUESTION: {question}\n\n"
+                    f"RETRIEVED CONTEXT ({len(context_parts)} sources):\n"
+                    f"{'=' * 50}\n\n"
+                    + context_str
+                    + f"\n\n{'=' * 50}\n"
+                    f"SOURCES:\n" + "\n".join(sources)
+                    + "\n\nUse this context to answer the question. "
+                    "Cite sources by their number (e.g., [1], [2])."
+                )
+                return ToolResult(success=True, output=output)
+
+            # Synthesize answer using LLM
+            answer = await self._synthesize_answer(
+                question=question,
+                context=context_str,
+                sources=sources,
+                provider=provider,
+                model=model,
             )
 
-            return ToolResult(
-                success=True,
-                output=output,
+            # Format final output
+            output = (
+                f"QUESTION: {question}\n\n"
+                f"ANSWER:\n{answer}\n\n"
+                f"{'=' * 50}\n"
+                f"SOURCES USED:\n" + "\n".join(sources)
             )
+
+            return ToolResult(success=True, output=output)
 
         except Exception as e:
             logger.exception(f"Query failed: {e}")
             return ToolResult(
                 success=False,
                 output=f"Query failed: {str(e)}",
+            )
+
+    async def _synthesize_answer(
+        self,
+        question: str,
+        context: str,
+        sources: List[str],
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> str:
+        """Synthesize an answer using an LLM provider.
+
+        Args:
+            question: The user's question
+            context: Retrieved context from documents
+            sources: List of source citations
+            provider: LLM provider name
+            model: Model name
+
+        Returns:
+            Synthesized answer string
+        """
+        from victor.config.settings import get_settings
+        from victor.providers.registry import ProviderRegistry
+
+        settings = get_settings()
+
+        # Determine provider
+        if not provider:
+            provider = settings.default_provider or "ollama"
+
+        # Get provider instance
+        try:
+            provider_instance = ProviderRegistry.get(provider)
+            if provider_instance is None:
+                # Try to create provider
+                provider_class = ProviderRegistry.get_class(provider)
+                if provider_class is None:
+                    raise ValueError(f"Provider '{provider}' not found")
+                provider_instance = provider_class()
+        except Exception as e:
+            logger.warning(f"Failed to get provider {provider}: {e}")
+            # Fallback: return context with instruction
+            return (
+                f"[Could not connect to {provider} for synthesis]\n\n"
+                f"Based on the retrieved context:\n{context}\n\n"
+                f"Please answer: {question}"
+            )
+
+        # Build prompt for synthesis
+        user_prompt = f"""Based on the following context, answer the question.
+
+CONTEXT:
+{context}
+
+QUESTION: {question}
+
+Provide a clear, concise answer citing sources using [Source N] format."""
+
+        messages = [
+            {"role": "system", "content": RAG_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Call provider
+        try:
+            # Use specified model or provider default
+            call_model = model or getattr(provider_instance, "default_model", None)
+
+            response = await provider_instance.chat(
+                messages=messages,
+                model=call_model,
+                temperature=0.3,  # Lower temperature for factual answers
+            )
+
+            # Extract answer from response
+            if hasattr(response, "content"):
+                return response.content
+            elif hasattr(response, "message"):
+                return response.message.get("content", str(response))
+            else:
+                return str(response)
+
+        except Exception as e:
+            logger.error(f"LLM synthesis failed: {e}")
+            return (
+                f"[Synthesis failed: {str(e)}]\n\n"
+                f"Retrieved context for your question:\n{context[:1000]}..."
             )
 
     def _get_document_store(self):
