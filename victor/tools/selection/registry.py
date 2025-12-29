@@ -124,9 +124,7 @@ class ToolSelectionStrategyRegistry:
             ValueError: If name exists and replace=False
         """
         if name in self._strategies and not replace:
-            raise ValueError(
-                f"Strategy '{name}' already registered. Use replace=True to override."
-            )
+            raise ValueError(f"Strategy '{name}' already registered. Use replace=True to override.")
 
         self._strategies[name] = strategy
         logger.debug(f"Registered strategy: {name}")

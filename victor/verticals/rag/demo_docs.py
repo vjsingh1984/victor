@@ -93,14 +93,27 @@ async def ingest_project_docs(
 
         # Filter files
         files = [
-            f for f in files
+            f
+            for f in files
             if f.is_file()
             and str(f) not in processed_files
-            and not any(skip in str(f) for skip in [
-                "__pycache__", ".git", "node_modules", ".venv",
-                "venv", ".tox", ".pytest_cache", "dist", "build",
-                ".egg-info", ".victor/", "archive/"
-            ])
+            and not any(
+                skip in str(f)
+                for skip in [
+                    "__pycache__",
+                    ".git",
+                    "node_modules",
+                    ".venv",
+                    "venv",
+                    ".tox",
+                    ".pytest_cache",
+                    "dist",
+                    "build",
+                    ".egg-info",
+                    ".victor/",
+                    "archive/",
+                ]
+            )
         ]
 
         if not files:
@@ -194,7 +207,7 @@ async def query_docs(query: str, top_k: int = 5) -> None:
         print(f"[{i}] {rel_path}")
         print(f"    Project: {project}")
         print(f"    Score: {result.score:.4f}")
-        print(f"    Content preview:")
+        print("    Content preview:")
         preview = result.content[:400].replace("\n", " ")
         print(f"    {preview}...")
         print()
@@ -220,7 +233,7 @@ async def show_stats() -> None:
 
     docs = await store.list_documents()
     if docs:
-        print(f"\nDocuments by project:")
+        print("\nDocuments by project:")
         by_project: Dict[str, int] = {}
         for doc in docs:
             project = doc.metadata.get("project", "Other")
@@ -339,10 +352,10 @@ def main():
     print("\nYou can now query the documentation using victor CLI:")
     print('  victor rag query "How do I add a new provider?"')
     print('  victor rag query "What tools are available?" --synthesize')
-    print('')
-    print('  # View statistics and list documents:')
-    print('  victor rag stats')
-    print('  victor rag list')
+    print("")
+    print("  # View statistics and list documents:")
+    print("  victor rag stats")
+    print("  victor rag list")
     print()
 
 

@@ -1222,9 +1222,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         if self._mode_workflow_team_coordinator is None:
             self._mode_workflow_team_coordinator = (
-                self._factory.create_mode_workflow_team_coordinator(
-                    self._vertical_context
-                )
+                self._factory.create_mode_workflow_team_coordinator(self._vertical_context)
             )
             logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
 
@@ -1279,9 +1277,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync coordinator with new vertical context (if already initialized)
         if self._mode_workflow_team_coordinator is not None:
             self._mode_workflow_team_coordinator.set_vertical_context(context)
-            logger.debug(
-                f"Coordinator synced with vertical context: {context.vertical_name}"
-            )
+            logger.debug(f"Coordinator synced with vertical context: {context.vertical_name}")
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 

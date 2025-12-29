@@ -89,10 +89,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         from victor.safety.pii import PII_COLUMN_PATTERNS as CORE_PII_PATTERNS
 
         # Return simplified dict format for backward compatibility
-        return {
-            pii_type.value: pattern
-            for pii_type, pattern in CORE_PII_PATTERNS.items()
-        }
+        return {pii_type.value: pattern for pii_type, pattern in CORE_PII_PATTERNS.items()}
 
     def detect_pii_columns(self, columns: List[str]) -> List[Tuple[str, str]]:
         """Detect potential PII columns in a dataframe.

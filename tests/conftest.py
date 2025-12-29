@@ -144,6 +144,7 @@ def empty_workflow_graph():
     @dataclass
     class TestState(State):
         """Minimal state for testing."""
+
         value: str = ""
 
     return StateGraph(TestState, name="test_workflow")
@@ -162,6 +163,7 @@ def linear_workflow_graph():
     @dataclass
     class LinearState(State):
         """State for linear workflow."""
+
         value: str = ""
         step: int = 0
 
@@ -204,6 +206,7 @@ def branching_workflow_graph():
     @dataclass
     class BranchState(State):
         """State for branching workflow."""
+
         value: str = ""
         branch: str = "default"
 
@@ -275,13 +278,15 @@ def mock_team_coordinator():
     from unittest.mock import AsyncMock, MagicMock
 
     coordinator = MagicMock()
-    coordinator.execute_team = AsyncMock(return_value=MagicMock(
-        success=True,
-        final_output="Test output",
-        member_results={},
-        total_tool_calls=5,
-        total_duration=10.0,
-    ))
+    coordinator.execute_team = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            final_output="Test output",
+            member_results={},
+            total_tool_calls=5,
+            total_duration=10.0,
+        )
+    )
     coordinator.set_progress_callback = MagicMock()
     return coordinator
 
@@ -316,6 +321,7 @@ def auto_approve_handler():
             status=HITLStatus.APPROVED,
             approved=True,
         )
+
     return handler
 
 
@@ -335,6 +341,7 @@ def auto_reject_handler():
             approved=False,
             reason="Auto-rejected for testing",
         )
+
     return handler
 
 

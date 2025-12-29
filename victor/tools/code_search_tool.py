@@ -45,6 +45,7 @@ def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any
     # Fallback to global cache for backward compatibility
     return _INDEX_CACHE
 
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",

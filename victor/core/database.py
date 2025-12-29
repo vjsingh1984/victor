@@ -303,9 +303,7 @@ class DatabaseManager:
         Returns:
             List of table names
         """
-        rows = self.query(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
@@ -374,10 +372,12 @@ class DatabaseManager:
 
         try:
             # Get tables from legacy database (excluding sqlite internal tables)
-            cursor = conn.execute(f"""
+            cursor = conn.execute(
+                f"""
                 SELECT name FROM legacy_{source_name}.sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """)
+            """
+            )
             tables = [row[0] for row in cursor.fetchall()]
 
             migrated = 0
@@ -388,27 +388,28 @@ class DatabaseManager:
                     source_count = conn.execute(
                         f"SELECT COUNT(*) FROM legacy_{source_name}.{table}"
                     ).fetchone()[0]
-                    target_count = conn.execute(
-                        f"SELECT COUNT(*) FROM {table}"
-                    ).fetchone()[0]
+                    target_count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
                     if source_count > 0 and target_count == 0:
                         # Copy data from source to existing target
-                        conn.execute(f"""
+                        conn.execute(
+                            f"""
                             INSERT INTO {table}
                             SELECT * FROM legacy_{source_name}.{table}
-                        """)
-                        logger.debug(
-                            f"Copied {source_count} rows from legacy {table}"
+                        """
                         )
+                        logger.debug(f"Copied {source_count} rows from legacy {table}")
                         migrated += 1
                     continue
 
                 # Get table schema
-                schema_row = conn.execute(f"""
+                schema_row = conn.execute(
+                    f"""
                     SELECT sql FROM legacy_{source_name}.sqlite_master
                     WHERE type='table' AND name=?
-                """, (table,)).fetchone()
+                """,
+                    (table,),
+                ).fetchone()
 
                 if schema_row and schema_row[0]:
                     # Create table in target
@@ -419,16 +420,21 @@ class DatabaseManager:
                             raise
 
                     # Copy data
-                    conn.execute(f"""
+                    conn.execute(
+                        f"""
                         INSERT INTO {table}
                         SELECT * FROM legacy_{source_name}.{table}
-                    """)
+                    """
+                    )
 
                     # Copy indexes
-                    idx_cursor = conn.execute(f"""
+                    idx_cursor = conn.execute(
+                        f"""
                         SELECT sql FROM legacy_{source_name}.sqlite_master
                         WHERE type='index' AND tbl_name=? AND sql IS NOT NULL
-                    """, (table,))
+                    """,
+                        (table,),
+                    )
                     for idx_row in idx_cursor:
                         try:
                             conn.execute(idx_row[0])
@@ -509,9 +515,7 @@ class DatabaseManager:
     def _ensure_async_state(self) -> None:
         """Initialize async-related state if not already done."""
         if not hasattr(self, "_write_queue"):
-            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = (
-                queue.Queue()
-            )
+            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = queue.Queue()
             self._write_lock = threading.Lock()
             self._batch_size = 100
             self._flush_interval = 5.0
@@ -734,18 +738,32 @@ class ProjectDatabaseManager:
     # Tables that should stay in project database (not global)
     PROJECT_TABLES = {
         # Graph tables (new consolidated names)
-        "graph_node", "graph_edge", "graph_file_mtime",
+        "graph_node",
+        "graph_edge",
+        "graph_file_mtime",
         # Legacy graph tables (for migration)
-        "nodes", "edges", "file_mtimes",
-        "symbols", "references", "definitions", "imports", "files",
+        "nodes",
+        "edges",
+        "file_mtimes",
+        "symbols",
+        "references",
+        "definitions",
+        "imports",
+        "files",
         # Conversation tables
-        "conversations", "messages", "conversation_metadata",
+        "conversations",
+        "messages",
+        "conversation_metadata",
         # Entity tables
-        "entities", "entity_relations", "entity_mentions",
+        "entities",
+        "entity_relations",
+        "entity_mentions",
         # Mode learning (project-specific preferences)
-        "mode_preferences", "mode_history",
+        "mode_preferences",
+        "mode_history",
         # FTS tables
-        "nodes_fts", "graph_node_fts",
+        "nodes_fts",
+        "graph_node_fts",
     }
 
     def __init__(self, project_path: Optional[Path] = None):
@@ -782,13 +800,15 @@ class ProjectDatabaseManager:
         conn.execute("PRAGMA foreign_keys=ON")
 
         # Create metadata table
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS _project_metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT,
                 updated_at TEXT
             )
-        """)
+        """
+        )
 
         # Create project-level tables (graph, etc.)
         for schema_sql in Schema.get_project_schemas():
@@ -870,9 +890,7 @@ class ProjectDatabaseManager:
 
     def get_tables(self) -> List[str]:
         """Get list of all tables."""
-        rows = self.query(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
@@ -882,9 +900,7 @@ class ProjectDatabaseManager:
                 return
 
             # Check if already migrated
-            cursor = conn.execute(
-                "SELECT value FROM _project_metadata WHERE key = 'migrated_at'"
-            )
+            cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'migrated_at'")
             row = cursor.fetchone()
             if row:
                 logger.debug(f"Project database already migrated at {row[0]}")
@@ -931,10 +947,12 @@ class ProjectDatabaseManager:
 
         try:
             # Get tables from legacy database
-            cursor = conn.execute(f"""
+            cursor = conn.execute(
+                f"""
                 SELECT name FROM legacy_{source_name}.sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """)
+            """
+            )
             tables = [row[0] for row in cursor.fetchall()]
 
             migrated = 0
@@ -948,10 +966,13 @@ class ProjectDatabaseManager:
                     continue
 
                 # Get table schema
-                schema_row = conn.execute(f"""
+                schema_row = conn.execute(
+                    f"""
                     SELECT sql FROM legacy_{source_name}.sqlite_master
                     WHERE type='table' AND name=?
-                """, (table,)).fetchone()
+                """,
+                    (table,),
+                ).fetchone()
 
                 if schema_row and schema_row[0]:
                     try:
@@ -961,10 +982,12 @@ class ProjectDatabaseManager:
                             raise
 
                     # Copy data
-                    conn.execute(f"""
+                    conn.execute(
+                        f"""
                         INSERT INTO {table}
                         SELECT * FROM legacy_{source_name}.{table}
-                    """)
+                    """
+                    )
 
                     migrated += 1
                     logger.debug(f"Migrated project table: {table}")

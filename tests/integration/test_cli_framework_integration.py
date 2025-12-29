@@ -114,7 +114,8 @@ class TestCLIFrameworkIntegration:
         orch.get_capability = MagicMock(
             side_effect=lambda name: (
                 {"name": name, "version": capabilities[name][0], "callable": capabilities[name][1]}
-                if name in capabilities else None
+                if name in capabilities
+                else None
             )
         )
         orch.list_capabilities = MagicMock(return_value=list(capabilities.keys()))

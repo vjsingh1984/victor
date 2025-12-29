@@ -94,8 +94,9 @@ class TestEntitiesList:
 
         # Should print warning
         call_args = [str(call) for call in context.console.print.call_args_list]
-        assert any("No entity memory" in str(call) or "memory" in str(call).lower()
-                   for call in call_args)
+        assert any(
+            "No entity memory" in str(call) or "memory" in str(call).lower() for call in call_args
+        )
 
     def test_list_with_type_filter(self, command, context):
         """Test listing with type filter."""

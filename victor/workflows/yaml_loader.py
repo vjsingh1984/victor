@@ -460,9 +460,7 @@ def load_workflow_from_yaml(
     if workflow_name:
         if workflow_name not in workflows_data:
             raise YAMLWorkflowError(f"Workflow '{workflow_name}' not found")
-        return load_workflow_from_dict(
-            workflows_data[workflow_name], workflow_name, config
-        )
+        return load_workflow_from_dict(workflows_data[workflow_name], workflow_name, config)
 
     # Load all workflows
     workflows = {}

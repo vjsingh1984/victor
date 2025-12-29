@@ -165,18 +165,22 @@ class TestToolExecutionGraph:
 
     def test_add_dependencies_bulk(self, graph):
         """add_dependencies should add multiple."""
-        graph.add_dependencies([
-            ("edit", {"read"}, {"test"}, 0.9),
-            ("test", {"edit"}, set(), 0.8),
-        ])
+        graph.add_dependencies(
+            [
+                ("edit", {"read"}, {"test"}, 0.9),
+                ("test", {"edit"}, set(), 0.8),
+            ]
+        )
         assert graph.node_count == 2
 
     def test_add_transitions_devops_format(self, graph):
         """add_transitions should handle devops format."""
-        graph.add_transitions({
-            "read_file": [("edit_files", 0.8), ("code_search", 0.6)],
-            "edit_files": [("run_tests", 0.9)],
-        })
+        graph.add_transitions(
+            {
+                "read_file": [("edit_files", 0.8), ("code_search", 0.6)],
+                "edit_files": [("run_tests", 0.9)],
+            }
+        )
         assert graph.transition_count >= 3
 
     def test_add_sequence(self, graph):
@@ -187,10 +191,12 @@ class TestToolExecutionGraph:
 
     def test_add_sequences_bulk(self, graph):
         """add_sequences should add multiple."""
-        graph.add_sequences([
-            ["read", "edit", "test"],
-            ["list", "read", "write"],
-        ])
+        graph.add_sequences(
+            [
+                ["read", "edit", "test"],
+                ["list", "read", "write"],
+            ]
+        )
         assert graph.transition_count > 0
 
     def test_add_io_tool(self, graph):
@@ -241,9 +247,11 @@ class TestToolExecutionGraph:
 
     def test_suggest_next_tools_avoids_recent(self, graph):
         """suggest_next_tools should deprioritize recent tools."""
-        graph.add_transitions({
-            "read": [("edit", 0.9), ("search", 0.8)],
-        })
+        graph.add_transitions(
+            {
+                "read": [("edit", 0.9), ("search", 0.8)],
+            }
+        )
         suggestions = graph.suggest_next_tools("read", history=["edit"])
         # edit should have lower score due to history
         for tool, score in suggestions:
@@ -252,9 +260,11 @@ class TestToolExecutionGraph:
 
     def test_suggest_next_tools_with_available_filter(self, graph):
         """suggest_next_tools should filter by available tools."""
-        graph.add_transitions({
-            "read": [("edit", 0.9), ("search", 0.8)],
-        })
+        graph.add_transitions(
+            {
+                "read": [("edit", 0.9), ("search", 0.8)],
+            }
+        )
         suggestions = graph.suggest_next_tools(
             "read",
             available_tools={"search"},
@@ -338,9 +348,11 @@ class TestToolExecutionGraph:
 
     def test_get_next_tools_returns_sorted_by_weight(self, graph):
         """get_next_tools should return tools sorted by weight descending."""
-        graph.add_transitions({
-            "read": [("edit", 0.9), ("search", 0.5)],
-        })
+        graph.add_transitions(
+            {
+                "read": [("edit", 0.9), ("search", 0.5)],
+            }
+        )
         next_tools = graph.get_next_tools("read")
         weights = [t[1] for t in next_tools]
         assert weights == sorted(weights, reverse=True)

@@ -129,17 +129,13 @@ class StateProtocol(Protocol):
     States must be dict-like with copy support.
     """
 
-    def __getitem__(self, key: str) -> Any:
-        ...
+    def __getitem__(self, key: str) -> Any: ...
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        ...
+    def __setitem__(self, key: str, value: Any) -> None: ...
 
-    def get(self, key: str, default: Any = None) -> Any:
-        ...
+    def get(self, key: str, default: Any = None) -> Any: ...
 
-    def copy(self) -> "StateProtocol":
-        ...
+    def copy(self) -> "StateProtocol": ...
 
 
 @runtime_checkable
@@ -150,8 +146,7 @@ class NodeFunctionProtocol(Protocol[StateType]):
     Can be sync or async.
     """
 
-    def __call__(self, state: StateType) -> Union[StateType, Awaitable[StateType]]:
-        ...
+    def __call__(self, state: StateType) -> Union[StateType, Awaitable[StateType]]: ...
 
 
 @runtime_checkable
@@ -161,8 +156,7 @@ class ConditionFunctionProtocol(Protocol[StateType]):
     Condition functions receive state and return a branch name.
     """
 
-    def __call__(self, state: StateType) -> str:
-        ...
+    def __call__(self, state: StateType) -> str: ...
 
 
 @dataclass
@@ -336,6 +330,7 @@ class RLCheckpointerAdapter:
         """Lazy load checkpoint store."""
         if self._store is None:
             from victor.agent.rl.checkpoint_store import get_checkpoint_store
+
             self._store = get_checkpoint_store()
         return self._store
 
@@ -504,9 +499,7 @@ class CompiledGraph(Generic[StateType]):
                 # Check iteration limit
                 iterations += 1
                 if iterations > exec_config.max_iterations:
-                    logger.warning(
-                        f"Max iterations ({exec_config.max_iterations}) reached"
-                    )
+                    logger.warning(f"Max iterations ({exec_config.max_iterations}) reached")
                     return ExecutionResult(
                         state=state,
                         success=False,
@@ -571,9 +564,7 @@ class CompiledGraph(Generic[StateType]):
                             duration=time.time() - start_time,
                             node_history=node_history,
                         )
-                    state = await asyncio.wait_for(
-                        node.execute(state), timeout=remaining
-                    )
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
                 else:
                     state = await node.execute(state)
 
@@ -991,8 +982,7 @@ class StateGraph(Generic[StateType]):
                     for branch, target in edge.target.items():
                         if target != END and target not in self._nodes:
                             errors.append(
-                                f"Conditional target '{target}' not found "
-                                f"(branch: {branch})"
+                                f"Conditional target '{target}' not found " f"(branch: {branch})"
                             )
 
         # Check all nodes are reachable

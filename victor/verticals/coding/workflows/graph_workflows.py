@@ -83,6 +83,7 @@ class CodingState(TypedDict, total=False):
         error: Error message if failed
         success: Whether task succeeded
     """
+
     task: str
     messages: List[str]
     research_findings: Optional[Dict[str, Any]]
@@ -108,6 +109,7 @@ class TestState(TypedDict, total=False):
         iteration: Current TDD iteration
         max_tdd_cycles: Maximum red-green-refactor cycles
     """
+
     feature_description: str
     test_code: Optional[str]
     implementation_code: Optional[str]
@@ -130,6 +132,7 @@ class BugFixState(TypedDict, total=False):
         attempts: Number of fix attempts
         max_attempts: Maximum fix attempts allowed
     """
+
     bug_description: str
     stack_trace: Optional[str]
     root_cause: Optional[str]
@@ -167,7 +170,9 @@ async def research_node(state: CodingState) -> CodingState:
 async def plan_node(state: CodingState) -> CodingState:
     """Create implementation plan based on research."""
     findings = state.get("research_findings", {})
-    state["implementation_plan"] = f"Plan based on {len(findings.get('patterns_found', []))} patterns"
+    state["implementation_plan"] = (
+        f"Plan based on {len(findings.get('patterns_found', []))} patterns"
+    )
     state["messages"].append("Planning phase completed")
     return state
 
@@ -207,6 +212,7 @@ async def finalize_node(state: CodingState) -> CodingState:
 
 # TDD Node Functions
 
+
 async def write_test_node(state: TestState) -> TestState:
     """Write failing test for feature (Red phase)."""
     state["test_code"] = f"# Test for: {state.get('feature_description', 'unknown')}"
@@ -236,6 +242,7 @@ async def refactor_node(state: TestState) -> TestState:
 
 
 # Bug Fix Node Functions
+
 
 async def investigate_node(state: BugFixState) -> BugFixState:
     """Investigate bug to find root cause."""
@@ -387,8 +394,8 @@ def create_tdd_workflow() -> StateGraph[TestState]:
         should_continue_tdd,
         {
             "implement": "implement",  # Tests still failing
-            "refactor": "refactor",    # Tests pass, refactor
-            "finish": END,             # Max cycles reached
+            "refactor": "refactor",  # Tests pass, refactor
+            "finish": END,  # Max cycles reached
         },
     )
 

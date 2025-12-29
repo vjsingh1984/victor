@@ -905,8 +905,7 @@ class FrameworkStepHandler(BaseStepHandler):
                     logger.debug("Applied RL hooks via set_rl_hooks")
                 else:
                     result.add_warning(
-                        "Orchestrator lacks set_rl_hooks method; "
-                        "hooks stored in context only"
+                        "Orchestrator lacks set_rl_hooks method; " "hooks stored in context only"
                     )
 
         result.add_info(f"Configured {learner_count} RL learners")
@@ -962,9 +961,7 @@ class FrameworkStepHandler(BaseStepHandler):
                 "Orchestrator lacks set_team_specs method; " "specs stored in context only"
             )
 
-        result.add_info(
-            f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}"
-        )
+        result.add_info(f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}")
         # Log each team spec registration (matching workflow DEBUG logging pattern)
         for team_name in team_specs.keys():
             logger.debug(f"Registered team_spec: {team_name}")

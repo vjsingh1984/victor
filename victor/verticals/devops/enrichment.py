@@ -198,41 +198,31 @@ class DevOpsEnrichmentStrategy:
         try:
             # Docker context
             if infra_context["docker"]:
-                docker_enrichment = self._build_docker_enrichment(
-                    infra_context["docker"]
-                )
+                docker_enrichment = self._build_docker_enrichment(infra_context["docker"])
                 if docker_enrichment:
                     enrichments.append(docker_enrichment)
 
             # Kubernetes context
             if infra_context["kubernetes"]:
-                k8s_enrichment = self._build_kubernetes_enrichment(
-                    infra_context["kubernetes"]
-                )
+                k8s_enrichment = self._build_kubernetes_enrichment(infra_context["kubernetes"])
                 if k8s_enrichment:
                     enrichments.append(k8s_enrichment)
 
             # Terraform context
             if infra_context["terraform"]:
-                tf_enrichment = self._build_terraform_enrichment(
-                    infra_context["terraform"]
-                )
+                tf_enrichment = self._build_terraform_enrichment(infra_context["terraform"])
                 if tf_enrichment:
                     enrichments.append(tf_enrichment)
 
             # CI/CD context
             if infra_context["ci_cd"]:
-                cicd_enrichment = self._build_cicd_enrichment(
-                    infra_context["ci_cd"]
-                )
+                cicd_enrichment = self._build_cicd_enrichment(infra_context["ci_cd"])
                 if cicd_enrichment:
                     enrichments.append(cicd_enrichment)
 
             # Add command history context if available
             if context.tool_history:
-                history_enrichment = self._enrich_from_tool_history(
-                    context.tool_history
-                )
+                history_enrichment = self._enrich_from_tool_history(context.tool_history)
                 if history_enrichment:
                     enrichments.append(history_enrichment)
 
@@ -269,7 +259,9 @@ class DevOpsEnrichmentStrategy:
         ]
 
         if "_prompt_mention" not in files:
-            content_parts.append(f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}")
+            content_parts.append(
+                f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}"
+            )
 
         return ContextEnrichment(
             type=EnrichmentType.PROJECT_CONTEXT,
@@ -301,7 +293,9 @@ class DevOpsEnrichmentStrategy:
         ]
 
         if "_prompt_mention" not in files:
-            content_parts.append(f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}")
+            content_parts.append(
+                f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}"
+            )
 
         return ContextEnrichment(
             type=EnrichmentType.PROJECT_CONTEXT,
@@ -333,7 +327,9 @@ class DevOpsEnrichmentStrategy:
         ]
 
         if "_prompt_mention" not in files:
-            content_parts.append(f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}")
+            content_parts.append(
+                f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}"
+            )
 
         return ContextEnrichment(
             type=EnrichmentType.PROJECT_CONTEXT,
@@ -365,7 +361,9 @@ class DevOpsEnrichmentStrategy:
         ]
 
         if "_prompt_mention" not in files:
-            content_parts.append(f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}")
+            content_parts.append(
+                f"\nRelevant files: {', '.join(f for f in files if f != '_prompt_mention')}"
+            )
 
         return ContextEnrichment(
             type=EnrichmentType.PROJECT_CONTEXT,
@@ -397,10 +395,19 @@ class DevOpsEnrichmentStrategy:
                 if isinstance(result, dict) and result.get("success"):
                     command = call.get("arguments", {}).get("command", "")
                     # Only include relevant DevOps commands
-                    if any(kw in command for kw in [
-                        "docker", "kubectl", "terraform", "helm",
-                        "ansible", "aws", "gcloud", "az",
-                    ]):
+                    if any(
+                        kw in command
+                        for kw in [
+                            "docker",
+                            "kubectl",
+                            "terraform",
+                            "helm",
+                            "ansible",
+                            "aws",
+                            "gcloud",
+                            "az",
+                        ]
+                    ):
                         successful_commands.append(command)
 
         if not successful_commands:

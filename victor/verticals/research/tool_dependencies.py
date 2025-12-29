@@ -81,10 +81,27 @@ RESEARCH_TOOL_CLUSTERS: Dict[str, Set[str]] = {
 # Recommended tool sequences for common research patterns
 # Uses canonical ToolNames constants for consistency
 RESEARCH_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "fact_check": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH],
-    "literature_review": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.WEB_FETCH, ToolNames.WEB_FETCH, ToolNames.WRITE],
+    "fact_check": [
+        ToolNames.WEB_SEARCH,
+        ToolNames.WEB_FETCH,
+        ToolNames.WEB_SEARCH,
+        ToolNames.WEB_FETCH,
+    ],
+    "literature_review": [
+        ToolNames.WEB_SEARCH,
+        ToolNames.WEB_FETCH,
+        ToolNames.WEB_FETCH,
+        ToolNames.WEB_FETCH,
+        ToolNames.WRITE,
+    ],
     "technical_lookup": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.GREP, ToolNames.READ],
-    "report_writing": [ToolNames.READ, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.WRITE, ToolNames.EDIT],
+    "report_writing": [
+        ToolNames.READ,
+        ToolNames.WEB_SEARCH,
+        ToolNames.WEB_FETCH,
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+    ],
 }
 
 # Tool dependencies for research
@@ -112,7 +129,12 @@ RESEARCH_TOOL_DEPENDENCIES: List[ToolDependency] = [
 
 # Required tools for research
 # Uses canonical ToolNames constants for consistency
-RESEARCH_REQUIRED_TOOLS: Set[str] = {ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.READ, ToolNames.WRITE}
+RESEARCH_REQUIRED_TOOLS: Set[str] = {
+    ToolNames.WEB_SEARCH,
+    ToolNames.WEB_FETCH,
+    ToolNames.READ,
+    ToolNames.WRITE,
+}
 
 # Optional tools that enhance research
 # Uses canonical ToolNames constants for consistency

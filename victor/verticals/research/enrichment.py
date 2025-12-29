@@ -58,19 +58,25 @@ def _extract_search_terms(prompt: str) -> List[str]:
     Returns:
         List of search term candidates
     """
-    # Remove common question patterns
-    prompt_clean = re.sub(
+    # Remove common question patterns for cleaner extraction
+    cleaned = re.sub(
         r"^(what|how|why|when|where|who|which|can|could|would|should|is|are|do|does)\s+",
         "",
         prompt.lower(),
     )
 
-    # Extract quoted phrases
+    # Extract quoted phrases (from original prompt to preserve case)
     quoted = re.findall(r'"([^"]+)"', prompt)
 
     # Extract key noun phrases (simplified)
     # Look for capitalized words and technical terms
     terms = re.findall(r"\b[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\b", prompt)
+
+    # Also extract significant words from cleaned prompt
+    significant_words = [
+        w for w in cleaned.split() if len(w) > 4 and w not in {"about", "which", "would"}
+    ]
+    terms.extend(significant_words[:3])
 
     # Combine and dedupe
     all_terms = quoted + terms
@@ -153,9 +159,7 @@ class ResearchEnrichmentStrategy:
 
         # Add conversation context if available
         if context.tool_history:
-            history_enrichment = self._enrich_from_tool_history(
-                context.tool_history
-            )
+            history_enrichment = self._enrich_from_tool_history(context.tool_history)
             if history_enrichment:
                 enrichments.append(history_enrichment)
 
@@ -246,17 +250,19 @@ class ResearchEnrichmentStrategy:
                 if isinstance(result, dict) and result.get("success"):
                     content = result.get("content", "")
                     if content and len(content) > 50:
-                        relevant_results.append({
-                            "tool": tool_name,
-                            "content": content[:300],
-                        })
+                        relevant_results.append(
+                            {
+                                "tool": tool_name,
+                                "content": content[:300],
+                            }
+                        )
 
         if not relevant_results:
             return None
 
         content_parts = ["Prior research in this session:"]
 
-        for item in relevant_results[: 3]:  # Max 3 prior results
+        for item in relevant_results[:3]:  # Max 3 prior results
             content_parts.append(f"\n- From {item['tool']}:")
             content_parts.append(f"  {item['content']}...")
 

@@ -219,9 +219,8 @@ class TestIAgentRoleProtocol:
         from victor.framework.agent_protocols import IAgentRole
 
         # Protocol should define get_system_prompt_section
-        assert (
-            "get_system_prompt_section" in dir(IAgentRole)
-            or hasattr(IAgentRole, "get_system_prompt_section")
+        assert "get_system_prompt_section" in dir(IAgentRole) or hasattr(
+            IAgentRole, "get_system_prompt_section"
         )
 
     def test_role_protocol_is_runtime_checkable(self):

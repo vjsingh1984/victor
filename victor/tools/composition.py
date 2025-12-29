@@ -104,6 +104,7 @@ class RunnableConfig:
         timeout: Timeout in seconds for execution
         callbacks: Optional callbacks for execution events
     """
+
     tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     max_concurrency: int = 10
@@ -148,7 +149,9 @@ class Runnable(ABC, Generic[Input, Output]):
         """
         ...
 
-    def __or__(self, other: Union["Runnable[Output, Other]", Callable[[Output], Other]]) -> "RunnableSequence[Input, Other]":
+    def __or__(
+        self, other: Union["Runnable[Output, Other]", Callable[[Output], Other]]
+    ) -> "RunnableSequence[Input, Other]":
         """Chain this runnable with another using the pipe operator.
 
         Args:
@@ -166,7 +169,9 @@ class Runnable(ABC, Generic[Input, Output]):
             return RunnableSequence([self, RunnableLambda(other)])
         raise TypeError(f"Cannot chain Runnable with {type(other)}")
 
-    def __ror__(self, other: Union["Runnable[Other, Input]", Callable[[Other], Input]]) -> "RunnableSequence[Other, Output]":
+    def __ror__(
+        self, other: Union["Runnable[Other, Input]", Callable[[Other], Input]]
+    ) -> "RunnableSequence[Other, Output]":
         """Support reverse pipe operator for left-side non-runnables.
 
         Args:
@@ -314,7 +319,9 @@ class RunnableSequence(Runnable[Input, Output]):
             current = await runnable.invoke(current, config)
         return current
 
-    def __or__(self, other: Union[Runnable[Output, Other], Callable[[Output], Other]]) -> "RunnableSequence[Input, Other]":
+    def __or__(
+        self, other: Union[Runnable[Output, Other], Callable[[Output], Other]]
+    ) -> "RunnableSequence[Input, Other]":
         """Extend the sequence with another runnable."""
         if isinstance(other, RunnableSequence):
             # Flatten nested sequences
@@ -326,7 +333,7 @@ class RunnableSequence(Runnable[Input, Output]):
         raise TypeError(f"Cannot chain with {type(other)}")
 
     def __repr__(self) -> str:
-        names = [getattr(r, 'name', type(r).__name__) for r in self._runnables]
+        names = [getattr(r, "name", type(r).__name__) for r in self._runnables]
         return f"RunnableSequence({' | '.join(names)})"
 
 
@@ -447,7 +454,9 @@ class RunnableBranch(Runnable[Input, Output]):
             *branches: Tuples of (condition, runnable) evaluated in order
             default: Runnable to use if no conditions match
         """
-        self._branches: List[Tuple[Callable[[Input], bool], Runnable[Input, Output]]] = list(branches)
+        self._branches: List[Tuple[Callable[[Input], bool], Runnable[Input, Output]]] = list(
+            branches
+        )
         self._default = default
 
         if not self._branches and not self._default:
@@ -490,7 +499,9 @@ class RunnableBranch(Runnable[Input, Output]):
         raise ValueError("No branch matched and no default provided")
 
     def __repr__(self) -> str:
-        return f"RunnableBranch({len(self._branches)} branches, default={self._default is not None})"
+        return (
+            f"RunnableBranch({len(self._branches)} branches, default={self._default is not None})"
+        )
 
 
 class RunnableLambda(Runnable[Input, Output]):
@@ -1030,12 +1041,14 @@ def map_keys(mapping: Dict[str, str]) -> Callable[[Dict], Dict]:
     Example:
         chain = tool1 | map_keys({"result": "input"}) | tool2
     """
+
     def mapper(d: Dict) -> Dict:
         result = dict(d)
         for old, new in mapping.items():
             if old in result:
                 result[new] = result.pop(old)
         return result
+
     return mapper
 
 
@@ -1048,8 +1061,10 @@ def select_keys(*keys: str) -> Callable[[Dict], Dict]:
     Returns:
         A function that filters to specified keys
     """
+
     def selector(d: Dict) -> Dict:
         return {k: v for k, v in d.items() if k in keys}
+
     return selector
 
 

@@ -318,9 +318,7 @@ class ModeConfigRegistry:
             default_budget=default_budget,
         )
 
-    def get_mode(
-        self, vertical: Optional[str], mode_name: str
-    ) -> Optional[ModeDefinition]:
+    def get_mode(self, vertical: Optional[str], mode_name: str) -> Optional[ModeDefinition]:
         """Get mode configuration, with vertical override support.
 
         Args:
@@ -354,9 +352,7 @@ class ModeConfigRegistry:
 
         return None
 
-    def get_mode_configs(
-        self, vertical: Optional[str] = None
-    ) -> Dict[str, ModeDefinition]:
+    def get_mode_configs(self, vertical: Optional[str] = None) -> Dict[str, ModeDefinition]:
         """Get all mode configurations for a vertical.
 
         Args:
@@ -487,9 +483,7 @@ class ModeConfigRegistry:
         """
         self._mode_aliases[alias.lower()] = target.lower()
 
-    def get_modes(
-        self, vertical: Optional[str] = None
-    ) -> Dict[str, ModeConfig]:
+    def get_modes(self, vertical: Optional[str] = None) -> Dict[str, ModeConfig]:
         """Get all modes as simplified ModeConfig objects.
 
         Returns default modes when no vertical specified, or merged modes
@@ -514,9 +508,7 @@ class ModeConfigRegistry:
 
         return result
 
-    def register_modes(
-        self, vertical: str, modes: Dict[str, ModeConfig]
-    ) -> None:
+    def register_modes(self, vertical: str, modes: Dict[str, ModeConfig]) -> None:
         """Register vertical-specific modes using simplified ModeConfig.
 
         This method allows registering modes using the simpler ModeConfig
@@ -550,9 +542,7 @@ class ModeConfigRegistry:
 # =============================================================================
 
 
-def get_mode_config(
-    mode_name: str, vertical: Optional[str] = None
-) -> Optional[ModeDefinition]:
+def get_mode_config(mode_name: str, vertical: Optional[str] = None) -> Optional[ModeDefinition]:
     """Get mode configuration.
 
     Convenience function for direct mode lookup.

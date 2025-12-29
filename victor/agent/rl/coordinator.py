@@ -436,6 +436,7 @@ class RLCoordinator:
             # Note: Uses both learner_name (legacy NOT NULL) and learner_id (new schema)
             # Also includes timestamp (legacy NOT NULL) alongside created_at (new schema)
             from datetime import datetime as dt
+
             timestamp_now = dt.now().isoformat()
             cursor = self.db.cursor()
             cursor.execute(
@@ -494,6 +495,7 @@ class RLCoordinator:
         """
         try:
             import json
+
             cursor = self.db.cursor()
             cursor.execute(
                 f"""

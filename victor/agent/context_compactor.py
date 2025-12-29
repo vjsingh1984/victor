@@ -801,12 +801,14 @@ class ContextCompactor:
         """
         self._ensure_async_state()
         base_stats = self.get_statistics()
-        base_stats.update({
-            "async_compactions": self._async_compactions,
-            "background_checks": self._background_checks,
-            "background_running": self._async_running,
-            "last_check_time": self._last_check_time,
-        })
+        base_stats.update(
+            {
+                "async_compactions": self._async_compactions,
+                "background_checks": self._background_checks,
+                "background_running": self._async_running,
+                "last_check_time": self._last_check_time,
+            }
+        )
         return base_stats
 
 

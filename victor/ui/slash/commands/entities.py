@@ -122,7 +122,7 @@ class EntitiesCommand(BaseSlashCommand):
         # Try to get from agent if available
         if ctx.agent:
             # Check if agent has entity memory
-            if hasattr(ctx.agent, 'entity_memory'):
+            if hasattr(ctx.agent, "entity_memory"):
                 return ctx.agent.entity_memory
 
         return None
@@ -222,9 +222,7 @@ class EntitiesCommand(BaseSlashCommand):
             table.add_row("Relations tracked", "0")
 
             ctx.console.print(table)
-            ctx.console.print(
-                "\n[dim]Entity memory populates during code analysis.[/]"
-            )
+            ctx.console.print("\n[dim]Entity memory populates during code analysis.[/]")
             return
 
         ctx.console.print("[yellow]Stats require async context.[/]")

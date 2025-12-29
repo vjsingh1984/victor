@@ -119,10 +119,7 @@ class TestPipelineConversion:
         workflow = ensemble_to_workflow(pipeline)
 
         # Should have agent nodes for each agent
-        agent_nodes = [
-            n for n in workflow.nodes.values()
-            if isinstance(n, AgentNode)
-        ]
+        agent_nodes = [n for n in workflow.nodes.values() if isinstance(n, AgentNode)]
         assert len(agent_nodes) >= 2
 
     def test_pipeline_with_hitl(self, researcher_agent, coder_agent):
@@ -145,10 +142,7 @@ class TestPipelineConversion:
         workflow = ensemble_to_workflow(pipeline)
 
         # Find the agent node
-        agent_nodes = [
-            n for n in workflow.nodes.values()
-            if isinstance(n, AgentNode)
-        ]
+        agent_nodes = [n for n in workflow.nodes.values() if isinstance(n, AgentNode)]
         assert len(agent_nodes) >= 1
 
         # Check tool budget
@@ -181,10 +175,7 @@ class TestParallelConversion:
         workflow = ensemble_to_workflow(parallel)
 
         # Should have a parallel execution node
-        parallel_nodes = [
-            n for n in workflow.nodes.values()
-            if isinstance(n, ParallelNode)
-        ]
+        parallel_nodes = [n for n in workflow.nodes.values() if isinstance(n, ParallelNode)]
         assert len(parallel_nodes) == 1
 
         # Parallel node should reference agent nodes
@@ -206,9 +197,7 @@ class TestParallelConversion:
 class TestHierarchicalConversion:
     """Tests for converting Hierarchical ensembles."""
 
-    def test_hierarchical_to_workflow(
-        self, researcher_agent, coder_agent, reviewer_agent
-    ):
+    def test_hierarchical_to_workflow(self, researcher_agent, coder_agent, reviewer_agent):
         """Test converting hierarchical ensemble to workflow."""
         hierarchical = Hierarchical(
             manager=researcher_agent,
@@ -249,10 +238,7 @@ class TestHierarchicalConversion:
         workflow = ensemble_to_workflow(hierarchical)
 
         # Should have parallel worker execution node
-        parallel_nodes = [
-            n for n in workflow.nodes.values()
-            if isinstance(n, ParallelNode)
-        ]
+        parallel_nodes = [n for n in workflow.nodes.values() if isinstance(n, ParallelNode)]
         assert len(parallel_nodes) == 1
 
 
@@ -377,10 +363,7 @@ class TestEdgeCases:
 
         workflow = ensemble_to_workflow(pipeline)
 
-        agent_nodes = [
-            n for n in workflow.nodes.values()
-            if isinstance(n, AgentNode)
-        ]
+        agent_nodes = [n for n in workflow.nodes.values() if isinstance(n, AgentNode)]
         assert len(agent_nodes) == 1
 
     def test_agent_with_no_tools(self):

@@ -137,16 +137,7 @@ def nested_state_workflow():
     """Workflow that works with deeply nested state."""
 
     def init_nested(ctx: Dict[str, Any]) -> Dict[str, Any]:
-        ctx["nested"] = {
-            "level1": {
-                "level2": {
-                    "level3": {
-                        "value": "initial",
-                        "items": []
-                    }
-                }
-            }
-        }
+        ctx["nested"] = {"level1": {"level2": {"level3": {"value": "initial", "items": []}}}}
         return ctx
 
     def modify_nested(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -255,9 +246,7 @@ class TestStatePersistenceAcrossNodes:
         # Final result should have all values
         assert result.context.data.get("c_value") == 300  # 100 + 200
 
-    async def test_nested_state_persists(
-        self, mock_orchestrator, nested_state_workflow
-    ):
+    async def test_nested_state_persists(self, mock_orchestrator, nested_state_workflow):
         """Test that deeply nested state modifications persist."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -585,14 +574,10 @@ class TestStateIsolation:
         executor = WorkflowExecutor(mock_orchestrator)
 
         # Run first workflow
-        result1 = await executor.execute(
-            workflow, initial_context={"value": "first", "items": []}
-        )
+        result1 = await executor.execute(workflow, initial_context={"value": "first", "items": []})
 
         # Run second workflow
-        result2 = await executor.execute(
-            workflow, initial_context={"value": "second", "items": []}
-        )
+        result2 = await executor.execute(workflow, initial_context={"value": "second", "items": []})
 
         # Each should only have its own value
         assert result1.context.data.get("items") == ["first"]
@@ -623,9 +608,7 @@ class TestWorkflowContextClass:
             return ctx
 
         workflow = (
-            WorkflowBuilder("context_ops_workflow")
-            .add_transform("test", test_context_ops)
-            .build()
+            WorkflowBuilder("context_ops_workflow").add_transform("test", test_context_ops).build()
         )
 
         executor = WorkflowExecutor(mock_orchestrator)
@@ -647,10 +630,7 @@ class TestWorkflowContextClass:
             return ctx
 
         def verify_update(ctx: Dict[str, Any]) -> Dict[str, Any]:
-            ctx["all_present"] = all(
-                ctx.get(f"key{i}") == f"value{i}"
-                for i in range(1, 4)
-            )
+            ctx["all_present"] = all(ctx.get(f"key{i}") == f"value{i}" for i in range(1, 4))
             return ctx
 
         workflow = (
@@ -694,18 +674,22 @@ class TestWorkflowContextClass:
         assert context.has_failures() is False
 
         # Add a successful result
-        context.add_result(NodeResult(
-            node_id="success_node",
-            status=NodeStatus.COMPLETED,
-        ))
+        context.add_result(
+            NodeResult(
+                node_id="success_node",
+                status=NodeStatus.COMPLETED,
+            )
+        )
         assert context.has_failures() is False
 
         # Add a failed result
-        context.add_result(NodeResult(
-            node_id="failed_node",
-            status=NodeStatus.FAILED,
-            error="Test error",
-        ))
+        context.add_result(
+            NodeResult(
+                node_id="failed_node",
+                status=NodeStatus.FAILED,
+                error="Test error",
+            )
+        )
         assert context.has_failures() is True
 
     async def test_context_get_outputs(self, mock_orchestrator):
@@ -713,21 +697,27 @@ class TestWorkflowContextClass:
         context = WorkflowContext()
 
         # Add results with outputs
-        context.add_result(NodeResult(
-            node_id="node1",
-            status=NodeStatus.COMPLETED,
-            output={"data": "output1"},
-        ))
-        context.add_result(NodeResult(
-            node_id="node2",
-            status=NodeStatus.COMPLETED,
-            output={"data": "output2"},
-        ))
-        context.add_result(NodeResult(
-            node_id="failed_node",
-            status=NodeStatus.FAILED,
-            output=None,
-        ))
+        context.add_result(
+            NodeResult(
+                node_id="node1",
+                status=NodeStatus.COMPLETED,
+                output={"data": "output1"},
+            )
+        )
+        context.add_result(
+            NodeResult(
+                node_id="node2",
+                status=NodeStatus.COMPLETED,
+                output={"data": "output2"},
+            )
+        )
+        context.add_result(
+            NodeResult(
+                node_id="failed_node",
+                status=NodeStatus.FAILED,
+                output=None,
+            )
+        )
 
         outputs = context.get_outputs()
 

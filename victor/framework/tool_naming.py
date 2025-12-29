@@ -145,7 +145,7 @@ def canonicalize_tool_list(tools: List[str]) -> List[str]:
 
 
 def canonicalize_transitions(
-    transitions: Dict[str, List[Tuple[str, float]]]
+    transitions: Dict[str, List[Tuple[str, float]]],
 ) -> Dict[str, List[Tuple[str, float]]]:
     """Canonicalize tool names in transition probability mappings.
 
@@ -257,9 +257,7 @@ def validate_tool_names(
             legacy_found.append(name)
             if warn:
                 ctx = f" in {context}" if context else ""
-                logger.warning(
-                    f"Legacy tool name '{name}'{ctx}, use '{canonical}' instead"
-                )
+                logger.warning(f"Legacy tool name '{name}'{ctx}, use '{canonical}' instead")
 
     return legacy_found
 

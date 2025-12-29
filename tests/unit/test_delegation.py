@@ -295,9 +295,7 @@ class TestDelegationHandler:
 
         # Can't create request with empty task (validation in __post_init__)
         # So we test the handler's validation separately
-        error = handler._validate_request(
-            DelegationRequest(task="valid")
-        )
+        error = handler._validate_request(DelegationRequest(task="valid"))
         assert error is None
 
     def test_validate_request_excessive_budget(self):
@@ -370,15 +368,17 @@ class TestDelegateTool:
     async def test_execute_success(self):
         """Successful delegation returns success result."""
         mock_handler = MagicMock()
-        mock_handler.handle = AsyncMock(return_value=DelegationResponse(
-            delegation_id="test123",
-            accepted=True,
-            status=DelegationStatus.COMPLETED,
-            delegate_id="delegate_abc",
-            result="Found 5 endpoints",
-            tool_calls_used=10,
-            duration_seconds=15.5,
-        ))
+        mock_handler.handle = AsyncMock(
+            return_value=DelegationResponse(
+                delegation_id="test123",
+                accepted=True,
+                status=DelegationStatus.COMPLETED,
+                delegate_id="delegate_abc",
+                result="Found 5 endpoints",
+                tool_calls_used=10,
+                duration_seconds=15.5,
+            )
+        )
 
         tool = DelegateTool(mock_handler)
         result = await tool.execute(
@@ -395,12 +395,14 @@ class TestDelegateTool:
     async def test_execute_rejection(self):
         """Rejected delegation returns failure result."""
         mock_handler = MagicMock()
-        mock_handler.handle = AsyncMock(return_value=DelegationResponse(
-            delegation_id="test123",
-            accepted=False,
-            status=DelegationStatus.FAILED,
-            error="Too many concurrent delegations",
-        ))
+        mock_handler.handle = AsyncMock(
+            return_value=DelegationResponse(
+                delegation_id="test123",
+                accepted=False,
+                status=DelegationStatus.FAILED,
+                error="Too many concurrent delegations",
+            )
+        )
 
         tool = DelegateTool(mock_handler)
         result = await tool.execute(task="Test task")
@@ -412,12 +414,14 @@ class TestDelegateTool:
     async def test_execute_async_mode(self):
         """Fire-and-forget mode returns pending status."""
         mock_handler = MagicMock()
-        mock_handler.handle = AsyncMock(return_value=DelegationResponse(
-            delegation_id="test123",
-            accepted=True,
-            status=DelegationStatus.PENDING,
-            delegate_id="delegate_abc",
-        ))
+        mock_handler.handle = AsyncMock(
+            return_value=DelegationResponse(
+                delegation_id="test123",
+                accepted=True,
+                status=DelegationStatus.PENDING,
+                delegate_id="delegate_abc",
+            )
+        )
 
         tool = DelegateTool(mock_handler)
         result = await tool.execute(
@@ -698,6 +702,7 @@ class TestModuleExports:
             DelegationHandler,
             DelegateTool,
         )
+
         # If we get here without ImportError, all exports work
         assert True
 
@@ -708,4 +713,5 @@ class TestModuleExports:
             ActiveDelegation,
             ROLE_MAPPING,
         )
+
         assert True

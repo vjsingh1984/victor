@@ -73,9 +73,7 @@ class GraphPath:
         """Number of edges in the path."""
         return len(self.relations)
 
-    def append(
-        self, entity: Entity, relation: Optional[EntityRelation] = None
-    ) -> "GraphPath":
+    def append(self, entity: Entity, relation: Optional[EntityRelation] = None) -> "GraphPath":
         """Append an entity and optional relation to the path."""
         self.entities.append(entity)
         if relation:
@@ -143,7 +141,8 @@ class EntityGraph:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
 
-        self._conn.executescript("""
+        self._conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS graph_entities (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -168,7 +167,8 @@ class EntityGraph:
             CREATE INDEX IF NOT EXISTS idx_graph_source ON graph_relations(source_id);
             CREATE INDEX IF NOT EXISTS idx_graph_target ON graph_relations(target_id);
             CREATE INDEX IF NOT EXISTS idx_graph_type ON graph_relations(relation_type);
-        """)
+        """
+        )
         self._conn.commit()
 
         # Load existing data into memory if in_memory mode
@@ -220,6 +220,7 @@ class EntityGraph:
 
         if self._conn:
             import json
+
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO graph_entities
@@ -252,6 +253,7 @@ class EntityGraph:
 
         if self._conn:
             import json
+
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO graph_relations
@@ -427,11 +429,7 @@ class EntityGraph:
         Returns:
             Tuple of (entities, relations)
         """
-        entities = [
-            self._entities[eid]
-            for eid in entity_ids
-            if eid in self._entities
-        ]
+        entities = [self._entities[eid] for eid in entity_ids if eid in self._entities]
 
         relations: List[EntityRelation] = []
         if include_relations:
@@ -515,13 +513,9 @@ class EntityGraph:
 
         # Remove from other entities' adjacency lists
         for eid in list(self._outgoing.keys()):
-            self._outgoing[eid] = [
-                r for r in self._outgoing[eid] if r.target_id != entity_id
-            ]
+            self._outgoing[eid] = [r for r in self._outgoing[eid] if r.target_id != entity_id]
         for eid in list(self._incoming.keys()):
-            self._incoming[eid] = [
-                r for r in self._incoming[eid] if r.source_id != entity_id
-            ]
+            self._incoming[eid] = [r for r in self._incoming[eid] if r.source_id != entity_id]
 
         # Remove from database
         if self._conn:

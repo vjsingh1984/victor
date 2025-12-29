@@ -138,12 +138,11 @@ class RAGDeleteTool(BaseTool):
                 )
 
             # Delete document
-            deleted = await store.delete_document(doc_id)
+            await store.delete_document(doc_id)
 
             return ToolResult(
                 success=True,
-                output=f"Successfully deleted document: {doc_id}\n"
-                       f"Source: {doc.source}",
+                output=f"Successfully deleted document: {doc_id}\n" f"Source: {doc.source}",
             )
 
         except Exception as e:
@@ -201,9 +200,9 @@ class RAGStatsTool(BaseTool):
 
             last_updated = ""
             if stats.get("last_updated"):
-                last_updated = datetime.fromtimestamp(
-                    stats["last_updated"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                last_updated = datetime.fromtimestamp(stats["last_updated"]).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
 
             output = (
                 f"RAG Knowledge Base Statistics\n"

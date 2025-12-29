@@ -82,6 +82,7 @@ class DeploymentState(TypedDict, total=False):
         error: Error message if failed
         success: Whether deployment succeeded
     """
+
     target_environment: str
     infrastructure_changes: List[str]
     assessment_findings: Optional[Dict[str, Any]]
@@ -108,6 +109,7 @@ class ContainerState(TypedDict, total=False):
         iteration: Current iteration
         max_iterations: Maximum iterations for build/test cycle
     """
+
     application_name: str
     dockerfile_content: Optional[str]
     compose_content: Optional[str]
@@ -130,6 +132,7 @@ class CICDState(TypedDict, total=False):
         test_run_output: Output from test run
         iteration: Current iteration
     """
+
     repository_path: str
     pipeline_type: str
     existing_config: Optional[str]
@@ -151,6 +154,7 @@ class SecurityAuditState(TypedDict, total=False):
         verification_results: Results from verification
         audit_complete: Whether audit is complete
     """
+
     audit_scope: str
     vulnerability_findings: Optional[List[Dict[str, Any]]]
     configuration_issues: Optional[List[Dict[str, Any]]]
@@ -187,7 +191,9 @@ async def plan_deployment_node(state: DeploymentState) -> DeploymentState:
     """Create deployment plan based on assessment."""
     findings = state.get("assessment_findings", {})
     env = state.get("target_environment", "dev")
-    state["deployment_plan"] = f"Deployment plan for {env} based on {len(findings.get('existing_resources', []))} resources"
+    state["deployment_plan"] = (
+        f"Deployment plan for {env} based on {len(findings.get('existing_resources', []))} resources"
+    )
     state["deployment_status"] = "planned"
     return state
 
@@ -318,7 +324,9 @@ async def create_remediation_plan_node(state: SecurityAuditState) -> SecurityAud
     """Create prioritized remediation plan."""
     vuln_count = len(state.get("vulnerability_findings", []))
     config_count = len(state.get("configuration_issues", []))
-    state["remediation_plan"] = f"Plan addressing {vuln_count} vulnerabilities and {config_count} config issues"
+    state["remediation_plan"] = (
+        f"Plan addressing {vuln_count} vulnerabilities and {config_count} config issues"
+    )
     return state
 
 
@@ -353,11 +361,7 @@ def should_retry_deployment(state: DeploymentState) -> str:
     max_iter = state.get("max_iterations", 3)
 
     # Check all validation results
-    all_passed = all(
-        v.get("passed", False)
-        for v in validation.values()
-        if isinstance(v, dict)
-    )
+    all_passed = all(v.get("passed", False) for v in validation.values() if isinstance(v, dict))
 
     if all_passed:
         return "done"

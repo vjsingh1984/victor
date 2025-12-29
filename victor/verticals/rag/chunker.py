@@ -53,6 +53,7 @@ class ChunkingConfig:
         respect_paragraph_boundaries: Try to break at paragraphs
         code_aware: Use code-aware chunking for code files
     """
+
     chunk_size: int = 512
     chunk_overlap: int = 50
     min_chunk_size: int = 100
@@ -81,16 +82,16 @@ class DocumentChunker:
     """
 
     # Sentence ending patterns
-    SENTENCE_END = re.compile(r'[.!?]\s+')
+    SENTENCE_END = re.compile(r"[.!?]\s+")
 
     # Code block patterns
-    CODE_BLOCK = re.compile(r'```[\s\S]*?```', re.MULTILINE)
-    FUNCTION_DEF = re.compile(r'^(def|async def|function|fn|func)\s+\w+', re.MULTILINE)
-    CLASS_DEF = re.compile(r'^(class|struct|interface|impl)\s+\w+', re.MULTILINE)
+    CODE_BLOCK = re.compile(r"```[\s\S]*?```", re.MULTILINE)
+    FUNCTION_DEF = re.compile(r"^(def|async def|function|fn|func)\s+\w+", re.MULTILINE)
+    CLASS_DEF = re.compile(r"^(class|struct|interface|impl)\s+\w+", re.MULTILINE)
 
     # Markdown patterns
-    MARKDOWN_HEADER = re.compile(r'^#{1,6}\s+.+$', re.MULTILINE)
-    MARKDOWN_LIST = re.compile(r'^[\s]*[-*+]\s+', re.MULTILINE)
+    MARKDOWN_HEADER = re.compile(r"^#{1,6}\s+.+$", re.MULTILINE)
+    MARKDOWN_LIST = re.compile(r"^[\s]*[-*+]\s+", re.MULTILINE)
 
     def __init__(self, config: Optional[ChunkingConfig] = None):
         """Initialize chunker.
@@ -168,7 +169,7 @@ class DocumentChunker:
             if self.config.respect_sentence_boundaries and chunk_end < len(content):
                 # Look for sentence end in the last portion of the chunk
                 search_start = max(current_pos + self.config.min_chunk_size, chunk_end - 100)
-                search_text = content[search_start:chunk_end + 50]
+                search_text = content[search_start : chunk_end + 50]
 
                 match = None
                 for m in self.SENTENCE_END.finditer(search_text):
@@ -257,7 +258,7 @@ class DocumentChunker:
 
         # Add content before first definition
         if definitions[0][1] > self.config.min_chunk_size:
-            pre_content = content[:definitions[0][1]].strip()
+            pre_content = content[: definitions[0][1]].strip()
             if len(pre_content) >= self.config.min_chunk_size:
                 chunks.append((pre_content, 0, definitions[0][1]))
 

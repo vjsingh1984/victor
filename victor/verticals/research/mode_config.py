@@ -87,6 +87,7 @@ _RESEARCH_TASK_BUDGETS: Dict[str, int] = {
 # Register with Central Registry
 # =============================================================================
 
+
 def _register_research_modes() -> None:
     """Register research modes with the central registry."""
     registry = ModeConfigRegistry.get_instance()

@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 try:
     import lancedb
     import pyarrow as pa
+
     LANCEDB_AVAILABLE = True
 except ImportError:
     LANCEDB_AVAILABLE = False
@@ -71,6 +72,7 @@ class Document:
         metadata: Additional metadata
         created_at: Creation timestamp
     """
+
     id: str
     content: str
     source: str
@@ -98,6 +100,7 @@ class DocumentChunk:
         end_char: End character offset
         metadata: Chunk-specific metadata
     """
+
     id: str
     doc_id: str
     content: str
@@ -118,6 +121,7 @@ class SearchResult:
         highlights: Highlighted text segments
         doc_source: Source document path
     """
+
     chunk: DocumentChunk
     score: float
     highlights: List[str] = field(default_factory=list)
@@ -151,6 +155,7 @@ class DocumentStoreConfig:
         rerank_results: Enable reranking
         max_results: Maximum results per search
     """
+
     path: Path = field(default_factory=lambda: Path(".victor/rag"))
     table_name: str = "documents"
     embedding_dim: int = 384  # Default for sentence-transformers/all-MiniLM-L6-v2
@@ -227,35 +232,29 @@ class DocumentStore:
         self.config.path.mkdir(parents=True, exist_ok=True)
 
         # Connect to LanceDB
-        self._db = await asyncio.to_thread(
-            lancedb.connect,
-            str(self.config.path)
-        )
+        self._db = await asyncio.to_thread(lancedb.connect, str(self.config.path))
 
         # Create or open table
         try:
-            self._table = await asyncio.to_thread(
-                self._db.open_table,
-                self.config.table_name
-            )
+            self._table = await asyncio.to_thread(self._db.open_table, self.config.table_name)
             logger.info(f"Opened existing table: {self.config.table_name}")
         except Exception:
             # Create new table with schema
-            schema = pa.schema([
-                pa.field("id", pa.string()),
-                pa.field("doc_id", pa.string()),
-                pa.field("content", pa.string()),
-                pa.field("chunk_index", pa.int32()),
-                pa.field("start_char", pa.int32()),
-                pa.field("end_char", pa.int32()),
-                pa.field("metadata", pa.string()),
-                pa.field("vector", pa.list_(pa.float32(), self.config.embedding_dim)),
-            ])
+            schema = pa.schema(
+                [
+                    pa.field("id", pa.string()),
+                    pa.field("doc_id", pa.string()),
+                    pa.field("content", pa.string()),
+                    pa.field("chunk_index", pa.int32()),
+                    pa.field("start_char", pa.int32()),
+                    pa.field("end_char", pa.int32()),
+                    pa.field("metadata", pa.string()),
+                    pa.field("vector", pa.list_(pa.float32(), self.config.embedding_dim)),
+                ]
+            )
 
             self._table = await asyncio.to_thread(
-                self._db.create_table,
-                self.config.table_name,
-                schema=schema
+                self._db.create_table, self.config.table_name, schema=schema
             )
             logger.info(f"Created new table: {self.config.table_name}")
 
@@ -318,16 +317,18 @@ class DocumentStore:
         # Convert to records
         records = []
         for chunk in chunks:
-            records.append({
-                "id": chunk.id,
-                "doc_id": chunk.doc_id,
-                "content": chunk.content,
-                "chunk_index": chunk.chunk_index,
-                "start_char": chunk.start_char,
-                "end_char": chunk.end_char,
-                "metadata": json.dumps(chunk.metadata),
-                "vector": chunk.embedding,
-            })
+            records.append(
+                {
+                    "id": chunk.id,
+                    "doc_id": chunk.doc_id,
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                    "start_char": chunk.start_char,
+                    "end_char": chunk.end_char,
+                    "metadata": json.dumps(chunk.metadata),
+                    "vector": chunk.embedding,
+                }
+            )
 
         # Add to table
         await asyncio.to_thread(self._table.add, records)
@@ -381,11 +382,7 @@ class DocumentStore:
         else:
             # Vector-only search
             results = await asyncio.to_thread(
-                lambda: (
-                    self._table.search(query_embedding)
-                    .limit(k)
-                    .to_list()
-                )
+                lambda: (self._table.search(query_embedding).limit(k).to_list())
             )
 
         # Convert to SearchResult
@@ -409,11 +406,13 @@ class DocumentStore:
                 continue
 
             score = 1.0 - row.get("_distance", 0.5)  # Convert distance to similarity
-            search_results.append(SearchResult(
-                chunk=chunk,
-                score=score,
-                doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
-            ))
+            search_results.append(
+                SearchResult(
+                    chunk=chunk,
+                    score=score,
+                    doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
+                )
+            )
 
         # Optionally rerank
         if self.config.rerank_results and len(search_results) > k:
@@ -451,11 +450,13 @@ class DocumentStore:
                 continue
 
             score = cosine_similarity(query_embedding, chunk.embedding)
-            results.append(SearchResult(
-                chunk=chunk,
-                score=score,
-                doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
-            ))
+            results.append(
+                SearchResult(
+                    chunk=chunk,
+                    score=score,
+                    doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
+                )
+            )
 
         # Sort by score
         results.sort(key=lambda x: x.score, reverse=True)
@@ -493,6 +494,7 @@ class DocumentStore:
         # Try to use sentence-transformers
         try:
             from sentence_transformers import SentenceTransformer
+
             if not hasattr(self, "_model"):
                 self._model = SentenceTransformer("all-MiniLM-L6-v2")
             embedding = self._model.encode(text, convert_to_numpy=True)
@@ -500,9 +502,10 @@ class DocumentStore:
         except ImportError:
             # Simple hash-based fallback for testing
             import hashlib
+
             h = hashlib.sha256(text.encode()).digest()
             # Convert to list of floats
-            return [b / 255.0 for b in h[:self.config.embedding_dim]]
+            return [b / 255.0 for b in h[: self.config.embedding_dim]]
 
     async def delete_document(self, doc_id: str) -> int:
         """Delete a document and its chunks.
@@ -529,9 +532,7 @@ class DocumentStore:
             return 0
 
         # Delete from LanceDB
-        await asyncio.to_thread(
-            lambda: self._table.delete(f"doc_id = '{doc_id}'")
-        )
+        await asyncio.to_thread(lambda: self._table.delete(f"doc_id = '{doc_id}'"))
 
         return 1  # LanceDB doesn't return count
 

@@ -136,12 +136,16 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Code style configuration dict
     """
-    return getattr(orchestrator, "code_style", {
-        "formatter": "black",
-        "linter": "ruff",
-        "max_line_length": 100,
-        "enforce_type_hints": True,
-    })
+    return getattr(
+        orchestrator,
+        "code_style",
+        {
+            "formatter": "black",
+            "linter": "ruff",
+            "max_line_length": 100,
+            "enforce_type_hints": True,
+        },
+    )
 
 
 def configure_test_requirements(

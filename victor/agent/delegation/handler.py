@@ -195,9 +195,7 @@ class DelegationHandler:
                 return await self._execute_delegation(delegation, role)
             else:
                 # Asynchronous: start and return immediately
-                delegation.task = asyncio.create_task(
-                    self._execute_delegation(delegation, role)
-                )
+                delegation.task = asyncio.create_task(self._execute_delegation(delegation, role))
                 return DelegationResponse.pending(request.delegation_id, delegate_id)
 
         except Exception as e:
@@ -239,9 +237,7 @@ class DelegationHandler:
                 timeout = request.deadline_seconds or 300
 
                 # Spawn delegate
-                logger.debug(
-                    f"Spawning {role.value} delegate for task: {request.task[:50]}..."
-                )
+                logger.debug(f"Spawning {role.value} delegate for task: {request.task[:50]}...")
 
                 result = await self.sub_agents.spawn(
                     role=role,
@@ -324,7 +320,9 @@ class DelegationHandler:
             return SubAgentRole.RESEARCHER
         elif any(kw in task_lower for kw in ["plan", "design", "architect", "organize"]):
             return SubAgentRole.PLANNER
-        elif any(kw in task_lower for kw in ["implement", "create", "build", "write", "edit", "fix"]):
+        elif any(
+            kw in task_lower for kw in ["implement", "create", "build", "write", "edit", "fix"]
+        ):
             return SubAgentRole.EXECUTOR
         elif any(kw in task_lower for kw in ["review", "check", "verify", "validate", "audit"]):
             return SubAgentRole.REVIEWER
@@ -344,35 +342,41 @@ class DelegationHandler:
             Context string for the delegate
         """
         lines = [
-            f"You are a delegate agent spawned to complete a specific task.",
+            "You are a delegate agent spawned to complete a specific task.",
             "",
             "## Task",
             request.task,
         ]
 
         if request.parent_goal:
-            lines.extend([
-                "",
-                "## Parent Agent's Goal",
-                request.parent_goal,
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Parent Agent's Goal",
+                    request.parent_goal,
+                ]
+            )
 
         if request.context:
-            lines.extend([
-                "",
-                "## Additional Context",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Additional Context",
+                ]
+            )
             for key, value in request.context.items():
                 lines.append(f"- **{key}**: {value}")
 
-        lines.extend([
-            "",
-            "## Instructions",
-            "1. Focus exclusively on the assigned task",
-            "2. Be thorough but efficient with tool usage",
-            "3. Summarize your findings clearly",
-            "4. Report any blockers or issues encountered",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Instructions",
+                "1. Focus exclusively on the assigned task",
+                "2. Be thorough but efficient with tool usage",
+                "3. Summarize your findings clearly",
+                "4. Report any blockers or issues encountered",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -399,9 +403,10 @@ class DelegationHandler:
         if result.success and result.summary:
             for line in result.summary.split("\n"):
                 line = line.strip()
-                if any(line.lower().startswith(prefix) for prefix in [
-                    "found", "discovered", "identified", "located"
-                ]):
+                if any(
+                    line.lower().startswith(prefix)
+                    for prefix in ["found", "discovered", "identified", "located"]
+                ):
                     discoveries.append(line)
 
         return DelegationResponse(

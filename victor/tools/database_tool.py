@@ -73,6 +73,7 @@ def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str,
     # Fallback to global cache for backward compatibility
     return _connections
 
+
 # Dangerous SQL patterns that should be blocked
 DANGEROUS_PATTERNS = [
     "DROP DATABASE",

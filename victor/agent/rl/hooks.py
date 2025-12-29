@@ -267,9 +267,7 @@ class RLHookRegistry:
         if event_type in self._subscribers:
             self._subscribers[event_type].discard(learner_name)
 
-    def add_handler(
-        self, event_type: RLEventType, handler: Callable[[RLEvent], None]
-    ) -> None:
+    def add_handler(self, event_type: RLEventType, handler: Callable[[RLEvent], None]) -> None:
         """Add a custom event handler.
 
         Allows extension without modifying learner code.
@@ -296,21 +294,15 @@ class RLHookRegistry:
         # Track exploration vs exploitation
         if event.was_exploration:
             for learner in self._subscribers.get(event.type, []):
-                self._exploration_counts[learner] = (
-                    self._exploration_counts.get(learner, 0) + 1
-                )
+                self._exploration_counts[learner] = self._exploration_counts.get(learner, 0) + 1
         else:
             for learner in self._subscribers.get(event.type, []):
-                self._exploitation_counts[learner] = (
-                    self._exploitation_counts.get(learner, 0) + 1
-                )
+                self._exploitation_counts[learner] = self._exploitation_counts.get(learner, 0) + 1
 
         # Track epsilon values
         if event.epsilon_value is not None:
             for learner in self._subscribers.get(event.type, []):
-                self._epsilon_history.append(
-                    (event.timestamp, learner, event.epsilon_value)
-                )
+                self._epsilon_history.append((event.timestamp, learner, event.epsilon_value))
 
         # Dispatch to subscribed learners
         if self._coordinator is None:
@@ -332,9 +324,7 @@ class RLHookRegistry:
             except Exception as e:
                 logger.warning(f"RL: Custom handler failed: {e}")
 
-        logger.debug(
-            f"RL: Dispatched {event.type.value} to {len(learners)} learners"
-        )
+        logger.debug(f"RL: Dispatched {event.type.value} to {len(learners)} learners")
 
     def _dispatch_to_learner(self, learner_name: str, event: RLEvent) -> None:
         """Dispatch event to a specific learner.
@@ -408,9 +398,7 @@ class RLHookRegistry:
             },
         }
 
-    def get_epsilon_trend(
-        self, learner_name: str, limit: int = 100
-    ) -> List[tuple]:
+    def get_epsilon_trend(self, learner_name: str, limit: int = 100) -> List[tuple]:
         """Get epsilon value trend for a learner.
 
         Args:
@@ -420,11 +408,7 @@ class RLHookRegistry:
         Returns:
             List of (timestamp, epsilon) tuples
         """
-        entries = [
-            (ts, eps)
-            for ts, name, eps in self._epsilon_history
-            if name == learner_name
-        ]
+        entries = [(ts, eps) for ts, name, eps in self._epsilon_history if name == learner_name]
         return entries[-limit:]
 
 

@@ -36,25 +36,97 @@ logger = logging.getLogger(__name__)
 # Known technology terms (expandable)
 KNOWN_TECHNOLOGIES = {
     # Languages
-    "python", "javascript", "typescript", "rust", "go", "golang", "java",
-    "c++", "cpp", "c#", "csharp", "ruby", "php", "swift", "kotlin", "scala",
+    "python",
+    "javascript",
+    "typescript",
+    "rust",
+    "go",
+    "golang",
+    "java",
+    "c++",
+    "cpp",
+    "c#",
+    "csharp",
+    "ruby",
+    "php",
+    "swift",
+    "kotlin",
+    "scala",
     # Frameworks
-    "react", "vue", "angular", "django", "flask", "fastapi", "express",
-    "spring", "rails", "laravel", "nextjs", "nuxt", "svelte",
+    "react",
+    "vue",
+    "angular",
+    "django",
+    "flask",
+    "fastapi",
+    "express",
+    "spring",
+    "rails",
+    "laravel",
+    "nextjs",
+    "nuxt",
+    "svelte",
     # Libraries
-    "numpy", "pandas", "tensorflow", "pytorch", "keras", "scikit-learn",
-    "langchain", "llamaindex", "transformers", "huggingface",
+    "numpy",
+    "pandas",
+    "tensorflow",
+    "pytorch",
+    "keras",
+    "scikit-learn",
+    "langchain",
+    "llamaindex",
+    "transformers",
+    "huggingface",
     # Databases
-    "postgresql", "postgres", "mysql", "mongodb", "redis", "elasticsearch",
-    "sqlite", "duckdb", "lancedb", "pinecone", "weaviate", "chromadb",
+    "postgresql",
+    "postgres",
+    "mysql",
+    "mongodb",
+    "redis",
+    "elasticsearch",
+    "sqlite",
+    "duckdb",
+    "lancedb",
+    "pinecone",
+    "weaviate",
+    "chromadb",
     # Tools
-    "docker", "kubernetes", "k8s", "git", "github", "gitlab", "jenkins",
-    "terraform", "ansible", "aws", "azure", "gcp", "vercel", "netlify",
+    "docker",
+    "kubernetes",
+    "k8s",
+    "git",
+    "github",
+    "gitlab",
+    "jenkins",
+    "terraform",
+    "ansible",
+    "aws",
+    "azure",
+    "gcp",
+    "vercel",
+    "netlify",
     # AI/ML
-    "openai", "anthropic", "claude", "gpt", "gpt-4", "llama", "mistral",
-    "gemini", "ollama", "deepseek", "groq", "together", "replicate",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt",
+    "gpt-4",
+    "llama",
+    "mistral",
+    "gemini",
+    "ollama",
+    "deepseek",
+    "groq",
+    "together",
+    "replicate",
     # Protocols
-    "rest", "graphql", "grpc", "websocket", "http", "https", "mcp",
+    "rest",
+    "graphql",
+    "grpc",
+    "websocket",
+    "http",
+    "https",
+    "mcp",
 }
 
 # Organization patterns
@@ -182,9 +254,7 @@ class TextEntityExtractor(EntityExtractor):
             metadata={"extractor": self.name},
         )
 
-    def _extract_technologies(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_technologies(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract technology entities."""
         entities: List[Entity] = []
         content_lower = content.lower()
@@ -210,9 +280,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_organizations(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_organizations(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract organization entities."""
         entities: List[Entity] = []
 
@@ -234,9 +302,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_projects(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_projects(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract project entities."""
         entities: List[Entity] = []
 
@@ -258,9 +324,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_concepts(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_concepts(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract concept entities."""
         entities: List[Entity] = []
 
@@ -282,9 +346,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_requirements(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_requirements(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract requirement and feature entities."""
         entities: List[Entity] = []
 
@@ -306,9 +368,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_bugs(
-        self, content: str, source: Optional[str]
-    ) -> List[Entity]:
+    def _extract_bugs(self, content: str, source: Optional[str]) -> List[Entity]:
         """Extract bug entities."""
         entities: List[Entity] = []
 
@@ -330,9 +390,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _infer_relationships(
-        self, content: str, entities: List[Entity]
-    ) -> List[EntityRelation]:
+    def _infer_relationships(self, content: str, entities: List[Entity]) -> List[EntityRelation]:
         """Infer relationships between entities."""
         relations: List[EntityRelation] = []
 
@@ -354,7 +412,7 @@ class TextEntityExtractor(EntityExtractor):
 
         # Concepts relate to each other
         for i, concept1 in enumerate(concepts):
-            for concept2 in concepts[i + 1:]:
+            for concept2 in concepts[i + 1 :]:
                 relation = EntityRelation(
                     source_id=concept1.id,
                     target_id=concept2.id,

@@ -151,11 +151,13 @@ class TestCodePatternScanner:
     def test_scan_multiple_commands(self):
         """Scanner should detect patterns in multiple commands."""
         scanner = CodePatternScanner()
-        result = scanner.scan_commands([
-            "git status",
-            "git push --force origin main",
-            "npm install",
-        ])
+        result = scanner.scan_commands(
+            [
+                "git status",
+                "git push --force origin main",
+                "npm install",
+            ]
+        )
         assert result.has_high is True
         assert len(result.matches) >= 1
 

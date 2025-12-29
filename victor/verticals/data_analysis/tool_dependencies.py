@@ -86,7 +86,13 @@ DATA_ANALYSIS_TOOL_SEQUENCES: Dict[str, List[str]] = {
     "data_profiling": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
     "visualization": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE],
     "statistical_test": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
-    "ml_pipeline": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.SHELL, ToolNames.WRITE],
+    "ml_pipeline": [
+        ToolNames.READ,
+        ToolNames.SHELL,
+        ToolNames.SHELL,
+        ToolNames.SHELL,
+        ToolNames.WRITE,
+    ],
     "report_generation": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE, ToolNames.WRITE],
 }
 

@@ -170,9 +170,7 @@ class TestBugFixWorkflow:
         wf = bug_fix_workflow()
 
         # Check for condition node
-        has_condition = any(
-            isinstance(node, ConditionNode) for node in wf.nodes.values()
-        )
+        has_condition = any(isinstance(node, ConditionNode) for node in wf.nodes.values())
         assert has_condition
 
 
@@ -192,9 +190,7 @@ class TestCodeReviewWorkflow:
         wf = code_review_workflow()
 
         # Check for parallel node
-        has_parallel = any(
-            isinstance(node, ParallelNode) for node in wf.nodes.values()
-        )
+        has_parallel = any(isinstance(node, ParallelNode) for node in wf.nodes.values())
         assert has_parallel
 
     def test_review_types(self):

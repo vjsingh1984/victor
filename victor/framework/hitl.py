@@ -358,10 +358,7 @@ class HITLController:
         Returns:
             List of pending ApprovalRequest objects
         """
-        return [
-            req for req in self._requests.values()
-            if req.status == ApprovalStatus.PENDING
-        ]
+        return [req for req in self._requests.values() if req.status == ApprovalStatus.PENDING]
 
     def respond_to_request(
         self,

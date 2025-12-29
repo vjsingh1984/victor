@@ -123,16 +123,20 @@ from victor.security import TokenValidator
         await graph.add_entity(func)
 
         # Add relationships
-        await graph.add_relation(EntityRelation(
-            source_id=module.id,
-            target_id=cls.id,
-            relation_type=RelationType.CONTAINS,
-        ))
-        await graph.add_relation(EntityRelation(
-            source_id=cls.id,
-            target_id=func.id,
-            relation_type=RelationType.CONTAINS,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=module.id,
+                target_id=cls.id,
+                relation_type=RelationType.CONTAINS,
+            )
+        )
+        await graph.add_relation(
+            EntityRelation(
+                source_id=cls.id,
+                target_id=func.id,
+                relation_type=RelationType.CONTAINS,
+            )
+        )
 
         # Find paths
         paths = await graph.find_paths(module.id, func.id, max_depth=3)
@@ -565,21 +569,23 @@ class TestPresetAgentCustomization:
 
     def test_preset_in_ensemble(self):
         """Test using presets in ensemble configurations."""
-        config = load_agents_from_dict({
-            "agents": [
-                {
-                    "name": "custom_reviewer",
-                    "extends": "reviewer",
-                    "constraints": {
-                        "max_iterations": 15,
+        config = load_agents_from_dict(
+            {
+                "agents": [
+                    {
+                        "name": "custom_reviewer",
+                        "extends": "reviewer",
+                        "constraints": {
+                            "max_iterations": 15,
+                        },
                     },
+                ],
+                "ensemble": {
+                    "type": "pipeline",
+                    "agents": ["researcher", "coder", "custom_reviewer"],
                 },
-            ],
-            "ensemble": {
-                "type": "pipeline",
-                "agents": ["researcher", "coder", "custom_reviewer"],
-            },
-        })
+            }
+        )
 
         ensemble = config.ensemble
         assert ensemble is not None

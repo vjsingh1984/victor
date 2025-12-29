@@ -44,12 +44,22 @@ class ResearchRLConfig:
     # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
-            "research": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.READ, ToolNames.WRITE],
+            "research": [
+                ToolNames.WEB_SEARCH,
+                ToolNames.WEB_FETCH,
+                ToolNames.READ,
+                ToolNames.WRITE,
+            ],
             "fact_check": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.GREP],
             "literature": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.READ],
             "competitive": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.WRITE],
             "synthesis": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT],
-            "exploration": [ToolNames.WEB_SEARCH, ToolNames.READ, ToolNames.GREP, ToolNames.OVERVIEW],
+            "exploration": [
+                ToolNames.WEB_SEARCH,
+                ToolNames.READ,
+                ToolNames.GREP,
+                ToolNames.OVERVIEW,
+            ],
         }
     )
 

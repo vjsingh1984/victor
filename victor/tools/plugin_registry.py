@@ -479,7 +479,9 @@ class ToolPluginRegistry:
         )
 
         if result:
-            logger.info(f"Started plugin hot-reload watcher for {len(self.plugin_dirs)} directories")
+            logger.info(
+                f"Started plugin hot-reload watcher for {len(self.plugin_dirs)} directories"
+            )
 
         return result
 

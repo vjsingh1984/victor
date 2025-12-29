@@ -228,8 +228,10 @@ class Entity:
         """
         # Use higher confidence description
         description = (
-            other.description if other.confidence > self.confidence else self.description
-        ) or self.description or other.description
+            (other.description if other.confidence > self.confidence else self.description)
+            or self.description
+            or other.description
+        )
 
         # Merge attributes
         merged_attrs = {**self.attributes, **other.attributes}

@@ -485,15 +485,9 @@ class UsageAnalytics:
             insights = {}
             for method, stats in self._selection_stats.items():
                 avg_tools = (
-                    stats["total_tools_selected"] / stats["count"]
-                    if stats["count"] > 0
-                    else 0
+                    stats["total_tools_selected"] / stats["count"] if stats["count"] > 0 else 0
                 )
-                avg_time = (
-                    stats["total_time_ms"] / stats["count"]
-                    if stats["count"] > 0
-                    else 0
-                )
+                avg_time = stats["total_time_ms"] / stats["count"] if stats["count"] > 0 else 0
 
                 insights[method] = {
                     "count": stats["count"],

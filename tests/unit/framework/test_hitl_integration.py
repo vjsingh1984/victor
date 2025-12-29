@@ -253,9 +253,7 @@ class TestApprovalFlowEndToEnd:
         controller = HITLController()
 
         # Register callbacks
-        controller.on_approval_request(
-            lambda req: events.append(("request_created", req.id))
-        )
+        controller.on_approval_request(lambda req: events.append(("request_created", req.id)))
 
         # Create request
         request = controller.request_approval(
@@ -327,7 +325,11 @@ class TestApprovalFlowEndToEnd:
 
             # Policy: Reject anything with "production" in context
             if "production" in str(request.context).lower():
-                return ApprovalStatus.REJECTED, "Production changes require manual review", "policy-bot"
+                return (
+                    ApprovalStatus.REJECTED,
+                    "Production changes require manual review",
+                    "policy-bot",
+                )
             else:
                 return ApprovalStatus.APPROVED, "Auto-approved by policy", "policy-bot"
 

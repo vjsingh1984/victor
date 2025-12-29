@@ -315,7 +315,11 @@ class TestWorkflowExecutorE2E:
         # Each completed node should have a result
         for node_id, node_result in result.context.node_results.items():
             assert isinstance(node_result, NodeResult)
-            assert node_result.status in [NodeStatus.COMPLETED, NodeStatus.FAILED, NodeStatus.SKIPPED]
+            assert node_result.status in [
+                NodeStatus.COMPLETED,
+                NodeStatus.FAILED,
+                NodeStatus.SKIPPED,
+            ]
 
     async def test_execute_tracks_duration(self, mock_orchestrator, simple_workflow):
         """Test that execution duration is tracked."""
@@ -409,9 +413,7 @@ class TestCheckpointFunctionality:
             return ctx
 
         workflow = (
-            WorkflowBuilder("state_checkpoint_workflow")
-            .add_transform("step_a", step_a)
-            .build()
+            WorkflowBuilder("state_checkpoint_workflow").add_transform("step_a", step_a).build()
         )
 
         mock_checkpointer = MagicMock()
@@ -486,8 +488,7 @@ class TestErrorHandlingAndRetry:
 
         # Error should be captured
         failed_results = [
-            r for r in result.context.node_results.values()
-            if r.status == NodeStatus.FAILED
+            r for r in result.context.node_results.values() if r.status == NodeStatus.FAILED
         ]
         assert len(failed_results) > 0
 
@@ -668,11 +669,13 @@ class TestParallelNodeExecution:
         def create_timed_transform(name: str, delay: float = 0.1):
             def transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 import time
+
                 start = time.time()
                 time.sleep(delay)
                 execution_times[name] = time.time() - start
                 ctx[f"{name}_completed"] = True
                 return ctx
+
             return transform
 
         # Create parallel tasks
@@ -814,10 +817,7 @@ class TestWorkflowContextManagement:
             return ctx
 
         def read_both_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
-            ctx["saw_both"] = (
-                ctx.get("key_a") == "value_a" and
-                ctx.get("key_b") == "value_b"
-            )
+            ctx["saw_both"] = ctx.get("key_a") == "value_a" and ctx.get("key_b") == "value_b"
             return ctx
 
         workflow = (

@@ -28,19 +28,25 @@ from victor.workflows.graph import (
 # Test fixtures
 
 
-async def simple_handler(state: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> NodeResult:
+async def simple_handler(
+    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+) -> NodeResult:
     """A simple handler that passes through state."""
     return NodeResult(status=NodeStatus.COMPLETED, output=state)
 
 
-async def increment_handler(state: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> NodeResult:
+async def increment_handler(
+    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+) -> NodeResult:
     """Handler that increments a counter in state."""
     new_state = state.copy()
     new_state["counter"] = state.get("counter", 0) + 1
     return NodeResult(status=NodeStatus.COMPLETED, output=new_state)
 
 
-async def failing_handler(state: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> NodeResult:
+async def failing_handler(
+    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+) -> NodeResult:
     """Handler that always fails."""
     return NodeResult(
         status=NodeStatus.FAILED,
@@ -248,10 +254,8 @@ class TestWorkflowGraph:
 
         graph.add_node(node1).add_node(node2).add_node(node3)
 
-        result = (
-            graph
-            .add_edge(WorkflowEdge(source_id="node1", target_id="node2"))
-            .add_edge(WorkflowEdge(source_id="node2", target_id="node3"))
+        result = graph.add_edge(WorkflowEdge(source_id="node1", target_id="node2")).add_edge(
+            WorkflowEdge(source_id="node2", target_id="node3")
         )
 
         assert result is graph
@@ -264,8 +268,7 @@ class TestWorkflowGraph:
         node3 = WorkflowNode(id="node3", name="Node 3", handler=simple_handler)
 
         (
-            graph
-            .add_node(node1)
+            graph.add_node(node1)
             .add_node(node2)
             .add_node(node3)
             .add_edge(WorkflowEdge(source_id="node1", target_id="node2"))
@@ -289,12 +292,15 @@ class TestWorkflowGraph:
         failure_condition = lambda state: state.get("result") == "failure"
 
         (
-            graph
-            .add_node(node1)
+            graph.add_node(node1)
             .add_node(node2)
             .add_node(node3)
-            .add_edge(ConditionalEdge(source_id="check", target_id="success", condition=success_condition))
-            .add_edge(ConditionalEdge(source_id="check", target_id="failure", condition=failure_condition))
+            .add_edge(
+                ConditionalEdge(source_id="check", target_id="success", condition=success_condition)
+            )
+            .add_edge(
+                ConditionalEdge(source_id="check", target_id="failure", condition=failure_condition)
+            )
         )
 
         # Test success path
@@ -377,8 +383,7 @@ class TestGraphValidation:
         node3 = WorkflowNode(id="orphan", name="Orphan", handler=simple_handler)
 
         (
-            graph
-            .add_node(node1)
+            graph.add_node(node1)
             .add_node(node2)
             .add_node(node3)
             .add_edge(WorkflowEdge(source_id="start", target_id="connected"))
@@ -397,8 +402,7 @@ class TestGraphValidation:
         node3 = WorkflowNode(id="end", name="End", handler=simple_handler)
 
         (
-            graph
-            .add_node(node1)
+            graph.add_node(node1)
             .add_node(node2)
             .add_node(node3)
             .add_edge(WorkflowEdge(source_id="start", target_id="process"))
@@ -422,8 +426,7 @@ class TestCycleDetection:
         node2 = WorkflowNode(id="b", name="B", handler=simple_handler)
 
         (
-            graph
-            .add_node(node1)
+            graph.add_node(node1)
             .add_node(node2)
             .add_edge(WorkflowEdge(source_id="a", target_id="b"))
             .add_edge(WorkflowEdge(source_id="b", target_id="a"))
@@ -441,8 +444,7 @@ class TestCycleDetection:
         node_end = WorkflowNode(id="end", name="End", handler=simple_handler)
 
         (
-            graph
-            .add_node(node)
+            graph.add_node(node)
             .add_node(node_end)
             .add_edge(WorkflowEdge(source_id="loop", target_id="loop"))
             .add_edge(WorkflowEdge(source_id="loop", target_id="end"))
@@ -462,8 +464,7 @@ class TestCycleDetection:
         node_c = WorkflowNode(id="c", name="C", handler=simple_handler)
 
         (
-            graph
-            .add_node(node_a)
+            graph.add_node(node_a)
             .add_node(node_b)
             .add_node(node_c)
             .add_edge(WorkflowEdge(source_id="a", target_id="b"))
@@ -486,8 +487,7 @@ class TestCycleDetection:
 
         # Diamond pattern: A -> B, A -> C, B -> D, C -> D
         (
-            graph
-            .add_node(node_a)
+            graph.add_node(node_a)
             .add_node(node_b)
             .add_node(node_c)
             .add_node(node_d)
@@ -517,8 +517,7 @@ class TestGraphHelperMethods:
         node_orphan = WorkflowNode(id="orphan", name="Orphan", handler=simple_handler)
 
         (
-            graph
-            .add_node(node_a)
+            graph.add_node(node_a)
             .add_node(node_b)
             .add_node(node_c)
             .add_node(node_orphan)
@@ -545,8 +544,7 @@ class TestGraphHelperMethods:
             return state.get("route", "path_a")
 
         (
-            graph
-            .add_node(node_router)
+            graph.add_node(node_router)
             .add_node(node_path_a)
             .add_node(node_path_b)
             .add_conditional_edge(

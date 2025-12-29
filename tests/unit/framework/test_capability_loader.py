@@ -102,15 +102,9 @@ class TestCapabilityLoader:
         """Test filtering capabilities by type."""
         loader = CapabilityLoader()
 
-        loader.register_capability(
-            "tool1", lambda x: x, capability_type=CapabilityType.TOOL
-        )
-        loader.register_capability(
-            "safety1", lambda x: x, capability_type=CapabilityType.SAFETY
-        )
-        loader.register_capability(
-            "tool2", lambda x: x, capability_type=CapabilityType.TOOL
-        )
+        loader.register_capability("tool1", lambda x: x, capability_type=CapabilityType.TOOL)
+        loader.register_capability("safety1", lambda x: x, capability_type=CapabilityType.SAFETY)
+        loader.register_capability("tool2", lambda x: x, capability_type=CapabilityType.TOOL)
 
         tools = loader.get_capabilities_by_type(CapabilityType.TOOL)
         assert len(tools) == 2
@@ -179,10 +173,9 @@ class TestModuleLoading:
     def test_load_from_path(self):
         """Test loading capabilities from a file path."""
         # Create a temporary capability module
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
-            f.write("""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(
+                """
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry
 
@@ -200,7 +193,8 @@ CAPABILITIES = [
         handler=my_handler,
     )
 ]
-""")
+"""
+            )
             temp_path = f.name
 
         try:

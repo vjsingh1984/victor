@@ -328,6 +328,7 @@ class TeamMemberSpec:
         if member.memory_enabled:
             try:
                 from victor.memory import get_memory_coordinator
+
                 member.attach_memory_coordinator(get_memory_coordinator())
             except ImportError:
                 pass  # Memory module not available, skip
@@ -430,10 +431,7 @@ class AgentTeam:
             )
         """
         # Convert specs to TeamMembers
-        team_members = [
-            spec.to_team_member(index=i)
-            for i, spec in enumerate(members)
-        ]
+        team_members = [spec.to_team_member(index=i) for i, spec in enumerate(members)]
 
         # For hierarchical, ensure we have a manager
         if formation == TeamFormation.HIERARCHICAL:
@@ -630,7 +628,11 @@ class AgentTeam:
 
             # Emit completion event
             yield TeamEvent(
-                type=TeamEventType.TEAM_COMPLETE if self._result.success else TeamEventType.TEAM_ERROR,
+                type=(
+                    TeamEventType.TEAM_COMPLETE
+                    if self._result.success
+                    else TeamEventType.TEAM_ERROR
+                ),
                 team_name=self.name,
                 message=f"Team '{self.name}' completed: {'success' if self._result.success else 'failed'}",
                 metadata={

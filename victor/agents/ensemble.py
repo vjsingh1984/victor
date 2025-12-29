@@ -103,9 +103,7 @@ class EnsembleResult:
         self.total_tokens = sum(r.tokens_used for r in self.agent_results)
         self.total_cost_usd = sum(r.cost_usd for r in self.agent_results)
         if self.agent_results:
-            self.total_duration_ms = max(
-                r.duration_ms for r in self.agent_results
-            )
+            self.total_duration_ms = max(r.duration_ms for r in self.agent_results)
 
 
 class Ensemble(ABC):
@@ -219,9 +217,7 @@ class Pipeline(Ensemble):
         current_context["original_task"] = task
 
         for agent in self.agents:
-            agent_result = await self._execute_agent(
-                agent, task, current_context, orchestrator
-            )
+            agent_result = await self._execute_agent(agent, task, current_context, orchestrator)
             result.agent_results.append(agent_result)
 
             if not agent_result.success:
@@ -258,9 +254,7 @@ class Pipeline(Ensemble):
         try:
             if orchestrator:
                 # Use real orchestrator
-                output = await self._run_with_orchestrator(
-                    agent, task, context, orchestrator
-                )
+                output = await self._run_with_orchestrator(agent, task, context, orchestrator)
             else:
                 # Mock execution for testing
                 output = f"[{agent.name}] Completed: {task}"
@@ -271,9 +265,7 @@ class Pipeline(Ensemble):
                 output=output,
                 started_at=start_time,
                 completed_at=datetime.now(timezone.utc),
-                duration_ms=(
-                    datetime.now(timezone.utc) - start_time
-                ).total_seconds() * 1000,
+                duration_ms=(datetime.now(timezone.utc) - start_time).total_seconds() * 1000,
             )
 
         except Exception as e:
@@ -303,7 +295,7 @@ class Pipeline(Ensemble):
         if agent.system_prompt:
             prompt_parts.insert(0, agent.system_prompt)
 
-        prompt = "\n\n".join(prompt_parts)
+        _prompt = "\n\n".join(prompt_parts)  # noqa: F841 - Built for future orchestrator integration
 
         # TODO: Integrate with actual orchestrator
         # For now, return mock output
@@ -362,19 +354,20 @@ class Parallel(Ensemble):
 
         # Execute all agents concurrently
         tasks = [
-            self._execute_agent(agent, task, context or {}, orchestrator)
-            for agent in self.agents
+            self._execute_agent(agent, task, context or {}, orchestrator) for agent in self.agents
         ]
         agent_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results
         for i, res in enumerate(agent_results):
             if isinstance(res, Exception):
-                result.agent_results.append(AgentResult(
-                    agent_name=self.agents[i].name,
-                    status=ExecutionStatus.FAILED,
-                    error=str(res),
-                ))
+                result.agent_results.append(
+                    AgentResult(
+                        agent_name=self.agents[i].name,
+                        status=ExecutionStatus.FAILED,
+                        error=str(res),
+                    )
+                )
             else:
                 result.agent_results.append(res)
 
@@ -424,11 +417,7 @@ class Parallel(Ensemble):
 
     def _default_aggregator(self, results: List[AgentResult]) -> Dict[str, Any]:
         """Default result aggregation."""
-        return {
-            r.agent_name: r.output
-            for r in results
-            if r.success
-        }
+        return {r.agent_name: r.output for r in results if r.success}
 
 
 class Hierarchical(Ensemble):
@@ -481,9 +470,7 @@ class Hierarchical(Ensemble):
         )
 
         # Manager analyzes task and creates delegation plan
-        manager_result = await self._run_manager(
-            task, context or {}, orchestrator
-        )
+        manager_result = await self._run_manager(task, context or {}, orchestrator)
         result.agent_results.append(manager_result)
 
         if not manager_result.success:

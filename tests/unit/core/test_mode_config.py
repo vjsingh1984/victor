@@ -268,7 +268,9 @@ class TestModeConfigRegistry:
         """get_mode_configs should include vertical overrides."""
         registry.register_vertical(
             "coding",
-            modes={"architect": ModeDefinition(name="architect", tool_budget=40, max_iterations=100)},
+            modes={
+                "architect": ModeDefinition(name="architect", tool_budget=40, max_iterations=100)
+            },
         )
         configs = registry.get_mode_configs("coding")
         assert "architect" in configs
@@ -359,7 +361,11 @@ class TestGetModesAndRegisterModes:
         # Register a vertical with custom mode
         registry.register_modes(
             "coding",
-            {"architect": ModeConfig(tool_budget=40, max_iterations=100, exploration_multiplier=1.5)},
+            {
+                "architect": ModeConfig(
+                    tool_budget=40, max_iterations=100, exploration_multiplier=1.5
+                )
+            },
         )
         modes = registry.get_modes("coding")
         # Should have both default modes and vertical modes
@@ -384,7 +390,9 @@ class TestGetModesAndRegisterModes:
         registry.register_modes(
             "devops",
             {
-                "kubernetes": ModeConfig(tool_budget=25, max_iterations=60, exploration_multiplier=2.0),
+                "kubernetes": ModeConfig(
+                    tool_budget=25, max_iterations=60, exploration_multiplier=2.0
+                ),
                 "terraform": ModeConfig(tool_budget=20, max_iterations=50),
             },
         )

@@ -159,9 +159,7 @@ class SignatureStore:
                 conn.executescript(self._get_schema())
 
                 # Check/set schema version
-                cursor = conn.execute(
-                    f"SELECT version FROM {Tables.SYS_SCHEMA_VERSION} LIMIT 1"
-                )
+                cursor = conn.execute(f"SELECT version FROM {Tables.SYS_SCHEMA_VERSION} LIMIT 1")
                 row = cursor.fetchone()
                 if row is None:
                     conn.execute(

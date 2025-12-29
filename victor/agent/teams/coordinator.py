@@ -330,9 +330,7 @@ class TeamCoordinator:
                 if result.total_duration < 60:
                     quality_score += 0.1
                 # Penalty for many failures
-                failed_members = sum(
-                    1 for r in result.member_results.values() if not r.success
-                )
+                failed_members = sum(1 for r in result.member_results.values() if not r.success)
                 if failed_members > 0:
                     quality_score -= 0.1 * failed_members
 
@@ -556,9 +554,7 @@ class TeamCoordinator:
 
         # Process results
         member_results: Dict[str, MemberResult] = {}
-        for i, (member, sub_result) in enumerate(
-            zip(config.members, fan_out_result.results)
-        ):
+        for i, (member, sub_result) in enumerate(zip(config.members, fan_out_result.results)):
             result = self._convert_subagent_result(member.id, sub_result)
             member_results[member.id] = result
 
@@ -690,8 +686,7 @@ Execute your assigned tasks and report your findings."""
         execution.member_statuses[manager.id] = MemberStatus.WORKING
 
         worker_reports = "\n\n".join(
-            f"**{w.name}**:\n{member_results[w.id].output}"
-            for w in workers
+            f"**{w.name}**:\n{member_results[w.id].output}" for w in workers
         )
 
         synthesis_prompt = f"""You are the team manager completing the team's work.
@@ -896,37 +891,43 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
         lines = [
             f"You are {member.name}, a {member.role.value} agent on a team.",
             "",
-            f"## Team Goal",
+            "## Team Goal",
             config.goal,
             "",
-            f"## Your Specific Goal",
+            "## Your Specific Goal",
             member.goal,
         ]
 
         # Add backstory/persona if provided (CrewAI-compatible)
         if member.backstory:
-            lines.extend([
-                "",
-                "## Background",
-                member.backstory,
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Background",
+                    member.backstory,
+                ]
+            )
 
         # Add expertise domains if specified
         if member.expertise:
-            lines.extend([
-                "",
-                "## Expertise",
-                f"Your areas of expertise: {', '.join(member.expertise)}",
-                "Leverage this expertise when analyzing problems and making recommendations.",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Expertise",
+                    f"Your areas of expertise: {', '.join(member.expertise)}",
+                    "Leverage this expertise when analyzing problems and making recommendations.",
+                ]
+            )
 
         # Add personality/communication style if specified
         if member.personality:
-            lines.extend([
-                "",
-                "## Communication Style",
-                member.personality,
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Communication Style",
+                    member.personality,
+                ]
+            )
 
         # Add delegation info if applicable
         if member.can_delegate:
@@ -934,25 +935,31 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             if member.max_delegation_depth > 0:
                 depth_info = f" (maximum {member.max_delegation_depth} levels deep)"
             if member.delegation_targets:
-                lines.extend([
-                    "",
-                    "## Delegation",
-                    f"You can delegate tasks to: {', '.join(member.delegation_targets)}{depth_info}",
-                ])
+                lines.extend(
+                    [
+                        "",
+                        "## Delegation",
+                        f"You can delegate tasks to: {', '.join(member.delegation_targets)}{depth_info}",
+                    ]
+                )
             else:
-                lines.extend([
-                    "",
-                    "## Delegation",
-                    f"You can delegate tasks to other team members when appropriate{depth_info}.",
-                ])
+                lines.extend(
+                    [
+                        "",
+                        "## Delegation",
+                        f"You can delegate tasks to other team members when appropriate{depth_info}.",
+                    ]
+                )
 
         # Add shared context
         if config.shared_context:
-            lines.extend([
-                "",
-                "## Initial Context",
-                str(config.shared_context),
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Initial Context",
+                    str(config.shared_context),
+                ]
+            )
 
         # Add shared memory
         memory_summary = shared_memory.get_summary()
@@ -963,11 +970,13 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
         if previous_results:
             lines.extend(["", "## Results from Previous Team Members"])
             for member_id, result in previous_results.items():
-                lines.extend([
-                    f"### {member_id}",
-                    result.output[:1000] if result.output else "(no output)",
-                    "",
-                ])
+                lines.extend(
+                    [
+                        f"### {member_id}",
+                        result.output[:1000] if result.output else "(no output)",
+                        "",
+                    ]
+                )
 
         return "\n".join(lines)
 
@@ -1009,9 +1018,10 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             # Simple extraction: lines starting with "Found", "Discovered", etc.
             for line in result.summary.split("\n"):
                 line = line.strip()
-                if any(line.lower().startswith(prefix) for prefix in [
-                    "found", "discovered", "identified", "located", "detected"
-                ]):
+                if any(
+                    line.lower().startswith(prefix)
+                    for prefix in ["found", "discovered", "identified", "located", "detected"]
+                ):
                     discoveries.append(line)
         return discoveries
 

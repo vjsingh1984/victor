@@ -74,6 +74,7 @@ _DATA_ANALYSIS_TASK_BUDGETS: Dict[str, int] = {
 # Register with Central Registry
 # =============================================================================
 
+
 def _register_data_analysis_modes() -> None:
     """Register data analysis modes with the central registry."""
     registry = ModeConfigRegistry.get_instance()

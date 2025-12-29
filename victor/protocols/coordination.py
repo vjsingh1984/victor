@@ -237,10 +237,14 @@ class CoordinationSuggestion:
     @property
     def should_suggest_team(self) -> bool:
         """Check if team should be suggested to user."""
-        return self.action in (
-            TeamSuggestionAction.SUGGEST,
-            TeamSuggestionAction.REQUIRE_APPROVAL,
-        ) and self.has_team_suggestion
+        return (
+            self.action
+            in (
+                TeamSuggestionAction.SUGGEST,
+                TeamSuggestionAction.REQUIRE_APPROVAL,
+            )
+            and self.has_team_suggestion
+        )
 
 
 @runtime_checkable

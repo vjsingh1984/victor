@@ -172,9 +172,7 @@ class WorkflowResult:
             "total_tool_calls": self.total_tool_calls,
             "error": self.error,
             "outputs": self.context.get_outputs(),
-            "node_results": {
-                nid: r.to_dict() for nid, r in self.context.node_results.items()
-            },
+            "node_results": {nid: r.to_dict() for nid, r in self.context.node_results.items()},
         }
 
     def get_output(self, node_id: str) -> Optional[Any]:
@@ -258,6 +256,7 @@ class WorkflowExecutor:
             self._cache = cache
         elif cache_config is not None:
             from victor.workflows.cache import WorkflowCache
+
             self._cache: Optional["WorkflowCache"] = WorkflowCache(cache_config)
         else:
             self._cache = None
@@ -317,7 +316,9 @@ class WorkflowExecutor:
         if self._checkpointer:
             checkpoint = self._checkpointer.get_latest_checkpoint(f"workflow_{thread_id}")
             if checkpoint:
-                logger.info(f"Resuming from checkpoint at node: {checkpoint.state.get('last_node')}")
+                logger.info(
+                    f"Resuming from checkpoint at node: {checkpoint.state.get('last_node')}"
+                )
                 initial_context = checkpoint.state.get("context", {})
                 resume_from_node = checkpoint.state.get("next_node")
 
@@ -335,20 +336,14 @@ class WorkflowExecutor:
         try:
             if timeout:
                 await asyncio.wait_for(
-                    self._execute_workflow(
-                        workflow, context, thread_id, resume_from_node
-                    ),
+                    self._execute_workflow(workflow, context, thread_id, resume_from_node),
                     timeout=timeout,
                 )
             else:
-                await self._execute_workflow(
-                    workflow, context, thread_id, resume_from_node
-                )
+                await self._execute_workflow(workflow, context, thread_id, resume_from_node)
 
             total_duration = time.time() - start_time
-            total_tool_calls = sum(
-                r.tool_calls_used for r in context.node_results.values()
-            )
+            total_tool_calls = sum(r.tool_calls_used for r in context.node_results.values())
 
             success = not context.has_failures()
 
@@ -451,7 +446,7 @@ class WorkflowExecutor:
             self._emit_workflow_step_event(
                 workflow_name=workflow.name,
                 node_id=node_id,
-                node_type=node.node_type.value if hasattr(node, 'node_type') else 'unknown',
+                node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
                 success=result.status == NodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )

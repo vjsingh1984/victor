@@ -310,12 +310,15 @@ class TestVerticalRegistration:
         core_budget = core_edit.tool_budget
 
         # Register vertical-specific "edit"
-        registry.register_for_vertical("devops", TaskTypeDefinition(
-            name="edit",
-            category=TaskCategory.MODIFICATION,
-            hint="[DEVOPS EDIT] Special edit for DevOps",
-            tool_budget=50,
-        ))
+        registry.register_for_vertical(
+            "devops",
+            TaskTypeDefinition(
+                name="edit",
+                category=TaskCategory.MODIFICATION,
+                hint="[DEVOPS EDIT] Special edit for DevOps",
+                tool_budget=50,
+            ),
+        )
 
         # With vertical, should get override
         devops_edit = registry.get("edit", vertical="devops")
@@ -332,12 +335,15 @@ class TestVerticalRegistration:
         """Test listing types includes vertical-specific ones."""
         registry = TaskTypeRegistry.get_instance()
 
-        registry.register_for_vertical("devops", TaskTypeDefinition(
-            name="kubernetes",
-            category=TaskCategory.MODIFICATION,
-            hint="[K8S] Kubernetes",
-            tool_budget=30,
-        ))
+        registry.register_for_vertical(
+            "devops",
+            TaskTypeDefinition(
+                name="kubernetes",
+                category=TaskCategory.MODIFICATION,
+                hint="[K8S] Kubernetes",
+                tool_budget=30,
+            ),
+        )
 
         # Without vertical, kubernetes not listed
         types = registry.list_types()
@@ -351,12 +357,18 @@ class TestVerticalRegistration:
         """Test listing registered verticals."""
         registry = TaskTypeRegistry.get_instance()
 
-        registry.register_for_vertical("devops", TaskTypeDefinition(
-            name="test1", category=TaskCategory.MODIFICATION, hint="", tool_budget=10
-        ))
-        registry.register_for_vertical("data_analysis", TaskTypeDefinition(
-            name="test2", category=TaskCategory.ANALYSIS, hint="", tool_budget=10
-        ))
+        registry.register_for_vertical(
+            "devops",
+            TaskTypeDefinition(
+                name="test1", category=TaskCategory.MODIFICATION, hint="", tool_budget=10
+            ),
+        )
+        registry.register_for_vertical(
+            "data_analysis",
+            TaskTypeDefinition(
+                name="test2", category=TaskCategory.ANALYSIS, hint="", tool_budget=10
+            ),
+        )
 
         verticals = registry.list_verticals()
         assert "devops" in verticals
@@ -527,12 +539,15 @@ class TestEdgeCases:
         """Test that vertical names are case-insensitive."""
         registry = TaskTypeRegistry.get_instance()
 
-        registry.register_for_vertical("DevOps", TaskTypeDefinition(
-            name="test",
-            category=TaskCategory.MODIFICATION,
-            hint="Test",
-            tool_budget=10,
-        ))
+        registry.register_for_vertical(
+            "DevOps",
+            TaskTypeDefinition(
+                name="test",
+                category=TaskCategory.MODIFICATION,
+                hint="Test",
+                tool_budget=10,
+            ),
+        )
 
         assert registry.get("test", vertical="devops") is not None
         assert registry.get("test", vertical="DEVOPS") is not None
@@ -561,12 +576,14 @@ class TestEdgeCases:
 
         def my_hook(registry):
             hook_called.append(True)
-            registry.register(TaskTypeDefinition(
-                name="from_hook",
-                category=TaskCategory.ANALYSIS,
-                hint="From hook",
-                tool_budget=10,
-            ))
+            registry.register(
+                TaskTypeDefinition(
+                    name="from_hook",
+                    category=TaskCategory.ANALYSIS,
+                    hint="From hook",
+                    tool_budget=10,
+                )
+            )
 
         # Add hook before get_instance
         new_registry = TaskTypeRegistry()

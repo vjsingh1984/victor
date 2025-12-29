@@ -368,8 +368,7 @@ class Diagnostic:
         code_desc = data.get("codeDescription", {})
         tags = [DiagnosticTag(t) for t in data.get("tags", [])]
         related = [
-            DiagnosticRelatedInformation.from_dict(ri)
-            for ri in data.get("relatedInformation", [])
+            DiagnosticRelatedInformation.from_dict(ri) for ri in data.get("relatedInformation", [])
         ]
         return cls(
             range=Range.from_dict(data["range"]),
@@ -489,9 +488,7 @@ class Hover:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {
-            "contents": {"kind": "markdown", "value": self.contents}
-        }
+        result: Dict[str, Any] = {"contents": {"kind": "markdown", "value": self.contents}}
         if self.range:
             result["range"] = self.range.to_dict()
         return result
@@ -503,9 +500,7 @@ class Hover:
         if isinstance(contents, dict):
             contents = contents.get("value", "")
         elif isinstance(contents, list):
-            contents = "\n".join(
-                c.get("value", c) if isinstance(c, dict) else c for c in contents
-            )
+            contents = "\n".join(c.get("value", c) if isinstance(c, dict) else c for c in contents)
 
         range_data = data.get("range")
         return cls(

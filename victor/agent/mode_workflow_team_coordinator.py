@@ -253,12 +253,12 @@ class RuleBasedTeamSelector:
             # Check name similarity
             if task_lower in team_name.lower():
                 confidence = max(confidence, 0.6)
-                reason = reason or f"Team name contains task type"
+                reason = reason or "Team name contains task type"
 
             # Check spec description if available
             if hasattr(spec, "description") and task_lower in spec.description.lower():
                 confidence = max(confidence, 0.5)
-                reason = reason or f"Team description matches task"
+                reason = reason or "Team description matches task"
 
             if confidence > 0:
                 recommendations.append(
@@ -313,9 +313,7 @@ class LearningBasedTeamSelector:
             recommendation = self._learner.get_recommendation(task_type)
             if recommendation and not recommendation.is_baseline:
                 # Map formation to team name
-                return self._find_team_for_recommendation(
-                    recommendation, available_teams
-                )
+                return self._find_team_for_recommendation(recommendation, available_teams)
         except Exception as e:
             logger.debug(f"Learner selection failed: {e}")
 
@@ -339,10 +337,13 @@ class LearningBasedTeamSelector:
                     TeamRecommendation(
                         team_name=self._find_team_for_recommendation(
                             recommendation, available_teams
-                        ) or "feature_team",
+                        )
+                        or "feature_team",
                         confidence=recommendation.confidence,
                         reason=recommendation.reason,
-                        formation=recommendation.formation.value if recommendation.formation else None,
+                        formation=(
+                            recommendation.formation.value if recommendation.formation else None
+                        ),
                         suggested_budget=recommendation.suggested_budget,
                         role_distribution=recommendation.role_distribution,
                         source="learning",
@@ -369,10 +370,18 @@ class LearningBasedTeamSelector:
         """
         # Try to match by formation if available
         if hasattr(recommendation, "formation") and recommendation.formation:
-            formation_name = recommendation.formation.value if hasattr(recommendation.formation, "value") else str(recommendation.formation)
+            formation_name = (
+                recommendation.formation.value
+                if hasattr(recommendation.formation, "value")
+                else str(recommendation.formation)
+            )
             for team_name, spec in available_teams.items():
                 if hasattr(spec, "formation"):
-                    spec_formation = spec.formation.value if hasattr(spec.formation, "value") else str(spec.formation)
+                    spec_formation = (
+                        spec.formation.value
+                        if hasattr(spec.formation, "value")
+                        else str(spec.formation)
+                    )
                     if spec_formation == formation_name:
                         return team_name
 
@@ -418,9 +427,7 @@ class HybridTeamSelector:
     ) -> Optional[str]:
         """Select team using hybrid approach."""
         # Try learning first (if learner has data)
-        learning_pick = self._learning_selector.select(
-            task_type, complexity, available_teams
-        )
+        learning_pick = self._learning_selector.select(task_type, complexity, available_teams)
         if learning_pick:
             return learning_pick
 
@@ -436,9 +443,7 @@ class HybridTeamSelector:
     ) -> List[TeamRecommendation]:
         """Recommend teams using hybrid approach."""
         # Get recommendations from both
-        rule_recs = self._rule_selector.recommend(
-            task_type, complexity, available_teams, top_k
-        )
+        rule_recs = self._rule_selector.recommend(task_type, complexity, available_teams, top_k)
         learning_recs = self._learning_selector.recommend(
             task_type, complexity, available_teams, top_k
         )
@@ -461,10 +466,7 @@ class HybridTeamSelector:
                 existing = combined[rec.team_name]
                 combined[rec.team_name] = TeamRecommendation(
                     team_name=rec.team_name,
-                    confidence=(
-                        existing.confidence +
-                        rec.confidence * self._learning_weight
-                    ),
+                    confidence=(existing.confidence + rec.confidence * self._learning_weight),
                     reason=f"{existing.reason}; {rec.reason}",
                     formation=rec.formation or existing.formation,
                     suggested_budget=rec.suggested_budget,

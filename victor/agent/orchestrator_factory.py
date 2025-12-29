@@ -2051,9 +2051,7 @@ class OrchestratorFactory(ModeAwareMixin):
             selection_strategy=selection_strategy,
         )
 
-        logger.debug(
-            f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}"
-        )
+        logger.debug(f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}")
         return coordinator
 
     # =========================================================================

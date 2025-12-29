@@ -869,10 +869,27 @@ class TestAllAdaptersProperties:
     """Test all adapters have required properties."""
 
     PROVIDER_NAMES = [
-        "openai", "anthropic", "google", "deepseek", "xai", "mistral",
-        "moonshot", "groq", "together", "fireworks", "cerebras",
-        "openrouter", "replicate", "huggingface", "azure", "bedrock",
-        "vertexai", "ollama", "lmstudio", "vllm", "llamacpp",
+        "openai",
+        "anthropic",
+        "google",
+        "deepseek",
+        "xai",
+        "mistral",
+        "moonshot",
+        "groq",
+        "together",
+        "fireworks",
+        "cerebras",
+        "openrouter",
+        "replicate",
+        "huggingface",
+        "azure",
+        "bedrock",
+        "vertexai",
+        "ollama",
+        "lmstudio",
+        "vllm",
+        "llamacpp",
     ]
 
     @pytest.mark.parametrize("provider", PROVIDER_NAMES)

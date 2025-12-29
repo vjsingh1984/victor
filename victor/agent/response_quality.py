@@ -230,10 +230,7 @@ class ResponseQualityScorer:
                 return
 
             # Extract dimension scores for metadata
-            dimension_data = {
-                ds.dimension.value: ds.score
-                for ds in result.dimension_scores
-            }
+            dimension_data = {ds.dimension.value: ds.score for ds in result.dimension_scores}
 
             event = RLEvent(
                 type=RLEventType.QUALITY_ASSESSED,

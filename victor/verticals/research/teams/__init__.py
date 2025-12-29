@@ -433,7 +433,11 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
                     "disciplines and viewpoints. You create conceptual frameworks that explain "
                     "how pieces fit together."
                 ),
-                expertise=["thematic analysis", "qualitative research", "interdisciplinary synthesis"],
+                expertise=[
+                    "thematic analysis",
+                    "qualitative research",
+                    "interdisciplinary synthesis",
+                ],
                 personality="integrative and creative; finds unexpected connections",
             ),
             TeamMemberSpec(

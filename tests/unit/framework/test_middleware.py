@@ -52,9 +52,7 @@ class TestLoggingMiddleware:
     async def test_before_tool_call_logs_message(self, middleware, caplog):
         """LoggingMiddleware should log before tool call."""
         with caplog.at_level(logging.DEBUG):
-            result = await middleware.before_tool_call(
-                "test_tool", {"arg1": "value1"}
-            )
+            result = await middleware.before_tool_call("test_tool", {"arg1": "value1"})
 
         assert result.proceed is True
         assert "Tool call: test_tool" in caplog.text
@@ -79,9 +77,7 @@ class TestLoggingMiddleware:
         await middleware.before_tool_call("test_tool", {})
 
         with caplog.at_level(logging.DEBUG):
-            await middleware.after_tool_call(
-                "test_tool", {}, "error", success=False
-            )
+            await middleware.after_tool_call("test_tool", {}, "error", success=False)
 
         assert "Tool failed: test_tool" in caplog.text
 
@@ -142,9 +138,7 @@ class TestSecretMaskingMiddleware:
     @pytest.mark.asyncio
     async def test_before_tool_call_masks_arguments_when_enabled(self):
         """SecretMaskingMiddleware should mask arguments when enabled."""
-        middleware = SecretMaskingMiddleware(
-            replacement="[MASKED]", mask_in_arguments=True
-        )
+        middleware = SecretMaskingMiddleware(replacement="[MASKED]", mask_in_arguments=True)
 
         result = await middleware.before_tool_call(
             "test_tool", {"token": "ghp_1234567890abcdefghijklmnopqrstuvwxyz"}
@@ -159,9 +153,7 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should mask secrets in result."""
         result_with_secret = "Found token: ghp_1234567890abcdefghijklmnopqrstuvwxyz"
 
-        masked = await middleware.after_tool_call(
-            "test_tool", {}, result_with_secret, success=True
-        )
+        masked = await middleware.after_tool_call("test_tool", {}, result_with_secret, success=True)
 
         assert masked is not None
         assert "[MASKED]" in masked
@@ -172,9 +164,7 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should mask AWS keys."""
         result_with_key = "AWS key: AKIAIOSFODNN7EXAMPLE"
 
-        masked = await middleware.after_tool_call(
-            "test_tool", {}, result_with_key, success=True
-        )
+        masked = await middleware.after_tool_call("test_tool", {}, result_with_key, success=True)
 
         assert masked is not None
         assert "[MASKED]" in masked
@@ -185,9 +175,7 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should return None when no secrets found."""
         clean_result = "This is a normal response without secrets."
 
-        masked = await middleware.after_tool_call(
-            "test_tool", {}, clean_result, success=True
-        )
+        masked = await middleware.after_tool_call("test_tool", {}, clean_result, success=True)
 
         assert masked is None  # No modification needed
 
@@ -199,9 +187,7 @@ class TestSecretMaskingMiddleware:
             "status": "ok",
         }
 
-        masked = await middleware.after_tool_call(
-            "test_tool", {}, result_dict, success=True
-        )
+        masked = await middleware.after_tool_call("test_tool", {}, result_dict, success=True)
 
         assert masked is not None
         assert "[MASKED]" in masked["output"]
@@ -210,9 +196,7 @@ class TestSecretMaskingMiddleware:
     @pytest.mark.asyncio
     async def test_after_tool_call_handles_none_result(self, middleware):
         """SecretMaskingMiddleware should handle None result."""
-        masked = await middleware.after_tool_call(
-            "test_tool", {}, None, success=True
-        )
+        masked = await middleware.after_tool_call("test_tool", {}, None, success=True)
         assert masked is None
 
     def test_priority_is_high(self, middleware):
@@ -337,9 +321,7 @@ class TestToolMetrics:
 
     def test_avg_duration_calculated(self):
         """avg_duration_ms should be calculated correctly."""
-        metrics = ToolMetrics(
-            tool_name="test", call_count=4, total_duration_ms=200.0
-        )
+        metrics = ToolMetrics(tool_name="test", call_count=4, total_duration_ms=200.0)
         assert metrics.avg_duration_ms == 50.0
 
     def test_success_rate_zero_when_no_calls(self):
@@ -349,9 +331,7 @@ class TestToolMetrics:
 
     def test_success_rate_calculated(self):
         """success_rate should be calculated correctly."""
-        metrics = ToolMetrics(
-            tool_name="test", call_count=10, success_count=7
-        )
+        metrics = ToolMetrics(tool_name="test", call_count=10, success_count=7)
         assert metrics.success_rate == 0.7
 
 
@@ -381,9 +361,7 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_blocks_force_push_short_flag(self, middleware):
         """GitSafetyMiddleware should block force push with -f flag."""
-        result = await middleware.before_tool_call(
-            "git", {"command": "git push -f origin main"}
-        )
+        result = await middleware.before_tool_call("git", {"command": "git push -f origin main"})
 
         assert result.proceed is False
         # Message may say "push -f" or "force" depending on which pattern matched
@@ -392,27 +370,21 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_blocks_hard_reset(self, middleware):
         """GitSafetyMiddleware should block hard reset."""
-        result = await middleware.before_tool_call(
-            "bash", {"command": "git reset --hard HEAD~3"}
-        )
+        result = await middleware.before_tool_call("bash", {"command": "git reset --hard HEAD~3"})
 
         assert result.proceed is False
 
     @pytest.mark.asyncio
     async def test_blocks_clean_fd(self, middleware):
         """GitSafetyMiddleware should block git clean -fd."""
-        result = await middleware.before_tool_call(
-            "shell", {"command": "git clean -fd"}
-        )
+        result = await middleware.before_tool_call("shell", {"command": "git clean -fd"})
 
         assert result.proceed is False
 
     @pytest.mark.asyncio
     async def test_warns_on_risky_operations(self, middleware):
         """GitSafetyMiddleware should warn on risky operations."""
-        result = await middleware.before_tool_call(
-            "execute_bash", {"command": "git rebase main"}
-        )
+        result = await middleware.before_tool_call("execute_bash", {"command": "git rebase main"})
 
         assert result.proceed is True
         assert "git_warning" in result.metadata
@@ -430,9 +402,7 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_allows_safe_operations(self, middleware):
         """GitSafetyMiddleware should allow safe git operations."""
-        result = await middleware.before_tool_call(
-            "execute_bash", {"command": "git status"}
-        )
+        result = await middleware.before_tool_call("execute_bash", {"command": "git status"})
 
         assert result.proceed is True
         assert not result.error_message
@@ -449,18 +419,14 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_ignores_non_git_commands(self, middleware):
         """GitSafetyMiddleware should ignore non-git commands."""
-        result = await middleware.before_tool_call(
-            "execute_bash", {"command": "ls -la"}
-        )
+        result = await middleware.before_tool_call("execute_bash", {"command": "ls -la"})
 
         assert result.proceed is True
 
     @pytest.mark.asyncio
     async def test_ignores_non_applicable_tools(self, middleware):
         """GitSafetyMiddleware should ignore non-applicable tools."""
-        result = await middleware.before_tool_call(
-            "read_file", {"path": "/etc/passwd"}
-        )
+        result = await middleware.before_tool_call("read_file", {"path": "/etc/passwd"})
 
         assert result.proceed is True
 

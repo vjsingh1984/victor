@@ -895,8 +895,7 @@ class Agent:
         if not workflow:
             available = workflow_provider.get_workflow_names()
             raise AgentError(
-                f"Workflow '{workflow_name}' not found. "
-                f"Available: {', '.join(available)}"
+                f"Workflow '{workflow_name}' not found. " f"Available: {', '.join(available)}"
             )
 
         # Create executor and run workflow
@@ -960,10 +959,7 @@ class Agent:
         team_spec = team_specs.get(team_name)
         if not team_spec:
             available = list(team_specs.keys())
-            raise AgentError(
-                f"Team '{team_name}' not found. "
-                f"Available: {', '.join(available)}"
-            )
+            raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
 
         # Create and run team
         team = await AgentTeam.create(

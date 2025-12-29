@@ -2283,18 +2283,22 @@ Respond with just the command to run."""
                 _team_messages[team_id] = []
 
                 # Broadcast team created event
-                await self._broadcast_ws({
-                    "type": "agent_event",
-                    "event": "team_created",
-                    "data": _teams[team_id],
-                    "timestamp": time.time(),
-                })
+                await self._broadcast_ws(
+                    {
+                        "type": "agent_event",
+                        "event": "team_created",
+                        "data": _teams[team_id],
+                        "timestamp": time.time(),
+                    }
+                )
 
-                return JSONResponse({
-                    "success": True,
-                    "team_id": team_id,
-                    "message": f"Team '{name}' created",
-                })
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "team_id": team_id,
+                        "message": f"Team '{name}' created",
+                    }
+                )
 
             except Exception as e:
                 logger.exception("Failed to create team")
@@ -2339,12 +2343,14 @@ Respond with just the command to run."""
                 member["status"] = "pending"
 
             # Broadcast team started event
-            await self._broadcast_ws({
-                "type": "agent_event",
-                "event": "team_started",
-                "data": team,
-                "timestamp": time.time(),
-            })
+            await self._broadcast_ws(
+                {
+                    "type": "agent_event",
+                    "event": "team_started",
+                    "data": team,
+                    "timestamp": time.time(),
+                }
+            )
 
             # Start team execution in background
             async def execute_team():
@@ -2377,14 +2383,16 @@ Respond with just the command to run."""
                     members = []
                     for m in team["members"]:
                         role = role_map.get(m["role"], SubAgentRole.EXECUTOR)
-                        members.append(TeamMember(
-                            id=m["id"],
-                            role=role,
-                            name=m["name"],
-                            goal=m["goal"],
-                            tool_budget=m["tool_budget"],
-                            is_manager=m.get("is_manager", False),
-                        ))
+                        members.append(
+                            TeamMember(
+                                id=m["id"],
+                                role=role,
+                                name=m["name"],
+                                goal=m["goal"],
+                                tool_budget=m["tool_budget"],
+                                is_manager=m.get("is_manager", False),
+                            )
+                        )
 
                     config = TeamConfig(
                         name=team["name"],
@@ -2413,12 +2421,14 @@ Respond with just the command to run."""
                                 member["discoveries"] = mr.discoveries
 
                         # Broadcast completion
-                        await self._broadcast_ws({
-                            "type": "agent_event",
-                            "event": "team_completed" if result.success else "team_failed",
-                            "data": team,
-                            "timestamp": time.time(),
-                        })
+                        await self._broadcast_ws(
+                            {
+                                "type": "agent_event",
+                                "event": "team_completed" if result.success else "team_failed",
+                                "data": team,
+                                "timestamp": time.time(),
+                            }
+                        )
 
                 except Exception as e:
                     logger.exception(f"Team {team_id} execution error")
@@ -2427,19 +2437,23 @@ Respond with just the command to run."""
                         team["error"] = str(e)
                         team["end_time"] = time.time()
 
-                        await self._broadcast_ws({
-                            "type": "agent_event",
-                            "event": "team_failed",
-                            "data": team,
-                            "timestamp": time.time(),
-                        })
+                        await self._broadcast_ws(
+                            {
+                                "type": "agent_event",
+                                "event": "team_failed",
+                                "data": team,
+                                "timestamp": time.time(),
+                            }
+                        )
 
             asyncio.create_task(execute_team())
 
-            return JSONResponse({
-                "success": True,
-                "message": f"Team {team_id} started",
-            })
+            return JSONResponse(
+                {
+                    "success": True,
+                    "message": f"Team {team_id} started",
+                }
+            )
 
         @app.post("/teams/{team_id}/cancel", tags=["Teams"])
         async def cancel_team(team_id: str) -> JSONResponse:
@@ -2458,17 +2472,21 @@ Respond with just the command to run."""
             team["end_time"] = time.time()
 
             # Broadcast cancellation
-            await self._broadcast_ws({
-                "type": "agent_event",
-                "event": "team_cancelled",
-                "data": team,
-                "timestamp": time.time(),
-            })
+            await self._broadcast_ws(
+                {
+                    "type": "agent_event",
+                    "event": "team_cancelled",
+                    "data": team,
+                    "timestamp": time.time(),
+                }
+            )
 
-            return JSONResponse({
-                "success": True,
-                "message": f"Team {team_id} cancelled",
-            })
+            return JSONResponse(
+                {
+                    "success": True,
+                    "message": f"Team {team_id} cancelled",
+                }
+            )
 
         @app.post("/teams/clear", tags=["Teams"])
         async def clear_teams() -> JSONResponse:
@@ -2485,10 +2503,12 @@ Respond with just the command to run."""
                     del _team_messages[team_id]
                 cleared += 1
 
-            return JSONResponse({
-                "success": True,
-                "cleared": cleared,
-            })
+            return JSONResponse(
+                {
+                    "success": True,
+                    "cleared": cleared,
+                }
+            )
 
         @app.get("/teams/{team_id}/messages", tags=["Teams"])
         async def get_team_messages(team_id: str) -> JSONResponse:
@@ -2516,24 +2536,26 @@ Respond with just the command to run."""
                 templates = []
 
                 for workflow_id, workflow_def in registry._workflows.items():
-                    templates.append({
-                        "id": workflow_id,
-                        "name": workflow_def.name,
-                        "description": workflow_def.description or "",
-                        "category": workflow_def.metadata.get("category", "General"),
-                        "steps": [
-                            {
-                                "id": node.id,
-                                "name": node.name or node.id,
-                                "type": node.type.value,
-                                "role": getattr(node, "role", None),
-                                "goal": getattr(node, "goal", None),
-                            }
-                            for node in workflow_def.nodes.values()
-                        ],
-                        "tags": workflow_def.metadata.get("tags", []),
-                        "estimated_duration": workflow_def.metadata.get("estimated_duration"),
-                    })
+                    templates.append(
+                        {
+                            "id": workflow_id,
+                            "name": workflow_def.name,
+                            "description": workflow_def.description or "",
+                            "category": workflow_def.metadata.get("category", "General"),
+                            "steps": [
+                                {
+                                    "id": node.id,
+                                    "name": node.name or node.id,
+                                    "type": node.type.value,
+                                    "role": getattr(node, "role", None),
+                                    "goal": getattr(node, "goal", None),
+                                }
+                                for node in workflow_def.nodes.values()
+                            ],
+                            "tags": workflow_def.metadata.get("tags", []),
+                            "estimated_duration": workflow_def.metadata.get("estimated_duration"),
+                        }
+                    )
 
                 return JSONResponse({"templates": templates})
 
@@ -2556,23 +2578,25 @@ Respond with just the command to run."""
                 if workflow_def is None:
                     return JSONResponse({"error": "Template not found"}, status_code=404)
 
-                return JSONResponse({
-                    "id": template_id,
-                    "name": workflow_def.name,
-                    "description": workflow_def.description or "",
-                    "category": workflow_def.metadata.get("category", "General"),
-                    "steps": [
-                        {
-                            "id": node.id,
-                            "name": node.name or node.id,
-                            "type": node.type.value,
-                            "role": getattr(node, "role", None),
-                            "goal": getattr(node, "goal", None),
-                        }
-                        for node in workflow_def.nodes.values()
-                    ],
-                    "tags": workflow_def.metadata.get("tags", []),
-                })
+                return JSONResponse(
+                    {
+                        "id": template_id,
+                        "name": workflow_def.name,
+                        "description": workflow_def.description or "",
+                        "category": workflow_def.metadata.get("category", "General"),
+                        "steps": [
+                            {
+                                "id": node.id,
+                                "name": node.name or node.id,
+                                "type": node.type.value,
+                                "role": getattr(node, "role", None),
+                                "goal": getattr(node, "goal", None),
+                            }
+                            for node in workflow_def.nodes.values()
+                        ],
+                        "tags": workflow_def.metadata.get("tags", []),
+                    }
+                )
 
             except ImportError:
                 return JSONResponse({"error": "Workflows module not available"}, status_code=404)
@@ -2626,12 +2650,14 @@ Respond with just the command to run."""
                 }
 
                 # Broadcast workflow started
-                await self._broadcast_ws({
-                    "type": "agent_event",
-                    "event": "workflow_started",
-                    "data": _workflow_executions[execution_id],
-                    "timestamp": time.time(),
-                })
+                await self._broadcast_ws(
+                    {
+                        "type": "agent_event",
+                        "event": "workflow_started",
+                        "data": _workflow_executions[execution_id],
+                        "timestamp": time.time(),
+                    }
+                )
 
                 # Execute in background
                 async def run_workflow():
@@ -2649,22 +2675,36 @@ Respond with just the command to run."""
                             exec_state["status"] = "completed" if result.success else "failed"
                             exec_state["end_time"] = time.time()
                             exec_state["progress"] = 100
-                            exec_state["output"] = str(result.final_output) if result.final_output else None
+                            exec_state["output"] = (
+                                str(result.final_output) if result.final_output else None
+                            )
 
                             # Update step statuses
                             for step in exec_state["steps"]:
                                 node_result = result.node_results.get(step["id"])
                                 if node_result:
-                                    step["status"] = "completed" if node_result.success else "failed"
-                                    step["duration"] = node_result.duration_ms / 1000 if node_result.duration_ms else None
+                                    step["status"] = (
+                                        "completed" if node_result.success else "failed"
+                                    )
+                                    step["duration"] = (
+                                        node_result.duration_ms / 1000
+                                        if node_result.duration_ms
+                                        else None
+                                    )
 
                             # Broadcast completion
-                            await self._broadcast_ws({
-                                "type": "agent_event",
-                                "event": "workflow_completed" if result.success else "workflow_failed",
-                                "data": exec_state,
-                                "timestamp": time.time(),
-                            })
+                            await self._broadcast_ws(
+                                {
+                                    "type": "agent_event",
+                                    "event": (
+                                        "workflow_completed"
+                                        if result.success
+                                        else "workflow_failed"
+                                    ),
+                                    "data": exec_state,
+                                    "timestamp": time.time(),
+                                }
+                            )
 
                     except Exception as e:
                         logger.exception(f"Workflow {execution_id} error")
@@ -2674,20 +2714,24 @@ Respond with just the command to run."""
                             exec_state["error"] = str(e)
                             exec_state["end_time"] = time.time()
 
-                            await self._broadcast_ws({
-                                "type": "agent_event",
-                                "event": "workflow_failed",
-                                "data": exec_state,
-                                "timestamp": time.time(),
-                            })
+                            await self._broadcast_ws(
+                                {
+                                    "type": "agent_event",
+                                    "event": "workflow_failed",
+                                    "data": exec_state,
+                                    "timestamp": time.time(),
+                                }
+                            )
 
                 asyncio.create_task(run_workflow())
 
-                return JSONResponse({
-                    "success": True,
-                    "execution_id": execution_id,
-                    "message": f"Workflow '{workflow_def.name}' started",
-                })
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "execution_id": execution_id,
+                        "message": f"Workflow '{workflow_def.name}' started",
+                    }
+                )
 
             except ImportError:
                 return JSONResponse({"error": "Workflows module not available"}, status_code=500)
@@ -2730,17 +2774,21 @@ Respond with just the command to run."""
             exec_state["end_time"] = time.time()
 
             # Broadcast cancellation
-            await self._broadcast_ws({
-                "type": "agent_event",
-                "event": "workflow_cancelled",
-                "data": exec_state,
-                "timestamp": time.time(),
-            })
+            await self._broadcast_ws(
+                {
+                    "type": "agent_event",
+                    "event": "workflow_cancelled",
+                    "data": exec_state,
+                    "timestamp": time.time(),
+                }
+            )
 
-            return JSONResponse({
-                "success": True,
-                "message": f"Workflow execution {execution_id} cancelled",
-            })
+            return JSONResponse(
+                {
+                    "success": True,
+                    "message": f"Workflow execution {execution_id} cancelled",
+                }
+            )
 
         # Placeholder endpoints
         @app.get("/credentials/get", tags=["System"])

@@ -249,6 +249,7 @@ class TestFrameworkShimVertical:
 
         def set_context(context):
             orch._vertical_context = context
+
         orch.set_vertical_context = MagicMock(side_effect=set_context)
         return orch
 
@@ -295,9 +296,7 @@ class TestFrameworkShimVertical:
             await shim.create_orchestrator()
 
             # New capability-based approach calls orchestrator.set_custom_prompt directly
-            mock_orchestrator.set_custom_prompt.assert_called_once_with(
-                "You are a test assistant."
-            )
+            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a test assistant.")
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):

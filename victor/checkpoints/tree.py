@@ -448,10 +448,7 @@ class CheckpointTree:
             child = self._nodes.get(child_id)
             if child:
                 descendants.append(child)
-                queue.extend(
-                    (grandchild_id, depth + 1)
-                    for grandchild_id in child.children_ids
-                )
+                queue.extend((grandchild_id, depth + 1) for grandchild_id in child.children_ids)
 
         return descendants
 
@@ -582,10 +579,7 @@ class CheckpointTree:
                 }
                 for cid, n in self._nodes.items()
             },
-            "branches": {
-                name: branch.to_dict()
-                for name, branch in self._branches.items()
-            },
+            "branches": {name: branch.to_dict() for name, branch in self._branches.items()},
         }
 
     def to_ascii(self, max_depth: Optional[int] = None) -> str:
@@ -760,7 +754,9 @@ class BranchManager:
         self._current_branch[session_id] = branch_name
         branch = self._branches[session_id][branch_name]
 
-        logger.info(f"Checked out branch '{branch_name}' (head: {branch.head_checkpoint_id[:12]}...)")
+        logger.info(
+            f"Checked out branch '{branch_name}' (head: {branch.head_checkpoint_id[:12]}...)"
+        )
 
         return branch
 
@@ -860,14 +856,21 @@ class BranchManager:
                     success=True,
                     merge_checkpoint_id=source.head_checkpoint_id,
                     strategy_used=MergeStrategy.FAST_FORWARD,
-                    changes_merged={"checkpoints": len(tree.get_path(
-                        target.head_checkpoint_id, source.head_checkpoint_id
-                    ))},
+                    changes_merged={
+                        "checkpoints": len(
+                            tree.get_path(target.head_checkpoint_id, source.head_checkpoint_id)
+                        )
+                    },
                 )
             else:
                 return MergeResult(
                     success=False,
-                    conflicts=[{"type": "not_linear", "message": "Cannot fast-forward, branches have diverged"}],
+                    conflicts=[
+                        {
+                            "type": "not_linear",
+                            "message": "Cannot fast-forward, branches have diverged",
+                        }
+                    ],
                 )
 
         # Three-way merge
@@ -875,7 +878,12 @@ class BranchManager:
             if not common_ancestor:
                 return MergeResult(
                     success=False,
-                    conflicts=[{"type": "no_common_ancestor", "message": "Branches have no common ancestor"}],
+                    conflicts=[
+                        {
+                            "type": "no_common_ancestor",
+                            "message": "Branches have no common ancestor",
+                        }
+                    ],
                 )
 
             # Load all three states
@@ -967,7 +975,10 @@ class BranchManager:
                 strategy_used=MergeStrategy.SQUASH,
             )
 
-        return MergeResult(success=False, conflicts=[{"type": "unsupported", "message": f"Strategy {strategy} not implemented"}])
+        return MergeResult(
+            success=False,
+            conflicts=[{"type": "unsupported", "message": f"Strategy {strategy} not implemented"}],
+        )
 
     def _default_state_merge(
         self,
@@ -1080,10 +1091,7 @@ class BranchManager:
         branches = list(self._branches[session_id].values())
 
         if not include_archived:
-            branches = [
-                b for b in branches
-                if b.status == BranchStatus.ACTIVE
-            ]
+            branches = [b for b in branches if b.status == BranchStatus.ACTIVE]
 
         return sorted(branches, key=lambda b: b.created_at, reverse=True)
 
@@ -1097,9 +1105,7 @@ class BranchManager:
             Populated CheckpointTree
         """
         branches = self._branches.get(session_id, {})
-        return await CheckpointTree.build_from_session(
-            self.backend, session_id, branches
-        )
+        return await CheckpointTree.build_from_session(self.backend, session_id, branches)
 
     async def replay_from(
         self,
@@ -1190,7 +1196,9 @@ class BranchManager:
         # Check for existing checkpoints
         checkpoints = await self.backend.list_checkpoints(session_id, limit=1)
         if not checkpoints:
-            raise CheckpointError(f"Cannot create default branch: no checkpoints in session {session_id}")
+            raise CheckpointError(
+                f"Cannot create default branch: no checkpoints in session {session_id}"
+            )
 
         return await self.create_branch(
             name=self.default_branch_name,
@@ -1221,9 +1229,7 @@ class BranchStorageProtocol(Protocol):
         """Load a branch by ID."""
         ...
 
-    async def load_branch_by_name(
-        self, session_id: str, name: str
-    ) -> Optional[BranchMetadata]:
+    async def load_branch_by_name(self, session_id: str, name: str) -> Optional[BranchMetadata]:
         """Load a branch by session and name."""
         ...
 

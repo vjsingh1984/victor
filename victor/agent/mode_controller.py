@@ -320,9 +320,7 @@ class AgentModeController:
         """
         self._callbacks.append(callback)
 
-    def _emit_mode_transition_event(
-        self, old_mode: AgentMode, new_mode: AgentMode
-    ) -> None:
+    def _emit_mode_transition_event(self, old_mode: AgentMode, new_mode: AgentMode) -> None:
         """Emit RL event for mode transition.
 
         This activates the mode_transition learner to learn optimal

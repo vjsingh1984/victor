@@ -383,7 +383,7 @@ class TestAgentConfig:
                     "description": "Extended coder",
                     "capabilities": {
                         "tools": ["deploy_script"],
-                    }
+                    },
                 }
             ]
         }
@@ -405,7 +405,7 @@ class TestAgentConfig:
             "ensemble": {
                 "type": "pipeline",
                 "agents": ["agent1", "agent2"],
-            }
+            },
         }
 
         config = load_agents_from_dict(data)
@@ -431,9 +431,7 @@ ensemble:
   type: pipeline
   agents: [yaml_agent]
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = f.name
 

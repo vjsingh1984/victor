@@ -87,7 +87,9 @@ class SecretMatch:
 # AWS Credentials
 AWS_ACCESS_KEY_PATTERN = r"(?<![A-Z0-9])AKIA[0-9A-Z]{16}(?![A-Z0-9])"
 AWS_SECRET_KEY_PATTERN = r"(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])"
-AWS_SESSION_TOKEN_PATTERN = r"(?i)aws[_-]?session[_-]?token\s*[=:]\s*['\"]?[A-Za-z0-9/+=]{100,}['\"]?"
+AWS_SESSION_TOKEN_PATTERN = (
+    r"(?i)aws[_-]?session[_-]?token\s*[=:]\s*['\"]?[A-Za-z0-9/+=]{100,}['\"]?"
+)
 
 # GitHub Tokens
 GITHUB_PAT_PATTERN = r"ghp_[0-9a-zA-Z]{36}"
@@ -97,7 +99,9 @@ GITHUB_REFRESH_PATTERN = r"ghr_[0-9a-zA-Z]{36}"
 
 # Other Cloud Providers
 GOOGLE_API_KEY_PATTERN = r"AIza[0-9A-Za-z\-_]{35}"
-AZURE_SUBSCRIPTION_KEY_PATTERN = r"(?i)(?:subscription[_-]?key|api[_-]?key)\s*[=:]\s*['\"]?[a-f0-9]{32}['\"]?"
+AZURE_SUBSCRIPTION_KEY_PATTERN = (
+    r"(?i)(?:subscription[_-]?key|api[_-]?key)\s*[=:]\s*['\"]?[a-f0-9]{32}['\"]?"
+)
 SLACK_TOKEN_PATTERN = r"xox[baprs]-[0-9]{10,13}-[0-9a-zA-Z]{24}"
 STRIPE_KEY_PATTERN = r"(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}"
 

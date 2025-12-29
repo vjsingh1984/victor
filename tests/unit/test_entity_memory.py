@@ -383,14 +383,20 @@ class TestEntityGraph:
         await graph.add_entity(e_b)
         await graph.add_entity(e_c)
 
-        await graph.add_relation(EntityRelation(
-            source_id=e_a.id, target_id=e_b.id,
-            relation_type=RelationType.DEPENDS_ON,
-        ))
-        await graph.add_relation(EntityRelation(
-            source_id=e_b.id, target_id=e_c.id,
-            relation_type=RelationType.DEPENDS_ON,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e_a.id,
+                target_id=e_b.id,
+                relation_type=RelationType.DEPENDS_ON,
+            )
+        )
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e_b.id,
+                target_id=e_c.id,
+                relation_type=RelationType.DEPENDS_ON,
+            )
+        )
 
         # Depth 1 should only get B
         neighbors_d1 = await graph.get_neighbors(e_a.id, depth=1)
@@ -411,14 +417,20 @@ class TestEntityGraph:
         await graph.add_entity(e_b)
         await graph.add_entity(e_c)
 
-        await graph.add_relation(EntityRelation(
-            source_id=e_a.id, target_id=e_b.id,
-            relation_type=RelationType.DEPENDS_ON,
-        ))
-        await graph.add_relation(EntityRelation(
-            source_id=e_b.id, target_id=e_c.id,
-            relation_type=RelationType.DEPENDS_ON,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e_a.id,
+                target_id=e_b.id,
+                relation_type=RelationType.DEPENDS_ON,
+            )
+        )
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e_b.id,
+                target_id=e_c.id,
+                relation_type=RelationType.DEPENDS_ON,
+            )
+        )
 
         paths = await graph.find_paths(e_a.id, e_c.id, max_depth=3)
 
@@ -439,10 +451,13 @@ class TestEntityGraph:
         await graph.add_entity(e2)
         await graph.add_entity(e3)
 
-        await graph.add_relation(EntityRelation(
-            source_id=e1.id, target_id=e2.id,
-            relation_type=RelationType.RELATED_TO,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e1.id,
+                target_id=e2.id,
+                relation_type=RelationType.RELATED_TO,
+            )
+        )
 
         entities, relations = await graph.get_subgraph({e1.id, e2.id})
 
@@ -458,10 +473,13 @@ class TestEntityGraph:
         await graph.add_entity(e1)
         await graph.add_entity(e2)
 
-        await graph.add_relation(EntityRelation(
-            source_id=e1.id, target_id=e2.id,
-            relation_type=RelationType.CONTAINS,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e1.id,
+                target_id=e2.id,
+                relation_type=RelationType.CONTAINS,
+            )
+        )
 
         stats = await graph.get_stats()
 
@@ -479,10 +497,13 @@ class TestEntityGraph:
         await graph.add_entity(e1)
         await graph.add_entity(e2)
 
-        await graph.add_relation(EntityRelation(
-            source_id=e1.id, target_id=e2.id,
-            relation_type=RelationType.DEPENDS_ON,
-        ))
+        await graph.add_relation(
+            EntityRelation(
+                source_id=e1.id,
+                target_id=e2.id,
+                relation_type=RelationType.DEPENDS_ON,
+            )
+        )
 
         removed = await graph.remove_entity(e1.id)
         assert removed is True
@@ -650,10 +671,7 @@ Python, Python, Python!
         result = await extractor.extract(text)
 
         # Should have only one Python entity (deduplicated)
-        python_entities = [
-            e for e in result.entities
-            if e.name.lower() == "python"
-        ]
+        python_entities = [e for e in result.entities if e.name.lower() == "python"]
         assert len(python_entities) <= 1
 
 

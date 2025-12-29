@@ -262,16 +262,24 @@ class TestWorkflowCache:
         node1 = TransformNode(id="transform1", name="Transform 1")
         node2 = TransformNode(id="transform2", name="Transform 2")
 
-        cache.set(node1, {"a": 1}, NodeResult(
-            node_id="transform1",
-            status=NodeStatus.COMPLETED,
-            output={"a": 2},
-        ))
-        cache.set(node2, {"b": 2}, NodeResult(
-            node_id="transform2",
-            status=NodeStatus.COMPLETED,
-            output={"b": 4},
-        ))
+        cache.set(
+            node1,
+            {"a": 1},
+            NodeResult(
+                node_id="transform1",
+                status=NodeStatus.COMPLETED,
+                output={"a": 2},
+            ),
+        )
+        cache.set(
+            node2,
+            {"b": 2},
+            NodeResult(
+                node_id="transform2",
+                status=NodeStatus.COMPLETED,
+                output={"b": 4},
+            ),
+        )
 
         # Clear all
         count = cache.clear()
@@ -421,11 +429,15 @@ class TestWorkflowCacheManager:
 
         cache = manager.get_cache("my_workflow")
         node = TransformNode(id="transform", name="Transform")
-        cache.set(node, {"x": 1}, NodeResult(
-            node_id="transform",
-            status=NodeStatus.COMPLETED,
-            output={"x": 2},
-        ))
+        cache.set(
+            node,
+            {"x": 1},
+            NodeResult(
+                node_id="transform",
+                status=NodeStatus.COMPLETED,
+                output={"x": 2},
+            ),
+        )
 
         count = manager.clear_workflow("my_workflow")
 
@@ -440,16 +452,24 @@ class TestWorkflowCacheManager:
         cache2 = manager.get_cache("workflow2")
 
         node = TransformNode(id="transform", name="Transform")
-        cache1.set(node, {"x": 1}, NodeResult(
-            node_id="transform",
-            status=NodeStatus.COMPLETED,
-            output={"x": 2},
-        ))
-        cache2.set(node, {"y": 1}, NodeResult(
-            node_id="transform",
-            status=NodeStatus.COMPLETED,
-            output={"y": 2},
-        ))
+        cache1.set(
+            node,
+            {"x": 1},
+            NodeResult(
+                node_id="transform",
+                status=NodeStatus.COMPLETED,
+                output={"x": 2},
+            ),
+        )
+        cache2.set(
+            node,
+            {"y": 1},
+            NodeResult(
+                node_id="transform",
+                status=NodeStatus.COMPLETED,
+                output={"y": 2},
+            ),
+        )
 
         count = manager.clear_all()
 
@@ -550,7 +570,9 @@ class TestWorkflowExecutorWithCache:
         assert stats["sets"] >= 1  # Transform node was cached
 
     @pytest.mark.asyncio
-    async def test_execute_uses_cached_transform_result(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_uses_cached_transform_result(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Transform node uses cached result on re-execution with same context."""
         config = WorkflowCacheConfig(enabled=True)
         cache = WorkflowCache(config)
@@ -584,7 +606,9 @@ class TestWorkflowExecutorWithCache:
         assert stats["misses"] == 1
 
     @pytest.mark.asyncio
-    async def test_execute_does_not_cache_agent_nodes(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_does_not_cache_agent_nodes(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Agent node results are not cached."""
         config = WorkflowCacheConfig(enabled=True)
         executor = WorkflowExecutor(mock_orchestrator, cache_config=config)
@@ -593,11 +617,7 @@ class TestWorkflowExecutorWithCache:
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
-        workflow = (
-            WorkflowBuilder("test")
-            .add_agent("agent", "executor", "Do something")
-            .build()
-        )
+        workflow = WorkflowBuilder("test").add_agent("agent", "executor", "Do something").build()
 
         # Execute twice
         await executor.execute(workflow, {"task": "analyze"})

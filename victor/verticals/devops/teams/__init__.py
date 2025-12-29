@@ -206,7 +206,12 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
                     "and reversible. You consider failure modes and have a plan B for every step. "
                     "Your plans include clear success criteria and monitoring checkpoints."
                 ),
-                expertise=["blue-green deployments", "canary releases", "feature flags", "rollback strategies"],
+                expertise=[
+                    "blue-green deployments",
+                    "canary releases",
+                    "feature flags",
+                    "rollback strategies",
+                ],
                 personality="cautious yet decisive; balances speed with safety",
                 memory=True,  # Plan builds on assessment
             ),
@@ -238,7 +243,12 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
                     "logs are flowing. You don't approve deployments that skip validation steps or "
                     "lack proper monitoring. Your sign-off means the deployment is production-ready."
                 ),
-                expertise=["infrastructure testing", "compliance", "security scanning", "monitoring"],
+                expertise=[
+                    "infrastructure testing",
+                    "compliance",
+                    "security scanning",
+                    "monitoring",
+                ],
                 personality="detail-oriented and skeptical; trusts but verifies",
             ),
         ],
@@ -277,7 +287,12 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
                     "handle signals correctly, and configure health checks. Your containers start "
                     "fast, use minimal resources, and follow the 12-factor app principles."
                 ),
-                expertise=["Docker", "multi-stage builds", "image optimization", "security hardening"],
+                expertise=[
+                    "Docker",
+                    "multi-stage builds",
+                    "image optimization",
+                    "security hardening",
+                ],
                 personality="perfectionist about image size and security",
             ),
             TeamMemberSpec(
@@ -315,7 +330,13 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
                     "what SLIs matter for SLOs, what logs need to be retained, and what traces "
                     "provide value. You design monitoring that enables quick incident response."
                 ),
-                expertise=["Prometheus", "Grafana", "ELK stack", "distributed tracing", "SRE practices"],
+                expertise=[
+                    "Prometheus",
+                    "Grafana",
+                    "ELK stack",
+                    "distributed tracing",
+                    "SRE practices",
+                ],
                 personality="metrics-driven; thinks in terms of SLOs and error budgets",
                 memory=True,  # Share requirements with engineer
             ),
@@ -353,7 +374,13 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
                     "test parallelization, and deployment strategies. You identify bottlenecks "
                     "in existing pipelines and opportunities for faster feedback loops."
                 ),
-                expertise=["GitHub Actions", "GitLab CI", "Jenkins", "ArgoCD", "build optimization"],
+                expertise=[
+                    "GitHub Actions",
+                    "GitLab CI",
+                    "Jenkins",
+                    "ArgoCD",
+                    "build optimization",
+                ],
                 personality="efficiency-focused; hates slow pipelines",
                 memory=True,
             ),

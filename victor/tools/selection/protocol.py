@@ -374,7 +374,7 @@ class BaseToolSelectionStrategy(ABC):
 
         Override in subclass to implement usage learning.
         """
-        pass
+        _ = (tool_name, success, context)  # Intentional no-op, mark params as used
 
     async def close(self) -> None:
         """Default: mark as closed.

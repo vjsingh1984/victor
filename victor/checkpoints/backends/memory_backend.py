@@ -85,9 +85,7 @@ class MemoryCheckpointBackend(CheckpointManagerProtocol):
 
         checkpoint_ids = self._by_session[session_id]
         checkpoints = [
-            self._checkpoints[cid].metadata
-            for cid in checkpoint_ids
-            if cid in self._checkpoints
+            self._checkpoints[cid].metadata for cid in checkpoint_ids if cid in self._checkpoints
         ]
 
         # Sort by timestamp descending

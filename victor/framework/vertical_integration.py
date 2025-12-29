@@ -262,6 +262,7 @@ def _invoke_capability(
         f"Object should implement CapabilityRegistryProtocol."
     )
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -683,6 +684,7 @@ class VerticalIntegrationPipeline:
         """
         try:
             from victor.tools.tool_names import get_canonical_name
+
             return {get_canonical_name(tool) for tool in tools}
         except ImportError:
             # Fallback if tool_names module not available
@@ -868,7 +870,9 @@ class VerticalIntegrationPipeline:
             logger.debug(f"Applied {len(all_patterns)} safety patterns via capability")
         elif _check_capability(orchestrator, "safety_patterns"):
             _invoke_capability(orchestrator, "safety_patterns", all_patterns)
-            logger.debug(f"Applied {len(all_patterns)} safety patterns via safety_patterns capability")
+            logger.debug(
+                f"Applied {len(all_patterns)} safety patterns via safety_patterns capability"
+            )
         else:
             # Use public method only (SOLID compliant - no private attributes)
             safety_checker = getattr(orchestrator, "safety_checker", None)
@@ -970,7 +974,7 @@ class VerticalIntegrationPipeline:
                     controller.set_mode_configs(mode_configs)
                 if hasattr(controller, "set_default_budget"):
                     controller.set_default_budget(default_budget)
-                logger.debug(f"Applied mode config via fallback")
+                logger.debug("Applied mode config via fallback")
 
     def _apply_tool_deps(
         self,
@@ -995,10 +999,10 @@ class VerticalIntegrationPipeline:
         # Apply via capability (protocol-first, fallback to direct access)
         if _check_capability(orchestrator, "tool_dependencies"):
             _invoke_capability(orchestrator, "tool_dependencies", dependencies)
-            logger.debug(f"Applied tool dependencies via capability")
+            logger.debug("Applied tool dependencies via capability")
         if _check_capability(orchestrator, "tool_sequences"):
             _invoke_capability(orchestrator, "tool_sequences", sequences)
-            logger.debug(f"Applied tool sequences via capability")
+            logger.debug("Applied tool sequences via capability")
 
         # Fallback: try tool sequence tracker directly
         if not _check_capability(orchestrator, "tool_dependencies"):
@@ -1010,7 +1014,7 @@ class VerticalIntegrationPipeline:
                     tracker.set_dependencies(dependencies)
                 if hasattr(tracker, "set_sequences"):
                     tracker.set_sequences(sequences)
-                logger.debug(f"Applied tool deps via fallback")
+                logger.debug("Applied tool deps via fallback")
 
     def _attach_context(
         self,
@@ -1034,8 +1038,7 @@ class VerticalIntegrationPipeline:
             logger.debug("Attached context via set_vertical_context")
         else:
             result.add_warning(
-                "Orchestrator lacks set_vertical_context method; "
-                "context not attached"
+                "Orchestrator lacks set_vertical_context method; " "context not attached"
             )
 
     # =========================================================================
@@ -1063,7 +1066,9 @@ class VerticalIntegrationPipeline:
         try:
             # Check if vertical has workflow provider using protocol (type-safe)
             workflow_provider = None
-            if isinstance(vertical, type) and issubclass(vertical, VerticalWorkflowProviderProtocol):
+            if isinstance(vertical, type) and issubclass(
+                vertical, VerticalWorkflowProviderProtocol
+            ):
                 workflow_provider = vertical.get_workflow_provider()
             elif isinstance(vertical, VerticalWorkflowProviderProtocol):
                 workflow_provider = vertical.get_workflow_provider()
@@ -1071,7 +1076,8 @@ class VerticalIntegrationPipeline:
             # Also check if vertical itself is a WorkflowProviderProtocol
             if workflow_provider is None and isinstance(vertical, type):
                 if isinstance(vertical, WorkflowProviderProtocol) or (
-                    hasattr(vertical, "get_workflows") and callable(getattr(vertical, "get_workflows", None))
+                    hasattr(vertical, "get_workflows")
+                    and callable(getattr(vertical, "get_workflows", None))
                 ):
                     # Vertical class implements protocol directly
                     workflow_provider = vertical
@@ -1102,8 +1108,7 @@ class VerticalIntegrationPipeline:
                         replace=True,
                     )
                 result.add_info(
-                    f"Registered {workflow_count} workflows: "
-                    f"{', '.join(workflows.keys())}"
+                    f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
                 )
             except ImportError:
                 result.add_warning("Workflow registry not available")
@@ -1154,7 +1159,8 @@ class VerticalIntegrationPipeline:
             # Fallback: check if vertical implements RLConfigProviderProtocol directly
             if rl_config is None:
                 if isinstance(vertical, RLConfigProviderProtocol) or (
-                    hasattr(vertical, "get_rl_config") and callable(getattr(vertical, "get_rl_config", None))
+                    hasattr(vertical, "get_rl_config")
+                    and callable(getattr(vertical, "get_rl_config", None))
                 ):
                     rl_config = vertical.get_rl_config()
 
@@ -1176,7 +1182,9 @@ class VerticalIntegrationPipeline:
                 rl_hooks = vertical.get_rl_hooks()
             elif isinstance(vertical, VerticalRLProviderProtocol):
                 rl_hooks = vertical.get_rl_hooks()
-            elif hasattr(vertical, "get_rl_hooks") and callable(getattr(vertical, "get_rl_hooks", None)):
+            elif hasattr(vertical, "get_rl_hooks") and callable(
+                getattr(vertical, "get_rl_hooks", None)
+            ):
                 # Fallback for backwards compatibility
                 rl_hooks = vertical.get_rl_hooks()
 
@@ -1192,8 +1200,7 @@ class VerticalIntegrationPipeline:
                     logger.debug("Applied RL hooks via set_rl_hooks")
                 else:
                     result.add_warning(
-                        "Orchestrator lacks set_rl_hooks method; "
-                        "hooks stored in context only"
+                        "Orchestrator lacks set_rl_hooks method; " "hooks stored in context only"
                     )
 
             result.add_info(f"Configured {learner_count} RL learners")
@@ -1241,7 +1248,8 @@ class VerticalIntegrationPipeline:
             # Fallback: check if vertical implements TeamSpecProviderProtocol directly
             if team_specs is None:
                 if isinstance(vertical, TeamSpecProviderProtocol) or (
-                    hasattr(vertical, "get_team_specs") and callable(getattr(vertical, "get_team_specs", None))
+                    hasattr(vertical, "get_team_specs")
+                    and callable(getattr(vertical, "get_team_specs", None))
                 ):
                     team_specs = vertical.get_team_specs()
 
@@ -1257,19 +1265,17 @@ class VerticalIntegrationPipeline:
             # Attach via capability (SOLID compliant)
             if _check_capability(orchestrator, "team_specs"):
                 _invoke_capability(orchestrator, "team_specs", team_specs)
-                logger.debug(f"Applied team specs via capability")
+                logger.debug("Applied team specs via capability")
             elif hasattr(orchestrator, "set_team_specs"):
                 orchestrator.set_team_specs(team_specs)
-                logger.debug(f"Applied team specs via set_team_specs")
+                logger.debug("Applied team specs via set_team_specs")
             else:
                 result.add_warning(
-                    f"Orchestrator lacks set_team_specs method; "
-                    "specs stored in context only"
+                    "Orchestrator lacks set_team_specs method; " "specs stored in context only"
                 )
 
             result.add_info(
-                f"Registered {team_count} team specs: "
-                f"{', '.join(team_specs.keys())}"
+                f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}"
             )
             # Log each team spec registration (matching workflow DEBUG logging pattern)
             for team_name in team_specs.keys():

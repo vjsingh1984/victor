@@ -399,9 +399,7 @@ class ToolExecutionGraph:
 
             # If existing tool produces inputs we need, add transition
             if existing_node.outputs & inputs:
-                self._add_transition(
-                    existing_name, name, weight * 0.8, "io_dependency"
-                )
+                self._add_transition(existing_name, name, weight * 0.8, "io_dependency")
 
             # If we produce outputs needed by existing tool, add transition
             if outputs & existing_node.inputs:
@@ -509,9 +507,7 @@ class ToolExecutionGraph:
                 # Reduce score for recently used tools
                 if transition.to_tool in recent_set:
                     score *= 0.5
-                candidates[transition.to_tool] = max(
-                    candidates.get(transition.to_tool, 0), score
-                )
+                candidates[transition.to_tool] = max(candidates.get(transition.to_tool, 0), score)
 
         # 2. Add cluster-related tools with lower score
         cluster_tools = self.get_cluster_tools(current_tool)
@@ -534,9 +530,7 @@ class ToolExecutionGraph:
                     candidates[enabled] = max(candidates.get(enabled, 0), score)
 
         # Sort by score and return top suggestions
-        sorted_candidates = sorted(
-            candidates.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_candidates = sorted(candidates.items(), key=lambda x: x[1], reverse=True)
         return sorted_candidates[:max_suggestions]
 
     def get_transition_weight(self, from_tool: str, to_tool: str) -> float:
@@ -681,9 +675,7 @@ class ToolExecutionGraph:
                 # This tool depends on current_tool, so it's a candidate
                 dep_node = self._nodes.get(tool_name)
                 if dep_node:
-                    candidates[tool_name] = max(
-                        candidates.get(tool_name, 0), dep_node.weight * 0.9
-                    )
+                    candidates[tool_name] = max(candidates.get(tool_name, 0), dep_node.weight * 0.9)
 
         # Sort by weight descending
         return sorted(candidates.items(), key=lambda x: x[1], reverse=True)

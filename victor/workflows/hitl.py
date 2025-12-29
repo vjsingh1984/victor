@@ -56,6 +56,7 @@ def _utc_now() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -219,16 +220,18 @@ class HITLNode(WorkflowNode):
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node."""
         d = super().to_dict()
-        d.update({
-            "hitl_type": self.hitl_type.value,
-            "prompt": self.prompt,
-            "context_keys": self.context_keys,
-            "choices": self.choices,
-            "default_value": self.default_value,
-            "timeout": self.timeout,
-            "fallback": self.fallback.value,
-            # Note: validator function is not serialized
-        })
+        d.update(
+            {
+                "hitl_type": self.hitl_type.value,
+                "prompt": self.prompt,
+                "context_keys": self.context_keys,
+                "choices": self.choices,
+                "default_value": self.default_value,
+                "timeout": self.timeout,
+                "fallback": self.fallback.value,
+                # Note: validator function is not serialized
+            }
+        )
         # Override type to indicate HITL
         d["type"] = "hitl"
         d["_hitl_node"] = True
@@ -319,9 +322,7 @@ class HITLExecutor:
         """
         request = node.create_request(context)
 
-        logger.info(
-            f"HITL request {request.request_id}: {node.hitl_type.value} - {node.prompt}"
-        )
+        logger.info(f"HITL request {request.request_id}: {node.hitl_type.value} - {node.prompt}")
 
         try:
             # Request human input with timeout
@@ -343,9 +344,7 @@ class HITLExecutor:
             return response
 
         except asyncio.TimeoutError:
-            logger.warning(
-                f"HITL request {request.request_id} timed out after {node.timeout}s"
-            )
+            logger.warning(f"HITL request {request.request_id} timed out after {node.timeout}s")
             return self._handle_timeout(request, node)
 
     def _handle_timeout(
@@ -497,9 +496,7 @@ class DefaultHITLHandler:
 
     async def _handle_input(self, request: HITLRequest) -> HITLResponse:
         """Handle freeform input."""
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, input, "Your input: "
-        )
+        response = await asyncio.get_event_loop().run_in_executor(None, input, "Your input: ")
         return HITLResponse(
             request_id=request.request_id,
             status=HITLStatus.APPROVED,
@@ -540,9 +537,7 @@ class DefaultHITLHandler:
                 approved=True,
             )
         elif response == "r":
-            reason = await asyncio.get_event_loop().run_in_executor(
-                None, input, "Reason: "
-            )
+            reason = await asyncio.get_event_loop().run_in_executor(None, input, "Reason: ")
             return HITLResponse(
                 request_id=request.request_id,
                 status=HITLStatus.REJECTED,
@@ -554,9 +549,7 @@ class DefaultHITLHandler:
             print("Enter modifications (one per line, empty line to finish):")
             modifications = {}
             while True:
-                line = await asyncio.get_event_loop().run_in_executor(
-                    None, input, ""
-                )
+                line = await asyncio.get_event_loop().run_in_executor(None, input, "")
                 if not line:
                     break
                 if "=" in line:

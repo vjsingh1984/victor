@@ -176,9 +176,7 @@ class TestOrchestratorCapability:
 
     def test_all_capability_types(self):
         """Test all capability types exist."""
-        expected_types = [
-            "TOOL", "PROMPT", "MODE", "SAFETY", "RL", "TEAM", "WORKFLOW", "VERTICAL"
-        ]
+        expected_types = ["TOOL", "PROMPT", "MODE", "SAFETY", "RL", "TEAM", "WORKFLOW", "VERTICAL"]
         for type_name in expected_types:
             assert hasattr(CapabilityType, type_name)
 

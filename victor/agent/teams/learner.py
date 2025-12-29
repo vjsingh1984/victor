@@ -119,8 +119,7 @@ class TeamRecommendation:
                         goal=role_goal,
                         tool_budget=budget_per_member,
                         is_manager=(
-                            self.formation == TeamFormation.HIERARCHICAL
-                            and member_idx == 1
+                            self.formation == TeamFormation.HIERARCHICAL and member_idx == 1
                         ),
                     )
                 )
@@ -394,9 +393,7 @@ class TeamCompositionLearner:
 
         if row is None:
             # No data - return baseline
-            return DEFAULT_COMPOSITIONS.get(
-                category, DEFAULT_COMPOSITIONS[TaskCategory.MIXED]
-            )
+            return DEFAULT_COMPOSITIONS.get(category, DEFAULT_COMPOSITIONS[TaskCategory.MIXED])
 
         (
             comp_key,
@@ -448,9 +445,7 @@ class TeamCompositionLearner:
             Exploratory TeamRecommendation
         """
         # Get baseline
-        baseline = DEFAULT_COMPOSITIONS.get(
-            category, DEFAULT_COMPOSITIONS[TaskCategory.MIXED]
-        )
+        baseline = DEFAULT_COMPOSITIONS.get(category, DEFAULT_COMPOSITIONS[TaskCategory.MIXED])
 
         # Randomly vary the baseline
         formations = list(TeamFormation)
@@ -571,9 +566,9 @@ class TeamCompositionLearner:
             row = cursor.fetchone()
 
             if row:
-                q_value, exec_count, success_count = row
+                q_value = row[0]  # Only q_value needed for update
             else:
-                q_value, exec_count, success_count = 0.5, 0, 0
+                q_value = 0.5
 
             # Q-learning update
             new_q = q_value + self.learning_rate * (reward - q_value)
@@ -697,8 +692,7 @@ class TeamCompositionLearner:
 
         # Compute composition key
         role_str = ",".join(
-            f"{role}={count}"
-            for role, count in sorted(metrics.role_distribution.items())
+            f"{role}={count}" for role, count in sorted(metrics.role_distribution.items())
         )
         comp_key = f"{metrics.formation.value}:{role_str}"
 
@@ -738,9 +732,7 @@ class TeamCompositionLearner:
         max_q = max_q_row[0] if max_q_row and max_q_row[0] else 0.5
 
         # Q-learning update
-        new_q = q_value + self.learning_rate * (
-            reward + self.discount_factor * max_q - q_value
-        )
+        new_q = q_value + self.learning_rate * (reward + self.discount_factor * max_q - q_value)
         new_q = max(0.0, min(1.0, new_q))
 
         # Update stats using exponential moving average
@@ -866,8 +858,7 @@ class TeamCompositionLearner:
             )
 
         top_compositions = [
-            {"key": row[0], "q_value": row[1], "executions": row[2]}
-            for row in cursor.fetchall()
+            {"key": row[0], "q_value": row[1], "executions": row[2]} for row in cursor.fetchall()
         ]
 
         return {

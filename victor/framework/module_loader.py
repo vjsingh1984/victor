@@ -383,9 +383,7 @@ class DynamicModuleLoader:
                             if on_change:
                                 on_change(file_path, event_type)
                         except Exception as e:
-                            logger.error(
-                                f"Error handling {event_type} for '{module_name}': {e}"
-                            )
+                            logger.error(f"Error handling {event_type} for '{module_name}': {e}")
 
                     loader._debounce_timer.schedule(module_name, do_reload)
 
@@ -828,9 +826,7 @@ class EntryPointCache:
                         logger.warning(f"Failed to load cache entry for '{group}': {e}")
 
             if self._memory_cache:
-                logger.info(
-                    f"Loaded {len(self._memory_cache)} entry point groups from cache"
-                )
+                logger.info(f"Loaded {len(self._memory_cache)} entry point groups from cache")
 
         except Exception as e:
             logger.warning(f"Failed to load entry point cache from disk: {e}")
@@ -844,10 +840,7 @@ class EntryPointCache:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
 
             with self._cache_lock:
-                data = {
-                    group: cached.to_dict()
-                    for group, cached in self._memory_cache.items()
-                }
+                data = {group: cached.to_dict() for group, cached in self._memory_cache.items()}
 
             with open(self._cache_file, "w") as f:
                 json.dump(data, f, indent=2)

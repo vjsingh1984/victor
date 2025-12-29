@@ -110,6 +110,7 @@ class CodeEntityExtractor(EntityExtractor):
         if use_treesitter:
             try:
                 from victor_coding.codebase.indexer import CodebaseIndexer
+
                 self._treesitter_available = True
             except ImportError:
                 logger.debug("Tree-sitter not available, using regex fallback")
@@ -162,9 +163,7 @@ class CodeEntityExtractor(EntityExtractor):
                         continue
 
                     # Calculate confidence based on pattern specificity
-                    confidence = self._calculate_confidence(
-                        name, entity_type, pattern, context
-                    )
+                    confidence = self._calculate_confidence(name, entity_type, pattern, context)
 
                     if confidence >= self._min_confidence:
                         entity = Entity.create(
@@ -229,7 +228,14 @@ class CodeEntityExtractor(EntityExtractor):
         if entity_type == EntityType.FILE:
             ext_match = re.search(r"\.(\w+)$", name)
             if ext_match and ext_match.group(1) in (
-                "py", "js", "ts", "tsx", "jsx", "go", "rs", "java"
+                "py",
+                "js",
+                "ts",
+                "tsx",
+                "jsx",
+                "go",
+                "rs",
+                "java",
             ):
                 confidence += 0.15
 

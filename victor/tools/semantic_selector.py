@@ -59,6 +59,7 @@ def _get_rl_hooks():
     if _rl_hooks is None:
         try:
             from victor.agent.rl.hooks import get_rl_hooks
+
             _rl_hooks = get_rl_hooks()
         except ImportError:
             _rl_hooks = None

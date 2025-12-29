@@ -125,9 +125,7 @@ class TaskAnalyzer:
         self._intent_classifier = None
         self._coordinator = coordinator
 
-    def set_coordinator(
-        self, coordinator: "ModeWorkflowTeamCoordinator"
-    ) -> None:
+    def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
 
         Args:

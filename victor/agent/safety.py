@@ -610,6 +610,7 @@ def create_hitl_confirmation_callback(
 
     try:
         from victor.config.settings import load_settings
+
         settings = load_settings()
         default_timeout = getattr(settings, "hitl_default_timeout", 300.0)
         default_fallback = getattr(settings, "hitl_default_fallback", "abort")
@@ -673,9 +674,7 @@ def create_hitl_confirmation_callback(
                     )
                     return True
                 else:
-                    logger.warning(
-                        f"Safety confirmation timed out, aborting: {request.tool_name}"
-                    )
+                    logger.warning(f"Safety confirmation timed out, aborting: {request.tool_name}")
                     return False
             else:
                 # Rejected or other status

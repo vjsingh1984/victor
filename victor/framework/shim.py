@@ -361,9 +361,7 @@ class FrameworkShim:
         sequences = dep_provider.get_tool_sequences()
 
         if hasattr(self._orchestrator, "vertical_context"):
-            self._orchestrator.vertical_context.apply_tool_dependencies(
-                dependencies, sequences
-            )
+            self._orchestrator.vertical_context.apply_tool_dependencies(dependencies, sequences)
         logger.debug(f"Applied {len(dependencies)} tool deps (deprecated path)")
 
     def _apply_system_prompt(self, system_prompt: str) -> None:

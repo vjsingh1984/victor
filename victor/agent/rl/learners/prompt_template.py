@@ -922,9 +922,7 @@ class PromptTemplateLearner(BaseLearner):
 
         self.db.commit()
 
-    def get_enrichment_probabilities(
-        self, vertical: str, task_type: str = ""
-    ) -> Dict[str, float]:
+    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> Dict[str, float]:
         """Get posterior mean probabilities for each enrichment type.
 
         Args:
@@ -942,9 +940,7 @@ class PromptTemplateLearner(BaseLearner):
                     probabilities[etype] = posterior.mean()
         return probabilities
 
-    def get_enrichment_recommendation(
-        self, vertical: str, task_type: str = ""
-    ) -> Dict[str, bool]:
+    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> Dict[str, bool]:
         """Get recommendation on which enrichment types to use.
 
         Uses Thompson Sampling to decide which enrichments are worth applying.
@@ -1033,9 +1029,7 @@ class PromptTemplateLearner(BaseLearner):
             if context not in enrichment_stats:
                 enrichment_stats[context] = {
                     "probability": posterior.mean(),
-                    "sample_count": self._enrichment_sample_counts.get(
-                        (vertical, etype), 0
-                    ),
+                    "sample_count": self._enrichment_sample_counts.get((vertical, etype), 0),
                 }
 
         return {

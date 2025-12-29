@@ -48,12 +48,14 @@ from victor.framework.graph import (
 
 class SimpleState(TypedDict):
     """Simple state for testing."""
+
     value: int
     history: List[str]
 
 
 class TaskState(TypedDict, total=False):
     """Task state with optional fields."""
+
     task: str
     result: Optional[str]
     iteration: int
@@ -125,11 +127,7 @@ class TestNode:
 
     def test_node_with_metadata(self):
         """Node should store metadata."""
-        node = Node(
-            id="test",
-            func=increment_node,
-            metadata={"key": "value"}
-        )
+        node = Node(id="test", func=increment_node, metadata={"key": "value"})
 
         assert node.metadata == {"key": "value"}
 
@@ -286,20 +284,24 @@ class TestMemoryCheckpointer:
         """load should return latest checkpoint."""
         checkpointer = MemoryCheckpointer()
 
-        await checkpointer.save(Checkpoint(
-            checkpoint_id="cp1",
-            thread_id="t1",
-            node_id="node1",
-            state={"value": 1},
-            timestamp=1.0,
-        ))
-        await checkpointer.save(Checkpoint(
-            checkpoint_id="cp2",
-            thread_id="t1",
-            node_id="node2",
-            state={"value": 2},
-            timestamp=2.0,
-        ))
+        await checkpointer.save(
+            Checkpoint(
+                checkpoint_id="cp1",
+                thread_id="t1",
+                node_id="node1",
+                state={"value": 1},
+                timestamp=1.0,
+            )
+        )
+        await checkpointer.save(
+            Checkpoint(
+                checkpoint_id="cp2",
+                thread_id="t1",
+                node_id="node2",
+                state={"value": 2},
+                timestamp=2.0,
+            )
+        )
 
         loaded = await checkpointer.load("t1")
 
@@ -320,14 +322,24 @@ class TestMemoryCheckpointer:
         """list should return all checkpoints for thread."""
         checkpointer = MemoryCheckpointer()
 
-        await checkpointer.save(Checkpoint(
-            checkpoint_id="cp1", thread_id="t1", node_id="n1",
-            state={}, timestamp=1.0,
-        ))
-        await checkpointer.save(Checkpoint(
-            checkpoint_id="cp2", thread_id="t1", node_id="n2",
-            state={}, timestamp=2.0,
-        ))
+        await checkpointer.save(
+            Checkpoint(
+                checkpoint_id="cp1",
+                thread_id="t1",
+                node_id="n1",
+                state={},
+                timestamp=1.0,
+            )
+        )
+        await checkpointer.save(
+            Checkpoint(
+                checkpoint_id="cp2",
+                thread_id="t1",
+                node_id="n2",
+                state={},
+                timestamp=2.0,
+            )
+        )
 
         checkpoints = await checkpointer.list("t1")
 
@@ -540,6 +552,7 @@ class TestCompiledGraphExecution:
     @pytest.mark.asyncio
     async def test_invoke_respects_max_iterations(self):
         """invoke should stop at max_iterations."""
+
         async def infinite_node(state: SimpleState) -> SimpleState:
             state["value"] += 1
             return state

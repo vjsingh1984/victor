@@ -197,11 +197,13 @@ class MockToolSelector(BaseToolSelectionStrategy):
         success: bool,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self._recorded_executions.append({
-            "tool_name": tool_name,
-            "success": success,
-            "context": context,
-        })
+        self._recorded_executions.append(
+            {
+                "tool_name": tool_name,
+                "success": success,
+                "context": context,
+            }
+        )
 
 
 class TestBaseToolSelectionStrategy:

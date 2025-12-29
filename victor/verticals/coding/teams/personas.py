@@ -536,8 +536,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             "Balancing coverage with maintainability",
         ],
         approach=(
-            "You test behavior, not implementation. "
-            "Your tests document what the code should do."
+            "You test behavior, not implementation. " "Your tests document what the code should do."
         ),
         working_style=(
             "You write clear test names, use appropriate assertions, "
@@ -586,7 +585,8 @@ def get_persona_by_expertise(expertise: ExpertiseCategory) -> List[CodingPersona
         List of personas with that expertise
     """
     return [
-        p for p in CODING_PERSONAS.values()
+        p
+        for p in CODING_PERSONAS.values()
         if expertise in p.expertise or expertise in p.secondary_expertise
     ]
 

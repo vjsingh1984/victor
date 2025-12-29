@@ -251,7 +251,9 @@ class FileTypeRegistry:
 
         return None
 
-    def detect_from_content(self, content: str, filename: Optional[str] = None) -> Optional[FileType]:
+    def detect_from_content(
+        self, content: str, filename: Optional[str] = None
+    ) -> Optional[FileType]:
         """Detect file type from content.
 
         Args:
@@ -314,364 +316,447 @@ class FileTypeRegistry:
     def _register_builtin_types(self) -> None:
         """Register built-in file types."""
         # Programming Languages
-        self.register(FileType(
-            name="python",
-            display_name="Python",
-            extensions=[".py", ".pyw", ".pyi", ".pyx"],
-            filenames=["SConstruct", "SConscript"],
-            shebangs=["python", "python3"],
-            mime_types=["text/x-python"],
-            category=FileCategory.CODE,
-            aliases=["py"],
-        ))
+        self.register(
+            FileType(
+                name="python",
+                display_name="Python",
+                extensions=[".py", ".pyw", ".pyi", ".pyx"],
+                filenames=["SConstruct", "SConscript"],
+                shebangs=["python", "python3"],
+                mime_types=["text/x-python"],
+                category=FileCategory.CODE,
+                aliases=["py"],
+            )
+        )
 
-        self.register(FileType(
-            name="javascript",
-            display_name="JavaScript",
-            extensions=[".js", ".mjs", ".cjs"],
-            shebangs=["node", "nodejs"],
-            mime_types=["text/javascript", "application/javascript"],
-            category=FileCategory.CODE,
-            aliases=["js"],
-        ))
+        self.register(
+            FileType(
+                name="javascript",
+                display_name="JavaScript",
+                extensions=[".js", ".mjs", ".cjs"],
+                shebangs=["node", "nodejs"],
+                mime_types=["text/javascript", "application/javascript"],
+                category=FileCategory.CODE,
+                aliases=["js"],
+            )
+        )
 
-        self.register(FileType(
-            name="typescript",
-            display_name="TypeScript",
-            extensions=[".ts", ".tsx", ".mts", ".cts"],
-            mime_types=["text/typescript"],
-            category=FileCategory.CODE,
-            aliases=["ts"],
-        ))
+        self.register(
+            FileType(
+                name="typescript",
+                display_name="TypeScript",
+                extensions=[".ts", ".tsx", ".mts", ".cts"],
+                mime_types=["text/typescript"],
+                category=FileCategory.CODE,
+                aliases=["ts"],
+            )
+        )
 
-        self.register(FileType(
-            name="rust",
-            display_name="Rust",
-            extensions=[".rs"],
-            mime_types=["text/x-rust"],
-            category=FileCategory.CODE,
-            aliases=["rs"],
-        ))
+        self.register(
+            FileType(
+                name="rust",
+                display_name="Rust",
+                extensions=[".rs"],
+                mime_types=["text/x-rust"],
+                category=FileCategory.CODE,
+                aliases=["rs"],
+            )
+        )
 
-        self.register(FileType(
-            name="go",
-            display_name="Go",
-            extensions=[".go"],
-            mime_types=["text/x-go"],
-            category=FileCategory.CODE,
-            aliases=["golang"],
-        ))
+        self.register(
+            FileType(
+                name="go",
+                display_name="Go",
+                extensions=[".go"],
+                mime_types=["text/x-go"],
+                category=FileCategory.CODE,
+                aliases=["golang"],
+            )
+        )
 
-        self.register(FileType(
-            name="java",
-            display_name="Java",
-            extensions=[".java"],
-            mime_types=["text/x-java"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="java",
+                display_name="Java",
+                extensions=[".java"],
+                mime_types=["text/x-java"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="kotlin",
-            display_name="Kotlin",
-            extensions=[".kt", ".kts"],
-            mime_types=["text/x-kotlin"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="kotlin",
+                display_name="Kotlin",
+                extensions=[".kt", ".kts"],
+                mime_types=["text/x-kotlin"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="swift",
-            display_name="Swift",
-            extensions=[".swift"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="swift",
+                display_name="Swift",
+                extensions=[".swift"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="c",
-            display_name="C",
-            extensions=[".c", ".h"],
-            mime_types=["text/x-c"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="c",
+                display_name="C",
+                extensions=[".c", ".h"],
+                mime_types=["text/x-c"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="cpp",
-            display_name="C++",
-            extensions=[".cpp", ".hpp", ".cc", ".hh", ".cxx", ".hxx"],
-            mime_types=["text/x-c++"],
-            category=FileCategory.CODE,
-            aliases=["c++", "cxx"],
-        ))
+        self.register(
+            FileType(
+                name="cpp",
+                display_name="C++",
+                extensions=[".cpp", ".hpp", ".cc", ".hh", ".cxx", ".hxx"],
+                mime_types=["text/x-c++"],
+                category=FileCategory.CODE,
+                aliases=["c++", "cxx"],
+            )
+        )
 
-        self.register(FileType(
-            name="csharp",
-            display_name="C#",
-            extensions=[".cs"],
-            mime_types=["text/x-csharp"],
-            category=FileCategory.CODE,
-            aliases=["cs", "c#"],
-        ))
+        self.register(
+            FileType(
+                name="csharp",
+                display_name="C#",
+                extensions=[".cs"],
+                mime_types=["text/x-csharp"],
+                category=FileCategory.CODE,
+                aliases=["cs", "c#"],
+            )
+        )
 
-        self.register(FileType(
-            name="ruby",
-            display_name="Ruby",
-            extensions=[".rb", ".rake", ".gemspec"],
-            filenames=["Rakefile", "Gemfile"],
-            shebangs=["ruby"],
-            mime_types=["text/x-ruby"],
-            category=FileCategory.CODE,
-            aliases=["rb"],
-        ))
+        self.register(
+            FileType(
+                name="ruby",
+                display_name="Ruby",
+                extensions=[".rb", ".rake", ".gemspec"],
+                filenames=["Rakefile", "Gemfile"],
+                shebangs=["ruby"],
+                mime_types=["text/x-ruby"],
+                category=FileCategory.CODE,
+                aliases=["rb"],
+            )
+        )
 
-        self.register(FileType(
-            name="php",
-            display_name="PHP",
-            extensions=[".php", ".phtml", ".php3", ".php4", ".php5"],
-            shebangs=["php"],
-            mime_types=["text/x-php"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="php",
+                display_name="PHP",
+                extensions=[".php", ".phtml", ".php3", ".php4", ".php5"],
+                shebangs=["php"],
+                mime_types=["text/x-php"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="shell",
-            display_name="Shell",
-            extensions=[".sh", ".bash", ".zsh"],
-            shebangs=["sh", "bash", "zsh", "/bin/sh", "/bin/bash"],
-            mime_types=["text/x-shellscript"],
-            category=FileCategory.CODE,
-            aliases=["bash", "sh", "zsh"],
-        ))
+        self.register(
+            FileType(
+                name="shell",
+                display_name="Shell",
+                extensions=[".sh", ".bash", ".zsh"],
+                shebangs=["sh", "bash", "zsh", "/bin/sh", "/bin/bash"],
+                mime_types=["text/x-shellscript"],
+                category=FileCategory.CODE,
+                aliases=["bash", "sh", "zsh"],
+            )
+        )
 
-        self.register(FileType(
-            name="powershell",
-            display_name="PowerShell",
-            extensions=[".ps1", ".psm1", ".psd1"],
-            mime_types=["text/x-powershell"],
-            category=FileCategory.CODE,
-            aliases=["ps1"],
-        ))
+        self.register(
+            FileType(
+                name="powershell",
+                display_name="PowerShell",
+                extensions=[".ps1", ".psm1", ".psd1"],
+                mime_types=["text/x-powershell"],
+                category=FileCategory.CODE,
+                aliases=["ps1"],
+            )
+        )
 
         # Configuration Files
-        self.register(FileType(
-            name="yaml",
-            display_name="YAML",
-            extensions=[".yaml", ".yml"],
-            mime_types=["text/yaml", "application/x-yaml"],
-            category=FileCategory.CONFIG,
-            aliases=["yml"],
-        ))
+        self.register(
+            FileType(
+                name="yaml",
+                display_name="YAML",
+                extensions=[".yaml", ".yml"],
+                mime_types=["text/yaml", "application/x-yaml"],
+                category=FileCategory.CONFIG,
+                aliases=["yml"],
+            )
+        )
 
-        self.register(FileType(
-            name="json",
-            display_name="JSON",
-            extensions=[".json", ".jsonc"],
-            mime_types=["application/json"],
-            category=FileCategory.CONFIG,
-        ))
+        self.register(
+            FileType(
+                name="json",
+                display_name="JSON",
+                extensions=[".json", ".jsonc"],
+                mime_types=["application/json"],
+                category=FileCategory.CONFIG,
+            )
+        )
 
-        self.register(FileType(
-            name="toml",
-            display_name="TOML",
-            extensions=[".toml"],
-            mime_types=["application/toml"],
-            category=FileCategory.CONFIG,
-        ))
+        self.register(
+            FileType(
+                name="toml",
+                display_name="TOML",
+                extensions=[".toml"],
+                mime_types=["application/toml"],
+                category=FileCategory.CONFIG,
+            )
+        )
 
-        self.register(FileType(
-            name="ini",
-            display_name="INI",
-            extensions=[".ini", ".cfg", ".conf"],
-            category=FileCategory.CONFIG,
-            aliases=["cfg", "conf"],
-        ))
+        self.register(
+            FileType(
+                name="ini",
+                display_name="INI",
+                extensions=[".ini", ".cfg", ".conf"],
+                category=FileCategory.CONFIG,
+                aliases=["cfg", "conf"],
+            )
+        )
 
-        self.register(FileType(
-            name="xml",
-            display_name="XML",
-            extensions=[".xml", ".xsd", ".xsl", ".xslt"],
-            mime_types=["text/xml", "application/xml"],
-            category=FileCategory.CONFIG,
-        ))
+        self.register(
+            FileType(
+                name="xml",
+                display_name="XML",
+                extensions=[".xml", ".xsd", ".xsl", ".xslt"],
+                mime_types=["text/xml", "application/xml"],
+                category=FileCategory.CONFIG,
+            )
+        )
 
-        self.register(FileType(
-            name="properties",
-            display_name="Properties",
-            extensions=[".properties"],
-            category=FileCategory.CONFIG,
-        ))
+        self.register(
+            FileType(
+                name="properties",
+                display_name="Properties",
+                extensions=[".properties"],
+                category=FileCategory.CONFIG,
+            )
+        )
 
-        self.register(FileType(
-            name="env",
-            display_name="Environment",
-            extensions=[".env"],
-            filenames=[".env", ".env.local", ".env.development", ".env.production"],
-            category=FileCategory.CONFIG,
-            aliases=["dotenv"],
-        ))
+        self.register(
+            FileType(
+                name="env",
+                display_name="Environment",
+                extensions=[".env"],
+                filenames=[".env", ".env.local", ".env.development", ".env.production"],
+                category=FileCategory.CONFIG,
+                aliases=["dotenv"],
+            )
+        )
 
         # Data Files
-        self.register(FileType(
-            name="csv",
-            display_name="CSV",
-            extensions=[".csv"],
-            mime_types=["text/csv"],
-            category=FileCategory.DATA,
-        ))
+        self.register(
+            FileType(
+                name="csv",
+                display_name="CSV",
+                extensions=[".csv"],
+                mime_types=["text/csv"],
+                category=FileCategory.DATA,
+            )
+        )
 
-        self.register(FileType(
-            name="tsv",
-            display_name="TSV",
-            extensions=[".tsv"],
-            mime_types=["text/tab-separated-values"],
-            category=FileCategory.DATA,
-        ))
+        self.register(
+            FileType(
+                name="tsv",
+                display_name="TSV",
+                extensions=[".tsv"],
+                mime_types=["text/tab-separated-values"],
+                category=FileCategory.DATA,
+            )
+        )
 
-        self.register(FileType(
-            name="parquet",
-            display_name="Parquet",
-            extensions=[".parquet"],
-            mime_types=["application/vnd.apache.parquet"],
-            category=FileCategory.DATA,
-        ))
+        self.register(
+            FileType(
+                name="parquet",
+                display_name="Parquet",
+                extensions=[".parquet"],
+                mime_types=["application/vnd.apache.parquet"],
+                category=FileCategory.DATA,
+            )
+        )
 
-        self.register(FileType(
-            name="sql",
-            display_name="SQL",
-            extensions=[".sql"],
-            mime_types=["text/x-sql"],
-            category=FileCategory.DATA,
-        ))
+        self.register(
+            FileType(
+                name="sql",
+                display_name="SQL",
+                extensions=[".sql"],
+                mime_types=["text/x-sql"],
+                category=FileCategory.DATA,
+            )
+        )
 
         # Documentation
-        self.register(FileType(
-            name="markdown",
-            display_name="Markdown",
-            extensions=[".md", ".markdown", ".mdown"],
-            mime_types=["text/markdown"],
-            category=FileCategory.DOCS,
-            aliases=["md"],
-        ))
+        self.register(
+            FileType(
+                name="markdown",
+                display_name="Markdown",
+                extensions=[".md", ".markdown", ".mdown"],
+                mime_types=["text/markdown"],
+                category=FileCategory.DOCS,
+                aliases=["md"],
+            )
+        )
 
-        self.register(FileType(
-            name="rst",
-            display_name="reStructuredText",
-            extensions=[".rst"],
-            mime_types=["text/x-rst"],
-            category=FileCategory.DOCS,
-            aliases=["restructuredtext"],
-        ))
+        self.register(
+            FileType(
+                name="rst",
+                display_name="reStructuredText",
+                extensions=[".rst"],
+                mime_types=["text/x-rst"],
+                category=FileCategory.DOCS,
+                aliases=["restructuredtext"],
+            )
+        )
 
-        self.register(FileType(
-            name="text",
-            display_name="Plain Text",
-            extensions=[".txt", ".text"],
-            mime_types=["text/plain"],
-            category=FileCategory.DOCS,
-            aliases=["txt", "plaintext"],
-        ))
+        self.register(
+            FileType(
+                name="text",
+                display_name="Plain Text",
+                extensions=[".txt", ".text"],
+                mime_types=["text/plain"],
+                category=FileCategory.DOCS,
+                aliases=["txt", "plaintext"],
+            )
+        )
 
         # Build Files
-        self.register(FileType(
-            name="dockerfile",
-            display_name="Dockerfile",
-            filenames=["Dockerfile", "Dockerfile.dev", "Dockerfile.prod"],
-            category=FileCategory.BUILD,
-            aliases=["docker"],
-        ))
+        self.register(
+            FileType(
+                name="dockerfile",
+                display_name="Dockerfile",
+                filenames=["Dockerfile", "Dockerfile.dev", "Dockerfile.prod"],
+                category=FileCategory.BUILD,
+                aliases=["docker"],
+            )
+        )
 
-        self.register(FileType(
-            name="makefile",
-            display_name="Makefile",
-            filenames=["Makefile", "makefile", "GNUmakefile"],
-            category=FileCategory.BUILD,
-            aliases=["make"],
-        ))
+        self.register(
+            FileType(
+                name="makefile",
+                display_name="Makefile",
+                filenames=["Makefile", "makefile", "GNUmakefile"],
+                category=FileCategory.BUILD,
+                aliases=["make"],
+            )
+        )
 
-        self.register(FileType(
-            name="cmake",
-            display_name="CMake",
-            extensions=[".cmake"],
-            filenames=["CMakeLists.txt"],
-            category=FileCategory.BUILD,
-        ))
+        self.register(
+            FileType(
+                name="cmake",
+                display_name="CMake",
+                extensions=[".cmake"],
+                filenames=["CMakeLists.txt"],
+                category=FileCategory.BUILD,
+            )
+        )
 
         # Web
-        self.register(FileType(
-            name="html",
-            display_name="HTML",
-            extensions=[".html", ".htm", ".xhtml"],
-            mime_types=["text/html"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="html",
+                display_name="HTML",
+                extensions=[".html", ".htm", ".xhtml"],
+                mime_types=["text/html"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="css",
-            display_name="CSS",
-            extensions=[".css"],
-            mime_types=["text/css"],
-            category=FileCategory.CODE,
-        ))
+        self.register(
+            FileType(
+                name="css",
+                display_name="CSS",
+                extensions=[".css"],
+                mime_types=["text/css"],
+                category=FileCategory.CODE,
+            )
+        )
 
-        self.register(FileType(
-            name="scss",
-            display_name="SCSS",
-            extensions=[".scss"],
-            category=FileCategory.CODE,
-            aliases=["sass"],
-        ))
+        self.register(
+            FileType(
+                name="scss",
+                display_name="SCSS",
+                extensions=[".scss"],
+                category=FileCategory.CODE,
+                aliases=["sass"],
+            )
+        )
 
         # Images
-        self.register(FileType(
-            name="png",
-            display_name="PNG Image",
-            extensions=[".png"],
-            mime_types=["image/png"],
-            category=FileCategory.IMAGE,
-        ))
+        self.register(
+            FileType(
+                name="png",
+                display_name="PNG Image",
+                extensions=[".png"],
+                mime_types=["image/png"],
+                category=FileCategory.IMAGE,
+            )
+        )
 
-        self.register(FileType(
-            name="jpeg",
-            display_name="JPEG Image",
-            extensions=[".jpg", ".jpeg"],
-            mime_types=["image/jpeg"],
-            category=FileCategory.IMAGE,
-            aliases=["jpg"],
-        ))
+        self.register(
+            FileType(
+                name="jpeg",
+                display_name="JPEG Image",
+                extensions=[".jpg", ".jpeg"],
+                mime_types=["image/jpeg"],
+                category=FileCategory.IMAGE,
+                aliases=["jpg"],
+            )
+        )
 
-        self.register(FileType(
-            name="svg",
-            display_name="SVG",
-            extensions=[".svg"],
-            mime_types=["image/svg+xml"],
-            category=FileCategory.IMAGE,
-        ))
+        self.register(
+            FileType(
+                name="svg",
+                display_name="SVG",
+                extensions=[".svg"],
+                mime_types=["image/svg+xml"],
+                category=FileCategory.IMAGE,
+            )
+        )
 
-        self.register(FileType(
-            name="gif",
-            display_name="GIF",
-            extensions=[".gif"],
-            mime_types=["image/gif"],
-            category=FileCategory.IMAGE,
-        ))
+        self.register(
+            FileType(
+                name="gif",
+                display_name="GIF",
+                extensions=[".gif"],
+                mime_types=["image/gif"],
+                category=FileCategory.IMAGE,
+            )
+        )
 
         # Archives
-        self.register(FileType(
-            name="zip",
-            display_name="ZIP Archive",
-            extensions=[".zip"],
-            mime_types=["application/zip"],
-            category=FileCategory.ARCHIVE,
-        ))
+        self.register(
+            FileType(
+                name="zip",
+                display_name="ZIP Archive",
+                extensions=[".zip"],
+                mime_types=["application/zip"],
+                category=FileCategory.ARCHIVE,
+            )
+        )
 
-        self.register(FileType(
-            name="tar",
-            display_name="TAR Archive",
-            extensions=[".tar", ".tar.gz", ".tgz", ".tar.bz2"],
-            mime_types=["application/x-tar"],
-            category=FileCategory.ARCHIVE,
-        ))
+        self.register(
+            FileType(
+                name="tar",
+                display_name="TAR Archive",
+                extensions=[".tar", ".tar.gz", ".tgz", ".tar.bz2"],
+                mime_types=["application/x-tar"],
+                category=FileCategory.ARCHIVE,
+            )
+        )
 
 
 # Convenience functions
+
 
 def detect_file_type(path: Path, content: Optional[str] = None) -> Optional[FileType]:
     """Detect file type from path.

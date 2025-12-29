@@ -150,7 +150,8 @@ class CrossVerticalLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Table for storing discovered patterns
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_PATTERN} (
                 pattern_id TEXT PRIMARY KEY,
                 task_type TEXT NOT NULL,
@@ -164,10 +165,12 @@ class CrossVerticalLearner(BaseLearner):
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Table for tracking pattern applications
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_PATTERN_USE} (
                 application_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pattern_id TEXT NOT NULL,
@@ -177,7 +180,8 @@ class CrossVerticalLearner(BaseLearner):
                 quality_score REAL,
                 feedback TEXT
             )
-        """)
+        """
+        )
 
         self.db.commit()
 
@@ -198,7 +202,8 @@ class CrossVerticalLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Query for task types with consistent behavior across verticals
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT
                 task_type,
                 AVG(quality_score) as avg_quality,
@@ -210,7 +215,9 @@ class CrossVerticalLearner(BaseLearner):
             GROUP BY task_type
             HAVING vertical_count >= ? AND sample_count >= ?
             ORDER BY avg_quality DESC
-        """, (self._min_verticals, self._min_samples))
+        """,
+            (self._min_verticals, self._min_samples),
+        )
 
         patterns = []
         for row in cursor.fetchall():
@@ -272,7 +279,8 @@ class CrossVerticalLearner(BaseLearner):
 
         # Get mode with highest quality for this task type
         # Mode is stored in metadata as JSON, so we look at outcomes that mention modes
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT
                 metadata,
                 AVG(quality_score) as avg_quality,
@@ -283,12 +291,15 @@ class CrossVerticalLearner(BaseLearner):
             HAVING count >= 5
             ORDER BY avg_quality DESC
             LIMIT 1
-        """, (task_type,))
+        """,
+            (task_type,),
+        )
 
         row = cursor.fetchone()
         if row and row[0]:
             try:
                 import json
+
                 metadata = json.loads(row[0])
                 return metadata.get("mode")
             except Exception:
@@ -345,11 +356,14 @@ class CrossVerticalLearner(BaseLearner):
         """
         # Check if target vertical has enough data
         cursor = self.db.cursor()
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT COUNT(*)
             FROM {Tables.RL_OUTCOME}
             WHERE vertical = ? AND task_type = ?
-        """, (target_vertical, task_type))
+        """,
+            (target_vertical, task_type),
+        )
 
         local_count = cursor.fetchone()[0]
 
@@ -414,18 +428,21 @@ class CrossVerticalLearner(BaseLearner):
             feedback: Optional feedback text
         """
         cursor = self.db.cursor()
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             INSERT INTO {Tables.RL_PATTERN_USE}
             (pattern_id, target_vertical, applied_at, success, quality_score, feedback)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            pattern_id,
-            target_vertical,
-            datetime.now().isoformat(),
-            1 if success else 0,
-            quality_score,
-            feedback,
-        ))
+        """,
+            (
+                pattern_id,
+                target_vertical,
+                datetime.now().isoformat(),
+                1 if success else 0,
+                quality_score,
+                feedback,
+            ),
+        )
         self.db.commit()
 
         logger.debug(
@@ -448,22 +465,27 @@ class CrossVerticalLearner(BaseLearner):
         cursor = self.db.cursor()
 
         if target_vertical:
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(success) as successes,
                     AVG(quality_score) as avg_quality
                 FROM {Tables.RL_PATTERN_USE}
                 WHERE target_vertical = ?
-            """, (target_vertical,))
+            """,
+                (target_vertical,),
+            )
         else:
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(success) as successes,
                     AVG(quality_score) as avg_quality
                 FROM {Tables.RL_PATTERN_USE}
-            """)
+            """
+            )
 
         row = cursor.fetchone()
         total = row[0] or 0

@@ -129,9 +129,7 @@ class TestApplySystemPrompt:
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
         assert mock_orchestrator._framework_system_prompt == "Custom prompt text"
-        mock_orchestrator.set_custom_prompt.assert_called_once_with(
-            "Custom prompt text"
-        )
+        mock_orchestrator.set_custom_prompt.assert_called_once_with("Custom prompt text")
 
     def test_apply_with_custom_prompt_attr(self):
         """Test applying prompt via prompt_builder when no set_custom_prompt.

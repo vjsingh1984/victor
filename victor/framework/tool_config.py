@@ -386,7 +386,9 @@ class ToolConfigurator:
         # Use capability-based approach (protocol-first, fallback to hasattr)
         if _check_capability(orchestrator, "enabled_tools"):
             _invoke_capability(orchestrator, "enabled_tools", tools)
-        elif hasattr(orchestrator, "set_enabled_tools") and callable(orchestrator.set_enabled_tools):
+        elif hasattr(orchestrator, "set_enabled_tools") and callable(
+            orchestrator.set_enabled_tools
+        ):
             orchestrator.set_enabled_tools(tools)
         else:
             # Fallback: log warning as this indicates protocol non-compliance

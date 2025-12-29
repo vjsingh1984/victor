@@ -292,25 +292,31 @@ class TeamMember:
         ]
 
         if self.backstory:
-            lines.extend([
-                "## Background",
-                self.backstory,
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Background",
+                    self.backstory,
+                    "",
+                ]
+            )
 
         if self.expertise:
-            lines.extend([
-                "## Expertise",
-                f"Your areas of expertise: {', '.join(self.expertise)}",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Expertise",
+                    f"Your areas of expertise: {', '.join(self.expertise)}",
+                    "",
+                ]
+            )
 
         if self.personality:
-            lines.extend([
-                "## Communication Style",
-                self.personality,
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Communication Style",
+                    self.personality,
+                    "",
+                ]
+            )
 
         if self.can_delegate:
             targets = self.delegation_targets or []
@@ -318,17 +324,21 @@ class TeamMember:
             if self.max_delegation_depth > 0:
                 depth_info = f" (max {self.max_delegation_depth} levels deep)"
             if targets:
-                lines.extend([
-                    "## Delegation",
-                    f"You can delegate tasks to: {', '.join(targets)}{depth_info}",
-                    "",
-                ])
+                lines.extend(
+                    [
+                        "## Delegation",
+                        f"You can delegate tasks to: {', '.join(targets)}{depth_info}",
+                        "",
+                    ]
+                )
             else:
-                lines.extend([
-                    "## Delegation",
-                    f"You can delegate tasks to other team members when appropriate{depth_info}.",
-                    "",
-                ])
+                lines.extend(
+                    [
+                        "## Delegation",
+                        f"You can delegate tasks to other team members when appropriate{depth_info}.",
+                        "",
+                    ]
+                )
 
         return "\n".join(lines)
 
@@ -359,7 +369,9 @@ class TeamMember:
             return self.memory_config
         return MemoryConfig(enabled=self.memory)
 
-    async def remember(self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    async def remember(
+        self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Store a discovery in memory for future tasks.
 
         Only works if memory is enabled and a memory_coordinator is attached.
@@ -445,8 +457,7 @@ class TeamMember:
             # Apply relevance threshold from config
             if config.relevance_threshold > 0:
                 results = [
-                    r for r in results
-                    if getattr(r, "score", 1.0) >= config.relevance_threshold
+                    r for r in results if getattr(r, "score", 1.0) >= config.relevance_threshold
                 ]
 
             return results

@@ -81,9 +81,7 @@ class WorkflowCacheConfig:
     enabled: bool = False
     ttl_seconds: int = 3600  # 1 hour default
     max_entries: int = 500
-    cacheable_node_types: Set[str] = field(
-        default_factory=lambda: {"transform", "condition"}
-    )
+    cacheable_node_types: Set[str] = field(default_factory=lambda: {"transform", "condition"})
     excluded_context_keys: Set[str] = field(
         default_factory=lambda: {"_internal", "_debug", "_timestamps"}
     )
@@ -273,7 +271,8 @@ class WorkflowCache:
 
         with self._lock:
             keys_to_delete = [
-                k for k, v in self._cache.items()
+                k
+                for k, v in self._cache.items()
                 if isinstance(v, CacheEntry) and v.node_id == node_id
             ]
 
@@ -360,14 +359,10 @@ class WorkflowCache:
         # Add node-specific data for more accurate cache matching
         if hasattr(node, "transform"):
             # For transform nodes, include function identity if possible
-            key_data["transform_name"] = getattr(
-                node.transform, "__name__", "anonymous"
-            )
+            key_data["transform_name"] = getattr(node.transform, "__name__", "anonymous")
         elif hasattr(node, "condition"):
             # For condition nodes, include condition function identity
-            key_data["condition_name"] = getattr(
-                node.condition, "__name__", "anonymous"
-            )
+            key_data["condition_name"] = getattr(node.condition, "__name__", "anonymous")
 
         # Generate hash
         key_str = json.dumps(key_data, sort_keys=True, default=str)
@@ -491,10 +486,7 @@ class WorkflowCacheManager:
             Dictionary mapping workflow names to their stats
         """
         with self._lock:
-            return {
-                name: cache.get_stats()
-                for name, cache in self._caches.items()
-            }
+            return {name: cache.get_stats() for name, cache in self._caches.items()}
 
 
 # Global cache manager instance

@@ -447,9 +447,7 @@ class EnrichmentCache:
             return
 
         # Sort by timestamp and remove oldest 20%
-        sorted_entries = sorted(
-            self._cache.items(), key=lambda x: x[1].timestamp
-        )
+        sorted_entries = sorted(self._cache.items(), key=lambda x: x[1].timestamp)
         to_remove = max(1, len(sorted_entries) // 5)
 
         for key, _ in sorted_entries[:to_remove]:

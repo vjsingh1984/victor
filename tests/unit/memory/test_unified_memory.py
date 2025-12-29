@@ -70,7 +70,7 @@ class MockMemoryProvider:
             content_str = str(r.content).lower()
             if query.query.lower() in content_str:
                 filtered.append(r)
-        return filtered[:query.limit]
+        return filtered[: query.limit]
 
     async def store(
         self,
@@ -303,7 +303,9 @@ class TestRecencyRankingStrategy:
         """Test handling results with no timestamp."""
         strategy = RecencyRankingStrategy()
         results = [
-            MemoryResult(source=MemoryType.ENTITY, content="a", relevance=0.9, timestamp=time.time()),
+            MemoryResult(
+                source=MemoryType.ENTITY, content="a", relevance=0.9, timestamp=time.time()
+            ),
             MemoryResult(source=MemoryType.ENTITY, content="b", relevance=0.8, timestamp=None),
         ]
         query = MemoryQuery(query="test")
@@ -540,6 +542,7 @@ class TestUnifiedMemoryCoordinator:
     @pytest.mark.asyncio
     async def test_error_handling(self, coordinator):
         """Test error handling in search."""
+
         class FailingProvider:
             @property
             def memory_type(self):
@@ -629,12 +632,22 @@ class TestMemoryIntegration:
 
         # Create providers with different results
         entity_results = [
-            MemoryResult(source=MemoryType.ENTITY, content="High relevance auth",
-                        relevance=0.95, id="e1", timestamp=time.time() - 7200),
+            MemoryResult(
+                source=MemoryType.ENTITY,
+                content="High relevance auth",
+                relevance=0.95,
+                id="e1",
+                timestamp=time.time() - 7200,
+            ),
         ]
         conv_results = [
-            MemoryResult(source=MemoryType.CONVERSATION, content="Recent auth msg",
-                        relevance=0.7, id="c1", timestamp=time.time() - 300),
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Recent auth msg",
+                relevance=0.7,
+                id="c1",
+                timestamp=time.time() - 300,
+            ),
         ]
 
         coordinator.register_provider(MockMemoryProvider(MemoryType.ENTITY, entity_results))
@@ -663,12 +676,14 @@ class TestMemoryIntegration:
 
             async def search(self, query):
                 await asyncio.sleep(self._delay)
-                return [MemoryResult(
-                    source=self._memory_type,
-                    content=f"Result from {self._memory_type.name}",
-                    relevance=0.8,
-                    id=f"id_{self._memory_type.name}",
-                )]
+                return [
+                    MemoryResult(
+                        source=self._memory_type,
+                        content=f"Result from {self._memory_type.name}",
+                        relevance=0.8,
+                        id=f"id_{self._memory_type.name}",
+                    )
+                ]
 
             def is_available(self):
                 return True

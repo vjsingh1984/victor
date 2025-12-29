@@ -40,8 +40,19 @@ class DevOpsRLConfig:
     # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
         default_factory=lambda: {
-            "deployment": [ToolNames.SHELL, ToolNames.DOCKER, ToolNames.GIT, ToolNames.READ, ToolNames.EDIT],
-            "containerization": [ToolNames.DOCKER, ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
+            "deployment": [
+                ToolNames.SHELL,
+                ToolNames.DOCKER,
+                ToolNames.GIT,
+                ToolNames.READ,
+                ToolNames.EDIT,
+            ],
+            "containerization": [
+                ToolNames.DOCKER,
+                ToolNames.SHELL,
+                ToolNames.READ,
+                ToolNames.WRITE,
+            ],
             "monitoring": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE, ToolNames.GREP],
             "configuration": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.GREP],
             "troubleshooting": [ToolNames.SHELL, ToolNames.READ, ToolNames.GREP, ToolNames.DOCKER],

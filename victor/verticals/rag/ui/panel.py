@@ -431,6 +431,5 @@ else:
 
         def __init__(self, *args, **kwargs):
             raise ImportError(
-                "Textual is required for RAG UI. "
-                "Install with: pip install textual"
+                "Textual is required for RAG UI. " "Install with: pip install textual"
             )

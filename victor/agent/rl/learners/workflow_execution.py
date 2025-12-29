@@ -126,7 +126,8 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Q-values table for workflow-task pairs
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_Q} (
                 workflow_name TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -138,10 +139,12 @@ class WorkflowExecutionLearner(BaseLearner):
                 last_updated TEXT,
                 PRIMARY KEY (workflow_name, task_type)
             )
-        """)
+        """
+        )
 
         # Execution history for detailed analysis
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_RUN} (
                 execution_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workflow_name TEXT NOT NULL,
@@ -153,7 +156,8 @@ class WorkflowExecutionLearner(BaseLearner):
                 mode TEXT,
                 executed_at TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         self.db.commit()
 
@@ -187,13 +191,16 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         placeholders = ",".join("?" * len(available_workflows))
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT workflow_name, q_value
             FROM {Tables.AGENT_WORKFLOW_Q}
             WHERE task_type = ? AND workflow_name IN ({placeholders})
             ORDER BY q_value DESC
             LIMIT 1
-        """, [task_type] + available_workflows)
+        """,
+            [task_type] + available_workflows,
+        )
 
         row = cursor.fetchone()
         if row:
@@ -220,17 +227,23 @@ class WorkflowExecutionLearner(BaseLearner):
 
         if available_workflows:
             placeholders = ",".join("?" * len(available_workflows))
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT workflow_name, q_value
                 FROM {Tables.AGENT_WORKFLOW_Q}
                 WHERE task_type = ? AND workflow_name IN ({placeholders})
-            """, [task_type] + available_workflows)
+            """,
+                [task_type] + available_workflows,
+            )
         else:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT workflow_name, q_value
                 FROM {Tables.AGENT_WORKFLOW_Q}
                 WHERE task_type = ?
-            """, (task_type,))
+            """,
+                (task_type,),
+            )
 
         return {row[0]: row[1] for row in cursor.fetchall()}
 
@@ -261,31 +274,37 @@ class WorkflowExecutionLearner(BaseLearner):
         now = datetime.now().isoformat()
 
         # Record in execution history
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO {Tables.AGENT_WORKFLOW_RUN}
             (workflow_name, task_type, success, duration_seconds, quality_score,
              vertical, mode, executed_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            workflow_name,
-            task_type,
-            1 if success else 0,
-            duration_seconds,
-            quality_score,
-            vertical,
-            mode,
-            now,
-        ))
+        """,
+            (
+                workflow_name,
+                task_type,
+                1 if success else 0,
+                duration_seconds,
+                quality_score,
+                vertical,
+                mode,
+                now,
+            ),
+        )
 
         # Compute reward
         reward = self._compute_reward(success, duration_seconds, quality_score)
 
         # Get current Q-value
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT q_value, execution_count, success_count, avg_duration, avg_quality
             FROM {Tables.AGENT_WORKFLOW_Q}
             WHERE workflow_name = ? AND task_type = ?
-        """, (workflow_name, task_type))
+        """,
+            (workflow_name, task_type),
+        )
 
         row = cursor.fetchone()
         if row:
@@ -308,15 +327,12 @@ class WorkflowExecutionLearner(BaseLearner):
         # Update aggregates
         new_execution_count = execution_count + 1
         new_success_count = success_count + (1 if success else 0)
-        new_avg_duration = (
-            (avg_duration * execution_count + duration_seconds) / new_execution_count
-        )
-        new_avg_quality = (
-            (avg_quality * execution_count + quality_score) / new_execution_count
-        )
+        new_avg_duration = (avg_duration * execution_count + duration_seconds) / new_execution_count
+        new_avg_quality = (avg_quality * execution_count + quality_score) / new_execution_count
 
         # Upsert Q-value
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO {Tables.AGENT_WORKFLOW_Q}
             (workflow_name, task_type, q_value, execution_count, success_count,
              avg_duration, avg_quality, last_updated)
@@ -328,16 +344,18 @@ class WorkflowExecutionLearner(BaseLearner):
                 avg_duration = excluded.avg_duration,
                 avg_quality = excluded.avg_quality,
                 last_updated = excluded.last_updated
-        """, (
-            workflow_name,
-            task_type,
-            new_q,
-            new_execution_count,
-            new_success_count,
-            new_avg_duration,
-            new_avg_quality,
-            now,
-        ))
+        """,
+            (
+                workflow_name,
+                task_type,
+                new_q,
+                new_execution_count,
+                new_success_count,
+                new_avg_duration,
+                new_avg_quality,
+                now,
+            ),
+        )
 
         self.db.commit()
 
@@ -395,13 +413,16 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Get best workflow
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT workflow_name, q_value, execution_count, success_count, avg_quality
             FROM {Tables.AGENT_WORKFLOW_Q}
             WHERE task_type = ?
             ORDER BY q_value DESC
             LIMIT 1
-        """, (task_type,))
+        """,
+            (task_type,),
+        )
 
         row = cursor.fetchone()
         if not row:
@@ -451,7 +472,8 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         if workflow_name:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     workflow_name,
                     task_type,
@@ -463,9 +485,12 @@ class WorkflowExecutionLearner(BaseLearner):
                 FROM {Tables.AGENT_WORKFLOW_Q}
                 WHERE workflow_name = ?
                 ORDER BY task_type
-            """, (workflow_name,))
+            """,
+                (workflow_name,),
+            )
         else:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     workflow_name,
                     task_type,
@@ -476,7 +501,8 @@ class WorkflowExecutionLearner(BaseLearner):
                     avg_quality
                 FROM {Tables.AGENT_WORKFLOW_Q}
                 ORDER BY workflow_name, task_type
-            """)
+            """
+            )
 
         stats = {}
         for row in cursor.fetchall():

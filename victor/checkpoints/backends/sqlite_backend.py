@@ -157,9 +157,11 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                         metadata.description,
                         json.dumps(metadata.tags),
                         metadata.version,
-                        json.dumps(serialized["data"])
-                        if not serialized["compressed"]
-                        else serialized["data"],
+                        (
+                            json.dumps(serialized["data"])
+                            if not serialized["compressed"]
+                            else serialized["data"]
+                        ),
                         1 if serialized["compressed"] else 0,
                         serialized["checksum"],
                     ),
@@ -203,9 +205,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                 row = await cursor.fetchone()
 
                 if not row:
-                    raise CheckpointNotFoundError(
-                        f"Checkpoint not found: {checkpoint_id}"
-                    )
+                    raise CheckpointNotFoundError(f"Checkpoint not found: {checkpoint_id}")
 
                 # Reconstruct metadata
                 metadata = CheckpointMetadata(
@@ -367,9 +367,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                 row = await cursor.fetchone()
 
                 if not row:
-                    raise CheckpointNotFoundError(
-                        f"Checkpoint not found: {checkpoint_id}"
-                    )
+                    raise CheckpointNotFoundError(f"Checkpoint not found: {checkpoint_id}")
 
                 return CheckpointMetadata(
                     checkpoint_id=row["checkpoint_id"],
@@ -437,9 +435,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
                 deleted = cursor.rowcount
 
                 if deleted > 0:
-                    logger.info(
-                        f"Cleaned up {deleted} old checkpoints for session {session_id}"
-                    )
+                    logger.info(f"Cleaned up {deleted} old checkpoints for session {session_id}")
 
                 return deleted
 

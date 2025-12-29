@@ -310,9 +310,7 @@ class CapabilityRegistryMixin:
             setter_method=self._set_team_specs,
         )
 
-        logger.info(
-            f"Capability registry initialized with {len(self._capabilities)} capabilities"
-        )
+        logger.info(f"Capability registry initialized with {len(self._capabilities)} capabilities")
 
     # =========================================================================
     # CapabilityRegistryProtocol implementation
@@ -455,9 +453,9 @@ class CapabilityRegistryMixin:
         # Warn if invoking deprecated capability
         if cap.deprecated:
             import warnings
+
             warnings.warn(
-                f"Capability '{name}' (v{cap.version}) is deprecated. "
-                f"{cap.deprecated_message}",
+                f"Capability '{name}' (v{cap.version}) is deprecated. " f"{cap.deprecated_message}",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -599,14 +597,14 @@ class CapabilityRegistryMixin:
         if hasattr(self, "_rl_hooks"):
             self._rl_hooks = hooks
         else:
-            setattr(self, "_rl_hooks", hooks)
+            self._rl_hooks = hooks
 
     def _set_team_specs(self, specs: Dict[str, Any]) -> None:
         """Set team specifications."""
         if hasattr(self, "_team_specs"):
             self._team_specs = specs
         else:
-            setattr(self, "_team_specs", specs)
+            self._team_specs = specs
 
     # =========================================================================
     # Dynamic Capability Loading (Phase 4.4)

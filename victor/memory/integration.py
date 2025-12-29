@@ -110,10 +110,7 @@ class EntityMemoryIntegration:
         )
 
         # Filter by confidence
-        entities = [
-            e for e in result.entities
-            if e.confidence >= self._min_confidence
-        ]
+        entities = [e for e in result.entities if e.confidence >= self._min_confidence]
 
         # Store entities
         for entity in entities:
@@ -209,16 +206,16 @@ class EntityMemoryIntegration:
 
             # Get related entities
             if include_related:
-                related = await self._entity_memory.get_related(
-                    entity.id, limit=max_related
-                )
+                related = await self._entity_memory.get_related(entity.id, limit=max_related)
                 for rel_entity, relation in related:
-                    context["relationships"].append({
-                        "source": entity.name,
-                        "target": rel_entity.name,
-                        "type": relation.relation_type.value,
-                        "strength": relation.strength,
-                    })
+                    context["relationships"].append(
+                        {
+                            "source": entity.name,
+                            "target": rel_entity.name,
+                            "type": relation.relation_type.value,
+                            "strength": relation.strength,
+                        }
+                    )
 
         return context
 
@@ -286,6 +283,7 @@ def create_entity_integration(
         db_path = str(project_path / ".victor" / "entities.db")
     else:
         from victor.config.settings import get_project_paths
+
         paths = get_project_paths()
         db_path = str(paths.project_victor_dir / "entities.db")
 

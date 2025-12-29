@@ -99,9 +99,7 @@ if TEXTUAL_AVAILABLE:
                     yield Static("No documents. Use 'Ingest' to add documents.")
                 else:
                     for doc in self._documents:
-                        created = datetime.fromtimestamp(doc.created_at).strftime(
-                            "%Y-%m-%d %H:%M"
-                        )
+                        created = datetime.fromtimestamp(doc.created_at).strftime("%Y-%m-%d %H:%M")
                         with Container(
                             classes="doc-item",
                             id=f"doc-item-{doc.id}",

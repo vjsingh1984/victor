@@ -138,7 +138,9 @@ class CapabilityAwareAgent:
             if self.can_use_tool("write_file") and self.use_tool("write_file"):
                 output_parts.append("Wrote files")
 
-        return f"{self._id}: {', '.join(output_parts)}" if output_parts else f"{self._id}: No actions"
+        return (
+            f"{self._id}: {', '.join(output_parts)}" if output_parts else f"{self._id}: No actions"
+        )
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and respond to a message."""
@@ -311,6 +313,7 @@ class TestToolBudgetEnforcement:
 
     def test_agent_respects_tool_budget(self):
         """Agent respects tool budget limit."""
+
         # Create agent with small budget role
         @dataclass
         class SmallBudgetRole:

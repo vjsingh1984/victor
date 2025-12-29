@@ -145,8 +145,7 @@ class TeamSpecRegistry:
         with self._lock:
             if name in self._teams and not replace:
                 raise ValueError(
-                    f"Team spec '{name}' already registered. "
-                    f"Use replace=True to overwrite."
+                    f"Team spec '{name}' already registered. " f"Use replace=True to overwrite."
                 )
 
             # Auto-detect vertical from namespaced name
@@ -249,11 +248,7 @@ class TeamSpecRegistry:
             Dict mapping names to team specs
         """
         with self._lock:
-            return {
-                name: entry.spec
-                for name, entry in self._teams.items()
-                if tag in entry.tags
-            }
+            return {name: entry.spec for name, entry in self._teams.items() if tag in entry.tags}
 
     def find_by_tags(self, tags: Set[str], match_all: bool = False) -> Dict[str, Any]:
         """Find team specs matching multiple tags.

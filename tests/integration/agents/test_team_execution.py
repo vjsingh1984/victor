@@ -288,9 +288,7 @@ class TestSequentialFormation:
 
         assert "member_results" in result
         assert len(result["member_results"]) == 3
-        assert all(
-            agent.id in result["member_results"] for agent in three_agent_team
-        )
+        assert all(agent.id in result["member_results"] for agent in three_agent_team)
 
     @pytest.mark.asyncio
     async def test_sequential_handles_agent_failure(
@@ -686,10 +684,7 @@ class TestPipelineFormation:
         coordinator: FrameworkTeamCoordinator,
     ):
         """Each stage output becomes input for the next."""
-        agents = [
-            IntegrationTestAgent(f"stage_{i}", output_prefix=f"Stage{i}")
-            for i in range(3)
-        ]
+        agents = [IntegrationTestAgent(f"stage_{i}", output_prefix=f"Stage{i}") for i in range(3)]
 
         for agent in agents:
             coordinator.add_member(agent)
@@ -793,10 +788,7 @@ class TestCrossFormation:
             coord = FrameworkTeamCoordinator()
             tracker: List[str] = []
 
-            agents = [
-                IntegrationTestAgent(f"agent_{i}", delay=0.05)
-                for i in range(3)
-            ]
+            agents = [IntegrationTestAgent(f"agent_{i}", delay=0.05) for i in range(3)]
 
             for agent in agents:
                 coord.add_member(agent)
@@ -810,7 +802,10 @@ class TestCrossFormation:
             results[formation] = {"duration": duration, "order": tracker.copy()}
 
         # Sequential should be slower than parallel
-        assert results[TeamFormation.SEQUENTIAL]["duration"] > results[TeamFormation.PARALLEL]["duration"]
+        assert (
+            results[TeamFormation.SEQUENTIAL]["duration"]
+            > results[TeamFormation.PARALLEL]["duration"]
+        )
 
     @pytest.mark.asyncio
     async def test_all_formations_produce_results(

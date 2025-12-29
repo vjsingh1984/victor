@@ -125,6 +125,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         if self._use_consolidated:
             # Use consolidated project.db via ProjectDatabaseManager
             from victor.core.database import get_project_database
+
             self._project_db = get_project_database(project_path)
             self.db_path = self._project_db.db_path
             # Use new table names from schema
@@ -553,9 +554,7 @@ class SqliteGraphStore(GraphStoreProtocol):
                     )
 
                 # Delete file mtime record
-                conn.execute(
-                    f"DELETE FROM {self._mtimes_table} WHERE file = ?", (file,)
-                )
+                conn.execute(f"DELETE FROM {self._mtimes_table} WHERE file = ?", (file,))
                 conn.commit()
             finally:
                 self._close_if_standalone(conn)
@@ -643,9 +642,7 @@ class SqliteGraphStore(GraphStoreProtocol):
 
             # Migrate edges
             logger.info("Migrating edges from legacy database...")
-            cursor = legacy_conn.execute(
-                "SELECT src, dst, type, weight, metadata FROM edges"
-            )
+            cursor = legacy_conn.execute("SELECT src, dst, type, weight, metadata FROM edges")
             edges_data = cursor.fetchall()
             edges_count = len(edges_data)
 
@@ -663,9 +660,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             # Migrate file mtimes
             logger.info("Migrating file mtimes from legacy database...")
             try:
-                cursor = legacy_conn.execute(
-                    "SELECT file, mtime, indexed_at FROM file_mtimes"
-                )
+                cursor = legacy_conn.execute("SELECT file, mtime, indexed_at FROM file_mtimes")
                 mtimes_data = cursor.fetchall()
                 files_count = len(mtimes_data)
 

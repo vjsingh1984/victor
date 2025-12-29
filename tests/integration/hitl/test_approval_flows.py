@@ -191,7 +191,9 @@ class TestCustomApprovalHandlers:
         """Custom handler should receive complete request information."""
         received_requests = []
 
-        async def tracking_handler(request: ApprovalRequest) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        async def tracking_handler(
+            request: ApprovalRequest,
+        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
             received_requests.append(request)
             return ApprovalStatus.APPROVED, "Handled", "handler"
 
@@ -216,7 +218,10 @@ class TestCustomApprovalHandlers:
     @pytest.mark.asyncio
     async def test_policy_based_approval_handler(self):
         """Handler can implement policy-based approval logic."""
-        async def policy_handler(request: ApprovalRequest) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+
+        async def policy_handler(
+            request: ApprovalRequest,
+        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Policy: Auto-approve low-risk, manual review for high-risk
             risk_level = request.context.get("risk_level", "unknown")
 
@@ -254,24 +259,30 @@ class TestCustomApprovalHandlers:
         """Handler can simulate external service calls (Slack, email, etc.)."""
         notification_log = []
 
-        async def notification_handler(request: ApprovalRequest) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        async def notification_handler(
+            request: ApprovalRequest,
+        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Simulate sending notification to external service
-            notification_log.append({
-                "service": "slack",
-                "channel": "#approvals",
-                "title": request.title,
-                "timestamp": time.time(),
-            })
+            notification_log.append(
+                {
+                    "service": "slack",
+                    "channel": "#approvals",
+                    "title": request.title,
+                    "timestamp": time.time(),
+                }
+            )
 
             # Simulate waiting for response (instant in test)
             await asyncio.sleep(0.01)
 
             # Simulate receiving approval from external service
-            notification_log.append({
-                "service": "slack",
-                "action": "approved",
-                "user": "alice@company.com",
-            })
+            notification_log.append(
+                {
+                    "service": "slack",
+                    "action": "approved",
+                    "user": "alice@company.com",
+                }
+            )
 
             return ApprovalStatus.APPROVED, "Approved via Slack", "alice@company.com"
 
@@ -346,7 +357,10 @@ class TestRejectionFlowWithReasonPropagation:
     @pytest.mark.asyncio
     async def test_rejection_from_custom_handler_with_detailed_reason(self):
         """Custom handler should propagate detailed rejection reasons."""
-        async def detailed_rejection_handler(request: ApprovalRequest) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+
+        async def detailed_rejection_handler(
+            request: ApprovalRequest,
+        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Check multiple conditions and provide detailed rejection reason
             reasons = []
 
@@ -443,6 +457,7 @@ class TestTimeoutHandlingWithFallbackBehaviors:
     @pytest.mark.asyncio
     async def test_workflow_hitl_timeout_with_continue_fallback(self):
         """CONTINUE fallback should allow workflow to proceed with default."""
+
         class NeverRespondsHandler:
             async def request_human_input(self, request: HITLRequest) -> HITLResponse:
                 await asyncio.sleep(10.0)  # Will be cancelled by timeout
@@ -469,6 +484,7 @@ class TestTimeoutHandlingWithFallbackBehaviors:
     @pytest.mark.asyncio
     async def test_workflow_hitl_timeout_with_abort_fallback(self):
         """ABORT fallback should prevent workflow from proceeding."""
+
         class NeverRespondsHandler:
             async def request_human_input(self, request: HITLRequest) -> HITLResponse:
                 await asyncio.sleep(10.0)
@@ -493,6 +509,7 @@ class TestTimeoutHandlingWithFallbackBehaviors:
     @pytest.mark.asyncio
     async def test_workflow_hitl_timeout_with_skip_fallback(self):
         """SKIP fallback should skip the node entirely."""
+
         class NeverRespondsHandler:
             async def request_human_input(self, request: HITLRequest) -> HITLResponse:
                 await asyncio.sleep(10.0)
@@ -517,6 +534,7 @@ class TestTimeoutHandlingWithFallbackBehaviors:
     @pytest.mark.asyncio
     async def test_response_before_timeout_prevents_timeout(self):
         """Response received before timeout should prevent timeout status."""
+
         class QuickHandler:
             async def request_human_input(self, request: HITLRequest) -> HITLResponse:
                 await asyncio.sleep(0.01)  # Quick response
@@ -705,11 +723,13 @@ class TestApprovalCallbackIntegration:
         callback_calls = []
 
         def on_request(request: ApprovalRequest):
-            callback_calls.append({
-                "event": "request_created",
-                "id": request.id,
-                "title": request.title,
-            })
+            callback_calls.append(
+                {
+                    "event": "request_created",
+                    "id": request.id,
+                    "title": request.title,
+                }
+            )
 
         controller = HITLController()
         controller.on_approval_request(on_request)

@@ -221,9 +221,7 @@ class VerticalLoader:
                 try:
                     # Parse "module:attr" format and load
                     vertical_cls = self._load_entry_point(name, value)
-                    if isinstance(vertical_cls, type) and issubclass(
-                        vertical_cls, VerticalBase
-                    ):
+                    if isinstance(vertical_cls, type) and issubclass(vertical_cls, VerticalBase):
                         self._discovered_verticals[name] = vertical_cls
                         # Also register in the global registry
                         VerticalRegistry.register(vertical_cls)

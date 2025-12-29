@@ -178,16 +178,12 @@ class CheckpointCommand(BaseSlashCommand):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
-                        ctx.agent.checkpoint_manager.list_checkpoints(
-                            session_id, limit=limit
-                        ),
+                        ctx.agent.checkpoint_manager.list_checkpoints(session_id, limit=limit),
                     )
                     checkpoints = future.result(timeout=10)
             else:
                 checkpoints = loop.run_until_complete(
-                    ctx.agent.checkpoint_manager.list_checkpoints(
-                        session_id, limit=limit
-                    )
+                    ctx.agent.checkpoint_manager.list_checkpoints(session_id, limit=limit)
                 )
 
             if not checkpoints:
@@ -247,9 +243,7 @@ class CheckpointCommand(BaseSlashCommand):
                     )
                     success = future.result(timeout=10)
             else:
-                success = loop.run_until_complete(
-                    ctx.agent.restore_checkpoint(checkpoint_id)
-                )
+                success = loop.run_until_complete(ctx.agent.restore_checkpoint(checkpoint_id))
 
             if success:
                 ctx.console.print(
@@ -271,9 +265,7 @@ class CheckpointCommand(BaseSlashCommand):
     def _handle_diff(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint diff subcommand."""
         if len(args) < 2:
-            ctx.console.print(
-                "[yellow]Usage:[/] /checkpoint diff <checkpoint_a> <checkpoint_b>"
-            )
+            ctx.console.print("[yellow]Usage:[/] /checkpoint diff <checkpoint_a> <checkpoint_b>")
             return
 
         if not ctx.agent.checkpoint_manager:
@@ -294,16 +286,12 @@ class CheckpointCommand(BaseSlashCommand):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
-                        ctx.agent.checkpoint_manager.diff_checkpoints(
-                            checkpoint_a, checkpoint_b
-                        ),
+                        ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b),
                     )
                     diff = future.result(timeout=10)
             else:
                 diff = loop.run_until_complete(
-                    ctx.agent.checkpoint_manager.diff_checkpoints(
-                        checkpoint_a, checkpoint_b
-                    )
+                    ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b)
                 )
 
             # Display diff summary
@@ -354,7 +342,9 @@ class CheckpointCommand(BaseSlashCommand):
 
             # Format timeline as ASCII art
             ascii_timeline = ctx.agent.checkpoint_manager.format_timeline_ascii(timeline)
-            ctx.console.print(Panel(ascii_timeline, title="Checkpoint Timeline", border_style="blue"))
+            ctx.console.print(
+                Panel(ascii_timeline, title="Checkpoint Timeline", border_style="blue")
+            )
 
         except Exception as e:
             ctx.console.print(f"[red]Error generating timeline:[/] {e}")

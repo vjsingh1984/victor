@@ -530,9 +530,7 @@ class CodePatternScanner:
                 result.add_match(pattern)
         return result
 
-    def get_patterns_by_category(
-        self, category: CodePatternCategory
-    ) -> List[SafetyPattern]:
+    def get_patterns_by_category(self, category: CodePatternCategory) -> List[SafetyPattern]:
         """Get patterns for a specific category.
 
         Args:

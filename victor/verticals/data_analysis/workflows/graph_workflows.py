@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 class EDAState(TypedDict, total=False):
     """Typed state for EDA workflows."""
+
     data_path: str
     data_shape: Optional[Dict[str, Any]]
     statistics: Optional[Dict[str, Any]]
@@ -64,6 +65,7 @@ class EDAState(TypedDict, total=False):
 
 class CleaningState(TypedDict, total=False):
     """Typed state for data cleaning workflows."""
+
     data_path: str
     quality_issues: Optional[List[Dict[str, Any]]]
     cleaning_plan: Optional[str]
@@ -76,6 +78,7 @@ class CleaningState(TypedDict, total=False):
 
 class MLPipelineState(TypedDict, total=False):
     """Typed state for ML pipeline workflows."""
+
     data_path: str
     problem_type: str  # classification, regression, clustering
     features: Optional[List[str]]

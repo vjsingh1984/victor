@@ -267,6 +267,7 @@ class TestResolveEnvVars:
     def test_resolve_simple_var(self):
         """Should resolve simple ${VAR} syntax."""
         import os
+
         os.environ["TEST_VAR_RESOLVE"] = "test_value"
         try:
             result = ConfigLoader.resolve_env_vars("prefix_${TEST_VAR_RESOLVE}_suffix")
@@ -277,6 +278,7 @@ class TestResolveEnvVars:
     def test_resolve_with_default(self):
         """Should use default when var is not set."""
         import os
+
         # Ensure var is not set
         if "UNSET_VAR_RESOLVE" in os.environ:
             del os.environ["UNSET_VAR_RESOLVE"]
@@ -287,6 +289,7 @@ class TestResolveEnvVars:
     def test_resolve_with_default_var_exists(self):
         """Should use env var value even when default is specified."""
         import os
+
         os.environ["SET_VAR_RESOLVE"] = "actual_value"
         try:
             result = ConfigLoader.resolve_env_vars("${SET_VAR_RESOLVE:-default_value}")
@@ -297,6 +300,7 @@ class TestResolveEnvVars:
     def test_resolve_missing_var_returns_empty(self):
         """Should return empty string for missing vars without default."""
         import os
+
         if "MISSING_VAR_RESOLVE" in os.environ:
             del os.environ["MISSING_VAR_RESOLVE"]
 
@@ -306,6 +310,7 @@ class TestResolveEnvVars:
     def test_resolve_multiple_vars(self):
         """Should resolve multiple vars in same string."""
         import os
+
         os.environ["VAR1_RESOLVE"] = "one"
         os.environ["VAR2_RESOLVE"] = "two"
         try:
@@ -338,6 +343,7 @@ class TestResolveEndpointList:
     def test_resolve_with_env_var_prefix(self):
         """Should prepend endpoints from env var."""
         import os
+
         os.environ["EXTRA_ENDPOINTS_TEST"] = "http://extra1:8000,http://extra2:9000"
         try:
             endpoints = ["http://localhost:8080"]
@@ -359,6 +365,7 @@ class TestResolveEndpointList:
     def test_resolve_env_var_in_endpoints(self):
         """Should resolve env vars in endpoint URLs."""
         import os
+
         os.environ["PORT_RESOLVE_TEST"] = "8080"
         try:
             endpoints = ["http://localhost:${PORT_RESOLVE_TEST}"]
@@ -370,6 +377,7 @@ class TestResolveEndpointList:
     def test_resolve_env_prefix_not_set(self):
         """Should handle missing env var prefix gracefully."""
         import os
+
         if "MISSING_PREFIX_TEST" in os.environ:
             del os.environ["MISSING_PREFIX_TEST"]
 
@@ -389,6 +397,7 @@ class TestProfileValidationResult:
     def test_create_valid_result(self):
         """Should create valid result with defaults."""
         from victor.agent.config_loader import ProfileValidationResult
+
         result = ProfileValidationResult("test_profile")
         assert result.profile_name == "test_profile"
         assert result.is_valid is True
@@ -399,6 +408,7 @@ class TestProfileValidationResult:
     def test_create_invalid_result(self):
         """Should create invalid result with errors."""
         from victor.agent.config_loader import ProfileValidationResult
+
         result = ProfileValidationResult(
             "bad_profile",
             is_valid=False,
@@ -410,6 +420,7 @@ class TestProfileValidationResult:
     def test_str_valid(self):
         """Should format valid result correctly."""
         from victor.agent.config_loader import ProfileValidationResult
+
         result = ProfileValidationResult("my_profile")
         text = str(result)
         assert "my_profile" in text
@@ -418,6 +429,7 @@ class TestProfileValidationResult:
     def test_str_invalid_with_errors(self):
         """Should format invalid result with errors."""
         from victor.agent.config_loader import ProfileValidationResult
+
         result = ProfileValidationResult(
             "bad_profile",
             is_valid=False,
@@ -443,6 +455,7 @@ class TestProfileValidator:
     def test_init(self):
         """Should initialize with settings."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
         assert validator.settings == mock_settings
@@ -451,6 +464,7 @@ class TestProfileValidator:
     def test_get_capability_loader_lazy_load(self):
         """Should lazy-load capability loader."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
         assert validator._capability_loader is None
@@ -472,6 +486,7 @@ class TestProfileValidator:
     def test_validate_profile_success(self):
         """Should return valid result for good profile."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
 
@@ -503,6 +518,7 @@ class TestProfileValidator:
     def test_validate_profile_no_capabilities(self):
         """Should warn when model capabilities not found."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
 
@@ -531,6 +547,7 @@ class TestProfileValidator:
     def test_validate_profile_no_native_tool_calls(self):
         """Should warn when model doesn't support native tool calls."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
 
@@ -567,6 +584,7 @@ class TestCheckOllamaModel:
         """Should return None when model is found."""
         import json
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         mock_settings.ollama_base_url = "http://localhost:11434"
         validator = ProfileValidator(mock_settings)
@@ -588,6 +606,7 @@ class TestCheckOllamaModel:
         """Should return warning when model not found."""
         import json
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         mock_settings.ollama_base_url = "http://localhost:11434"
         validator = ProfileValidator(mock_settings)
@@ -610,6 +629,7 @@ class TestCheckOllamaModel:
         """Should return None on connection error."""
         import urllib.error
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         mock_settings.ollama_base_url = "http://localhost:11434"
         validator = ProfileValidator(mock_settings)
@@ -628,6 +648,7 @@ class TestValidateAllOllamaProfiles:
     def test_no_profiles_yaml(self):
         """Should return empty list when no profiles yaml."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         mock_settings._profiles_yaml = None
         validator = ProfileValidator(mock_settings)
@@ -637,6 +658,7 @@ class TestValidateAllOllamaProfiles:
     def test_validates_ollama_profiles(self):
         """Should validate only Ollama profiles."""
         from victor.agent.config_loader import ProfileValidator, ProfileValidationResult
+
         mock_settings = MagicMock()
         mock_settings._profiles_yaml = {
             "profiles": {
@@ -662,6 +684,7 @@ class TestValidateAllOllamaProfiles:
     def test_skips_non_dict_profiles(self):
         """Should skip non-dict profile configs."""
         from victor.agent.config_loader import ProfileValidator, ProfileValidationResult
+
         mock_settings = MagicMock()
         mock_settings._profiles_yaml = {
             "profiles": {
@@ -684,6 +707,7 @@ class TestLogValidationSummary:
     def test_log_no_results(self, caplog):
         """Should do nothing with empty results."""
         from victor.agent.config_loader import ProfileValidator
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
         validator.log_validation_summary([])
@@ -693,6 +717,7 @@ class TestLogValidationSummary:
         """Should log warning summary."""
         import logging
         from victor.agent.config_loader import ProfileValidator, ProfileValidationResult
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
         results = [
@@ -709,6 +734,7 @@ class TestLogValidationSummary:
         """Should log error summary."""
         import logging
         from victor.agent.config_loader import ProfileValidator, ProfileValidationResult
+
         mock_settings = MagicMock()
         validator = ProfileValidator(mock_settings)
         results = [
@@ -732,6 +758,7 @@ class TestValidateProfilesOnStartup:
     def test_calls_validator(self):
         """Should call validator methods."""
         from victor.agent.config_loader import validate_profiles_on_startup
+
         mock_settings = MagicMock()
 
         with patch("victor.agent.config_loader.ProfileValidator") as mock_cls:
@@ -750,6 +777,7 @@ class TestValidateProfilesOnStartup:
     def test_with_availability_check(self):
         """Should pass check_availability flag."""
         from victor.agent.config_loader import validate_profiles_on_startup
+
         mock_settings = MagicMock()
 
         with patch("victor.agent.config_loader.ProfileValidator") as mock_cls:

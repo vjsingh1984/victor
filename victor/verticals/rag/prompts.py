@@ -117,7 +117,9 @@ Citation Format:
 
         # Check if this looks like a question
         query = context.get("query", "")
-        if query and any(q in query.lower() for q in ["what", "how", "why", "when", "where", "who", "?"]):
+        if query and any(
+            q in query.lower() for q in ["what", "how", "why", "when", "where", "who", "?"]
+        ):
             hints.append("This appears to be a question. Use rag_query to find relevant context.")
 
         # Check for file-related queries

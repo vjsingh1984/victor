@@ -419,6 +419,7 @@ class TestSafetyCheckerHITLIntegration:
         assert callable(callback)
         # Callback should be async
         import inspect
+
         assert inspect.iscoroutinefunction(callback)
 
     @pytest.mark.asyncio
@@ -432,11 +433,13 @@ class TestSafetyCheckerHITLIntegration:
 
         # Create mock handler that approves
         mock_handler = MagicMock()
-        mock_handler.request_human_input = AsyncMock(return_value=HITLResponse(
-            request_id="test",
-            status=HITLStatus.APPROVED,
-            approved=True,
-        ))
+        mock_handler.request_human_input = AsyncMock(
+            return_value=HITLResponse(
+                request_id="test",
+                status=HITLStatus.APPROVED,
+                approved=True,
+            )
+        )
 
         callback = create_hitl_confirmation_callback(
             hitl_handler=mock_handler,
@@ -466,12 +469,14 @@ class TestSafetyCheckerHITLIntegration:
         )
 
         mock_handler = MagicMock()
-        mock_handler.request_human_input = AsyncMock(return_value=HITLResponse(
-            request_id="test",
-            status=HITLStatus.REJECTED,
-            approved=False,
-            reason="Too dangerous",
-        ))
+        mock_handler.request_human_input = AsyncMock(
+            return_value=HITLResponse(
+                request_id="test",
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason="Too dangerous",
+            )
+        )
 
         callback = create_hitl_confirmation_callback(
             hitl_handler=mock_handler,

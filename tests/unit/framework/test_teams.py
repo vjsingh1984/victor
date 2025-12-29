@@ -81,11 +81,7 @@ class TestTeamMemberSpec:
 
     def test_to_team_member_with_custom_name(self):
         """to_team_member should use custom name if provided."""
-        spec = TeamMemberSpec(
-            role="executor",
-            goal="Write code",
-            name="Code Writer"
-        )
+        spec = TeamMemberSpec(role="executor", goal="Write code", name="Code Writer")
         member = spec.to_team_member()
 
         assert member.name == "Code Writer"
@@ -344,37 +340,19 @@ class TestTeamEvent:
 
     def test_is_member_event(self):
         """is_member_event should identify member events."""
-        assert TeamEvent(
-            type=TeamEventType.MEMBER_START,
-            team_name="T"
-        ).is_member_event is True
+        assert TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_member_event is True
 
-        assert TeamEvent(
-            type=TeamEventType.MEMBER_COMPLETE,
-            team_name="T"
-        ).is_member_event is True
+        assert TeamEvent(type=TeamEventType.MEMBER_COMPLETE, team_name="T").is_member_event is True
 
-        assert TeamEvent(
-            type=TeamEventType.TEAM_START,
-            team_name="T"
-        ).is_member_event is False
+        assert TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_member_event is False
 
     def test_is_lifecycle_event(self):
         """is_lifecycle_event should identify lifecycle events."""
-        assert TeamEvent(
-            type=TeamEventType.TEAM_START,
-            team_name="T"
-        ).is_lifecycle_event is True
+        assert TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_lifecycle_event is True
 
-        assert TeamEvent(
-            type=TeamEventType.TEAM_COMPLETE,
-            team_name="T"
-        ).is_lifecycle_event is True
+        assert TeamEvent(type=TeamEventType.TEAM_COMPLETE, team_name="T").is_lifecycle_event is True
 
-        assert TeamEvent(
-            type=TeamEventType.MEMBER_START,
-            team_name="T"
-        ).is_lifecycle_event is False
+        assert TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_lifecycle_event is False
 
     def test_to_dict(self):
         """to_dict should serialize event correctly."""
@@ -627,21 +605,23 @@ class TestAgentTeamExecution:
         from victor.agent.teams.team import TeamResult, MemberResult
 
         coordinator = MagicMock()
-        coordinator.execute_team = AsyncMock(return_value=TeamResult(
-            success=True,
-            final_output="Team completed",
-            member_results={
-                "m1": MemberResult(
-                    member_id="m1",
-                    success=True,
-                    output="Done",
-                    tool_calls_used=5,
-                    duration_seconds=1.0,
-                ),
-            },
-            total_tool_calls=5,
-            total_duration=2.0,
-        ))
+        coordinator.execute_team = AsyncMock(
+            return_value=TeamResult(
+                success=True,
+                final_output="Team completed",
+                member_results={
+                    "m1": MemberResult(
+                        member_id="m1",
+                        success=True,
+                        output="Done",
+                        tool_calls_used=5,
+                        duration_seconds=1.0,
+                    ),
+                },
+                total_tool_calls=5,
+                total_duration=2.0,
+            )
+        )
         return coordinator
 
     @pytest.fixture

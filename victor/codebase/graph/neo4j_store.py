@@ -2,5 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Neo4j graph store module shim."""
 import warnings
-warnings.warn("Importing from 'victor.codebase.graph.neo4j_store' is deprecated. Please use 'victor_coding.codebase.graph.neo4j_store' instead.", DeprecationWarning, stacklevel=2)
+
+warnings.warn(
+    "Importing from 'victor.codebase.graph.neo4j_store' is deprecated. Please use 'victor_coding.codebase.graph.neo4j_store' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 from victor_coding.codebase.graph.neo4j_store import *  # noqa: F401, F403

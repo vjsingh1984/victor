@@ -344,7 +344,7 @@ class ConversationMemoryAdapter:
                             )
                         )
 
-            return results[:query.limit]
+            return results[: query.limit]
 
         except Exception as e:
             logger.warning(f"ConversationMemoryAdapter search failed: {e}")
@@ -468,9 +468,8 @@ class GraphMemoryAdapter:
             relation_types = None
             if query.filters and "relation_types" in query.filters:
                 from victor.memory.entity_types import RelationType
-                relation_types = [
-                    RelationType(rt) for rt in query.filters["relation_types"]
-                ]
+
+                relation_types = [RelationType(rt) for rt in query.filters["relation_types"]]
 
             # Get direction filter
             direction = "both"
@@ -667,7 +666,7 @@ class ToolResultsMemoryAdapter:
 
             # Sort by relevance and limit
             results.sort(key=lambda r: r.relevance, reverse=True)
-            return results[:query.limit]
+            return results[: query.limit]
 
         except Exception as e:
             logger.warning(f"ToolResultsMemoryAdapter search failed: {e}")

@@ -46,7 +46,7 @@ class TestTreeSitterAvailability:
 
 @pytest.mark.skipif(
     not pytest.importorskip("tree_sitter", reason="tree-sitter not installed"),
-    reason="tree-sitter not installed"
+    reason="tree-sitter not installed",
 )
 class TestTreeSitterEntityExtractor:
     """Tests for TreeSitterEntityExtractor."""
@@ -55,6 +55,7 @@ class TestTreeSitterEntityExtractor:
     def extractor(self):
         """Create extractor instance."""
         from victor.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
+
         return TreeSitterEntityExtractor(auto_discover_plugins=True)
 
     def test_extractor_name(self, extractor):
@@ -86,9 +87,7 @@ def login(user):
     auth = UserAuth()
     return auth.authenticate(user, "secret")
 '''
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.py', delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 
@@ -113,7 +112,7 @@ def login(user):
     @pytest.mark.asyncio
     async def test_extract_javascript_code(self, extractor):
         """Test extraction from JavaScript code."""
-        code = '''
+        code = """
 class ApiClient {
     constructor(baseUrl) {
         this.baseUrl = baseUrl;
@@ -128,10 +127,8 @@ class ApiClient {
 function createClient(url) {
     return new ApiClient(url);
 }
-'''
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.js', delete=False
-        ) as f:
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 
@@ -179,7 +176,7 @@ function createClient(url) {
 
 @pytest.mark.skipif(
     not pytest.importorskip("tree_sitter", reason="tree-sitter not installed"),
-    reason="tree-sitter not installed"
+    reason="tree-sitter not installed",
 )
 class TestTreeSitterFileExtractor:
     """Tests for TreeSitterFileExtractor."""
@@ -188,6 +185,7 @@ class TestTreeSitterFileExtractor:
     def extractor(self):
         """Create file extractor instance."""
         from victor.memory.extractors.tree_sitter_extractor import TreeSitterFileExtractor
+
         return TreeSitterFileExtractor()
 
     def test_extractor_name(self, extractor):
@@ -197,14 +195,12 @@ class TestTreeSitterFileExtractor:
     @pytest.mark.asyncio
     async def test_extract_file(self, extractor):
         """Test file extraction."""
-        code = '''
+        code = """
 class DataProcessor:
     def process(self, data):
         return data.transform()
-'''
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.py', delete=False
-        ) as f:
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 
@@ -266,9 +262,7 @@ class OrderProcessor:
         return self.validate(order)
 '''
 
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.py', delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 

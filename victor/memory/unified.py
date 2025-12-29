@@ -130,9 +130,7 @@ class MemoryResult:
         """Generate ID if not provided."""
         if not self.id:
             content_str = str(self.content)[:100]
-            self.id = hashlib.md5(
-                f"{self.source.name}:{content_str}".encode()
-            ).hexdigest()[:16]
+            self.id = hashlib.md5(f"{self.source.name}:{content_str}".encode()).hexdigest()[:16]
 
     def __repr__(self) -> str:
         return (
@@ -316,10 +314,7 @@ class RelevanceRankingStrategy:
 
         # Filter by min relevance
         if query.min_relevance > 0:
-            sorted_results = [
-                r for r in sorted_results
-                if r.relevance >= query.min_relevance
-            ]
+            sorted_results = [r for r in sorted_results if r.relevance >= query.min_relevance]
 
         return sorted_results[:limit]
 
@@ -401,10 +396,7 @@ class HybridRankingStrategy:
         scored_results = []
         for r in unique_results:
             recency = self._recency_score(r.timestamp)
-            combined = (
-                self.relevance_weight * r.relevance +
-                self.recency_weight * recency
-            )
+            combined = self.relevance_weight * r.relevance + self.recency_weight * recency
             scored_results.append((combined, r))
 
         # Sort by combined score
@@ -480,9 +472,7 @@ class UnifiedMemoryCoordinator:
         """
         memory_type = provider.memory_type
         if memory_type in self._providers:
-            logger.warning(
-                f"Replacing existing provider for {memory_type.name}"
-            )
+            logger.warning(f"Replacing existing provider for {memory_type.name}")
         self._providers[memory_type] = provider
         logger.info(f"Registered memory provider: {memory_type.name}")
 
@@ -501,9 +491,7 @@ class UnifiedMemoryCoordinator:
             return True
         return False
 
-    def get_provider(
-        self, memory_type: MemoryType
-    ) -> Optional[MemoryProviderProtocol]:
+    def get_provider(self, memory_type: MemoryType) -> Optional[MemoryProviderProtocol]:
         """Get a specific provider.
 
         Args:
@@ -522,9 +510,7 @@ class UnifiedMemoryCoordinator:
         """
         return list(self._providers.keys())
 
-    def set_ranking_strategy(
-        self, strategy: RankingStrategyProtocol
-    ) -> None:
+    def set_ranking_strategy(self, strategy: RankingStrategyProtocol) -> None:
         """Set the ranking strategy.
 
         Args:
@@ -583,8 +569,7 @@ class UnifiedMemoryCoordinator:
 
         # Parallel search
         search_tasks = [
-            self._search_provider(provider, memory_query)
-            for provider in target_providers
+            self._search_provider(provider, memory_query) for provider in target_providers
         ]
 
         results_lists = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -594,16 +579,12 @@ class UnifiedMemoryCoordinator:
         for i, results in enumerate(results_lists):
             if isinstance(results, Exception):
                 self._error_count += 1
-                logger.warning(
-                    f"Provider {target_providers[i].memory_type.name} failed: {results}"
-                )
+                logger.warning(f"Provider {target_providers[i].memory_type.name} failed: {results}")
             else:
                 all_results.extend(results)
 
         # Rank and deduplicate
-        ranked_results = self._ranking_strategy.rank(
-            all_results, memory_query, limit
-        )
+        ranked_results = self._ranking_strategy.rank(all_results, memory_query, limit)
 
         logger.debug(
             f"Search '{query[:50]}...' returned {len(ranked_results)} results "
@@ -621,9 +602,7 @@ class UnifiedMemoryCoordinator:
         try:
             return await provider.search(query)
         except Exception as e:
-            logger.error(
-                f"Error searching {provider.memory_type.name}: {e}"
-            )
+            logger.error(f"Error searching {provider.memory_type.name}: {e}")
             raise
 
     async def search_type(
@@ -711,9 +690,7 @@ class UnifiedMemoryCoordinator:
         return {
             "query_count": self._query_count,
             "error_count": self._error_count,
-            "error_rate": (
-                self._error_count / max(1, self._query_count)
-            ),
+            "error_rate": (self._error_count / max(1, self._query_count)),
             "providers": {
                 t.name: {
                     "available": p.is_available(),

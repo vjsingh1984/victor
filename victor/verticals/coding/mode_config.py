@@ -93,6 +93,7 @@ _CODING_TASK_BUDGETS: Dict[str, int] = {
 # Register with Central Registry
 # =============================================================================
 
+
 def _register_coding_modes() -> None:
     """Register coding modes with the central registry."""
     registry = ModeConfigRegistry.get_instance()

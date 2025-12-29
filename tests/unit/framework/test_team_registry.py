@@ -350,8 +350,12 @@ class TestAutoRegistration:
 
         assert len(coding_teams) >= 5, f"Expected at least 5 coding teams, got {len(coding_teams)}"
         assert len(devops_teams) >= 4, f"Expected at least 4 devops teams, got {len(devops_teams)}"
-        assert len(research_teams) >= 5, f"Expected at least 5 research teams, got {len(research_teams)}"
-        assert len(data_analysis_teams) >= 5, f"Expected at least 5 data_analysis teams, got {len(data_analysis_teams)}"
+        assert (
+            len(research_teams) >= 5
+        ), f"Expected at least 5 research teams, got {len(research_teams)}"
+        assert (
+            len(data_analysis_teams) >= 5
+        ), f"Expected at least 5 data_analysis teams, got {len(data_analysis_teams)}"
 
     def test_coding_vertical_team_specs_available(self):
         """Coding team specs should be available and match registered count."""

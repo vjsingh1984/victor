@@ -91,7 +91,7 @@ def mock_coding_strategy():
             return [
                 ContextEnrichment(
                     type=EnrichmentType.KNOWLEDGE_GRAPH,
-                    content=f"Symbol: calculate_total found in utils.py:42",
+                    content="Symbol: calculate_total found in utils.py:42",
                     priority=EnrichmentPriority.HIGH,
                     token_estimate=50,
                 ),
@@ -147,9 +147,7 @@ class TestEnrichmentPipeline:
     """Tests for the full enrichment pipeline."""
 
     @pytest.mark.asyncio
-    async def test_enrichment_service_with_strategy(
-        self, enrichment_service, mock_coding_strategy
-    ):
+    async def test_enrichment_service_with_strategy(self, enrichment_service, mock_coding_strategy):
         """Enrichment service applies strategy enrichments."""
         enrichment_service.register_strategy("coding", mock_coding_strategy)
 
@@ -206,9 +204,7 @@ class TestPromptBuilderIntegration:
     """Tests for prompt builder integration with enrichment."""
 
     @pytest.mark.asyncio
-    async def test_prompt_builder_with_enrichment(
-        self, enrichment_service, mock_coding_strategy
-    ):
+    async def test_prompt_builder_with_enrichment(self, enrichment_service, mock_coding_strategy):
         """Prompt builder can enrich user prompts."""
         enrichment_service.register_strategy("coding", mock_coding_strategy)
 
@@ -342,9 +338,7 @@ class TestCachingBehavior:
     """Tests for enrichment caching behavior."""
 
     @pytest.mark.asyncio
-    async def test_cache_hit_on_same_request(
-        self, enrichment_service, mock_coding_strategy
-    ):
+    async def test_cache_hit_on_same_request(self, enrichment_service, mock_coding_strategy):
         """Same request uses cached result."""
         call_count = 0
 
@@ -390,9 +384,7 @@ class TestCachingBehavior:
         assert result2.from_cache is True
 
     @pytest.mark.asyncio
-    async def test_cache_miss_on_different_context(
-        self, enrichment_service, mock_coding_strategy
-    ):
+    async def test_cache_miss_on_different_context(self, enrichment_service, mock_coding_strategy):
         """Different context causes cache miss."""
         enrichment_service.register_strategy("coding", mock_coding_strategy)
 

@@ -342,7 +342,9 @@ class TestPersonaRegistry:
         persona = get_persona("friendly_assistant")
 
         assert persona is not None
-        assert "friendly" in persona.name.lower() or "friendly" in persona.communication_style.lower()
+        assert (
+            "friendly" in persona.name.lower() or "friendly" in persona.communication_style.lower()
+        )
 
     def test_get_persona_senior_developer(self):
         """senior_developer persona should be available."""

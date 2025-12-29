@@ -231,7 +231,7 @@ class MockConversationStore:
             self._messages[session_id] = []
         msg = MockConversationMessage(
             id=f"msg_{len(self._messages[session_id])}",
-            role_value=role.value if hasattr(role, 'value') else role,
+            role_value=role.value if hasattr(role, "value") else role,
             content=content,
             tool_name=tool_name,
             tool_call_id=tool_call_id,
@@ -338,8 +338,11 @@ class TestConversationMemoryAdapter:
             MockConversationMessage("msg_1", "user", "Fix the authentication bug"),
             MockConversationMessage("msg_2", "assistant", "I found the auth issue"),
             MockConversationMessage(
-                "msg_3", "tool_result", "File contents here",
-                tool_name="read_file", tool_call_id="tc_1"
+                "msg_3",
+                "tool_result",
+                "File contents here",
+                tool_name="read_file",
+                tool_call_id="tc_1",
             ),
         ]
         return store
@@ -459,12 +462,18 @@ class TestToolResultsMemoryAdapter:
         store = MockConversationStore()
         store._messages["session_1"] = [
             MockConversationMessage(
-                "msg_1", "tool_result", "config.py contents here",
-                tool_name="read_file", tool_call_id="tc_1"
+                "msg_1",
+                "tool_result",
+                "config.py contents here",
+                tool_name="read_file",
+                tool_call_id="tc_1",
             ),
             MockConversationMessage(
-                "msg_2", "tool_result", "search results for auth",
-                tool_name="code_search", tool_call_id="tc_2"
+                "msg_2",
+                "tool_result",
+                "search results for auth",
+                tool_name="code_search",
+                tool_call_id="tc_2",
             ),
         ]
         return store

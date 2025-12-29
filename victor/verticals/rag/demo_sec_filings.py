@@ -94,6 +94,7 @@ class SECFilingFetcher:
         }
         # Create SSL context that doesn't verify certificates (for demo purposes)
         import ssl
+
         self._ssl_context = ssl.create_default_context()
         self._ssl_context.check_hostname = False
         self._ssl_context.verify_mode = ssl.CERT_NONE
@@ -358,7 +359,7 @@ async def show_stats() -> None:
 
     docs = await store.list_documents()
     if docs:
-        print(f"\nDocuments by company:")
+        print("\nDocuments by company:")
         by_company: Dict[str, int] = {}
         for doc in docs:
             symbol = doc.metadata.get("symbol", "Other")
@@ -448,19 +449,21 @@ def main():
         return
 
     if args.query:
-        asyncio.run(query_filings(
-            args.query,
-            synthesize=args.synthesize,
-            provider=args.provider,
-            model=args.model,
-        ))
+        asyncio.run(
+            query_filings(
+                args.query,
+                synthesize=args.synthesize,
+                provider=args.provider,
+                model=args.model,
+            )
+        )
         return
 
     # Ingest filings
     companies = [args.company.upper()] if args.company else None
 
     print(f"\n{'=' * 60}")
-    print(f"SEC Filing RAG Demo")
+    print("SEC Filing RAG Demo")
     print(f"{'=' * 60}")
     print(f"Filing Type: {args.filing_type}")
     print(f"Companies: {companies or 'All FAANG'}")
@@ -483,16 +486,16 @@ def main():
         print(f"  {company_name}: {chunks} chunks")
     print(f"{'=' * 60}")
     print("\nYou can now query the filings using victor CLI:")
-    print('  # Context only (default):')
+    print("  # Context only (default):")
     print('  victor rag query "What is Apple\'s revenue?"')
-    print('')
-    print('  # With LLM synthesis (using default provider):')
+    print("")
+    print("  # With LLM synthesis (using default provider):")
     print('  victor rag query "What is Apple\'s revenue?" --synthesize')
-    print('')
-    print('  # With specific provider/model:')
+    print("")
+    print("  # With specific provider/model:")
     print('  victor rag query "Risk factors" -S -p anthropic -m claude-sonnet-4-20250514')
-    print('')
-    print('  # Or use the demo script:')
+    print("")
+    print("  # Or use the demo script:")
     print('  python -m victor.verticals.rag.demo_sec_filings --query "Revenue" --synthesize')
     print()
 

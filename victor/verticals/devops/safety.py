@@ -103,10 +103,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         Returns:
             List of (regex_pattern, description, risk_level) tuples.
         """
-        return [
-            (p.pattern, p.description, p.risk_level)
-            for p in self._scanner.all_patterns
-        ]
+        return [(p.pattern, p.description, p.risk_level) for p in self._scanner.all_patterns]
 
     def get_blocked_operations(self) -> List[str]:
         """Return operations that should be blocked in DevOps context."""
@@ -127,10 +124,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
             Dict of credential_type -> regex_pattern.
         """
         # Return simplified dict format for backward compatibility
-        return {
-            name: pattern
-            for name, (pattern, _, _) in CREDENTIAL_PATTERNS.items()
-        }
+        return {name: pattern for name, (pattern, _, _) in CREDENTIAL_PATTERNS.items()}
 
     def scan_for_secrets(self, content: str) -> List[Dict]:
         """Scan content for secrets using the core SecretScanner.

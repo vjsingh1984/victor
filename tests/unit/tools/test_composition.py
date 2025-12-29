@@ -75,6 +75,7 @@ class TestRunnableLambda:
     @pytest.mark.asyncio
     async def test_async_lambda(self):
         """Test wrapping an async function."""
+
         async def async_double(x):
             await asyncio.sleep(0.001)
             return x * 2
@@ -195,6 +196,7 @@ class TestRunnableParallel:
                 await asyncio.sleep(0.05)
                 execution_order.append(f"end_{name}")
                 return x
+
             return inner
 
         tasks = {
@@ -299,12 +301,11 @@ class TestRunnableBinding:
     @pytest.mark.asyncio
     async def test_bind_kwargs(self):
         """Test binding keyword arguments."""
+
         def add(a: int, b: int) -> int:
             return a + b
 
-        add_five = RunnableLambda(
-            lambda d: add(d.get("a", 0), d.get("b", 0))
-        ).bind(b=5)
+        add_five = RunnableLambda(lambda d: add(d.get("a", 0), d.get("b", 0))).bind(b=5)
 
         # The bind wraps the lambda, but for dicts we need different approach
         base = RunnableLambda(lambda d: d.get("a", 0) + d.get("b", 0))

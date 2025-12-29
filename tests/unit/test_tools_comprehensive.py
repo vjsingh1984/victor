@@ -800,7 +800,9 @@ class TestSemanticToolSelector:
         # Attribute is cost_aware_selection, not _cost_aware
         assert mock_selector.cost_aware_selection is True
         # Cache embeddings is stored differently
-        assert hasattr(mock_selector, "_cache_embeddings") or hasattr(mock_selector, "cache_embeddings")
+        assert hasattr(mock_selector, "_cache_embeddings") or hasattr(
+            mock_selector, "cache_embeddings"
+        )
 
     def test_selector_apply_cost_penalty(self, mock_selector):
         """Test cost penalty factor is configurable."""

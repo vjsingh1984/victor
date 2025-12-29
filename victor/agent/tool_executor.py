@@ -69,10 +69,13 @@ def _get_rl_hooks():
     if _rl_hooks is None:
         try:
             from victor.agent.rl.hooks import get_rl_hooks
+
             _rl_hooks = get_rl_hooks()
         except ImportError:
             _rl_hooks = None
     return _rl_hooks
+
+
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -668,7 +671,10 @@ class ToolExecutor:
             provider = context.get("provider")
             if provider is not None and not isinstance(provider, str):
                 # Provider is an object - get its name attribute or class name
-                provider = getattr(provider, "name", None) or provider.__class__.__name__.replace("Provider", "").lower()
+                provider = (
+                    getattr(provider, "name", None)
+                    or provider.__class__.__name__.replace("Provider", "").lower()
+                )
 
             # Extract model name - handle both string and object
             model = context.get("model")

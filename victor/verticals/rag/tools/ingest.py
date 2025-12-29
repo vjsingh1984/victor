@@ -362,7 +362,19 @@ class RAGIngestTool(BaseTool):
         for file_path in files:
             try:
                 # Skip binary files
-                if file_path.suffix.lower() in {".pyc", ".so", ".dll", ".exe", ".bin", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"}:
+                if file_path.suffix.lower() in {
+                    ".pyc",
+                    ".so",
+                    ".dll",
+                    ".exe",
+                    ".bin",
+                    ".ico",
+                    ".png",
+                    ".jpg",
+                    ".jpeg",
+                    ".gif",
+                    ".svg",
+                }:
                     continue
 
                 # Detect doc_type
@@ -384,7 +396,8 @@ class RAGIngestTool(BaseTool):
 
                 # Generate doc_id from path
                 rel_path = file_path.relative_to(directory)
-                doc_id = f"dir_{re.sub(r'[^\\w\\-]', '_', str(rel_path))[:40]}_{uuid.uuid4().hex[:4]}"
+                sanitized_path = re.sub(r"[^\w\-]", "_", str(rel_path))[:40]
+                doc_id = f"dir_{sanitized_path}_{uuid.uuid4().hex[:4]}"
 
                 # Create document
                 doc = Document(
@@ -444,8 +457,23 @@ class RAGIngestTool(BaseTool):
     def _detect_doc_type(self, extension: str) -> str:
         """Detect document type from file extension."""
         code_extensions = {
-            ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
-            ".rs", ".go", ".rb", ".php", ".swift", ".kt", ".scala", ".sh",
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".java",
+            ".cpp",
+            ".c",
+            ".h",
+            ".rs",
+            ".go",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".sh",
         }
         markdown_extensions = {".md", ".markdown", ".rst"}
 
@@ -474,6 +502,5 @@ class RAGIngestTool(BaseTool):
 
         except ImportError:
             raise ImportError(
-                "pypdf is required for PDF ingestion. "
-                "Install with: pip install pypdf"
+                "pypdf is required for PDF ingestion. " "Install with: pip install pypdf"
             )

@@ -175,7 +175,11 @@ async def populated_backend(mock_backend):
     )
     await mock_backend.save_checkpoint(
         session_id,
-        {"stage": "ANALYZING", "tool_history": ["read", "search", "analyze", "grep"], "message_count": 4},
+        {
+            "stage": "ANALYZING",
+            "tool_history": ["read", "search", "analyze", "grep"],
+            "message_count": 4,
+        },
         cp2,
     )
     checkpoints.append(cp2)
@@ -191,7 +195,11 @@ async def populated_backend(mock_backend):
     )
     await mock_backend.save_checkpoint(
         session_id,
-        {"stage": "EXECUTING", "tool_history": ["read", "search", "analyze", "grep", "write", "edit"], "message_count": 6},
+        {
+            "stage": "EXECUTING",
+            "tool_history": ["read", "search", "analyze", "grep", "write", "edit"],
+            "message_count": 6,
+        },
         cp3,
     )
     checkpoints.append(cp3)
@@ -207,7 +215,11 @@ async def populated_backend(mock_backend):
     )
     await mock_backend.save_checkpoint(
         session_id,
-        {"stage": "EXECUTING", "tool_history": ["read", "search", "analyze", "grep", "refactor"], "message_count": 5},
+        {
+            "stage": "EXECUTING",
+            "tool_history": ["read", "search", "analyze", "grep", "refactor"],
+            "message_count": 5,
+        },
         cp4,
     )
     checkpoints.append(cp4)
@@ -477,6 +489,7 @@ class TestBranchManager:
         await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
         from victor.checkpoints.tree import CheckpointError
+
         with pytest.raises(CheckpointError, match="already exists"):
             await branch_manager.create_branch("feature", session_id, checkpoints[1].checkpoint_id)
 
@@ -535,6 +548,7 @@ class TestBranchManager:
 
         # Can't delete unmerged branch without force
         from victor.checkpoints.tree import CheckpointError
+
         with pytest.raises(CheckpointError, match="not been merged"):
             await branch_manager.delete_branch("feature", session_id)
 

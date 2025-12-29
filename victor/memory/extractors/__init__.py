@@ -41,6 +41,7 @@ try:
         TreeSitterEntityExtractor,
         TreeSitterFileExtractor,
     )
+
     _HAS_TREE_SITTER = True
 except ImportError:
     TreeSitterEntityExtractor = None  # type: ignore

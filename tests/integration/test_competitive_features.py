@@ -459,6 +459,7 @@ class TestHITLFeatures:
         class SlowHandler:
             async def request_human_input(self, request):
                 import asyncio
+
                 await asyncio.sleep(1.0)  # Longer than timeout
                 # This should never be reached due to timeout
 
@@ -470,6 +471,7 @@ class TestHITLFeatures:
 
         # Then the response should reflect timeout with continue behavior
         from victor.workflows.hitl import HITLStatus
+
         assert response.status == HITLStatus.TIMEOUT
         assert response.approved is True  # CONTINUE fallback approves
         assert response.value == "auto-continued"

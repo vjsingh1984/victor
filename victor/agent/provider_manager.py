@@ -467,7 +467,7 @@ class ProviderManager:
                 quality_score=0.5,  # Will be updated by outcome
                 metadata={
                     "old_model": old_model,
-                    "reason": reason.value if hasattr(reason, 'value') else str(reason),
+                    "reason": reason.value if hasattr(reason, "value") else str(reason),
                 },
             )
 

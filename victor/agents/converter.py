@@ -238,7 +238,9 @@ class EnsembleConverter:
                 role=self._get_role_for_agent(worker),
                 goal=worker.system_prompt or worker.description,
                 tool_budget=worker.constraints.max_tool_calls or self.default_tool_budget,
-                allowed_tools=list(worker.capabilities.tools) if worker.capabilities.tools else None,
+                allowed_tools=(
+                    list(worker.capabilities.tools) if worker.capabilities.tools else None
+                ),
                 input_mapping={"task": "manager_plan"},
                 output_key=f"{worker.name}_output",
                 next_nodes=[],

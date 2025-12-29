@@ -217,14 +217,26 @@ DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
     },
     "terraform_workflow": {
         "description": "Terraform init/plan/apply workflow",
-        "sequence": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.SHELL, ToolNames.GIT],
+        "sequence": [
+            ToolNames.READ,
+            ToolNames.SHELL,
+            ToolNames.SHELL,
+            ToolNames.SHELL,
+            ToolNames.GIT,
+        ],
         "inputs": {"terraform_dir", "environment"},
         "outputs": {"apply_output", "state_changes"},
         "weight": 0.8,
     },
     "monitoring_stack": {
         "description": "Set up monitoring with Prometheus/Grafana",
-        "sequence": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.SHELL],
+        "sequence": [
+            ToolNames.READ,
+            ToolNames.WRITE,
+            ToolNames.EDIT,
+            ToolNames.SHELL,
+            ToolNames.SHELL,
+        ],
         "inputs": {"services", "metrics_port"},
         "outputs": {"prometheus_config", "grafana_dashboard"},
         "weight": 0.8,

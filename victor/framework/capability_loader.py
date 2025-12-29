@@ -307,9 +307,7 @@ class CapabilityLoader(DynamicModuleLoader):
                         if name:
                             loaded_names.append(name)
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to instantiate capability class {attr_name}: {e}"
-                        )
+                        logger.warning(f"Failed to instantiate capability class {attr_name}: {e}")
 
             logger.info(
                 f"Loaded {len(loaded_names)} capabilities from '{module_name}': "
@@ -778,9 +776,7 @@ class CapabilityLoader(DynamicModuleLoader):
         """
         return name in self._capabilities
 
-    def get_capabilities_by_type(
-        self, capability_type: CapabilityType
-    ) -> List[CapabilityEntry]:
+    def get_capabilities_by_type(self, capability_type: CapabilityType) -> List[CapabilityEntry]:
         """Get all capabilities of a specific type.
 
         Args:
@@ -951,6 +947,7 @@ class CapabilityLoader(DynamicModuleLoader):
         Returns:
             True if watching started successfully
         """
+
         # Use base class file watcher with a callback wrapper
         def on_file_change(file_path: str, event_type: str) -> None:
             if callback:

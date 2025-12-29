@@ -72,87 +72,87 @@ class Tables:
     # ===========================================
 
     # Core RL tables (consolidated)
-    RL_LEARNER = "rl_learner"           # Learner registry/configuration
-    RL_OUTCOME = "rl_outcome"           # All learner outcomes (central fact table)
-    RL_METRIC = "rl_metric"             # Telemetry and monitoring
-    RL_Q_VALUE = "rl_q_value"           # Unified Q-values (partitioned by learner_id)
-    RL_TRANSITION = "rl_transition"     # Unified state transitions (partitioned by learner_id)
-    RL_PARAM = "rl_param"               # Unified parameters (partitioned by learner_id)
-    RL_TASK_STAT = "rl_task_stat"       # Unified task statistics (partitioned by learner_id)
+    RL_LEARNER = "rl_learner"  # Learner registry/configuration
+    RL_OUTCOME = "rl_outcome"  # All learner outcomes (central fact table)
+    RL_METRIC = "rl_metric"  # Telemetry and monitoring
+    RL_Q_VALUE = "rl_q_value"  # Unified Q-values (partitioned by learner_id)
+    RL_TRANSITION = "rl_transition"  # Unified state transitions (partitioned by learner_id)
+    RL_PARAM = "rl_param"  # Unified parameters (partitioned by learner_id)
+    RL_TASK_STAT = "rl_task_stat"  # Unified task statistics (partitioned by learner_id)
 
     # Mode transition learner
-    RL_MODE_Q = "rl_mode_q"             # Mode transition Q-values
-    RL_MODE_HISTORY = "rl_mode_history" # Mode transition history
-    RL_MODE_TASK = "rl_mode_task"       # Mode task statistics
+    RL_MODE_Q = "rl_mode_q"  # Mode transition Q-values
+    RL_MODE_HISTORY = "rl_mode_history"  # Mode transition history
+    RL_MODE_TASK = "rl_mode_task"  # Mode task statistics
 
     # Model selector learner
-    RL_MODEL_Q = "rl_model_q"           # Model selector Q-values
-    RL_MODEL_TASK = "rl_model_task"     # Model task Q-values
-    RL_MODEL_STATE = "rl_model_state"   # Model selector state
+    RL_MODEL_Q = "rl_model_q"  # Model selector Q-values
+    RL_MODEL_TASK = "rl_model_task"  # Model task Q-values
+    RL_MODEL_STATE = "rl_model_state"  # Model selector state
 
     # Tool selector learner
-    RL_TOOL_Q = "rl_tool_q"             # Tool selector Q-values
-    RL_TOOL_TASK = "rl_tool_task"       # Tool task Q-values
-    RL_TOOL_OUTCOME = "rl_tool_outcome" # Tool outcomes
+    RL_TOOL_Q = "rl_tool_q"  # Tool selector Q-values
+    RL_TOOL_TASK = "rl_tool_task"  # Tool task Q-values
+    RL_TOOL_OUTCOME = "rl_tool_outcome"  # Tool outcomes
 
     # Cache eviction learner
-    RL_CACHE_Q = "rl_cache_q"           # Cache eviction Q-values
-    RL_CACHE_TOOL = "rl_cache_tool"     # Cache tool values
-    RL_CACHE_HISTORY = "rl_cache_history" # Cache eviction history
+    RL_CACHE_Q = "rl_cache_q"  # Cache eviction Q-values
+    RL_CACHE_TOOL = "rl_cache_tool"  # Cache tool values
+    RL_CACHE_HISTORY = "rl_cache_history"  # Cache eviction history
 
     # Grounding threshold learner
-    RL_GROUNDING_PARAM = "rl_grounding_param"     # Grounding parameters
-    RL_GROUNDING_STAT = "rl_grounding_stat"       # Grounding statistics
-    RL_GROUNDING_HISTORY = "rl_grounding_history" # Grounding history
+    RL_GROUNDING_PARAM = "rl_grounding_param"  # Grounding parameters
+    RL_GROUNDING_STAT = "rl_grounding_stat"  # Grounding statistics
+    RL_GROUNDING_HISTORY = "rl_grounding_history"  # Grounding history
 
     # Other learner stats
-    RL_SEMANTIC_STAT = "rl_semantic_stat"   # Semantic threshold stats
-    RL_PATIENCE_STAT = "rl_patience_stat"   # Continuation patience stats
-    RL_PROMPT_STAT = "rl_prompt_stat"       # Continuation prompt stats
-    RL_QUALITY_WEIGHT = "rl_quality_weight" # Quality weights
-    RL_QUALITY_HISTORY = "rl_quality_history" # Quality weight history
+    RL_SEMANTIC_STAT = "rl_semantic_stat"  # Semantic threshold stats
+    RL_PATIENCE_STAT = "rl_patience_stat"  # Continuation patience stats
+    RL_PROMPT_STAT = "rl_prompt_stat"  # Continuation prompt stats
+    RL_QUALITY_WEIGHT = "rl_quality_weight"  # Quality weights
+    RL_QUALITY_HISTORY = "rl_quality_history"  # Quality weight history
 
     # Cross-vertical learning
-    RL_PATTERN = "rl_pattern"           # Cross-vertical patterns
-    RL_PATTERN_USE = "rl_pattern_use"   # Pattern application tracking
+    RL_PATTERN = "rl_pattern"  # Cross-vertical patterns
+    RL_PATTERN_USE = "rl_pattern_use"  # Pattern application tracking
 
     # ===========================================
     # AGENT DOMAIN (agent_)
     # ===========================================
 
     # Team execution
-    AGENT_TEAM_CONFIG = "agent_team_config"   # Team composition Q-values
-    AGENT_TEAM_RUN = "agent_team_run"         # Team execution records
+    AGENT_TEAM_CONFIG = "agent_team_config"  # Team composition Q-values
+    AGENT_TEAM_RUN = "agent_team_run"  # Team execution records
 
     # Workflow execution
-    AGENT_WORKFLOW_RUN = "agent_workflow_run" # Workflow execution records
-    AGENT_WORKFLOW_Q = "agent_workflow_q"     # Workflow Q-values
+    AGENT_WORKFLOW_RUN = "agent_workflow_run"  # Workflow execution records
+    AGENT_WORKFLOW_Q = "agent_workflow_q"  # Workflow Q-values
 
     # Prompt templates
-    AGENT_PROMPT_STYLE = "agent_prompt_style"     # Prompt style definitions
-    AGENT_PROMPT_ELEMENT = "agent_prompt_element" # Prompt components
-    AGENT_PROMPT_HISTORY = "agent_prompt_history" # Prompt history
+    AGENT_PROMPT_STYLE = "agent_prompt_style"  # Prompt style definitions
+    AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
+    AGENT_PROMPT_HISTORY = "agent_prompt_history"  # Prompt history
 
     # Curriculum & Policy
-    AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"     # Learning curriculum
-    AGENT_CURRICULUM_METRIC = "agent_curriculum_metric"   # Curriculum performance
-    AGENT_CURRICULUM_HISTORY = "agent_curriculum_history" # Curriculum history
-    AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot"       # Policy state snapshots
+    AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"  # Learning curriculum
+    AGENT_CURRICULUM_METRIC = "agent_curriculum_metric"  # Curriculum performance
+    AGENT_CURRICULUM_HISTORY = "agent_curriculum_history"  # Curriculum history
+    AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot"  # Policy state snapshots
 
     # ===========================================
     # GRAPH DOMAIN (graph_) - Project-level tables
     # ===========================================
 
     # Core graph tables (stored in project.db)
-    GRAPH_NODE = "graph_node"           # Symbol nodes (functions, classes, etc.)
-    GRAPH_EDGE = "graph_edge"           # References, calls, imports between nodes
+    GRAPH_NODE = "graph_node"  # Symbol nodes (functions, classes, etc.)
+    GRAPH_EDGE = "graph_edge"  # References, calls, imports between nodes
     GRAPH_FILE_MTIME = "graph_file_mtime"  # File modification times for staleness
 
     # ===========================================
     # UI DOMAIN (ui_)
     # ===========================================
-    UI_SESSION = "ui_session"           # TUI session persistence
-    UI_FAILED_CALL = "ui_failed_call"   # Failed tool call signatures
+    UI_SESSION = "ui_session"  # TUI session persistence
+    UI_FAILED_CALL = "ui_failed_call"  # Failed tool call signatures
 
     # ===========================================
     # LEGACY TABLE MAPPINGS (for migration)
@@ -170,18 +170,15 @@ class Tables:
             # System
             "_db_metadata": cls.SYS_METADATA,
             "schema_version": cls.SYS_SCHEMA_VERSION,
-
             # RL Core
             "rl_outcomes": cls.RL_OUTCOME,
             "rl_telemetry": cls.RL_METRIC,
-
             # RL Q-Values (consolidated into rl_q_value)
             "mode_transition_q_values": cls.RL_Q_VALUE,
             "model_selector_q_values": cls.RL_Q_VALUE,
             "tool_selector_q_values": cls.RL_Q_VALUE,
             "cache_eviction_q_values": cls.RL_Q_VALUE,
             "workflow_q_values": cls.RL_Q_VALUE,
-
             # RL History (consolidated into rl_transition)
             "mode_transition_history": cls.RL_TRANSITION,
             "grounding_threshold_history": cls.RL_TRANSITION,
@@ -189,7 +186,6 @@ class Tables:
             "prompt_template_history": cls.RL_TRANSITION,
             "cache_eviction_history": cls.RL_TRANSITION,
             "curriculum_history": cls.RL_TRANSITION,
-
             # RL Params (consolidated into rl_param)
             "continuation_patience_stats": cls.RL_PARAM,
             "continuation_prompts_stats": cls.RL_PARAM,
@@ -198,38 +194,30 @@ class Tables:
             "grounding_threshold_stats": cls.RL_PARAM,
             "quality_weights": cls.RL_PARAM,
             "model_selector_state": cls.RL_PARAM,
-
             # RL Task Stats (consolidated into rl_task_stat)
             "mode_transition_task_stats": cls.RL_TASK_STAT,
             "model_selector_task_q_values": cls.RL_TASK_STAT,
             "tool_selector_task_q_values": cls.RL_TASK_STAT,
             "cache_eviction_tool_values": cls.RL_TASK_STAT,
             "tool_selector_outcomes": cls.RL_TASK_STAT,
-
             # RL Patterns
             "cross_vertical_patterns": cls.RL_PATTERN,
             "cross_vertical_applications": cls.RL_PATTERN_USE,
-
             # Agent - Teams
             "team_composition_stats": cls.AGENT_TEAM_CONFIG,
             "team_execution_history": cls.AGENT_TEAM_RUN,
-
             # Agent - Workflows
             "workflow_executions": cls.AGENT_WORKFLOW_RUN,
-
             # Agent - Prompts
             "prompt_template_styles": cls.AGENT_PROMPT_STYLE,
             "prompt_template_elements": cls.AGENT_PROMPT_ELEMENT,
-
             # Agent - Curriculum
             "curriculum_stages": cls.AGENT_CURRICULUM_STAGE,
             "curriculum_metrics": cls.AGENT_CURRICULUM_METRIC,
             "policy_checkpoints": cls.AGENT_POLICY_SNAPSHOT,
-
             # UI
             "sessions": cls.UI_SESSION,
             "failed_signatures": cls.UI_FAILED_CALL,
-
             # Graph (legacy names from sqlite_store.py)
             "nodes": cls.GRAPH_NODE,
             "edges": cls.GRAPH_EDGE,
@@ -243,6 +231,7 @@ class LearnerID:
     When using consolidated tables like rl_q_value, use these IDs
     to partition data by learner.
     """
+
     MODE_TRANSITION = "mode_transition"
     MODEL_SELECTOR = "model_selector"
     TOOL_SELECTOR = "tool_selector"
@@ -722,7 +711,6 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
         2: [
             # Rename system tables
             f"ALTER TABLE _db_metadata RENAME TO {Tables.SYS_METADATA}",
-
             # Create new RL tables
             Schema.RL_LEARNER,
             Schema.RL_Q_VALUE,
@@ -730,12 +718,10 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             Schema.RL_PARAM,
             Schema.RL_TASK_STAT,
             Schema.RL_METRIC,
-
             # Rename existing tables
             f"ALTER TABLE rl_outcomes RENAME TO {Tables.RL_OUTCOME}",
             f"ALTER TABLE cross_vertical_patterns RENAME TO {Tables.RL_PATTERN}",
             f"ALTER TABLE cross_vertical_applications RENAME TO {Tables.RL_PATTERN_USE}",
-
             # Rename agent tables
             f"ALTER TABLE team_composition_stats RENAME TO {Tables.AGENT_TEAM_CONFIG}",
             f"ALTER TABLE team_execution_history RENAME TO {Tables.AGENT_TEAM_RUN}",
@@ -745,7 +731,6 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             f"ALTER TABLE curriculum_stages RENAME TO {Tables.AGENT_CURRICULUM_STAGE}",
             f"ALTER TABLE curriculum_metrics RENAME TO {Tables.AGENT_CURRICULUM_METRIC}",
             f"ALTER TABLE policy_checkpoints RENAME TO {Tables.AGENT_POLICY_SNAPSHOT}",
-
             # Rename UI tables
             f"ALTER TABLE sessions RENAME TO {Tables.UI_SESSION}",
             f"ALTER TABLE failed_signatures RENAME TO {Tables.UI_FAILED_CALL}",

@@ -150,9 +150,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         sanitized = {k: self._sanitize_value(k, v) for k, v in arguments.items()}
         return f" args={sanitized}"
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Log tool call before execution.
 
         Args:
@@ -298,16 +296,12 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
             elif isinstance(value, dict):
                 result[key] = self._mask_dict_values(value)
             elif isinstance(value, list):
-                result[key] = [
-                    self._mask_content(v) if isinstance(v, str) else v for v in value
-                ]
+                result[key] = [self._mask_content(v) if isinstance(v, str) else v for v in value]
             else:
                 result[key] = value
         return result
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Optionally mask secrets in input arguments.
 
         Args:
@@ -482,9 +476,7 @@ class MetricsMiddleware(MiddlewareProtocol):
             self._metrics[tool_name] = ToolMetrics(tool_name=tool_name)
         return self._metrics[tool_name]
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Record call start time.
 
         Args:
@@ -696,9 +688,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         self._block_dangerous = block_dangerous
         self._warn_on_risky = warn_on_risky
-        self._protected_branches = (
-            self.PROTECTED_BRANCHES | (protected_branches or set())
-        )
+        self._protected_branches = self.PROTECTED_BRANCHES | (protected_branches or set())
         self._allowed_force_branches = allowed_force_branches or set()
         self._blocked = self.BLOCKED_OPERATIONS | (custom_blocked or set())
         self._warned = self.WARNED_OPERATIONS | (custom_warned or set())
@@ -714,9 +704,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         for branch in self._protected_branches:
             # Check for patterns like "push origin main --force"
-            if branch in command and any(
-                force in command for force in ["--force", "-f"]
-            ):
+            if branch in command and any(force in command for force in ["--force", "-f"]):
                 return branch
         return None
 
@@ -739,9 +727,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
                     return True
         return False
 
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Check git operations for safety.
 
         Args:

@@ -89,9 +89,29 @@ def _extract_symbols_from_prompt(prompt: str) -> List[str]:
 
     # Remove common words and duplicates
     common_words = {
-        "the", "and", "for", "with", "this", "that", "from", "have",
-        "are", "was", "were", "been", "being", "has", "had", "can",
-        "could", "will", "would", "should", "may", "might", "must",
+        "the",
+        "and",
+        "for",
+        "with",
+        "this",
+        "that",
+        "from",
+        "have",
+        "are",
+        "was",
+        "were",
+        "been",
+        "being",
+        "has",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "should",
+        "may",
+        "might",
+        "must",
     }
     symbols = [s for s in symbols if s.lower() not in common_words]
 
@@ -202,26 +222,20 @@ class CodingEnrichmentStrategy:
         try:
             # 1. Get symbols mentioned in the context
             if context.symbol_mentions:
-                symbol_enrichment = await self._enrich_from_symbols(
-                    context.symbol_mentions
-                )
+                symbol_enrichment = await self._enrich_from_symbols(context.symbol_mentions)
                 if symbol_enrichment:
                     enrichments.append(symbol_enrichment)
 
             # 2. Get context from mentioned files
             if context.file_mentions:
-                file_enrichment = await self._enrich_from_files(
-                    context.file_mentions
-                )
+                file_enrichment = await self._enrich_from_files(context.file_mentions)
                 if file_enrichment:
                     enrichments.append(file_enrichment)
 
             # 3. Extract and search for symbols in the prompt
             prompt_symbols = _extract_symbols_from_prompt(prompt)
             if prompt_symbols:
-                search_enrichment = await self._enrich_from_search(
-                    prompt_symbols
-                )
+                search_enrichment = await self._enrich_from_search(prompt_symbols)
                 if search_enrichment:
                     enrichments.append(search_enrichment)
 
@@ -257,7 +271,7 @@ class CodingEnrichmentStrategy:
             try:
                 nodes = await self._graph_store.find_nodes(name=symbol)
                 if nodes:
-                    found_symbols.extend(nodes[: 2])  # Max 2 matches per symbol
+                    found_symbols.extend(nodes[:2])  # Max 2 matches per symbol
             except Exception as e:
                 logger.debug("Error searching for symbol %s: %s", symbol, e)
 
@@ -308,7 +322,7 @@ class CodingEnrichmentStrategy:
                             n.line or 0,
                         )
                     )
-                    all_nodes.extend(nodes[: 3])  # Max 3 per file
+                    all_nodes.extend(nodes[:3])  # Max 3 per file
             except Exception as e:
                 logger.debug("Error getting symbols for file %s: %s", file_path, e)
 
@@ -354,7 +368,7 @@ class CodingEnrichmentStrategy:
             return None
 
         # Create search query from symbols
-        query = " ".join(symbols[: 5])  # Use first 5 symbols
+        query = " ".join(symbols[:5])  # Use first 5 symbols
 
         try:
             results = await self._graph_store.search_symbols(

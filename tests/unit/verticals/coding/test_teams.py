@@ -190,9 +190,7 @@ class TestTeamMemberSpecs:
 
         for name, spec in CODING_TEAM_SPECS.items():
             for member in spec.members:
-                assert member.role in valid_roles, (
-                    f"Invalid role '{member.role}' in {name}"
-                )
+                assert member.role in valid_roles, f"Invalid role '{member.role}' in {name}"
 
     def test_member_budgets_reasonable(self):
         """Test member tool budgets are reasonable."""
@@ -207,6 +205,4 @@ class TestTeamMemberSpecs:
         for name, spec in CODING_TEAM_SPECS.items():
             names = [m.name for m in spec.members if m.name]
             # Names that are set should be unique
-            assert len(names) == len(set(names)), (
-                f"Duplicate names in {name}"
-            )
+            assert len(names) == len(set(names)), f"Duplicate names in {name}"

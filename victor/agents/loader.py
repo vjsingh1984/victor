@@ -160,10 +160,7 @@ def load_agents_from_dict(
         config.ensemble = _build_ensemble(ensemble_data, config.agents)
 
     # Store metadata
-    config.metadata = {
-        k: v for k, v in data.items()
-        if k not in ("agents", "ensemble")
-    }
+    config.metadata = {k: v for k, v in data.items() if k not in ("agents", "ensemble")}
 
     return config
 

@@ -286,9 +286,7 @@ class CompositionStats:
         Returns:
             Key like "sequential:researcher=2,executor=1"
         """
-        role_str = ",".join(
-            f"{role}={count}" for role, count in sorted(self.role_counts.items())
-        )
+        role_str = ",".join(f"{role}={count}" for role, count in sorted(self.role_counts.items()))
         return f"{self.formation.value}:{role_str}"
 
     def update(self, metrics: TeamMetrics) -> None:

@@ -73,12 +73,12 @@ class RAGAssistant(VerticalBase):
         """
         return [
             # RAG-specific tools
-            "rag_ingest",      # Ingest documents into the store
-            "rag_search",      # Search for relevant chunks
-            "rag_query",       # Query with context retrieval
-            "rag_list",        # List indexed documents
-            "rag_delete",      # Delete documents
-            "rag_stats",       # Get store statistics
+            "rag_ingest",  # Ingest documents into the store
+            "rag_search",  # Search for relevant chunks
+            "rag_query",  # Query with context retrieval
+            "rag_list",  # List indexed documents
+            "rag_delete",  # Delete documents
+            "rag_stats",  # Get store statistics
             # Filesystem for document access
             "read",
             "ls",

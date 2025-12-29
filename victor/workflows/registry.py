@@ -363,9 +363,7 @@ class WorkflowRegistry:
             try:
                 # This is a simplified loader - in production you'd want
                 # proper module path resolution
-                spec = importlib.util.spec_from_file_location(
-                    module_name, py_file
-                )
+                spec = importlib.util.spec_from_file_location(module_name, py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
@@ -383,15 +381,9 @@ class WorkflowRegistry:
             Dictionary representation
         """
         return {
-            "workflows": {
-                name: workflow.to_dict()
-                for name, workflow in self._definitions.items()
-            },
+            "workflows": {name: workflow.to_dict() for name, workflow in self._definitions.items()},
             "factories": list(self._factories.keys()),
-            "metadata": {
-                name: meta.to_dict()
-                for name, meta in self._metadata.items()
-            },
+            "metadata": {name: meta.to_dict() for name, meta in self._metadata.items()},
         }
 
 

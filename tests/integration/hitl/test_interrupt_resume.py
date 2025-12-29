@@ -166,13 +166,7 @@ class TestResumeFromCheckpointWithContextRestoration:
         complex_context = {
             "strings": ["a", "b", "c"],
             "numbers": [1, 2.5, 3],
-            "nested": {
-                "level1": {
-                    "level2": {
-                        "value": "deep"
-                    }
-                }
-            },
+            "nested": {"level1": {"level2": {"value": "deep"}}},
             "boolean": True,
             "null_value": None,
         }
@@ -242,11 +236,13 @@ class TestMultipleInterruptPointsInWorkflow:
         result_1 = await step_1()
 
         # First interrupt after analysis
-        cp1 = controller.interrupt(context={
-            "current_step": "after_analysis",
-            "results": result_1,
-            "log": workflow_log.copy(),
-        })
+        cp1 = controller.interrupt(
+            context={
+                "current_step": "after_analysis",
+                "results": result_1,
+                "log": workflow_log.copy(),
+            }
+        )
 
         # Simulate human review and resume
         assert controller.is_paused is True
@@ -257,11 +253,13 @@ class TestMultipleInterruptPointsInWorkflow:
         result_2 = await step_2(context_1["results"])
 
         # Second interrupt after issue identification
-        cp2 = controller.interrupt(context={
-            "current_step": "after_identification",
-            "results": result_2,
-            "log": workflow_log.copy(),
-        })
+        cp2 = controller.interrupt(
+            context={
+                "current_step": "after_identification",
+                "results": result_2,
+                "log": workflow_log.copy(),
+            }
+        )
 
         # Resume and complete
         context_2 = controller.resume(cp2)
@@ -279,16 +277,20 @@ class TestMultipleInterruptPointsInWorkflow:
         controller = HITLController()
 
         # Simulate parallel workflow branches
-        branch_a_cp = controller.interrupt(context={
-            "branch": "A",
-            "data": ["a1", "a2"],
-        })
+        branch_a_cp = controller.interrupt(
+            context={
+                "branch": "A",
+                "data": ["a1", "a2"],
+            }
+        )
         controller.resume(branch_a_cp)
 
-        branch_b_cp = controller.interrupt(context={
-            "branch": "B",
-            "data": ["b1", "b2", "b3"],
-        })
+        branch_b_cp = controller.interrupt(
+            context={
+                "branch": "B",
+                "data": ["b1", "b2", "b3"],
+            }
+        )
         controller.resume(branch_b_cp)
 
         # Verify each checkpoint preserved its state
@@ -403,13 +405,7 @@ class TestCheckpointPersistenceAndRetrieval:
         large_context = {
             "large_list": list(range(1000)),
             "large_dict": {f"key_{i}": f"value_{i}" for i in range(500)},
-            "nested_data": {
-                "level_1": {
-                    "level_2": {
-                        "items": ["item"] * 100
-                    }
-                }
-            },
+            "nested_data": {"level_1": {"level_2": {"items": ["item"] * 100}}},
             "long_string": "x" * 10000,
         }
 
@@ -436,10 +432,12 @@ class TestPauseResumeCallbacks:
         pause_events = []
 
         def on_pause(checkpoint_id: str, context: Dict[str, Any]):
-            pause_events.append({
-                "checkpoint_id": checkpoint_id,
-                "context": context.copy(),
-            })
+            pause_events.append(
+                {
+                    "checkpoint_id": checkpoint_id,
+                    "context": context.copy(),
+                }
+            )
 
         controller = HITLController()
         controller.on_pause(on_pause)
@@ -523,10 +521,12 @@ class TestInterruptResumeWithApprovalRequests:
         )
 
         # Interrupt with reference to pending approval
-        checkpoint_id = controller.interrupt(context={
-            "pending_approval_id": approval_req.id,
-            "workflow_stage": "awaiting_deployment_approval",
-        })
+        checkpoint_id = controller.interrupt(
+            context={
+                "pending_approval_id": approval_req.id,
+                "workflow_stage": "awaiting_deployment_approval",
+            }
+        )
 
         # Resume and check pending approval
         context = controller.resume(checkpoint_id)
@@ -551,10 +551,12 @@ class TestInterruptResumeWithApprovalRequests:
             title="Continue workflow?",
             description="Approve to continue",
         )
-        cp = controller.interrupt(context={
-            "at_step": 1,
-            "approval_id": approval.id,
-        })
+        cp = controller.interrupt(
+            context={
+                "at_step": 1,
+                "approval_id": approval.id,
+            }
+        )
 
         workflow_events.append("interrupted_for_approval")
 

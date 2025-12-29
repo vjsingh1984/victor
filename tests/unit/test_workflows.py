@@ -363,11 +363,7 @@ class TestWorkflowDecorator:
 
         @workflow("test_decorated", "A test workflow")
         def test_workflow():
-            return (
-                WorkflowBuilder("test_decorated")
-                .add_agent("a", "executor", "A")
-                .build()
-            )
+            return WorkflowBuilder("test_decorated").add_agent("a", "executor", "A").build()
 
         # Should be in registered workflows
         registered = get_registered_workflows()
@@ -612,28 +608,18 @@ class TestWorkflowContext:
     def test_has_failures(self):
         """has_failures detects failures."""
         ctx = WorkflowContext()
-        ctx.add_result(
-            NodeResult(node_id="a", status=NodeStatus.COMPLETED)
-        )
+        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED))
         assert ctx.has_failures() is False
 
-        ctx.add_result(
-            NodeResult(node_id="b", status=NodeStatus.FAILED)
-        )
+        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
         assert ctx.has_failures() is True
 
     def test_get_outputs(self):
         """get_outputs returns successful outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(
-            NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="A output")
-        )
-        ctx.add_result(
-            NodeResult(node_id="b", status=NodeStatus.FAILED)
-        )
-        ctx.add_result(
-            NodeResult(node_id="c", status=NodeStatus.COMPLETED, output="C output")
-        )
+        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="A output"))
+        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
+        ctx.add_result(NodeResult(node_id="c", status=NodeStatus.COMPLETED, output="C output"))
 
         outputs = ctx.get_outputs()
         assert outputs == {"a": "A output", "c": "C output"}
@@ -645,9 +631,7 @@ class TestWorkflowResult:
     def test_success_result(self):
         """Create successful result."""
         ctx = WorkflowContext()
-        ctx.add_result(
-            NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Done")
-        )
+        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Done"))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -704,9 +688,7 @@ class TestWorkflowExecutor:
         executor._sub_agents = mock_sub_agents
 
         workflow = (
-            WorkflowBuilder("test")
-            .add_agent("analyze", "researcher", "Analyze code")
-            .build()
+            WorkflowBuilder("test").add_agent("analyze", "researcher", "Analyze code").build()
         )
 
         result = await executor.execute(workflow, {"files": ["main.py"]})
@@ -730,11 +712,7 @@ class TestWorkflowExecutor:
         mock_sub_agents.spawn = slow_spawn
         executor._sub_agents = mock_sub_agents
 
-        workflow = (
-            WorkflowBuilder("test")
-            .add_agent("slow", "executor", "Slow task")
-            .build()
-        )
+        workflow = WorkflowBuilder("test").add_agent("slow", "executor", "Slow task").build()
 
         result = await executor.execute(workflow, timeout=0.1)
 
@@ -890,7 +868,9 @@ class TestWorkflowExecutorExtended:
         assert result.success is False
 
     @pytest.mark.asyncio
-    async def test_execute_agent_node_with_all_roles(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_agent_node_with_all_roles(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute agent node maps all role types correctly."""
         from victor.agent.subagents import SubAgentRole
 
@@ -923,10 +903,14 @@ class TestWorkflowExecutorExtended:
             await executor.execute(workflow)
 
             call_kwargs = mock_sub_agents.spawn.call_args[1]
-            assert call_kwargs["role"] == expected_role, f"Role {role} should map to {expected_role}"
+            assert (
+                call_kwargs["role"] == expected_role
+            ), f"Role {role} should map to {expected_role}"
 
     @pytest.mark.asyncio
-    async def test_execute_agent_node_with_output_key(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_agent_node_with_output_key(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute agent node stores output in context with output_key."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1065,7 +1049,9 @@ class TestWorkflowExecutorExtended:
         assert "Transform failed" in transform_result.error
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_node_all_strategy(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_parallel_node_all_strategy(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute parallel node with 'all' join strategy returns SKIPPED without workflow in context."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1214,7 +1200,9 @@ class TestWorkflowExecutorExtended:
             assert "not found" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_build_agent_task_with_input_mapping(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_build_agent_task_with_input_mapping(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """_build_agent_task includes input mapping in task."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1234,10 +1222,13 @@ class TestWorkflowExecutorExtended:
             start_node="start",
         )
 
-        await executor.execute(workflow, {
-            "target_files": ["main.py", "utils.py"],
-            "analysis_mode": "full",
-        })
+        await executor.execute(
+            workflow,
+            {
+                "target_files": ["main.py", "utils.py"],
+                "analysis_mode": "full",
+            },
+        )
 
         # Check that task contains input mapping
         call_kwargs = mock_sub_agents.spawn.call_args[1]
@@ -1248,7 +1239,9 @@ class TestWorkflowExecutorExtended:
         assert "mode" in task
 
     @pytest.mark.asyncio
-    async def test_build_agent_task_with_previous_outputs(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_build_agent_task_with_previous_outputs(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """_build_agent_task includes previous node outputs."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1464,9 +1457,7 @@ class TestWorkflowResultExtended:
     def test_to_dict_includes_outputs(self):
         """to_dict includes node outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(
-            NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Output A")
-        )
+        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Output A"))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1499,5 +1490,6 @@ class TestModuleExports:
             WorkflowResult,
             WorkflowExecutor,
         )
+
         # If we get here without ImportError, all exports work
         assert True

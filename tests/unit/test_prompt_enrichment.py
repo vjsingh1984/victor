@@ -269,6 +269,7 @@ class TestEnrichmentCache:
 
         # Entry should be expired immediately
         import time
+
         time.sleep(0.01)  # Small delay to ensure TTL check
 
         result = cache.get("prompt", "coding", context)

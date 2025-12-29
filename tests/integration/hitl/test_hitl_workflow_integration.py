@@ -405,11 +405,7 @@ class TestContextKeyFilteringForApprovalRequests:
 
         workflow_context = {
             "config": {
-                "level1": {
-                    "level2": {
-                        "value": "deep_value"
-                    }
-                },
+                "level1": {"level2": {"value": "deep_value"}},
                 "list_data": [1, 2, 3],
             },
             "results": ["result1", "result2"],
@@ -435,6 +431,7 @@ class TestHITLCombinedWithConditionalEdges:
 
     def test_workflow_with_hitl_before_condition(self):
         """HITL node can precede conditional branching."""
+
         def router(ctx: Dict[str, Any]) -> str:
             if ctx.get("approved"):
                 return "proceed"
@@ -461,6 +458,7 @@ class TestHITLCombinedWithConditionalEdges:
 
     def test_workflow_with_condition_before_hitl(self):
         """Conditional edge can route to different HITL nodes."""
+
         def severity_router(ctx: Dict[str, Any]) -> str:
             severity = ctx.get("severity", "low")
             if severity == "high":
@@ -543,6 +541,7 @@ class TestHITLCombinedWithConditionalEdges:
 
     def test_complex_workflow_with_multiple_hitl_and_conditions(self):
         """Complex workflow with multiple HITL nodes and conditions."""
+
         def review_outcome(ctx: Dict[str, Any]) -> str:
             if ctx.get("approved"):
                 return "approved"
@@ -567,7 +566,12 @@ class TestHITLCombinedWithConditionalEdges:
                 {"approved": "prepare_deploy", "rejected": "revise"},
             )
             # Approved path
-            .add_agent("prepare_deploy", "executor", "Prepare deployment", next_nodes=["deploy_target_decision"])
+            .add_agent(
+                "prepare_deploy",
+                "executor",
+                "Prepare deployment",
+                next_nodes=["deploy_target_decision"],
+            )
             .add_condition(
                 "deploy_target_decision",
                 deploy_type,

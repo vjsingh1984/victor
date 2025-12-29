@@ -542,5 +542,6 @@ class TestModuleExports:
             get_team_learner,
             DEFAULT_COMPOSITIONS,
         )
+
         # If we get here without ImportError, all exports work
         assert True

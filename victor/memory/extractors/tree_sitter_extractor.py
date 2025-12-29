@@ -65,6 +65,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
         if self._extractor is None:
             try:
                 from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+
                 self._extractor = TreeSitterExtractor(auto_discover=self._auto_discover)
             except ImportError as e:
                 logger.warning(f"Tree-sitter not available: {e}")
@@ -120,10 +121,9 @@ class TreeSitterEntityExtractor(EntityExtractor):
             else:
                 # Write to temp file for parsing
                 import tempfile
+
                 suffix = file_path.suffix or self._get_extension_for_language(language)
-                with tempfile.NamedTemporaryFile(
-                    mode='w', suffix=suffix, delete=False
-                ) as f:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
                     f.write(content)
                     temp_path = Path(f.name)
 
@@ -241,12 +241,11 @@ class TreeSitterEntityExtractor(EntityExtractor):
 
         # Write to temp file with appropriate extension
         import tempfile
+
         suffix = self._get_extension_for_language(language)
 
         try:
-            with tempfile.NamedTemporaryFile(
-                mode='w', suffix=suffix, delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
                 f.write(content)
                 temp_path = Path(f.name)
 
@@ -404,9 +403,18 @@ class TreeSitterFileExtractor(EntityExtractor):
 
         if file_patterns is None:
             file_patterns = [
-                "*.py", "*.js", "*.ts", "*.tsx",
-                "*.java", "*.go", "*.rs", "*.rb",
-                "*.c", "*.cpp", "*.h", "*.hpp",
+                "*.py",
+                "*.js",
+                "*.ts",
+                "*.tsx",
+                "*.java",
+                "*.go",
+                "*.rs",
+                "*.rb",
+                "*.c",
+                "*.cpp",
+                "*.h",
+                "*.hpp",
             ]
 
         for pattern in file_patterns:

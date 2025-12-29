@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 class ResearchState(TypedDict, total=False):
     """Typed state for deep research workflows."""
+
     query: str
     search_terms: Optional[List[str]]
     sources: Optional[List[Dict[str, Any]]]
@@ -69,6 +70,7 @@ class ResearchState(TypedDict, total=False):
 
 class FactCheckState(TypedDict, total=False):
     """Typed state for fact-checking workflows."""
+
     claims_text: str
     parsed_claims: Optional[List[Dict[str, Any]]]
     evidence: Optional[List[Dict[str, Any]]]
@@ -80,6 +82,7 @@ class FactCheckState(TypedDict, total=False):
 
 class LiteratureState(TypedDict, total=False):
     """Typed state for literature review workflows."""
+
     research_question: str
     search_protocol: Optional[Dict[str, Any]]
     papers_found: Optional[List[Dict[str, Any]]]

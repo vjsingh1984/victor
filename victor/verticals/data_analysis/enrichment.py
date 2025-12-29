@@ -186,9 +186,7 @@ class DataAnalysisEnrichmentStrategy:
 
             # Add query patterns from tool history
             if context.tool_history:
-                history_enrichment = self._enrich_from_tool_history(
-                    context.tool_history
-                )
+                history_enrichment = self._enrich_from_tool_history(context.tool_history)
                 if history_enrichment:
                     enrichments.append(history_enrichment)
 
@@ -220,7 +218,7 @@ class DataAnalysisEnrichmentStrategy:
 
         schemas = []
 
-        for source in data_sources[: 3]:  # Max 3 sources
+        for source in data_sources[:3]:  # Max 3 sources
             try:
                 schema = await self._schema_lookup_fn(source)
                 if schema:
@@ -273,49 +271,42 @@ class DataAnalysisEnrichmentStrategy:
 - Check for outliers that may skew results
 - Consider partial correlation to control for confounders
 - Correlation matrix: df.corr() with seaborn heatmap""",
-
             "regression": """Regression Analysis Guidelines:
 - Check assumptions: linearity, normality of residuals, homoscedasticity
 - Use train/test split or cross-validation
 - Check for multicollinearity (VIF > 5 is concerning)
 - Consider regularization (Ridge/Lasso) for many features
 - Report R², RMSE, and residual plots""",
-
             "clustering": """Clustering Guidelines:
 - Scale features first (StandardScaler or MinMaxScaler)
 - Use elbow method or silhouette score to determine k
 - Consider different algorithms: K-means (spherical), DBSCAN (density), hierarchical
 - Use PCA/t-SNE for visualization of high-dimensional clusters
 - Profile clusters with descriptive statistics""",
-
             "classification": """Classification Guidelines:
 - Handle class imbalance (oversampling, undersampling, SMOTE)
 - Use stratified train/test split
 - Consider multiple metrics: accuracy, precision, recall, F1, AUC-ROC
 - Use confusion matrix for detailed error analysis
 - Cross-validation for robust evaluation""",
-
             "time_series": """Time Series Guidelines:
 - Ensure datetime index is sorted and has consistent frequency
 - Check for stationarity (ADF test)
 - Decompose into trend, seasonal, and residual components
 - Handle missing values with interpolation
 - Consider ARIMA, Prophet, or exponential smoothing""",
-
             "statistical_test": """Statistical Testing Guidelines:
 - State null and alternative hypotheses clearly
 - Check assumptions for chosen test
 - Report test statistic, p-value, and effect size
 - Use appropriate test: t-test (means), chi-square (categorical), ANOVA (multiple groups)
 - Consider multiple testing correction if many comparisons""",
-
             "visualization": """Visualization Guidelines:
 - Choose appropriate chart type for data and message
 - Use clear labels, titles, and legends
 - Consider colorblind-friendly palettes (viridis, cividis)
 - Add context with annotations where helpful
 - Save in high resolution: plt.savefig('fig.png', dpi=300)""",
-
             "profiling": """Data Profiling Guidelines:
 - Check shape and dtypes: df.info()
 - Summary statistics: df.describe()
@@ -361,10 +352,20 @@ class DataAnalysisEnrichmentStrategy:
                     content = code or query
 
                     # Filter for data analysis patterns
-                    if content and any(kw in content.lower() for kw in [
-                        "pandas", "numpy", "df.", "plt.", "seaborn",
-                        "select", "from", "where", "group by",
-                    ]):
+                    if content and any(
+                        kw in content.lower()
+                        for kw in [
+                            "pandas",
+                            "numpy",
+                            "df.",
+                            "plt.",
+                            "seaborn",
+                            "select",
+                            "from",
+                            "where",
+                            "group by",
+                        ]
+                    ):
                         successful_queries.append(content[:200])
 
         if not successful_queries:

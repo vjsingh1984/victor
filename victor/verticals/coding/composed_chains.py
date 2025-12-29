@@ -385,9 +385,7 @@ lint_chain = RunnableBranch(
     (is_python_file, lazy_tool("shell").bind(command="ruff check {path}")),
     (is_typescript_file, lazy_tool("shell").bind(command="npx tsc --noEmit {path}")),
     (is_javascript_file, lazy_tool("shell").bind(command="npx eslint {path}")),
-    default=RunnableLambda(
-        lambda ctx: {"success": True, "output": "No linter for this file type"}
-    ),
+    default=RunnableLambda(lambda ctx: {"success": True, "output": "No linter for this file type"}),
 )
 """Language-aware linting chain with conditional routing."""
 
@@ -399,8 +397,7 @@ test_discovery_chain = chain(
     RunnableLambda(
         lambda ctx: {
             "test_files": [
-                m for m in extract_search_results(ctx)
-                if "test" in m.get("path", "").lower()
+                m for m in extract_search_results(ctx) if "test" in m.get("path", "").lower()
             ],
         },
         name="filter_tests",
@@ -434,6 +431,7 @@ class ChainConfig:
         max_files: Maximum files to process in parallel
         timeout_seconds: Timeout for chain execution
     """
+
     include_git: bool = True
     include_tests: bool = True
     max_files: int = 10
@@ -510,11 +508,7 @@ def create_edit_verify_chain(
         RunnableParallel(**verification_steps),
         RunnableLambda(
             lambda ctx: {
-                "success": all(
-                    v.get("success", True)
-                    for v in ctx.values()
-                    if isinstance(v, dict)
-                ),
+                "success": all(v.get("success", True) for v in ctx.values() if isinstance(v, dict)),
                 "results": ctx,
             },
             name="aggregate_verification",
