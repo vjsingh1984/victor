@@ -31,8 +31,10 @@ from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.teams.team import TeamFormation
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
+    from victor.framework.teams import AgentTeam, TeamMemberSpec
     from victor.observability import EventBus, ObservabilityIntegration
     from victor.verticals.base import VerticalBase, VerticalConfig
 
@@ -179,15 +181,19 @@ class Agent:
         from victor.framework._internal import create_orchestrator_from_options
 
         # Extract configuration from vertical if provided
+        # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
+        # is now handled by VerticalIntegrationPipeline in create_orchestrator_from_options
         vertical_config: Optional["VerticalConfig"] = None
         system_prompt: Optional[str] = None
 
         if vertical:
             vertical_config = vertical.get_config()
             # Vertical tools override explicit tools if not provided
+            # Note: Pipeline also handles this, but we do it here for tools kwarg compat
             if tools is None:
                 tools = vertical_config.tools
-            # Get vertical's system prompt
+            # Get vertical's system prompt for backward compatibility
+            # Note: Pipeline also handles this, but explicit param takes priority
             system_prompt = vertical_config.system_prompt
             # Apply provider hints from vertical
             if vertical_config.provider_hints.get("preferred_providers"):
@@ -197,6 +203,8 @@ class Agent:
                     pass  # Keep user's choice, hints are just hints
 
         try:
+            # Create orchestrator with full vertical integration via pipeline
+            # This achieves parity with CLI (FrameworkShim) path
             orchestrator = await create_orchestrator_from_options(
                 provider=provider,
                 model=model,
@@ -211,6 +219,7 @@ class Agent:
                 system_prompt=system_prompt,
                 enable_observability=enable_observability,
                 session_id=session_id,
+                vertical=vertical,  # Pass vertical for unified pipeline integration
             )
             return cls(
                 orchestrator,
@@ -240,6 +249,114 @@ class Agent:
         provider = getattr(orchestrator.provider, "name", "unknown")
         model = getattr(orchestrator, "model", None)
         return cls(orchestrator, provider=provider, model=model)
+
+    @classmethod
+    async def create_team(
+        cls,
+        name: str,
+        goal: str,
+        members: List["TeamMemberSpec"],
+        *,
+        formation: "TeamFormation" = None,
+        provider: str = "anthropic",
+        model: Optional[str] = None,
+        total_tool_budget: int = 100,
+        max_iterations: int = 50,
+        timeout_seconds: int = 600,
+        shared_context: Optional[Dict[str, Any]] = None,
+        config: Optional[AgentConfig] = None,
+    ) -> "AgentTeam":
+        """Create a multi-agent team.
+
+        This creates a team of agents that coordinate to achieve a shared goal.
+        Teams support different formation patterns for different workflows.
+
+        Args:
+            name: Human-readable team name
+            goal: Overall team objective
+            members: List of TeamMemberSpec defining team composition
+            formation: How agents coordinate (SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE)
+            provider: LLM provider for all team members
+            model: Model identifier for all team members
+            total_tool_budget: Total tool calls across all members
+            max_iterations: Maximum total iterations
+            timeout_seconds: Maximum execution time
+            shared_context: Initial context shared with all members
+            config: Advanced configuration for the orchestrator
+
+        Returns:
+            AgentTeam ready for execution
+
+        Example - Sequential research team:
+            from victor.framework.teams import TeamMemberSpec, TeamFormation
+
+            team = await Agent.create_team(
+                name="Code Analysis",
+                goal="Analyze the authentication module",
+                members=[
+                    TeamMemberSpec(role="researcher", goal="Find auth code"),
+                    TeamMemberSpec(role="analyzer", goal="Analyze patterns"),
+                    TeamMemberSpec(role="reviewer", goal="Summarize findings"),
+                ],
+                formation=TeamFormation.SEQUENTIAL,
+            )
+            result = await team.run()
+
+        Example - Pipeline for feature implementation:
+            team = await Agent.create_team(
+                name="Feature Implementation",
+                goal="Implement user authentication",
+                members=[
+                    TeamMemberSpec(role="researcher", goal="Find auth patterns"),
+                    TeamMemberSpec(role="planner", goal="Design implementation"),
+                    TeamMemberSpec(role="executor", goal="Write the code"),
+                    TeamMemberSpec(role="reviewer", goal="Review and fix"),
+                ],
+                formation=TeamFormation.PIPELINE,
+            )
+
+            async for event in team.stream():
+                print(f"{event.type}: {event.message}")
+
+        Example - Hierarchical with manager:
+            team = await Agent.create_team(
+                name="Project Team",
+                goal="Build a REST API",
+                members=[
+                    TeamMemberSpec(role="planner", goal="Coordinate team", is_manager=True),
+                    TeamMemberSpec(role="researcher", goal="Research API patterns"),
+                    TeamMemberSpec(role="executor", goal="Implement endpoints"),
+                    TeamMemberSpec(role="reviewer", goal="Test and review"),
+                ],
+                formation=TeamFormation.HIERARCHICAL,
+            )
+        """
+        from victor.agent.teams.team import TeamFormation as TF
+        from victor.framework.teams import AgentTeam
+
+        # Default to SEQUENTIAL if not specified
+        if formation is None:
+            formation = TF.SEQUENTIAL
+
+        # Create an agent to get an orchestrator
+        agent = await cls.create(
+            provider=provider,
+            model=model,
+            config=config,
+        )
+
+        # Create team using the agent's orchestrator
+        return await AgentTeam.create(
+            orchestrator=agent.get_orchestrator(),
+            name=name,
+            goal=goal,
+            members=members,
+            formation=formation,
+            total_tool_budget=total_tool_budget,
+            max_iterations=max_iterations,
+            timeout_seconds=timeout_seconds,
+            shared_context=shared_context,
+        )
 
     # =========================================================================
     # Primary Methods
@@ -719,6 +836,195 @@ class Agent:
         """
         if self._cqrs_adapter:
             self._cqrs_adapter.forward(event)
+
+    # =========================================================================
+    # Workflow and Team Execution
+    # =========================================================================
+
+    async def run_workflow(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Run a workflow by name from the vertical's workflow provider.
+
+        This executes a multi-step workflow defined by the vertical,
+        coordinating multiple agents through a DAG of operations.
+
+        Args:
+            workflow_name: Name of the workflow to run (e.g., "feature_implementation")
+            context: Initial context data for the workflow
+            timeout: Overall timeout in seconds (None = no limit)
+
+        Returns:
+            Dict with workflow result including outputs, success status, and metrics
+
+        Raises:
+            AgentError: If no vertical is configured or workflow not found
+
+        Example:
+            # Run a feature implementation workflow
+            result = await agent.run_workflow(
+                "feature_implementation",
+                context={"feature": "Add user authentication"}
+            )
+            print(result["success"])
+            print(result["outputs"])
+
+            # Run an EDA workflow for data analysis
+            result = await agent.run_workflow(
+                "eda_workflow",
+                context={"data_file": "sales.csv"}
+            )
+        """
+        from victor.workflows.executor import WorkflowExecutor
+
+        # Check if vertical is configured
+        if not self._vertical:
+            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
+
+        # Get workflow provider from vertical
+        workflow_provider = self._vertical.get_workflow_provider()
+        if not workflow_provider:
+            raise AgentError(f"Vertical '{self._vertical.name}' does not provide workflows.")
+
+        # Get the workflow definition
+        workflow = workflow_provider.get_workflow(workflow_name)
+        if not workflow:
+            available = workflow_provider.get_workflow_names()
+            raise AgentError(
+                f"Workflow '{workflow_name}' not found. "
+                f"Available: {', '.join(available)}"
+            )
+
+        # Create executor and run workflow
+        executor = WorkflowExecutor(self._orchestrator)
+        result = await executor.execute(workflow, context, timeout=timeout)
+
+        return result.to_dict()
+
+    async def run_team(
+        self,
+        team_name: str,
+        goal: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+        timeout_seconds: int = 600,
+    ) -> Dict[str, Any]:
+        """Run a pre-configured team from the vertical's team specs.
+
+        This creates and executes a multi-agent team defined by the vertical,
+        using the team's formation pattern and member specifications.
+
+        Args:
+            team_name: Name of the team spec (e.g., "feature_team", "bug_fix_team")
+            goal: Specific goal for this team execution
+            context: Initial shared context for team members
+            timeout_seconds: Maximum execution time
+
+        Returns:
+            Dict with team result including final output and member contributions
+
+        Raises:
+            AgentError: If no vertical is configured or team not found
+
+        Example:
+            # Run a feature implementation team
+            result = await agent.run_team(
+                "feature_team",
+                goal="Implement user authentication with JWT",
+                context={"target_dir": "src/auth/"}
+            )
+
+            # Run a bug fix team
+            result = await agent.run_team(
+                "bug_fix_team",
+                goal="Fix the login timeout issue",
+                context={"error_log": "TimeoutError at auth.py:45"}
+            )
+        """
+        from victor.framework.teams import AgentTeam
+
+        # Check if vertical is configured
+        if not self._vertical:
+            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
+
+        # Get team specs from vertical
+        team_specs = self._vertical.get_team_specs()
+        if not team_specs:
+            raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
+
+        # Get the team specification
+        team_spec = team_specs.get(team_name)
+        if not team_spec:
+            available = list(team_specs.keys())
+            raise AgentError(
+                f"Team '{team_name}' not found. "
+                f"Available: {', '.join(available)}"
+            )
+
+        # Create and run team
+        team = await AgentTeam.create(
+            orchestrator=self._orchestrator,
+            name=team_spec.name,
+            goal=goal,
+            members=team_spec.members,
+            formation=team_spec.formation,
+            total_tool_budget=team_spec.total_tool_budget,
+            max_iterations=team_spec.max_iterations,
+            timeout_seconds=timeout_seconds,
+            shared_context=context,
+        )
+
+        # Execute team and collect result
+        result = await team.run()
+
+        return {
+            "success": result.success if hasattr(result, "success") else True,
+            "final_output": result.final_output if hasattr(result, "final_output") else str(result),
+            "team_name": team_spec.name,
+            "goal": goal,
+        }
+
+    def get_available_workflows(self) -> List[str]:
+        """Get list of available workflow names from the vertical.
+
+        Returns:
+            List of workflow names, or empty list if no vertical/workflows
+
+        Example:
+            workflows = agent.get_available_workflows()
+            print(workflows)  # ['feature_implementation', 'bug_fix', 'code_review']
+        """
+        if not self._vertical:
+            return []
+
+        workflow_provider = self._vertical.get_workflow_provider()
+        if not workflow_provider:
+            return []
+
+        return workflow_provider.get_workflow_names()
+
+    def get_available_teams(self) -> List[str]:
+        """Get list of available team names from the vertical.
+
+        Returns:
+            List of team names, or empty list if no vertical/teams
+
+        Example:
+            teams = agent.get_available_teams()
+            print(teams)  # ['feature_team', 'bug_fix_team', 'review_team']
+        """
+        if not self._vertical:
+            return []
+
+        team_specs = self._vertical.get_team_specs()
+        if not team_specs:
+            return []
+
+        return list(team_specs.keys())
 
     # =========================================================================
     # Lifecycle

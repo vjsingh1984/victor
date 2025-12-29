@@ -51,6 +51,11 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
+from victor.framework.vertical_integration import (
+    VerticalIntegrationPipeline,
+    IntegrationResult,
+)
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
@@ -209,193 +214,126 @@ class FrameworkShim:
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
 
-        This applies:
+        This delegates to VerticalIntegrationPipeline for unified vertical
+        application across both CLI (FrameworkShim) and SDK (Agent.create()) paths.
+
+        The pipeline applies:
         - System prompt (via prompt_builder)
-        - Tool filter (stored for selection-time filtering)
-        - Stage configuration (stored for state machine hints)
-        - Middleware chain (for tool execution processing)
-        - Safety extensions (for dangerous operation patterns)
+        - Tool filter (via set_enabled_tools protocol)
+        - Stage configuration (via vertical context)
+        - Middleware chain (via apply_vertical_middleware protocol)
+        - Safety extensions (via apply_vertical_safety_patterns protocol)
         - Prompt contributions (for task type hints)
+        - Mode configuration and tool dependencies
 
         Args:
             vertical: Vertical class to apply.
         """
-        logger.debug(f"Applying vertical: {vertical.name}")
+        logger.debug(f"Applying vertical via pipeline: {vertical.name}")
 
-        # Get the full config from vertical
-        self._vertical_config = vertical.get_config()
+        # Use unified pipeline for vertical application
+        pipeline = VerticalIntegrationPipeline()
+        result = pipeline.apply(self._orchestrator, vertical)
 
-        # Apply system prompt
-        system_prompt = vertical.get_system_prompt()
-        if system_prompt:
-            self._apply_system_prompt(system_prompt)
+        # Store result for access
+        self._vertical_config = result.context.config if result.context else None
+        self._integration_result = result
 
-        # Apply tool filter using ToolsProtocol method
-        # These tools will be enabled/prioritized during tool selection
-        tools = vertical.get_tools()
-        if tools:
-            # Use protocol method if available (proper API)
-            if hasattr(self._orchestrator, "set_enabled_tools") and callable(
-                self._orchestrator.set_enabled_tools
-            ):
-                self._orchestrator.set_enabled_tools(set(tools))
-            else:
-                logger.warning(
-                    "Orchestrator does not implement set_enabled_tools(); "
-                    "vertical tools may not be applied properly"
-                )
-            logger.debug(f"Applied vertical tools: {len(tools)} tools")
+        if result.success:
+            logger.info(
+                f"Applied vertical '{result.vertical_name}' via CLI path: "
+                f"tools={len(result.tools_applied)}, "
+                f"middleware={result.middleware_count}, "
+                f"safety={result.safety_patterns_count}, "
+                f"hints={result.prompt_hints_count}"
+            )
+        else:
+            for error in result.errors:
+                logger.error(f"Vertical integration error: {error}")
+            for warning in result.warnings:
+                logger.warning(f"Vertical integration warning: {warning}")
 
-        # Store stage config for state machine hints
-        stages = vertical.get_stages()
-        if stages:
-            self._orchestrator._vertical_stages = stages
-            logger.debug(f"Applied vertical stages: {list(stages.keys())}")
-
-        # Store vertical metadata on orchestrator
-        self._orchestrator._vertical_name = vertical.name
-        self._orchestrator._vertical_config = self._vertical_config
-
-        # Apply vertical extensions (new protocol-based system)
-        self._apply_vertical_extensions(vertical)
+    # =========================================================================
+    # Deprecated Methods - Kept for backward compatibility
+    # These are now handled by VerticalIntegrationPipeline in _apply_vertical()
+    # =========================================================================
 
     def _apply_vertical_extensions(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical extensions to orchestrator.
 
-        This applies the protocol-based extension system:
-        - Middleware chain for tool execution
-        - Safety extensions for danger pattern detection
-        - Prompt contributors for task hints
-        - Mode configurations for tool budgets
+        .. deprecated:: 8.0
+            This method is deprecated. Use _apply_vertical() which now
+            delegates to VerticalIntegrationPipeline for unified handling.
 
         Args:
             vertical: Vertical class to get extensions from.
         """
-        extensions = vertical.get_extensions()
-        if extensions is None:
-            logger.debug("No extensions available for vertical")
-            return
+        import warnings
 
-        # Apply middleware chain
-        if extensions.middleware:
-            self._apply_middleware(extensions.middleware)
-
-        # Apply safety extensions
-        if extensions.safety_extensions:
-            self._apply_safety_extensions(extensions.safety_extensions)
-
-        # Apply prompt contributors
-        if extensions.prompt_contributors:
-            self._apply_prompt_contributors(extensions.prompt_contributors)
-
-        # Apply mode config provider
-        if extensions.mode_config_provider:
-            self._apply_mode_config(extensions.mode_config_provider)
-
-        # Apply tool dependency provider
-        if extensions.tool_dependency_provider:
-            self._apply_tool_dependencies(extensions.tool_dependency_provider)
-
-        logger.debug(
-            f"Applied vertical extensions: "
-            f"middleware={len(extensions.middleware)}, "
-            f"safety={len(extensions.safety_extensions)}, "
-            f"prompts={len(extensions.prompt_contributors)}"
+        warnings.warn(
+            "_apply_vertical_extensions is deprecated, use _apply_vertical() "
+            "which now delegates to VerticalIntegrationPipeline",
+            DeprecationWarning,
+            stacklevel=2,
         )
+        # Delegate to pipeline
+        pipeline = VerticalIntegrationPipeline()
+        pipeline.apply(self._orchestrator, vertical)
 
     def _apply_middleware(self, middleware_list: list) -> None:
         """Apply middleware implementations to orchestrator.
 
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
+
         Args:
             middleware_list: List of MiddlewareProtocol implementations.
         """
-        # Use orchestrator's apply method if available (preferred)
+        # Delegate to orchestrator protocol method
         if hasattr(self._orchestrator, "apply_vertical_middleware"):
             self._orchestrator.apply_vertical_middleware(middleware_list)
-            return
-
-        # Fallback: Check if orchestrator has middleware chain support
-        chain = getattr(self._orchestrator, "middleware_chain", None)
-        if chain is not None and hasattr(chain, "add"):
-            for middleware in middleware_list:
-                chain.add(middleware)
-            logger.debug(f"Added {len(middleware_list)} middleware to chain")
-        else:
-            chain = getattr(self._orchestrator, "_middleware_chain", None)
-            if chain is not None and hasattr(chain, "add"):
-                for middleware in middleware_list:
-                    chain.add(middleware)
-                logger.debug(f"Added {len(middleware_list)} middleware to chain")
-            else:
-                # Store for later use by orchestrator
-                self._orchestrator._vertical_middleware = middleware_list
-                logger.debug(f"Stored {len(middleware_list)} middleware for orchestrator")
+        logger.debug(f"Applied {len(middleware_list)} middleware (deprecated path)")
 
     def _apply_safety_extensions(self, safety_extensions: list) -> None:
         """Apply safety extensions to orchestrator.
 
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
+
         Args:
             safety_extensions: List of SafetyExtensionProtocol implementations.
         """
-        # Collect all patterns from extensions
         all_patterns = []
         for ext in safety_extensions:
             all_patterns.extend(ext.get_bash_patterns())
             all_patterns.extend(ext.get_file_patterns())
 
-        # Use orchestrator's apply method if available (preferred)
         if hasattr(self._orchestrator, "apply_vertical_safety_patterns"):
             self._orchestrator.apply_vertical_safety_patterns(all_patterns)
-            return
-
-        # Fallback: Store patterns on orchestrator for safety checker
-        safety_checker = getattr(self._orchestrator, "safety_checker", None)
-        if safety_checker is not None:
-            # If safety checker exists, try to add patterns
-            if hasattr(safety_checker, "add_patterns"):
-                safety_checker.add_patterns(all_patterns)
-            elif hasattr(safety_checker, "_custom_patterns"):
-                safety_checker._custom_patterns.extend(all_patterns)
-            logger.debug(f"Applied {len(all_patterns)} safety patterns to checker")
-        else:
-            # Store for later initialization
-            self._orchestrator._vertical_safety_patterns = all_patterns
-            logger.debug(f"Stored {len(all_patterns)} safety patterns for orchestrator")
+        logger.debug(f"Applied {len(all_patterns)} safety patterns (deprecated path)")
 
     def _apply_prompt_contributors(self, contributors: list) -> None:
         """Apply prompt contributors to orchestrator.
 
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
+
         Args:
             contributors: List of PromptContributorProtocol implementations.
         """
-        # Merge task hints from all contributors
         merged_hints = {}
         for contributor in sorted(contributors, key=lambda c: c.get_priority()):
             merged_hints.update(contributor.get_task_type_hints())
 
-        # Apply to prompt builder if available
-        if hasattr(self._orchestrator, "prompt_builder"):
-            prompt_builder = self._orchestrator.prompt_builder
-            if hasattr(prompt_builder, "set_task_type_hints"):
-                prompt_builder.set_task_type_hints(merged_hints)
-            elif hasattr(prompt_builder, "_task_type_hints"):
-                prompt_builder._task_type_hints = merged_hints
-
-            # Apply additional system prompt sections
-            for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-                section = contributor.get_system_prompt_section()
-                if section:
-                    if hasattr(prompt_builder, "add_prompt_section"):
-                        prompt_builder.add_prompt_section(section)
-                    elif hasattr(prompt_builder, "_prompt_sections"):
-                        prompt_builder._prompt_sections.append(section)
-
-        # Store for reference
-        self._orchestrator._vertical_task_hints = merged_hints
-        logger.debug(f"Applied {len(merged_hints)} task type hints")
+        if hasattr(self._orchestrator, "vertical_context"):
+            self._orchestrator.vertical_context.apply_task_hints(merged_hints)
+        logger.debug(f"Applied {len(merged_hints)} task hints (deprecated path)")
 
     def _apply_mode_config(self, mode_provider: Any) -> None:
         """Apply mode configuration provider.
+
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
 
         Args:
             mode_provider: ModeConfigProviderProtocol implementation.
@@ -404,22 +342,17 @@ class FrameworkShim:
         default_mode = mode_provider.get_default_mode()
         default_budget = mode_provider.get_default_tool_budget()
 
-        # Apply to adaptive mode controller if available
-        if hasattr(self._orchestrator, "adaptive_mode_controller"):
-            controller = self._orchestrator.adaptive_mode_controller
-            if hasattr(controller, "set_mode_configs"):
-                controller.set_mode_configs(mode_configs)
-            if hasattr(controller, "set_default_budget"):
-                controller.set_default_budget(default_budget)
-
-        # Store for reference
-        self._orchestrator._vertical_mode_configs = mode_configs
-        self._orchestrator._vertical_default_mode = default_mode
-        self._orchestrator._vertical_default_budget = default_budget
-        logger.debug(f"Applied {len(mode_configs)} mode configurations")
+        if hasattr(self._orchestrator, "vertical_context"):
+            self._orchestrator.vertical_context.apply_mode_configs(
+                mode_configs, default_mode, default_budget
+            )
+        logger.debug(f"Applied {len(mode_configs)} mode configs (deprecated path)")
 
     def _apply_tool_dependencies(self, dep_provider: Any) -> None:
         """Apply tool dependency provider.
+
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
 
         Args:
             dep_provider: ToolDependencyProviderProtocol implementation.
@@ -427,34 +360,26 @@ class FrameworkShim:
         dependencies = dep_provider.get_dependencies()
         sequences = dep_provider.get_tool_sequences()
 
-        # Apply to tool sequence tracker if available
-        if hasattr(self._orchestrator, "tool_sequence_tracker"):
-            tracker = self._orchestrator.tool_sequence_tracker
-            if hasattr(tracker, "set_dependencies"):
-                tracker.set_dependencies(dependencies)
-            if hasattr(tracker, "set_sequences"):
-                tracker.set_sequences(sequences)
-
-        # Store for reference
-        self._orchestrator._vertical_tool_dependencies = dependencies
-        self._orchestrator._vertical_tool_sequences = sequences
-        logger.debug(
-            f"Applied {len(dependencies)} tool dependencies, " f"{len(sequences)} sequences"
-        )
+        if hasattr(self._orchestrator, "vertical_context"):
+            self._orchestrator.vertical_context.apply_tool_dependencies(
+                dependencies, sequences
+            )
+        logger.debug(f"Applied {len(dependencies)} tool deps (deprecated path)")
 
     def _apply_system_prompt(self, system_prompt: str) -> None:
         """Apply a custom system prompt to the orchestrator.
 
+        .. deprecated:: 8.0
+            Now handled by VerticalIntegrationPipeline.
+
         Args:
             system_prompt: System prompt text.
         """
-        # Store the custom system prompt for use in conversation
-        self._orchestrator._framework_system_prompt = system_prompt
+        if hasattr(self._orchestrator, "vertical_context"):
+            self._orchestrator.vertical_context.apply_system_prompt(system_prompt)
 
-        # If orchestrator has a prompt_builder, configure it
         if hasattr(self._orchestrator, "prompt_builder"):
             prompt_builder = self._orchestrator.prompt_builder
-            # Try set_custom_prompt method first
             if hasattr(prompt_builder, "set_custom_prompt"):
                 prompt_builder.set_custom_prompt(system_prompt)
                 logger.debug("Applied system prompt via set_custom_prompt")

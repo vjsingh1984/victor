@@ -405,6 +405,74 @@ try:
 except ImportError:
     _METRICS_EXPORTS = []
 
+# Teams (Phase 4 - Multi-Agent Teams Exposure)
+try:
+    from victor.framework.teams import (
+        AgentTeam,
+        MemberResult,
+        TeamConfig,
+        TeamEvent,
+        TeamEventType,
+        TeamFormation,
+        TeamMember,
+        TeamMemberSpec,
+        TeamResult,
+        member_complete_event,
+        member_start_event,
+        team_complete_event,
+        team_start_event,
+    )
+
+    _TEAMS_EXPORTS = [
+        "AgentTeam",
+        "MemberResult",
+        "TeamConfig",
+        "TeamEvent",
+        "TeamEventType",
+        "TeamFormation",
+        "TeamMember",
+        "TeamMemberSpec",
+        "TeamResult",
+        "member_complete_event",
+        "member_start_event",
+        "team_complete_event",
+        "team_start_event",
+    ]
+except ImportError:
+    _TEAMS_EXPORTS = []
+
+# Reinforcement Learning (Phase 5 - RL + Capability Registry)
+try:
+    from victor.framework.rl import (
+        BaseLearner,
+        LearnerStats,
+        LearnerType,
+        RLCoordinator,
+        RLManager,
+        RLOutcome,
+        RLRecommendation,
+        RLStats,
+        create_outcome,
+        get_rl_coordinator,
+        record_tool_success,
+    )
+
+    _RL_EXPORTS = [
+        "BaseLearner",
+        "LearnerStats",
+        "LearnerType",
+        "RLCoordinator",
+        "RLManager",
+        "RLOutcome",
+        "RLRecommendation",
+        "RLStats",
+        "create_outcome",
+        "get_rl_coordinator",
+        "record_tool_success",
+    ]
+except ImportError:
+    _RL_EXPORTS = []
+
 __all__ = (
     [
         # Core classes (the 5 concepts)
@@ -473,6 +541,8 @@ __all__ = (
     + _RESILIENCE_EXPORTS
     + _HEALTH_EXPORTS
     + _METRICS_EXPORTS
+    + _TEAMS_EXPORTS
+    + _RL_EXPORTS
 )
 
 # Version of the framework API
