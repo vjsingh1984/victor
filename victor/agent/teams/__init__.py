@@ -72,6 +72,7 @@ Example Usage:
 """
 
 from victor.agent.teams.team import (
+    MemoryConfig,
     TeamFormation,
     MemberStatus,
     TeamMember,
@@ -101,6 +102,7 @@ from victor.agent.teams.learner import (
 
 __all__ = [
     # Core team types
+    "MemoryConfig",
     "TeamFormation",
     "MemberStatus",
     "TeamMember",

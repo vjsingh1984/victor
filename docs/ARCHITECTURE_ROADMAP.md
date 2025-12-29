@@ -48,16 +48,34 @@
 - `victor/workflows/cache.py` - New workflow caching module
 - 255 tests pass
 
+### Phase 4: Advanced Patterns ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| StateGraph DSL | ✅ | Created workflows/graph_dsl.py with State, StateGraph, `>>` operator |
+| Crew personas via TeamMember | ✅ | Added expertise, personality, max_delegation_depth, MemoryConfig |
+| LCEL-style composition | ✅ | Created tools/composition.py with Runnable, pipe `|` operator |
+| Dynamic capability loading | ✅ | Created framework/capability_loader.py with hot-reload support |
+
+**Key Changes**:
+- `victor/workflows/graph_dsl.py` - StateGraph DSL with 35 tests
+- `victor/agent/teams/team.py` - Enhanced TeamMember with persona attributes
+- `victor/tools/composition.py` - LCEL-style Runnable system (748 lines, 31 tests)
+- `victor/framework/capability_loader.py` - Dynamic capability loading (23 tests)
+- 437 tests pass
+
 ---
 
-## Current Phase: Advanced Patterns (Phase 4)
+## Roadmap Complete 🎉
 
-| Task | Description | Reference |
-|------|-------------|-----------|
-| StateGraph DSL | Declarative workflow definitions | Similar to LangGraph patterns |
-| Crew personas via TeamMember | Rich agent personas with backstory | victor/agent/teams/ |
-| LCEL-style composition | Pipe-based tool chaining | Functional composition |
-| Dynamic capability loading | Hot-reload capabilities at runtime | Plugin architecture |
+All four phases of the architecture roadmap have been completed:
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Foundation Fixes | ✅ Complete |
+| Phase 2 | Core Extraction | ✅ Complete |
+| Phase 3 | Architecture Improvements | ✅ Complete |
+| Phase 4 | Advanced Patterns | ✅ Complete |
 
 ---
 

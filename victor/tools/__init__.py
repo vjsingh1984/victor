@@ -93,6 +93,28 @@ from victor.tools.selection import (
     register_strategy,
 )
 
+# Re-export LCEL-style composition (Promotion 4.3)
+from victor.tools.composition import (
+    Runnable,
+    RunnableConfig,
+    RunnableSequence,
+    RunnableParallel,
+    RunnableBranch,
+    RunnableLambda,
+    RunnablePassthrough,
+    RunnableBinding,
+    ToolRunnable,
+    FunctionToolRunnable,
+    as_runnable,
+    chain,
+    parallel,
+    branch,
+    extract_output,
+    extract_if_success,
+    map_keys,
+    select_keys,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base classes
@@ -142,4 +164,23 @@ __all__ = [
     "get_strategy",
     "get_best_strategy",
     "list_strategies",
+    # LCEL-style Composition (Promotion 4.3)
+    "Runnable",
+    "RunnableConfig",
+    "RunnableSequence",
+    "RunnableParallel",
+    "RunnableBranch",
+    "RunnableLambda",
+    "RunnablePassthrough",
+    "RunnableBinding",
+    "ToolRunnable",
+    "FunctionToolRunnable",
+    "as_runnable",
+    "chain",
+    "parallel",
+    "branch",
+    "extract_output",
+    "extract_if_success",
+    "map_keys",
+    "select_keys",
 ]

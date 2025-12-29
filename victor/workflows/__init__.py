@@ -77,6 +77,17 @@ from victor.workflows.cache import (
     get_workflow_cache_manager,
     configure_workflow_cache,
 )
+from victor.workflows.graph_dsl import (
+    State,
+    StateGraph,
+    GraphNode,
+    NodeType as GraphNodeType,
+    NodeFunc,
+    RouterFunc,
+    Compilable,
+    create_graph,
+    compile_graph,
+)
 
 __all__ = [
     # Base
@@ -118,4 +129,14 @@ __all__ = [
     "WorkflowCacheManager",
     "get_workflow_cache_manager",
     "configure_workflow_cache",
+    # StateGraph DSL
+    "State",
+    "StateGraph",
+    "GraphNode",
+    "GraphNodeType",
+    "NodeFunc",
+    "RouterFunc",
+    "Compilable",
+    "create_graph",
+    "compile_graph",
 ]

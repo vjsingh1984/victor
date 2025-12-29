@@ -539,6 +539,28 @@ try:
 except ImportError:
     _GRAPH_EXPORTS = []
 
+# Capability Loader (Phase 4.4 - Dynamic capability loading for plugins)
+try:
+    from victor.framework.capability_loader import (
+        CapabilityLoader,
+        CapabilityEntry,
+        CapabilityLoadError,
+        capability,
+        create_capability_loader,
+        get_default_capability_loader,
+    )
+
+    _CAPABILITY_LOADER_EXPORTS = [
+        "CapabilityLoader",
+        "CapabilityEntry",
+        "CapabilityLoadError",
+        "capability",
+        "create_capability_loader",
+        "get_default_capability_loader",
+    ]
+except ImportError:
+    _CAPABILITY_LOADER_EXPORTS = []
+
 # Checkpointing is handled by victor.agent.rl.checkpoint_store.CheckpointStore
 # which provides versioning, rollback, and diff capabilities.
 # WorkflowExecutor and StateGraph integrate with it via optional parameters.
@@ -623,6 +645,7 @@ __all__ = (
     + _GRAPH_EXPORTS
     + _CHECKPOINTER_EXPORTS
     + _CREW_EXPORTS
+    + _CAPABILITY_LOADER_EXPORTS
 )
 
 # Vertical Integration (Phase 3.1 - Step Handlers)

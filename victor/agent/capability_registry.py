@@ -64,6 +64,7 @@ class CapabilityRegistryMixin:
     - Queried by name or type
     - Invoked via setter methods
     - Read via getter methods or attribute access
+    - Dynamically loaded from plugins (Phase 4.4)
     """
 
     def __init_capability_registry__(self) -> None:
@@ -73,6 +74,7 @@ class CapabilityRegistryMixin:
         """
         self._capabilities: Dict[str, OrchestratorCapability] = {}
         self._capability_methods: Dict[str, Callable] = {}
+        self._dynamic_capabilities: Set[str] = set()  # Track dynamically loaded caps
         self._register_default_capabilities()
 
     def _register_capability(
@@ -605,6 +607,159 @@ class CapabilityRegistryMixin:
             self._team_specs = specs
         else:
             setattr(self, "_team_specs", specs)
+
+    # =========================================================================
+    # Dynamic Capability Loading (Phase 4.4)
+    # =========================================================================
+
+    def register_dynamic_capability(
+        self,
+        capability: OrchestratorCapability,
+        setter_method: Optional[Callable] = None,
+        getter_method: Optional[Callable] = None,
+    ) -> bool:
+        """Register a capability dynamically at runtime.
+
+        This method allows plugins to register new capabilities after
+        the orchestrator has been initialized. Unlike _register_capability(),
+        this marks the capability as dynamically loaded for tracking.
+
+        Args:
+            capability: Capability declaration
+            setter_method: Method to call for setting (if capability.setter)
+            getter_method: Method to call for getting (if capability.getter)
+
+        Returns:
+            True if capability was registered successfully
+
+        Example:
+            # From a plugin
+            orch.register_dynamic_capability(
+                OrchestratorCapability(
+                    name="custom_safety",
+                    capability_type=CapabilityType.SAFETY,
+                    setter="apply_custom_safety",
+                    version="1.0",
+                ),
+                setter_method=my_safety_check_fn,
+            )
+        """
+        try:
+            # Register using existing method
+            self._register_capability(capability, setter_method, getter_method)
+
+            # Track as dynamically loaded
+            if not hasattr(self, "_dynamic_capabilities"):
+                self._dynamic_capabilities = set()
+            self._dynamic_capabilities.add(capability.name)
+
+            logger.info(
+                f"Registered dynamic capability: {capability.name} "
+                f"(type={capability.capability_type.value}, version={capability.version})"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to register dynamic capability '{capability.name}': {e}")
+            return False
+
+    def unregister_dynamic_capability(self, name: str) -> bool:
+        """Unregister a dynamically loaded capability.
+
+        Only capabilities that were registered via register_dynamic_capability()
+        can be unregistered. Built-in capabilities cannot be unregistered.
+
+        Args:
+            name: Capability name to unregister
+
+        Returns:
+            True if capability was unregistered
+
+        Raises:
+            ValueError: If attempting to unregister a built-in capability
+        """
+        if not hasattr(self, "_dynamic_capabilities"):
+            self._dynamic_capabilities = set()
+
+        if name not in self._dynamic_capabilities:
+            if name in self._capabilities:
+                raise ValueError(
+                    f"Cannot unregister built-in capability '{name}'. "
+                    "Only dynamically loaded capabilities can be unregistered."
+                )
+            logger.warning(f"Capability '{name}' not found")
+            return False
+
+        # Remove from registries
+        if name in self._capabilities:
+            del self._capabilities[name]
+        if f"{name}:set" in self._capability_methods:
+            del self._capability_methods[f"{name}:set"]
+        if f"{name}:get" in self._capability_methods:
+            del self._capability_methods[f"{name}:get"]
+
+        self._dynamic_capabilities.discard(name)
+
+        logger.info(f"Unregistered dynamic capability: {name}")
+        return True
+
+    def get_dynamic_capabilities(self) -> Set[str]:
+        """Get names of all dynamically loaded capabilities.
+
+        Returns:
+            Set of capability names that were dynamically loaded
+        """
+        if not hasattr(self, "_dynamic_capabilities"):
+            self._dynamic_capabilities = set()
+        return set(self._dynamic_capabilities)
+
+    def is_dynamic_capability(self, name: str) -> bool:
+        """Check if a capability was dynamically loaded.
+
+        Args:
+            name: Capability name
+
+        Returns:
+            True if the capability was dynamically loaded
+        """
+        if not hasattr(self, "_dynamic_capabilities"):
+            self._dynamic_capabilities = set()
+        return name in self._dynamic_capabilities
+
+    def load_capabilities_from_loader(
+        self,
+        loader: Any,
+        capability_names: Optional[list] = None,
+    ) -> list:
+        """Load capabilities from a CapabilityLoader.
+
+        This provides integration with the CapabilityLoader class for
+        plugin-based capability loading.
+
+        Args:
+            loader: CapabilityLoader instance
+            capability_names: Optional list of specific capabilities to load
+                            (loads all if None)
+
+        Returns:
+            List of successfully loaded capability names
+
+        Example:
+            from victor.framework import CapabilityLoader
+
+            loader = CapabilityLoader()
+            loader.load_from_module("my_plugin.capabilities")
+
+            # Apply to orchestrator
+            orch.load_capabilities_from_loader(loader)
+        """
+        if not hasattr(loader, "apply_to"):
+            raise TypeError(
+                f"Expected CapabilityLoader but got {type(loader).__name__}. "
+                "The loader must have an apply_to() method."
+            )
+
+        return loader.apply_to(self, capability_names)
 
 
 __all__ = ["CapabilityRegistryMixin"]

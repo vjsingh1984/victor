@@ -68,6 +68,7 @@ from typing import (
 from victor.agent.subagents.base import SubAgentRole
 from victor.agent.teams.coordinator import TeamCoordinator
 from victor.agent.teams.team import (
+    MemoryConfig,
     MemberResult,
     TeamConfig,
     TeamFormation,
@@ -203,7 +204,8 @@ class TeamMemberSpec:
     """Simplified specification for a team member.
 
     This provides a user-friendly way to specify team members without
-    needing to know about SubAgentRole internals.
+    needing to know about SubAgentRole internals. Supports rich persona
+    attributes inspired by CrewAI for natural agent characterization.
 
     Attributes:
         role: Role name (researcher, planner, executor, reviewer)
@@ -212,20 +214,44 @@ class TeamMemberSpec:
         tool_budget: Maximum tool calls (default based on role)
         is_manager: Whether this member is the team manager (for hierarchical)
         priority: Execution priority (lower = earlier, for sequential/pipeline)
-        backstory: Rich persona description for agent personality
-        memory: Whether to persist discoveries across tasks
+        backstory: Rich persona description for agent's history and character
+        expertise: List of domain expertise areas for context-aware behavior
+        personality: Communication style and behavioral traits
+        max_delegation_depth: Maximum levels of delegation allowed (0 = none)
+        memory: Whether to persist discoveries across tasks (simple flag)
+        memory_config: Detailed memory configuration (overrides simple memory)
         cache: Whether to cache tool results
         verbose: Whether to show detailed execution logs
         max_iterations: Per-member iteration limit
 
     Example:
+        # Simple usage
         TeamMemberSpec(
             role="researcher",
             goal="Find all authentication code and patterns",
-            backstory="You are a security expert with 10 years experience "
-                      "analyzing authentication systems.",
+            backstory="You are a security expert with 10 years experience.",
             tool_budget=20,
             memory=True,
+        )
+
+        # Rich persona with CrewAI-style attributes
+        TeamMemberSpec(
+            role="researcher",
+            goal="Find authentication vulnerabilities",
+            name="Security Analyst",
+            backstory="10 years of security experience at major tech companies. "
+                      "Previously led red team exercises at a Fortune 500 company.",
+            expertise=["security", "authentication", "oauth", "jwt"],
+            personality="methodical and thorough; communicates findings with severity ratings",
+            max_delegation_depth=2,
+            memory=True,
+            memory_config=MemoryConfig(
+                enabled=True,
+                persist_across_sessions=True,
+                memory_types={"entity", "semantic"},
+                relevance_threshold=0.7,
+            ),
+            tool_budget=25,
         )
     """
 
@@ -237,7 +263,11 @@ class TeamMemberSpec:
     priority: int = 0
     # Rich persona attributes (CrewAI-compatible)
     backstory: str = ""
+    expertise: List[str] = field(default_factory=list)
+    personality: str = ""
+    max_delegation_depth: int = 0
     memory: bool = False
+    memory_config: Optional[MemoryConfig] = None
     cache: bool = True
     verbose: bool = False
     max_iterations: Optional[int] = None
@@ -249,7 +279,7 @@ class TeamMemberSpec:
             index: Member index for ID generation
 
         Returns:
-            TeamMember instance with memory coordinator attached if memory=True
+            TeamMember instance with memory coordinator attached if memory is enabled
         """
         # Resolve role
         role_lower = self.role.lower()
@@ -282,16 +312,20 @@ class TeamMemberSpec:
             tool_budget=tool_budget,
             is_manager=self.is_manager,
             priority=self.priority if self.priority else index,
-            # Pass through persona attributes
+            # Pass through all persona attributes
             backstory=self.backstory,
+            expertise=self.expertise,
+            personality=self.personality,
+            max_delegation_depth=self.max_delegation_depth,
             memory=self.memory,
+            memory_config=self.memory_config,
             cache=self.cache,
             verbose=self.verbose,
             max_iterations=self.max_iterations,
         )
 
         # Auto-attach memory coordinator if memory is enabled
-        if self.memory:
+        if member.memory_enabled:
             try:
                 from victor.memory import get_memory_coordinator
                 member.attach_memory_coordinator(get_memory_coordinator())
@@ -824,6 +858,7 @@ __all__ = [
     "TeamEvent",
     "TeamEventType",
     # Re-exports from teams infrastructure
+    "MemoryConfig",
     "TeamFormation",
     "TeamConfig",
     "TeamMember",

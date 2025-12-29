@@ -881,6 +881,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
     ) -> str:
         """Build context string for a member.
 
+        Incorporates all persona attributes (backstory, expertise, personality)
+        to create a rich context that guides agent behavior.
+
         Args:
             member: Member to build context for
             config: Team configuration
@@ -908,19 +911,39 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 member.backstory,
             ])
 
+        # Add expertise domains if specified
+        if member.expertise:
+            lines.extend([
+                "",
+                "## Expertise",
+                f"Your areas of expertise: {', '.join(member.expertise)}",
+                "Leverage this expertise when analyzing problems and making recommendations.",
+            ])
+
+        # Add personality/communication style if specified
+        if member.personality:
+            lines.extend([
+                "",
+                "## Communication Style",
+                member.personality,
+            ])
+
         # Add delegation info if applicable
         if member.can_delegate:
+            depth_info = ""
+            if member.max_delegation_depth > 0:
+                depth_info = f" (maximum {member.max_delegation_depth} levels deep)"
             if member.delegation_targets:
                 lines.extend([
                     "",
                     "## Delegation",
-                    f"You can delegate tasks to: {', '.join(member.delegation_targets)}",
+                    f"You can delegate tasks to: {', '.join(member.delegation_targets)}{depth_info}",
                 ])
             else:
                 lines.extend([
                     "",
                     "## Delegation",
-                    "You can delegate tasks to other team members when appropriate.",
+                    f"You can delegate tasks to other team members when appropriate{depth_info}.",
                 ])
 
         # Add shared context
@@ -1021,15 +1044,23 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
     def _format_worker_list(self, workers: List[TeamMember]) -> str:
         """Format worker list for manager context.
 
+        Includes expertise information to help managers make informed
+        delegation decisions.
+
         Args:
             workers: List of worker members
 
         Returns:
-            Formatted worker list
+            Formatted worker list with roles, goals, and expertise
         """
         lines = []
         for worker in workers:
-            lines.append(f"- **{worker.name}** ({worker.role.value}): {worker.goal}")
+            expertise_info = ""
+            if worker.expertise:
+                expertise_info = f" [expertise: {', '.join(worker.expertise[:5])}]"
+            lines.append(
+                f"- **{worker.name}** ({worker.role.value}): {worker.goal}{expertise_info}"
+            )
         return "\n".join(lines)
 
     def _report_progress(self, team_id: str, message: str, percent: float) -> None:
