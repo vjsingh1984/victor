@@ -15,23 +15,37 @@ The RAG vertical provides:
 ### 1. Ingest Documents
 
 ```bash
-# Using Victor CLI with RAG vertical
-victor chat --vertical rag "Ingest the file docs/README.md"
+# Ingest a single file
+victor rag ingest ./README.md
 
-# Using RAG tools directly
-victor tools call rag_ingest --path ./docs/README.md
+# Ingest a directory recursively
+victor rag ingest ./docs --recursive --pattern "*.md"
+
+# Ingest from URL
+victor rag ingest https://example.com/api-docs
 ```
 
 ### 2. Search Documents
 
 ```bash
-victor chat --vertical rag "Search for information about authentication"
+# Basic search
+victor rag search "authentication"
+
+# Search with more results
+victor rag search "error handling" --top-k 10
 ```
 
 ### 3. Query with Context
 
 ```bash
-victor chat --vertical rag "What are the main features of this project?"
+# Get relevant context (no LLM synthesis)
+victor rag query "What are the main features of this project?"
+
+# Get synthesized answer using Ollama
+victor rag query "What is the authentication flow?" --synthesize
+
+# Use specific provider and model
+victor rag query "Explain the API endpoints" --synthesize --provider anthropic --model claude-sonnet-4-20250514
 ```
 
 ## Demo Scripts
@@ -43,7 +57,10 @@ The RAG vertical includes two demo scripts showcasing real-world use cases.
 Ingest and query SEC filings for FAANG companies (Meta, Amazon, Apple, Netflix, Google).
 
 ```bash
-# List available companies
+# Run the built-in SEC demo (ingests project docs first)
+victor rag demo sec
+
+# Or use the full demo script for more options
 python -m victor.verticals.rag.demo_sec_filings --list-companies
 
 # Output:
@@ -75,14 +92,15 @@ python -m victor.verticals.rag.demo_sec_filings --count 3
 #### Query Filings
 
 ```bash
-# Query for financial information
+# Query using victor CLI (after ingesting)
+victor rag query "What is Apple's total revenue?"
+victor rag query "What are Amazon's main risk factors?" --synthesize
+
+# Or use the demo script directly
 python -m victor.verticals.rag.demo_sec_filings --query "What is Apple's total revenue?"
 
-# Query for risk factors
-python -m victor.verticals.rag.demo_sec_filings --query "What are Amazon's main risk factors?"
-
-# Query for specific metrics
-python -m victor.verticals.rag.demo_sec_filings --query "What is Netflix's subscriber count?"
+# With LLM synthesis
+python -m victor.verticals.rag.demo_sec_filings --query "Risk factors" --synthesize --provider ollama
 ```
 
 #### Example Output
@@ -110,18 +128,21 @@ Found 5 relevant chunks:
 Ingest and query project documentation.
 
 ```bash
-# Ingest Victor's own documentation
-python -m victor.verticals.rag.demo_docs
+# Run the built-in docs demo
+victor rag demo docs
 
-# Ingest custom project docs
-python -m victor.verticals.rag.demo_docs --path /path/to/project --pattern "*.md"
+# Or ingest custom project docs using CLI
+victor rag ingest ./docs --recursive --pattern "*.md"
 
 # Query the documentation
-python -m victor.verticals.rag.demo_docs --query "How do I add a new provider?"
-python -m victor.verticals.rag.demo_docs --query "What tools are available?"
+victor rag query "How do I add a new provider?"
+victor rag query "What tools are available?" --synthesize
 
 # Show store statistics
-python -m victor.verticals.rag.demo_docs --stats
+victor rag stats
+
+# List all indexed documents
+victor rag list
 ```
 
 ## RAG Tools Reference
@@ -341,31 +362,31 @@ If fetching URLs fails with SSL errors:
 
 ```bash
 # Ingest codebase documentation
-python -m victor.verticals.rag.demo_docs --path ./my-project
+victor rag ingest ./my-project/docs --recursive --pattern "*.md"
 
 # Ask questions
-victor chat -V rag "How do I authenticate users?"
-victor chat -V rag "What database does this project use?"
+victor rag query "How do I authenticate users?" --synthesize
+victor rag query "What database does this project use?" --synthesize
 ```
 
 ### 2. Legal Document Analysis
 
 ```bash
 # Ingest contracts
-victor tools call rag_ingest --path ./contracts --recursive --pattern "*.pdf"
+victor rag ingest ./contracts --recursive --pattern "*.pdf"
 
 # Query for specific clauses
-victor chat -V rag "What are the termination conditions?"
+victor rag query "What are the termination conditions?" --synthesize
 ```
 
 ### 3. Research Paper Analysis
 
 ```bash
 # Ingest papers
-victor tools call rag_ingest --path ./papers --pattern "*.pdf"
+victor rag ingest ./papers --pattern "*.pdf"
 
 # Query findings
-victor chat -V rag "What methods achieve state-of-the-art results?"
+victor rag query "What methods achieve state-of-the-art results?" --synthesize
 ```
 
 ### 4. Financial Analysis (SEC Filings)
@@ -374,8 +395,9 @@ victor chat -V rag "What methods achieve state-of-the-art results?"
 # Ingest all FAANG 10-K filings
 python -m victor.verticals.rag.demo_sec_filings
 
-# Compare companies
-python -m victor.verticals.rag.demo_sec_filings --query "Compare revenue growth across companies"
+# Query using CLI
+victor rag query "What is Apple's revenue?" --synthesize
+victor rag query "Compare risk factors across companies" --synthesize --provider anthropic
 ```
 
 ## Related Documentation

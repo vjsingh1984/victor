@@ -336,9 +336,13 @@ def main():
 
     print(f"\n  Total: {total_chunks} chunks")
     print(f"{'=' * 60}")
-    print("\nYou can now query the documentation:")
-    print('  python -m victor.verticals.rag.demo_docs --query "How do I add a new provider?"')
-    print('  python -m victor.verticals.rag.demo_docs --query "What tools are available?"')
+    print("\nYou can now query the documentation using victor CLI:")
+    print('  victor rag query "How do I add a new provider?"')
+    print('  victor rag query "What tools are available?" --synthesize')
+    print('')
+    print('  # View statistics and list documents:')
+    print('  victor rag stats')
+    print('  victor rag list')
     print()
 
 
