@@ -276,6 +276,104 @@ class TeamSpecRegistry:
                         results[name] = entry.spec
             return results
 
+    def find_team_for_task(
+        self,
+        task_type: str,
+        preferred_vertical: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Find the best team spec for a given task type across all verticals.
+
+        This method enables cross-vertical team discovery by searching
+        all registered teams for one that matches the task type.
+
+        Args:
+            task_type: Type of task (e.g., "feature", "deploy", "research", "eda")
+            preferred_vertical: If set, prefer teams from this vertical
+
+        Returns:
+            Team spec that can handle the task, or None if not found
+        """
+        with self._lock:
+            # Task type to vertical/team mapping
+            # This is a simple heuristic; verticals can provide more sophisticated matching
+            task_hints: Dict[str, List[str]] = {
+                # Coding vertical
+                "feature": ["coding"],
+                "implement": ["coding"],
+                "bug": ["coding"],
+                "fix": ["coding"],
+                "refactor": ["coding"],
+                "review": ["coding", "research"],
+                "test": ["coding", "data_analysis"],
+                "documentation": ["coding"],
+                # DevOps vertical
+                "deploy": ["devops"],
+                "deployment": ["devops"],
+                "infrastructure": ["devops"],
+                "container": ["devops"],
+                "docker": ["devops"],
+                "monitoring": ["devops"],
+                "cicd": ["devops"],
+                "pipeline": ["devops"],
+                "security": ["devops", "coding"],
+                # Research vertical
+                "research": ["research"],
+                "literature": ["research"],
+                "fact_check": ["research"],
+                "competitive": ["research"],
+                "synthesis": ["research"],
+                "technical": ["research", "coding"],
+                # Data Analysis vertical
+                "eda": ["data_analysis"],
+                "exploration": ["data_analysis"],
+                "clean": ["data_analysis"],
+                "statistics": ["data_analysis"],
+                "ml": ["data_analysis"],
+                "visualization": ["data_analysis"],
+                "report": ["data_analysis", "research"],
+            }
+
+            task_lower = task_type.lower()
+
+            # Get list of verticals to check
+            verticals_to_check = task_hints.get(task_lower, [])
+
+            # If preferred vertical is specified and in the hints, prioritize it
+            if preferred_vertical:
+                if preferred_vertical in verticals_to_check:
+                    verticals_to_check = [preferred_vertical] + [
+                        v for v in verticals_to_check if v != preferred_vertical
+                    ]
+                else:
+                    # Try preferred vertical first even if not in hints
+                    verticals_to_check = [preferred_vertical] + verticals_to_check
+
+            # If no hints, search all verticals
+            if not verticals_to_check:
+                verticals_to_check = list(
+                    set(entry.vertical for entry in self._teams.values() if entry.vertical)
+                )
+
+            # Search each vertical for a matching team
+            for vertical in verticals_to_check:
+                # Try to find the vertical's get_team_for_task function result
+                for name, entry in self._teams.items():
+                    if entry.vertical != vertical:
+                        continue
+
+                    # Check if the team spec has a task type that matches
+                    # Team names often contain the task type
+                    short_name = entry.short_name
+                    if task_lower in short_name or short_name.replace("_team", "") == task_lower:
+                        return entry.spec
+
+            # Fallback: try exact match on team short name
+            for entry in self._teams.values():
+                if entry.short_name == task_lower or entry.short_name == f"{task_lower}_team":
+                    return entry.spec
+
+            return None
+
     def clear(self) -> None:
         """Clear all registered team specs."""
         with self._lock:
@@ -379,10 +477,76 @@ def get_team_spec(name: str) -> Optional[Any]:
     return get_team_registry().get(name)
 
 
+def load_all_verticals() -> int:
+    """Load team specs from all verticals.
+
+    This function explicitly imports all vertical teams modules and
+    registers their teams with the global registry. If modules are
+    already imported, it will still register their teams (useful after
+    clearing the registry).
+
+    Returns:
+        Total number of teams registered across all verticals.
+    """
+    registry = get_team_registry()
+
+    # Define verticals and their team specs attribute names
+    verticals = [
+        ("victor.verticals.coding.teams", "CODING_TEAM_SPECS", "coding"),
+        ("victor.verticals.devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
+        ("victor.verticals.research.teams", "RESEARCH_TEAM_SPECS", "research"),
+        ("victor.verticals.data_analysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
+    ]
+
+    for module_name, specs_attr, vertical_name in verticals:
+        try:
+            import importlib
+
+            module = importlib.import_module(module_name)
+            team_specs = getattr(module, specs_attr, None)
+
+            if team_specs:
+                # Register the teams (replace=True allows re-registration)
+                count = registry.register_from_vertical(vertical_name, team_specs)
+                logger.debug(f"Loaded {count} teams from {module_name}")
+            else:
+                logger.warning(f"No {specs_attr} found in {module_name}")
+
+        except ImportError as e:
+            logger.warning(f"Failed to import {module_name}: {e}")
+        except Exception as e:
+            logger.warning(f"Error loading {module_name}: {e}")
+
+    # Return the total count of registered teams
+    total_count = len(registry.list_teams())
+    logger.info(f"Loaded {total_count} teams from all verticals")
+    return total_count
+
+
+def find_team_for_task(
+    task_type: str,
+    preferred_vertical: Optional[str] = None,
+) -> Optional[Any]:
+    """Find the best team spec for a task type across all verticals.
+
+    Convenience function that delegates to the registry.
+
+    Args:
+        task_type: Type of task (e.g., "feature", "deploy", "research", "eda")
+        preferred_vertical: If set, prefer teams from this vertical
+
+    Returns:
+        Team spec that can handle the task, or None if not found
+    """
+    return get_team_registry().find_team_for_task(task_type, preferred_vertical)
+
+
 __all__ = [
     "TeamSpecRegistry",
     "TeamSpecEntry",
     "get_team_registry",
     "register_team_spec",
     "get_team_spec",
+    "load_all_verticals",
+    "find_team_for_task",
 ]

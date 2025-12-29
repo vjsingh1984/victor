@@ -45,6 +45,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.framework.module_loader import DynamicModuleLoader
 from victor.tools.base import BaseTool, ToolRegistry
 from victor.tools.plugin import PluginMetadata, ToolPlugin
 
@@ -66,6 +67,11 @@ class ToolPluginRegistry:
     - Plugin lifecycle management (init, cleanup)
     - Tool registration with ToolRegistry
     - Plugin configuration management
+
+    Uses DynamicModuleLoader (via composition) for shared module loading infrastructure:
+    - Module cache invalidation
+    - File watching with debounced reloads
+    - Submodule tracking
 
     Attributes:
         plugin_dirs: List of directories to search for plugins
@@ -100,6 +106,12 @@ class ToolPluginRegistry:
         self.config = config or {}
         self.loaded_plugins: Dict[str, ToolPlugin] = {}
         self._disabled_plugins: Set[str] = set()
+
+        # Use DynamicModuleLoader for shared module loading infrastructure
+        self._module_loader = DynamicModuleLoader(
+            watch_dirs=self.plugin_dirs,
+            debounce_delay=0.5,
+        )
 
         if auto_load:
             self.discover_and_load()
@@ -363,7 +375,7 @@ class ToolPluginRegistry:
         Performs true hot-reloading by:
         1. Calling plugin cleanup
         2. Removing from loaded plugins
-        3. Invalidating Python module cache
+        3. Invalidating Python module cache (via DynamicModuleLoader)
         4. Re-importing the plugin module
         5. Re-registering the plugin
 
@@ -394,9 +406,9 @@ class ToolPluginRegistry:
         if not self.unload_plugin(plugin_name):
             return False
 
-        # Invalidate module cache for true hot-reload
+        # Invalidate module cache for true hot-reload (use shared loader)
         if force_reimport:
-            self._invalidate_plugin_modules(module_name, plugin_path)
+            self._module_loader.invalidate_modules_in_path(module_name, plugin_path)
 
         # Reload plugin
         new_plugin = self.load_plugin_from_path(plugin_path)
@@ -407,48 +419,30 @@ class ToolPluginRegistry:
         logger.error(f"Failed to hot-reload plugin: {plugin_name}")
         return False
 
-    def _invalidate_plugin_modules(self, module_name: str, plugin_path: Path) -> None:
-        """Invalidate Python module cache for a plugin and its submodules.
-
-        This ensures that subsequent imports will load fresh code from disk.
+    def _get_plugin_for_path(self, file_path: Path) -> Optional[str]:
+        """Find which plugin a file belongs to.
 
         Args:
-            module_name: Base module name for the plugin
-            plugin_path: Path to plugin directory
+            file_path: Path to check
+
+        Returns:
+            Plugin name or None if not found
         """
-        # Remove the main plugin module
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-            logger.debug(f"Invalidated module: {module_name}")
-
-        # Remove any submodules that were imported from the plugin directory
-        plugin_path_str = str(plugin_path.resolve())
-        modules_to_remove = []
-
-        for mod_name, mod in list(sys.modules.items()):
-            if mod is None:
-                continue
-
-            # Check if module comes from plugin directory
-            try:
-                mod_file = getattr(mod, "__file__", None)
-                if mod_file and plugin_path_str in str(Path(mod_file).resolve()):
-                    modules_to_remove.append(mod_name)
-            except Exception:
-                continue
-
-        for mod_name in modules_to_remove:
-            del sys.modules[mod_name]
-            logger.debug(f"Invalidated submodule: {mod_name}")
-
-        # Clear any cached imports
-        importlib.invalidate_caches()
+        file_path_resolved = file_path.resolve()
+        for name, plugin in self.loaded_plugins.items():
+            plugin_path = plugin.get_metadata().path
+            if plugin_path and str(file_path_resolved).startswith(str(plugin_path.resolve())):
+                return name
+        return None
 
     def watch_plugins(self, callback: Optional[Callable[[str, str], None]] = None) -> bool:
         """Start watching plugin directories for changes.
 
         When a plugin file changes, automatically reload the affected plugin.
         This is useful during development for immediate feedback.
+
+        Uses the shared DynamicModuleLoader infrastructure for file watching
+        with debounced reloads.
 
         Args:
             callback: Optional callback(plugin_name, event_type) for change notifications.
@@ -457,100 +451,42 @@ class ToolPluginRegistry:
         Returns:
             True if watching started successfully
         """
-        try:
-            from watchdog.observers import Observer
-            from watchdog.events import FileSystemEventHandler, FileModifiedEvent
-        except ImportError:
-            logger.warning("watchdog not installed - plugin hot-reload watching unavailable")
-            return False
-
-        if hasattr(self, "_plugin_observer") and self._plugin_observer:
+        if self._module_loader.is_watching:
             logger.warning("Plugin watcher already running")
             return False
 
-        class PluginFileHandler(FileSystemEventHandler):
-            def __init__(handler_self, registry: "ToolPluginRegistry"):
-                super().__init__()
-                handler_self.registry = registry
-                handler_self._debounce_timers: Dict[str, Any] = {}
-                handler_self._debounce_delay = 0.5  # 500ms debounce
+        # Create a file change handler that maps to plugin reloads
+        def on_file_change(file_path: str, event_type: str) -> None:
+            path_obj = Path(file_path)
+            plugin_name = self._get_plugin_for_path(path_obj)
 
-            def _get_plugin_for_path(handler_self, file_path: str) -> Optional[str]:
-                """Find which plugin a file belongs to."""
-                file_path_obj = Path(file_path).resolve()
-                for name, plugin in handler_self.registry.loaded_plugins.items():
-                    plugin_path = plugin.get_metadata().path
-                    if plugin_path and str(file_path_obj).startswith(str(plugin_path.resolve())):
-                        return name
-                return None
+            if plugin_name and event_type != "deleted":
+                try:
+                    if self.reload_plugin(plugin_name):
+                        if callback:
+                            callback(plugin_name, event_type)
+                        logger.info(
+                            f"Auto-reloaded plugin '{plugin_name}' due to file {event_type}"
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to auto-reload plugin '{plugin_name}': {e}")
 
-            def _schedule_reload(handler_self, plugin_name: str, event_type: str) -> None:
-                """Schedule a debounced reload."""
-                import threading
+        # Use the shared module loader's file watching infrastructure
+        result = self._module_loader.setup_file_watcher(
+            dirs=self.plugin_dirs,
+            on_change=on_file_change,
+            recursive=True,
+        )
 
-                # Cancel existing timer
-                if plugin_name in handler_self._debounce_timers:
-                    handler_self._debounce_timers[plugin_name].cancel()
+        if result:
+            logger.info(f"Started plugin hot-reload watcher for {len(self.plugin_dirs)} directories")
 
-                def do_reload():
-                    try:
-                        if handler_self.registry.reload_plugin(plugin_name):
-                            if callback:
-                                callback(plugin_name, event_type)
-                            logger.info(
-                                f"Auto-reloaded plugin '{plugin_name}' due to file {event_type}"
-                            )
-                    except Exception as e:
-                        logger.error(f"Failed to auto-reload plugin '{plugin_name}': {e}")
-                    finally:
-                        handler_self._debounce_timers.pop(plugin_name, None)
-
-                timer = threading.Timer(handler_self._debounce_delay, do_reload)
-                timer.daemon = True
-                timer.start()
-                handler_self._debounce_timers[plugin_name] = timer
-
-            def on_modified(handler_self, event) -> None:
-                if event.is_directory:
-                    return
-                if not event.src_path.endswith(".py"):
-                    return
-                plugin_name = handler_self._get_plugin_for_path(event.src_path)
-                if plugin_name:
-                    handler_self._schedule_reload(plugin_name, "modified")
-
-            def on_created(handler_self, event) -> None:
-                if event.is_directory:
-                    return
-                if not event.src_path.endswith(".py"):
-                    return
-                plugin_name = handler_self._get_plugin_for_path(event.src_path)
-                if plugin_name:
-                    handler_self._schedule_reload(plugin_name, "created")
-
-        self._plugin_observer = Observer()
-        self._plugin_handler = PluginFileHandler(self)
-
-        # Watch all plugin directories
-        for plugin_dir in self.plugin_dirs:
-            if plugin_dir.exists():
-                self._plugin_observer.schedule(
-                    self._plugin_handler, str(plugin_dir), recursive=True
-                )
-                logger.debug(f"Watching plugin directory: {plugin_dir}")
-
-        self._plugin_observer.start()
-        logger.info(f"Started plugin hot-reload watcher for {len(self.plugin_dirs)} directories")
-        return True
+        return result
 
     def stop_watching(self) -> None:
         """Stop watching plugin directories for changes."""
-        if hasattr(self, "_plugin_observer") and self._plugin_observer:
-            self._plugin_observer.stop()
-            self._plugin_observer.join(timeout=2.0)
-            self._plugin_observer = None
-            self._plugin_handler = None
-            logger.info("Stopped plugin hot-reload watcher")
+        self._module_loader.stop_file_watcher()
+        logger.info("Stopped plugin hot-reload watcher")
 
     def cleanup_all(self) -> None:
         """Cleanup all loaded plugins and stop watching."""

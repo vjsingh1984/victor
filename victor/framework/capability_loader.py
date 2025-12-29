@@ -70,6 +70,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
+from victor.framework.module_loader import DynamicModuleLoader
 from victor.framework.protocols import (
     CapabilityRegistryProtocol,
     CapabilityType,
@@ -145,7 +146,7 @@ class CapabilityLoadError(Exception):
 # =============================================================================
 
 
-class CapabilityLoader:
+class CapabilityLoader(DynamicModuleLoader):
     """Dynamic capability loader for plugins and runtime extension.
 
     This class manages the lifecycle of dynamically loaded capabilities:
@@ -156,6 +157,11 @@ class CapabilityLoader:
 
     The loader maintains its own registry of capabilities which can then
     be applied to orchestrators that implement CapabilityRegistryProtocol.
+
+    Inherits from DynamicModuleLoader for shared module loading infrastructure:
+    - Module cache invalidation
+    - File watching with debounced reloads
+    - Submodule tracking
 
     Thread Safety:
         The loader is NOT thread-safe. Use external synchronization if
@@ -189,10 +195,11 @@ class CapabilityLoader:
             auto_discover: If True, discover capabilities from plugin_dirs on init
             plugin_dirs: Directories to search for capability modules
         """
+        # Initialize base class with watch_dirs
+        super().__init__(watch_dirs=plugin_dirs or [])
+
         self._capabilities: Dict[str, CapabilityEntry] = {}
-        self._loaded_modules: Dict[str, Any] = {}
         self._module_capabilities: Dict[str, Set[str]] = {}  # module -> capability names
-        self._module_paths: Dict[str, Path] = {}  # module -> file path (for reload)
         self._plugin_dirs = plugin_dirs or []
         self._watchers: List[Callable[[str, str], None]] = []  # change callbacks
 
@@ -258,7 +265,7 @@ class CapabilityLoader:
 
             # Import module
             module = importlib.import_module(module_name)
-            self._loaded_modules[module_name] = module
+            self.track_module(module_name, module)
             self._module_capabilities[module_name] = set()
 
             loaded_names = []
@@ -360,9 +367,8 @@ class CapabilityLoader:
             sys.modules[module_name] = module
             spec.loader.exec_module(module)
 
-            self._loaded_modules[module_name] = module
+            self.track_module(module_name, module, file_path=path)
             self._module_capabilities[module_name] = set()
-            self._module_paths[module_name] = path  # Track path for reload
 
             loaded_names = []
 
@@ -623,14 +629,14 @@ class CapabilityLoader:
             )
 
         # Check if this was loaded from a file path
-        module_path = self._module_paths.get(module_name)
+        module_path = self.get_module_path(module_name)
 
         # Unregister existing capabilities from this module
         if module_name in self._module_capabilities:
             for cap_name in list(self._module_capabilities[module_name]):
                 self.unregister_capability(cap_name)
 
-        # Invalidate module cache
+        # Invalidate module cache (use base class method)
         self._invalidate_module(module_name)
 
         # Notify watchers
@@ -649,26 +655,13 @@ class CapabilityLoader:
     def _invalidate_module(self, module_name: str) -> None:
         """Invalidate Python module cache for hot-reload.
 
+        Delegates to base class invalidate_module() for shared logic.
+
         Args:
             module_name: Module name to invalidate
         """
-        # Remove from loaded tracking
-        self._loaded_modules.pop(module_name, None)
-
-        # Remove main module
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-            logger.debug(f"Invalidated module: {module_name}")
-
-        # Remove submodules
-        prefix = f"{module_name}."
-        to_remove = [name for name in sys.modules if name.startswith(prefix)]
-        for name in to_remove:
-            del sys.modules[name]
-            logger.debug(f"Invalidated submodule: {name}")
-
-        # Clear import caches
-        importlib.invalidate_caches()
+        # Use base class implementation
+        self.invalidate_module(module_name)
 
     def unload_module(self, module_name: str) -> bool:
         """Unload a module and all its capabilities.
@@ -689,8 +682,11 @@ class CapabilityLoader:
                 self.unregister_capability(cap_name)
             del self._module_capabilities[module_name]
 
-        # Invalidate module cache
+        # Invalidate module cache (uses base class method via _invalidate_module)
         self._invalidate_module(module_name)
+
+        # Untrack module (cleanup base class tracking)
+        self.untrack_module(module_name)
 
         # Notify watchers
         for watcher in self._watchers:
@@ -817,7 +813,7 @@ class CapabilityLoader:
         Returns:
             List of module names
         """
-        return list(self._loaded_modules.keys())
+        return self.get_tracked_modules()
 
     # =========================================================================
     # Application to Orchestrator
@@ -907,6 +903,37 @@ class CapabilityLoader:
     # File Watching (Optional)
     # =========================================================================
 
+    def _on_module_changed(
+        self,
+        module_name: str,
+        file_path: Path,
+        event_type: str,
+    ) -> None:
+        """Handle a module file change (override from DynamicModuleLoader).
+
+        This method is called when a watched file changes.
+
+        Args:
+            module_name: Name of the changed module
+            file_path: Path to the changed file
+            event_type: Type of change ("modified", "created", "deleted")
+        """
+        if event_type == "deleted":
+            # Don't try to reload deleted modules
+            logger.debug(f"Module '{module_name}' file deleted: {file_path}")
+            return
+
+        try:
+            self.reload_module(module_name)
+            # Notify watchers
+            for watcher in self._watchers:
+                try:
+                    watcher(module_name, "reload")
+                except Exception as e:
+                    logger.warning(f"Watcher error during auto-reload: {e}")
+        except Exception as e:
+            logger.error(f"Auto-reload failed for '{module_name}': {e}")
+
     def watch_for_changes(
         self,
         callback: Optional[Callable[[str], None]] = None,
@@ -916,95 +943,30 @@ class CapabilityLoader:
         When a capability module file changes, it will be automatically
         reloaded. Requires the 'watchdog' package.
 
+        Uses base class DynamicModuleLoader's file watching infrastructure.
+
         Args:
             callback: Optional callback(module_name) when a module is reloaded
 
         Returns:
             True if watching started successfully
         """
-        try:
-            from watchdog.events import FileSystemEventHandler
-            from watchdog.observers import Observer
-        except ImportError:
-            logger.warning(
-                "watchdog not installed - file watching unavailable. "
-                "Install with: pip install watchdog"
-            )
-            return False
-
-        if hasattr(self, "_observer") and self._observer:
-            logger.warning("File watcher already running")
-            return False
-
-        class CapabilityFileHandler(FileSystemEventHandler):
-            def __init__(handler_self, loader: CapabilityLoader):
-                super().__init__()
-                handler_self.loader = loader
-                handler_self._debounce: Dict[str, Any] = {}
-
-            def on_modified(handler_self, event) -> None:
-                if event.is_directory:
-                    return
-                if not event.src_path.endswith(".py"):
-                    return
-
-                # Find which module this file belongs to
-                file_path = Path(event.src_path)
-                module_name = None
-
-                for mod_name, mod in handler_self.loader._loaded_modules.items():
-                    mod_file = getattr(mod, "__file__", None)
-                    if mod_file and Path(mod_file).resolve() == file_path.resolve():
-                        module_name = mod_name
-                        break
-
+        # Use base class file watcher with a callback wrapper
+        def on_file_change(file_path: str, event_type: str) -> None:
+            if callback:
+                module_name = self._find_module_for_file(Path(file_path))
                 if module_name:
-                    # Debounce to avoid multiple reloads
-                    import threading
+                    callback(module_name)
 
-                    if module_name in handler_self._debounce:
-                        handler_self._debounce[module_name].cancel()
-
-                    def do_reload():
-                        try:
-                            handler_self.loader.reload_module(module_name)
-                            if callback:
-                                callback(module_name)
-                        except Exception as e:
-                            logger.error(f"Auto-reload failed for '{module_name}': {e}")
-                        finally:
-                            handler_self._debounce.pop(module_name, None)
-
-                    timer = threading.Timer(0.5, do_reload)
-                    timer.daemon = True
-                    timer.start()
-                    handler_self._debounce[module_name] = timer
-
-        self._observer = Observer()
-        self._file_handler = CapabilityFileHandler(self)
-
-        for plugin_dir in self._plugin_dirs:
-            plugin_dir = Path(plugin_dir).expanduser()
-            if plugin_dir.exists():
-                self._observer.schedule(
-                    self._file_handler, str(plugin_dir), recursive=True
-                )
-                logger.debug(f"Watching directory: {plugin_dir}")
-
-        self._observer.start()
-        logger.info(
-            f"Started capability file watcher for {len(self._plugin_dirs)} directories"
+        return self.setup_file_watcher(
+            dirs=[Path(d) for d in self._plugin_dirs],
+            on_change=on_file_change,
+            recursive=True,
         )
-        return True
 
     def stop_watching(self) -> None:
         """Stop watching for file changes."""
-        if hasattr(self, "_observer") and self._observer:
-            self._observer.stop()
-            self._observer.join(timeout=2.0)
-            self._observer = None
-            self._file_handler = None
-            logger.info("Stopped capability file watcher")
+        self.stop_file_watcher()
 
     # =========================================================================
     # Context Manager

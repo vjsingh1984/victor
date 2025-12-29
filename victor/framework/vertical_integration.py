@@ -111,6 +111,9 @@ from victor.verticals.protocols import (
     RLConfigProviderProtocol,
     TeamSpecProviderProtocol,
     WorkflowProviderProtocol,
+    VerticalRLProviderProtocol,
+    VerticalTeamProviderProtocol,
+    VerticalWorkflowProviderProtocol,
 )
 
 # Import capability registry protocol for type-safe capability access
@@ -1058,14 +1061,18 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has workflow provider using protocol
+            # Check if vertical has workflow provider using protocol (type-safe)
             workflow_provider = None
-            if hasattr(vertical, "get_workflow_provider"):
+            if isinstance(vertical, type) and issubclass(vertical, VerticalWorkflowProviderProtocol):
+                workflow_provider = vertical.get_workflow_provider()
+            elif isinstance(vertical, VerticalWorkflowProviderProtocol):
                 workflow_provider = vertical.get_workflow_provider()
 
             # Also check if vertical itself is a WorkflowProviderProtocol
             if workflow_provider is None and isinstance(vertical, type):
-                if hasattr(vertical, "get_workflows"):
+                if isinstance(vertical, WorkflowProviderProtocol) or (
+                    hasattr(vertical, "get_workflows") and callable(getattr(vertical, "get_workflows", None))
+                ):
                     # Vertical class implements protocol directly
                     workflow_provider = vertical
 
@@ -1130,19 +1137,26 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has RL config using protocol
+            # Check if vertical has RL config using protocol (type-safe)
             rl_config = None
             rl_provider = None
 
-            # Check for RL config provider method
-            if hasattr(vertical, "get_rl_config_provider"):
+            # Check for RL config provider method using protocol
+            if isinstance(vertical, type) and issubclass(vertical, VerticalRLProviderProtocol):
+                rl_provider = vertical.get_rl_config_provider()
+                if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
+                    rl_config = rl_provider.get_rl_config()
+            elif isinstance(vertical, VerticalRLProviderProtocol):
                 rl_provider = vertical.get_rl_config_provider()
                 if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
                     rl_config = rl_provider.get_rl_config()
 
             # Fallback: check if vertical implements RLConfigProviderProtocol directly
-            if rl_config is None and hasattr(vertical, "get_rl_config"):
-                rl_config = vertical.get_rl_config()
+            if rl_config is None:
+                if isinstance(vertical, RLConfigProviderProtocol) or (
+                    hasattr(vertical, "get_rl_config") and callable(getattr(vertical, "get_rl_config", None))
+                ):
+                    rl_config = vertical.get_rl_config()
 
             if rl_config is None:
                 return
@@ -1156,24 +1170,31 @@ class VerticalIntegrationPipeline:
             # Store in context
             context.apply_rl_config(rl_config)
 
-            # Apply to RL hooks if vertical provides them
-            if hasattr(vertical, "get_rl_hooks"):
+            # Apply to RL hooks if vertical provides them (type-safe)
+            rl_hooks = None
+            if isinstance(vertical, type) and issubclass(vertical, VerticalRLProviderProtocol):
                 rl_hooks = vertical.get_rl_hooks()
-                if rl_hooks:
-                    context.apply_rl_hooks(rl_hooks)
+            elif isinstance(vertical, VerticalRLProviderProtocol):
+                rl_hooks = vertical.get_rl_hooks()
+            elif hasattr(vertical, "get_rl_hooks") and callable(getattr(vertical, "get_rl_hooks", None)):
+                # Fallback for backwards compatibility
+                rl_hooks = vertical.get_rl_hooks()
 
-                    # Attach hooks via capability (SOLID compliant)
-                    if _check_capability(orchestrator, "rl_hooks"):
-                        _invoke_capability(orchestrator, "rl_hooks", rl_hooks)
-                        logger.debug("Applied RL hooks via capability")
-                    elif hasattr(orchestrator, "set_rl_hooks"):
-                        orchestrator.set_rl_hooks(rl_hooks)
-                        logger.debug("Applied RL hooks via set_rl_hooks")
-                    else:
-                        result.add_warning(
-                            "Orchestrator lacks set_rl_hooks method; "
-                            "hooks stored in context only"
-                        )
+            if rl_hooks:
+                context.apply_rl_hooks(rl_hooks)
+
+                # Attach hooks via capability (SOLID compliant)
+                if _check_capability(orchestrator, "rl_hooks"):
+                    _invoke_capability(orchestrator, "rl_hooks", rl_hooks)
+                    logger.debug("Applied RL hooks via capability")
+                elif hasattr(orchestrator, "set_rl_hooks"):
+                    orchestrator.set_rl_hooks(rl_hooks)
+                    logger.debug("Applied RL hooks via set_rl_hooks")
+                else:
+                    result.add_warning(
+                        "Orchestrator lacks set_rl_hooks method; "
+                        "hooks stored in context only"
+                    )
 
             result.add_info(f"Configured {learner_count} RL learners")
             logger.debug(f"Applied RL config with {learner_count} learners")
@@ -1203,19 +1224,26 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
-            # Check if vertical has team specs using protocol
+            # Check if vertical has team specs using protocol (type-safe)
             team_specs = None
             team_provider = None
 
-            # Check for team spec provider method
-            if hasattr(vertical, "get_team_spec_provider"):
+            # Check for team spec provider method using protocol
+            if isinstance(vertical, type) and issubclass(vertical, VerticalTeamProviderProtocol):
+                team_provider = vertical.get_team_spec_provider()
+                if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
+                    team_specs = team_provider.get_team_specs()
+            elif isinstance(vertical, VerticalTeamProviderProtocol):
                 team_provider = vertical.get_team_spec_provider()
                 if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
                     team_specs = team_provider.get_team_specs()
 
             # Fallback: check if vertical implements TeamSpecProviderProtocol directly
-            if team_specs is None and hasattr(vertical, "get_team_specs"):
-                team_specs = vertical.get_team_specs()
+            if team_specs is None:
+                if isinstance(vertical, TeamSpecProviderProtocol) or (
+                    hasattr(vertical, "get_team_specs") and callable(getattr(vertical, "get_team_specs", None))
+                ):
+                    team_specs = vertical.get_team_specs()
 
             if not team_specs:
                 return

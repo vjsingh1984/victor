@@ -570,6 +570,96 @@ class TeamSpecProviderProtocol(Protocol):
 
 
 # =============================================================================
+# Vertical Provider Protocols (for isinstance() checks in integration)
+# =============================================================================
+
+
+@runtime_checkable
+class VerticalRLProviderProtocol(Protocol):
+    """Protocol for verticals providing RL configuration.
+
+    This protocol enables type-safe isinstance() checks instead of hasattr()
+    when integrating vertical RL configuration with the framework.
+
+    Example:
+        class CodingVertical(VerticalBase, VerticalRLProviderProtocol):
+            @classmethod
+            def get_rl_config_provider(cls) -> Optional[RLConfigProviderProtocol]:
+                return CodingRLConfigProvider()
+
+            @classmethod
+            def get_rl_hooks(cls) -> Optional[Any]:
+                return CodingRLHooks()
+    """
+
+    @classmethod
+    def get_rl_config_provider(cls) -> Optional[RLConfigProviderProtocol]:
+        """Get the RL configuration provider for this vertical.
+
+        Returns:
+            RLConfigProviderProtocol implementation or None
+        """
+        ...
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for outcome recording.
+
+        Returns:
+            RLHooks instance or None
+        """
+        ...
+
+
+@runtime_checkable
+class VerticalTeamProviderProtocol(Protocol):
+    """Protocol for verticals providing team specifications.
+
+    This protocol enables type-safe isinstance() checks instead of hasattr()
+    when integrating vertical team specs with the framework.
+
+    Example:
+        class CodingVertical(VerticalBase, VerticalTeamProviderProtocol):
+            @classmethod
+            def get_team_spec_provider(cls) -> Optional[TeamSpecProviderProtocol]:
+                return CodingTeamSpecProvider()
+    """
+
+    @classmethod
+    def get_team_spec_provider(cls) -> Optional[TeamSpecProviderProtocol]:
+        """Get the team specification provider for this vertical.
+
+        Returns:
+            TeamSpecProviderProtocol implementation or None
+        """
+        ...
+
+
+@runtime_checkable
+class VerticalWorkflowProviderProtocol(Protocol):
+    """Protocol for verticals providing workflow definitions.
+
+    This protocol enables type-safe isinstance() checks instead of hasattr()
+    when integrating vertical workflows with the framework.
+
+    Example:
+        class CodingVertical(VerticalBase, VerticalWorkflowProviderProtocol):
+            @classmethod
+            def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
+                return CodingWorkflowProvider()
+    """
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
+        """Get the workflow provider for this vertical.
+
+        Returns:
+            WorkflowProviderProtocol implementation or None
+        """
+        ...
+
+
+# =============================================================================
 # Composite Vertical Extension
 # =============================================================================
 
@@ -658,6 +748,10 @@ __all__ = [
     "ServiceProviderProtocol",
     "RLConfigProviderProtocol",
     "TeamSpecProviderProtocol",
+    # Vertical Provider Protocols (for isinstance() checks)
+    "VerticalRLProviderProtocol",
+    "VerticalTeamProviderProtocol",
+    "VerticalWorkflowProviderProtocol",
     # Composite
     "VerticalExtensions",
 ]

@@ -999,7 +999,7 @@ class TestGetTeamForTask:
 
         team = get_team_for_task("eda")
         assert team is not None
-        assert team.name == "EDA Team"
+        assert team.name == "Exploratory Data Analysis Team"
 
         team = get_team_for_task("ml")
         assert team is not None
