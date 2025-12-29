@@ -196,12 +196,21 @@ class VerticalBase(ABC):
             @classmethod
             def get_system_prompt(cls):
                 return "You are a security expert..."
+
+    Config Caching:
+        The get_config() method caches its result per-class to avoid
+        repeated computation. Call clear_config_cache() to invalidate
+        when config sources change (typically only needed in tests).
     """
 
     # Subclasses must define these
     name: str = ""
     description: str = ""
     version: str = "1.0.0"
+
+    # Config cache (keyed by class name, stores VerticalConfig)
+    _config_cache: Dict[str, "VerticalConfig"] = {}
+    _extensions_cache: Dict[str, Any] = {}
 
     @classmethod
     @abstractmethod
@@ -524,15 +533,25 @@ class VerticalBase(ABC):
             return None
 
     @classmethod
-    def get_extensions(cls) -> Any:
+    def get_extensions(cls, *, use_cache: bool = True) -> Any:
         """Get all extensions for this vertical.
 
         Aggregates all extension implementations for framework integration.
         Override for custom extension aggregation.
 
+        Args:
+            use_cache: If True (default), return cached extensions if available.
+                       Set to False to force rebuild.
+
         Returns:
             VerticalExtensions or None
         """
+        cache_key = cls.__name__
+
+        # Return cached extensions if available and caching enabled
+        if use_cache and cache_key in cls._extensions_cache:
+            return cls._extensions_cache[cache_key]
+
         # Import here to avoid circular dependency
         try:
             from victor.verticals.protocols import VerticalExtensions
@@ -540,7 +559,7 @@ class VerticalBase(ABC):
             safety = cls.get_safety_extension()
             prompt = cls.get_prompt_contributor()
 
-            return VerticalExtensions(
+            extensions = VerticalExtensions(
                 middleware=cls.get_middleware(),
                 safety_extensions=[safety] if safety else [],
                 prompt_contributors=[prompt] if prompt else [],
@@ -549,6 +568,10 @@ class VerticalBase(ABC):
                 workflow_provider=cls.get_workflow_provider(),
                 service_provider=cls.get_service_provider(),
             )
+
+            # Cache the extensions
+            cls._extensions_cache[cache_key] = extensions
+            return extensions
         except ImportError:
             return None
 
@@ -557,15 +580,25 @@ class VerticalBase(ABC):
     # =========================================================================
 
     @classmethod
-    def get_config(cls) -> VerticalConfig:
+    def get_config(cls, *, use_cache: bool = True) -> VerticalConfig:
         """Get the complete configuration for this vertical.
 
         This is the main template method that assembles the configuration
         by calling the various override points.
 
+        Args:
+            use_cache: If True (default), return cached config if available.
+                       Set to False to force rebuild.
+
         Returns:
             Complete VerticalConfig for agent creation.
         """
+        cache_key = cls.__name__
+
+        # Return cached config if available and caching enabled
+        if use_cache and cache_key in cls._config_cache:
+            return cls._config_cache[cache_key]
+
         # Build tool set
         tool_names = cls.get_tools()
         tools = ToolSet.from_tools(tool_names)
@@ -585,7 +618,27 @@ class VerticalBase(ABC):
         )
 
         # Allow final customization
-        return cls.customize_config(config)
+        config = cls.customize_config(config)
+
+        # Cache the config
+        cls._config_cache[cache_key] = config
+        return config
+
+    @classmethod
+    def clear_config_cache(cls, *, clear_all: bool = False) -> None:
+        """Clear the config cache for this vertical.
+
+        Args:
+            clear_all: If True, clear cache for all verticals.
+                       If False (default), clear only for this class.
+        """
+        if clear_all:
+            cls._config_cache.clear()
+            cls._extensions_cache.clear()
+        else:
+            cache_key = cls.__name__
+            cls._config_cache.pop(cache_key, None)
+            cls._extensions_cache.pop(cache_key, None)
 
     @classmethod
     def get_tool_set(cls) -> ToolSet:

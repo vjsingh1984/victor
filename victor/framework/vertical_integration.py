@@ -103,94 +103,103 @@ from victor.framework.protocols import CapabilityRegistryProtocol
 
 
 def _check_capability(obj: Any, capability_name: str) -> bool:
-    """Check if object has capability via registry or fallback to hasattr.
+    """Check if object has capability via registry.
 
-    This function provides a migration path from hasattr to protocol-based
-    capability discovery. It first checks the capability registry (if available),
-    then falls back to hasattr for backward compatibility.
+    Uses protocol-based capability discovery. Orchestrators must implement
+    CapabilityRegistryProtocol for proper capability checking.
+
+    SOLID Compliance:
+    - Uses protocol, not hasattr (DIP - Dependency Inversion)
+    - No private attribute access (SRP - Single Responsibility)
 
     Args:
-        obj: Object to check
+        obj: Object to check (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
 
     Returns:
-        True if capability is available
+        True if capability is available via the registry
     """
-    # Check capability registry first (protocol-based)
+    # Check capability registry (protocol-based only)
     if isinstance(obj, CapabilityRegistryProtocol):
         return obj.has_capability(capability_name)
 
-    # Fallback mappings for hasattr compatibility
-    capability_to_attr = {
+    # For objects not implementing protocol, check for public method
+    # Note: No private attribute fallbacks (SOLID compliant)
+    public_methods = {
         "enabled_tools": "set_enabled_tools",
         "prompt_builder": "prompt_builder",
-        "custom_prompt": "prompt_builder",
-        "task_type_hints": "prompt_builder",
-        "prompt_section": "prompt_builder",
         "vertical_middleware": "apply_vertical_middleware",
-        "middleware_chain": "_middleware_chain",
         "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "safety_patterns": "_safety_checker",
-        "adaptive_mode_controller": "adaptive_mode_controller",
-        "mode_configs": "adaptive_mode_controller",
-        "default_budget": "adaptive_mode_controller",
-        "tool_sequence_tracker": "_sequence_tracker",
-        "tool_dependencies": "_sequence_tracker",
-        "tool_sequences": "_sequence_tracker",
         "vertical_context": "set_vertical_context",
-        "rl_hooks": "_rl_hooks",
-        "team_specs": "_team_specs",
+        "adaptive_mode_controller": "adaptive_mode_controller",
     }
 
-    attr = capability_to_attr.get(capability_name, capability_name)
-    return hasattr(obj, attr)
+    method_name = public_methods.get(capability_name, capability_name)
+    return hasattr(obj, method_name) and (
+        callable(getattr(obj, method_name, None))
+        or not callable(getattr(obj, method_name, None))  # Allow properties
+    )
 
 
 def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any) -> Any:
-    """Invoke capability via registry or fallback to direct method call.
+    """Invoke capability via registry or public method call.
 
-    This function provides a migration path from getattr to protocol-based
-    capability invocation. It first tries the capability registry (if available),
-    then falls back to direct method call for backward compatibility.
+    Uses protocol-based capability invocation. Orchestrators must implement
+    CapabilityRegistryProtocol for proper capability invocation.
+
+    SOLID Compliance:
+    - Uses protocol, not private attribute assignment (DIP)
+    - No direct private attribute writes (SRP)
 
     Args:
-        obj: Object to invoke capability on
+        obj: Object to invoke capability on (should implement CapabilityRegistryProtocol)
         capability_name: Name of capability
         *args: Arguments for capability
         **kwargs: Keyword arguments for capability
 
     Returns:
         Result of capability invocation
+
+    Raises:
+        AttributeError: If capability cannot be invoked
     """
-    # Use capability registry if available
+    # Use capability registry if available (preferred)
     if isinstance(obj, CapabilityRegistryProtocol):
         try:
             return obj.invoke_capability(capability_name, *args, **kwargs)
-        except (KeyError, TypeError):
-            pass  # Fall through to fallback
+        except (KeyError, TypeError) as e:
+            logger.debug(f"Registry invoke failed for {capability_name}: {e}")
+            # Fall through to public method fallback
 
-    # Fallback mappings
-    capability_to_method = {
+    # Fallback: use public method mappings only (no private attributes)
+    public_method_mappings = {
         "enabled_tools": "set_enabled_tools",
         "vertical_middleware": "apply_vertical_middleware",
         "vertical_safety_patterns": "apply_vertical_safety_patterns",
         "vertical_context": "set_vertical_context",
         "rl_hooks": "set_rl_hooks",
         "team_specs": "set_team_specs",
+        "mode_configs": "set_mode_configs",
+        "default_budget": "set_default_budget",
+        "tool_dependencies": "set_tool_dependencies",
+        "tool_sequences": "set_tool_sequences",
+        "custom_prompt": "set_custom_prompt",
+        "task_type_hints": "set_task_type_hints",
+        "prompt_section": "add_prompt_section",
+        "safety_patterns": "add_safety_patterns",
     }
 
-    method_name = capability_to_method.get(capability_name, f"set_{capability_name}")
+    method_name = public_method_mappings.get(capability_name, f"set_{capability_name}")
     method = getattr(obj, method_name, None)
     if callable(method):
         return method(*args, **kwargs)
 
-    # Fallback: try direct attribute assignment
-    attr_name = f"_{capability_name}"
-    if hasattr(obj, attr_name):
-        setattr(obj, attr_name, args[0] if args else kwargs.get("value"))
-        return None
-
-    raise AttributeError(f"Cannot invoke capability '{capability_name}' on {type(obj)}")
+    # No private attribute fallback - raise clear error instead
+    raise AttributeError(
+        f"Cannot invoke capability '{capability_name}' on {type(obj).__name__}. "
+        f"Expected method '{method_name}' not found. "
+        f"Object should implement CapabilityRegistryProtocol."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -531,19 +540,21 @@ class VerticalIntegrationPipeline:
             if system_prompt:
                 context.apply_system_prompt(system_prompt)
 
-                # Apply via capability (protocol-first with fallback)
+                # Apply via capability (protocol-first)
                 if _check_capability(orchestrator, "custom_prompt"):
                     _invoke_capability(orchestrator, "custom_prompt", system_prompt)
                     logger.debug("Applied system prompt via capability")
                 elif _check_capability(orchestrator, "prompt_builder"):
-                    # Fallback: try direct prompt builder access
+                    # Fallback: use public method only (SOLID compliant)
                     prompt_builder = getattr(orchestrator, "prompt_builder", None)
-                    if prompt_builder:
-                        if hasattr(prompt_builder, "set_custom_prompt"):
-                            prompt_builder.set_custom_prompt(system_prompt)
-                        elif hasattr(prompt_builder, "_custom_prompt"):
-                            prompt_builder._custom_prompt = system_prompt
-                        logger.debug("Applied system prompt via prompt_builder fallback")
+                    if prompt_builder and hasattr(prompt_builder, "set_custom_prompt"):
+                        prompt_builder.set_custom_prompt(system_prompt)
+                        logger.debug("Applied system prompt via prompt_builder")
+                    else:
+                        result.add_warning(
+                            "prompt_builder lacks set_custom_prompt method; "
+                            "prompt stored in context only"
+                        )
         except Exception as e:
             if self._strict_mode:
                 result.add_error(f"Failed to apply system prompt: {e}")
@@ -682,7 +693,7 @@ class VerticalIntegrationPipeline:
         context.apply_safety_patterns(all_patterns)
         result.safety_patterns_count = len(all_patterns)
 
-        # Use capability-based approach (protocol-first, fallback to hasattr)
+        # Use capability-based approach (protocol-first, SOLID compliant)
         if _check_capability(orchestrator, "vertical_safety_patterns"):
             _invoke_capability(orchestrator, "vertical_safety_patterns", all_patterns)
             logger.debug(f"Applied {len(all_patterns)} safety patterns via capability")
@@ -690,16 +701,16 @@ class VerticalIntegrationPipeline:
             _invoke_capability(orchestrator, "safety_patterns", all_patterns)
             logger.debug(f"Applied {len(all_patterns)} safety patterns via safety_patterns capability")
         else:
-            # Fallback: try safety checker directly
-            safety_checker = getattr(orchestrator, "safety_checker", None) or getattr(
-                orchestrator, "_safety_checker", None
-            )
-            if safety_checker:
-                if hasattr(safety_checker, "add_patterns"):
-                    safety_checker.add_patterns(all_patterns)
-                elif hasattr(safety_checker, "_custom_patterns"):
-                    safety_checker._custom_patterns.extend(all_patterns)
-                logger.debug(f"Applied {len(all_patterns)} safety patterns via fallback")
+            # Use public method only (SOLID compliant - no private attributes)
+            safety_checker = getattr(orchestrator, "safety_checker", None)
+            if safety_checker and hasattr(safety_checker, "add_patterns"):
+                safety_checker.add_patterns(all_patterns)
+                logger.debug(f"Applied {len(all_patterns)} safety patterns via public method")
+            else:
+                result.add_warning(
+                    f"Could not apply {len(all_patterns)} safety patterns; "
+                    "patterns stored in context only"
+                )
 
     def _apply_prompts(
         self,
@@ -724,20 +735,23 @@ class VerticalIntegrationPipeline:
         context.apply_task_hints(merged_hints)
         result.prompt_hints_count = len(merged_hints)
 
-        # Apply task hints via capability
+        # Apply task hints via capability (SOLID compliant)
         if _check_capability(orchestrator, "task_type_hints"):
             _invoke_capability(orchestrator, "task_type_hints", merged_hints)
             logger.debug(f"Applied {len(merged_hints)} task hints via capability")
         elif _check_capability(orchestrator, "prompt_builder"):
-            # Fallback: try direct prompt builder access
+            # Use public method only (SOLID compliant)
             prompt_builder = getattr(orchestrator, "prompt_builder", None)
-            if prompt_builder:
-                if hasattr(prompt_builder, "set_task_type_hints"):
-                    prompt_builder.set_task_type_hints(merged_hints)
-                elif hasattr(prompt_builder, "_task_type_hints"):
-                    prompt_builder._task_type_hints = merged_hints
+            if prompt_builder and hasattr(prompt_builder, "set_task_type_hints"):
+                prompt_builder.set_task_type_hints(merged_hints)
+                logger.debug(f"Applied {len(merged_hints)} task hints via prompt_builder")
+            else:
+                result.add_warning(
+                    f"Could not apply {len(merged_hints)} task hints; "
+                    "hints stored in context only"
+                )
 
-        # Apply prompt sections
+        # Apply prompt sections (SOLID compliant)
         for contributor in sorted(contributors, key=lambda c: c.get_priority()):
             section = contributor.get_system_prompt_section()
             if section:
@@ -842,14 +856,18 @@ class VerticalIntegrationPipeline:
             context: Vertical context to attach
             result: Result to update
         """
-        # Use capability-based approach (protocol-first, fallback to direct)
+        # Use capability-based approach (SOLID compliant)
         if _check_capability(orchestrator, "vertical_context"):
             _invoke_capability(orchestrator, "vertical_context", context)
             logger.debug("Attached context via capability")
+        elif hasattr(orchestrator, "set_vertical_context"):
+            orchestrator.set_vertical_context(context)
+            logger.debug("Attached context via set_vertical_context")
         else:
-            # Fallback: direct attribute assignment
-            orchestrator._vertical_context = context
-            logger.debug("Attached context via _vertical_context attribute")
+            result.add_warning(
+                "Orchestrator lacks set_vertical_context method; "
+                "context not attached"
+            )
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
@@ -978,14 +996,18 @@ class VerticalIntegrationPipeline:
                 if rl_hooks:
                     context.apply_rl_hooks(rl_hooks)
 
-                    # Attach hooks via capability (protocol-first, fallback to direct)
+                    # Attach hooks via capability (SOLID compliant)
                     if _check_capability(orchestrator, "rl_hooks"):
                         _invoke_capability(orchestrator, "rl_hooks", rl_hooks)
                         logger.debug("Applied RL hooks via capability")
+                    elif hasattr(orchestrator, "set_rl_hooks"):
+                        orchestrator.set_rl_hooks(rl_hooks)
+                        logger.debug("Applied RL hooks via set_rl_hooks")
                     else:
-                        # Fallback: direct attribute assignment
-                        orchestrator._rl_hooks = rl_hooks
-                        logger.debug("Applied RL hooks via fallback")
+                        result.add_warning(
+                            "Orchestrator lacks set_rl_hooks method; "
+                            "hooks stored in context only"
+                        )
 
             result.add_info(f"Configured {learner_count} RL learners")
             logger.debug(f"Applied RL config with {learner_count} learners")
@@ -1038,14 +1060,18 @@ class VerticalIntegrationPipeline:
             # Store in context
             context.apply_team_specs(team_specs)
 
-            # Attach via capability (protocol-first, fallback to direct)
+            # Attach via capability (SOLID compliant)
             if _check_capability(orchestrator, "team_specs"):
                 _invoke_capability(orchestrator, "team_specs", team_specs)
                 logger.debug(f"Applied team specs via capability")
+            elif hasattr(orchestrator, "set_team_specs"):
+                orchestrator.set_team_specs(team_specs)
+                logger.debug(f"Applied team specs via set_team_specs")
             else:
-                # Fallback: direct attribute assignment
-                orchestrator._team_specs = team_specs
-                logger.debug(f"Applied team specs via fallback")
+                result.add_warning(
+                    f"Orchestrator lacks set_team_specs method; "
+                    "specs stored in context only"
+                )
 
             result.add_info(
                 f"Registered {team_count} team specs: "
