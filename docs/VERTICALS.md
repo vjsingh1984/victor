@@ -126,6 +126,39 @@ config = DataAnalysisAssistant.get_config()
 - Clear visualizations
 - Reproducible analysis
 
+### RAGAssistant
+
+Optimized for Retrieval-Augmented Generation (RAG) workflows - document ingestion, vector search, and Q&A.
+
+```python
+from victor.verticals import RAGAssistant
+
+config = RAGAssistant.get_config()
+# 10 tools: rag_ingest, rag_search, rag_query, rag_list, rag_delete, rag_stats, read, ls, web_fetch, shell
+# Stages: INITIAL → INGESTING → SEARCHING → QUERYING → SYNTHESIZING
+```
+
+**Capabilities:**
+- Document ingestion from files (PDF, Markdown, Text, Code)
+- URL/web content ingestion with HTML text extraction
+- Directory batch ingestion with glob patterns
+- LanceDB vector storage (embedded, no server required)
+- Hybrid search combining vector + full-text
+- Query with automatic context retrieval
+- Source attribution and citations
+
+**System Prompt Focus:**
+- Always search before answering
+- Cite sources with document references
+- No hallucination - stay grounded in documents
+- Clear distinction between indexed vs. unknown info
+
+**Demo Scripts:**
+- SEC 10-K/10-Q filing ingestion for FAANG stocks
+- Project documentation ingestion
+
+See [RAG_DEMO.md](./guides/RAG_DEMO.md) for detailed usage examples.
+
 ## CLI Usage
 
 The `victor chat` command supports verticals via the `--vertical` (or `-V`) flag:
@@ -153,6 +186,7 @@ victor chat --help  # Shows available verticals in help text
 | research | `--vertical research` | Web research and document analysis |
 | devops | `--vertical devops` | Infrastructure and deployment |
 | data_analysis | `--vertical data_analysis` | Data science and analysis |
+| rag | `--vertical rag` | Retrieval-Augmented Generation (document Q&A) |
 
 ### Observability Options
 

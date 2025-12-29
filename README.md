@@ -35,7 +35,7 @@ flowchart LR
         Agent["Agent<br/>Orchestrator"]
         Tools["45 Tools"]
         Search["Semantic<br/>Search"]
-        Verticals["4 Domain<br/>Verticals"]
+        Verticals["5 Domain<br/>Verticals"]
     end
 
     subgraph Providers["Any Provider"]
@@ -58,7 +58,7 @@ flowchart LR
 |-----------|-----------------|-----------------|
 | **Vendor Lock-in** | Single provider only | 25+ providers, switch anytime |
 | **Data Privacy** | Code goes to vendor cloud | 100% air-gapped mode available |
-| **Domain Expertise** | Generic code assistant | 4 specialized verticals |
+| **Domain Expertise** | Generic code assistant | 5 specialized verticals |
 | **Tool Access** | Fixed, limited toolset | 45 tools with cost-aware selection |
 | **Protocol Support** | Proprietary integrations | MCP client + server support |
 
@@ -102,7 +102,7 @@ Tools are classified by cost tier for intelligent selection:
 </details>
 
 <details>
-<summary><b>4 Domain Verticals</b> - Verified in <code>victor/verticals/</code></summary>
+<summary><b>5 Domain Verticals</b> - Verified in <code>victor/verticals/</code></summary>
 
 | Vertical | Tools | Specialization |
 |----------|-------|----------------|
@@ -110,6 +110,7 @@ Tools are classified by cost tier for intelligent selection:
 | **Research** | 9 | Web search, citation management, fact synthesis |
 | **DevOps** | 13 | Docker, Terraform, CI/CD, infrastructure |
 | **Data Analysis** | 11 | Pandas, visualization, statistical analysis |
+| **RAG** | 10 | Document ingestion, vector search, Q&A with citations |
 
 **Technical Detail**: Verticals implement `VerticalBase` (victor/verticals/base.py) with protocol-based extensions: `PromptContributorProtocol`, `SafetyExtensionProtocol`, `ModeConfigProviderProtocol`. Framework remains vertical-agnostic.
 </details>
@@ -213,7 +214,7 @@ Specialized assistants with domain-optimized prompts, tool selection, and safety
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#8B5CF6'}}}%%
 mindmap
-  root((4 Verticals))
+  root((5 Verticals))
     Coding
       30 tools
       Multi-file edit
@@ -318,7 +319,7 @@ flowchart TB
         Orchestrator["AgentOrchestrator"]
         Providers["25+ Providers"]
         Tools["45 Tools"]
-        Verticals["4 Verticals"]
+        Verticals["5 Verticals"]
     end
 
     CLI --> Direct
@@ -471,7 +472,7 @@ Victor is in active development with **11,100+ passing tests**. Core functionali
 | Agent Orchestrator | Stable | DI migration complete, async support |
 | 45 Tools | Stable | Documented in TOOL_CATALOG.md |
 | 25+ Providers | Stable | victor/providers/ directory |
-| 4 Domain Verticals | Stable | victor/verticals/ directory |
+| 5 Domain Verticals | Stable | victor/verticals/ directory |
 | Semantic Search | Stable | 10 languages, AST parsing |
 | VS Code Extension | Beta | vscode-victor/ directory |
 | MCP Support | Stable | Client + server modes |
@@ -573,8 +574,8 @@ Victor's framework is built on SOLID principles for extensibility and maintainab
 │ Adaptive        │ 13 RL learners for tool selection, mode            │
 │ Learning        │ transition, quality weights (victor/agent/rl/)     │
 ├─────────────────┼────────────────────────────────────────────────────┤
-│ Vertical        │ 4 domain verticals: Coding, Research, DevOps,      │
-│ Extensibility   │ Data Analysis (victor/verticals/)                  │
+│ Vertical        │ 5 domain verticals: Coding, Research, DevOps,      │
+│ Extensibility   │ Data Analysis, RAG (victor/verticals/)             │
 ├─────────────────┼────────────────────────────────────────────────────┤
 │ Air-Gapped      │ 100% local operation with Ollama/vLLM              │
 │ Support         │ (airgapped_mode=True)                              │
