@@ -252,3 +252,64 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
             # Research can benefit from readonly_only_for_analysis since it's primarily reading
             readonly_only_for_analysis=True,
         )
+
+    # =========================================================================
+    # New Framework Integrations (Workflows, RL, Teams)
+    # =========================================================================
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get Research-specific workflow provider.
+
+        Provides workflows for:
+        - deep_research: Multi-source research with verification
+        - fact_check: Fact verification workflow
+        - literature_review: Academic literature review
+        - competitive_analysis: Market and competitive research
+
+        Returns:
+            ResearchWorkflowProvider instance
+        """
+        from victor.verticals.research.workflows import ResearchWorkflowProvider
+
+        return ResearchWorkflowProvider()
+
+    @classmethod
+    def get_rl_config(cls) -> Optional[Any]:
+        """Get RL configuration for Research vertical.
+
+        Returns:
+            ResearchRLConfig instance
+        """
+        from victor.verticals.research.rl import ResearchRLConfig
+
+        return ResearchRLConfig()
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for Research vertical.
+
+        Returns:
+            ResearchRLHooks instance
+        """
+        from victor.verticals.research.rl import ResearchRLHooks
+
+        return ResearchRLHooks()
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for Research tasks.
+
+        Provides pre-configured team specifications for:
+        - deep_research_team: Comprehensive multi-source research
+        - fact_check_team: Claim verification
+        - literature_team: Academic literature review
+        - competitive_team: Market research
+        - synthesis_team: Report synthesis
+
+        Returns:
+            Dict mapping team names to ResearchTeamSpec instances
+        """
+        from victor.verticals.research.teams import RESEARCH_TEAM_SPECS
+
+        return RESEARCH_TEAM_SPECS
