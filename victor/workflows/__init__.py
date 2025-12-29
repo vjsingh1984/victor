@@ -60,6 +60,15 @@ from victor.workflows.executor import (
     WorkflowResult,
     WorkflowExecutor,
 )
+from victor.workflows.yaml_loader import (
+    YAMLWorkflowError,
+    YAMLWorkflowConfig,
+    YAMLWorkflowProvider,
+    load_workflow_from_dict,
+    load_workflow_from_yaml,
+    load_workflow_from_file,
+    load_workflows_from_directory,
+)
 
 __all__ = [
     # Base
@@ -86,4 +95,12 @@ __all__ = [
     "WorkflowContext",
     "WorkflowResult",
     "WorkflowExecutor",
+    # YAML Loader
+    "YAMLWorkflowError",
+    "YAMLWorkflowConfig",
+    "YAMLWorkflowProvider",
+    "load_workflow_from_dict",
+    "load_workflow_from_yaml",
+    "load_workflow_from_file",
+    "load_workflows_from_directory",
 ]
