@@ -35,6 +35,7 @@ import sqlite3
 from typing import Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class SemanticThresholdLearner(BaseLearner):
 
         # Stats table: one row per embedding_model:task_type:tool_name
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS semantic_threshold_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_SEMANTIC_STAT} (
                 context_key TEXT PRIMARY KEY,
                 embedding_model TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -78,9 +79,9 @@ class SemanticThresholdLearner(BaseLearner):
 
         # Index for fast lookups
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_semantic_threshold_model
-            ON semantic_threshold_stats(embedding_model, task_type, tool_name)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_semantic_stat_model
+            ON {Tables.RL_SEMANTIC_STAT}(embedding_model, task_type, tool_name)
             """
         )
 
@@ -112,7 +113,7 @@ class SemanticThresholdLearner(BaseLearner):
 
         # Get or create stats
         cursor.execute(
-            "SELECT * FROM semantic_threshold_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_SEMANTIC_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()
@@ -171,8 +172,8 @@ class SemanticThresholdLearner(BaseLearner):
 
         # Upsert to database
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO semantic_threshold_stats
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_SEMANTIC_STAT}
             (context_key, embedding_model, task_type, tool_name, total_searches,
              zero_result_count, low_quality_count, avg_results_count, avg_threshold,
              recommended_threshold, results_sum, threshold_sum, last_updated)
@@ -293,7 +294,7 @@ class SemanticThresholdLearner(BaseLearner):
 
         cursor = self.db.cursor()
         cursor.execute(
-            "SELECT * FROM semantic_threshold_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_SEMANTIC_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()

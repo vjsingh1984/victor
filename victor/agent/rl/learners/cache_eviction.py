@@ -31,6 +31,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +120,8 @@ class CacheEvictionLearner(BaseLearner):
 
         # Q-values table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache_eviction_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_Q} (
                 state_key TEXT NOT NULL,
                 action TEXT NOT NULL,
                 q_value REAL NOT NULL DEFAULT 0.0,
@@ -133,8 +134,8 @@ class CacheEvictionLearner(BaseLearner):
 
         # Tool value estimates
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache_eviction_tool_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_TOOL} (
                 tool_name TEXT PRIMARY KEY,
                 estimated_value REAL NOT NULL DEFAULT 0.5,
                 hit_count INTEGER NOT NULL DEFAULT 0,
@@ -146,8 +147,8 @@ class CacheEvictionLearner(BaseLearner):
 
         # Eviction history for analysis
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache_eviction_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 state_key TEXT NOT NULL,
                 action TEXT NOT NULL,
@@ -161,9 +162,9 @@ class CacheEvictionLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_cache_eviction_state
-            ON cache_eviction_q_values(state_key)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_cache_q_state
+            ON {Tables.RL_CACHE_Q}(state_key)
             """
         )
 
@@ -176,7 +177,7 @@ class CacheEvictionLearner(BaseLearner):
 
         # Load Q-values
         try:
-            cursor.execute("SELECT * FROM cache_eviction_q_values")
+            cursor.execute(f"SELECT * FROM {Tables.RL_CACHE_Q}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 state_key = row_dict["state_key"]
@@ -195,7 +196,7 @@ class CacheEvictionLearner(BaseLearner):
 
         # Load tool value estimates
         try:
-            cursor.execute("SELECT * FROM cache_eviction_tool_values")
+            cursor.execute(f"SELECT * FROM {Tables.RL_CACHE_TOOL}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 tool_name = row_dict["tool_name"]
@@ -276,8 +277,8 @@ class CacheEvictionLearner(BaseLearner):
 
         # Save Q-value
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO cache_eviction_q_values
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_CACHE_Q}
             (state_key, action, q_value, visit_count, last_updated)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -293,8 +294,8 @@ class CacheEvictionLearner(BaseLearner):
         # Save eviction history
         hit_after = outcome.metadata.get("hit_after", 0)
         cursor.execute(
-            """
-            INSERT INTO cache_eviction_history
+            f"""
+            INSERT INTO {Tables.RL_CACHE_HISTORY}
             (state_key, action, tool_name, reward, hit_after, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -333,8 +334,8 @@ class CacheEvictionLearner(BaseLearner):
         # Save to database
         cursor = self.db.cursor()
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO cache_eviction_tool_values
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_CACHE_TOOL}
             (tool_name, estimated_value, hit_count, miss_count, last_updated)
             VALUES (?, ?, ?, ?, ?)
             """,

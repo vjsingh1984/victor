@@ -20,6 +20,10 @@ Provides both sync and async interfaces:
 
 The async methods use `asyncio.to_thread()` to offload SQLite operations to a thread pool,
 preventing event loop blocking while maintaining the same synchronous SQLite internals.
+
+Database:
+    Uses the unified database at ~/.victor/victor.db via victor.core.database.
+    All RL tables are consolidated in this single database for easier management.
 """
 
 import asyncio
@@ -29,6 +33,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.database import get_database
+from victor.core.schema import Tables, Schema
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +50,7 @@ class RLCoordinator:
     - Export metrics for monitoring
 
     Architecture:
-    - Single SQLite database: ~/.victor/rl_data/rl.db
+    - Uses unified database: ~/.victor/victor.db (via victor.core.database)
     - Each learner gets own tables (prefixed with learner name)
     - Shared outcomes table for cross-learner analysis
     - Telemetry table for monitoring
@@ -55,25 +61,23 @@ class RLCoordinator:
         rec = coordinator.get_recommendation("continuation_patience", ...)
     """
 
-    def __init__(self, storage_path: Path, db_path: Optional[Path] = None):
+    def __init__(self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None):
         """Initialize RL coordinator.
 
         Args:
-            storage_path: Directory for RL data (e.g., ~/.victor/rl_data/)
-            db_path: Path to SQLite database (defaults to ~/.victor/graph/graph.db)
+            storage_path: Directory for RL data (e.g., ~/.victor/rl_data/) - legacy, now ignored
+            db_path: Path to SQLite database - legacy, now uses unified database
         """
+        # Legacy storage_path kept for backward compatibility
+        if storage_path is None:
+            storage_path = Path.home() / ".victor" / "rl_data"
         self.storage_path = storage_path
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-        # Use existing graph database for RL tables
-        if db_path is None:
-            db_path = Path.home() / ".victor" / "graph" / "graph.db"
-
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        self.db = sqlite3.connect(str(self.db_path), check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
+        # Use unified database from victor.core.database
+        self._db_manager = get_database()
+        self.db = self._db_manager.get_connection()
+        self.db_path = self._db_manager.db_path
 
         # Registry of learners
         self._learners: Dict[str, BaseLearner] = {}
@@ -84,51 +88,23 @@ class RLCoordinator:
         # Auto-register default learners
         self._register_default_learners()
 
-        logger.info(f"RL: Coordinator initialized with database at {self.db_path}")
+        # Connect to RL hooks and metrics for event-driven updates
+        self._connect_hooks_and_metrics()
+
+        logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
 
     def _ensure_core_tables(self) -> None:
         """Create core tables for telemetry and cross-learner analysis."""
         cursor = self.db.cursor()
 
-        # Shared outcomes table for all learners
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rl_outcomes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                learner_name TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                vertical TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                quality_score REAL NOT NULL,
-                metadata TEXT,
-                timestamp TEXT NOT NULL,
-                created_at REAL DEFAULT (julianday('now'))
-            )
-            """
-        )
+        # Shared outcomes table for all learners (uses schema constant)
+        cursor.execute(Schema.RL_OUTCOME)
 
         # Index for fast lookups
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_rl_outcomes_learner
-            ON rl_outcomes(learner_name, provider, model, task_type)
-            """
-        )
+        cursor.executescript(Schema.RL_OUTCOME_INDEXES)
 
-        # Telemetry table for monitoring
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rl_telemetry (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                learner_name TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                data TEXT,
-                timestamp TEXT NOT NULL
-            )
-            """
-        )
+        # Telemetry/metrics table for monitoring (uses schema constant)
+        cursor.execute(Schema.RL_METRIC)
 
         self.db.commit()
         logger.debug("RL: Core tables ensured")
@@ -141,6 +117,27 @@ class RLCoordinator:
         """
         # Learners are registered when first accessed via get_learner()
         pass
+
+    def _connect_hooks_and_metrics(self) -> None:
+        """Connect to RL hooks registry and metrics exporter.
+
+        This enables event-driven learner activation and metrics collection.
+        """
+        try:
+            # Connect to hooks registry
+            from victor.agent.rl.hooks import get_rl_hooks
+
+            hooks = get_rl_hooks(coordinator=self)
+            logger.debug("RL: Connected to hooks registry")
+
+            # Connect to metrics exporter
+            from victor.agent.rl.metrics import get_rl_metrics
+
+            get_rl_metrics(coordinator=self, hooks=hooks)
+            logger.debug("RL: Connected to metrics exporter")
+
+        except ImportError as e:
+            logger.debug("RL: Hooks/metrics not available: %s", e)
 
     def register_learner(self, name: str, learner: BaseLearner) -> None:
         """Register a learner with the coordinator.
@@ -237,6 +234,19 @@ class RLCoordinator:
                 from victor.agent.rl.learners.prompt_template import PromptTemplateLearner
 
                 return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
+            elif name == "team_composition":
+                from victor.agent.teams.learner import TeamCompositionLearner
+
+                # TeamCompositionLearner has different signature - uses db_path instead of db_connection
+                return TeamCompositionLearner(learning_rate=0.1)
+            elif name == "cross_vertical":
+                from victor.agent.rl.learners.cross_vertical import CrossVerticalLearner
+
+                return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
+            elif name == "workflow_execution":
+                from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
+
+                return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
@@ -271,27 +281,40 @@ class RLCoordinator:
             learner.record_outcome(outcome)
 
             # Record in shared outcomes table
+            # Note: Uses both learner_name (legacy NOT NULL) and learner_id (new schema)
+            # Also includes timestamp (legacy NOT NULL) alongside created_at (new schema)
+            from datetime import datetime as dt
+            timestamp_now = dt.now().isoformat()
             cursor = self.db.cursor()
             cursor.execute(
-                """
-                INSERT INTO rl_outcomes (
-                    learner_name, provider, model, task_type, vertical,
-                    success, quality_score, metadata, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                f"""
+                INSERT INTO {Tables.RL_OUTCOME} (
+                    learner_name, learner_id, provider, model, task_type, vertical,
+                    success, quality_score, metadata, timestamp, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """,
                 (
-                    learner_name,
+                    learner_name,  # legacy column (NOT NULL)
+                    learner_name,  # new column (for index)
                     outcome.provider,
                     outcome.model,
                     outcome.task_type,
-                    outcome.vertical,
+                    outcome.vertical or "general",  # Default to "general" if None
                     1 if outcome.success else 0,
                     outcome.quality_score,
                     outcome.to_dict()["metadata"],  # JSON string
-                    outcome.timestamp,
+                    timestamp_now,  # legacy timestamp column (NOT NULL)
                 ),
             )
             self.db.commit()
+
+            # Also record telemetry metric
+            self._record_metric(
+                learner_name,
+                "outcome_recorded",
+                outcome.quality_score,
+                {"success": outcome.success, "task_type": outcome.task_type},
+            )
 
             logger.debug(
                 f"RL: Recorded outcome for {learner_name} "
@@ -301,6 +324,58 @@ class RLCoordinator:
         except Exception as e:
             logger.error(f"RL: Failed to record outcome for {learner_name}: {e}")
             self.db.rollback()
+
+    def _record_metric(
+        self,
+        learner_id: str,
+        metric_type: str,
+        metric_value: float,
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Record a telemetry metric to rl_metric table.
+
+        Args:
+            learner_id: Learner name/ID
+            metric_type: Type of metric (e.g., 'outcome_recorded', 'q_value_update')
+            metric_value: Numeric metric value
+            metadata: Optional additional metadata dict
+        """
+        try:
+            import json
+            cursor = self.db.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {Tables.RL_METRIC}
+                (learner_id, metric_type, metric_value, metadata)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    learner_id,
+                    metric_type,
+                    metric_value,
+                    json.dumps(metadata) if metadata else None,
+                ),
+            )
+            self.db.commit()
+        except Exception as e:
+            logger.debug(f"RL: Failed to record metric: {e}")
+
+    def record_metric(
+        self,
+        learner_id: str,
+        metric_type: str,
+        metric_value: float,
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Public interface to record telemetry metrics.
+
+        Args:
+            learner_id: Learner name/ID
+            metric_type: Type of metric
+            metric_value: Numeric metric value
+            metadata: Optional additional metadata
+        """
+        self._record_metric(learner_id, metric_type, metric_value, metadata)
 
     def get_recommendation(
         self,
@@ -425,7 +500,7 @@ class RLCoordinator:
 
         # Add global stats
         cursor = self.db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM rl_outcomes")
+        cursor.execute(f"SELECT COUNT(*) FROM {Tables.RL_OUTCOME}")
         metrics["coordinator"]["total_outcomes"] = cursor.fetchone()[0]
 
         return metrics
@@ -493,7 +568,7 @@ class RLCoordinator:
         # Count outcomes from database
         cursor = self.db.cursor()
         try:
-            cursor.execute("SELECT COUNT(*) FROM rl_outcomes")
+            cursor.execute(f"SELECT COUNT(*) FROM {Tables.RL_OUTCOME}")
             total_outcomes = cursor.fetchone()[0]
         except Exception:
             total_outcomes = 0
@@ -540,8 +615,7 @@ def get_rl_coordinator() -> RLCoordinator:
     """
     global _rl_coordinator
     if _rl_coordinator is None:
-        storage_path = Path.home() / ".victor" / "rl_data"
-        _rl_coordinator = RLCoordinator(storage_path)
+        _rl_coordinator = RLCoordinator()
     return _rl_coordinator
 
 
@@ -556,7 +630,6 @@ async def get_rl_coordinator_async() -> RLCoordinator:
     """
     global _rl_coordinator
     if _rl_coordinator is None:
-        storage_path = Path.home() / ".victor" / "rl_data"
         # Initialize in thread to avoid blocking event loop
-        _rl_coordinator = await asyncio.to_thread(RLCoordinator, storage_path)
+        _rl_coordinator = await asyncio.to_thread(RLCoordinator)
     return _rl_coordinator

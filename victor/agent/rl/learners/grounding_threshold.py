@@ -42,6 +42,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,8 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Beta parameters table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS grounding_threshold_params (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_PARAM} (
                 context_key TEXT NOT NULL,
                 threshold REAL NOT NULL,
                 alpha REAL NOT NULL DEFAULT 1.0,
@@ -124,8 +125,8 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Provider statistics
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS grounding_threshold_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_STAT} (
                 provider TEXT PRIMARY KEY,
                 true_positives INTEGER NOT NULL DEFAULT 0,
                 true_negatives INTEGER NOT NULL DEFAULT 0,
@@ -138,8 +139,8 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Decision history
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS grounding_threshold_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 context_key TEXT NOT NULL,
                 threshold REAL NOT NULL,
@@ -152,9 +153,9 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_grounding_threshold_context
-            ON grounding_threshold_params(context_key)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_grounding_param_context
+            ON {Tables.RL_GROUNDING_PARAM}(context_key)
             """
         )
 
@@ -167,7 +168,7 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Load Beta parameters
         try:
-            cursor.execute("SELECT * FROM grounding_threshold_params")
+            cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_PARAM}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 context_key = row_dict["context_key"]
@@ -187,7 +188,7 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Load error rates
         try:
-            cursor.execute("SELECT * FROM grounding_threshold_stats")
+            cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_STAT}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 provider = row_dict["provider"]
@@ -332,8 +333,8 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Ensure row exists
         cursor.execute(
-            """
-            INSERT OR IGNORE INTO grounding_threshold_stats
+            f"""
+            INSERT OR IGNORE INTO {Tables.RL_GROUNDING_STAT}
             (provider, true_positives, true_negatives, false_positives, false_negatives, last_updated)
             VALUES (?, 0, 0, 0, 0, ?)
             """,
@@ -351,7 +352,7 @@ class GroundingThresholdLearner(BaseLearner):
         if column:
             cursor.execute(
                 f"""
-                UPDATE grounding_threshold_stats
+                UPDATE {Tables.RL_GROUNDING_STAT}
                 SET {column} = {column} + 1, last_updated = ?
                 WHERE provider = ?
                 """,
@@ -373,11 +374,11 @@ class GroundingThresholdLearner(BaseLearner):
         # Save Beta parameters
         alpha, beta = self._beta_params[context_key][closest_threshold]
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO grounding_threshold_params
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_GROUNDING_PARAM}
             (context_key, threshold, alpha, beta, sample_count, last_updated)
             VALUES (?, ?, ?, ?, COALESCE(
-                (SELECT sample_count + 1 FROM grounding_threshold_params
+                (SELECT sample_count + 1 FROM {Tables.RL_GROUNDING_PARAM}
                  WHERE context_key = ? AND threshold = ?), 1
             ), ?)
             """,
@@ -394,8 +395,8 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Save history
         cursor.execute(
-            """
-            INSERT INTO grounding_threshold_history
+            f"""
+            INSERT INTO {Tables.RL_GROUNDING_HISTORY}
             (context_key, threshold, result_type, reward, timestamp)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -492,7 +493,7 @@ class GroundingThresholdLearner(BaseLearner):
             Dictionary with fp_rate, fn_rate, precision, recall
         """
         cursor = self.db.cursor()
-        cursor.execute("SELECT * FROM grounding_threshold_stats WHERE provider = ?", (provider,))
+        cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_STAT} WHERE provider = ?", (provider,))
         row = cursor.fetchone()
 
         if not row:
@@ -526,7 +527,7 @@ class GroundingThresholdLearner(BaseLearner):
             Dictionary mapping provider to error rates
         """
         cursor = self.db.cursor()
-        cursor.execute("SELECT DISTINCT provider FROM grounding_threshold_stats")
+        cursor.execute(f"SELECT DISTINCT provider FROM {Tables.RL_GROUNDING_STAT}")
         providers = [row[0] for row in cursor.fetchall()]
 
         return {provider: self.get_provider_error_rates(provider) for provider in providers}

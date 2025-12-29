@@ -34,6 +34,7 @@ import logging
 from typing import Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ class ContinuationPromptLearner(BaseLearner):
 
         # Stats table: one row per provider:model:task_type
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS continuation_prompts_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_PROMPT_STAT} (
                 context_key TEXT PRIMARY KEY,
                 provider TEXT NOT NULL,
                 model TEXT NOT NULL,
@@ -79,9 +80,9 @@ class ContinuationPromptLearner(BaseLearner):
 
         # Index for fast lookups
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_cont_prompts_provider
-            ON continuation_prompts_stats(provider, model, task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_prompt_stat_provider
+            ON {Tables.RL_PROMPT_STAT}(provider, model, task_type)
             """
         )
 
@@ -107,7 +108,7 @@ class ContinuationPromptLearner(BaseLearner):
 
         # Get or create stats
         cursor.execute(
-            "SELECT * FROM continuation_prompts_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()
@@ -174,8 +175,8 @@ class ContinuationPromptLearner(BaseLearner):
 
         # Upsert to database
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO continuation_prompts_stats
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_PROMPT_STAT}
             (context_key, provider, model, task_type, total_sessions, successful_sessions,
              stuck_loop_count, forced_completion_count, avg_quality_score, avg_prompts_used,
              current_max_prompts, recommended_max_prompts, quality_sum, prompts_sum, last_updated)
@@ -290,7 +291,7 @@ class ContinuationPromptLearner(BaseLearner):
 
         cursor = self.db.cursor()
         cursor.execute(
-            "SELECT * FROM continuation_prompts_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()

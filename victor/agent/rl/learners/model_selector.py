@@ -37,6 +37,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -124,10 +125,10 @@ class ModelSelectorLearner(BaseLearner):
         """Create tables for model selector stats."""
         cursor = self.db.cursor()
 
-        # Global Q-values table
+        # Global Q-values table (uses Tables constants)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS model_selector_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_Q} (
                 provider TEXT PRIMARY KEY,
                 q_value REAL NOT NULL,
                 selection_count INTEGER DEFAULT 0,
@@ -138,8 +139,8 @@ class ModelSelectorLearner(BaseLearner):
 
         # Task-specific Q-values table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS model_selector_task_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_TASK} (
                 provider TEXT NOT NULL,
                 task_type TEXT NOT NULL,
                 q_value REAL NOT NULL,
@@ -152,8 +153,8 @@ class ModelSelectorLearner(BaseLearner):
 
         # State table (epsilon, total_selections)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS model_selector_state (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_STATE} (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             )
@@ -162,9 +163,9 @@ class ModelSelectorLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_model_selector_task
-            ON model_selector_task_q_values(provider, task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_model_task
+            ON {Tables.RL_MODEL_TASK}(provider, task_type)
             """
         )
 
@@ -176,7 +177,7 @@ class ModelSelectorLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Load global Q-values
-        cursor.execute("SELECT * FROM model_selector_q_values")
+        cursor.execute("SELECT * FROM {Tables.RL_MODEL_Q}")
         for row in cursor.fetchall():
             stats = dict(row)
             provider = stats["provider"]
@@ -185,7 +186,7 @@ class ModelSelectorLearner(BaseLearner):
             self._total_selections += stats["selection_count"]
 
         # Load task-specific Q-values
-        cursor.execute("SELECT * FROM model_selector_task_q_values")
+        cursor.execute("SELECT * FROM {Tables.RL_MODEL_TASK}")
         for row in cursor.fetchall():
             stats = dict(row)
             provider = stats["provider"]
@@ -200,7 +201,7 @@ class ModelSelectorLearner(BaseLearner):
 
         # Load epsilon and total_selections
         cursor.execute(
-            "SELECT * FROM model_selector_state WHERE key IN ('epsilon', 'total_selections')"
+            "SELECT * FROM {Tables.RL_MODEL_STATE} WHERE key IN ('epsilon', 'total_selections')"
         )
         for row in cursor.fetchall():
             stats = dict(row)
@@ -281,7 +282,7 @@ class ModelSelectorLearner(BaseLearner):
         # Save global Q-value
         cursor.execute(
             """
-            INSERT OR REPLACE INTO model_selector_q_values
+            INSERT OR REPLACE INTO {Tables.RL_MODEL_Q}
             (provider, q_value, selection_count, last_updated)
             VALUES (?, ?, ?, ?)
             """,
@@ -298,7 +299,7 @@ class ModelSelectorLearner(BaseLearner):
             if task_type in self._q_table_by_task[provider]:
                 cursor.execute(
                     """
-                    INSERT OR REPLACE INTO model_selector_task_q_values
+                    INSERT OR REPLACE INTO {Tables.RL_MODEL_TASK}
                     (provider, task_type, q_value, selection_count, last_updated)
                     VALUES (?, ?, ?, ?, ?)
                     """,
@@ -313,11 +314,11 @@ class ModelSelectorLearner(BaseLearner):
 
         # Save epsilon and total_selections
         cursor.execute(
-            "INSERT OR REPLACE INTO model_selector_state (key, value) VALUES ('epsilon', ?)",
+            "INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('epsilon', ?)",
             (str(self.epsilon),),
         )
         cursor.execute(
-            "INSERT OR REPLACE INTO model_selector_state (key, value) VALUES ('total_selections', ?)",
+            "INSERT OR REPLACE INTO {Tables.RL_MODEL_STATE} (key, value) VALUES ('total_selections', ?)",
             (str(self._total_selections),),
         )
 

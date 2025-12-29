@@ -35,6 +35,7 @@ import logging
 from typing import Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class ContinuationPatienceLearner(BaseLearner):
 
         # Stats table: one row per provider:model:task_type
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS continuation_patience_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_PATIENCE_STAT} (
                 context_key TEXT PRIMARY KEY,
                 provider TEXT NOT NULL,
                 model TEXT NOT NULL,
@@ -75,9 +76,9 @@ class ContinuationPatienceLearner(BaseLearner):
 
         # Index for fast lookups
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_cont_patience_provider
-            ON continuation_patience_stats(provider, model, task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_patience_stat_provider
+            ON {Tables.RL_PATIENCE_STAT}(provider, model, task_type)
             """
         )
 
@@ -103,7 +104,7 @@ class ContinuationPatienceLearner(BaseLearner):
 
         # Get or create stats
         cursor.execute(
-            "SELECT * FROM continuation_patience_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()
@@ -152,8 +153,8 @@ class ContinuationPatienceLearner(BaseLearner):
 
         # Upsert to database
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO continuation_patience_stats
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_PATIENCE_STAT}
             (context_key, provider, model, task_type, current_patience,
              total_sessions, false_positives, true_positives, missed_stuck_loops,
              last_updated)
@@ -242,7 +243,7 @@ class ContinuationPatienceLearner(BaseLearner):
 
         cursor = self.db.cursor()
         cursor.execute(
-            "SELECT * FROM continuation_patience_stats WHERE context_key = ?",
+            f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
             (context_key,),
         )
         row = cursor.fetchone()

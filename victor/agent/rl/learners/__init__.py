@@ -16,12 +16,16 @@
 
 from victor.agent.rl.learners.continuation_patience import ContinuationPatienceLearner
 from victor.agent.rl.learners.continuation_prompts import ContinuationPromptLearner
+from victor.agent.rl.learners.cross_vertical import CrossVerticalLearner
 from victor.agent.rl.learners.model_selector import ModelSelectorLearner
 from victor.agent.rl.learners.semantic_threshold import SemanticThresholdLearner
+from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
 
 __all__ = [
     "ContinuationPatienceLearner",
     "ContinuationPromptLearner",
+    "CrossVerticalLearner",
     "ModelSelectorLearner",
     "SemanticThresholdLearner",
+    "WorkflowExecutionLearner",
 ]

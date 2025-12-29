@@ -39,6 +39,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +142,8 @@ class QualityWeightLearner(BaseLearner):
 
         # Weights table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS quality_weights (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_WEIGHT} (
                 task_type TEXT NOT NULL,
                 dimension TEXT NOT NULL,
                 weight REAL NOT NULL,
@@ -156,8 +157,8 @@ class QualityWeightLearner(BaseLearner):
 
         # Learning history
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS quality_weight_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_type TEXT NOT NULL,
                 dimension_scores TEXT NOT NULL,
@@ -170,9 +171,9 @@ class QualityWeightLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_quality_weights_task
-            ON quality_weights(task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_quality_weight_task
+            ON {Tables.RL_QUALITY_WEIGHT}(task_type)
             """
         )
 
@@ -184,7 +185,7 @@ class QualityWeightLearner(BaseLearner):
         cursor = self.db.cursor()
 
         try:
-            cursor.execute("SELECT * FROM quality_weights")
+            cursor.execute(f"SELECT * FROM {Tables.RL_QUALITY_WEIGHT}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 task_type = row_dict["task_type"]
@@ -337,8 +338,8 @@ class QualityWeightLearner(BaseLearner):
         # Save current weights
         for dim in QualityDimension.ALL:
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO quality_weights
+                f"""
+                INSERT OR REPLACE INTO {Tables.RL_QUALITY_WEIGHT}
                 (task_type, dimension, weight, velocity, sample_count, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -354,8 +355,8 @@ class QualityWeightLearner(BaseLearner):
 
         # Save history
         cursor.execute(
-            """
-            INSERT INTO quality_weight_history
+            f"""
+            INSERT INTO {Tables.RL_QUALITY_HISTORY}
             (task_type, dimension_scores, overall_success, weights_used, timestamp)
             VALUES (?, ?, ?, ?, ?)
             """,

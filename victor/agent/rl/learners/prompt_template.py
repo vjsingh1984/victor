@@ -43,6 +43,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -239,8 +240,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Style posteriors table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_styles (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_STYLE} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
                 style TEXT NOT NULL,
@@ -255,8 +256,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Element posteriors table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_elements (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_ELEMENT} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
                 element TEXT NOT NULL,
@@ -271,8 +272,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Learning history
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -286,15 +287,15 @@ class PromptTemplateLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_prompt_styles_context
-            ON prompt_template_styles(task_type, provider)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_agent_prompt_style_context
+            ON {Tables.AGENT_PROMPT_STYLE}(task_type, provider)
             """
         )
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_prompt_elements_context
-            ON prompt_template_elements(task_type, provider)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_agent_prompt_element_context
+            ON {Tables.AGENT_PROMPT_ELEMENT}(task_type, provider)
             """
         )
 
@@ -307,7 +308,7 @@ class PromptTemplateLearner(BaseLearner):
 
         try:
             # Load style posteriors
-            cursor.execute("SELECT * FROM prompt_template_styles")
+            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_STYLE}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 key = (row_dict["task_type"], row_dict["provider"], row_dict["style"])
@@ -322,7 +323,7 @@ class PromptTemplateLearner(BaseLearner):
                 )
 
             # Load element posteriors
-            cursor.execute("SELECT * FROM prompt_template_elements")
+            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_ELEMENT}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 key = (row_dict["task_type"], row_dict["provider"], row_dict["element"])
@@ -452,8 +453,8 @@ class PromptTemplateLearner(BaseLearner):
         # Save style posterior
         style_posterior = self._get_style_posterior(task_type, provider, template.style)
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO prompt_template_styles
+            f"""
+            INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_STYLE}
             (task_type, provider, style, alpha, beta, sample_count, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
@@ -472,8 +473,8 @@ class PromptTemplateLearner(BaseLearner):
         for element in template.elements:
             element_posterior = self._get_element_posterior(task_type, provider, element)
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO prompt_template_elements
+                f"""
+                INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_ELEMENT}
                 (task_type, provider, element, alpha, beta, sample_count, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -490,8 +491,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Save history
         cursor.execute(
-            """
-            INSERT INTO prompt_template_history
+            f"""
+            INSERT INTO {Tables.AGENT_PROMPT_HISTORY}
             (task_type, provider, model, template_used, success, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
