@@ -21,6 +21,7 @@ including code validation, syntax checking, and auto-correction.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Dict, Optional, Set
 
 from victor.verticals.protocols import (
@@ -142,6 +143,9 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
 
     This middleware is specific to the coding vertical and wraps
     the framework's CodeCorrectionMiddleware for protocol compliance.
+
+    Also integrates with RL system to record tool success/failure
+    for adaptive learning.
     """
 
     def __init__(
@@ -149,6 +153,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         enabled: bool = True,
         auto_fix: bool = True,
         max_iterations: int = 1,
+        enable_rl: bool = True,
     ):
         """Initialize the middleware.
 
@@ -156,11 +161,16 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             enabled: Whether correction is enabled
             auto_fix: Whether to automatically fix detected issues
             max_iterations: Maximum correction iterations
+            enable_rl: Whether to record RL training data
         """
         self._enabled = enabled
         self._auto_fix = auto_fix
         self._max_iterations = max_iterations
+        self._enable_rl = enable_rl
         self._inner_middleware = None
+        self._rl_hooks = None
+        # Track timing for RL
+        self._tool_start_times: Dict[str, float] = {}
 
     def _get_inner(self):
         """Lazy-load the inner middleware."""
@@ -181,6 +191,18 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
                 logger.warning("Code correction middleware not available")
                 return None
         return self._inner_middleware
+
+    def _get_rl_hooks(self):
+        """Lazy-load the RL hooks."""
+        if self._rl_hooks is None and self._enable_rl:
+            try:
+                from victor.verticals.coding.rl import CodingRLHooks
+
+                self._rl_hooks = CodingRLHooks()
+            except ImportError:
+                logger.debug("RL hooks not available")
+                return None
+        return self._rl_hooks
 
     def should_validate(self, tool_name: str) -> bool:
         """Check if this tool should have its code validated.
@@ -241,6 +263,8 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
     async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Validate and optionally fix code before tool execution.
 
+        Also tracks timing for RL recording.
+
         Args:
             tool_name: Name of the tool being called
             arguments: Arguments passed to the tool
@@ -248,6 +272,10 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         Returns:
             MiddlewareResult with validation status and any corrections
         """
+        # Track start time for RL
+        if self._enable_rl:
+            self._tool_start_times[tool_name] = time.time()
+
         if not self._enabled:
             return MiddlewareResult()
 
@@ -292,20 +320,59 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         arguments: Dict[str, Any],
         result: Any,
         success: bool,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Optional[Any]:
         """Called after tool execution.
 
-        Currently does nothing for code correction.
+        Records RL outcomes for tool success/failure to enable
+        adaptive tool selection learning.
 
         Args:
             tool_name: Name of the tool
             arguments: Arguments passed
             result: Tool result
             success: Whether execution succeeded
+            context: Optional execution context with provider/model info
 
         Returns:
             None (no modification)
         """
+        # Record RL outcome
+        if self._enable_rl:
+            rl_hooks = self._get_rl_hooks()
+            if rl_hooks is not None:
+                try:
+                    # Calculate duration
+                    start_time = self._tool_start_times.pop(tool_name, None)
+                    duration_ms = (time.time() - start_time) * 1000 if start_time else 0
+
+                    # Get context info
+                    ctx = context or {}
+                    task_type = ctx.get("task_type", "general")
+                    provider = ctx.get("provider", "unknown")
+                    model = ctx.get("model", "unknown")
+
+                    if success:
+                        rl_hooks.on_tool_success(
+                            tool_name=tool_name,
+                            task_type=task_type,
+                            provider=provider,
+                            model=model,
+                            duration_ms=duration_ms,
+                            context=ctx,
+                        )
+                    else:
+                        error_msg = str(result) if result else "Unknown error"
+                        rl_hooks.on_tool_failure(
+                            tool_name=tool_name,
+                            task_type=task_type,
+                            provider=provider,
+                            model=model,
+                            error=error_msg,
+                        )
+                except Exception as e:
+                    logger.debug("Error recording RL outcome: %s", e)
+
         return None
 
     def get_priority(self) -> MiddlewarePriority:

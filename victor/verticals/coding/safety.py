@@ -16,202 +16,30 @@
 
 This module defines dangerous operation patterns specific to
 software development, particularly git operations and code refactoring.
+
+This module now delegates to the core safety infrastructure at
+victor.safety.code_patterns for pattern scanning, while maintaining
+backward compatibility for existing imports.
 """
 
 from __future__ import annotations
 
 from typing import Dict, List
 
+from victor.safety.code_patterns import (
+    CodePatternScanner,
+    GIT_PATTERNS,
+    REFACTORING_PATTERNS,
+    PACKAGE_MANAGER_PATTERNS,
+    BUILD_DEPLOY_PATTERNS,
+    SENSITIVE_FILE_PATTERNS,
+)
 from victor.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
 
 
-# Git-specific dangerous patterns
-GIT_DANGEROUS_PATTERNS: List[SafetyPattern] = [
-    # HIGH risk git operations
-    SafetyPattern(
-        pattern=r"git\s+reset\s+--hard",
-        description="Discard all uncommitted changes",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+clean\s+-fd",
-        description="Delete untracked files",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+push\s+.*--force",
-        description="Force push (may lose commits)",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+push\s+-f",
-        description="Force push (may lose commits)",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+rebase\s+.*--force",
-        description="Force rebase",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+branch\s+-D",
-        description="Force delete branch",
-        risk_level="HIGH",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+push\s+.*:\s*\S+",
-        description="Delete remote branch",
-        risk_level="HIGH",
-        category="git",
-    ),
-    # MEDIUM risk git operations
-    SafetyPattern(
-        pattern=r"git\s+checkout\s+--\s+",
-        description="Discard changes to file",
-        risk_level="MEDIUM",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+stash\s+drop",
-        description="Discard stashed changes",
-        risk_level="MEDIUM",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+stash\s+clear",
-        description="Clear all stashes",
-        risk_level="MEDIUM",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+rebase\s+-i",
-        description="Interactive rebase (rewrites history)",
-        risk_level="MEDIUM",
-        category="git",
-    ),
-    SafetyPattern(
-        pattern=r"git\s+commit\s+--amend",
-        description="Amend last commit",
-        risk_level="MEDIUM",
-        category="git",
-    ),
-]
-
-
-# Refactoring-specific patterns
-REFACTORING_PATTERNS: List[SafetyPattern] = [
-    SafetyPattern(
-        pattern=r"refactor.*--all",
-        description="Refactor across entire codebase",
-        risk_level="HIGH",
-        category="refactoring",
-    ),
-    SafetyPattern(
-        pattern=r"rename.*--recursive",
-        description="Recursive symbol rename",
-        risk_level="MEDIUM",
-        category="refactoring",
-    ),
-]
-
-
-# Package manager patterns
-PACKAGE_MANAGER_PATTERNS: List[SafetyPattern] = [
-    SafetyPattern(
-        pattern=r"pip\s+uninstall",
-        description="Uninstall Python package",
-        risk_level="MEDIUM",
-        category="package",
-    ),
-    SafetyPattern(
-        pattern=r"npm\s+uninstall",
-        description="Uninstall npm package",
-        risk_level="MEDIUM",
-        category="package",
-    ),
-    SafetyPattern(
-        pattern=r"yarn\s+remove",
-        description="Remove yarn package",
-        risk_level="MEDIUM",
-        category="package",
-    ),
-    SafetyPattern(
-        pattern=r"cargo\s+remove",
-        description="Remove Rust crate",
-        risk_level="MEDIUM",
-        category="package",
-    ),
-    SafetyPattern(
-        pattern=r"pip\s+install\s+--force-reinstall",
-        description="Force reinstall package",
-        risk_level="MEDIUM",
-        category="package",
-    ),
-]
-
-
-# Build/deployment patterns
-BUILD_DEPLOY_PATTERNS: List[SafetyPattern] = [
-    SafetyPattern(
-        pattern=r"docker\s+system\s+prune",
-        description="Remove unused Docker data",
-        risk_level="MEDIUM",
-        category="docker",
-    ),
-    SafetyPattern(
-        pattern=r"docker\s+image\s+prune\s+-a",
-        description="Remove all unused images",
-        risk_level="MEDIUM",
-        category="docker",
-    ),
-    SafetyPattern(
-        pattern=r"kubectl\s+delete",
-        description="Delete Kubernetes resources",
-        risk_level="HIGH",
-        category="kubernetes",
-    ),
-    SafetyPattern(
-        pattern=r"terraform\s+destroy",
-        description="Destroy infrastructure",
-        risk_level="CRITICAL",
-        category="infrastructure",
-    ),
-]
-
-
-# File operation patterns specific to coding
-CODING_FILE_PATTERNS: List[SafetyPattern] = [
-    SafetyPattern(
-        pattern=r"\.env$",
-        description="Environment file with secrets",
-        risk_level="HIGH",
-        category="secrets",
-    ),
-    SafetyPattern(
-        pattern=r"\.pem$|\.key$",
-        description="Private key file",
-        risk_level="CRITICAL",
-        category="secrets",
-    ),
-    SafetyPattern(
-        pattern=r"credentials\.json",
-        description="Credentials file",
-        risk_level="HIGH",
-        category="secrets",
-    ),
-    SafetyPattern(
-        pattern=r"\.git/",
-        description="Git internal directory",
-        risk_level="HIGH",
-        category="git",
-    ),
-]
+# Re-export core patterns with legacy names for backward compatibility
+GIT_DANGEROUS_PATTERNS: List[SafetyPattern] = GIT_PATTERNS
+CODING_FILE_PATTERNS: List[SafetyPattern] = SENSITIVE_FILE_PATTERNS
 
 
 class CodingSafetyExtension(SafetyExtensionProtocol):
@@ -219,6 +47,9 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
 
     Provides coding-specific dangerous operation patterns including
     git operations, refactoring, and package management.
+
+    This class delegates to the core CodePatternScanner for pattern
+    matching while providing the SafetyExtensionProtocol interface.
     """
 
     def __init__(
@@ -241,27 +72,22 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         self._include_packages = include_packages
         self._include_build = include_build
 
+        # Create a CodePatternScanner with matching configuration
+        self._scanner = CodePatternScanner(
+            include_git=include_git,
+            include_refactoring=include_refactoring,
+            include_packages=include_packages,
+            include_build=include_build,
+            include_files=True,
+        )
+
     def get_bash_patterns(self) -> List[SafetyPattern]:
         """Get coding-specific bash command patterns.
 
         Returns:
             List of safety patterns for dangerous bash commands
         """
-        patterns = []
-
-        if self._include_git:
-            patterns.extend(GIT_DANGEROUS_PATTERNS)
-
-        if self._include_refactoring:
-            patterns.extend(REFACTORING_PATTERNS)
-
-        if self._include_packages:
-            patterns.extend(PACKAGE_MANAGER_PATTERNS)
-
-        if self._include_build:
-            patterns.extend(BUILD_DEPLOY_PATTERNS)
-
-        return patterns
+        return self._scanner.all_patterns
 
     def get_file_patterns(self) -> List[SafetyPattern]:
         """Get coding-specific file operation patterns.
@@ -269,7 +95,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         Returns:
             List of safety patterns for file operations
         """
-        return CODING_FILE_PATTERNS.copy()
+        return self._scanner.file_patterns
 
     def get_tool_restrictions(self) -> Dict[str, List[str]]:
         """Get tool-specific argument restrictions.
@@ -295,9 +121,32 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         """
         return "coding"
 
+    def scan_command(self, command: str) -> List[SafetyPattern]:
+        """Scan a command for dangerous patterns.
+
+        Args:
+            command: The command to scan
+
+        Returns:
+            List of matched safety patterns
+        """
+        return self._scanner.scan_command(command).matches
+
+    def is_sensitive_file(self, path: str) -> bool:
+        """Check if a file path is sensitive.
+
+        Args:
+            path: File path to check
+
+        Returns:
+            True if the file is sensitive
+        """
+        return self._scanner.is_sensitive_file(path)
+
 
 __all__ = [
     "CodingSafetyExtension",
+    # Re-exported from core for backward compatibility
     "GIT_DANGEROUS_PATTERNS",
     "REFACTORING_PATTERNS",
     "PACKAGE_MANAGER_PATTERNS",

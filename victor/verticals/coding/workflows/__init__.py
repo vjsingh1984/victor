@@ -12,11 +12,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Coding-specific workflows.
+"""Coding vertical workflows.
 
-This package contains workflow implementations specific to software
-development tasks like new feature creation, refactoring, etc.
+This package provides workflow definitions for common coding tasks:
+- Feature implementation (full and quick)
+- Bug fix (systematic and quick)
+- Code review (comprehensive, quick, and PR)
+
+Example:
+    from victor.verticals.coding.workflows import CodingWorkflowProvider
+
+    provider = CodingWorkflowProvider()
+    workflows = provider.get_workflows()
+
+    # Get specific workflow
+    feature_wf = provider.get_workflow("feature_implementation")
+    print(f"Workflow: {feature_wf.name}")
+    print(f"Description: {feature_wf.description}")
+    print(f"Agents: {feature_wf.get_agent_count()}")
+    print(f"Total Budget: {feature_wf.get_total_budget()}")
 """
 
-# Workflows will be added here as they are migrated from the framework
-__all__ = []
+from victor.verticals.coding.workflows.provider import CodingWorkflowProvider
+
+# Individual workflows for direct import
+from victor.verticals.coding.workflows.feature import (
+    feature_implementation_workflow,
+    quick_feature_workflow,
+)
+from victor.verticals.coding.workflows.bugfix import (
+    bug_fix_workflow,
+    quick_fix_workflow,
+)
+from victor.verticals.coding.workflows.review import (
+    code_review_workflow,
+    quick_review_workflow,
+    pr_review_workflow,
+)
+
+__all__ = [
+    # Provider
+    "CodingWorkflowProvider",
+    # Feature workflows
+    "feature_implementation_workflow",
+    "quick_feature_workflow",
+    # Bug fix workflows
+    "bug_fix_workflow",
+    "quick_fix_workflow",
+    # Review workflows
+    "code_review_workflow",
+    "quick_review_workflow",
+    "pr_review_workflow",
+]

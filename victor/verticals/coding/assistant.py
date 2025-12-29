@@ -381,11 +381,21 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
     def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
         """Get coding-specific workflow provider.
 
+        Provides workflows for common coding tasks:
+        - feature_implementation: Full feature development
+        - quick_feature: Fast feature implementation
+        - bug_fix: Systematic bug fixing
+        - quick_fix: Fast bug fix
+        - code_review: Comprehensive review
+        - quick_review: Fast review
+        - pr_review: Pull request review
+
         Returns:
-            Workflow provider (or None if not implemented)
+            CodingWorkflowProvider instance
         """
-        # TODO: Implement workflow provider
-        return None
+        from victor.verticals.coding.workflows import CodingWorkflowProvider
+
+        return CodingWorkflowProvider()
 
     @classmethod
     def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
@@ -434,6 +444,52 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             # For analysis queries, don't hide write tools - coding often needs them
             readonly_only_for_analysis=False,
         )
+
+    @classmethod
+    def get_rl_config(cls) -> Optional[Any]:
+        """Get RL configuration for coding vertical.
+
+        Provides configuration for reinforcement learning integration,
+        including active learners, task type mappings, and quality thresholds.
+
+        Returns:
+            CodingRLConfig instance
+        """
+        from victor.verticals.coding.rl import CodingRLConfig
+
+        return CodingRLConfig()
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for coding vertical.
+
+        Provides hooks for recording RL outcomes and getting recommendations.
+
+        Returns:
+            CodingRLHooks instance
+        """
+        from victor.verticals.coding.rl import CodingRLHooks
+
+        return CodingRLHooks()
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for complex coding tasks.
+
+        Provides pre-configured team specifications for:
+        - feature_team: Feature implementation
+        - bug_fix_team: Bug investigation and fix
+        - refactoring_team: Safe refactoring
+        - review_team: Comprehensive code review
+        - testing_team: Test coverage improvement
+        - documentation_team: Documentation generation
+
+        Returns:
+            Dict mapping team names to CodingTeamSpec instances
+        """
+        from victor.verticals.coding.teams import CODING_TEAM_SPECS
+
+        return CODING_TEAM_SPECS
 
     @classmethod
     def get_extensions(cls) -> VerticalExtensions:
