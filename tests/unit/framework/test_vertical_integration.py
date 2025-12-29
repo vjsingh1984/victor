@@ -723,7 +723,7 @@ class TestRealVerticalIntegration:
         """Test that devops vertical provides RL config."""
         from victor.verticals.devops import DevOpsAssistant
 
-        rl_config = DevOpsAssistant.get_rl_config()
+        rl_config = DevOpsAssistant.get_rl_config_provider()
         assert rl_config is not None
 
         assert hasattr(rl_config, "active_learners")
@@ -732,8 +732,9 @@ class TestRealVerticalIntegration:
         """Test that devops vertical provides team specs."""
         from victor.verticals.devops import DevOpsAssistant
 
-        teams = DevOpsAssistant.get_team_specs()
-        assert teams is not None
+        team_provider = DevOpsAssistant.get_team_spec_provider()
+        assert team_provider is not None
+        teams = team_provider.get_team_specs()
         assert len(teams) > 0
         assert "deployment_team" in teams
 
@@ -752,7 +753,7 @@ class TestRealVerticalIntegration:
         """Test that research vertical provides RL config."""
         from victor.verticals.research import ResearchAssistant
 
-        rl_config = ResearchAssistant.get_rl_config()
+        rl_config = ResearchAssistant.get_rl_config_provider()
         assert rl_config is not None
 
         assert hasattr(rl_config, "active_learners")
@@ -761,8 +762,9 @@ class TestRealVerticalIntegration:
         """Test that research vertical provides team specs."""
         from victor.verticals.research import ResearchAssistant
 
-        teams = ResearchAssistant.get_team_specs()
-        assert teams is not None
+        team_provider = ResearchAssistant.get_team_spec_provider()
+        assert team_provider is not None
+        teams = team_provider.get_team_specs()
         assert len(teams) > 0
         assert "deep_research_team" in teams
 
@@ -781,7 +783,7 @@ class TestRealVerticalIntegration:
         """Test that data analysis vertical provides RL config."""
         from victor.verticals.data_analysis import DataAnalysisAssistant
 
-        rl_config = DataAnalysisAssistant.get_rl_config()
+        rl_config = DataAnalysisAssistant.get_rl_config_provider()
         assert rl_config is not None
 
         assert hasattr(rl_config, "active_learners")
@@ -790,8 +792,9 @@ class TestRealVerticalIntegration:
         """Test that data analysis vertical provides team specs."""
         from victor.verticals.data_analysis import DataAnalysisAssistant
 
-        teams = DataAnalysisAssistant.get_team_specs()
-        assert teams is not None
+        team_provider = DataAnalysisAssistant.get_team_spec_provider()
+        assert team_provider is not None
+        teams = team_provider.get_team_specs()
         assert len(teams) > 0
         assert "eda_team" in teams
 

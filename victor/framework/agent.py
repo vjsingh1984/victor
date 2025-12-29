@@ -1020,7 +1020,17 @@ class Agent:
         if not self._vertical:
             return []
 
-        team_specs = self._vertical.get_team_specs()
+        # Support both provider pattern (ISP-compliant) and direct method
+        team_specs = None
+        if hasattr(self._vertical, "get_team_spec_provider"):
+            team_provider = self._vertical.get_team_spec_provider()
+            if team_provider and hasattr(team_provider, "get_team_specs"):
+                team_specs = team_provider.get_team_specs()
+
+        # Fall back to direct method for backward compatibility
+        if team_specs is None and hasattr(self._vertical, "get_team_specs"):
+            team_specs = self._vertical.get_team_specs()
+
         if not team_specs:
             return []
 
