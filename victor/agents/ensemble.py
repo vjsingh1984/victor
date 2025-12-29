@@ -295,7 +295,9 @@ class Pipeline(Ensemble):
         if agent.system_prompt:
             prompt_parts.insert(0, agent.system_prompt)
 
-        _prompt = "\n\n".join(prompt_parts)  # noqa: F841 - Built for future orchestrator integration
+        _prompt = "\n\n".join(
+            prompt_parts
+        )  # noqa: F841 - Built for future orchestrator integration
 
         # TODO: Integrate with actual orchestrator
         # For now, return mock output
