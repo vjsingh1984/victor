@@ -234,6 +234,18 @@ from victor.core.agent_commands import (
     create_agent_command_bus,
 )
 
+from victor.core.mode_config import (
+    ModeLevel,
+    ModeDefinition,
+    VerticalModeConfig,
+    DEFAULT_MODES,
+    DEFAULT_TASK_BUDGETS,
+    ModeConfigRegistry,
+    get_mode_config,
+    get_tool_budget,
+    register_vertical_modes,
+)
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -413,4 +425,14 @@ __all__ = [
     "SessionProjection",
     "AgentCommandBus",
     "create_agent_command_bus",
+    # Mode Configuration
+    "ModeLevel",
+    "ModeDefinition",
+    "VerticalModeConfig",
+    "DEFAULT_MODES",
+    "DEFAULT_TASK_BUDGETS",
+    "ModeConfigRegistry",
+    "get_mode_config",
+    "get_tool_budget",
+    "register_vertical_modes",
 ]
