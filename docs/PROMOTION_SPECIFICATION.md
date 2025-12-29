@@ -1,889 +1,500 @@
-# Victor Framework: Core Promotion Specification
+# Victor Framework Promotion Specification
 
-## Implementation Status (December 2025)
+## Executive Summary
 
-**Status: ✅ COMPLETE**
-
-All promotions have been implemented:
-
-| Promotion | Description | Status | Files Created |
-|-----------|-------------|--------|---------------|
-| 1 | Safety Infrastructure Extension | ✅ | `victor/safety/{code_patterns,infrastructure,types}.py` |
-| 2 | Mode Configuration Registry | ✅ | `victor/core/mode_config.py` |
-| 3 | Tool Dependency Graph | ✅ | `victor/tools/tool_graph.py` |
-| 4 | Tool Selection Strategy Protocol | ✅ | `victor/tools/selection/{protocol,registry}.py` |
-| 5 | Typed Tool Execution Context | ✅ | `victor/tools/context.py` |
-
-**Tests:**
-- ✅ `tests/unit/safety/` - Safety module tests
-- ✅ `tests/unit/core/` - Core module tests
-- ✅ `tests/unit/tools/test_tool_graph.py` - Tool graph tests
-- ✅ `tests/unit/tools/test_selection.py` - Tool selection tests
-- ✅ `tests/unit/tools/test_context.py` - Context tests
+This document identifies generic capabilities that should be promoted from vertical-specific implementations to the Victor framework core, ensuring all verticals benefit from shared, robust infrastructure. The analysis follows SOLID principles to ensure pluggability, extensibility, and alignment with modern AI agent framework best practices.
 
 ---
 
-## Overview
+## Table of Contents
 
-This document specifies the exact modules, interfaces, and implementations to be promoted from verticals to victor-core for cross-vertical benefit.
+1. [Framework Architecture Analysis](#1-framework-architecture-analysis)
+2. [Capabilities for Promotion](#2-capabilities-for-promotion)
+3. [SOLID Principles Compliance](#3-solid-principles-compliance)
+4. [Competitive Analysis](#4-competitive-analysis)
+5. [Implementation Roadmap](#5-implementation-roadmap)
+6. [Design Patterns & Best Practices](#6-design-patterns--best-practices)
 
 ---
 
-## Promotion 1: Safety Infrastructure Extension
+## 1. Framework Architecture Analysis
 
-### Current State
-
-```
-victor/safety/           # EXISTING (Partial)
-├── __init__.py
-├── secrets.py           # 19+ credential patterns
-└── pii.py               # 20+ PII types
-
-victor/verticals/coding/safety.py        # To consolidate
-victor/verticals/devops/safety.py        # To consolidate
-victor/verticals/data_analysis/safety.py # To consolidate
-victor/verticals/research/safety.py      # To consolidate
-```
-
-### Target State
+### 1.1 Current Layer Architecture
 
 ```
-victor/safety/
-├── __init__.py              # Unified exports
-├── base.py                  # Base classes and protocols
-├── secrets.py               # [EXISTING] Credential detection
-├── pii.py                   # [EXISTING] PII detection
-├── code_patterns.py         # [NEW] From coding/safety.py
-├── infrastructure.py        # [NEW] From devops/safety.py
-├── misinformation.py        # [NEW] From research/safety.py
-├── scanner.py               # [NEW] Unified scanner
-└── registry.py              # [NEW] Domain pattern registry
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           FRAMEWORK LAYER                                     │
+│  victor/framework/                                                            │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │   Agent     │ │    Task     │ │   Tools     │ │   State     │            │
+│  │  (facade)   │ │  (types)    │ │  (presets)  │ │ (observable)│            │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘            │
+│                          │                                                    │
+│                          ▼                                                    │
+│  ┌────────────────────────────────────────────────────────────────────┐      │
+│  │              VerticalIntegrationPipeline (9 steps)                  │      │
+│  └────────────────────────────────────────────────────────────────────┘      │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           PROTOCOL LAYER                                      │
+│  victor/protocols/                                                            │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │  Provider   │ │  Grounding  │ │   Quality   │ │    LSP      │            │
+│  │  Adapter    │ │  Strategy   │ │  Assessor   │ │   Types     │            │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘            │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           VERTICAL LAYER                                      │
+│  victor/verticals/                                                            │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │   Coding    │ │   DevOps    │ │    Data     │ │  Research   │            │
+│  │  Assistant  │ │  Assistant  │ │  Analysis   │ │  Assistant  │            │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘            │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            AGENT LAYER                                        │
+│  victor/agent/                                                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │Orchestrator │ │    Tool     │ │  Streaming  │ │     RL      │            │
+│  │  (facade)   │ │  Pipeline   │ │ Controller  │ │ Coordinator │            │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘            │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### New Interfaces
+### 1.2 Strengths
+
+| Component | Rating | Notes |
+|-----------|--------|-------|
+| Protocol Layer | ★★★★★ | Clean SOLID interfaces, 20+ provider adapters |
+| RL System | ★★★★★ | 13 learners, event-driven, cross-vertical transfer |
+| Framework API | ★★★★☆ | Golden 5-concept API, but escape hatches needed |
+| Tool System | ★★★★☆ | 45+ tools, semantic selection, cost tiers |
+| Vertical Integration | ★★★☆☆ | Good pipeline, but significant duplication |
+| State Management | ★★★☆☆ | Conversation stages, but no LangGraph-style graphs |
+
+### 1.3 Identified Issues
+
+1. **Mode Configuration Duplication**: 4 verticals × ~150 lines = ~600 lines duplicated
+2. **Tool Dependency Duplication**: 4 verticals × ~200 lines = ~800 lines duplicated
+3. **Missing Graph-Based Workflows**: No DAG execution like LangGraph
+4. **Limited Multi-Agent**: Teams exist but not as flexible as CrewAI crews
+5. **No Human-in-the-Loop Protocol**: HITL nodes exist in YAML but no framework protocol
+
+---
+
+## 2. Capabilities for Promotion
+
+### 2.1 HIGH PRIORITY - Immediate Promotion
+
+#### 2.1.1 Unified Mode Configuration Factory
+
+**Current State**: Each vertical implements custom ModeConfig dataclass
+**Duplication**: ~600 lines across 4 verticals
+
+**Promotion Target**: victor/framework/mode_config.py
 
 ```python
-# victor/safety/base.py
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from enum import Enum
-from typing import List, Optional, Pattern
-import re
-
-
-class SafetySeverity(Enum):
-    """Severity levels for safety findings."""
-    INFO = "info"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class SafetyCategory(Enum):
-    """Categories of safety patterns."""
-    CREDENTIAL = "credential"
-    PII = "pii"
-    CODE = "code"
-    INFRASTRUCTURE = "infrastructure"
-    MISINFORMATION = "misinformation"
-    CUSTOM = "custom"
-
-
 @dataclass
-class SafetyPattern:
-    """Definition of a safety pattern."""
+class UnifiedModeConfig:
+    """Framework-level mode configuration."""
     name: str
-    pattern: str  # Regex pattern
-    severity: SafetySeverity
-    category: SafetyCategory
-    description: str
-    remediation: Optional[str] = None
-
-    @property
-    def compiled_pattern(self) -> Pattern:
-        return re.compile(self.pattern, re.IGNORECASE | re.MULTILINE)
-
-
-@dataclass
-class SafetyMatch:
-    """A match found by safety scanning."""
-    pattern_name: str
-    matched_text: str
-    severity: SafetySeverity
-    category: SafetyCategory
-    line_number: Optional[int] = None
-    column: Optional[int] = None
-    context: Optional[str] = None
-    remediation: Optional[str] = None
-
-
-class SafetyScanner(ABC):
-    """Protocol for safety scanners."""
-
-    @abstractmethod
-    def get_patterns(self) -> List[SafetyPattern]:
-        """Get all patterns this scanner checks."""
-        ...
-
-    @abstractmethod
-    def scan(self, content: str) -> List[SafetyMatch]:
-        """Scan content for safety issues."""
-        ...
-
-    def scan_file(self, file_path: str) -> List[SafetyMatch]:
-        """Scan a file for safety issues."""
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            return self.scan(f.read())
-
-
-# victor/safety/registry.py
-class SafetyPatternRegistry:
-    """Registry for safety patterns across domains."""
-
-    _instance: Optional["SafetyPatternRegistry"] = None
-    _patterns: Dict[SafetyCategory, List[SafetyPattern]] = {}
-    _scanners: Dict[SafetyCategory, SafetyScanner] = {}
-
-    @classmethod
-    def get_instance(cls) -> "SafetyPatternRegistry":
-        if cls._instance is None:
-            cls._instance = cls()
-            cls._instance._register_builtin()
-        return cls._instance
-
-    def register_pattern(self, pattern: SafetyPattern) -> None:
-        """Register a safety pattern."""
-        if pattern.category not in self._patterns:
-            self._patterns[pattern.category] = []
-        self._patterns[pattern.category].append(pattern)
-
-    def register_scanner(self, category: SafetyCategory, scanner: SafetyScanner) -> None:
-        """Register a scanner for a category."""
-        self._scanners[category] = scanner
-
-    def get_patterns(self, category: Optional[SafetyCategory] = None) -> List[SafetyPattern]:
-        """Get patterns, optionally filtered by category."""
-        if category:
-            return self._patterns.get(category, [])
-        return [p for patterns in self._patterns.values() for p in patterns]
-
-    def scan_all(self, content: str) -> List[SafetyMatch]:
-        """Scan content with all registered scanners."""
-        matches = []
-        for scanner in self._scanners.values():
-            matches.extend(scanner.scan(content))
-        return matches
-
-    def _register_builtin(self) -> None:
-        """Register built-in patterns and scanners."""
-        from victor.safety.secrets import SecretScanner
-        from victor.safety.pii import PIIScanner
-
-        self.register_scanner(SafetyCategory.CREDENTIAL, SecretScanner())
-        self.register_scanner(SafetyCategory.PII, PIIScanner())
-```
-
-### Patterns to Promote
-
-#### From `coding/safety.py`:
-```python
-# victor/safety/code_patterns.py
-GIT_DANGEROUS_PATTERNS = [
-    SafetyPattern(
-        name="git_force_push",
-        pattern=r"git\s+push\s+.*--force",
-        severity=SafetySeverity.HIGH,
-        category=SafetyCategory.CODE,
-        description="Force push can overwrite remote history",
-        remediation="Use --force-with-lease instead",
-    ),
-    SafetyPattern(
-        name="git_reset_hard",
-        pattern=r"git\s+reset\s+--hard",
-        severity=SafetySeverity.MEDIUM,
-        category=SafetyCategory.CODE,
-        description="Hard reset discards uncommitted changes",
-        remediation="Stash changes before reset",
-    ),
-    # ... more patterns
-]
-```
-
-#### From `devops/safety.py`:
-```python
-# victor/safety/infrastructure.py
-INFRA_DANGEROUS_PATTERNS = [
-    SafetyPattern(
-        name="privileged_container",
-        pattern=r"privileged:\s*true",
-        severity=SafetySeverity.CRITICAL,
-        category=SafetyCategory.INFRASTRUCTURE,
-        description="Privileged containers have full host access",
-        remediation="Use specific capabilities instead",
-    ),
-    SafetyPattern(
-        name="root_user",
-        pattern=r"USER\s+root",
-        severity=SafetySeverity.MEDIUM,
-        category=SafetyCategory.INFRASTRUCTURE,
-        description="Running as root increases attack surface",
-        remediation="Create non-root user in Dockerfile",
-    ),
-    # ... more patterns
-]
-```
-
----
-
-## Promotion 2: Mode Configuration Registry
-
-### Current State
-
-Each vertical implements:
-```python
-# In each vertical's mode_config.py
-class ModeConfigProvider(ModeConfigProviderProtocol):
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
-        return {
-            "fast": ModeConfig(name="fast", tool_budget=10, ...),
-            "thorough": ModeConfig(name="thorough", tool_budget=50, ...),
-            ...
-        }
-```
-
-### Target State
-
-```python
-# victor/core/mode_config.py
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
-from enum import Enum
-
-
-class ModeType(Enum):
-    """Standard mode types."""
-    FAST = "fast"
-    BALANCED = "balanced"
-    THOROUGH = "thorough"
-    EXPLORE = "explore"
-    PLAN = "plan"
-
-
-@dataclass
-class ModeConfig:
-    """Configuration for an operational mode."""
-    name: str
-    tool_budget: int = 25
-    max_iterations: int = 40
-    exploration_multiplier: float = 1.0
-    allowed_tools: Optional[List[str]] = None
-    blocked_tools: Optional[List[str]] = None
+    tool_budget: int
+    max_iterations: int
+    temperature: float = 0.7
     description: str = ""
+    allowed_tools: Optional[Set[str]] = None
+    allowed_stages: Optional[List[str]] = None  # For DevOps
+    exploration_multiplier: float = 1.0
+    sandbox_only: bool = False
 
-    # Execution settings
-    enable_parallel: bool = True
-    max_concurrent_tools: int = 5
-    enable_caching: bool = True
-
-    # Quality settings
-    quality_threshold: float = 0.80
-    require_grounding: bool = True
-
-
-class ModeConfigRegistry:
-    """Central registry for operational modes."""
-
-    _instance: Optional["ModeConfigRegistry"] = None
-
-    # Default modes applicable to all verticals
-    DEFAULT_MODES: Dict[str, ModeConfig] = {
-        "fast": ModeConfig(
-            name="fast",
-            tool_budget=10,
-            max_iterations=20,
-            exploration_multiplier=0.5,
-            description="Quick responses, minimal exploration",
-        ),
-        "balanced": ModeConfig(
-            name="balanced",
-            tool_budget=25,
-            max_iterations=40,
-            exploration_multiplier=1.0,
-            description="Default balanced mode",
-        ),
-        "thorough": ModeConfig(
-            name="thorough",
-            tool_budget=50,
-            max_iterations=60,
-            exploration_multiplier=1.5,
-            description="Deep exploration, comprehensive analysis",
-        ),
-        "explore": ModeConfig(
-            name="explore",
-            tool_budget=30,
-            max_iterations=80,
-            exploration_multiplier=3.0,
-            blocked_tools=["write", "edit", "rm"],
-            description="Read-only exploration mode",
-        ),
-        "plan": ModeConfig(
-            name="plan",
-            tool_budget=40,
-            max_iterations=60,
-            exploration_multiplier=2.5,
-            description="Planning and analysis mode",
-        ),
-    }
-
-    def __init__(self):
-        self._vertical_modes: Dict[str, Dict[str, ModeConfig]] = {}
+class ModeConfigFactory:
+    """Factory for creating mode configs from vertical data."""
 
     @classmethod
-    def get_instance(cls) -> "ModeConfigRegistry":
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+    def from_dict(cls, data: Dict[str, Any]) -> UnifiedModeConfig:
+        """Create config from dictionary (YAML/JSON)."""
 
-    def register_modes(self, vertical: str, modes: Dict[str, ModeConfig]) -> None:
-        """Register modes for a vertical (overrides defaults)."""
-        self._vertical_modes[vertical] = modes
-
-    def get_mode(self, mode_name: str, vertical: Optional[str] = None) -> ModeConfig:
-        """Get mode config, checking vertical-specific then defaults."""
-        # Check vertical-specific first
-        if vertical and vertical in self._vertical_modes:
-            if mode_name in self._vertical_modes[vertical]:
-                return self._vertical_modes[vertical][mode_name]
-
-        # Fall back to defaults
-        if mode_name in self.DEFAULT_MODES:
-            return self.DEFAULT_MODES[mode_name]
-
-        raise ValueError(f"Unknown mode: {mode_name}")
-
-    def get_all_modes(self, vertical: Optional[str] = None) -> Dict[str, ModeConfig]:
-        """Get all available modes for a vertical."""
-        modes = dict(self.DEFAULT_MODES)
-        if vertical and vertical in self._vertical_modes:
-            modes.update(self._vertical_modes[vertical])
-        return modes
-
-    def list_mode_names(self, vertical: Optional[str] = None) -> List[str]:
-        """List available mode names."""
-        return list(self.get_all_modes(vertical).keys())
-
-
-# Convenience functions
-def get_mode(mode_name: str, vertical: Optional[str] = None) -> ModeConfig:
-    """Get a mode configuration."""
-    return ModeConfigRegistry.get_instance().get_mode(mode_name, vertical)
-
-
-def register_vertical_modes(vertical: str, modes: Dict[str, ModeConfig]) -> None:
-    """Register modes for a vertical."""
-    ModeConfigRegistry.get_instance().register_modes(vertical, modes)
+    @classmethod
+    def create_preset(cls, preset: str) -> UnifiedModeConfig:
+        """Create from preset name (fast, default, thorough, etc.)."""
 ```
 
-### Vertical Simplification
-
-```python
-# Before: victor/verticals/coding/mode_config.py (60 lines)
-class CodingModeConfigProvider(ModeConfigProviderProtocol):
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
-        return {
-            "fast": ModeConfig(name="fast", tool_budget=10, max_iterations=20),
-            "balanced": ModeConfig(name="balanced", tool_budget=25, max_iterations=40),
-            "thorough": ModeConfig(name="thorough", tool_budget=50, max_iterations=60),
-            "explore": ModeConfig(name="explore", tool_budget=30, max_iterations=80),
-            "plan": ModeConfig(name="plan", tool_budget=40, max_iterations=60),
-        }
-
-# After: victor/verticals/coding/mode_config.py (10 lines)
-from victor.core.mode_config import register_vertical_modes, ModeConfig
-
-# Only register coding-specific overrides
-register_vertical_modes("coding", {
-    "debug": ModeConfig(
-        name="debug",
-        tool_budget=30,
-        max_iterations=100,
-        description="Extended debugging mode",
-    ),
-})
-```
+**Benefits**:
+- Single source of truth for mode structure
+- Verticals define only data, not classes
+- Enables cross-vertical mode sharing
 
 ---
 
-## Promotion 3: Tool Dependency Graph
+#### 2.1.2 Tool Dependency Factory
 
-### Current State
+**Current State**: Each vertical reimplements BaseToolDependencyProvider
+**Duplication**: ~800 lines across 4 verticals
 
-Two incompatible formats:
-```python
-# victor/verticals/coding/tool_dependencies.py
-@dataclass
-class ToolDependency:
-    tool_name: str
-    depends_on: List[str]
-    enables: List[str]
-    weight: float
-
-# victor/verticals/devops/tool_dependencies.py
-TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
-    "read": [("edit", 0.6), ("grep", 0.3)],
-    "grep": [("read", 0.5), ("semantic_search", 0.3)],
-}
-```
-
-### Target State
+**Promotion Target**: victor/framework/tool_dependencies.py
 
 ```python
-# victor/tools/tool_graph.py
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
-from enum import Enum
-
-
-class DependencyType(Enum):
-    """Types of tool dependencies."""
-    REQUIRES = "requires"      # Must run before
-    ENABLES = "enables"        # Makes possible
-    SUGGESTS = "suggests"      # Often follows
-    CONFLICTS = "conflicts"    # Should not run together
-
-
 @dataclass
-class ToolTransition:
-    """A transition between tools with probability."""
-    from_tool: str
-    to_tool: str
-    probability: float  # 0.0 to 1.0
-    dependency_type: DependencyType = DependencyType.SUGGESTS
-    context: Optional[str] = None  # e.g., "after_error", "success"
+class ToolDependencySpec:
+    """Declarative tool dependency specification."""
+    dependencies: List[ToolDependency]
+    transitions: Dict[str, List[Tuple[str, float]]]
+    clusters: Dict[str, Set[str]]
+    sequences: Dict[str, List[str]]
+    required_tools: Set[str]
+    optional_tools: Set[str]
 
+class ToolDependencyFactory:
+    """Factory for creating dependency providers from specs."""
 
-@dataclass
-class ToolNode:
-    """A node in the tool dependency graph."""
-    name: str
-    category: str = ""
-    outgoing: List[ToolTransition] = field(default_factory=list)
-    incoming: List[ToolTransition] = field(default_factory=list)
+    @classmethod
+    def from_spec(cls, spec: ToolDependencySpec) -> BaseToolDependencyProvider:
+        """Create provider from declarative spec."""
 
-
-class ToolExecutionGraph:
-    """Unified graph of tool execution patterns.
-
-    Supports both:
-    - ToolDependency format (coding vertical)
-    - Transition probability format (devops vertical)
-    """
-
-    def __init__(self):
-        self._nodes: Dict[str, ToolNode] = {}
-        self._transitions: List[ToolTransition] = []
-
-    def add_node(self, name: str, category: str = "") -> ToolNode:
-        """Add or get a tool node."""
-        if name not in self._nodes:
-            self._nodes[name] = ToolNode(name=name, category=category)
-        return self._nodes[name]
-
-    def add_transition(
-        self,
-        from_tool: str,
-        to_tool: str,
-        probability: float,
-        dependency_type: DependencyType = DependencyType.SUGGESTS,
-        context: Optional[str] = None,
-    ) -> None:
-        """Add a transition between tools."""
-        transition = ToolTransition(
-            from_tool=from_tool,
-            to_tool=to_tool,
-            probability=probability,
-            dependency_type=dependency_type,
-            context=context,
-        )
-        self._transitions.append(transition)
-
-        # Update nodes
-        from_node = self.add_node(from_tool)
-        to_node = self.add_node(to_tool)
-        from_node.outgoing.append(transition)
-        to_node.incoming.append(transition)
-
-    def add_dependency(
-        self,
-        tool_name: str,
-        depends_on: List[str],
-        enables: List[str],
-        weight: float = 1.0,
-    ) -> None:
-        """Add dependencies in ToolDependency format (coding style)."""
-        for dep in depends_on:
-            self.add_transition(dep, tool_name, weight, DependencyType.REQUIRES)
-        for enabled in enables:
-            self.add_transition(tool_name, enabled, weight, DependencyType.ENABLES)
-
-    def add_transitions(
-        self,
-        transitions: Dict[str, List[Tuple[str, float]]]
-    ) -> None:
-        """Add transitions in dict format (devops style)."""
-        for from_tool, targets in transitions.items():
-            for to_tool, prob in targets:
-                self.add_transition(from_tool, to_tool, prob)
-
-    def get_next_tools(
-        self,
-        current_tool: str,
-        context: Optional[str] = None,
-        min_probability: float = 0.1,
-    ) -> List[Tuple[str, float]]:
-        """Get likely next tools with probabilities."""
-        if current_tool not in self._nodes:
-            return []
-
-        node = self._nodes[current_tool]
-        results = []
-        for t in node.outgoing:
-            if t.probability >= min_probability:
-                if context is None or t.context is None or t.context == context:
-                    results.append((t.to_tool, t.probability))
-
-        return sorted(results, key=lambda x: -x[1])
-
-    def get_required_tools(self, tool_name: str) -> Set[str]:
-        """Get tools that must run before this tool."""
-        if tool_name not in self._nodes:
-            return set()
-
-        required = set()
-        for t in self._nodes[tool_name].incoming:
-            if t.dependency_type == DependencyType.REQUIRES:
-                required.add(t.from_tool)
-        return required
-
-    def validate_sequence(self, sequence: List[str]) -> Tuple[bool, List[str]]:
-        """Validate a tool call sequence.
-
-        Returns:
-            Tuple of (is_valid, list of issues)
-        """
-        issues = []
-
-        for i, tool in enumerate(sequence):
-            required = self.get_required_tools(tool)
-            preceding = set(sequence[:i])
-
-            missing = required - preceding
-            if missing:
-                issues.append(
-                    f"Tool '{tool}' requires {missing} to run first"
-                )
-
-        return len(issues) == 0, issues
-
-    def get_boost_score(
-        self,
-        candidate_tool: str,
-        recent_tools: List[str],
-        decay: float = 0.8,
-    ) -> float:
-        """Calculate selection boost based on recent tool history.
-
-        Used by ToolSequenceTracker for 15-20% selection improvement.
-        """
-        boost = 0.0
-        weight = 1.0
-
-        for recent in reversed(recent_tools[-5:]):  # Last 5 tools
-            next_tools = self.get_next_tools(recent)
-            for tool, prob in next_tools:
-                if tool == candidate_tool:
-                    boost += prob * weight
-                    break
-            weight *= decay
-
-        return min(boost, 0.3)  # Cap at 30% boost
-
-
-# Global instance
-_graph: Optional[ToolExecutionGraph] = None
-
-
-def get_tool_graph() -> ToolExecutionGraph:
-    """Get the global tool execution graph."""
-    global _graph
-    if _graph is None:
-        _graph = ToolExecutionGraph()
-        _register_default_patterns(_graph)
-    return _graph
-
-
-def _register_default_patterns(graph: ToolExecutionGraph) -> None:
-    """Register default tool execution patterns."""
-    # Common patterns across all verticals
-    graph.add_transitions({
-        "read": [
-            ("edit", 0.6),
-            ("grep", 0.4),
-            ("semantic_search", 0.3),
-        ],
-        "grep": [
-            ("read", 0.7),
-            ("semantic_search", 0.4),
-        ],
-        "semantic_search": [
-            ("read", 0.8),
-            ("grep", 0.3),
-        ],
-        "edit": [
-            ("read", 0.5),  # Verify changes
-            ("shell", 0.4),  # Run tests
-            ("git", 0.3),   # Commit
-        ],
-        "write": [
-            ("read", 0.6),
-            ("shell", 0.4),
-        ],
-        "shell": [
-            ("read", 0.5),
-            ("edit", 0.3),
-        ],
-        "git": [
-            ("shell", 0.4),  # Run tests before commit
-            ("read", 0.3),
-        ],
-    })
+    @classmethod
+    def from_yaml(cls, path: Path) -> BaseToolDependencyProvider:
+        """Load from YAML configuration."""
 ```
+
+**Benefits**:
+- Eliminates 80% of tool dependency code in verticals
+- Enables YAML-driven configuration
+- Supports spec merging for composite verticals
 
 ---
 
-## Promotion 4: Tool Selection Strategy Protocol
+#### 2.1.3 Graph-Based Workflow Engine
 
-### Target Interface
+**Gap**: Victor has YAML workflows but no LangGraph-style DAG execution
 
-```python
-# victor/tools/selection/protocol.py
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List, Optional, Protocol
-
-
-@dataclass
-class PerformanceProfile:
-    """Performance characteristics of a selection strategy."""
-    avg_latency_ms: float
-    requires_embeddings: bool
-    requires_model_inference: bool
-    memory_usage_mb: float
-
-
-@dataclass
-class ToolSelectionContext:
-    """Context for tool selection."""
-    prompt: str
-    conversation_history: List[dict]
-    current_stage: str
-    task_type: Optional[str]
-    provider_name: str
-    model_name: str
-    cost_budget: float
-    enabled_tools: Optional[List[str]]
-    disabled_tools: Optional[List[str]]
-
-
-class ToolSelectionStrategy(Protocol):
-    """Protocol for tool selection strategies."""
-
-    def get_strategy_name(self) -> str:
-        """Get the name of this strategy."""
-        ...
-
-    def get_performance_profile(self) -> PerformanceProfile:
-        """Get performance characteristics."""
-        ...
-
-    async def select_tools(
-        self,
-        context: ToolSelectionContext,
-        max_tools: int = 10,
-    ) -> List[str]:
-        """Select relevant tools for the context.
-
-        Returns:
-            List of tool names, ordered by relevance
-        """
-        ...
-
-    def supports_context(self, context: ToolSelectionContext) -> bool:
-        """Check if this strategy can handle the context."""
-        ...
-
-
-# victor/tools/selection/registry.py
-class ToolSelectionStrategyRegistry:
-    """Registry of tool selection strategies."""
-
-    _strategies: Dict[str, ToolSelectionStrategy] = {}
-
-    @classmethod
-    def register(cls, name: str, strategy: ToolSelectionStrategy) -> None:
-        cls._strategies[name] = strategy
-
-    @classmethod
-    def get(cls, name: str) -> Optional[ToolSelectionStrategy]:
-        return cls._strategies.get(name)
-
-    @classmethod
-    def get_best_strategy(cls, context: ToolSelectionContext) -> ToolSelectionStrategy:
-        """Get the best strategy for the given context."""
-        # Prefer semantic if embeddings available
-        if "semantic" in cls._strategies:
-            strategy = cls._strategies["semantic"]
-            if strategy.supports_context(context):
-                return strategy
-
-        # Fall back to hybrid
-        if "hybrid" in cls._strategies:
-            return cls._strategies["hybrid"]
-
-        # Fall back to keyword
-        return cls._strategies.get("keyword")
-```
-
----
-
-## Promotion 5: Typed Tool Execution Context
-
-### Target Interface
+**Promotion Target**: victor/framework/graph_engine.py
 
 ```python
-# victor/tools/context.py
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-from enum import Enum, auto
-
-
-class Permission(Enum):
-    """Permissions for tool execution."""
-    READ_FILES = auto()
-    WRITE_FILES = auto()
-    EXECUTE_COMMANDS = auto()
-    NETWORK_ACCESS = auto()
-    GIT_OPERATIONS = auto()
-    ADMIN_OPERATIONS = auto()
-
-
-@dataclass
-class ToolExecutionContext:
-    """Typed context for tool execution.
-
-    Replaces Dict[str, Any] _exec_ctx parameter.
-    """
-    # Session info
-    session_id: str
-    workspace_root: Path
-
-    # Conversation state
-    conversation_history: List[Dict[str, Any]] = field(default_factory=list)
-    current_stage: str = "INITIAL"
-
-    # Budget tracking
-    tool_budget_total: int = 25
-    tool_budget_used: int = 0
-
-    # Provider info
-    provider_name: str = ""
-    model_name: str = ""
-    provider_capabilities: Dict[str, Any] = field(default_factory=dict)
-
-    # Permissions
-    user_permissions: Set[Permission] = field(
-        default_factory=lambda: {Permission.READ_FILES}
-    )
-
-    # Tool-specific state
-    open_files: Dict[str, str] = field(default_factory=dict)  # path -> content
-    modified_files: Set[str] = field(default_factory=set)
-    created_files: Set[str] = field(default_factory=set)
-
-    # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class WorkflowNode(Protocol):
+    """Protocol for workflow nodes."""
 
     @property
-    def tool_budget_remaining(self) -> int:
-        return max(0, self.tool_budget_total - self.tool_budget_used)
+    def node_id(self) -> str: ...
 
-    @property
-    def can_write(self) -> bool:
-        return Permission.WRITE_FILES in self.user_permissions
+    async def execute(self, state: WorkflowState) -> WorkflowState: ...
 
-    @property
-    def can_execute(self) -> bool:
-        return Permission.EXECUTE_COMMANDS in self.user_permissions
+    def get_next_nodes(self, state: WorkflowState) -> List[str]: ...
 
-    def use_budget(self, amount: int = 1) -> bool:
-        """Use tool budget. Returns False if insufficient."""
-        if self.tool_budget_used + amount > self.tool_budget_total:
-            return False
-        self.tool_budget_used += amount
-        return True
+class WorkflowGraph:
+    """DAG-based workflow execution engine."""
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dict for backward compatibility."""
-        return {
-            "session_id": self.session_id,
-            "workspace_root": str(self.workspace_root),
-            "conversation_history": self.conversation_history,
-            "current_stage": self.current_stage,
-            "tool_budget_remaining": self.tool_budget_remaining,
-            "provider_name": self.provider_name,
-            "model_name": self.model_name,
-            "can_write": self.can_write,
-            "can_execute": self.can_execute,
-            **self.metadata,
-        }
+    def add_node(self, node: WorkflowNode) -> None: ...
+    def add_edge(self, from_node: str, to_node: str, condition: Optional[Callable] = None) -> None: ...
+    def add_conditional_edges(self, from_node: str, router: Callable[[WorkflowState], str]) -> None: ...
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionContext":
-        """Create from dict for backward compatibility."""
-        return cls(
-            session_id=data.get("session_id", ""),
-            workspace_root=Path(data.get("workspace_root", ".")),
-            conversation_history=data.get("conversation_history", []),
-            current_stage=data.get("current_stage", "INITIAL"),
-            tool_budget_total=data.get("tool_budget_total", 25),
-            tool_budget_used=data.get("tool_budget_used", 0),
-            provider_name=data.get("provider_name", ""),
-            model_name=data.get("model_name", ""),
-            metadata={k: v for k, v in data.items() if k not in cls.__dataclass_fields__},
-        )
+    async def execute(self, initial_state: WorkflowState) -> WorkflowState:
+        """Execute workflow with state transitions."""
+```
+
+**Competitive Alignment**: Matches LangGraph's graph-based architecture
+
+---
+
+### 2.2 MEDIUM PRIORITY - Phase 2 Promotion
+
+#### 2.2.1 Human-in-the-Loop Protocol
+
+**Current State**: HITL nodes in YAML workflows but no framework protocol
+
+**Promotion Target**: victor/framework/hitl.py
+
+```python
+class HITLProtocol(Protocol):
+    """Human-in-the-loop interaction protocol."""
+
+    async def request_approval(
+        self,
+        action: str,
+        context: Dict[str, Any],
+        timeout: float = 300.0
+    ) -> HITLResponse: ...
+
+    async def request_input(
+        self,
+        prompt: str,
+        input_type: HITLInputType,
+        validation: Optional[Callable] = None
+    ) -> Any: ...
 ```
 
 ---
 
-## Migration Guide
+#### 2.2.2 Multi-Agent Crew System
 
-### For Vertical Maintainers
+**Current State**: Teams exist but limited to coding vertical
 
-1. **Safety**: Import patterns from `victor.safety` instead of defining locally
-2. **Mode Config**: Call `register_vertical_modes()` for custom modes only
-3. **Tool Dependencies**: Use `get_tool_graph().add_transitions()` to register patterns
-4. **Tool Execution**: Accept `ToolExecutionContext` instead of `Dict[str, Any]`
+**Promotion Target**: victor/framework/crews.py
 
-### Backward Compatibility
+```python
+class AgentRole(Protocol):
+    """Protocol for agent roles in crews."""
 
-All promoted modules include:
-- `from_dict()` / `to_dict()` methods for legacy code
-- Deprecation warnings when using old patterns
-- Gradual migration path (old code continues to work)
+    @property
+    def role_name(self) -> str: ...
+
+    @property
+    def capabilities(self) -> Set[str]: ...
+
+    async def execute_task(self, task: Task, context: CrewContext) -> TaskResult: ...
+
+class Crew:
+    """Multi-agent crew for collaborative task execution."""
+
+    def __init__(self, name: str, formation: CrewFormation):
+        self.agents: Dict[str, AgentRole] = {}
+
+    async def execute(self, task: Task) -> CrewResult:
+        """Execute task with crew collaboration."""
+
+class CrewFormation(Enum):
+    SEQUENTIAL = "sequential"      # Agents work in order
+    PARALLEL = "parallel"          # Agents work simultaneously
+    HIERARCHICAL = "hierarchical"  # Manager delegates to workers
+    CONSENSUS = "consensus"        # Agents vote on decisions
+```
+
+**Competitive Alignment**: Matches CrewAI's role-based architecture
 
 ---
 
-*Specification version: 1.0*
-*Last updated: December 2025*
+#### 2.2.3 Unified Safety Scanner
+
+**Promotion Target**: victor/framework/safety.py
+
+```python
+class SafetyScannerRegistry:
+    """Registry of safety scanners for composition."""
+
+    _scanners: Dict[str, SafetyScanner] = {}
+
+    @classmethod
+    def register(cls, name: str, scanner: SafetyScanner) -> None: ...
+
+    @classmethod
+    def create_composite(cls, *names: str) -> CompositeSafetyScanner: ...
+
+class SafetyProfile:
+    """Declarative safety profile for verticals."""
+
+    def __init__(
+        self,
+        scanners: List[str],
+        additional_patterns: Optional[List[SafetyPattern]] = None
+    ): ...
+```
+
+---
+
+## 3. SOLID Principles Compliance
+
+### 3.1 Current Compliance Assessment
+
+| Principle | Current | Target | Gap |
+|-----------|---------|--------|-----|
+| **Single Responsibility** | ★★★★☆ | ★★★★★ | Mode configs do too much |
+| **Open/Closed** | ★★★★☆ | ★★★★★ | Some private attr writes |
+| **Liskov Substitution** | ★★★★★ | ★★★★★ | Protocols well-designed |
+| **Interface Segregation** | ★★★★☆ | ★★★★★ | Some protocols too large |
+| **Dependency Inversion** | ★★★★☆ | ★★★★★ | Some concrete dependencies |
+
+### 3.2 Recommended Improvements
+
+#### 3.2.1 Single Responsibility
+
+**Issue**: VerticalBase has 15+ methods
+**Fix**: Extract into focused protocols
+
+```python
+# After: Focused protocols
+class ToolProviderProtocol(Protocol):
+    def get_tools(self) -> List[str]: ...
+
+class PromptProviderProtocol(Protocol):
+    def get_system_prompt(self) -> str: ...
+
+class SafetyProviderProtocol(Protocol):
+    def get_safety_profile(self) -> SafetyProfile: ...
+```
+
+#### 3.2.2 Open/Closed
+
+**Issue**: Private attribute writes in VerticalIntegrationPipeline
+**Fix**: Use protocol methods exclusively
+
+```python
+# After: Protocol-only
+class OrchestratorVerticalProtocol(Protocol):
+    def set_vertical_context(self, ctx: VerticalContext) -> None: ...
+
+orchestrator.set_vertical_context(context)  # Always protocol method
+```
+
+#### 3.2.3 Interface Segregation
+
+**Issue**: OrchestratorProtocol has 50+ methods
+**Fix**: Split into focused sub-protocols
+
+```python
+class ConversationProtocol(Protocol):
+    def add_message(self, msg: Message) -> None: ...
+
+class ToolExecutionProtocol(Protocol):
+    def execute_tool(self, name: str, args: Dict) -> ToolResult: ...
+
+class OrchestratorProtocol(ConversationProtocol, ToolExecutionProtocol, ...):
+    pass
+```
+
+---
+
+## 4. Competitive Analysis
+
+### 4.1 Framework Comparison Matrix
+
+| Feature | Victor | LangGraph | CrewAI | AutoGen |
+|---------|--------|-----------|--------|---------|
+| **Architecture** | Protocol-First Layered | Graph-Based DAG | Role-Based Crews | Conversational |
+| **State Management** | Conversation Stages | Explicit Graph State | Shared Crew Context | Chat History |
+| **Multi-Agent** | Teams (Limited) | Nodes as Agents | Full Crew System | Dynamic Roles |
+| **Tool System** | 45+ Tools, Semantic Selection | LangChain Tools | Tool Calling | Code Execution |
+| **RL Learning** | 13 Learners, Cross-Vertical | None | None | None |
+| **Provider Support** | 25+ Providers | Via LangChain | Limited | OpenAI Focus |
+| **Air-Gapped Mode** | Full Support | Partial | None | None |
+| **Vertical Domains** | 4 Verticals | None (Generic) | None (Generic) | None (Generic) |
+| **Enterprise Features** | RBAC, Audit, Safety | Via LangSmith | Enterprise Plan | Limited |
+
+### 4.2 Victor's Unique Differentiators
+
+1. **Reinforcement Learning System**: Only framework with 13+ RL learners
+2. **Cross-Vertical Transfer Learning**: Knowledge sharing between domains
+3. **25+ Provider Support**: Most comprehensive provider coverage
+4. **Air-Gapped Mode**: Enterprise security requirement
+5. **Domain Verticals**: Pre-built assistants for coding, DevOps, data analysis
+6. **Protocol-First Design**: SOLID-compliant extensibility
+
+### 4.3 Competitive Gaps to Address
+
+| Gap | Competitor Advantage | Victor Solution |
+|-----|---------------------|-----------------|
+| Graph Workflows | LangGraph DAG engine | Implement WorkflowGraph |
+| Role-Based Crews | CrewAI crew system | Promote Teams to framework |
+| Visual Debugging | LangSmith tracing | Enhance observability |
+| Low-Code Builder | Langflow UI | Future: Victor Studio |
+
+### 4.4 Strategic Positioning
+
+```
+                    HIGH FLEXIBILITY
+                          │
+         LangGraph        │         AutoGen
+         (Graph Control)  │     (Conversational)
+                          │
+    ──────────────────────┼──────────────────────
+                          │
+         Victor           │         CrewAI
+     (Protocol + RL)      │     (Role-Based)
+                          │
+                    HIGH STRUCTURE
+```
+
+**Victor's Position**: High structure with protocol-first design AND unique RL capabilities
+
+---
+
+## 5. Implementation Roadmap
+
+### Phase 1: Foundation (Sprint 1-2)
+
+| Task | Priority | Effort | Impact |
+|------|----------|--------|--------|
+| Unified Mode Config Factory | HIGH | 3 days | Eliminate 600 lines |
+| Tool Dependency Factory | HIGH | 5 days | Eliminate 800 lines |
+| Protocol Refactoring | MEDIUM | 3 days | Better extensibility |
+
+### Phase 2: Competitive Features (Sprint 3-4)
+
+| Task | Priority | Effort | Impact |
+|------|----------|--------|--------|
+| Graph Workflow Engine | HIGH | 8 days | Match LangGraph |
+| Crew System Promotion | HIGH | 5 days | Match CrewAI |
+| HITL Protocol | MEDIUM | 3 days | Enterprise workflows |
+
+### Phase 3: Polish (Sprint 5-6)
+
+| Task | Priority | Effort | Impact |
+|------|----------|--------|--------|
+| Vertical Template Generator | LOW | 3 days | Developer experience |
+| Transfer Learning API | LOW | 5 days | RL enhancement |
+| Documentation Update | MEDIUM | 5 days | Adoption |
+
+---
+
+## 6. Design Patterns & Best Practices
+
+### 6.1 Recommended Patterns
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| **Protocol First** | All public interfaces | WorkflowNode(Protocol) |
+| **Factory** | Object creation | ModeConfigFactory |
+| **Registry** | Dynamic lookup | SafetyScannerRegistry |
+| **Composite** | Aggregation | CompositeSafetyScanner |
+| **Strategy** | Pluggable algorithms | Tool selection strategies |
+| **Observer** | Event dispatch | RL hooks system |
+| **Facade** | Complex subsystems | AgentOrchestrator |
+| **Template Method** | Extension skeleton | VerticalBase |
+
+### 6.2 Anti-Patterns to Avoid
+
+| Anti-Pattern | Current Occurrence | Fix |
+|--------------|-------------------|-----|
+| Private Attr Writes | VerticalIntegrationPipeline | Use protocol methods |
+| God Class | AgentOrchestrator (100+ deps) | Continue extraction |
+| Duplicate Code | Mode configs, tool deps | Use factories |
+| Concrete Dependencies | Some direct imports | Use DI container |
+
+---
+
+## 7. Conclusion
+
+### Key Recommendations
+
+1. **Immediate**: Implement UnifiedModeConfig and ToolDependencyFactory to eliminate ~1400 lines of duplication
+
+2. **Short-term**: Add WorkflowGraph for LangGraph-competitive DAG execution
+
+3. **Medium-term**: Promote Teams to framework-level Crew system for CrewAI competitiveness
+
+4. **Long-term**: Build Victor Studio for low-code agent building
+
+### Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Vertical code duplication | ~40% | <10% |
+| New vertical creation time | 2-3 days | 2-3 hours |
+| Protocol coverage | 70% | 95% |
+| Competitive feature parity | 60% | 90% |
+
+---
+
+## References
+
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [CrewAI Documentation](https://docs.crewai.com/)
+- [AutoGen Documentation](https://microsoft.github.io/autogen/)
+- [DataCamp Framework Comparison](https://www.datacamp.com/tutorial/crewai-vs-langgraph-vs-autogen)
+- [Turing AI Frameworks Guide](https://www.turing.com/resources/ai-agent-frameworks)
+
+---
+
+*Document Version: 1.0*
+*Last Updated: 2025-12-29*
