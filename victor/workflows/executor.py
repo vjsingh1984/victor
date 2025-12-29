@@ -279,6 +279,14 @@ class WorkflowExecutor:
                 f"in {total_duration:.2f}s ({total_tool_calls} tool calls)"
             )
 
+            # Emit RL event for workflow completion
+            self._emit_workflow_completed_event(
+                workflow_name=workflow.name,
+                success=success,
+                duration=total_duration,
+                tool_calls=total_tool_calls,
+            )
+
             return WorkflowResult(
                 workflow_name=workflow.name,
                 success=success,
@@ -340,6 +348,15 @@ class WorkflowExecutor:
             result = await self._execute_node(node, context)
             context.add_result(result)
             executed.add(node_id)
+
+            # Emit RL event for workflow step
+            self._emit_workflow_step_event(
+                workflow_name=workflow.name,
+                node_id=node_id,
+                node_type=node.node_type.value if hasattr(node, 'node_type') else 'unknown',
+                success=result.status == NodeStatus.COMPLETED,
+                duration=result.duration,
+            )
 
             # If failed, stop unless configured to continue
             if result.status == NodeStatus.FAILED:
@@ -690,6 +707,97 @@ class WorkflowExecutor:
             )
 
         return await self.execute(workflow, initial_context, timeout=timeout)
+
+    def _emit_workflow_step_event(
+        self,
+        workflow_name: str,
+        node_id: str,
+        node_type: str,
+        success: bool,
+        duration: float,
+    ) -> None:
+        """Emit RL event for workflow step completion.
+
+        Args:
+            workflow_name: Name of the workflow
+            node_id: ID of the completed node
+            node_type: Type of node (agent, condition, parallel, transform)
+            success: Whether the step succeeded
+            duration: Duration in seconds
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            # Quality based on success and speed
+            quality = 0.9 if success else 0.3
+            if duration > 60:  # Penalize slow steps
+                quality -= 0.1
+
+            event = RLEvent(
+                type=RLEventType.WORKFLOW_STEP,
+                workflow_name=workflow_name,
+                workflow_step=node_id,
+                success=success,
+                quality_score=quality,
+                metadata={
+                    "node_type": node_type,
+                    "duration_seconds": duration,
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Workflow step event emission failed: {e}")
+
+    def _emit_workflow_completed_event(
+        self,
+        workflow_name: str,
+        success: bool,
+        duration: float,
+        tool_calls: int,
+    ) -> None:
+        """Emit RL event for workflow completion.
+
+        Args:
+            workflow_name: Name of the workflow
+            success: Whether the workflow succeeded
+            duration: Total duration in seconds
+            tool_calls: Total tool calls used
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            # Quality based on success and efficiency
+            quality = 0.8 if success else 0.2
+            if success and duration < 60:  # Fast completion bonus
+                quality += 0.1
+            if success and tool_calls < 20:  # Efficient bonus
+                quality += 0.1
+
+            event = RLEvent(
+                type=RLEventType.WORKFLOW_COMPLETED,
+                workflow_name=workflow_name,
+                success=success,
+                quality_score=min(1.0, quality),
+                metadata={
+                    "duration_seconds": duration,
+                    "tool_calls": tool_calls,
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Workflow completed event emission failed: {e}")
 
 
 __all__ = [

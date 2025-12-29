@@ -206,6 +206,52 @@ class ResponseQualityScorer:
             except Exception as e:
                 logger.debug(f"Observer error: {e}")
 
+    def _emit_quality_assessed_event(
+        self,
+        result: QualityResult,
+        query: str,
+        response: str,
+    ) -> None:
+        """Emit RL event for quality assessment.
+
+        This activates the quality_weights learner to learn optimal
+        dimension weights based on quality outcomes.
+
+        Args:
+            result: Quality assessment result
+            query: Original query
+            response: Response that was scored
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            # Extract dimension scores for metadata
+            dimension_data = {
+                ds.dimension.value: ds.score
+                for ds in result.dimension_scores
+            }
+
+            event = RLEvent(
+                type=RLEventType.QUALITY_ASSESSED,
+                success=result.passes_threshold,
+                quality_score=result.overall_score,
+                metadata={
+                    "dimensions": dimension_data,
+                    "passes_threshold": result.passes_threshold,
+                    "query_length": len(query),
+                    "response_length": len(response),
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Quality assessed event emission failed: {e}")
+
     async def score(
         self,
         query: str,
@@ -272,6 +318,9 @@ class ResponseQualityScorer:
 
         # Notify observers
         self._notify_observers(result)
+
+        # Emit RL event for quality assessment
+        self._emit_quality_assessed_event(result, query, response)
 
         logger.debug(
             f"Quality score: {overall_score:.2f} "

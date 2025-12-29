@@ -291,6 +291,9 @@ class AgentModeController:
             except Exception as e:
                 logger.error(f"Mode change callback failed: {e}")
 
+        # Emit RL event for mode transition
+        self._emit_mode_transition_event(old_mode, new_mode)
+
         logger.info(f"Switched from {old_mode.value} to {new_mode.value} mode")
         return True
 
@@ -316,6 +319,41 @@ class AgentModeController:
             callback: Function called with (old_mode, new_mode)
         """
         self._callbacks.append(callback)
+
+    def _emit_mode_transition_event(
+        self, old_mode: AgentMode, new_mode: AgentMode
+    ) -> None:
+        """Emit RL event for mode transition.
+
+        This activates the mode_transition learner to learn optimal
+        mode transitions based on task context.
+
+        Args:
+            old_mode: Mode transitioning from
+            new_mode: Mode transitioning to
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.MODE_TRANSITION,
+                mode_from=old_mode.value,
+                mode_to=new_mode.value,
+                success=True,  # Transition always succeeds
+                quality_score=0.5,  # Will be updated by outcome recording
+                metadata={
+                    "history_length": len(self._mode_history),
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Mode transition event emission failed: {e}")
 
     def is_tool_allowed(self, tool_name: str) -> bool:
         """Check if a tool is allowed in the current mode.

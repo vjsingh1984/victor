@@ -322,6 +322,47 @@ class IntelligentAgentPipeline:
                 logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
         return self._grounding_verifier
 
+    def _emit_grounding_event(
+        self,
+        is_grounded: bool,
+        grounding_score: float,
+        task_type: str,
+    ) -> None:
+        """Emit RL event for grounding verification.
+
+        This activates the grounding_threshold learner to learn optimal
+        thresholds based on verification outcomes.
+
+        Args:
+            is_grounded: Whether the response passed grounding verification
+            grounding_score: Confidence score from grounding verifier
+            task_type: Type of task being verified
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.GROUNDING_CHECK,
+                success=is_grounded,
+                quality_score=grounding_score,
+                provider=self.provider_name,
+                model=self.model,
+                task_type=task_type,
+                threshold_value=grounding_score,
+                metadata={
+                    "is_grounded": is_grounded,
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"[IntelligentPipeline] Grounding event emission failed: {e}")
+
     async def _get_resilient_executor(self):
         """Lazy initialize resilient executor."""
         if self._resilient_executor is None:
@@ -577,6 +618,13 @@ class IntelligentAgentPipeline:
                 f"{issue.issue_type.value}: {issue.description}"
                 for issue in grounding_result.issues
             ]
+
+            # Emit RL event for grounding verification
+            self._emit_grounding_event(
+                is_grounded=is_grounded,
+                grounding_score=grounding_score,
+                task_type=task_type,
+            )
 
         # Record feedback for learning
         learning_reward = 0.0

@@ -47,6 +47,10 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from victor.observability.team_metrics import (
+    record_team_spawned,
+    record_team_completed,
+)
 from victor.agent.subagents.base import SubAgentConfig, SubAgentResult
 from victor.agent.subagents.orchestrator import (
     ROLE_DEFAULT_BUDGETS,
@@ -142,7 +146,42 @@ class TeamCoordinator:
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
+        # Execution context for observability
+        self._task_type: str = "unknown"
+        self._complexity: str = "medium"
+        self._vertical_name: str = "coding"
+        self._trigger: str = "auto"  # auto, manual, suggestion
+        self._rl_coordinator: Optional[Any] = None
+
         logger.info("TeamCoordinator initialized")
+
+    def set_execution_context(
+        self,
+        task_type: str = "unknown",
+        complexity: str = "medium",
+        vertical: str = "coding",
+        trigger: str = "auto",
+    ) -> None:
+        """Set execution context for observability and RL.
+
+        Args:
+            task_type: Type of task being executed
+            complexity: Complexity level (low, medium, high, extreme)
+            vertical: Vertical name (coding, devops, etc.)
+            trigger: What triggered the execution (auto, manual, suggestion)
+        """
+        self._task_type = task_type
+        self._complexity = complexity
+        self._vertical_name = vertical
+        self._trigger = trigger
+
+    def set_rl_coordinator(self, rl_coordinator: Any) -> None:
+        """Set the RL coordinator for recording outcomes.
+
+        Args:
+            rl_coordinator: RLCoordinator instance
+        """
+        self._rl_coordinator = rl_coordinator
 
     def set_progress_callback(
         self,
@@ -186,6 +225,15 @@ class TeamCoordinator:
             f"({config.formation.value} formation)"
         )
 
+        # Record team spawned for observability
+        record_team_spawned(
+            team_name=config.name,
+            vertical=self._vertical_name,
+            task_type=self._task_type,
+            complexity=self._complexity,
+            trigger=self._trigger,
+        )
+
         try:
             # Execute based on formation
             if config.formation == TeamFormation.SEQUENTIAL:
@@ -201,6 +249,7 @@ class TeamCoordinator:
 
             execution.status = "completed" if result.success else "failed"
             execution.end_time = time.time()
+            duration_seconds = result.total_duration
 
             logger.info(
                 f"Team '{config.name}' completed: "
@@ -209,25 +258,163 @@ class TeamCoordinator:
                 f"duration={result.total_duration:.1f}s"
             )
 
+            # Record team completed for observability
+            record_team_completed(
+                team_name=config.name,
+                success=result.success,
+                duration_seconds=duration_seconds,
+                tool_calls=result.total_tool_calls,
+                formation=config.formation.value,
+                member_count=len(config.members),
+            )
+
+            # Record RL outcome for team composition learning
+            self._record_team_rl_outcome(config, result)
+
             return result
 
         except Exception as e:
             execution.status = "error"
             execution.end_time = time.time()
+            duration_seconds = time.time() - execution.start_time
             logger.error(f"Team '{config.name}' failed: {e}", exc_info=True)
+
+            # Record failed team for observability
+            record_team_completed(
+                team_name=config.name,
+                success=False,
+                duration_seconds=duration_seconds,
+                tool_calls=0,
+                formation=config.formation.value,
+                member_count=len(config.members),
+            )
 
             return TeamResult(
                 success=False,
                 final_output=f"Team execution failed: {str(e)}",
                 member_results={},
                 total_tool_calls=0,
-                total_duration=time.time() - execution.start_time,
+                total_duration=duration_seconds,
                 formation_used=config.formation,
             )
 
         finally:
             # Cleanup
             self._active_teams.pop(execution.team_id, None)
+
+    def _record_team_rl_outcome(
+        self,
+        config: TeamConfig,
+        result: TeamResult,
+    ) -> None:
+        """Record RL outcome for team composition learning.
+
+        Args:
+            config: Team configuration used
+            result: Execution result
+        """
+        if not self._rl_coordinator:
+            return
+
+        try:
+            from victor.agent.rl.base import RLOutcome
+
+            # Compute quality score based on success and efficiency
+            quality_score = 0.5  # Baseline
+            if result.success:
+                quality_score = 0.7
+                # Bonus for efficient tool usage
+                if result.total_tool_calls < len(config.members) * 10:
+                    quality_score += 0.1
+                # Bonus for fast execution
+                if result.total_duration < 60:
+                    quality_score += 0.1
+                # Penalty for many failures
+                failed_members = sum(
+                    1 for r in result.member_results.values() if not r.success
+                )
+                if failed_members > 0:
+                    quality_score -= 0.1 * failed_members
+
+            quality_score = min(1.0, max(0.0, quality_score))
+
+            outcome = RLOutcome(
+                provider="team_coordinator",
+                model=config.formation.value,
+                task_type=self._task_type,
+                success=result.success,
+                quality_score=quality_score,
+                metadata={
+                    "team_name": config.name,
+                    "member_count": len(config.members),
+                    "tool_calls": result.total_tool_calls,
+                    "duration_seconds": result.total_duration,
+                    "formation": config.formation.value,
+                },
+                vertical=self._vertical_name,
+            )
+
+            self._rl_coordinator.record_outcome(
+                "team_composition",
+                outcome,
+                vertical=self._vertical_name,
+            )
+
+            # Also emit via RL hooks for event-driven tracking
+            self._emit_team_completed_event(config, result, quality_score)
+
+            logger.debug(
+                f"Recorded RL outcome for team '{config.name}': "
+                f"quality={quality_score:.2f}, success={result.success}"
+            )
+
+        except ImportError:
+            # RL module not available
+            pass
+        except Exception as e:
+            logger.warning(f"Failed to record team RL outcome: {e}")
+
+    def _emit_team_completed_event(
+        self,
+        config: "TeamConfig",
+        result: "TeamResult",
+        quality_score: float,
+    ) -> None:
+        """Emit RL event for team completion.
+
+        This activates the team_composition learner via the event system.
+
+        Args:
+            config: Team configuration
+            result: Execution result
+            quality_score: Computed quality score
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.TEAM_COMPLETED,
+                team_id=config.name,
+                team_formation=config.formation.value,
+                success=result.success,
+                quality_score=quality_score,
+                task_type=self._task_type,
+                vertical=self._vertical_name,
+                metadata={
+                    "member_count": len(config.members),
+                    "tool_calls": result.total_tool_calls,
+                    "duration_seconds": result.total_duration,
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Team completed event emission failed: {e}")
 
     async def _execute_sequential(
         self,

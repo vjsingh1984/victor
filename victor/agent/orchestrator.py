@@ -741,12 +741,16 @@ class AgentOrchestrator(ModeAwareMixin):
         # This replaces scattered _vertical_* attributes with a proper container
         self._vertical_context: VerticalContext = create_vertical_context()
 
+        # Initialize ModeWorkflowTeamCoordinator for intelligent team/workflow suggestions
+        # Lazy initialization pattern - coordinator is created on first access
+        self._mode_workflow_team_coordinator: Optional[Any] = None
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
             "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
             "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration, WorkflowOptimization, VerticalContext"
+            "ObservabilityIntegration, WorkflowOptimization, VerticalContext, ModeWorkflowTeamCoordinator"
         )
 
     # =====================================================================
@@ -1190,6 +1194,61 @@ class AgentOrchestrator(ModeAwareMixin):
         """
         return self._vertical_context
 
+    @property
+    def coordination(self) -> Any:
+        """Get the mode-workflow-team coordinator (lazy initialization).
+
+        The ModeWorkflowTeamCoordinator bridges agent modes, team specifications,
+        and workflow definitions to provide intelligent suggestions for task execution.
+
+        Use this for:
+        - Getting team suggestions for complex tasks
+        - Workflow recommendations based on task type
+        - Mode-specific coordination configuration
+
+        Returns:
+            ModeWorkflowTeamCoordinator instance
+        """
+        if self._mode_workflow_team_coordinator is None:
+            self._mode_workflow_team_coordinator = (
+                self._factory.create_mode_workflow_team_coordinator(
+                    self._vertical_context
+                )
+            )
+            logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
+
+        return self._mode_workflow_team_coordinator
+
+    def get_team_suggestions(
+        self,
+        task_type: str,
+        complexity: str,
+    ) -> Any:
+        """Get team and workflow suggestions for a task.
+
+        Queries the ModeWorkflowTeamCoordinator to get recommendations for
+        teams and workflows based on task classification and current mode.
+
+        Args:
+            task_type: Classified task type (e.g., "feature", "bugfix", "refactor")
+            complexity: Complexity level (e.g., "low", "medium", "high", "extreme")
+
+        Returns:
+            CoordinationSuggestion with team and workflow recommendations
+        """
+        from victor.agent.mode_controller import MODE_CONFIGS
+
+        # Get current mode
+        current_mode = "build"  # Default
+        if self.mode_controller:
+            current_mode = self.mode_controller.current_mode.value
+
+        return self.coordination.suggest_for_task(
+            task_type=task_type,
+            complexity=complexity,
+            mode=current_mode,
+        )
+
     # =========================================================================
     # Vertical Protocol Methods
     # These implement OrchestratorVerticalProtocol for proper vertical integration
@@ -1205,6 +1264,14 @@ class AgentOrchestrator(ModeAwareMixin):
             context: VerticalContext to set
         """
         self._vertical_context = context
+
+        # Sync coordinator with new vertical context (if already initialized)
+        if self._mode_workflow_team_coordinator is not None:
+            self._mode_workflow_team_coordinator.set_vertical_context(context)
+            logger.debug(
+                f"Coordinator synced with vertical context: {context.vertical_name}"
+            )
+
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
     def set_enabled_tools(self, tools: Set[str]) -> None:
@@ -1548,6 +1615,15 @@ class AgentOrchestrator(ModeAwareMixin):
                 )
                 self._rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
 
+                # Emit RL hook for continuation prompt
+                self._emit_continuation_event(
+                    event_type="prompt",
+                    success=success and completed,
+                    quality_score=quality_score,
+                    task_type=task_type,
+                    prompts_used=continuation_prompts_used,
+                )
+
                 # Also record for continuation_patience learner if we have stuck loop data
                 if continuation_prompts_used > 0:
                     patience_outcome = RLOutcome(
@@ -1565,6 +1641,16 @@ class AgentOrchestrator(ModeAwareMixin):
                     )
                     self._rl_coordinator.record_outcome(
                         "continuation_patience", patience_outcome, vertical_name
+                    )
+
+                    # Emit RL hook for continuation patience
+                    self._emit_continuation_event(
+                        event_type="patience",
+                        success=success and completed,
+                        quality_score=quality_score,
+                        task_type=task_type,
+                        prompts_used=continuation_prompts_used,
+                        stuck_detected=stuck_loop_detected,
                     )
 
             except Exception as e:
@@ -1609,6 +1695,63 @@ class AgentOrchestrator(ModeAwareMixin):
         except Exception as e:
             logger.debug(f"IntelligentPipeline should_continue failed: {e}")
             return True, "Fallback to continue"
+
+    def _emit_continuation_event(
+        self,
+        event_type: str,
+        success: bool,
+        quality_score: float,
+        task_type: str,
+        prompts_used: int,
+        stuck_detected: bool = False,
+    ) -> None:
+        """Emit RL event for continuation attempt.
+
+        Args:
+            event_type: Either "prompt" or "patience"
+            success: Whether the continuation was successful
+            quality_score: Quality score of the result
+            task_type: Type of task
+            prompts_used: Number of continuation prompts used
+            stuck_detected: Whether a stuck loop was detected
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            if event_type == "prompt":
+                event = RLEvent(
+                    type=RLEventType.CONTINUATION_PROMPT,
+                    success=success,
+                    quality_score=quality_score,
+                    provider=self.provider.name,
+                    model=self.model,
+                    task_type=task_type,
+                    metadata={
+                        "prompts_used": prompts_used,
+                    },
+                )
+            else:  # patience
+                event = RLEvent(
+                    type=RLEventType.CONTINUATION_ATTEMPT,
+                    success=success,
+                    quality_score=quality_score,
+                    provider=self.provider.name,
+                    model=self.model,
+                    task_type=task_type,
+                    metadata={
+                        "prompts_used": prompts_used,
+                        "stuck_detected": stuck_detected,
+                    },
+                )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Continuation event emission failed: {e}")
 
     @property
     def safety_checker(self) -> SafetyChecker:
@@ -2063,6 +2206,33 @@ class AgentOrchestrator(ModeAwareMixin):
         # This enables the 15-20% accuracy improvement via workflow pattern detection
         if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "record_tool_execution"):
             self.tool_selector.record_tool_execution(tool_name, success=success)
+
+        # Record to RL tool_selector learner for Q-learning optimization
+        if self._rl_coordinator:
+            try:
+                from victor.agent.rl.base import RLOutcome
+
+                # Get current context
+                provider_name = getattr(self.current_provider, "name", "unknown")
+                model_name = getattr(self, "_current_model", "unknown")
+                task_type = getattr(self, "_task_type", "general")
+                vertical_name = getattr(self, "_vertical_name", None)
+
+                tool_outcome = RLOutcome(
+                    success=success,
+                    quality_score=1.0 if success else 0.0,
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                    metadata={
+                        "tool_name": tool_name,
+                        "execution_time_ms": elapsed_ms,
+                        "error_type": error_type,
+                    },
+                )
+                self._rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
+            except Exception as e:
+                logger.debug(f"Failed to record tool outcome to RL: {e}")
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -2666,9 +2836,61 @@ class AgentOrchestrator(ModeAwareMixin):
         # Only add for models with >= 32K context (smaller models benefit from sequential reads)
         if context_window >= 32768:
             budget_hint = budget.to_prompt_hint()
-            return f"{base_prompt}\n\n{budget_hint}"
+            final_prompt = f"{base_prompt}\n\n{budget_hint}"
+        else:
+            final_prompt = base_prompt
 
-        return base_prompt
+        # Emit prompt_used event for RL learning
+        self._emit_prompt_used_event(final_prompt)
+
+        return final_prompt
+
+    def _emit_prompt_used_event(self, prompt: str) -> None:
+        """Emit PROMPT_USED event for RL prompt template learner.
+
+        Args:
+            prompt: The final system prompt that was built
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            # Determine prompt style based on provider type
+            # Cloud providers use concise style, local uses detailed
+            provider_name = getattr(self.provider, "name", "unknown")
+            is_local = provider_name.lower() in {"ollama", "lmstudio", "vllm"}
+            prompt_style = "detailed" if is_local else "structured"
+
+            # Calculate prompt characteristics
+            has_examples = "example" in prompt.lower() or "e.g." in prompt.lower()
+            has_thinking = "step by step" in prompt.lower() or "think" in prompt.lower()
+            has_constraints = "must" in prompt.lower() or "always" in prompt.lower()
+
+            event = RLEvent(
+                type=RLEventType.PROMPT_USED,
+                success=True,  # Prompt was successfully built
+                quality_score=0.5,  # Neutral until we get outcome feedback
+                provider=provider_name,
+                model=self.model,
+                task_type="general",  # Will be updated with actual task type
+                metadata={
+                    "prompt_style": prompt_style,
+                    "prompt_length": len(prompt),
+                    "has_examples": has_examples,
+                    "has_thinking_prompt": has_thinking,
+                    "has_constraints": has_constraints,
+                    "session_id": getattr(self, "_session_id", ""),
+                },
+            )
+            hooks.emit(event)
+            logger.debug(f"Emitted prompt_used event: style={prompt_style}")
+
+        except Exception as e:
+            # RL hook failure should never block prompt building
+            logger.debug(f"Failed to emit prompt_used event: {e}")
 
     def _strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text."""

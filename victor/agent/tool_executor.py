@@ -58,6 +58,21 @@ from victor.tools.base import (
     ToolResult,
     ValidationResult,
 )
+
+# RL hook integration (lazy import to avoid circular dependencies)
+_rl_hooks = None
+
+
+def _get_rl_hooks():
+    """Get RL hooks registry (lazy initialization)."""
+    global _rl_hooks
+    if _rl_hooks is None:
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks
+            _rl_hooks = get_rl_hooks()
+        except ImportError:
+            _rl_hooks = None
+    return _rl_hooks
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -555,6 +570,9 @@ class ToolExecutor:
             sig = (tool_name, str(sorted(normalized_args.items())))
             self._failed_signatures.add(sig)
 
+        # Emit RL event for tool execution (for learner activation)
+        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
+
         return ToolExecutionResult(
             tool_name=tool_name,
             success=success,
@@ -614,6 +632,68 @@ class ToolExecutor:
                     raise HookError(hook_name, e, tool_name) from e
                 else:
                     logger.warning("After hook '%s' failed (non-critical): %s", hook_name, str(e))
+
+    def _emit_rl_tool_event(
+        self,
+        tool_name: str,
+        success: bool,
+        execution_time: float,
+        context: Dict[str, Any],
+    ) -> None:
+        """Emit RL event for tool execution to activate tool_selector learner.
+
+        This is called after every tool execution to provide feedback to the
+        RL system for learning optimal tool selection.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            success: Whether the tool execution succeeded
+            execution_time: Time taken to execute the tool (seconds)
+            context: Execution context with provider, model, task info
+        """
+        try:
+            rl_hooks = _get_rl_hooks()
+            if rl_hooks is None:
+                return
+
+            from victor.agent.rl.hooks import RLEvent, RLEventType
+
+            # Calculate quality score based on success and execution time
+            # Fast successful executions get higher scores
+            base_quality = 0.9 if success else 0.3
+            time_penalty = min(execution_time / 30.0, 0.3)  # Penalize slow executions
+            quality_score = base_quality - time_penalty
+
+            # Extract provider name - handle both string and Provider object
+            provider = context.get("provider")
+            if provider is not None and not isinstance(provider, str):
+                # Provider is an object - get its name attribute or class name
+                provider = getattr(provider, "name", None) or provider.__class__.__name__.replace("Provider", "").lower()
+
+            # Extract model name - handle both string and object
+            model = context.get("model")
+            if model is not None and not isinstance(model, str):
+                model = str(model)
+
+            event = RLEvent(
+                type=RLEventType.TOOL_EXECUTED,
+                tool_name=tool_name,
+                success=success,
+                quality_score=quality_score,
+                provider=provider,
+                model=model,
+                task_type=context.get("task_type", "general"),
+                vertical=context.get("vertical", "coding"),
+                metadata={
+                    "execution_time": execution_time,
+                },
+            )
+
+            rl_hooks.emit(event)
+
+        except Exception as e:
+            # RL hook failure should never block tool execution
+            logger.debug("RL tool event emission failed: %s", str(e))
 
     async def _execute_with_retry(
         self,

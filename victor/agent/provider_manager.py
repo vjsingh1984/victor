@@ -424,6 +424,13 @@ class ProviderManager:
                 f"(native_tools={self.capabilities.native_tool_calls if self.capabilities else 'unknown'})"
             )
 
+            # Emit RL event for model selection
+            self._emit_model_selected_event(
+                old_model=old_model,
+                new_model=model,
+                reason=reason,
+            )
+
             return True
 
         except Exception as e:
@@ -431,6 +438,43 @@ class ProviderManager:
             if self._current_state:
                 self._current_state.last_error = str(e)
             return False
+
+    def _emit_model_selected_event(
+        self,
+        old_model: str,
+        new_model: str,
+        reason: "SwitchReason",
+    ) -> None:
+        """Emit RL event for model selection.
+
+        Args:
+            old_model: Previous model name
+            new_model: New model name
+            reason: Reason for the switch
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.MODEL_SELECTED,
+                provider=self.provider_name,
+                model=new_model,
+                success=True,
+                quality_score=0.5,  # Will be updated by outcome
+                metadata={
+                    "old_model": old_model,
+                    "reason": reason.value if hasattr(reason, 'value') else str(reason),
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Model selected event emission failed: {e}")
 
     def get_info(self) -> Dict[str, Any]:
         """Get information about current provider and model.

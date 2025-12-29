@@ -418,6 +418,9 @@ class TieredCache:
             self._cache_eviction_learner.record_outcome(outcome)
             logger.debug(f"RL: Recorded cache hit for {tool_name}")
 
+            # Emit RL hook event for cache hit
+            self._emit_cache_event(tool_name=tool_name, cache_hit=True)
+
         except Exception as e:
             logger.debug(f"RL: Failed to record cache hit: {e}")
 
@@ -443,8 +446,41 @@ class TieredCache:
             self._cache_eviction_learner.record_outcome(outcome)
             logger.debug(f"RL: Recorded cache miss for {tool_name}")
 
+            # Emit RL hook event for cache miss
+            self._emit_cache_event(tool_name=tool_name, cache_hit=False)
+
         except Exception as e:
             logger.debug(f"RL: Failed to record cache miss: {e}")
+
+    def _emit_cache_event(self, tool_name: str, cache_hit: bool) -> None:
+        """Emit RL event for cache access.
+
+        Args:
+            tool_name: Name of the tool
+            cache_hit: Whether this was a cache hit
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.CACHE_ACCESS,
+                tool_name=tool_name,
+                cache_hit=cache_hit,
+                success=cache_hit,
+                quality_score=1.0 if cache_hit else 0.0,
+                metadata={
+                    "utilization": self._get_utilization(),
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Cache event emission failed: {e}")
 
     def _get_utilization(self) -> float:
         """Get current cache utilization (0-1)."""

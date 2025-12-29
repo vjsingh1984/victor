@@ -49,6 +49,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Lazy hook initialization to avoid circular imports
+_rl_hooks = None
+
+
+def _get_rl_hooks():
+    """Lazy load RL hooks registry."""
+    global _rl_hooks
+    if _rl_hooks is None:
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks
+            _rl_hooks = get_rl_hooks()
+        except ImportError:
+            _rl_hooks = None
+    return _rl_hooks
+
+
 # Cost tier warning messages for user visibility
 COST_TIER_WARNINGS = {
     CostTier.HIGH: "HIGH COST: This tool may use significant resources or make external API calls",
@@ -1403,6 +1419,15 @@ class SemanticToolSelector:
         if self._last_cost_warnings:
             logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type="default",
+            classification_aware=False,
+            excluded_count=0,
+        )
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
@@ -1531,6 +1556,15 @@ class SemanticToolSelector:
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
             logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
+
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type="default",
+            classification_aware=False,
+            excluded_count=0,
+        )
 
         # Convert to ToolDefinition
         return [
@@ -1993,6 +2027,15 @@ class SemanticToolSelector:
         # Generate cost warnings
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
 
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type=task_type_str,
+            classification_aware=True,
+            excluded_count=len(excluded_tools),
+        )
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
@@ -2075,3 +2118,59 @@ class SemanticToolSelector:
 
         if self._client:
             await self._client.aclose()
+
+    def _emit_semantic_match_event(
+        self,
+        selected_tools: List[Tuple[Any, float]],
+        threshold: float,
+        task_type: str = "default",
+        classification_aware: bool = False,
+        excluded_count: int = 0,
+    ) -> None:
+        """Emit semantic match event for RL learning.
+
+        Args:
+            selected_tools: List of (tool, score) tuples
+            threshold: Similarity threshold used
+            task_type: Task type from classification (if available)
+            classification_aware: Whether classification was used
+            excluded_count: Number of tools excluded by negation
+        """
+        hooks = _get_rl_hooks()
+        if hooks is None:
+            return
+
+        try:
+            from victor.agent.rl.hooks import RLEvent, RLEventType
+
+            # Calculate selection quality metrics
+            avg_score = (
+                sum(score for _, score in selected_tools) / len(selected_tools)
+                if selected_tools
+                else 0.0
+            )
+            tool_names = [t.name for t, _ in selected_tools]
+
+            event = RLEvent(
+                type=RLEventType.SEMANTIC_MATCH,
+                success=len(selected_tools) > 0,
+                quality_score=avg_score,
+                tool_name=",".join(tool_names[:5]),  # First 5 tools
+                context={
+                    "threshold": threshold,
+                    "tools_selected": len(selected_tools),
+                    "task_type": task_type,
+                    "classification_aware": classification_aware,
+                    "excluded_count": excluded_count,
+                    "avg_similarity": avg_score,
+                    "top_scores": [s for _, s in selected_tools[:3]],  # Top 3 scores
+                },
+            )
+            hooks.emit(event)
+            logger.log(
+                TRACE,
+                f"Emitted semantic_match event: {len(selected_tools)} tools, "
+                f"threshold={threshold:.3f}, avg_score={avg_score:.3f}",
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit semantic_match event: {e}")
