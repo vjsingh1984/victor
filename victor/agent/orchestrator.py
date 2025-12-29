@@ -848,11 +848,12 @@ class AgentOrchestrator(ModeAwareMixin):
                     "tool_calls_made": tool_calls_made,
                     "session_id": session.session_id,
                 },
-                vertical="coding",
+                vertical=getattr(self._vertical_context, "vertical_name", None) or "default",
             )
 
-            # Record outcome for model selector
-            self._rl_coordinator.record_outcome("model_selector", outcome, "coding")
+            # Record outcome for model selector - use vertical from context
+            vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
+            self._rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
 
             logger.debug(
                 f"RL feedback: provider={session.provider} success={success} "
@@ -1526,6 +1527,9 @@ class AgentOrchestrator(ModeAwareMixin):
                 max_prompts_configured = getattr(self, "_max_continuation_prompts_used", 6)
                 stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
 
+                # Get vertical name from context (avoid hardcoded "coding")
+                vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
+
                 # Record outcome for continuation_prompts learner
                 outcome = RLOutcome(
                     provider=self.provider.name,
@@ -1540,9 +1544,9 @@ class AgentOrchestrator(ModeAwareMixin):
                         "forced_completion": ctx.force_completion,
                         "tool_calls_total": self.tool_calls_used,
                     },
-                    vertical="coding",
+                    vertical=vertical_name,
                 )
-                self._rl_coordinator.record_outcome("continuation_prompts", outcome, "coding")
+                self._rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
 
                 # Also record for continuation_patience learner if we have stuck loop data
                 if continuation_prompts_used > 0:
@@ -1557,10 +1561,10 @@ class AgentOrchestrator(ModeAwareMixin):
                             "actually_stuck": stuck_loop_detected and not success,
                             "eventually_made_progress": not stuck_loop_detected and success,
                         },
-                        vertical="coding",
+                        vertical=vertical_name,
                     )
                     self._rl_coordinator.record_outcome(
-                        "continuation_patience", patience_outcome, "coding"
+                        "continuation_patience", patience_outcome, vertical_name
                     )
 
             except Exception as e:
