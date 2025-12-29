@@ -262,3 +262,64 @@ When presenting analysis:
             # Data analysis often involves exploratory work, allow write tools for analysis
             readonly_only_for_analysis=False,
         )
+
+    # =========================================================================
+    # New Framework Integrations (Workflows, RL, Teams)
+    # =========================================================================
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get Data Analysis-specific workflow provider.
+
+        Provides workflows for:
+        - eda_workflow: Exploratory Data Analysis
+        - data_cleaning: Data cleaning and preparation
+        - statistical_analysis: Hypothesis testing and statistical modeling
+        - ml_pipeline: End-to-end machine learning pipeline
+
+        Returns:
+            DataAnalysisWorkflowProvider instance
+        """
+        from victor.verticals.data_analysis.workflows import DataAnalysisWorkflowProvider
+
+        return DataAnalysisWorkflowProvider()
+
+    @classmethod
+    def get_rl_config(cls) -> Optional[Any]:
+        """Get RL configuration for Data Analysis vertical.
+
+        Returns:
+            DataAnalysisRLConfig instance
+        """
+        from victor.verticals.data_analysis.rl import DataAnalysisRLConfig
+
+        return DataAnalysisRLConfig()
+
+    @classmethod
+    def get_rl_hooks(cls) -> Optional[Any]:
+        """Get RL hooks for Data Analysis vertical.
+
+        Returns:
+            DataAnalysisRLHooks instance
+        """
+        from victor.verticals.data_analysis.rl import DataAnalysisRLHooks
+
+        return DataAnalysisRLHooks()
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for Data Analysis tasks.
+
+        Provides pre-configured team specifications for:
+        - eda_team: Exploratory data analysis
+        - cleaning_team: Data quality and preparation
+        - statistics_team: Hypothesis testing
+        - ml_team: Machine learning pipeline
+        - visualization_team: Charts and dashboards
+
+        Returns:
+            Dict mapping team names to DataAnalysisTeamSpec instances
+        """
+        from victor.verticals.data_analysis.teams import DATA_ANALYSIS_TEAM_SPECS
+
+        return DATA_ANALYSIS_TEAM_SPECS
