@@ -59,6 +59,9 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(similarity::cosine_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::batch_cosine_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::top_k_similar, m)?)?;
+    m.add_function(wrap_pyfunction!(similarity::batch_normalize_vectors, m)?)?;
+    m.add_function(wrap_pyfunction!(similarity::batch_cosine_similarity_normalized, m)?)?;
+    m.add_function(wrap_pyfunction!(similarity::top_k_similar_normalized, m)?)?;
 
     // JSON repair functions
     m.add_function(wrap_pyfunction!(json_repair::repair_json, m)?)?;

@@ -295,6 +295,97 @@ def top_k_similar(
     return indexed[:k]
 
 
+def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
+    """Normalize vectors to unit length for efficient similarity computation.
+
+    Pre-normalizing vectors allows subsequent similarity computations to
+    skip redundant norm calculations, providing ~2x speedup for batch operations.
+
+    Args:
+        vectors: List of vectors to normalize
+
+    Returns:
+        List of normalized vectors (unit length)
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.batch_normalize_vectors(vectors)
+
+    # Pure Python fallback using NumPy
+    if not vectors:
+        return []
+
+    arr = np.array(vectors, dtype=np.float32)
+    norms = np.linalg.norm(arr, axis=1, keepdims=True) + 1e-9
+    normalized = arr / norms
+    return normalized.tolist()
+
+
+def batch_cosine_similarity_normalized(
+    query: List[float], normalized_corpus: List[List[float]]
+) -> List[float]:
+    """Compute cosine similarities with a pre-normalized corpus.
+
+    This is faster than batch_cosine_similarity when the corpus has already
+    been normalized via batch_normalize_vectors, as it avoids redundant
+    norm calculations.
+
+    Args:
+        query: Query embedding vector (will be normalized internally)
+        normalized_corpus: List of pre-normalized corpus vectors (unit length)
+
+    Returns:
+        List of similarity scores, one per corpus vector
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.batch_cosine_similarity_normalized(query, normalized_corpus)
+
+    # Pure Python fallback using NumPy
+    if not normalized_corpus:
+        return []
+
+    query_arr = np.array(query, dtype=np.float32)
+    corpus_arr = np.array(normalized_corpus, dtype=np.float32)
+
+    # Normalize query
+    query_normalized = query_arr / (np.linalg.norm(query_arr) + 1e-9)
+
+    # For pre-normalized corpus, similarity is just dot product
+    similarities = np.dot(corpus_arr, query_normalized)
+    return similarities.tolist()
+
+
+def top_k_similar_normalized(
+    query: List[float], normalized_corpus: List[List[float]], k: int = 10
+) -> List[Tuple[int, float]]:
+    """Find top-k similar vectors from a pre-normalized corpus.
+
+    More efficient version of top_k_similar when corpus is already normalized
+    via batch_normalize_vectors.
+
+    Args:
+        query: Query embedding vector
+        normalized_corpus: List of pre-normalized corpus vectors
+        k: Number of top results to return
+
+    Returns:
+        List of (index, similarity) tuples, sorted by similarity descending
+    """
+    if _NATIVE_AVAILABLE:
+        return _native.top_k_similar_normalized(query, normalized_corpus, k)
+
+    # Pure Python fallback using heap for efficiency
+    import heapq
+
+    similarities = batch_cosine_similarity_normalized(query, normalized_corpus)
+
+    # Use heapq.nlargest for efficient top-k selection
+    indexed = [(sim, i) for i, sim in enumerate(similarities)]
+    top_k = heapq.nlargest(k, indexed)
+
+    # Convert back to (index, similarity) format
+    return [(i, sim) for sim, i in top_k]
+
+
 # =============================================================================
 # JSON REPAIR FUNCTIONS
 # =============================================================================
@@ -1053,6 +1144,9 @@ __all__ = [
     "cosine_similarity",
     "batch_cosine_similarity",
     "top_k_similar",
+    "batch_normalize_vectors",
+    "batch_cosine_similarity_normalized",
+    "top_k_similar_normalized",
     # JSON repair
     "repair_json",
     "extract_json_objects",

@@ -214,6 +214,159 @@ pub fn top_k_similar(
     Ok(top_k)
 }
 
+/// Normalize vectors in-place to unit length.
+///
+/// This is useful for pre-processing embeddings before similarity computation,
+/// reducing redundant norm calculations in batch operations.
+///
+/// # Arguments
+/// * `vectors` - List of vectors to normalize in-place
+///
+/// # Returns
+/// List of normalized vectors (unit length)
+#[pyfunction]
+pub fn batch_normalize_vectors(vectors: Vec<Vec<f32>>) -> PyResult<Vec<Vec<f32>>> {
+    if vectors.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Use parallel processing for larger batches
+    let results: Vec<Vec<f32>> = if vectors.len() > 100 {
+        vectors
+            .par_iter()
+            .map(|vec| normalize_vector(vec))
+            .collect()
+    } else {
+        vectors
+            .iter()
+            .map(|vec| normalize_vector(vec))
+            .collect()
+    };
+
+    Ok(results)
+}
+
+/// Normalize a single vector to unit length using SIMD.
+#[inline]
+fn normalize_vector(vec: &[f32]) -> Vec<f32> {
+    let norm = simd_norm(vec);
+    vec.iter().map(|&x| x / norm).collect()
+}
+
+/// Compute cosine similarities between a query and pre-normalized corpus vectors.
+///
+/// This is faster than batch_cosine_similarity when the corpus is already normalized,
+/// as it avoids redundant norm calculations.
+///
+/// # Arguments
+/// * `query` - Query embedding vector (will be normalized internally)
+/// * `normalized_corpus` - List of pre-normalized corpus vectors (unit length)
+///
+/// # Returns
+/// List of similarity scores, one per corpus vector
+#[pyfunction]
+pub fn batch_cosine_similarity_normalized(
+    query: Vec<f32>,
+    normalized_corpus: Vec<Vec<f32>>,
+) -> PyResult<Vec<f32>> {
+    if normalized_corpus.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Validate dimensions
+    let query_dim = query.len();
+    for (i, vec) in normalized_corpus.iter().enumerate() {
+        if vec.len() != query_dim {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!(
+                    "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
+                    query_dim, i, vec.len()
+                )
+            ));
+        }
+    }
+
+    // Normalize query once
+    let query_normalized = normalize_vector(&query);
+
+    // For pre-normalized vectors, similarity is just dot product
+    let results: Vec<f32> = if normalized_corpus.len() > 100 {
+        normalized_corpus
+            .par_iter()
+            .map(|vec| simd_dot(&query_normalized, vec))
+            .collect()
+    } else {
+        normalized_corpus
+            .iter()
+            .map(|vec| simd_dot(&query_normalized, vec))
+            .collect()
+    };
+
+    Ok(results)
+}
+
+/// Find top-k similar vectors from a pre-normalized corpus.
+///
+/// More efficient version of top_k_similar when corpus is already normalized.
+///
+/// # Arguments
+/// * `query` - Query embedding vector
+/// * `normalized_corpus` - List of pre-normalized corpus vectors
+/// * `k` - Number of top results to return
+///
+/// # Returns
+/// List of (index, similarity) tuples, sorted by similarity descending
+#[pyfunction]
+#[pyo3(signature = (query, normalized_corpus, k = 10))]
+pub fn top_k_similar_normalized(
+    query: Vec<f32>,
+    normalized_corpus: Vec<Vec<f32>>,
+    k: usize,
+) -> PyResult<Vec<(usize, f32)>> {
+    let similarities = batch_cosine_similarity_normalized(query, normalized_corpus)?;
+
+    // Use a binary heap for efficient top-k selection
+    use std::collections::BinaryHeap;
+    use std::cmp::Ordering;
+
+    #[derive(PartialEq)]
+    struct ScoredIndex(usize, f32);
+
+    impl Eq for ScoredIndex {}
+
+    impl PartialOrd for ScoredIndex {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            // Reverse order for min-heap behavior
+            other.1.partial_cmp(&self.1)
+        }
+    }
+
+    impl Ord for ScoredIndex {
+        fn cmp(&self, other: &Self) -> Ordering {
+            self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        }
+    }
+
+    let k = k.min(similarities.len());
+    let mut heap: BinaryHeap<ScoredIndex> = BinaryHeap::with_capacity(k + 1);
+
+    for (idx, sim) in similarities.into_iter().enumerate() {
+        heap.push(ScoredIndex(idx, sim));
+        if heap.len() > k {
+            heap.pop(); // Remove smallest
+        }
+    }
+
+    // Extract and sort results
+    let mut results: Vec<(usize, f32)> = heap
+        .into_iter()
+        .map(|si| (si.0, si.1))
+        .collect();
+    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+
+    Ok(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,5 +439,70 @@ mod tests {
         let a = vec![1.0, 2.0];
         let b = vec![1.0, 2.0, 3.0];
         assert!(cosine_similarity(a, b).is_err());
+    }
+
+    #[test]
+    fn test_batch_normalize_vectors() {
+        let vectors = vec![
+            vec![3.0, 4.0],  // norm = 5
+            vec![1.0, 0.0],  // norm = 1
+            vec![0.0, 2.0],  // norm = 2
+        ];
+        let normalized = batch_normalize_vectors(vectors).unwrap();
+
+        assert_eq!(normalized.len(), 3);
+
+        // Check first vector is normalized to unit length
+        let norm0: f32 = normalized[0].iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm0 - 1.0).abs() < 1e-6);
+
+        // Check values
+        assert!((normalized[0][0] - 0.6).abs() < 1e-6);
+        assert!((normalized[0][1] - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_batch_cosine_similarity_normalized() {
+        // Pre-normalized vectors (unit length)
+        let corpus = vec![
+            vec![1.0, 0.0, 0.0],  // unit vector along x
+            vec![0.0, 1.0, 0.0],  // unit vector along y
+            vec![0.0, 0.0, 1.0],  // unit vector along z
+        ];
+        let query = vec![1.0, 0.0, 0.0];  // Will be normalized internally
+
+        let sims = batch_cosine_similarity_normalized(query, corpus).unwrap();
+        assert_eq!(sims.len(), 3);
+        assert!((sims[0] - 1.0).abs() < 1e-6);  // Identical
+        assert!(sims[1].abs() < 1e-6);          // Orthogonal
+        assert!(sims[2].abs() < 1e-6);          // Orthogonal
+    }
+
+    #[test]
+    fn test_top_k_similar_normalized() {
+        // Pre-normalized vectors
+        let corpus = vec![
+            vec![0.6, 0.8],       // ~53 degrees from x-axis
+            vec![1.0, 0.0],       // x-axis (most similar to query)
+            vec![0.0, 1.0],       // y-axis (least similar)
+            vec![0.8, 0.6],       // ~37 degrees (second most similar)
+        ];
+        let query = vec![1.0, 0.0];  // x-axis
+
+        let top = top_k_similar_normalized(query, corpus, 2).unwrap();
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, 1);  // Index 1 is most similar (x-axis)
+        assert_eq!(top[1].0, 3);  // Index 3 is second most similar
+    }
+
+    #[test]
+    fn test_normalize_vector() {
+        let v = vec![3.0, 4.0];
+        let normalized = normalize_vector(&v);
+        assert!((normalized[0] - 0.6).abs() < 1e-6);
+        assert!((normalized[1] - 0.8).abs() < 1e-6);
+
+        let norm: f32 = normalized.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-6);
     }
 }
