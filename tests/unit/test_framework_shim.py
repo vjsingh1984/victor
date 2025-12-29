@@ -280,7 +280,11 @@ class TestFrameworkShimVertical:
 
     @pytest.mark.asyncio
     async def test_vertical_system_prompt_applied(self, mock_settings, mock_orchestrator):
-        """Test that vertical system prompt is applied."""
+        """Test that vertical system prompt is applied.
+
+        With capability-based invocation, the orchestrator's set_custom_prompt
+        method is called directly (via _invoke_capability mapping).
+        """
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
             new_callable=AsyncMock,
@@ -290,7 +294,8 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with(
+            # New capability-based approach calls orchestrator.set_custom_prompt directly
+            mock_orchestrator.set_custom_prompt.assert_called_once_with(
                 "You are a test assistant."
             )
 

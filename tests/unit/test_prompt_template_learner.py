@@ -29,6 +29,7 @@ from victor.agent.rl.learners.prompt_template import (
     BetaDistribution,
 )
 from victor.agent.rl.base import RLOutcome
+from victor.core.schema import Tables
 
 
 @pytest.fixture
@@ -368,7 +369,7 @@ class TestPromptTemplateLearnerPersistence:
 
         # Check database has data
         cursor = learner.db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM prompt_template_styles")
+        cursor.execute(f"SELECT COUNT(*) FROM {Tables.AGENT_PROMPT_STYLE}")
         count = cursor.fetchone()[0]
         assert count > 0
 
@@ -416,7 +417,7 @@ class TestPromptTemplateLearnerPersistence:
         learner.record_outcome(outcome)
 
         cursor = learner.db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM prompt_template_history")
+        cursor.execute(f"SELECT COUNT(*) FROM {Tables.AGENT_PROMPT_HISTORY}")
         count = cursor.fetchone()[0]
         assert count > 0
 

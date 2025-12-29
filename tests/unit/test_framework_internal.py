@@ -118,21 +118,29 @@ class TestApplySystemPrompt:
     """Test system prompt application."""
 
     def test_apply_with_set_custom_prompt(self):
-        """Test applying prompt when prompt_builder has set_custom_prompt."""
+        """Test applying prompt via orchestrator's set_custom_prompt method.
+
+        The new capability-based approach calls orchestrator.set_custom_prompt
+        directly when available (via _invoke_capability mapping).
+        """
         mock_orchestrator = MagicMock()
-        mock_orchestrator.prompt_builder = MagicMock()
-        mock_orchestrator.prompt_builder.set_custom_prompt = MagicMock()
+        mock_orchestrator.set_custom_prompt = MagicMock()
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
         assert mock_orchestrator._framework_system_prompt == "Custom prompt text"
-        mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with(
+        mock_orchestrator.set_custom_prompt.assert_called_once_with(
             "Custom prompt text"
         )
 
     def test_apply_with_custom_prompt_attr(self):
-        """Test applying prompt when prompt_builder has _custom_prompt."""
-        mock_orchestrator = MagicMock()
+        """Test applying prompt via prompt_builder when no set_custom_prompt.
+
+        When orchestrator doesn't have set_custom_prompt, falls back to
+        prompt_builder.set_custom_prompt or prompt_builder._custom_prompt.
+        """
+        # Create mock without set_custom_prompt so it falls through to prompt_builder
+        mock_orchestrator = MagicMock(spec=["_framework_system_prompt", "prompt_builder"])
         mock_orchestrator.prompt_builder = MagicMock(spec=["_custom_prompt"])
 
         apply_system_prompt(mock_orchestrator, "Another prompt")

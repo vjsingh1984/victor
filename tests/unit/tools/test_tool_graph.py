@@ -17,6 +17,7 @@
 import pytest
 
 from victor.tools.tool_graph import (
+    ToolDependency,
     ToolNode,
     ToolTransition,
     ToolExecutionGraph,
@@ -35,6 +36,36 @@ def registry():
     """Create a fresh registry for each test."""
     ToolGraphRegistry.reset_instance()
     return ToolGraphRegistry.get_instance()
+
+
+class TestToolDependency:
+    """Tests for ToolDependency dataclass."""
+
+    def test_tool_dependency_has_required_fields(self):
+        """ToolDependency should have tool_name, depends_on, enables, transition_weight."""
+        dep = ToolDependency(tool_name="edit_files")
+        assert dep.tool_name == "edit_files"
+        assert dep.depends_on == []
+        assert dep.enables == []
+        assert dep.transition_weight == 1.0
+
+    def test_tool_dependency_with_all_fields(self):
+        """ToolDependency should accept all fields."""
+        dep = ToolDependency(
+            tool_name="edit_files",
+            depends_on=["read_file"],
+            enables=["run_tests"],
+            transition_weight=0.9,
+        )
+        assert dep.tool_name == "edit_files"
+        assert dep.depends_on == ["read_file"]
+        assert dep.enables == ["run_tests"]
+        assert dep.transition_weight == 0.9
+
+    def test_tool_dependency_default_weight(self):
+        """transition_weight should default to 1.0."""
+        dep = ToolDependency(tool_name="test")
+        assert dep.transition_weight == 1.0
 
 
 class TestToolNode:
@@ -60,6 +91,20 @@ class TestToolNode:
         )
         assert "read_file" in node.depends_on
         assert "run_tests" in node.enables
+
+    def test_tool_node_from_dependency(self):
+        """from_dependency should create ToolNode from ToolDependency."""
+        dep = ToolDependency(
+            tool_name="edit_files",
+            depends_on=["read_file"],
+            enables=["run_tests"],
+            transition_weight=0.9,
+        )
+        node = ToolNode.from_dependency(dep)
+        assert node.name == "edit_files"
+        assert node.depends_on == {"read_file"}
+        assert node.enables == {"run_tests"}
+        assert node.weight == 0.9
 
 
 class TestToolTransition:
@@ -103,6 +148,20 @@ class TestToolExecutionGraph:
         )
         prereqs = graph.get_prerequisites("edit_files")
         assert "read_file" in prereqs
+
+    def test_add_dependency_with_tool_dependency_object(self, graph):
+        """add_dependency should accept ToolDependency dataclass."""
+        dep = ToolDependency(
+            tool_name="edit_files",
+            depends_on=["read_file"],
+            enables=["run_tests"],
+            transition_weight=0.9,
+        )
+        graph.add_dependency(dep)
+        prereqs = graph.get_prerequisites("edit_files")
+        assert "read_file" in prereqs
+        enabled = graph.get_enabled_tools("edit_files")
+        assert "run_tests" in enabled
 
     def test_add_dependencies_bulk(self, graph):
         """add_dependencies should add multiple."""
@@ -263,6 +322,56 @@ class TestToolExecutionGraph:
         is_valid, missing = graph.validate_execution("edit", set())
         assert is_valid is False
         assert "read" in missing
+
+    def test_get_next_tools_returns_enabled_tools(self, graph):
+        """get_next_tools should return enabled tools with weights."""
+        graph.add_dependency("read", enables={"edit", "search"}, weight=0.9)
+        next_tools = graph.get_next_tools("read")
+        assert len(next_tools) >= 2
+        tool_names = [t[0] for t in next_tools]
+        assert "edit" in tool_names
+        assert "search" in tool_names
+        # Each tool should have a weight
+        for tool, weight in next_tools:
+            assert isinstance(weight, float)
+            assert 0.0 <= weight <= 1.0
+
+    def test_get_next_tools_returns_sorted_by_weight(self, graph):
+        """get_next_tools should return tools sorted by weight descending."""
+        graph.add_transitions({
+            "read": [("edit", 0.9), ("search", 0.5)],
+        })
+        next_tools = graph.get_next_tools("read")
+        weights = [t[1] for t in next_tools]
+        assert weights == sorted(weights, reverse=True)
+
+    def test_validate_sequence_returns_true_for_valid(self, graph):
+        """validate_sequence should return True for valid sequence."""
+        graph.add_dependency("edit", depends_on={"read"})
+        graph.add_dependency("test", depends_on={"edit"})
+        # Valid sequence: read before edit, edit before test
+        assert graph.validate_sequence(["read", "edit", "test"]) is True
+
+    def test_validate_sequence_returns_false_when_dependency_missing(self, graph):
+        """validate_sequence should return False when dependency missing."""
+        graph.add_dependency("edit", depends_on={"read"})
+        graph.add_dependency("test", depends_on={"edit"})
+        # Invalid: edit comes before read
+        assert graph.validate_sequence(["edit", "read", "test"]) is False
+        # Invalid: test comes before edit
+        assert graph.validate_sequence(["read", "test", "edit"]) is False
+
+    def test_validate_sequence_empty_returns_true(self, graph):
+        """validate_sequence should return True for empty sequence."""
+        assert graph.validate_sequence([]) is True
+
+    def test_validate_sequence_no_dependencies_returns_true(self, graph):
+        """validate_sequence should return True when tools have no dependencies."""
+        graph.add_node("read")
+        graph.add_node("edit")
+        # Tools without dependencies can be in any order
+        assert graph.validate_sequence(["edit", "read"]) is True
+        assert graph.validate_sequence(["read", "edit"]) is True
 
     def test_merge_graphs(self, graph):
         """merge should combine two graphs."""

@@ -139,12 +139,10 @@ class TestThresholdLearnerIntegration:
         )
 
         # Assert
-        # Check database directly or via learner methods if available
-        # Since learner doesn't expose stats directly anymore, we check via get_recommendation or internal methods if needed for verification
-        # But here we assume no exception is enough or we can verify via recommendation later
-        # For this test, let's verify data was inserted
+        # Check database directly via the correct table name from schema
+        # The table name is defined in victor.core.schema.Tables.RL_SEMANTIC_STAT
         cursor = db.cursor()
-        cursor.execute("SELECT * FROM semantic_threshold_stats")
+        cursor.execute("SELECT * FROM rl_semantic_stat")
         rows = cursor.fetchall()
         assert len(rows) > 0
 

@@ -29,13 +29,19 @@ from victor.agent.rl.learners.cache_eviction import (
     CacheEvictionLearner,
     CacheEvictionAction,
 )
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -81,7 +87,7 @@ def _get_q_value_from_db(
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        "SELECT q_value, visit_count FROM cache_eviction_q_values WHERE state_key = ? AND action = ?",
+        f"SELECT q_value, visit_count FROM {Tables.RL_CACHE_Q} WHERE state_key = ? AND action = ?",
         (state_key, action),
     )
     row = cursor.fetchone()
@@ -194,13 +200,17 @@ class TestCacheEvictionLearner:
         state_key = "medium:recent:low:search"
         action = CacheEvictionAction.KEEP
 
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("cache_eviction")  # type: ignore
 
         _record_eviction_outcome(learner1, state_key=state_key, action=action)
-        coordinator1.db.close()
+        reset_database()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("cache_eviction")  # type: ignore
 
         q_value, count = _get_q_value_from_db(coordinator2, state_key, action)
@@ -210,6 +220,8 @@ class TestCacheEvictionLearner:
         # Check state was loaded correctly
         assert state_key in learner2._q_values
         assert action in learner2._q_values[state_key]
+
+        reset_database()
 
     def test_get_recommendation_exploitation(self, learner: CacheEvictionLearner) -> None:
         """Test get_recommendation returns best action in exploitation mode."""

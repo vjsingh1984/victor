@@ -414,8 +414,8 @@ class TestAgentVerticalIntegration:
             def get_system_prompt(cls) -> str:
                 return "You are a test assistant specialized in testing."
 
-        # Get config
-        config = TestVertical.get_config()
+        # Get config (use_cache=False to avoid stale cached config)
+        config = TestVertical.get_config(use_cache=False)
 
         assert config.system_prompt == "You are a test assistant specialized in testing."
         assert config.tools is not None

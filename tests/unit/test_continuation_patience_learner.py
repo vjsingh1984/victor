@@ -8,13 +8,19 @@ from pathlib import Path
 from victor.agent.rl.base import RLOutcome, RLRecommendation
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.continuation_patience import ContinuationPatienceLearner
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -65,7 +71,7 @@ def _get_patience_stats(
     cursor = coordinator.db.cursor()
     context_key = f"{provider}:{model}:{task_type}"
     cursor.execute(
-        "SELECT * FROM continuation_patience_stats WHERE context_key = ?",
+        f"SELECT * FROM {Tables.RL_PATIENCE_STAT} WHERE context_key = ?",
         (context_key,),
     )
     row = cursor.fetchone()
@@ -81,7 +87,7 @@ class TestContinuationPatienceLearner:
         assert learner.name == "continuation_patience"
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='continuation_patience_stats';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_PATIENCE_STAT}';"
         )
         assert cursor.fetchone() is not None
 

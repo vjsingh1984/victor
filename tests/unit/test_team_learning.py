@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
+from victor.core.database import reset_database, get_database
 from victor.agent.subagents import SubAgentRole
 from victor.agent.teams import (
     TeamFormation,
@@ -352,13 +353,14 @@ class TestTeamCompositionLearner:
     """Test TeamCompositionLearner class."""
 
     @pytest.fixture
-    def learner(self):
+    def learner(self, tmp_path: Path):
         """Create learner with temporary database."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test_learning.db"
-            learner = TeamCompositionLearner(db_path=db_path)
-            yield learner
-            learner.close()
+        reset_database()
+        db_path = tmp_path / "test_learning.db"
+        get_database(db_path)
+        learner = TeamCompositionLearner(db_path=db_path)
+        yield learner
+        reset_database()
 
     def test_initialization(self, learner):
         """Learner initializes correctly."""
@@ -422,7 +424,7 @@ class TestTeamCompositionLearner:
             formation_used=TeamFormation.SEQUENTIAL,
         )
 
-        learner.record_outcome("Implement feature", config, result)
+        learner.record_team_outcome("Implement feature", config, result)
 
         stats = learner.get_stats(TaskCategory.IMPLEMENTATION)
         assert stats["total_executions"] == 1
@@ -462,7 +464,7 @@ class TestTeamCompositionLearner:
                 total_duration=25.0,
                 formation_used=TeamFormation.SEQUENTIAL,
             )
-            learner.record_outcome("Implement feature", config, result)
+            learner.record_team_outcome("Implement feature", config, result)
 
         # Q-value should be relatively high after successes
         stats = learner.get_stats(TaskCategory.IMPLEMENTATION)
@@ -515,7 +517,7 @@ class TestTeamCompositionLearner:
             formation_used=TeamFormation.SEQUENTIAL,
         )
 
-        learner.record_outcome("Create task", config, result)
+        learner.record_team_outcome("Create task", config, result)
 
         # Reset
         learner.reset()

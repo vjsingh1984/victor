@@ -19,6 +19,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from victor.core.database import reset_database, get_database
 from victor.agent.signature_store import (
     FailedSignature,
     SignatureStore,
@@ -80,10 +81,13 @@ class TestSignatureStore:
     """Tests for SignatureStore class."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self, tmp_path: Path):
         """Create a temporary database path."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir) / "test_signatures.db"
+        reset_database()
+        db_path = tmp_path / "test_signatures.db"
+        get_database(db_path)
+        yield db_path
+        reset_database()
 
     @pytest.fixture
     def store(self, temp_db):
@@ -299,24 +303,29 @@ class TestGlobalFunctions:
         store2 = get_signature_store()
         assert store1 is not store2
 
-    def test_get_signature_store_with_path(self):
+    def test_get_signature_store_with_path(self, tmp_path: Path):
         """Test get_signature_store with custom path."""
         reset_signature_store()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            custom_path = Path(tmpdir) / "custom.db"
-            store = get_signature_store(custom_path)
-            assert store.db_path == custom_path
+        reset_database()
+        custom_path = tmp_path / "custom.db"
+        get_database(custom_path)
+        store = get_signature_store(custom_path)
+        assert store.db_path == custom_path
         reset_signature_store()
+        reset_database()
 
 
 class TestSignatureStoreEdgeCases:
     """Edge case tests for SignatureStore."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self, tmp_path: Path):
         """Create a temporary database path."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir) / "test_signatures.db"
+        reset_database()
+        db_path = tmp_path / "test_signatures.db"
+        get_database(db_path)
+        yield db_path
+        reset_database()
 
     def test_empty_args(self, temp_db):
         """Test with empty args dict."""

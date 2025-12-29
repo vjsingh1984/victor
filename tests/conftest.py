@@ -126,3 +126,307 @@ def auto_mock_docker_for_orchestrator(request):
             yield
     else:
         yield
+
+
+# ============ Workflow Fixtures ============
+
+
+@pytest.fixture
+def empty_workflow_graph():
+    """Empty StateGraph workflow for testing.
+
+    Creates an empty StateGraph instance that can be populated with
+    nodes and edges for testing workflow building logic.
+    """
+    from dataclasses import dataclass
+    from victor.workflows.graph_dsl import StateGraph, State
+
+    @dataclass
+    class TestState(State):
+        """Minimal state for testing."""
+        value: str = ""
+
+    return StateGraph(TestState, name="test_workflow")
+
+
+@pytest.fixture
+def linear_workflow_graph():
+    """Linear A -> B -> C workflow graph.
+
+    Creates a complete linear workflow with three nodes that can
+    be used to test sequential execution patterns.
+    """
+    from dataclasses import dataclass
+    from victor.workflows.graph_dsl import StateGraph, State
+
+    @dataclass
+    class LinearState(State):
+        """State for linear workflow."""
+        value: str = ""
+        step: int = 0
+
+    def handler_a(state: LinearState) -> LinearState:
+        state.step = 1
+        state.value = "a"
+        return state
+
+    def handler_b(state: LinearState) -> LinearState:
+        state.step = 2
+        state.value += "->b"
+        return state
+
+    def handler_c(state: LinearState) -> LinearState:
+        state.step = 3
+        state.value += "->c"
+        return state
+
+    graph = StateGraph(LinearState, name="linear")
+    graph.add_node("a", handler_a)
+    graph.add_node("b", handler_b)
+    graph.add_node("c", handler_c)
+    graph.add_edge("a", "b")
+    graph.add_edge("b", "c")
+    graph.set_entry_point("a")
+    graph.set_finish_point("c")
+    return graph
+
+
+@pytest.fixture
+def branching_workflow_graph():
+    """Workflow graph with conditional branching.
+
+    Creates a workflow with a decision node that routes to different
+    branches based on state, useful for testing conditional routing.
+    """
+    from dataclasses import dataclass
+    from victor.workflows.graph_dsl import StateGraph, State
+
+    @dataclass
+    class BranchState(State):
+        """State for branching workflow."""
+        value: str = ""
+        branch: str = "default"
+
+    def router(state: BranchState) -> str:
+        return state.branch
+
+    graph = StateGraph(BranchState, name="branching")
+    graph.add_node("start", lambda s: s)
+    graph.add_node("branch_a", lambda s: s)
+    graph.add_node("branch_b", lambda s: s)
+    graph.add_node("merge", lambda s: s)
+    graph.set_entry_point("start")
+    graph.add_conditional_edges(
+        "start", router, {"a": "branch_a", "b": "branch_b", "default": "merge"}
+    )
+    graph.add_edge("branch_a", "merge")
+    graph.add_edge("branch_b", "merge")
+    graph.set_finish_point("merge")
+    return graph
+
+
+# ============ Multi-Agent Fixtures ============
+
+
+@pytest.fixture
+def mock_team_member():
+    """Mock team member for testing.
+
+    Creates a mock TeamMember with executor role for testing
+    team coordination without actual agent execution.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from victor.agent.subagents.base import SubAgentRole
+
+    member = MagicMock()
+    member.id = "test_member"
+    member.role = SubAgentRole.EXECUTOR
+    member.name = "Test Executor"
+    member.goal = "Test goal"
+    member.tool_budget = 15
+    member.is_manager = False
+    member.priority = 0
+    return member
+
+
+@pytest.fixture
+def team_member_specs():
+    """List of TeamMemberSpec instances for testing.
+
+    Provides a standard set of team member specifications
+    representing a typical research/execute/review pipeline.
+    """
+    from victor.framework.teams import TeamMemberSpec
+
+    return [
+        TeamMemberSpec(role="researcher", goal="Research the codebase"),
+        TeamMemberSpec(role="executor", goal="Implement changes"),
+        TeamMemberSpec(role="reviewer", goal="Review the implementation"),
+    ]
+
+
+@pytest.fixture
+def mock_team_coordinator():
+    """Mock TeamCoordinator for testing without orchestrator.
+
+    Creates a mock coordinator with stubbed methods for testing
+    team-related functionality in isolation.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    coordinator = MagicMock()
+    coordinator.execute_team = AsyncMock(return_value=MagicMock(
+        success=True,
+        final_output="Test output",
+        member_results={},
+        total_tool_calls=5,
+        total_duration=10.0,
+    ))
+    coordinator.set_progress_callback = MagicMock()
+    return coordinator
+
+
+# ============ HITL Fixtures ============
+
+
+@pytest.fixture
+def hitl_executor():
+    """HITLExecutor for testing human-in-the-loop workflows.
+
+    Creates an executor with a default handler that can be
+    used to test HITL node execution flow.
+    """
+    from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
+
+    return HITLExecutor(handler=DefaultHITLHandler())
+
+
+@pytest.fixture
+def auto_approve_handler():
+    """Handler that auto-approves all HITL requests for testing.
+
+    Returns a handler function that automatically approves all
+    requests, useful for testing workflow flow without interruption.
+    """
+    from victor.workflows.hitl import HITLResponse, HITLStatus
+
+    async def handler(request):
+        return HITLResponse(
+            request_id=request.request_id,
+            status=HITLStatus.APPROVED,
+            approved=True,
+        )
+    return handler
+
+
+@pytest.fixture
+def auto_reject_handler():
+    """Handler that auto-rejects all HITL requests for testing.
+
+    Returns a handler function that automatically rejects all
+    requests, useful for testing rejection flow handling.
+    """
+    from victor.workflows.hitl import HITLResponse, HITLStatus
+
+    async def handler(request):
+        return HITLResponse(
+            request_id=request.request_id,
+            status=HITLStatus.REJECTED,
+            approved=False,
+            reason="Auto-rejected for testing",
+        )
+    return handler
+
+
+@pytest.fixture
+def hitl_approval_node():
+    """Pre-configured HITLNode for approval testing."""
+    from victor.workflows.hitl import HITLNode, HITLNodeType, HITLFallback
+
+    return HITLNode(
+        id="test_approval",
+        name="Test Approval",
+        hitl_type=HITLNodeType.APPROVAL,
+        prompt="Approve this action?",
+        timeout=5.0,
+        fallback=HITLFallback.ABORT,
+    )
+
+
+# ============ Mode Config Fixtures ============
+
+
+@pytest.fixture
+def default_mode_config():
+    """Default mode configuration for testing.
+
+    Returns a standard mode definition with typical settings.
+    """
+    from victor.core.mode_config import ModeDefinition
+
+    return ModeDefinition(
+        name="test_mode",
+        tool_budget=20,
+        max_iterations=40,
+        temperature=0.7,
+        description="Test mode for unit tests",
+    )
+
+
+@pytest.fixture
+def mode_config_registry():
+    """Fresh ModeConfigRegistry for testing.
+
+    Creates a new registry instance (not the singleton) to allow
+    isolated testing of mode configuration logic.
+    """
+    from victor.core.mode_config import ModeConfigRegistry
+
+    # Create a fresh instance, bypassing singleton
+    registry = ModeConfigRegistry()
+    return registry
+
+
+@pytest.fixture
+def registered_mode_registry():
+    """ModeConfigRegistry with test verticals registered.
+
+    Creates a registry with pre-configured test verticals for
+    testing vertical-specific mode lookups.
+    """
+    from victor.core.mode_config import ModeConfigRegistry, ModeDefinition
+
+    registry = ModeConfigRegistry()
+    registry.register_vertical(
+        "test_vertical",
+        modes={
+            "custom": ModeDefinition(
+                name="custom",
+                tool_budget=25,
+                max_iterations=50,
+                description="Custom test mode",
+            ),
+        },
+        task_budgets={"test_task": 15, "complex_task": 30},
+        default_mode="standard",
+        default_budget=12,
+    )
+    return registry
+
+
+# ============ Utility Fixtures ============
+
+
+@pytest.fixture
+def temp_workflow_context():
+    """Temporary workflow context dictionary for testing.
+
+    Provides a basic context structure that can be passed to
+    workflow nodes during execution.
+    """
+    return {
+        "input": "test input",
+        "files": [],
+        "analysis": None,
+        "output": None,
+    }

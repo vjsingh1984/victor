@@ -17,6 +17,7 @@
 import pytest
 
 from victor.core.mode_config import (
+    ModeConfig,
     ModeConfigRegistry,
     ModeDefinition,
     VerticalModeConfig,
@@ -35,6 +36,39 @@ def registry():
     return ModeConfigRegistry.get_instance()
 
 
+class TestModeConfig:
+    """Tests for ModeConfig dataclass."""
+
+    def test_mode_config_has_required_fields(self):
+        """ModeConfig should have tool_budget, max_iterations, exploration_multiplier."""
+        config = ModeConfig(
+            tool_budget=10,
+            max_iterations=30,
+        )
+        assert config.tool_budget == 10
+        assert config.max_iterations == 30
+        assert config.exploration_multiplier == 1.0  # Default
+        assert config.allowed_tools is None  # Default
+
+    def test_mode_config_with_all_fields(self):
+        """ModeConfig should accept all fields including allowed_tools."""
+        config = ModeConfig(
+            tool_budget=15,
+            max_iterations=50,
+            exploration_multiplier=2.5,
+            allowed_tools={"read_file", "edit_files"},
+        )
+        assert config.tool_budget == 15
+        assert config.max_iterations == 50
+        assert config.exploration_multiplier == 2.5
+        assert config.allowed_tools == {"read_file", "edit_files"}
+
+    def test_mode_config_exploration_multiplier_default(self):
+        """exploration_multiplier should default to 1.0."""
+        config = ModeConfig(tool_budget=10, max_iterations=30)
+        assert config.exploration_multiplier == 1.0
+
+
 class TestModeDefinition:
     """Tests for ModeDefinition dataclass."""
 
@@ -50,8 +84,10 @@ class TestModeDefinition:
         assert mode.max_iterations == 30
         assert mode.temperature == 0.7
         assert mode.description == ""
+        assert mode.exploration_multiplier == 1.0
         assert mode.allowed_stages == []
         assert mode.priority_tools == []
+        assert mode.allowed_tools is None
 
     def test_mode_definition_to_dict(self):
         """to_dict should return all fields."""
@@ -61,12 +97,30 @@ class TestModeDefinition:
             max_iterations=30,
             temperature=0.8,
             description="Test mode",
+            exploration_multiplier=2.0,
         )
         d = mode.to_dict()
         assert d["name"] == "test"
         assert d["tool_budget"] == 10
         assert d["temperature"] == 0.8
         assert d["description"] == "Test mode"
+        assert d["exploration_multiplier"] == 2.0
+
+    def test_mode_definition_to_mode_config(self):
+        """to_mode_config should convert to ModeConfig correctly."""
+        mode = ModeDefinition(
+            name="test",
+            tool_budget=15,
+            max_iterations=50,
+            exploration_multiplier=2.5,
+            allowed_tools={"read_file"},
+        )
+        config = mode.to_mode_config()
+        assert isinstance(config, ModeConfig)
+        assert config.tool_budget == 15
+        assert config.max_iterations == 50
+        assert config.exploration_multiplier == 2.5
+        assert config.allowed_tools == {"read_file"}
 
 
 class TestDefaultModes:
@@ -79,12 +133,29 @@ class TestDefaultModes:
         assert "comprehensive" in DEFAULT_MODES
         assert "default" in DEFAULT_MODES
 
+    def test_default_modes_have_expected_modes(self):
+        """DEFAULT_MODES should have fast, thorough, explore, plan modes."""
+        assert "fast" in DEFAULT_MODES
+        assert "thorough" in DEFAULT_MODES
+        assert "explore" in DEFAULT_MODES
+        assert "plan" in DEFAULT_MODES
+
     def test_default_modes_have_valid_values(self):
         """Default modes should have valid configurations."""
         for name, mode in DEFAULT_MODES.items():
             assert mode.tool_budget > 0
             assert mode.max_iterations > 0
             assert 0.0 <= mode.temperature <= 1.0
+            assert mode.exploration_multiplier >= 0.0
+
+    def test_default_modes_have_exploration_multipliers(self):
+        """Default modes should have exploration_multiplier defined."""
+        # Explore mode should have higher multiplier for more exploration
+        assert DEFAULT_MODES["explore"].exploration_multiplier > 1.0
+        # Plan mode should have multiplier for planning
+        assert DEFAULT_MODES["plan"].exploration_multiplier > 1.0
+        # Fast should have lower multiplier
+        assert DEFAULT_MODES["fast"].exploration_multiplier <= 1.0
 
     def test_mode_budget_progression(self):
         """Tool budgets should increase with mode complexity."""
@@ -259,3 +330,81 @@ class TestConvenienceFunctions:
         )
         registry = ModeConfigRegistry.get_instance()
         assert "test" in registry.list_verticals()
+
+
+class TestGetModesAndRegisterModes:
+    """Tests for get_modes() and register_modes() methods."""
+
+    def test_get_modes_returns_default_modes(self, registry):
+        """get_modes() should return default modes when no vertical specified."""
+        modes = registry.get_modes()
+        assert "fast" in modes
+        assert "thorough" in modes
+        assert "explore" in modes
+        assert "plan" in modes
+        # Check they are ModeConfig instances
+        assert isinstance(modes["fast"], ModeConfig)
+
+    def test_get_modes_returns_mode_config_objects(self, registry):
+        """get_modes() should return ModeConfig objects with correct fields."""
+        modes = registry.get_modes()
+        fast_mode = modes["fast"]
+        assert hasattr(fast_mode, "tool_budget")
+        assert hasattr(fast_mode, "max_iterations")
+        assert hasattr(fast_mode, "exploration_multiplier")
+        assert hasattr(fast_mode, "allowed_tools")
+
+    def test_get_modes_with_vertical_merges_modes(self, registry):
+        """get_modes(vertical) should return merged modes with overrides."""
+        # Register a vertical with custom mode
+        registry.register_modes(
+            "coding",
+            {"architect": ModeConfig(tool_budget=40, max_iterations=100, exploration_multiplier=1.5)},
+        )
+        modes = registry.get_modes("coding")
+        # Should have both default modes and vertical modes
+        assert "fast" in modes  # Default
+        assert "architect" in modes  # Vertical-specific
+        assert modes["architect"].tool_budget == 40
+
+    def test_get_modes_vertical_overrides_default(self, registry):
+        """get_modes(vertical) should override default modes."""
+        # Override the fast mode for coding vertical
+        registry.register_modes(
+            "coding",
+            {"fast": ModeConfig(tool_budget=8, max_iterations=15, exploration_multiplier=0.5)},
+        )
+        modes = registry.get_modes("coding")
+        # The fast mode should be overridden
+        assert modes["fast"].tool_budget == 8
+        assert modes["fast"].max_iterations == 15
+
+    def test_register_modes_adds_vertical_specific_modes(self, registry):
+        """register_modes() should add vertical-specific modes."""
+        registry.register_modes(
+            "devops",
+            {
+                "kubernetes": ModeConfig(tool_budget=25, max_iterations=60, exploration_multiplier=2.0),
+                "terraform": ModeConfig(tool_budget=20, max_iterations=50),
+            },
+        )
+        # Check via get_modes
+        modes = registry.get_modes("devops")
+        assert "kubernetes" in modes
+        assert "terraform" in modes
+        assert modes["kubernetes"].tool_budget == 25
+        assert modes["terraform"].exploration_multiplier == 1.0  # Default
+
+    def test_register_modes_multiple_calls_update(self, registry):
+        """register_modes() called multiple times should update modes."""
+        registry.register_modes(
+            "data",
+            {"analysis": ModeConfig(tool_budget=15, max_iterations=40)},
+        )
+        registry.register_modes(
+            "data",
+            {"visualization": ModeConfig(tool_budget=10, max_iterations=30)},
+        )
+        modes = registry.get_modes("data")
+        assert "analysis" in modes
+        assert "visualization" in modes

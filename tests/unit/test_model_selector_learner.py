@@ -9,13 +9,22 @@ from typing import Optional, Tuple
 from victor.agent.rl.base import RLOutcome, RLRecommendation
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.model_selector import ModelSelectorLearner, SelectionStrategy
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    # Reset the global singleton to ensure fresh database for each test
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    # Initialize the database singleton with temp path BEFORE creating coordinator
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    # Reset again after the test to clean up
+    reset_database()
 
 
 @pytest.fixture
@@ -63,12 +72,12 @@ def _get_q_value_from_db(
     cursor = coordinator.db.cursor()
     if task_type:
         cursor.execute(
-            "SELECT q_value, selection_count FROM model_selector_task_q_values WHERE provider = ? AND task_type = ?",
+            f"SELECT q_value, selection_count FROM {Tables.RL_MODEL_TASK} WHERE provider = ? AND task_type = ?",
             (provider, task_type),
         )
     else:
         cursor.execute(
-            "SELECT q_value, selection_count FROM model_selector_q_values WHERE provider = ?",
+            f"SELECT q_value, selection_count FROM {Tables.RL_MODEL_Q} WHERE provider = ?",
             (provider,),
         )
     row = cursor.fetchone()
@@ -81,15 +90,15 @@ class TestModelSelectorLearner:
         assert learner.name == "model_selector"
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='model_selector_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODEL_Q}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='model_selector_task_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODEL_TASK}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='model_selector_state';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODEL_STATE}';"
         )
         assert cursor.fetchone() is not None
 
@@ -117,14 +126,24 @@ class TestModelSelectorLearner:
 
     def test_persistence(self, tmp_path: Path) -> None:
         """State persists across learner instances."""
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        # Reset to ensure clean state
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+
+        # Initialize DB singleton with temp path
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("model_selector")  # type: ignore
         initial_epsilon_learner1 = learner1.epsilon
 
         _record_selection_outcome(learner1, provider="openai")
-        coordinator1.db.close()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        # Reset the singleton to simulate new session (don't call close directly)
+        reset_database()
+
+        # Re-initialize with same temp path to test persistence
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("model_selector")  # type: ignore
 
         q_value, count = _get_q_value_from_db(coordinator2, "openai")
@@ -134,6 +153,9 @@ class TestModelSelectorLearner:
             learner2.epsilon < initial_epsilon_learner1
         )  # Epsilon should decay from initial value
         assert learner2.epsilon == learner1.epsilon  # The actual decayed value should be loaded
+
+        # Clean up
+        reset_database()
 
     @pytest.mark.parametrize(
         "strategy, expected_reason",
