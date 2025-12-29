@@ -21,13 +21,20 @@ Builds provider-specific system prompts based on:
 """
 
 import logging
-from typing import Optional, Set, List, Dict, Any
+from typing import TYPE_CHECKING, Optional, Set, List, Dict, Any
 
 from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
 from victor.agent.provider_tool_guidance import (
     get_tool_guidance_strategy,
     ToolGuidanceStrategy,
 )
+
+if TYPE_CHECKING:
+    from victor.agent.prompt_enrichment import (
+        PromptEnrichmentService,
+        EnrichmentContext,
+        EnrichedPrompt,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +354,8 @@ class SystemPromptBuilder:
         tool_guidance_strategy: Optional[ToolGuidanceStrategy] = None,
         task_type: str = "medium",
         available_tools: Optional[List[str]] = None,
+        enrichment_service: Optional["PromptEnrichmentService"] = None,
+        vertical: Optional[str] = None,
     ):
         """Initialize the prompt builder.
 
@@ -359,6 +368,8 @@ class SystemPromptBuilder:
             tool_guidance_strategy: Optional provider-specific tool guidance strategy (GAP-5)
             task_type: Task complexity level (simple, medium, complex) for guidance
             available_tools: List of available tool names for guidance context
+            enrichment_service: Optional prompt enrichment service for context injection
+            vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
@@ -368,6 +379,8 @@ class SystemPromptBuilder:
         self.prompt_contributors = prompt_contributors or []
         self.task_type = task_type
         self.available_tools = available_tools or []
+        self.enrichment_service = enrichment_service
+        self.vertical = vertical or "coding"
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -517,6 +530,66 @@ class SystemPromptBuilder:
             return ""
 
         return self._tool_guidance.get_synthesis_checkpoint_prompt(tool_count)
+
+    async def enrich_prompt(
+        self,
+        prompt: str,
+        context: Optional["EnrichmentContext"] = None,
+    ) -> "EnrichedPrompt":
+        """Enrich a user prompt with contextual information.
+
+        Uses the enrichment service to inject relevant context based on the
+        vertical (coding, research, devops, data_analysis). This can include:
+        - Knowledge graph symbols for coding tasks
+        - Web search results for research tasks
+        - Infrastructure context for devops tasks
+        - Schema context for data analysis tasks
+
+        Args:
+            prompt: The user prompt to enrich
+            context: Optional enrichment context with session/task metadata.
+                     If not provided, a basic context will be created.
+
+        Returns:
+            EnrichedPrompt with the enriched prompt text and metadata.
+            If enrichment is disabled or unavailable, returns the original prompt.
+        """
+        # Import here to avoid circular imports
+        from victor.agent.prompt_enrichment import EnrichmentContext, EnrichedPrompt
+
+        # If no enrichment service, return original prompt
+        if not self.enrichment_service:
+            logger.debug("No enrichment service available, returning original prompt")
+            return EnrichedPrompt(
+                original_prompt=prompt,
+                enriched_prompt=prompt,
+            )
+
+        # Create default context if not provided
+        if context is None:
+            context = EnrichmentContext(
+                task_type=self.task_type,
+            )
+
+        try:
+            result = await self.enrichment_service.enrich(
+                prompt=prompt,
+                vertical=self.vertical,
+                context=context,
+            )
+            logger.info(
+                "Prompt enriched: vertical=%s, enrichments=%d, tokens_added=%d",
+                self.vertical,
+                result.enrichment_count,
+                result.total_tokens_added,
+            )
+            return result
+        except Exception as e:
+            logger.warning("Prompt enrichment failed: %s", e)
+            return EnrichedPrompt(
+                original_prompt=prompt,
+                enriched_prompt=prompt,
+            )
 
     def build(self) -> str:
         """Build the system prompt.

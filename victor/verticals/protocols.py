@@ -660,6 +660,105 @@ class VerticalWorkflowProviderProtocol(Protocol):
 
 
 # =============================================================================
+# Enrichment Strategy Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class EnrichmentStrategyProtocol(Protocol):
+    """Protocol for vertical-specific prompt enrichment strategies.
+
+    Enables auto prompt optimization where prompts are enriched
+    with relevant context from vertical-specific sources:
+    - Coding: Knowledge graph symbols, related code snippets
+    - Research: Web search results, source citations
+    - DevOps: Infrastructure context, command patterns
+    - Data Analysis: Schema context, query patterns
+
+    Example:
+        class CodingEnrichmentStrategy:
+            async def get_enrichments(
+                self,
+                prompt: str,
+                context: "EnrichmentContext",
+            ) -> List["ContextEnrichment"]:
+                # Query knowledge graph for relevant symbols
+                symbols = await self.graph.search(prompt)
+                return [
+                    ContextEnrichment(
+                        type=EnrichmentType.KNOWLEDGE_GRAPH,
+                        content=format_symbols(symbols),
+                        priority=EnrichmentPriority.HIGH,
+                    )
+                ]
+
+            def get_priority(self) -> int:
+                return 50
+
+            def get_token_allocation(self) -> float:
+                return 0.4  # Use up to 40% of token budget
+    """
+
+    async def get_enrichments(
+        self,
+        prompt: str,
+        context: Any,  # EnrichmentContext from victor.agent.prompt_enrichment
+    ) -> List[Any]:  # List[ContextEnrichment]
+        """Get enrichments for a prompt.
+
+        Args:
+            prompt: The prompt to enrich
+            context: EnrichmentContext with task metadata
+
+        Returns:
+            List of ContextEnrichment objects to apply
+        """
+        ...
+
+    def get_priority(self) -> int:
+        """Get priority for this strategy.
+
+        Lower values are processed first.
+
+        Returns:
+            Priority value (default 50)
+        """
+        ...
+
+    def get_token_allocation(self) -> float:
+        """Get fraction of token budget this strategy can use.
+
+        Returns:
+            Float between 0.0 and 1.0 (e.g., 0.4 for 40%)
+        """
+        ...
+
+
+@runtime_checkable
+class VerticalEnrichmentProviderProtocol(Protocol):
+    """Protocol for verticals providing enrichment strategies.
+
+    This protocol enables type-safe isinstance() checks when integrating
+    vertical prompt enrichment with the framework.
+
+    Example:
+        class CodingVertical(VerticalBase, VerticalEnrichmentProviderProtocol):
+            @classmethod
+            def get_enrichment_strategy(cls) -> Optional[EnrichmentStrategyProtocol]:
+                return CodingEnrichmentStrategy()
+    """
+
+    @classmethod
+    def get_enrichment_strategy(cls) -> Optional[EnrichmentStrategyProtocol]:
+        """Get the enrichment strategy for this vertical.
+
+        Returns:
+            EnrichmentStrategyProtocol implementation or None
+        """
+        ...
+
+
+# =============================================================================
 # Composite Vertical Extension
 # =============================================================================
 
@@ -679,6 +778,7 @@ class VerticalExtensions:
         tool_dependency_provider: Tool dependency provider
         workflow_provider: Workflow provider
         service_provider: Service provider
+        enrichment_strategy: Prompt enrichment strategy for DSPy-like optimization
     """
 
     middleware: List[MiddlewareProtocol] = field(default_factory=list)
@@ -690,6 +790,7 @@ class VerticalExtensions:
     service_provider: Optional[ServiceProviderProtocol] = None
     rl_config_provider: Optional[RLConfigProviderProtocol] = None
     team_spec_provider: Optional[TeamSpecProviderProtocol] = None
+    enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
@@ -748,10 +849,12 @@ __all__ = [
     "ServiceProviderProtocol",
     "RLConfigProviderProtocol",
     "TeamSpecProviderProtocol",
+    "EnrichmentStrategyProtocol",
     # Vertical Provider Protocols (for isinstance() checks)
     "VerticalRLProviderProtocol",
     "VerticalTeamProviderProtocol",
     "VerticalWorkflowProviderProtocol",
+    "VerticalEnrichmentProviderProtocol",
     # Composite
     "VerticalExtensions",
 ]

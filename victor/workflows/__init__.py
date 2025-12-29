@@ -60,6 +60,17 @@ from victor.workflows.executor import (
     WorkflowResult,
     WorkflowExecutor,
 )
+from victor.workflows.protocols import (
+    RetryPolicy,
+    IWorkflowNode,
+    IWorkflowEdge,
+    IWorkflowGraph,
+    ICheckpointStore,
+    IWorkflowExecutor,
+    # Re-export NodeStatus and NodeResult from protocols for graph API users
+    NodeStatus as GraphNodeStatus,
+    NodeResult as GraphNodeResult,
+)
 from victor.workflows.yaml_loader import (
     YAMLWorkflowError,
     YAMLWorkflowConfig,
@@ -88,6 +99,15 @@ from victor.workflows.graph_dsl import (
     create_graph,
     compile_graph,
 )
+from victor.workflows.graph import (
+    WorkflowNode as GraphWorkflowNode,
+    WorkflowEdge,
+    ConditionalEdge,
+    WorkflowGraph,
+    DuplicateNodeError,
+    InvalidEdgeError,
+    GraphValidationError,
+)
 
 __all__ = [
     # Base
@@ -114,6 +134,15 @@ __all__ = [
     "WorkflowContext",
     "WorkflowResult",
     "WorkflowExecutor",
+    # Protocols (Graph API)
+    "RetryPolicy",
+    "IWorkflowNode",
+    "IWorkflowEdge",
+    "IWorkflowGraph",
+    "ICheckpointStore",
+    "IWorkflowExecutor",
+    "GraphNodeStatus",
+    "GraphNodeResult",
     # YAML Loader
     "YAMLWorkflowError",
     "YAMLWorkflowConfig",
@@ -139,4 +168,12 @@ __all__ = [
     "Compilable",
     "create_graph",
     "compile_graph",
+    # Graph implementation (LangGraph-like API)
+    "GraphWorkflowNode",
+    "WorkflowEdge",
+    "ConditionalEdge",
+    "WorkflowGraph",
+    "DuplicateNodeError",
+    "InvalidEdgeError",
+    "GraphValidationError",
 ]
