@@ -17,7 +17,8 @@
 This module provides cross-vertical safety capabilities:
 - Secret and credential detection
 - PII (Personally Identifiable Information) detection and anonymization
-- Safety pattern matching for dangerous operations
+- Code safety patterns (git, package managers, refactoring)
+- Infrastructure safety patterns (Kubernetes, Docker, Terraform)
 
 Example usage:
     from victor.safety import (
@@ -31,6 +32,14 @@ Example usage:
         detect_pii_in_content,
         get_anonymization_suggestion,
         PIIScanner,
+        # Code patterns
+        CodePatternScanner,
+        scan_command,
+        is_sensitive_file,
+        # Infrastructure patterns
+        InfrastructureScanner,
+        validate_dockerfile,
+        validate_kubernetes_manifest,
     )
 
     # Check code for hardcoded secrets
@@ -48,7 +57,21 @@ Example usage:
 
     # Mask secrets before logging
     safe_content = mask_secrets(sensitive_content)
+
+    # Scan git command for dangerous patterns
+    scanner = CodePatternScanner()
+    result = scanner.scan_command("git push --force origin main")
+    if result.has_high:
+        print("Dangerous git command!")
+
+    # Validate Kubernetes manifest
+    issues = validate_kubernetes_manifest(manifest_yaml)
+    for issue in issues:
+        print(f"- {issue}")
 """
+
+# Core types
+from victor.safety.types import SafetyPattern
 
 # Secret detection
 from victor.safety.secrets import (
@@ -89,7 +112,49 @@ from victor.safety.pii import (
     get_safety_reminders,
 )
 
+# Code patterns (git, package managers, refactoring)
+from victor.safety.code_patterns import (
+    # Enums
+    CodePatternCategory,
+    # Pattern lists
+    GIT_PATTERNS,
+    REFACTORING_PATTERNS,
+    PACKAGE_MANAGER_PATTERNS,
+    BUILD_DEPLOY_PATTERNS,
+    SENSITIVE_FILE_PATTERNS,
+    # Classes
+    ScanResult,
+    CodePatternScanner,
+    # Functions
+    scan_command,
+    is_sensitive_file,
+    get_all_patterns,
+)
+
+# Infrastructure patterns (Kubernetes, Docker, Terraform)
+from victor.safety.infrastructure import (
+    # Enums
+    InfraPatternCategory,
+    # Pattern lists
+    DESTRUCTIVE_PATTERNS,
+    KUBERNETES_PATTERNS,
+    DOCKER_PATTERNS,
+    TERRAFORM_PATTERNS,
+    CLOUD_PATTERNS,
+    # Classes
+    InfraScanResult,
+    InfrastructureScanner,
+    # Functions
+    scan_infrastructure_command,
+    validate_dockerfile,
+    validate_kubernetes_manifest,
+    get_all_infrastructure_patterns,
+    get_safety_reminders as get_infrastructure_reminders,
+)
+
 __all__ = [
+    # Core types
+    "SafetyPattern",
     # Secret detection - Types
     "SecretSeverity",
     "SecretMatch",
@@ -121,4 +186,36 @@ __all__ = [
     "has_pii",
     "get_pii_types",
     "get_safety_reminders",
+    # Code patterns - Enums
+    "CodePatternCategory",
+    # Code patterns - Pattern lists
+    "GIT_PATTERNS",
+    "REFACTORING_PATTERNS",
+    "PACKAGE_MANAGER_PATTERNS",
+    "BUILD_DEPLOY_PATTERNS",
+    "SENSITIVE_FILE_PATTERNS",
+    # Code patterns - Classes
+    "ScanResult",
+    "CodePatternScanner",
+    # Code patterns - Functions
+    "scan_command",
+    "is_sensitive_file",
+    "get_all_patterns",
+    # Infrastructure patterns - Enums
+    "InfraPatternCategory",
+    # Infrastructure patterns - Pattern lists
+    "DESTRUCTIVE_PATTERNS",
+    "KUBERNETES_PATTERNS",
+    "DOCKER_PATTERNS",
+    "TERRAFORM_PATTERNS",
+    "CLOUD_PATTERNS",
+    # Infrastructure patterns - Classes
+    "InfraScanResult",
+    "InfrastructureScanner",
+    # Infrastructure patterns - Functions
+    "scan_infrastructure_command",
+    "validate_dockerfile",
+    "validate_kubernetes_manifest",
+    "get_all_infrastructure_patterns",
+    "get_infrastructure_reminders",
 ]
