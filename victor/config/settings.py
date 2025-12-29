@@ -1181,3 +1181,7 @@ def load_settings() -> Settings:
         Settings instance
     """
     return Settings()
+
+
+# Alias for compatibility with packages/victor-core
+get_settings = load_settings

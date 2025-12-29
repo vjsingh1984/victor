@@ -34,8 +34,14 @@ try:
         discover_tool_plugins,
     )
 
+    # Framework API (for top-level imports like `from victor import Agent`)
+    from victor.framework import Agent, ToolSet
+
     __all__ = [
         "__version__",
+        # Framework API
+        "Agent",
+        "ToolSet",
         # Config
         "Settings",
         "get_settings",

@@ -253,10 +253,11 @@ class RAGQueryTool(BaseTool):
         Returns:
             Synthesized answer string
         """
-        from victor.config.settings import get_settings
+        from victor.config.settings import load_settings
+        from victor.providers.base import Message
         from victor.providers.registry import ProviderRegistry
 
-        settings = get_settings()
+        settings = load_settings()
 
         # Determine provider
         if not provider:
@@ -264,13 +265,7 @@ class RAGQueryTool(BaseTool):
 
         # Get provider instance
         try:
-            provider_instance = ProviderRegistry.get(provider)
-            if provider_instance is None:
-                # Try to create provider
-                provider_class = ProviderRegistry.get_class(provider)
-                if provider_class is None:
-                    raise ValueError(f"Provider '{provider}' not found")
-                provider_instance = provider_class()
+            provider_instance = ProviderRegistry.create(provider)
         except Exception as e:
             logger.warning(f"Failed to get provider {provider}: {e}")
             # Fallback: return context with instruction
@@ -290,8 +285,8 @@ class RAGQueryTool(BaseTool):
         )
 
         messages = [
-            {"role": "system", "content": RAG_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
+            Message(role="system", content=RAG_SYSTEM_PROMPT),
+            Message(role="user", content=user_prompt),
         ]
 
         # Call provider
