@@ -2014,6 +2014,48 @@ class OrchestratorFactory(ModeAwareMixin):
             mode_completion_criteria=self.create_mode_completion_criteria(),
         )
 
+    def create_mode_workflow_team_coordinator(
+        self,
+        vertical_context: Any,
+    ) -> Any:
+        """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
+
+        The coordinator bridges agent modes, team specifications, and workflows
+        to provide intelligent suggestions for task execution.
+
+        Args:
+            vertical_context: VerticalContext with team specs and workflows
+
+        Returns:
+            ModeWorkflowTeamCoordinator instance
+        """
+        from victor.agent.mode_workflow_team_coordinator import create_coordinator
+
+        # Get team learner from RL coordinator if available
+        team_learner = None
+        try:
+            from victor.agent.protocols import RLCoordinatorProtocol
+
+            rl_coordinator = self.container.get_optional(RLCoordinatorProtocol)
+            if rl_coordinator:
+                team_learner = rl_coordinator.get_learner("team_composition")
+        except Exception as e:
+            logger.debug(f"Could not get team composition learner: {e}")
+
+        # Determine selection strategy from settings
+        selection_strategy = getattr(self.settings, "team_selection_strategy", "hybrid")
+
+        coordinator = create_coordinator(
+            vertical_context=vertical_context,
+            team_learner=team_learner,
+            selection_strategy=selection_strategy,
+        )
+
+        logger.debug(
+            f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}"
+        )
+        return coordinator
+
 
 # Convenience function for creating factory
 def create_orchestrator_factory(

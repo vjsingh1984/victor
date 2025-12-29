@@ -35,6 +35,8 @@ from victor.agent.unified_classifier import (
 if TYPE_CHECKING:
     from victor.embeddings.task_classifier import TaskType
     from victor.embeddings.intent_classifier import IntentType
+    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
+    from victor.protocols.coordination import CoordinationSuggestion
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
@@ -64,6 +66,8 @@ class TaskAnalysis:
     intent_type: Optional["IntentType"] = None
     matched_patterns: List[str] = field(default_factory=list)
     analysis_details: Dict[str, Any] = field(default_factory=dict)
+    # Coordination suggestions (team/workflow recommendations)
+    coordination_suggestion: Optional["CoordinationSuggestion"] = None
 
     @property
     def is_simple(self) -> bool:
@@ -77,18 +81,59 @@ class TaskAnalysis:
     def is_generation(self) -> bool:
         return self.complexity == TaskComplexity.GENERATION
 
+    @property
+    def has_team_suggestion(self) -> bool:
+        """Check if there are team suggestions."""
+        if not self.coordination_suggestion:
+            return False
+        return len(self.coordination_suggestion.team_recommendations) > 0
+
+    @property
+    def should_spawn_team(self) -> bool:
+        """Check if a team should be auto-spawned based on suggestions."""
+        if not self.coordination_suggestion:
+            return False
+        return self.coordination_suggestion.should_spawn_team
+
+    @property
+    def primary_team(self) -> Optional[str]:
+        """Get the primary team recommendation if available."""
+        if not self.coordination_suggestion:
+            return None
+        rec = self.coordination_suggestion.primary_team
+        return rec.team_name if rec else None
+
     def should_force_completion(self, tool_calls: int) -> bool:
         return tool_calls >= self.tool_budget
 
 
 class TaskAnalyzer:
 
-    def __init__(self):
+    def __init__(
+        self,
+        coordinator: Optional["ModeWorkflowTeamCoordinator"] = None,
+    ):
+        """Initialize task analyzer.
+
+        Args:
+            coordinator: Optional ModeWorkflowTeamCoordinator for team/workflow suggestions
+        """
         self._complexity_classifier = None
         self._action_authorizer = None
         self._unified_classifier = None
         self._task_classifier = None
         self._intent_classifier = None
+        self._coordinator = coordinator
+
+    def set_coordinator(
+        self, coordinator: "ModeWorkflowTeamCoordinator"
+    ) -> None:
+        """Set the coordinator for team/workflow suggestions.
+
+        Args:
+            coordinator: ModeWorkflowTeamCoordinator instance
+        """
+        self._coordinator = coordinator
 
     @property
     def complexity_classifier(self) -> ComplexityClassifier:
@@ -191,6 +236,67 @@ class TaskAnalyzer:
                 analysis.analysis_details["intent_confidence"] = intent_result.confidence
             except Exception as e:
                 logger.warning(f"Intent classification failed: {e}")
+
+        return analysis
+
+    def analyze_with_suggestions(
+        self,
+        message: str,
+        mode: str = "build",
+        include_task_type: bool = True,
+        include_intent: bool = False,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> TaskAnalysis:
+        """Analyze task and get coordination suggestions.
+
+        This extends the base analyze() method by adding coordination suggestions
+        from the ModeWorkflowTeamCoordinator based on task type and complexity.
+
+        Args:
+            message: User message to analyze
+            mode: Current agent mode (explore, plan, build)
+            include_task_type: Include semantic task type classification
+            include_intent: Include intent classification
+            context: Optional context dict with history, etc.
+
+        Returns:
+            TaskAnalysis with coordination_suggestion populated
+        """
+        # Get base analysis
+        analysis = self.analyze(
+            message=message,
+            include_task_type=include_task_type,
+            include_intent=include_intent,
+            context=context,
+        )
+
+        # Add coordination suggestions if coordinator is available
+        if self._coordinator:
+            try:
+                # Map complexity to string
+                complexity_str = analysis.complexity.value.lower()
+
+                # Get task type string
+                task_type_str = analysis.unified_task_type.value.lower()
+
+                # Get suggestions from coordinator
+                suggestion = self._coordinator.suggest_for_task(
+                    task_type=task_type_str,
+                    complexity=complexity_str,
+                    mode=mode,
+                )
+                analysis.coordination_suggestion = suggestion
+
+                # Log if there are team suggestions for high complexity
+                if suggestion.has_team_suggestion:
+                    logger.debug(
+                        f"Task analysis with suggestions: task={task_type_str}, "
+                        f"complexity={complexity_str}, mode={mode}, "
+                        f"teams={len(suggestion.team_recommendations)}, "
+                        f"action={suggestion.action.value}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to get coordination suggestions: {e}")
 
         return analysis
 

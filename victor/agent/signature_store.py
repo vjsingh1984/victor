@@ -16,6 +16,9 @@ Design Principles:
 - TTL-based expiration for automatic cleanup
 - Thread-safe concurrent access
 - Minimal memory footprint (signatures stored on disk)
+
+Database:
+    Uses the unified database at ~/.victor/victor.db via victor.core.database.
 """
 
 from __future__ import annotations
@@ -30,6 +33,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
+
+from victor.core.database import get_database
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +84,11 @@ class SignatureStore:
         stats = store.get_stats()
     """
 
-    SCHEMA = """
-        CREATE TABLE IF NOT EXISTS failed_signatures (
+    @classmethod
+    def _get_schema(cls) -> str:
+        """Get schema SQL with table constants."""
+        return f"""
+        CREATE TABLE IF NOT EXISTS {Tables.UI_FAILED_CALL} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tool_name TEXT NOT NULL,
             args_hash TEXT NOT NULL,
@@ -92,11 +101,11 @@ class SignatureStore:
             UNIQUE(tool_name, args_hash)
         );
 
-        CREATE INDEX IF NOT EXISTS idx_tool_name ON failed_signatures(tool_name);
-        CREATE INDEX IF NOT EXISTS idx_expires_at ON failed_signatures(expires_at);
-        CREATE INDEX IF NOT EXISTS idx_lookup ON failed_signatures(tool_name, args_hash);
+        CREATE INDEX IF NOT EXISTS idx_failed_call_tool ON {Tables.UI_FAILED_CALL}(tool_name);
+        CREATE INDEX IF NOT EXISTS idx_failed_call_expires ON {Tables.UI_FAILED_CALL}(expires_at);
+        CREATE INDEX IF NOT EXISTS idx_failed_call_lookup ON {Tables.UI_FAILED_CALL}(tool_name, args_hash);
 
-        CREATE TABLE IF NOT EXISTS schema_version (
+        CREATE TABLE IF NOT EXISTS {Tables.SYS_SCHEMA_VERSION} (
             version INTEGER PRIMARY KEY
         );
     """
@@ -110,14 +119,13 @@ class SignatureStore:
         """Initialize signature store.
 
         Args:
-            db_path: Path to SQLite database (defaults to ~/.victor/signatures.db)
+            db_path: Path to SQLite database - legacy, now uses unified database
             ttl_seconds: Time-to-live for signatures
             max_signatures: Maximum signatures to store (oldest pruned first)
         """
-        if db_path is None:
-            db_path = Path.home() / ".victor" / "signatures.db"
-
-        self.db_path = Path(db_path).expanduser()
+        # Use unified database from victor.core.database
+        self._db_manager = get_database()
+        self.db_path = self._db_manager.db_path
         self.ttl_seconds = ttl_seconds
         self.max_signatures = max_signatures
         self._lock = threading.RLock()
@@ -133,22 +141,13 @@ class SignatureStore:
 
     @contextmanager
     def _get_connection(self) -> Iterator[sqlite3.Connection]:
-        """Get thread-local database connection.
+        """Get database connection from unified database manager.
 
         Yields:
             SQLite connection
         """
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                timeout=10.0,
-                check_same_thread=False,
-            )
-            self._local.conn.row_factory = sqlite3.Row
-
         try:
-            yield self._local.conn
+            yield self._db_manager.get_connection()
         except sqlite3.Error as e:
             logger.error(f"Database error: {e}")
             raise
@@ -157,14 +156,16 @@ class SignatureStore:
         """Initialize database schema."""
         with self._lock:
             with self._get_connection() as conn:
-                conn.executescript(self.SCHEMA)
+                conn.executescript(self._get_schema())
 
                 # Check/set schema version
-                cursor = conn.execute("SELECT version FROM schema_version LIMIT 1")
+                cursor = conn.execute(
+                    f"SELECT version FROM {Tables.SYS_SCHEMA_VERSION} LIMIT 1"
+                )
                 row = cursor.fetchone()
                 if row is None:
                     conn.execute(
-                        "INSERT INTO schema_version (version) VALUES (?)",
+                        f"INSERT INTO {Tables.SYS_SCHEMA_VERSION} (version) VALUES (?)",
                         (SCHEMA_VERSION,),
                     )
                 conn.commit()
@@ -199,7 +200,7 @@ class SignatureStore:
         with self._lock:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "SELECT tool_name, args_hash, expires_at FROM failed_signatures "
+                    f"SELECT tool_name, args_hash, expires_at FROM {Tables.UI_FAILED_CALL} "
                     "WHERE expires_at > ?",
                     (now,),
                 )
@@ -236,7 +237,7 @@ class SignatureStore:
         with self._lock:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "SELECT expires_at FROM failed_signatures "
+                    f"SELECT expires_at FROM {Tables.UI_FAILED_CALL} "
                     "WHERE tool_name = ? AND args_hash = ? AND expires_at > ?",
                     (tool_name, args_hash, time.time()),
                 )
@@ -271,8 +272,8 @@ class SignatureStore:
             with self._get_connection() as conn:
                 # Upsert: insert or update
                 conn.execute(
-                    """
-                    INSERT INTO failed_signatures
+                    f"""
+                    INSERT INTO {Tables.UI_FAILED_CALL}
                         (tool_name, args_hash, args_json, error_message,
                          failure_count, first_seen, last_seen, expires_at)
                     VALUES (?, ?, ?, ?, 1, ?, ?, ?)
@@ -320,7 +321,7 @@ class SignatureStore:
         with self._lock:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "DELETE FROM failed_signatures WHERE tool_name = ? AND args_hash = ?",
+                    f"DELETE FROM {Tables.UI_FAILED_CALL} WHERE tool_name = ? AND args_hash = ?",
                     (tool_name, args_hash),
                 )
                 conn.commit()
@@ -344,7 +345,7 @@ class SignatureStore:
         with self._lock:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "DELETE FROM failed_signatures WHERE tool_name = ?",
+                    f"DELETE FROM {Tables.UI_FAILED_CALL} WHERE tool_name = ?",
                     (tool_name,),
                 )
                 conn.commit()
@@ -365,7 +366,7 @@ class SignatureStore:
         """
         with self._lock:
             with self._get_connection() as conn:
-                cursor = conn.execute("DELETE FROM failed_signatures")
+                cursor = conn.execute(f"DELETE FROM {Tables.UI_FAILED_CALL}")
                 conn.commit()
                 deleted = cursor.rowcount
 
@@ -383,7 +384,7 @@ class SignatureStore:
         with self._lock:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "DELETE FROM failed_signatures WHERE expires_at < ?",
+                    f"DELETE FROM {Tables.UI_FAILED_CALL} WHERE expires_at < ?",
                     (now,),
                 )
                 conn.commit()
@@ -400,16 +401,16 @@ class SignatureStore:
     def _maybe_prune(self) -> None:
         """Prune oldest signatures if over limit."""
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM failed_signatures")
+            cursor = conn.execute(f"SELECT COUNT(*) FROM {Tables.UI_FAILED_CALL}")
             count = cursor.fetchone()[0]
 
             if count > self.max_signatures:
                 # Delete oldest 10%
                 to_delete = max(count - self.max_signatures, count // 10)
                 conn.execute(
-                    """
-                    DELETE FROM failed_signatures WHERE id IN (
-                        SELECT id FROM failed_signatures
+                    f"""
+                    DELETE FROM {Tables.UI_FAILED_CALL} WHERE id IN (
+                        SELECT id FROM {Tables.UI_FAILED_CALL}
                         ORDER BY last_seen ASC LIMIT ?
                     )
                     """,
@@ -435,13 +436,13 @@ class SignatureStore:
         with self._get_connection() as conn:
             if tool_name:
                 cursor = conn.execute(
-                    "SELECT * FROM failed_signatures WHERE tool_name = ? "
+                    f"SELECT * FROM {Tables.UI_FAILED_CALL} WHERE tool_name = ? "
                     "ORDER BY last_seen DESC LIMIT ?",
                     (tool_name, limit),
                 )
             else:
                 cursor = conn.execute(
-                    "SELECT * FROM failed_signatures ORDER BY last_seen DESC LIMIT ?",
+                    f"SELECT * FROM {Tables.UI_FAILED_CALL} ORDER BY last_seen DESC LIMIT ?",
                     (limit,),
                 )
 
@@ -466,27 +467,27 @@ class SignatureStore:
         """
         with self._get_connection() as conn:
             # Total count
-            cursor = conn.execute("SELECT COUNT(*) FROM failed_signatures")
+            cursor = conn.execute(f"SELECT COUNT(*) FROM {Tables.UI_FAILED_CALL}")
             total = cursor.fetchone()[0]
 
             # Active (non-expired) count
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM failed_signatures WHERE expires_at > ?",
+                f"SELECT COUNT(*) FROM {Tables.UI_FAILED_CALL} WHERE expires_at > ?",
                 (time.time(),),
             )
             active = cursor.fetchone()[0]
 
             # By tool
             cursor = conn.execute(
-                "SELECT tool_name, COUNT(*), SUM(failure_count) "
-                "FROM failed_signatures GROUP BY tool_name"
+                f"SELECT tool_name, COUNT(*), SUM(failure_count) "
+                f"FROM {Tables.UI_FAILED_CALL} GROUP BY tool_name"
             )
             by_tool = {row[0]: {"signatures": row[1], "total_failures": row[2]} for row in cursor}
 
             # Most failing
             cursor = conn.execute(
-                "SELECT tool_name, args_hash, failure_count "
-                "FROM failed_signatures ORDER BY failure_count DESC LIMIT 5"
+                f"SELECT tool_name, args_hash, failure_count "
+                f"FROM {Tables.UI_FAILED_CALL} ORDER BY failure_count DESC LIMIT 5"
             )
             most_failing = [{"tool": row[0], "hash": row[1], "count": row[2]} for row in cursor]
 

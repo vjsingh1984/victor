@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+from victor.core.database import get_database, get_project_database
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
@@ -70,6 +71,19 @@ providers:
             console.print(f"[green]✓[/] Global config created at {config_dir}")
         else:
             console.print(f"[dim]Global config exists at {config_dir}[/]")
+
+        # Step 1.5: Initialize databases
+        console.print("[dim]Initializing databases...[/]")
+        try:
+            # Initialize global database (user-level: RL, sessions, signatures)
+            global_db = get_database()
+            console.print(f"  [green]✓[/] Global database: {global_db.db_path}")
+
+            # Initialize project database (repo-level: graph, conversations, entities)
+            project_db = get_project_database()
+            console.print(f"  [green]✓[/] Project database: {project_db.db_path}")
+        except Exception as e:
+            console.print(f"  [yellow]![/] Database initialization warning: {e}")
 
         if config_only:
             console.print(f"\nEdit {profiles_file} to customize profiles")

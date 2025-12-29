@@ -917,7 +917,10 @@ class VerticalIntegrationPipeline:
                 f"Registered {team_count} team specs: "
                 f"{', '.join(team_specs.keys())}"
             )
-            logger.debug(f"Applied {team_count} team specifications")
+            # Log each team spec registration (matching workflow DEBUG logging pattern)
+            for team_name in team_specs.keys():
+                logger.debug(f"Registered team_spec: {team_name}")
+            logger.debug(f"Applied {team_count} team specifications from vertical")
 
         except Exception as e:
             if self._strict_mode:

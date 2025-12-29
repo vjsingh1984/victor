@@ -2,6 +2,9 @@
 
 Provides auto-save/restore functionality for conversations,
 allowing users to resume where they left off.
+
+Database:
+    Uses the unified database at ~/.victor/victor.db via victor.core.database.
 """
 
 from __future__ import annotations
@@ -13,6 +16,9 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
+
+from victor.core.database import get_database
+from victor.core.schema import Tables
 
 
 @dataclass
@@ -123,81 +129,85 @@ class SessionManager:
         """Initialize session manager.
 
         Args:
-            db_path: Path to SQLite database. Defaults to ~/.victor/sessions.db
+            db_path: Path to SQLite database - legacy, now uses unified database
         """
-        if db_path is None:
-            db_path = Path.home() / ".victor" / "sessions.db"
-
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db_path = db_path
+        # Use unified database from victor.core.database
+        self._db_manager = get_database()
+        self.db_path = self._db_manager.db_path
         self._init_db()
+
+    def _get_conn(self) -> sqlite3.Connection:
+        """Get database connection."""
+        return self._db_manager.get_connection()
 
     def _init_db(self) -> None:
         """Initialize database schema."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    name TEXT,
-                    provider TEXT,
-                    model TEXT,
-                    profile TEXT,
-                    created_at TEXT,
-                    updated_at TEXT,
-                    data TEXT
-                )
-            """
+        conn = self._get_conn()
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.UI_SESSION} (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                provider TEXT,
+                model TEXT,
+                profile TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                data TEXT
             )
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_sessions_updated
-                ON sessions(updated_at DESC)
-            """
-            )
-            conn.commit()
+        """
+        )
+        conn.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_ui_session_updated
+            ON {Tables.UI_SESSION}(updated_at DESC)
+        """
+        )
+        conn.commit()
 
     def save(self, session: Session) -> None:
         """Save or update a session."""
         session.updated_at = datetime.now().isoformat()
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO sessions
-                (id, name, provider, model, created_at, updated_at, data)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    session.id,
-                    session.name,
-                    session.provider,
-                    session.model,
-                    session.created_at,
-                    session.updated_at,
-                    json.dumps(session.to_dict()),
-                ),
-            )
-            conn.commit()
+        conn = self._get_conn()
+        conn.execute(
+            f"""
+            INSERT OR REPLACE INTO {Tables.UI_SESSION}
+            (id, name, provider, model, created_at, updated_at, data)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                session.id,
+                session.name,
+                session.provider,
+                session.model,
+                session.created_at,
+                session.updated_at,
+                json.dumps(session.to_dict()),
+            ),
+        )
+        conn.commit()
 
     def load(self, session_id: str) -> Optional[Session]:
         """Load a session by ID."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT data FROM sessions WHERE id = ?",
-                (session_id,),
-            )
-            row = cursor.fetchone()
-            if row:
-                return Session.from_dict(json.loads(row[0]))
+        conn = self._get_conn()
+        cursor = conn.execute(
+            f"SELECT data FROM {Tables.UI_SESSION} WHERE id = ?",
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return Session.from_dict(json.loads(row[0]))
         return None
 
     def get_latest(self) -> Optional[Session]:
         """Get the most recently updated session."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT data FROM sessions ORDER BY updated_at DESC LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                return Session.from_dict(json.loads(row[0]))
+        conn = self._get_conn()
+        cursor = conn.execute(
+            f"SELECT data FROM {Tables.UI_SESSION} ORDER BY updated_at DESC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        if row:
+            return Session.from_dict(json.loads(row[0]))
         return None
 
     def list_sessions(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -207,31 +217,31 @@ class SessionManager:
             List of session metadata dicts with id, name, provider, model,
             created_at, updated_at, and message_count.
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                """
-                SELECT id, name, provider, model, created_at, updated_at, data
-                FROM sessions
-                ORDER BY updated_at DESC
-                LIMIT ?
-            """,
-                (limit,),
+        conn = self._get_conn()
+        cursor = conn.execute(
+            f"""
+            SELECT id, name, provider, model, created_at, updated_at, data
+            FROM {Tables.UI_SESSION}
+            ORDER BY updated_at DESC
+            LIMIT ?
+        """,
+            (limit,),
+        )
+        sessions = []
+        for row in cursor:
+            data = json.loads(row[6])
+            sessions.append(
+                {
+                    "id": row[0],
+                    "name": row[1] or f"Session {row[0][:8]}",
+                    "provider": row[2],
+                    "model": row[3],
+                    "created_at": row[4],
+                    "updated_at": row[5],
+                    "message_count": len(data.get("messages", [])),
+                }
             )
-            sessions = []
-            for row in cursor:
-                data = json.loads(row[6])
-                sessions.append(
-                    {
-                        "id": row[0],
-                        "name": row[1] or f"Session {row[0][:8]}",
-                        "provider": row[2],
-                        "model": row[3],
-                        "created_at": row[4],
-                        "updated_at": row[5],
-                        "message_count": len(data.get("messages", [])),
-                    }
-                )
-            return sessions
+        return sessions
 
     def delete(self, session_id: str) -> bool:
         """Delete a session by ID.
@@ -239,13 +249,13 @@ class SessionManager:
         Returns:
             True if session was deleted, False if not found.
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "DELETE FROM sessions WHERE id = ?",
-                (session_id,),
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        conn = self._get_conn()
+        cursor = conn.execute(
+            f"DELETE FROM {Tables.UI_SESSION} WHERE id = ?",
+            (session_id,),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
 
     def export_markdown(self, session_id: str, output_path: Path) -> bool:
         """Export a session to markdown file.
