@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from victor.graph.sqlite_store import SqliteGraphStore
-from victor_coding.codebase.indexer import CodebaseIndex
+from victor.codebase.graph.sqlite_store import SqliteGraphStore
+from victor.codebase.indexer import CodebaseIndex
 
 
 @pytest.mark.asyncio

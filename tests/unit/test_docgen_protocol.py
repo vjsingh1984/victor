@@ -17,7 +17,7 @@
 import pytest
 from pathlib import Path
 
-from victor_coding.docgen.protocol import (
+from victor.docgen.protocol import (
     DocFormat,
     DocStyle,
     Parameter,

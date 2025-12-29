@@ -50,7 +50,7 @@ def mock_chromadb():
 
     # Patch chromadb.Client directly instead of through module
     with patch("chromadb.Client") as mock_client_class:
-        with patch("victor.codebase.embeddings.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
             mock_client = MagicMock()
             mock_collection = MagicMock()
             mock_collection.name = "test_collection"
@@ -65,7 +65,7 @@ class TestChromaDBProvider:
 
     def test_initialization(self, chroma_config):
         """Test provider initialization."""
-        with patch("victor.codebase.embeddings.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
             provider = ChromaDBProvider(chroma_config)
 
             assert provider.config == chroma_config
@@ -76,7 +76,7 @@ class TestChromaDBProvider:
 
     def test_initialization_chromadb_not_available(self, chroma_config):
         """Test initialization when ChromaDB not available."""
-        with patch("victor.codebase.embeddings.chromadb_provider.CHROMADB_AVAILABLE", False):
+        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", False):
             with pytest.raises(ImportError, match="ChromaDB not available"):
                 ChromaDBProvider(chroma_config)
 
@@ -86,7 +86,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -117,7 +117,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -135,7 +135,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -157,7 +157,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -181,7 +181,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -209,7 +209,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -247,7 +247,7 @@ class TestChromaDBProvider:
         }
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -272,7 +272,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -292,7 +292,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -315,7 +315,7 @@ class TestChromaDBProvider:
         mock_collection.count.return_value = 42
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -341,7 +341,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
         with patch(
-            "victor.codebase.embeddings.chromadb_provider.create_embedding_model"
+            "victor.vector_stores.chromadb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()

@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from victor_coding.codebase.symbol_resolver import SymbolResolver
+from victor.codebase.symbol_resolver import SymbolResolver
 
 
 def test_symbol_resolver_prefers_other_file():

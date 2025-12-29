@@ -18,7 +18,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor_coding.codebase.chunker import (
+from victor.codebase.chunker import (
     CodeChunker,
     ChunkConfig,
     ChunkingStrategy,

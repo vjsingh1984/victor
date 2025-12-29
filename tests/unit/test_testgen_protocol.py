@@ -16,7 +16,7 @@
 
 from pathlib import Path
 
-from victor_coding.testgen.protocol import (
+from victor.testgen.protocol import (
     AssertionType,
     ClassSignature,
     FunctionSignature,

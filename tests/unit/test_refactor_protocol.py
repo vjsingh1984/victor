@@ -17,7 +17,7 @@
 import pytest
 from pathlib import Path
 
-from victor_coding.refactor.protocol import (
+from victor.refactor.protocol import (
     CodeEdit,
     CodePattern,
     RefactorCapabilities,

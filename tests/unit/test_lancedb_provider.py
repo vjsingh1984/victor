@@ -64,7 +64,7 @@ class TestLanceDBProvider:
 
     def test_initialization(self, lancedb_config):
         """Test provider initialization."""
-        with patch("victor.codebase.embeddings.lancedb_provider.LANCEDB_AVAILABLE", True):
+        with patch("victor.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", True):
             provider = LanceDBProvider(lancedb_config)
 
             assert provider.config == lancedb_config
@@ -75,7 +75,7 @@ class TestLanceDBProvider:
 
     def test_initialization_lancedb_not_available(self, lancedb_config):
         """Test initialization when LanceDB not available."""
-        with patch("victor.codebase.embeddings.lancedb_provider.LANCEDB_AVAILABLE", False):
+        with patch("victor.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", False):
             with pytest.raises(ImportError, match="LanceDB not available"):
                 LanceDBProvider(lancedb_config)
 
@@ -85,7 +85,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -116,7 +116,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -136,7 +136,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -158,7 +158,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -182,7 +182,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -214,7 +214,7 @@ class TestLanceDBProvider:
         mock_db.table_names.return_value = ["test_table"]  # Table exists
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -244,7 +244,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -300,7 +300,7 @@ class TestLanceDBProvider:
         mock_table.search.return_value = mock_search
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -325,7 +325,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -346,7 +346,7 @@ class TestLanceDBProvider:
         mock_db.table_names.return_value = ["test_table"]
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -366,7 +366,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -386,7 +386,7 @@ class TestLanceDBProvider:
         mock_db.table_names.return_value = ["test_table"]
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -410,7 +410,7 @@ class TestLanceDBProvider:
         mock_table.count_rows.return_value = 42
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -435,7 +435,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
@@ -455,7 +455,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
 
         with patch(
-            "victor.codebase.embeddings.lancedb_provider.create_embedding_model"
+            "victor.vector_stores.lancedb_provider.create_embedding_model"
         ) as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()

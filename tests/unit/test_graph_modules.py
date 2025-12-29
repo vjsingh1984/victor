@@ -178,19 +178,19 @@ class TestCreateGraphStore:
         with pytest.raises(ValueError, match="Unsupported graph store backend"):
             create_graph_store("invalid_backend", Path("."))
 
-    @patch("victor.codebase.graph.registry.DuckDBGraphStore", None)
+    @patch("victor.graph.registry.DuckDBGraphStore", None)
     def test_duckdb_not_installed(self):
         """Test DuckDB raises when not installed."""
         with pytest.raises(ValueError, match="DuckDB.*not installed"):
             create_graph_store("duckdb", Path("."))
 
-    @patch("victor.codebase.graph.registry.LanceDBGraphStore", None)
+    @patch("victor.graph.registry.LanceDBGraphStore", None)
     def test_lancedb_not_installed(self):
         """Test LanceDB raises when not installed."""
         with pytest.raises(ValueError, match="LanceDB.*not installed"):
             create_graph_store("lancedb", Path("."))
 
-    @patch("victor.codebase.graph.registry.Neo4jGraphStore", None)
+    @patch("victor.graph.registry.Neo4jGraphStore", None)
     def test_neo4j_not_installed(self):
         """Test Neo4j raises when not installed."""
         with pytest.raises(ValueError, match="Neo4j.*not installed"):

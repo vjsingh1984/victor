@@ -125,8 +125,8 @@ class TestGetParser:
         result = get_parser("python")
         assert result is cached
 
-    @patch("victor.codebase.tree_sitter_manager.get_language")
-    @patch("victor.codebase.tree_sitter_manager.Parser")
+    @patch("victor_coding.codebase.tree_sitter_manager.get_language")
+    @patch("victor_coding.codebase.tree_sitter_manager.Parser")
     def test_new_parser_created(self, mock_parser_class, mock_get_lang):
         """Test new parser is created for uncached language."""
         _parser_cache.clear()
@@ -148,9 +148,9 @@ class TestGetParser:
 class TestRunQuery:
     """Tests for run_query function."""
 
-    @patch("victor.codebase.tree_sitter_manager.get_language")
-    @patch("victor.codebase.tree_sitter_manager.Query")
-    @patch("victor.codebase.tree_sitter_manager.QueryCursor")
+    @patch("victor_coding.codebase.tree_sitter_manager.get_language")
+    @patch("victor_coding.codebase.tree_sitter_manager.Query")
+    @patch("victor_coding.codebase.tree_sitter_manager.QueryCursor")
     def test_run_query_basic(self, mock_cursor_class, mock_query_class, mock_get_lang):
         """Test basic query execution."""
         mock_lang = MagicMock()
@@ -174,9 +174,9 @@ class TestRunQuery:
         mock_cursor.captures.assert_called_once_with(mock_tree.root_node)
         assert result == {"name": [mock_cursor.captures.return_value["name"][0]]}
 
-    @patch("victor.codebase.tree_sitter_manager.get_language")
-    @patch("victor.codebase.tree_sitter_manager.Query")
-    @patch("victor.codebase.tree_sitter_manager.QueryCursor")
+    @patch("victor_coding.codebase.tree_sitter_manager.get_language")
+    @patch("victor_coding.codebase.tree_sitter_manager.Query")
+    @patch("victor_coding.codebase.tree_sitter_manager.QueryCursor")
     def test_run_query_empty_result(self, mock_cursor_class, mock_query_class, mock_get_lang):
         """Test query with no matches."""
         mock_lang = MagicMock()

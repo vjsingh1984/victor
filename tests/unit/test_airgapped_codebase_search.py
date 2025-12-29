@@ -371,7 +371,7 @@ class TestAirgappedDemo:
 
             with (
                 patch(
-                    "victor.codebase.embeddings.lancedb_provider.lancedb.connect"
+                    "victor.vector_stores.lancedb_provider.lancedb.connect"
                 ) as mock_connect,
                 patch("sentence_transformers.SentenceTransformer") as MockST,
             ):

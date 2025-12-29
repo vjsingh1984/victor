@@ -52,6 +52,14 @@ class MockVertical(VerticalBase):
     def get_system_prompt(cls):
         return "You are a test assistant."
 
+    @classmethod
+    def get_stages(cls):
+        return {
+            "INITIAL": {"allowed_tools": ["read"], "next": ["PLANNING"]},
+            "PLANNING": {"allowed_tools": ["read", "write"], "next": ["EXECUTION"]},
+            "EXECUTION": {"allowed_tools": ["read", "write", "edit"], "next": ["INITIAL"]},
+        }
+
 
 class TestFrameworkShimBasic:
     """Basic FrameworkShim tests."""
@@ -236,6 +244,12 @@ class TestFrameworkShimVertical:
             side_effect=lambda tools: setattr(orch, "_enabled_tools", tools)
         )
         orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
+        # Add vertical context storage (set via pipeline)
+        orch._vertical_context = None
+
+        def set_context(context):
+            orch._vertical_context = context
+        orch.set_vertical_context = MagicMock(side_effect=set_context)
         return orch
 
     @pytest.fixture(autouse=True)
@@ -282,7 +296,7 @@ class TestFrameworkShimVertical:
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):
-        """Test that vertical stages are applied."""
+        """Test that vertical stages are applied via vertical context."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
             new_callable=AsyncMock,
@@ -292,8 +306,12 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            assert hasattr(mock_orchestrator, "_vertical_stages")
-            stages = mock_orchestrator._vertical_stages
+            # Stages are applied via vertical context, not _vertical_stages
+            assert hasattr(mock_orchestrator, "_vertical_context")
+            context = mock_orchestrator._vertical_context
+            assert context is not None
+            # Check that stages were applied to context
+            stages = context.stages
             assert "INITIAL" in stages
             assert "PLANNING" in stages
             assert "EXECUTION" in stages
