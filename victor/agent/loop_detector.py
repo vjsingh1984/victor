@@ -54,7 +54,7 @@ from victor.tools.metadata_registry import get_progress_params as registry_get_p
 
 # Import native extensions with fallback
 try:
-    from victor.native import (
+    from victor.processing.native import (
         compute_signature as native_compute_signature,
         is_native_available,
     )
@@ -596,7 +596,7 @@ class LoopDetector:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.CODE_SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:
@@ -607,7 +607,7 @@ class LoopDetector:
             if command:
                 # Extract first 50 chars of command for unique identification
                 return f"bash:{command[:50]}"
-        elif canonical_name in {ToolNames.FETCH, ToolNames.WEB, ToolNames.SUMMARIZE}:
+        elif canonical_name in {ToolNames.WEB_FETCH, ToolNames.WEB_SEARCH, ToolNames.SUMMARIZE}:
             # Track web operations as resources (important for ACTION tasks)
             url = arguments.get("url", "")
             query = arguments.get("query", "")
@@ -636,7 +636,7 @@ class LoopDetector:
             path = arguments.get("path", "")
             if path:
                 return f"dir:{path}"
-        elif canonical_name in {ToolNames.GREP, ToolNames.SEARCH}:
+        elif canonical_name in {ToolNames.GREP, ToolNames.CODE_SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             if query:

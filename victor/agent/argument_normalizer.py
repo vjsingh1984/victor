@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple, TypedDict
 
 # Import native extensions with fallback
 try:
-    from victor.native import (
+    from victor.processing.native import (
         repair_json as native_repair_json,
         is_native_available,
     )

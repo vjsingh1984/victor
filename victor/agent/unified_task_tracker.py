@@ -1137,7 +1137,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def _update_stage(self, tool_name: str) -> None:
         """Update conversation stage based on tool usage."""
         canonical = get_canonical_name(tool_name)
-        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.SEARCH}:
+        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
             if self._progress.stage == ConversationStage.INITIAL:
                 self._progress.stage = ConversationStage.READING
 
@@ -1412,7 +1412,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         elif canonical == ToolNames.LS:
             path = arguments.get("path", "")
             return f"dir:{path}" if path else None
-        elif canonical in {ToolNames.GREP, ToolNames.SEARCH}:
+        elif canonical in {ToolNames.GREP, ToolNames.CODE_SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:50]}" if query else None

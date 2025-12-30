@@ -62,7 +62,7 @@ from victor.agent.synthesis_checkpoint import (
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
-    from victor.cache.tool_cache import ToolCache
+    from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
 

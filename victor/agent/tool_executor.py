@@ -34,7 +34,7 @@ from victor.agent.debug_logger import TRACE
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
-from victor.cache.tool_cache import ToolCache
+from victor.storage.cache.tool_cache import ToolCache
 from victor.core.errors import (
     ErrorCategory,
     ErrorHandler,
@@ -101,7 +101,7 @@ class ValidationMode(Enum):
 
 if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
-    from victor.auth.rbac import RBACManager
+    from victor.security.auth.rbac import RBACManager
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +332,7 @@ class ToolExecutor:
             return True, None
         else:
             # Build informative denial message
-            from victor.auth.rbac import Permission
+            from victor.security.auth.rbac import Permission
 
             required_permission = Permission.from_access_mode(access_mode)
             return (

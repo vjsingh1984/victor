@@ -139,8 +139,6 @@ class FileChangeHistory:
 
     Uses SQLite for persistent storage and maintains an in-memory
     stack for fast undo/redo operations.
-
-    Note: Previously named `ChangeTracker`. Alias kept for backward compatibility.
     """
 
     def __init__(
@@ -682,10 +680,6 @@ class FileChangeHistory:
 
         logger.info(f"Cleared {count} change groups from history")
         return count
-
-
-# Backward compatibility alias
-ChangeTracker = FileChangeHistory
 
 
 # Global instance for easy access

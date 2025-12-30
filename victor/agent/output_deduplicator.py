@@ -49,7 +49,7 @@ from typing import Optional, Set
 
 # Import native extensions with fallback
 try:
-    from victor.native import (
+    from victor.processing.native import (
         normalize_block as native_normalize_block,
         rolling_hash_blocks as native_rolling_hash_blocks,
         is_native_available,

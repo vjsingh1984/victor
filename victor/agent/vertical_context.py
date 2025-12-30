@@ -57,14 +57,15 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.verticals.base import VerticalConfig
-    from victor.verticals.protocols import (
+    from victor.core.verticals.base import VerticalConfig
+    from victor.core.verticals.protocols import (
         MiddlewareProtocol,
         ModeConfig,
         SafetyPattern,
         TaskTypeHint,
         ToolDependency,
     )
+    from victor.core.vertical_types import TieredToolConfig
 
 
 # =============================================================================
@@ -243,6 +244,12 @@ class VerticalContext:
     rl_hooks: Optional[Any] = None
     team_specs: Dict[str, Any] = field(default_factory=dict)
 
+    # Tiered tool configuration (Phase 1: Gap fix)
+    tiered_config: Optional["TieredToolConfig"] = None
+
+    # Enrichment strategy (Phase 1: Gap fix)
+    enrichment_strategy: Optional[Any] = None
+
     # ==========================================================================
     # Property Accessors
     # ==========================================================================
@@ -296,6 +303,16 @@ class VerticalContext:
     def has_team_specs(self) -> bool:
         """Check if team specs are configured."""
         return len(self.team_specs) > 0
+
+    @property
+    def has_tiered_config(self) -> bool:
+        """Check if tiered tool config is configured."""
+        return self.tiered_config is not None
+
+    @property
+    def has_enrichment_strategy(self) -> bool:
+        """Check if enrichment strategy is configured."""
+        return self.enrichment_strategy is not None
 
     # ==========================================================================
     # Mutation Methods (implements MutableVerticalContextProtocol)
@@ -434,6 +451,28 @@ class VerticalContext:
         """
         self.team_specs = specs
 
+    def apply_tiered_config(self, config: "TieredToolConfig") -> None:
+        """Apply tiered tool configuration.
+
+        The tiered config defines mandatory, vertical_core, and semantic_pool
+        tool sets for intelligent tool filtering by ToolAccessController.
+
+        Args:
+            config: TieredToolConfig from the active vertical
+        """
+        self.tiered_config = config
+
+    def apply_enrichment_strategy(self, strategy: Any) -> None:
+        """Apply enrichment strategy for prompt optimization.
+
+        The strategy enables auto prompt optimization by enriching prompts
+        with vertical-specific context (e.g., code symbols, web citations).
+
+        Args:
+            strategy: EnrichmentStrategyProtocol implementation from the vertical
+        """
+        self.enrichment_strategy = strategy
+
     # ==========================================================================
     # Query Methods
     # ==========================================================================
@@ -569,6 +608,10 @@ class VerticalContext:
             "has_rl_config": self.rl_config is not None,
             "has_rl_hooks": self.rl_hooks is not None,
             "team_specs": list(self.team_specs.keys()),
+            # Tiered tool config
+            "has_tiered_config": self.tiered_config is not None,
+            # Enrichment strategy
+            "has_enrichment_strategy": self.enrichment_strategy is not None,
         }
 
     @classmethod

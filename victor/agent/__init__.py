@@ -20,7 +20,6 @@ from victor.agent.tool_selection import get_critical_tools
 from victor.agent.message_history import MessageHistory
 from victor.agent.observability import (
     TracingProvider,
-    ObservabilityManager,
     Span,
     SpanKind,
     SpanStatus,
@@ -85,7 +84,6 @@ __all__ = [
     "ContextMetrics",
     # Observability
     "TracingProvider",
-    "ObservabilityManager",
     "Span",
     "SpanKind",
     "SpanStatus",

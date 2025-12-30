@@ -2141,6 +2141,10 @@ __all__ = [
     "BudgetStatus",
     "BudgetConfig",
     "IBudgetManager",
+    # New coordinator protocols (WS-D)
+    "ToolCoordinatorProtocol",
+    "StateCoordinatorProtocol",
+    "PromptCoordinatorProtocol",
 ]
 
 
@@ -2613,5 +2617,221 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
 
         Returns:
             Dictionary with query counts, errors, registered providers
+        """
+        ...
+
+
+# =============================================================================
+# New Coordinator Protocols (WS-D: Orchestrator SOLID Fixes)
+# =============================================================================
+
+
+@runtime_checkable
+class ToolCoordinatorProtocol(Protocol):
+    """Protocol for tool coordination operations.
+
+    Coordinates tool selection, budgeting, and execution through a unified
+    interface. Consolidates tool-related operations from AgentOrchestrator.
+    """
+
+    async def select_tools(self, context: Any) -> List[Any]:
+        """Select appropriate tools for the current context.
+
+        Args:
+            context: TaskContext with message, task_type, etc.
+
+        Returns:
+            List of selected tool definitions
+        """
+        ...
+
+    def get_remaining_budget(self) -> int:
+        """Get remaining tool call budget.
+
+        Returns:
+            Number of tool calls remaining
+        """
+        ...
+
+    def consume_budget(self, amount: int = 1) -> None:
+        """Consume tool call budget.
+
+        Args:
+            amount: Number of budget units to consume
+        """
+        ...
+
+    async def execute_tool_calls(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        context: Optional[Any] = None,
+    ) -> Any:
+        """Execute tool calls through the pipeline.
+
+        Args:
+            tool_calls: List of tool calls to execute
+            context: Optional task context
+
+        Returns:
+            PipelineExecutionResult with execution details
+        """
+        ...
+
+    def reset_budget(self, new_budget: Optional[int] = None) -> None:
+        """Reset the tool budget.
+
+        Args:
+            new_budget: New budget to set, or use default
+        """
+        ...
+
+    def is_budget_exhausted(self) -> bool:
+        """Check if tool budget is exhausted.
+
+        Returns:
+            True if no budget remaining
+        """
+        ...
+
+
+@runtime_checkable
+class StateCoordinatorProtocol(Protocol):
+    """Protocol for state coordination operations.
+
+    Coordinates conversation state and stage transitions through a unified
+    interface. Consolidates state management from AgentOrchestrator.
+    """
+
+    def get_current_stage(self) -> Any:
+        """Get the current conversation stage.
+
+        Returns:
+            Current ConversationStage
+        """
+        ...
+
+    def transition_to(
+        self,
+        stage: Any,
+        reason: str = "",
+        tool_name: Optional[str] = None,
+    ) -> bool:
+        """Transition to a new conversation stage.
+
+        Args:
+            stage: Target stage to transition to
+            reason: Reason for the transition
+            tool_name: Tool that triggered the transition
+
+        Returns:
+            True if transition was successful
+        """
+        ...
+
+    def get_message_history(self) -> List[Any]:
+        """Get the full message history.
+
+        Returns:
+            List of Message objects
+        """
+        ...
+
+    def get_recent_messages(
+        self,
+        limit: int = 10,
+        include_system: bool = False,
+    ) -> List[Any]:
+        """Get recent messages from history.
+
+        Args:
+            limit: Maximum messages to return
+            include_system: Whether to include system messages
+
+        Returns:
+            List of recent Message objects
+        """
+        ...
+
+    def is_in_exploration_phase(self) -> bool:
+        """Check if currently in exploration phase.
+
+        Returns:
+            True if in exploration phase
+        """
+        ...
+
+    def is_in_execution_phase(self) -> bool:
+        """Check if currently in execution phase.
+
+        Returns:
+            True if in execution phase
+        """
+        ...
+
+
+@runtime_checkable
+class PromptCoordinatorProtocol(Protocol):
+    """Protocol for prompt coordination operations.
+
+    Coordinates system prompt assembly through a unified interface.
+    Consolidates prompt building from AgentOrchestrator.
+    """
+
+    def build_system_prompt(
+        self,
+        context: Any,
+        include_hints: bool = True,
+    ) -> str:
+        """Build the complete system prompt.
+
+        Args:
+            context: TaskContext for prompt building
+            include_hints: Whether to include task hints
+
+        Returns:
+            Complete system prompt string
+        """
+        ...
+
+    def add_task_hint(self, task_type: str, hint: str) -> None:
+        """Add or update a task-type hint.
+
+        Args:
+            task_type: Task type (e.g., "edit", "debug")
+            hint: Hint text for this task type
+        """
+        ...
+
+    def get_task_hint(self, task_type: str) -> Optional[str]:
+        """Get the hint for a task type.
+
+        Args:
+            task_type: Task type to get hint for
+
+        Returns:
+            Hint string or None
+        """
+        ...
+
+    def add_section(
+        self,
+        name: str,
+        content: str,
+        priority: Optional[int] = None,
+    ) -> None:
+        """Add a runtime section to be included in prompts.
+
+        Args:
+            name: Section name (unique identifier)
+            content: Section content
+            priority: Optional priority
+        """
+        ...
+
+    def set_grounding_mode(self, mode: str) -> None:
+        """Set the grounding rules mode.
+
+        Args:
+            mode: "minimal" or "extended"
         """
         ...

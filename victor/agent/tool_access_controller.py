@@ -285,14 +285,8 @@ class VerticalLayer(AccessLayer):
         if self._tiered_config is None:
             return True, "No vertical restrictions"
 
-        # Get all allowed tools from tiered config
-        allowed = set()
-        if hasattr(self._tiered_config, "core_tools"):
-            allowed.update(self._tiered_config.core_tools or [])
-        if hasattr(self._tiered_config, "extension_tools"):
-            allowed.update(self._tiered_config.extension_tools or [])
-        if hasattr(self._tiered_config, "optional_tools"):
-            allowed.update(self._tiered_config.optional_tools or [])
+        # Get all allowed tools from tiered config (ISP fix: support both interfaces)
+        allowed = self._get_allowed_from_config()
 
         if not allowed:
             return True, "Vertical has no tool restrictions"
@@ -303,20 +297,47 @@ class VerticalLayer(AccessLayer):
         vertical_name = context.vertical_name if context else "active"
         return False, f"Tool '{tool_name}' not in {vertical_name} vertical's tool set"
 
-    def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
-        """Get tools allowed by vertical."""
-        if self._tiered_config is None:
-            return all_tools.copy()
+    def _get_allowed_from_config(self) -> Set[str]:
+        """Extract allowed tools from tiered config (ISP-compliant).
 
-        allowed = set()
+        Supports both legacy interface (core_tools/extension_tools/optional_tools)
+        and TieredToolConfig interface (mandatory/vertical_core/semantic_pool).
+        """
+        if self._tiered_config is None:
+            return set()
+
+        allowed: Set[str] = set()
+
+        # TieredToolConfig interface (preferred)
+        if hasattr(self._tiered_config, "mandatory"):
+            allowed.update(self._tiered_config.mandatory or set())
+        if hasattr(self._tiered_config, "vertical_core"):
+            allowed.update(self._tiered_config.vertical_core or set())
+        if hasattr(self._tiered_config, "semantic_pool"):
+            allowed.update(self._tiered_config.semantic_pool or set())
+
+        # Use helper method if available (TieredToolConfig.get_all_tools())
+        if hasattr(self._tiered_config, "get_all_tools"):
+            allowed.update(self._tiered_config.get_all_tools() or set())
+
+        # Legacy interface fallback (deprecated)
         if hasattr(self._tiered_config, "core_tools"):
             allowed.update(self._tiered_config.core_tools or [])
         if hasattr(self._tiered_config, "extension_tools"):
             allowed.update(self._tiered_config.extension_tools or [])
         if hasattr(self._tiered_config, "optional_tools"):
             allowed.update(self._tiered_config.optional_tools or [])
+
+        return allowed
+
+    def get_allowed_tools(
+        self, all_tools: Set[str], context: Optional[ToolAccessContext]
+    ) -> Set[str]:
+        """Get tools allowed by vertical (ISP fix: uses unified config extraction)."""
+        if self._tiered_config is None:
+            return all_tools.copy()
+
+        allowed = self._get_allowed_from_config()
 
         if not allowed:
             return all_tools.copy()

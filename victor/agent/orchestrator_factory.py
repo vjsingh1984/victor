@@ -292,7 +292,7 @@ class OrchestratorFactory(ModeAwareMixin):
             Configured SystemPromptBuilder
         """
         from victor.agent.prompt_builder import SystemPromptBuilder
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.protocols import VerticalExtensions
 
         # Get prompt contributors from vertical extensions
         prompt_contributors = []
@@ -439,9 +439,9 @@ class OrchestratorFactory(ModeAwareMixin):
         if not getattr(self.settings, "tool_cache_enabled", True):
             return None
 
-        from victor.cache.config import CacheConfig
+        from victor.storage.cache.config import CacheConfig
         from victor.config.settings import get_project_paths
-        from victor.cache.tool_cache import ToolCache
+        from victor.storage.cache.tool_cache import ToolCache
 
         # Allow explicit override of cache_dir, otherwise use centralized path
         cache_dir = getattr(self.settings, "tool_cache_dir", None)
@@ -580,7 +580,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         try:
             from victor.agent.middleware_chain import MiddlewareChain
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             middleware_chain = MiddlewareChain()
 
@@ -640,7 +640,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         # Register vertical safety patterns with the safety checker
         try:
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             extensions = self.container.get_optional(VerticalExtensions)
             if extensions and extensions.safety_extensions:
@@ -1678,7 +1678,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Get prompt contributors from vertical extensions
         prompt_contributors = []
         try:
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             extensions = self.container.get_optional(VerticalExtensions)
             if extensions and extensions.prompt_contributors:
@@ -1964,15 +1964,18 @@ class OrchestratorFactory(ModeAwareMixin):
             return None
 
         try:
-            from victor.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+            from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
             from victor.config.settings import get_project_paths
 
             # Get project paths for checkpoint storage
             paths = get_project_paths()
-            checkpoint_db_path = paths.project_victor_dir / "checkpoints.db"
 
-            # Create SQLite backend
-            backend = SQLiteCheckpointBackend(str(checkpoint_db_path))
+            # Create SQLite backend with directory path (not full file path)
+            # SQLiteCheckpointBackend expects storage_path as Path, db_name as filename
+            backend = SQLiteCheckpointBackend(
+                storage_path=paths.project_victor_dir,
+                db_name="checkpoints.db",
+            )
 
             # Get settings
             auto_interval = getattr(self.settings, "checkpoint_auto_interval", 5)

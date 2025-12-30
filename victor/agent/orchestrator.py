@@ -154,6 +154,7 @@ from victor.agent.recovery import (
     RecoveryAction,
 )
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.protocols import RecoveryHandlerProtocol
 from victor.agent.orchestrator_recovery import (
     OrchestratorRecoveryIntegration,
@@ -213,9 +214,9 @@ from victor.agent.response_completer import (
     ToolFailureContext,
     create_response_completer,
 )
-from victor.analytics.logger import UsageLogger
-from victor.analytics.streaming_metrics import StreamingMetricsCollector
-from victor.cache.tool_cache import ToolCache
+from victor.observability.analytics.logger import UsageLogger
+from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
+from victor.storage.cache.tool_cache import ToolCache
 from victor.config.model_capabilities import ToolCallingMatrix
 from victor.config.settings import Settings
 from victor.context.project_context import ProjectContext
@@ -229,14 +230,14 @@ from victor.providers.base import (
 from victor.providers.registry import ProviderRegistry
 from victor.core.errors import ProviderRateLimitError
 from victor.tools.base import CostTier, ToolRegistry
-from victor.tools.code_executor_tool import CodeExecutionManager
-from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
+from victor.tools.code_executor_tool import CodeSandbox
+from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.tool_names import ToolNames, TOOL_ALIASES
-from victor.embeddings.intent_classifier import IntentClassifier, IntentType
+from victor.storage.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
-from victor.workflows.new_feature_workflow import NewFeatureWorkflow
+from victor.workflows.discovery import register_builtin_workflows
 
 # Streaming submodule - extracted for testability
 from victor.agent.streaming import (
@@ -746,6 +747,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize VerticalContext for unified vertical state management
         # This replaces scattered _vertical_* attributes with a proper container
         self._vertical_context: VerticalContext = create_vertical_context()
+
+        # Initialize VerticalIntegrationAdapter for single-source vertical methods
+        # Eliminates duplicate apply_vertical_* implementations (SRP compliance)
+        self._vertical_integration_adapter = VerticalIntegrationAdapter(self)
 
         # Initialize ModeWorkflowTeamCoordinator for intelligent team/workflow suggestions
         # Lazy initialization pattern - coordinator is created on first access
@@ -1281,51 +1286,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
-        """Set enabled tools from vertical (OrchestratorVerticalProtocol).
+    def set_tiered_tool_config(self, config: Any) -> None:
+        """Set tiered tool configuration (Phase 1: Gap fix).
 
-        This configures the tool access controller with vertical-specific
-        tool filters.
+        Applies tiered tool config from vertical to:
+        1. VerticalContext for storage
+        2. ToolAccessController.VerticalLayer for access filtering
+
+        Args:
+            config: TieredToolConfig from the active vertical
+        """
+        # Store in vertical context
+        if self._vertical_context is not None:
+            self._vertical_context.apply_tiered_config(config)
+
+        # Apply to tool access controller
+        if self._tool_access_controller is not None:
+            self._tool_access_controller.set_tiered_config(config)
+            logger.debug("Tiered config applied to ToolAccessController")
+
+        logger.debug("Tiered tool config set")
+
+    def _apply_vertical_tools(self, tools: Set[str]) -> None:
+        """Apply enabled tools to vertical context and access controller.
+
+        Internal helper called by set_enabled_tools. Separated to avoid
+        duplication and maintain single method for protocol compliance.
 
         Args:
             tools: Set of tool names to enable
         """
         self._vertical_context.apply_enabled_tools(tools)
-
-        # Apply to tool access controller if available
-        if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
-            self._tool_access_controller.set_vertical_tools(tools)
-        logger.debug(f"Enabled {len(tools)} tools from vertical")
-
-    def apply_vertical_middleware(self, middleware: List[Any]) -> None:
-        """Apply middleware from vertical (OrchestratorVerticalProtocol).
-
-        Args:
-            middleware: List of MiddlewareProtocol implementations
-        """
-        self._vertical_context.apply_middleware(middleware)
-
-        # Apply to middleware chain if available
-        if hasattr(self, "_middleware_chain") and self._middleware_chain:
-            for mw in middleware:
-                self._middleware_chain.add(mw)
-        logger.debug(f"Applied {len(middleware)} middleware from vertical")
-
-    def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
-        """Apply safety patterns from vertical (OrchestratorVerticalProtocol).
-
-        Args:
-            patterns: List of SafetyPattern instances
-        """
-        self._vertical_context.apply_safety_patterns(patterns)
-
-        # Apply to safety checker if available
-        if hasattr(self, "_safety_checker") and self._safety_checker:
-            if hasattr(self._safety_checker, "add_patterns"):
-                self._safety_checker.add_patterns(patterns)
-            elif hasattr(self._safety_checker, "_custom_patterns"):
-                self._safety_checker._custom_patterns.extend(patterns)
-        logger.debug(f"Applied {len(patterns)} safety patterns from vertical")
+        logger.debug(f"Applied {len(tools)} tools to vertical context")
 
     async def save_checkpoint(
         self,
@@ -1799,30 +1791,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         vertical-specific middleware. This enables the middleware chain
         pattern for tool execution.
 
+        Delegates to VerticalIntegrationAdapter for single-source implementation.
+
         Args:
             middleware_list: List of MiddlewareProtocol implementations.
         """
-        if not middleware_list:
-            return
-
-        # Store middleware for use during tool execution
-        self._vertical_middleware = middleware_list
-
-        # Initialize middleware chain if not present
-        if not hasattr(self, "_middleware_chain") or self._middleware_chain is None:
-            try:
-                from victor.agent.middleware_chain import MiddlewareChain
-
-                self._middleware_chain = MiddlewareChain()
-            except ImportError:
-                logger.warning("MiddlewareChain not available")
-                return
-
-        # Add all middleware to chain
-        for middleware in middleware_list:
-            self._middleware_chain.add(middleware)
-
-        logger.debug(f"Applied {len(middleware_list)} vertical middleware")
+        self._vertical_integration_adapter.apply_middleware(middleware_list)
 
     def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
         """Apply safety patterns from vertical extensions.
@@ -1830,30 +1804,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Called by FrameworkShim to inject vertical-specific danger patterns
         into the safety checker.
 
+        Delegates to VerticalIntegrationAdapter for single-source implementation.
+
         Args:
             patterns: List of SafetyPattern objects.
         """
-        if not patterns:
-            return
-
-        # Store patterns for reference
-        self._vertical_safety_patterns = patterns
-
-        # Add patterns to safety checker
-        if self._safety_checker is not None:
-            try:
-                # Convert SafetyPattern to the format SafetyChecker expects
-                for pattern in patterns:
-                    self._safety_checker.add_custom_pattern(
-                        pattern=pattern.pattern,
-                        description=pattern.description,
-                        risk_level=pattern.risk_level,
-                        category=pattern.category,
-                    )
-                logger.debug(f"Applied {len(patterns)} vertical safety patterns")
-            except AttributeError:
-                # SafetyChecker might not support add_custom_pattern
-                logger.debug("SafetyChecker does not support add_custom_pattern")
+        self._vertical_integration_adapter.apply_safety_patterns(patterns)
 
     def get_middleware_chain(self) -> Optional[Any]:
         """Get the middleware chain for tool execution.
@@ -2617,7 +2573,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Get prompt contributors from vertical extensions
             prompt_contributors = []
             try:
-                from victor.verticals.protocols import VerticalExtensions
+                from victor.core.verticals.protocols import VerticalExtensions
 
                 extensions = self._container.get_optional(VerticalExtensions)
                 if extensions and extensions.prompt_contributors:
@@ -2719,7 +2675,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Get prompt contributors from vertical extensions
             prompt_contributors = []
             try:
-                from victor.verticals.protocols import VerticalExtensions
+                from victor.core.verticals.protocols import VerticalExtensions
 
                 extensions = self._container.get_optional(VerticalExtensions)
                 if extensions and extensions.prompt_contributors:
@@ -3001,32 +2957,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """A hook that logs information before a tool is called."""
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
-
-    def _filter_tools_by_intent(self, tools: List[Any]) -> List[Any]:
-        """Filter tools based on detected user intent.
-
-        DEPRECATED: Use tool_planner.filter_tools_by_intent() directly.
-
-        This method delegates to ToolPlanner for centralized intent-based filtering.
-        Maintained for backward compatibility.
-
-        This method enforces intent-based tool restrictions:
-        - DISPLAY_ONLY: Blocks write tools (write_file, edit_files, etc.)
-        - READ_ONLY: Blocks write tools AND generation tools
-        - WRITE_ALLOWED: No restrictions
-        - AMBIGUOUS: No restrictions (relies on prompt guard)
-
-        The blocked tools are defined in action_authorizer.INTENT_BLOCKED_TOOLS,
-        which is the single source of truth for tool filtering.
-
-        Args:
-            tools: List of tool definitions (ToolDefinition objects or dicts)
-
-        Returns:
-            Filtered list of tools, excluding blocked tools for current intent
-        """
-        current_intent = getattr(self, "_current_intent", None)
-        return self._tool_planner.filter_tools_by_intent(tools, current_intent)
 
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
@@ -3473,10 +3403,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     def _register_default_workflows(self) -> None:
-        """Register default workflows."""
-        # Only register if not already registered (singleton registry may have it)
-        if self.workflow_registry.get("new_feature") is None:
-            self.workflow_registry.register(NewFeatureWorkflow())
+        """Register default workflows via dynamic discovery.
+
+        Uses DIP-compliant workflow discovery to avoid hardcoded imports.
+        Workflows are discovered from victor.workflows package automatically.
+        """
+        count = register_builtin_workflows(self.workflow_registry)
+        logger.debug(f"Dynamically registered {count} workflows")
 
     def _register_default_tools(self) -> None:
         """Dynamically discovers and registers all tools.
@@ -3510,14 +3443,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Try MCPRegistry with auto-discovery first
         try:
-            from victor.mcp.registry import MCPRegistry
+            from victor.integrations.mcp.registry import MCPRegistry
 
             # Auto-discover MCP servers from standard locations
             self.mcp_registry = MCPRegistry.discover_servers()
 
             # Also register command from settings if specified
             if mcp_command:
-                from victor.mcp.registry import MCPServerConfig
+                from victor.integrations.mcp.registry import MCPServerConfig
 
                 cmd_parts = mcp_command.split()
                 self.mcp_registry.register_server(
@@ -3550,14 +3483,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Set up legacy single MCP client (backwards compatibility)."""
         if mcp_command:
             try:
-                from victor.mcp.client import MCPClient
+                from victor.integrations.mcp.client import MCPClient
 
                 mcp_client = MCPClient()
                 cmd_parts = mcp_command.split()
                 self._create_background_task(
                     mcp_client.connect(cmd_parts), name="mcp_legacy_connect"
                 )
-                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+                # MCP client setup is now handled via context injection
             except Exception as exc:
                 logger.warning(f"Failed to start MCP client: {exc}")
 
@@ -3645,41 +3578,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.plugin_manager = self.tool_registrar.plugin_manager
         if tool_count > 0:
             logger.info(f"Plugins initialized via ToolRegistrar: {tool_count} tools")
-
-    def _plan_tools(
-        self, goals: List[str], available_inputs: Optional[List[str]] = None
-    ) -> List[ToolDefinition]:
-        """Plan a sequence of tools to satisfy goals using the dependency graph.
-
-        DEPRECATED: Use tool_planner.plan_tools() directly.
-
-        This method delegates to ToolPlanner for centralized tool planning.
-        Maintained for backward compatibility.
-
-        Args:
-            goals: List of desired outputs
-            available_inputs: Optional list of inputs already available
-
-        Returns:
-            List of ToolDefinition objects for the planned sequence
-        """
-        return self._tool_planner.plan_tools(goals, available_inputs)
-
-    def _goal_hints_for_message(self, user_message: str) -> List[str]:
-        """Infer planning goals from the user request.
-
-        DEPRECATED: Use tool_planner.infer_goals_from_message() directly.
-
-        This method delegates to ToolPlanner for centralized goal inference.
-        Maintained for backward compatibility.
-
-        Args:
-            user_message: The user's input message
-
-        Returns:
-            List of inferred goal outputs
-        """
-        return self._tool_planner.infer_goals_from_message(user_message)
 
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.
@@ -4321,7 +4219,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
         # Set goals for tool selection
-        ctx.goals = self._goal_hints_for_message(user_message)
+        ctx.goals = self._tool_planner.infer_goals_from_message(user_message)
 
         # Sync tool tracking from orchestrator to context
         ctx.tool_budget = self.tool_budget
@@ -4405,7 +4303,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             available_inputs = ["query"]
             if self.observed_files:
                 available_inputs.append("file_contents")
-            planned_tools = self._plan_tools(goals, available_inputs=available_inputs)
+            planned_tools = self._tool_planner.plan_tools(goals, available_inputs)
 
         conversation_depth = self.conversation.message_count()
         conversation_history = (
@@ -4419,7 +4317,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             planned_tools=planned_tools,
         )
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
-        tools = self._filter_tools_by_intent(tools)
+        current_intent = getattr(self, "_current_intent", None)
+        tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
         return tools
 
     # =====================================================================
@@ -5356,7 +5255,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     "Only explore if absolutely necessary to complete the task.",
                 )
 
-        goals = self._goal_hints_for_message(user_message)
+        goals = self._tool_planner.infer_goals_from_message(user_message)
 
         # Log all limits for debugging
         logger.info(
@@ -6991,12 +6890,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
+        This is the single source of truth for enabled tools configuration.
+        It updates all relevant components: tool selector, vertical context,
+        tool access controller, and tiered configuration.
+
         Args:
             tools: Set of tool names to enable
             tiered_config: Optional TieredToolConfig to propagate for stage filtering.
                           If None, will attempt to retrieve from active vertical.
         """
         self._enabled_tools = tools
+
+        # Apply to vertical context and tool access controller
+        self._apply_vertical_tools(tools)
+
         # Propagate to tool_selector for selection-time filtering
         if hasattr(self, "tool_selector") and self.tool_selector:
             self.tool_selector.set_enabled_tools(tools)
@@ -7021,7 +6928,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             TieredToolConfig or None
         """
         try:
-            from victor.verticals.vertical_loader import get_vertical_loader
+            from victor.core.verticals.vertical_loader import get_vertical_loader
 
             loader = get_vertical_loader()
             if loader.active_vertical:

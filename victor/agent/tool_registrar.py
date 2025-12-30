@@ -417,7 +417,7 @@ class ToolRegistrar:
 
         # Try MCPRegistry with auto-discovery first
         try:
-            from victor.mcp.registry import MCPRegistry, MCPServerConfig
+            from victor.integrations.mcp.registry import MCPRegistry, MCPServerConfig
 
             # Auto-discover MCP servers from standard locations
             self.mcp_registry = MCPRegistry.discover_servers()
@@ -461,13 +461,12 @@ class ToolRegistrar:
         """Set up legacy single MCP client (backwards compatibility)."""
         if mcp_command:
             try:
-                from victor.mcp.client import MCPClient
-                from victor.tools.mcp_bridge_tool import configure_mcp_client
+                from victor.integrations.mcp.client import MCPClient
 
                 mcp_client = MCPClient()
                 cmd_parts = mcp_command.split()
                 self._create_task(mcp_client.connect(cmd_parts), "mcp_legacy_connect")
-                configure_mcp_client(mcp_client, prefix=getattr(self.settings, "mcp_prefix", "mcp"))
+                # MCP client setup is now handled via context injection
             except Exception as exc:
                 logger.warning(f"Failed to start MCP client: {exc}")
 

@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from victor.agent.recovery_handler import RecoveryHandler
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.tool_pipeline import ToolPipeline
-    from victor.completion import CompletionResponse, StreamChunk
+    from victor.processing.completion import CompletionResponse, StreamChunk
     from victor.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)

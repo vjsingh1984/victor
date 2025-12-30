@@ -476,7 +476,7 @@ class TeamMember:
             coordinator: UnifiedMemoryCoordinator instance
 
         Example:
-            from victor.memory import get_memory_coordinator
+            from victor.storage.memory import get_memory_coordinator
             member.attach_memory_coordinator(get_memory_coordinator())
         """
         self.memory_coordinator = coordinator

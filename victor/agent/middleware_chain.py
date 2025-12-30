@@ -25,7 +25,7 @@ Design:
 
 Usage:
     from victor.agent.middleware_chain import MiddlewareChain
-    from victor.verticals.protocols import MiddlewareProtocol
+    from victor.core.verticals.protocols import MiddlewareProtocol
 
     # Create chain
     chain = MiddlewareChain()
@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Set
 
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     MiddlewarePriority,
     MiddlewareProtocol,
     MiddlewareResult,
