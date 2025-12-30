@@ -14,67 +14,19 @@
 
 """Safety utilities for detecting secrets, PII, and dangerous patterns.
 
-This module provides cross-vertical safety capabilities:
-- Secret and credential detection
-- PII (Personally Identifiable Information) detection and anonymization
-- Code safety patterns (git, package managers, refactoring)
-- Infrastructure safety patterns (Kubernetes, Docker, Terraform)
+This module has moved to victor.security.safety.
+Please update your imports to use the new location.
 
-Example usage:
-    from victor.safety import (
-        # Secrets
-        detect_secrets,
-        has_secrets,
-        mask_secrets,
-        SecretScanner,
-        # PII
-        detect_pii_columns,
-        detect_pii_in_content,
-        get_anonymization_suggestion,
-        PIIScanner,
-        # Code patterns
-        CodePatternScanner,
-        scan_command,
-        is_sensitive_file,
-        # Infrastructure patterns
-        InfrastructureScanner,
-        validate_dockerfile,
-        validate_kubernetes_manifest,
-    )
-
-    # Check code for hardcoded secrets
-    secrets = detect_secrets(code_content)
-    if secrets:
-        print(f"Found {len(secrets)} secrets!")
-        for secret in secrets:
-            print(f"  - {secret.secret_type}: {secret.suggestion}")
-
-    # Check dataframe columns for PII
-    pii_cols = detect_pii_columns(df.columns.tolist())
-    for col, pii_type in pii_cols:
-        suggestion = get_anonymization_suggestion(pii_type)
-        print(f"  - {col}: {pii_type.value} - {suggestion}")
-
-    # Mask secrets before logging
-    safe_content = mask_secrets(sensitive_content)
-
-    # Scan git command for dangerous patterns
-    scanner = CodePatternScanner()
-    result = scanner.scan_command("git push --force origin main")
-    if result.has_high:
-        print("Dangerous git command!")
-
-    # Validate Kubernetes manifest
-    issues = validate_kubernetes_manifest(manifest_yaml)
-    for issue in issues:
-        print(f"- {issue}")
+This stub provides backward compatibility.
 """
 
+# Re-export from new location for backward compatibility
+
 # Core types
-from victor.safety.types import SafetyPattern
+from victor.security.safety.types import SafetyPattern
 
 # Secret detection
-from victor.safety.secrets import (
+from victor.security.safety.secrets import (
     # Types
     SecretSeverity,
     SecretMatch,
@@ -90,7 +42,7 @@ from victor.safety.secrets import (
 )
 
 # PII detection
-from victor.safety.pii import (
+from victor.security.safety.pii import (
     # Types
     PIIType,
     PIISeverity,
@@ -113,7 +65,7 @@ from victor.safety.pii import (
 )
 
 # Code patterns (git, package managers, refactoring)
-from victor.safety.code_patterns import (
+from victor.security.safety.code_patterns import (
     # Enums
     CodePatternCategory,
     # Pattern lists
@@ -132,7 +84,7 @@ from victor.safety.code_patterns import (
 )
 
 # Infrastructure patterns (Kubernetes, Docker, Terraform)
-from victor.safety.infrastructure import (
+from victor.security.safety.infrastructure import (
     # Enums
     InfraPatternCategory,
     # Pattern lists
@@ -153,7 +105,7 @@ from victor.safety.infrastructure import (
 )
 
 # Registry for unified scanner management
-from victor.safety.registry import (
+from victor.security.safety.registry import (
     ISafetyScanner,
     SafetyRegistry,
 )
