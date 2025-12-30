@@ -74,7 +74,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     Any,
@@ -692,7 +692,7 @@ class SQLiteEventStore(EventStore):
                             event.event_id,
                             event.event_type,
                             json.dumps(event.to_dict()),
-                            datetime.utcnow().isoformat(),
+                            datetime.now(timezone.utc).isoformat(),
                         ),
                     )
 
@@ -817,7 +817,7 @@ class SQLiteEventStore(EventStore):
                         stream_id,
                         version,
                         json.dumps(snapshot),
-                        datetime.utcnow().isoformat(),
+                        datetime.now(timezone.utc).isoformat(),
                     ),
                 )
                 conn.commit()

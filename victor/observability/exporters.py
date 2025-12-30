@@ -36,7 +36,7 @@ import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
@@ -430,7 +430,7 @@ class BufferedExporter(BaseExporter):
         self._batch_size = batch_size
         self._flush_interval = flush_interval
         self._buffer: List[VictorEvent] = []
-        self._last_flush = datetime.utcnow()
+        self._last_flush = datetime.now(timezone.utc)
 
     def export(self, event: VictorEvent) -> None:
         """Buffer event for later export.
@@ -443,7 +443,7 @@ class BufferedExporter(BaseExporter):
         # Check if we should flush
         should_flush = (
             len(self._buffer) >= self._batch_size
-            or (datetime.utcnow() - self._last_flush).total_seconds() >= self._flush_interval
+            or (datetime.now(timezone.utc) - self._last_flush).total_seconds() >= self._flush_interval
         )
 
         if should_flush:
@@ -454,7 +454,7 @@ class BufferedExporter(BaseExporter):
         for event in self._buffer:
             self._exporter.export(event)
         self._buffer.clear()
-        self._last_flush = datetime.utcnow()
+        self._last_flush = datetime.now(timezone.utc)
 
     def close(self) -> None:
         """Flush remaining events and close."""

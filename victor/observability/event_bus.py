@@ -29,7 +29,7 @@ import logging
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, auto
 from typing import (
     TYPE_CHECKING,
@@ -193,7 +193,7 @@ class VictorEvent:
             timestamp=(
                 datetime.fromisoformat(data["timestamp"])
                 if "timestamp" in data
-                else datetime.utcnow()
+                else datetime.now(timezone.utc)
             ),
             category=EventCategory(data["category"]),
             name=data["name"],
