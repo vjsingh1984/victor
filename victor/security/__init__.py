@@ -12,19 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Security scanning and CVE database integration.
+"""Unified Security Module for Victor.
 
-This module provides comprehensive security scanning capabilities
-including vulnerability detection, CVE database integration, and
-security reporting.
+This module provides comprehensive security capabilities including:
+
+Submodules:
+- victor.security.auth: Authentication and authorization (RBAC)
+- victor.security.safety: Safety patterns (secrets, PII, code patterns)
+- victor.security.audit: Compliance and audit logging
+
+Also includes:
+- Vulnerability scanning and CVE database integration
+- Security policy enforcement and reporting
 
 Example usage:
     from victor.security import get_security_manager, SecurityPolicy
+    from victor.security.auth import RBACManager, Permission
+    from victor.security.safety import detect_secrets, CodePatternScanner
+    from victor.security.audit import AuditManager
     from pathlib import Path
     import asyncio
 
     async def scan_project():
-        # Get manager with custom policy
+        # Vulnerability scanning
         manager = get_security_manager(project_root=Path("."))
         manager.policy = SecurityPolicy(
             fail_on_critical=True,
@@ -44,16 +54,23 @@ Example usage:
             for failure in failures:
                 print(f"FAIL: {failure}")
 
-        # Get fix commands
-        fixes = manager.get_fix_commands()
-        for ecosystem, commands in fixes.items():
-            print(f"\\n{ecosystem} fixes:")
-            for cmd in commands:
-                print(f"  {cmd}")
+        # Secret detection
+        secrets = detect_secrets(code_content)
+
+        # RBAC
+        rbac = RBACManager()
+        if rbac.check_permission("user", Permission.WRITE):
+            # Allow write operation
+            pass
+
+        # Audit logging
+        audit = AuditManager.get_instance()
+        await audit.log_file_operation("read", "/path/to/file")
 
     asyncio.run(scan_project())
 """
 
+# CVE/Vulnerability scanning (existing functionality)
 from victor.security.protocol import (
     CVE,
     CVSSMetrics,
@@ -89,7 +106,16 @@ from victor.security.manager import (
     reset_security_manager,
 )
 
+# Submodule imports for convenience (not re-exporting all, just exposing submodules)
+from victor.security import auth
+from victor.security import safety
+from victor.security import audit
+
 __all__ = [
+    # Submodules
+    "auth",
+    "safety",
+    "audit",
     # Protocol types
     "CVE",
     "CVSSMetrics",

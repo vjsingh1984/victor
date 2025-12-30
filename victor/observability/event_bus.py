@@ -77,6 +77,60 @@ class EventPriority(int, Enum):
     CRITICAL = 200
 
 
+class BackpressureStrategy(str, Enum):
+    """Strategy for handling queue overflow.
+
+    When the event queue is full, this determines behavior:
+    - DROP_OLDEST: Remove oldest event to make room (lossy but non-blocking)
+    - DROP_NEWEST: Discard incoming event (lossy but preserves order)
+    - BLOCK: Wait for space (can cause backpressure upstream)
+    - REJECT: Raise exception (caller handles backpressure)
+    """
+
+    DROP_OLDEST = "drop_oldest"
+    DROP_NEWEST = "drop_newest"
+    BLOCK = "block"
+    REJECT = "reject"
+
+
+class EventQueueFullError(Exception):
+    """Raised when event queue is full and backpressure strategy is REJECT."""
+
+    def __init__(self, queue_size: int, event_name: str):
+        self.queue_size = queue_size
+        self.event_name = event_name
+        super().__init__(f"Event queue full ({queue_size} events). Cannot enqueue '{event_name}'")
+
+
+@dataclass
+class BackpressureMetrics:
+    """Metrics for monitoring event queue backpressure.
+
+    Attributes:
+        events_dropped: Total events dropped due to backpressure
+        events_rejected: Total events rejected (REJECT strategy)
+        peak_queue_depth: Maximum queue depth observed
+        current_queue_depth: Current queue depth
+        backpressure_events: Number of times backpressure was applied
+    """
+
+    events_dropped: int = 0
+    events_rejected: int = 0
+    peak_queue_depth: int = 0
+    current_queue_depth: int = 0
+    backpressure_events: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize metrics to dictionary."""
+        return {
+            "events_dropped": self.events_dropped,
+            "events_rejected": self.events_rejected,
+            "peak_queue_depth": self.peak_queue_depth,
+            "current_queue_depth": self.current_queue_depth,
+            "backpressure_events": self.backpressure_events,
+        }
+
+
 @dataclass(frozen=True)
 class VictorEvent:
     """Canonical event format for all Victor observations.
@@ -223,8 +277,21 @@ class EventBus:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self) -> None:
-        """Initialize the event bus."""
+    # Default configuration for backpressure
+    DEFAULT_QUEUE_MAXSIZE = 10000
+    DEFAULT_BACKPRESSURE_STRATEGY = BackpressureStrategy.DROP_OLDEST
+
+    def __init__(
+        self,
+        queue_maxsize: int = DEFAULT_QUEUE_MAXSIZE,
+        backpressure_strategy: BackpressureStrategy = DEFAULT_BACKPRESSURE_STRATEGY,
+    ) -> None:
+        """Initialize the event bus.
+
+        Args:
+            queue_maxsize: Maximum queue size (0 for unbounded, not recommended).
+            backpressure_strategy: Strategy when queue is full.
+        """
         if getattr(self, "_initialized", False):
             return
 
@@ -232,10 +299,13 @@ class EventBus:
             cat: [] for cat in EventCategory
         }
         self._exporters: List["BaseExporter"] = []
-        self._event_queue: asyncio.Queue[VictorEvent] = asyncio.Queue()
+        self._queue_maxsize = queue_maxsize
+        self._backpressure_strategy = backpressure_strategy
+        self._event_queue: asyncio.Queue[VictorEvent] = asyncio.Queue(maxsize=queue_maxsize)
         self._is_processing = False
         self._session_id: Optional[str] = None
         self._trace_context: Dict[str, str] = {}
+        self._backpressure_metrics = BackpressureMetrics()
         self._initialized = True
         self._lock = threading.Lock()
 
@@ -260,6 +330,10 @@ class EventBus:
                 cls._instance._exporters = []
                 cls._instance._session_id = None
                 cls._instance._trace_context = {}
+                cls._instance._backpressure_metrics = BackpressureMetrics()
+                # Recreate queue with same maxsize
+                maxsize = getattr(cls._instance, "_queue_maxsize", 10000)
+                cls._instance._event_queue = asyncio.Queue(maxsize=maxsize)
 
     def set_session_id(self, session_id: str) -> None:
         """Set the current session ID for event correlation.
@@ -472,6 +546,206 @@ class EventBus:
         if category:
             return len(self._subscriptions.get(category, []))
         return sum(len(subs) for subs in self._subscriptions.values())
+
+    # =========================================================================
+    # Backpressure Management
+    # =========================================================================
+
+    def configure_backpressure(
+        self,
+        strategy: BackpressureStrategy,
+        queue_maxsize: Optional[int] = None,
+    ) -> None:
+        """Configure backpressure handling at runtime.
+
+        Note: Changing queue_maxsize requires recreating the queue,
+        which may lose pending events. Use with caution.
+
+        Args:
+            strategy: New backpressure strategy.
+            queue_maxsize: Optional new queue size (recreates queue).
+        """
+        with self._lock:
+            self._backpressure_strategy = strategy
+            if queue_maxsize is not None and queue_maxsize != self._queue_maxsize:
+                self._queue_maxsize = queue_maxsize
+                # Drain existing queue and recreate
+                old_events = []
+                while not self._event_queue.empty():
+                    try:
+                        old_events.append(self._event_queue.get_nowait())
+                    except asyncio.QueueEmpty:
+                        break
+                self._event_queue = asyncio.Queue(maxsize=queue_maxsize)
+                # Re-add events up to new capacity
+                for event in old_events[:queue_maxsize] if queue_maxsize > 0 else old_events:
+                    try:
+                        self._event_queue.put_nowait(event)
+                    except asyncio.QueueFull:
+                        break
+
+    def get_backpressure_metrics(self) -> BackpressureMetrics:
+        """Get current backpressure metrics.
+
+        Returns:
+            BackpressureMetrics with current stats.
+        """
+        # Update current queue depth
+        self._backpressure_metrics.current_queue_depth = self._event_queue.qsize()
+        return self._backpressure_metrics
+
+    def get_queue_depth(self) -> int:
+        """Get current queue depth.
+
+        Returns:
+            Number of events in queue.
+        """
+        return self._event_queue.qsize()
+
+    def get_queue_capacity(self) -> int:
+        """Get queue capacity (maxsize).
+
+        Returns:
+            Maximum queue size (0 means unbounded).
+        """
+        return self._queue_maxsize
+
+    def is_queue_full(self) -> bool:
+        """Check if queue is at capacity.
+
+        Returns:
+            True if queue is full (or unbounded queue always returns False).
+        """
+        return self._event_queue.full()
+
+    async def queue_event_async(
+        self,
+        event: VictorEvent,
+        timeout: Optional[float] = None,
+    ) -> bool:
+        """Queue an event with backpressure handling.
+
+        This method respects the configured backpressure strategy when
+        the queue is full.
+
+        Args:
+            event: Event to queue.
+            timeout: Optional timeout for BLOCK strategy (seconds).
+
+        Returns:
+            True if event was queued, False if dropped.
+
+        Raises:
+            EventQueueFullError: If strategy is REJECT and queue is full.
+        """
+        # Track queue depth metrics
+        current_depth = self._event_queue.qsize()
+        if current_depth > self._backpressure_metrics.peak_queue_depth:
+            self._backpressure_metrics.peak_queue_depth = current_depth
+
+        # Try non-blocking put first
+        try:
+            self._event_queue.put_nowait(event)
+            return True
+        except asyncio.QueueFull:
+            pass
+
+        # Queue is full - apply backpressure strategy
+        self._backpressure_metrics.backpressure_events += 1
+
+        if self._backpressure_strategy == BackpressureStrategy.DROP_NEWEST:
+            self._backpressure_metrics.events_dropped += 1
+            logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
+            return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.DROP_OLDEST:
+            try:
+                # Remove oldest event
+                dropped = self._event_queue.get_nowait()
+                logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
+                self._backpressure_metrics.events_dropped += 1
+                # Add new event
+                self._event_queue.put_nowait(event)
+                return True
+            except (asyncio.QueueEmpty, asyncio.QueueFull):
+                # Race condition - just drop new event
+                self._backpressure_metrics.events_dropped += 1
+                return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.BLOCK:
+            try:
+                await asyncio.wait_for(
+                    self._event_queue.put(event),
+                    timeout=timeout,
+                )
+                return True
+            except asyncio.TimeoutError:
+                logger.warning(f"Event queue blocked timeout: {event.name}")
+                self._backpressure_metrics.events_dropped += 1
+                return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.REJECT:
+            self._backpressure_metrics.events_rejected += 1
+            raise EventQueueFullError(self._queue_maxsize, event.name)
+
+        return False
+
+    def queue_event_sync(self, event: VictorEvent) -> bool:
+        """Queue an event synchronously with backpressure handling.
+
+        Non-blocking version for sync code paths.
+
+        Args:
+            event: Event to queue.
+
+        Returns:
+            True if event was queued, False if dropped.
+
+        Raises:
+            EventQueueFullError: If strategy is REJECT and queue is full.
+        """
+        # Track queue depth metrics
+        current_depth = self._event_queue.qsize()
+        if current_depth > self._backpressure_metrics.peak_queue_depth:
+            self._backpressure_metrics.peak_queue_depth = current_depth
+
+        # Try non-blocking put first
+        try:
+            self._event_queue.put_nowait(event)
+            return True
+        except asyncio.QueueFull:
+            pass
+
+        # Queue is full - apply backpressure strategy
+        self._backpressure_metrics.backpressure_events += 1
+
+        if self._backpressure_strategy == BackpressureStrategy.DROP_NEWEST:
+            self._backpressure_metrics.events_dropped += 1
+            logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
+            return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.DROP_OLDEST:
+            try:
+                dropped = self._event_queue.get_nowait()
+                logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
+                self._backpressure_metrics.events_dropped += 1
+                self._event_queue.put_nowait(event)
+                return True
+            except (asyncio.QueueEmpty, asyncio.QueueFull):
+                self._backpressure_metrics.events_dropped += 1
+                return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.BLOCK:
+            # In sync context, BLOCK behaves like DROP_NEWEST
+            self._backpressure_metrics.events_dropped += 1
+            logger.warning(f"Event dropped (BLOCK in sync context): {event.name}")
+            return False
+
+        elif self._backpressure_strategy == BackpressureStrategy.REJECT:
+            self._backpressure_metrics.events_rejected += 1
+            raise EventQueueFullError(self._queue_maxsize, event.name)
+
+        return False
 
     # =========================================================================
     # Convenience Factory Methods
