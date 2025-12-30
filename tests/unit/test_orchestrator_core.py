@@ -182,7 +182,9 @@ class TestMCPIntegration:
         """Test _setup_legacy_mcp with no command does nothing (covers line 670)."""
         orchestrator._setup_legacy_mcp(None)  # Should not raise
 
-    @pytest.mark.skip(reason="configure_mcp_client removed in Dec 2025 refactoring; _setup_legacy_mcp now uses MCPClient directly")
+    @pytest.mark.skip(
+        reason="configure_mcp_client removed in Dec 2025 refactoring; _setup_legacy_mcp now uses MCPClient directly"
+    )
     def test_setup_legacy_mcp_with_command_failure(self, orchestrator):
         """Test _setup_legacy_mcp handles connection failure (covers lines 678-679)."""
         with patch("victor.integrations.mcp.client.MCPClient") as mock_client:
@@ -5031,7 +5033,9 @@ class TestCreateStreamContext:
     """Tests for _create_stream_context method."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="_goal_hints_for_message extracted to ToolRegistrar in Dec 2025 refactoring")
+    @pytest.mark.skip(
+        reason="_goal_hints_for_message extracted to ToolRegistrar in Dec 2025 refactoring"
+    )
     async def test_creates_context_with_user_message(self, orchestrator):
         """Test that _create_stream_context creates proper context."""
         with patch.object(orchestrator, "_prepare_stream") as mock_prepare:
