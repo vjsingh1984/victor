@@ -27,7 +27,7 @@ Usage:
 
 import asyncio
 import sys
-from victor.mcp import MCPClient
+from victor.integrations.mcp import MCPClient
 
 
 async def demo_client():
@@ -192,7 +192,7 @@ async def demo_client():
     print(
         """
 # In Victor's agent orchestrator:
-from victor.mcp import MCPClient
+from victor.integrations.mcp import MCPClient
 
 # Connect to external MCP server
 async with MCPClient() as client:

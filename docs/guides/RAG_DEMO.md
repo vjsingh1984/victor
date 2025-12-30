@@ -54,53 +54,80 @@ The RAG vertical includes two demo scripts showcasing real-world use cases.
 
 ### SEC 10-K/10-Q Filing Demo
 
-Ingest and query SEC filings for FAANG companies (Meta, Amazon, Apple, Netflix, Google).
+Ingest and query SEC filings for **100 S&P 500 companies** including FAANG, Magnificent 7, and top companies by sector.
 
 ```bash
-# Run the built-in SEC demo (ingests project docs first)
-victor rag demo sec
+# Quick start: Ingest FAANG company filings
+victor rag demo-sec --preset faang
 
-# Or use the full demo script for more options
-python -m victor.verticals.rag.demo_sec_filings --list-companies
-
-# Output:
-# Available FAANG Companies:
-# --------------------------------------------------
-#   META: Meta Platforms (Facebook) (CIK: 0001326801)
-#   AMZN: Amazon.com Inc (CIK: 0001018724)
-#   AAPL: Apple Inc (CIK: 0000320193)
-#   NFLX: Netflix Inc (CIK: 0001065280)
-#   GOOGL: Alphabet Inc (Google) (CIK: 0001652044)
+# List available company presets
+victor rag demo-sec --list
 ```
+
+#### Available Presets
+
+| Preset | Companies | Description |
+|--------|-----------|-------------|
+| `faang` | 5 | Meta, Amazon, Apple, Netflix, Google |
+| `mag7` | 7 | Magnificent 7 (Apple, Microsoft, Google, Amazon, NVIDIA, Meta, Tesla) |
+| `top10` | 10 | Top 10 S&P 500 by market cap |
+| `top25` | 25 | Top 25 S&P 500 by market cap |
+| `top50` | 50 | Top 50 S&P 500 by market cap |
+| `top100` | 100 | All 100 tracked companies |
+| `tech` | ~25 | Technology sector companies |
+| `healthcare` | ~15 | Healthcare sector companies |
+| `financials` | ~15 | Financial services companies |
+| `energy` | 5 | Energy sector companies |
 
 #### Ingest Filings
 
 ```bash
-# Ingest Apple's latest 10-K filing
-python -m victor.verticals.rag.demo_sec_filings --company AAPL
+# Ingest by preset
+victor rag demo-sec --preset faang          # 5 companies
+victor rag demo-sec --preset mag7           # Magnificent 7
+victor rag demo-sec --preset top50          # Top 50 S&P 500
+victor rag demo-sec --preset tech           # Tech sector only
 
-# Ingest all FAANG 10-K filings
-python -m victor.verticals.rag.demo_sec_filings
+# Ingest specific companies
+victor rag demo-sec --company AAPL
+victor rag demo-sec --company AAPL --company MSFT --company NVDA
 
-# Ingest 10-Q filings instead
-python -m victor.verticals.rag.demo_sec_filings --filing-type 10-Q
+# Ingest 10-Q filings instead of 10-K
+victor rag demo-sec --preset faang --filing-type 10-Q
 
 # Ingest multiple filings per company
-python -m victor.verticals.rag.demo_sec_filings --count 3
+victor rag demo-sec --preset mag7 --count 3
+
+# Control concurrent downloads
+victor rag demo-sec --preset top50 --max-concurrent 10
 ```
 
 #### Query Filings
 
 ```bash
-# Query using victor CLI (after ingesting)
+# Query using victor rag CLI (after ingesting)
 victor rag query "What is Apple's total revenue?"
 victor rag query "What are Amazon's main risk factors?" --synthesize
+victor rag query "Compare NVIDIA and AMD revenue growth" --synthesize -p anthropic
 
-# Or use the demo script directly
-python -m victor.verticals.rag.demo_sec_filings --query "What is Apple's total revenue?"
+# Search without synthesis
+victor rag search "technology risk factors"
 
-# With LLM synthesis
-python -m victor.verticals.rag.demo_sec_filings --query "Risk factors" --synthesize --provider ollama
+# Use the demo command with sector filtering
+victor rag demo-sec --query "Revenue trends" --sector Technology --synthesize
+```
+
+#### Manage SEC Filings
+
+```bash
+# Show statistics on ingested SEC filings
+victor rag demo-sec --stats
+
+# Clear all SEC filings from the store
+victor rag demo-sec --clear
+
+# List all documents (shows SEC filings too)
+victor rag list
 ```
 
 #### Example Output
@@ -291,7 +318,7 @@ Query → Embedding → Vector Search → Reranking → Results
 ### Document Store Config
 
 ```python
-from victor.verticals.rag.document_store import DocumentStoreConfig
+from victor.rag.document_store import DocumentStoreConfig
 
 config = DocumentStoreConfig(
     path=Path(".victor/rag"),      # Storage location
@@ -306,7 +333,7 @@ config = DocumentStoreConfig(
 ### Chunking Config
 
 ```python
-from victor.verticals.rag.chunker import ChunkingConfig
+from victor.rag.chunker import ChunkingConfig
 
 config = ChunkingConfig(
     chunk_size=512,        # Tokens per chunk
@@ -392,12 +419,15 @@ victor rag query "What methods achieve state-of-the-art results?" --synthesize
 ### 4. Financial Analysis (SEC Filings)
 
 ```bash
-# Ingest all FAANG 10-K filings
-python -m victor.verticals.rag.demo_sec_filings
+# Ingest top 50 S&P 500 10-K filings
+victor rag demo-sec --preset top50
 
 # Query using CLI
 victor rag query "What is Apple's revenue?" --synthesize
-victor rag query "Compare risk factors across companies" --synthesize --provider anthropic
+victor rag query "Compare risk factors across tech companies" --synthesize --provider anthropic
+
+# Filter queries by sector
+victor rag demo-sec --query "Revenue growth" --sector Healthcare --synthesize
 ```
 
 ## Related Documentation

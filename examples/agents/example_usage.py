@@ -35,7 +35,7 @@ from victor.agents import (
 )
 
 # Entity memory imports
-from victor.memory import (
+from victor.storage.memory import (
     EntityMemory,
     EntityGraph,
     CompositeExtractor,
@@ -219,7 +219,7 @@ async def example_entity_graph():
     await graph.initialize()
 
     # Create entities
-    from victor.memory import Entity, EntityRelation, RelationType
+    from victor.storage.memory import Entity, EntityRelation, RelationType
 
     module = Entity.create("auth_module", EntityType.MODULE)
     auth_class = Entity.create("UserAuth", EntityType.CLASS)
@@ -258,7 +258,7 @@ async def example_tree_sitter_extraction():
     """Use Tree-sitter for accurate code parsing."""
     print("\n=== Tree-sitter Code Extraction ===\n")
 
-    from victor.memory import (
+    from victor.storage.memory import (
         has_tree_sitter,
         create_extractor,
         TreeSitterFileExtractor,

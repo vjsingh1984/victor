@@ -53,7 +53,7 @@ pip install target/wheels/victor_native-*.whl
 The native extensions are automatically used when available:
 
 ```python
-from victor.native import (
+from victor.processing.native import (
     rolling_hash_blocks,
     batch_cosine_similarity,
     repair_json,
@@ -85,10 +85,10 @@ sig = compute_signature("read_file", {"path": "/test.py"})
 
 ## Fallback Behavior
 
-If the native extension is not available (not installed or incompatible platform), the `victor.native` module automatically falls back to pure Python implementations with equivalent functionality.
+If the native extension is not available (not installed or incompatible platform), the `victor.processing.native` module automatically falls back to pure Python implementations with equivalent functionality.
 
 ```python
-from victor.native import is_native_available
+from victor.processing.native import is_native_available
 
 if is_native_available():
     print("Using Rust implementation (fast)")

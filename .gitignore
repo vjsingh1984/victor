@@ -87,6 +87,10 @@ dmypy.json
 *.db
 *.sqlite3
 
+# SQLite journal files
+*.db-wal
+*.db-shm
+
 # Temporary files
 tmp/
 temp/

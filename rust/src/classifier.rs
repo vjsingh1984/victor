@@ -323,8 +323,12 @@ impl TaskClassifier {
             .collect();
 
         // Score each category
-        let action_score =
-            self.score_category(text, get_action_matcher(), ACTION_PATTERNS, &negation_positions);
+        let action_score = self.score_category(
+            text,
+            get_action_matcher(),
+            ACTION_PATTERNS,
+            &negation_positions,
+        );
         let analysis_score = self.score_category(
             text,
             get_analysis_matcher(),
@@ -437,16 +441,14 @@ impl TaskClassifier {
             let (_, weight) = patterns[pattern_idx];
 
             // Check if negated
-            let is_negated = negation_positions
-                .iter()
-                .any(|&neg_pos| {
-                    let distance = if neg_pos < mat.start() {
-                        mat.start() - neg_pos
-                    } else {
-                        neg_pos - mat.start()
-                    };
-                    distance <= self.negation_radius && neg_pos < mat.start()
-                });
+            let is_negated = negation_positions.iter().any(|&neg_pos| {
+                let distance = if neg_pos < mat.start() {
+                    mat.start() - neg_pos
+                } else {
+                    neg_pos - mat.start()
+                };
+                distance <= self.negation_radius && neg_pos < mat.start()
+            });
 
             if is_negated {
                 negated += 1;

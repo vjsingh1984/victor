@@ -37,9 +37,7 @@ fn simd_norm(vec: &[f32]) -> f32 {
 
     let mut sum = f32x8::ZERO;
     for chunk in chunks {
-        let v = f32x8::from(unsafe {
-            *(chunk.as_ptr() as *const [f32; 8])
-        });
+        let v = f32x8::from(unsafe { *(chunk.as_ptr() as *const [f32; 8]) });
         sum += v * v;
     }
 
@@ -65,12 +63,8 @@ fn simd_dot(a: &[f32], b: &[f32]) -> f32 {
 
     let mut sum = f32x8::ZERO;
     for (a_chunk, b_chunk) in a_chunks.zip(b_chunks) {
-        let av = f32x8::from(unsafe {
-            *(a_chunk.as_ptr() as *const [f32; 8])
-        });
-        let bv = f32x8::from(unsafe {
-            *(b_chunk.as_ptr() as *const [f32; 8])
-        });
+        let av = f32x8::from(unsafe { *(a_chunk.as_ptr() as *const [f32; 8]) });
+        let bv = f32x8::from(unsafe { *(b_chunk.as_ptr() as *const [f32; 8]) });
         sum += av * bv;
     }
 
@@ -98,9 +92,11 @@ fn simd_dot(a: &[f32], b: &[f32]) -> f32 {
 #[pyfunction]
 pub fn cosine_similarity(a: Vec<f32>, b: Vec<f32>) -> PyResult<f32> {
     if a.len() != b.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("Vectors must have same length: {} vs {}", a.len(), b.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "Vectors must have same length: {} vs {}",
+            a.len(),
+            b.len()
+        )));
     }
 
     if a.is_empty() {
@@ -129,10 +125,7 @@ pub fn cosine_similarity(a: Vec<f32>, b: Vec<f32>) -> PyResult<f32> {
 /// # Raises
 /// * `ValueError` - If query dimension doesn't match corpus dimensions
 #[pyfunction]
-pub fn batch_cosine_similarity(
-    query: Vec<f32>,
-    corpus: Vec<Vec<f32>>,
-) -> PyResult<Vec<f32>> {
+pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResult<Vec<f32>> {
     if corpus.is_empty() {
         return Ok(Vec::new());
     }
@@ -141,12 +134,12 @@ pub fn batch_cosine_similarity(
     let query_dim = query.len();
     for (i, vec) in corpus.iter().enumerate() {
         if vec.len() != query_dim {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!(
-                    "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
-                    query_dim, i, vec.len()
-                )
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
+                query_dim,
+                i,
+                vec.len()
+            )));
         }
     }
 
@@ -196,10 +189,7 @@ pub fn top_k_similar(
     let similarities = batch_cosine_similarity(query, corpus)?;
 
     // Create (index, similarity) pairs
-    let mut indexed: Vec<(usize, f32)> = similarities
-        .into_iter()
-        .enumerate()
-        .collect();
+    let mut indexed: Vec<(usize, f32)> = similarities.into_iter().enumerate().collect();
 
     // Partial sort for efficiency - only need top k
     let k = k.min(indexed.len());
@@ -237,10 +227,7 @@ pub fn batch_normalize_vectors(vectors: Vec<Vec<f32>>) -> PyResult<Vec<Vec<f32>>
             .map(|vec| normalize_vector(vec))
             .collect()
     } else {
-        vectors
-            .iter()
-            .map(|vec| normalize_vector(vec))
-            .collect()
+        vectors.iter().map(|vec| normalize_vector(vec)).collect()
     };
 
     Ok(results)
@@ -277,12 +264,12 @@ pub fn batch_cosine_similarity_normalized(
     let query_dim = query.len();
     for (i, vec) in normalized_corpus.iter().enumerate() {
         if vec.len() != query_dim {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!(
-                    "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
-                    query_dim, i, vec.len()
-                )
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
+                query_dim,
+                i,
+                vec.len()
+            )));
         }
     }
 
@@ -326,24 +313,24 @@ pub fn top_k_similar_normalized(
     let similarities = batch_cosine_similarity_normalized(query, normalized_corpus)?;
 
     // Use a binary heap for efficient top-k selection
-    use std::collections::BinaryHeap;
     use std::cmp::Ordering;
+    use std::collections::BinaryHeap;
 
     #[derive(PartialEq)]
     struct ScoredIndex(usize, f32);
 
     impl Eq for ScoredIndex {}
 
-    impl PartialOrd for ScoredIndex {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    impl Ord for ScoredIndex {
+        fn cmp(&self, other: &Self) -> Ordering {
             // Reverse order for min-heap behavior
-            other.1.partial_cmp(&self.1)
+            other.1.partial_cmp(&self.1).unwrap_or(Ordering::Equal)
         }
     }
 
-    impl Ord for ScoredIndex {
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    impl PartialOrd for ScoredIndex {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
         }
     }
 
@@ -358,10 +345,7 @@ pub fn top_k_similar_normalized(
     }
 
     // Extract and sort results
-    let mut results: Vec<(usize, f32)> = heap
-        .into_iter()
-        .map(|si| (si.0, si.1))
-        .collect();
+    let mut results: Vec<(usize, f32)> = heap.into_iter().map(|si| (si.0, si.1)).collect();
     results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
     Ok(results)
@@ -414,14 +398,14 @@ mod tests {
         let query = vec![1.0, 0.0];
         let corpus = vec![
             vec![0.5, 0.5],
-            vec![1.0, 0.0],  // Most similar
+            vec![1.0, 0.0], // Most similar
             vec![0.0, 1.0],
-            vec![0.9, 0.1],  // Second most similar
+            vec![0.9, 0.1], // Second most similar
         ];
         let top = top_k_similar(query, corpus, 2).unwrap();
         assert_eq!(top.len(), 2);
-        assert_eq!(top[0].0, 1);  // Index of most similar
-        assert_eq!(top[1].0, 3);  // Index of second most similar
+        assert_eq!(top[0].0, 1); // Index of most similar
+        assert_eq!(top[1].0, 3); // Index of second most similar
     }
 
     #[test]
@@ -444,9 +428,9 @@ mod tests {
     #[test]
     fn test_batch_normalize_vectors() {
         let vectors = vec![
-            vec![3.0, 4.0],  // norm = 5
-            vec![1.0, 0.0],  // norm = 1
-            vec![0.0, 2.0],  // norm = 2
+            vec![3.0, 4.0], // norm = 5
+            vec![1.0, 0.0], // norm = 1
+            vec![0.0, 2.0], // norm = 2
         ];
         let normalized = batch_normalize_vectors(vectors).unwrap();
 
@@ -465,34 +449,34 @@ mod tests {
     fn test_batch_cosine_similarity_normalized() {
         // Pre-normalized vectors (unit length)
         let corpus = vec![
-            vec![1.0, 0.0, 0.0],  // unit vector along x
-            vec![0.0, 1.0, 0.0],  // unit vector along y
-            vec![0.0, 0.0, 1.0],  // unit vector along z
+            vec![1.0, 0.0, 0.0], // unit vector along x
+            vec![0.0, 1.0, 0.0], // unit vector along y
+            vec![0.0, 0.0, 1.0], // unit vector along z
         ];
-        let query = vec![1.0, 0.0, 0.0];  // Will be normalized internally
+        let query = vec![1.0, 0.0, 0.0]; // Will be normalized internally
 
         let sims = batch_cosine_similarity_normalized(query, corpus).unwrap();
         assert_eq!(sims.len(), 3);
-        assert!((sims[0] - 1.0).abs() < 1e-6);  // Identical
-        assert!(sims[1].abs() < 1e-6);          // Orthogonal
-        assert!(sims[2].abs() < 1e-6);          // Orthogonal
+        assert!((sims[0] - 1.0).abs() < 1e-6); // Identical
+        assert!(sims[1].abs() < 1e-6); // Orthogonal
+        assert!(sims[2].abs() < 1e-6); // Orthogonal
     }
 
     #[test]
     fn test_top_k_similar_normalized() {
         // Pre-normalized vectors
         let corpus = vec![
-            vec![0.6, 0.8],       // ~53 degrees from x-axis
-            vec![1.0, 0.0],       // x-axis (most similar to query)
-            vec![0.0, 1.0],       // y-axis (least similar)
-            vec![0.8, 0.6],       // ~37 degrees (second most similar)
+            vec![0.6, 0.8], // ~53 degrees from x-axis
+            vec![1.0, 0.0], // x-axis (most similar to query)
+            vec![0.0, 1.0], // y-axis (least similar)
+            vec![0.8, 0.6], // ~37 degrees (second most similar)
         ];
-        let query = vec![1.0, 0.0];  // x-axis
+        let query = vec![1.0, 0.0]; // x-axis
 
         let top = top_k_similar_normalized(query, corpus, 2).unwrap();
         assert_eq!(top.len(), 2);
-        assert_eq!(top[0].0, 1);  // Index 1 is most similar (x-axis)
-        assert_eq!(top[1].0, 3);  // Index 3 is second most similar
+        assert_eq!(top[0].0, 1); // Index 1 is most similar (x-axis)
+        assert_eq!(top[1].0, 3); // Index 3 is second most similar
     }
 
     #[test]

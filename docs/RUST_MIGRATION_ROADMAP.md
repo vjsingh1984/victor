@@ -180,7 +180,7 @@ maturin develop --release
 maturin build --release
 
 # Verify native extensions
-python -c "from victor.native import is_native_available; print('Native:', is_native_available())"
+python -c "from victor.processing.native import is_native_available; print('Native:', is_native_available())"
 
 # Benchmark
 python scripts/benchmark_native.py

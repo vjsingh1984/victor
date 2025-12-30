@@ -20,16 +20,16 @@ dynamically loaded at runtime. It includes:
 
 1. A custom tool implementation
 2. A plugin class that registers the tool
-3. Usage with ToolPluginManager
+3. Usage with ToolPluginRegistry
 
 To run this example:
     python examples/example_plugin.py
 
 To load the plugin programmatically:
-    from victor.tools.plugin import ToolPluginManager
+    from victor.tools.plugin_registry import ToolPluginRegistry
     from examples.example_plugin import WeatherPlugin
 
-    manager = ToolPluginManager()
+    manager = ToolPluginRegistry()
     manager.load(WeatherPlugin())
 """
 
@@ -315,16 +315,16 @@ class WeatherPlugin(ToolPlugin):
 
 
 async def demo_plugin_usage():
-    """Demonstrate plugin usage with ToolPluginManager."""
+    """Demonstrate plugin usage with ToolPluginRegistry."""
     from victor.tools.base import ToolRegistry
-    from victor.tools.plugin_manager import ToolPluginManager
+    from victor.tools.plugin_registry import ToolPluginRegistry
 
     print("=" * 60)
     print("Victor Plugin System Demo")
     print("=" * 60)
 
-    # Create plugin manager and registry
-    manager = ToolPluginManager()
+    # Create plugin registry and tool registry
+    manager = ToolPluginRegistry()
     registry = ToolRegistry()
 
     # Load our example plugin
@@ -379,7 +379,7 @@ async def demo_plugin_usage():
 
 async def demo_mcp_registry():
     """Demonstrate MCP Registry usage."""
-    from victor.mcp import MCPRegistry, MCPServerConfig
+    from victor.integrations.mcp import MCPRegistry, MCPServerConfig
 
     print("\n" + "=" * 60)
     print("MCP Registry Demo")
@@ -422,7 +422,7 @@ if __name__ == "__main__":
 ║  This example demonstrates:                                   ║
 ║  1. Creating custom tools (WeatherTool, TemperatureConverter) ║
 ║  2. Packaging tools in a plugin (WeatherPlugin)               ║
-║  3. Using ToolPluginManager to load/unload plugins            ║
+║  3. Using ToolPluginRegistry to load/unload plugins           ║
 ║  4. Tool execution through the registry                       ║
 ║  5. MCP Registry for managing external MCP servers            ║
 ╚══════════════════════════════════════════════════════════════╝

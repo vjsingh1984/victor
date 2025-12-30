@@ -27,7 +27,7 @@ Usage:
 
 import asyncio
 import argparse
-from victor.mcp import MCPServer, MCPResource
+from victor.integrations.mcp import MCPServer, MCPResource
 from victor.tools.base import ToolRegistry
 from victor.tools.bash import execute_bash
 from victor.tools.filesystem import ReadFileTool, WriteFileTool, ListDirectoryTool

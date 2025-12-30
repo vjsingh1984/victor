@@ -200,5 +200,4 @@ mod tests {
         let sim = signature_similarity("1111111122222222", "1111111133333333");
         assert!((sim - 0.5).abs() < 0.1);
     }
-
 }

@@ -29,13 +29,19 @@
 //! - `streaming_filter`: Fast thinking token detection for streaming
 //! - `thinking`: Thinking pattern detection for breaking loops
 //! - `classifier`: Fast task classification with weighted patterns
+//! - `chunking`: High-performance document chunking for RAG
+//! - `secrets`: High-performance secret detection using compiled regex
+//! - `pattern_match`: Aho-Corasick multi-pattern matching for tool/intent detection
 
 use pyo3::prelude::*;
 
+mod chunking;
 mod classifier;
 mod dedup;
 mod hashing;
 mod json_repair;
+mod pattern_match;
+mod secrets;
 mod similarity;
 mod streaming_filter;
 mod thinking;
@@ -60,7 +66,10 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(similarity::batch_cosine_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::top_k_similar, m)?)?;
     m.add_function(wrap_pyfunction!(similarity::batch_normalize_vectors, m)?)?;
-    m.add_function(wrap_pyfunction!(similarity::batch_cosine_similarity_normalized, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        similarity::batch_cosine_similarity_normalized,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(similarity::top_k_similar_normalized, m)?)?;
 
     // JSON repair functions
@@ -75,10 +84,19 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Streaming filter classes and functions
     m.add_class::<streaming_filter::StreamingFilter>()?;
     m.add_class::<streaming_filter::StreamingChunkResult>()?;
-    m.add_function(wrap_pyfunction!(streaming_filter::strip_thinking_tokens, m)?)?;
-    m.add_function(wrap_pyfunction!(streaming_filter::contains_thinking_tokens, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        streaming_filter::strip_thinking_tokens,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        streaming_filter::contains_thinking_tokens,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(streaming_filter::find_thinking_tokens, m)?)?;
-    m.add_function(wrap_pyfunction!(streaming_filter::extract_thinking_content, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        streaming_filter::extract_thinking_content,
+        m
+    )?)?;
 
     // Thinking pattern detection classes and functions
     m.add_class::<thinking::ThinkingDetector>()?;
@@ -97,6 +115,35 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(classifier::has_generation_keywords, m)?)?;
     m.add_function(wrap_pyfunction!(classifier::has_negation, m)?)?;
     m.add_function(wrap_pyfunction!(classifier::find_all_keywords, m)?)?;
+
+    // Document chunking functions (HIGH impact, LOW complexity)
+    m.add_function(wrap_pyfunction!(chunking::chunk_by_sentences, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::chunk_by_chars, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::chunk_by_paragraphs, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::detect_doc_type, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::count_tokens_approx, m)?)?;
+
+    // Secret detection functions (HIGH impact, MEDIUM complexity)
+    m.add_class::<secrets::SecretMatch>()?;
+    m.add_function(wrap_pyfunction!(secrets::scan_secrets, m)?)?;
+    m.add_function(wrap_pyfunction!(secrets::has_secrets, m)?)?;
+    m.add_function(wrap_pyfunction!(secrets::get_secret_types, m)?)?;
+    m.add_function(wrap_pyfunction!(secrets::mask_secrets, m)?)?;
+    m.add_function(wrap_pyfunction!(secrets::list_secret_patterns, m)?)?;
+    m.add_function(wrap_pyfunction!(secrets::scan_secrets_summary, m)?)?;
+
+    // Pattern matching functions (HIGH impact, MEDIUM complexity)
+    m.add_class::<pattern_match::PatternMatcher>()?;
+    m.add_class::<pattern_match::PatternMatch>()?;
+    m.add_function(wrap_pyfunction!(pattern_match::contains_any_pattern, m)?)?;
+    m.add_function(wrap_pyfunction!(pattern_match::find_all_patterns, m)?)?;
+    m.add_function(wrap_pyfunction!(pattern_match::count_pattern_matches, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        pattern_match::get_matched_pattern_indices,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(pattern_match::batch_contains_any, m)?)?;
+    m.add_function(wrap_pyfunction!(pattern_match::weighted_pattern_score, m)?)?;
 
     Ok(())
 }

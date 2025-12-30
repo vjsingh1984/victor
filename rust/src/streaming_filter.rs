@@ -34,16 +34,16 @@ static INLINE_MATCHER: OnceLock<AhoCorasick> = OnceLock::new();
 
 /// Start patterns for thinking blocks
 const START_PATTERNS: &[&str] = &[
-    "<｜begin▁of▁thinking｜>",  // DeepSeek Unicode
-    "<|begin_of_thinking|>",    // DeepSeek ASCII
-    "<think>",                  // Qwen3
+    "<｜begin▁of▁thinking｜>", // DeepSeek Unicode
+    "<|begin_of_thinking|>",   // DeepSeek ASCII
+    "<think>",                 // Qwen3
 ];
 
 /// End patterns for thinking blocks
 const END_PATTERNS: &[&str] = &[
-    "<｜end▁of▁thinking｜>",    // DeepSeek Unicode
-    "<|end_of_thinking|>",      // DeepSeek ASCII
-    "</think>",                 // Qwen3
+    "<｜end▁of▁thinking｜>", // DeepSeek Unicode
+    "<|end_of_thinking|>",   // DeepSeek ASCII
+    "</think>",              // Qwen3
 ];
 
 /// All patterns for inline stripping
@@ -58,23 +58,20 @@ const ALL_PATTERNS: &[&str] = &[
 
 /// Get or initialize the start pattern matcher
 fn get_start_matcher() -> &'static AhoCorasick {
-    START_MATCHER.get_or_init(|| {
-        AhoCorasick::new(START_PATTERNS).expect("Failed to compile start patterns")
-    })
+    START_MATCHER
+        .get_or_init(|| AhoCorasick::new(START_PATTERNS).expect("Failed to compile start patterns"))
 }
 
 /// Get or initialize the end pattern matcher
 fn get_end_matcher() -> &'static AhoCorasick {
-    END_MATCHER.get_or_init(|| {
-        AhoCorasick::new(END_PATTERNS).expect("Failed to compile end patterns")
-    })
+    END_MATCHER
+        .get_or_init(|| AhoCorasick::new(END_PATTERNS).expect("Failed to compile end patterns"))
 }
 
 /// Get or initialize the inline pattern matcher
 fn get_inline_matcher() -> &'static AhoCorasick {
-    INLINE_MATCHER.get_or_init(|| {
-        AhoCorasick::new(ALL_PATTERNS).expect("Failed to compile inline patterns")
-    })
+    INLINE_MATCHER
+        .get_or_init(|| AhoCorasick::new(ALL_PATTERNS).expect("Failed to compile inline patterns"))
 }
 
 /// Thinking state during streaming

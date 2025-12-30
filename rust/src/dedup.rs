@@ -110,9 +110,7 @@ fn split_into_blocks(content: &str) -> Vec<&str> {
 
         // Find next paragraph break or code block
         let remaining = &content[pos..];
-        let next_break = remaining
-            .find("\n\n")
-            .unwrap_or(remaining.len());
+        let next_break = remaining.find("\n\n").unwrap_or(remaining.len());
         let next_code = remaining.find("```").unwrap_or(remaining.len());
 
         let chunk_end = next_break.min(next_code);
@@ -151,10 +149,7 @@ fn split_into_blocks(content: &str) -> Vec<&str> {
 /// List of tuples: (hash string, original block, is_duplicate boolean)
 #[pyfunction]
 #[pyo3(signature = (content, min_block_length = 50))]
-pub fn rolling_hash_blocks(
-    content: &str,
-    min_block_length: usize,
-) -> Vec<(String, String, bool)> {
+pub fn rolling_hash_blocks(content: &str, min_block_length: usize) -> Vec<(String, String, bool)> {
     let blocks = split_into_blocks(content);
     let mut seen_hashes: AHashSet<String> = AHashSet::with_capacity(blocks.len());
     let mut results: Vec<(String, String, bool)> = Vec::with_capacity(blocks.len());
@@ -187,10 +182,7 @@ pub fn rolling_hash_blocks(
 /// List of (block_index, hash) for duplicate blocks
 #[pyfunction]
 #[pyo3(signature = (content, min_block_length = 50))]
-pub fn find_duplicate_blocks(
-    content: &str,
-    min_block_length: usize,
-) -> Vec<(usize, String)> {
+pub fn find_duplicate_blocks(content: &str, min_block_length: usize) -> Vec<(usize, String)> {
     let blocks = split_into_blocks(content);
     let mut seen_hashes: AHashSet<String> = AHashSet::with_capacity(blocks.len());
     let mut duplicates: Vec<(usize, String)> = Vec::new();
@@ -263,7 +255,8 @@ mod tests {
 
     #[test]
     fn test_find_duplicate_blocks() {
-        let content = "This is a test paragraph.\n\nAnother paragraph here.\n\nThis is a test paragraph.";
+        let content =
+            "This is a test paragraph.\n\nAnother paragraph here.\n\nThis is a test paragraph.";
         let duplicates = find_duplicate_blocks(content, 10);
         assert_eq!(duplicates.len(), 1);
         assert_eq!(duplicates[0].0, 2); // Third block is duplicate

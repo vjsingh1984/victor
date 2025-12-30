@@ -35,7 +35,6 @@ WORKDIR /app
 # Copy only requirements first for better caching
 COPY requirements.txt pyproject.toml README.md ./
 COPY victor ./victor
-COPY packages ./packages
 
 # Install Python dependencies
 # Option 1: Install from main package (current, includes all features)
@@ -52,11 +51,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 #     pip install --no-cache-dir lancedb
 
 # Pre-download embedding model for air-gapped deployment
-# This downloads all-MiniLM-L12-v2 (120MB) during build time
+# This downloads BAAI/bge-small-en-v1.5 (130MB) during build time - the core default
 # Model will be cached in Docker image at ~/.cache/huggingface/
+# Note: Must use string constant to avoid victor import chain (requires FastAPI)
 RUN python3 -c "from sentence_transformers import SentenceTransformer; \
-    print('📦 Pre-downloading embedding model: all-MiniLM-L12-v2'); \
-    model = SentenceTransformer('all-MiniLM-L12-v2'); \
+    MODEL = 'BAAI/bge-small-en-v1.5'; \
+    print(f'📦 Pre-downloading embedding model: {MODEL}'); \
+    model = SentenceTransformer(MODEL); \
     print('✅ Embedding model cached in Docker image'); \
     print(f'📊 Model dimension: {model.get_sentence_embedding_dimension()}'); \
     import os; print(f'📂 Cache location: {os.path.expanduser(\"~/.cache\")}')"

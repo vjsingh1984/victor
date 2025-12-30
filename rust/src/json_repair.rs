@@ -96,7 +96,11 @@ pub fn repair_json(input: &str) -> String {
 /// Internal repair function without Python GIL overhead
 fn repair_json_internal(input: &str) -> String {
     // Fast path: check if repair is likely needed
-    if !input.contains('\'') && !input.contains("True") && !input.contains("False") && !input.contains("None") {
+    if !input.contains('\'')
+        && !input.contains("True")
+        && !input.contains("False")
+        && !input.contains("None")
+    {
         // Might already be valid JSON
         if serde_json::from_str::<serde_json::Value>(input).is_ok() {
             return input.to_string();
@@ -123,7 +127,8 @@ fn repair_json_internal(input: &str) -> String {
                     }
                     CharClass::Other => {
                         // Check for Python literals: True, False, None
-                        let remaining: String = std::iter::once(c).chain(chars.clone().take(5)).collect();
+                        let remaining: String =
+                            std::iter::once(c).chain(chars.clone().take(5)).collect();
                         if remaining.starts_with("True") {
                             result.push_str("true");
                             // Skip "rue"
@@ -151,21 +156,19 @@ fn repair_json_internal(input: &str) -> String {
                     }
                 }
             }
-            State::InDoubleQuote => {
-                match CharClass::from_char(c) {
-                    CharClass::Quote if c == '"' => {
-                        result.push('"');
-                        state = State::Normal;
-                    }
-                    CharClass::Backslash => {
-                        result.push('\\');
-                        state = State::Escaped;
-                    }
-                    _ => {
-                        result.push(c);
-                    }
+            State::InDoubleQuote => match CharClass::from_char(c) {
+                CharClass::Quote if c == '"' => {
+                    result.push('"');
+                    state = State::Normal;
                 }
-            }
+                CharClass::Backslash => {
+                    result.push('\\');
+                    state = State::Escaped;
+                }
+                _ => {
+                    result.push(c);
+                }
+            },
             State::InSingleQuote => {
                 match CharClass::from_char(c) {
                     CharClass::Quote if c == '\'' => {
