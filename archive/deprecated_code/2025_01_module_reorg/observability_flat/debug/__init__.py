@@ -1,0 +1,58 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""This module has moved to victor.observability.debug.
+
+This module is kept for backward compatibility. Please update imports to use:
+    from victor.observability.debug import ...
+"""
+
+# Re-export from new location for backward compatibility
+from victor.observability.debug.protocol import (
+    DebugSession,
+    DebugState,
+    Breakpoint,
+    StackFrame,
+    Variable,
+    Scope,
+    Thread,
+    StopReason,
+)
+from victor.observability.debug.adapter import (
+    BaseDebugAdapter,
+    DebugAdapter,
+    DebugAdapterCapabilities,
+)
+from victor.observability.debug.manager import DebugManager
+from victor.observability.debug.registry import DebugAdapterRegistry, get_debug_registry
+
+__all__ = [
+    # Protocol types
+    "DebugSession",
+    "DebugState",
+    "Breakpoint",
+    "StackFrame",
+    "Variable",
+    "Scope",
+    "Thread",
+    "StopReason",
+    # Adapter interface
+    "BaseDebugAdapter",
+    "DebugAdapter",
+    "DebugAdapterCapabilities",
+    # Manager and registry
+    "DebugManager",
+    "DebugAdapterRegistry",
+    "get_debug_registry",
+]
