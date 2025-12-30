@@ -585,23 +585,27 @@ class VerticalBase(ABC):
         Aggregates all extension implementations for framework integration.
         Override for custom extension aggregation.
 
+        LSP Compliance: This method ALWAYS returns a valid VerticalExtensions
+        object, never None. Even on exceptions, it returns an empty
+        VerticalExtensions with default values.
+
         Args:
             use_cache: If True (default), return cached extensions if available.
                        Set to False to force rebuild.
 
         Returns:
-            VerticalExtensions containing all vertical extensions
+            VerticalExtensions containing all vertical extensions (never None)
         """
+        # Import at top of method to ensure it's available for fallback
+        from victor.core.verticals.protocols import VerticalExtensions
+
         cache_key = cls.__name__
 
         # Return cached extensions if available and caching enabled
         if use_cache and cache_key in cls._extensions_cache:
             return cls._extensions_cache[cache_key]
 
-        # Import here to avoid circular dependency
         try:
-            from victor.core.verticals.protocols import VerticalExtensions
-
             safety = cls.get_safety_extension()
             prompt = cls.get_prompt_contributor()
 
@@ -621,8 +625,10 @@ class VerticalBase(ABC):
             # Cache the extensions
             cls._extensions_cache[cache_key] = extensions
             return extensions
-        except ImportError:
-            return None
+        except Exception:
+            # LSP compliance: return empty VerticalExtensions instead of None
+            # This handles any errors in extension getter methods
+            return VerticalExtensions()
 
     # =========================================================================
     # Template Method Implementation
