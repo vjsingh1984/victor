@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
 from uuid import uuid4
@@ -493,7 +493,7 @@ class CQRSEventAdapter:
             category=category,
             name=event_type,
             data=event_data,
-            timestamp=getattr(event, "timestamp", datetime.utcnow()),
+            timestamp=getattr(event, "timestamp", datetime.now(timezone.utc)),
         )
 
     def _infer_category(self, event_type: str) -> "EventCategory":
