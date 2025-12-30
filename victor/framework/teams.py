@@ -327,7 +327,7 @@ class TeamMemberSpec:
         # Auto-attach memory coordinator if memory is enabled
         if member.memory_enabled:
             try:
-                from victor.memory import get_memory_coordinator
+                from victor.storage.memory import get_memory_coordinator
 
                 member.attach_memory_coordinator(get_memory_coordinator())
             except ImportError:

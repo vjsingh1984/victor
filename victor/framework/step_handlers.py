@@ -80,8 +80,8 @@ from typing import (
 if TYPE_CHECKING:
     from victor.agent.vertical_context import VerticalContext
     from victor.framework.vertical_integration import IntegrationResult
-    from victor.verticals.base import VerticalBase
-    from victor.verticals.protocols import (
+    from victor.core.verticals.base import VerticalBase
+    from victor.core.verticals.protocols import (
         MiddlewareProtocol,
         ModeConfigProviderProtocol,
         PromptContributorProtocol,
@@ -94,7 +94,7 @@ if TYPE_CHECKING:
     )
 
 # Import protocols for runtime isinstance checks
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
     TeamSpecProviderProtocol,
     WorkflowProviderProtocol,
@@ -180,25 +180,11 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
             logger.debug(f"Registry invoke failed for {capability_name}: {e}")
             # Fall through to public method fallback
 
-    # Fallback: use public method mappings only (no private attributes)
-    public_method_mappings = {
-        "enabled_tools": "set_enabled_tools",
-        "vertical_middleware": "apply_vertical_middleware",
-        "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "vertical_context": "set_vertical_context",
-        "rl_hooks": "set_rl_hooks",
-        "team_specs": "set_team_specs",
-        "mode_configs": "set_mode_configs",
-        "default_budget": "set_default_budget",
-        "tool_dependencies": "set_tool_dependencies",
-        "tool_sequences": "set_tool_sequences",
-        "custom_prompt": "set_custom_prompt",
-        "task_type_hints": "set_task_type_hints",
-        "prompt_section": "add_prompt_section",
-        "safety_patterns": "add_safety_patterns",
-    }
+    # Fallback: use centralized capability method mappings
+    # Import from capability_registry (single source of truth)
+    from victor.agent.capability_registry import get_method_for_capability
 
-    method_name = public_method_mappings.get(capability_name, f"set_{capability_name}")
+    method_name = get_method_for_capability(capability_name)
     method = getattr(obj, method_name, None)
     if callable(method):
         return method(*args, **kwargs)
@@ -784,10 +770,15 @@ class FrameworkStepHandler(BaseStepHandler):
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
-        """Apply framework integrations (workflows, RL, teams)."""
+        """Apply framework integrations (workflows, RL, teams, chains, personas, capabilities)."""
         self.apply_workflows(orchestrator, vertical, context, result)
         self.apply_rl_config(orchestrator, vertical, context, result)
         self.apply_team_specs(orchestrator, vertical, context, result)
+        # Phase 1: Gap fix - Register chains and personas
+        self.apply_chains(orchestrator, vertical, context, result)
+        self.apply_personas(orchestrator, vertical, context, result)
+        # Phase 1: Gap fix - Wire capability provider to framework
+        self.apply_capability_provider(orchestrator, vertical, context, result)
 
     def apply_workflows(
         self,
@@ -967,6 +958,284 @@ class FrameworkStepHandler(BaseStepHandler):
             logger.debug(f"Registered team_spec: {team_name}")
         logger.debug(f"Applied {team_count} team specifications from vertical")
 
+    def apply_chains(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Register composed chains from vertical with ChainRegistry.
+
+        Phase 1: Gap fix - Chains were defined but never registered.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Result to update
+        """
+        # Check if vertical provides chains (supports both get_chains and get_composed_chains)
+        chains = None
+        if hasattr(vertical, "get_chains"):
+            chains = vertical.get_chains()
+        elif hasattr(vertical, "get_composed_chains"):
+            chains = vertical.get_composed_chains()
+        if not chains:
+            return
+
+        chain_count = len(chains)
+
+        # Register with ChainRegistry
+        try:
+            from victor.framework.chain_registry import get_chain_registry
+
+            registry = get_chain_registry()
+            for name, chain in chains.items():
+                full_name = f"{vertical.name}:{name}"
+                registry.register(
+                    name,
+                    chain,
+                    vertical=vertical.name,
+                    replace=True,
+                )
+                logger.debug(f"Registered chain: {full_name}")
+
+            result.add_info(f"Registered {chain_count} chains: {', '.join(chains.keys())}")
+            logger.debug(f"Applied {chain_count} chains from vertical")
+        except ImportError:
+            result.add_warning("ChainRegistry not available")
+        except Exception as e:
+            result.add_warning(f"Could not register chains: {e}")
+
+    def apply_personas(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Register personas from vertical with PersonaRegistry.
+
+        Phase 1: Gap fix - Personas were defined but never registered.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Result to update
+        """
+        # Check if vertical provides personas
+        if not hasattr(vertical, "get_personas"):
+            return
+
+        personas = vertical.get_personas()
+        if not personas:
+            return
+
+        persona_count = len(personas)
+
+        # Register with PersonaRegistry
+        try:
+            from victor.framework.persona_registry import get_persona_registry
+
+            registry = get_persona_registry()
+            for name, persona in personas.items():
+                # Convert to PersonaSpec if needed
+                if hasattr(persona, "to_persona_spec"):
+                    spec = persona.to_persona_spec()
+                elif hasattr(persona, "to_dict"):
+                    # Create from dict
+                    from victor.framework.persona_registry import PersonaSpec
+
+                    data = persona.to_dict()
+                    spec = PersonaSpec(
+                        name=data.get("name", name),
+                        role=data.get("role", ""),
+                        expertise=data.get("expertise", []),
+                        communication_style=data.get("communication_style", ""),
+                        behavioral_traits=data.get("behavioral_traits", []),
+                        vertical=vertical.name,
+                    )
+                else:
+                    # Use as-is if it's already a PersonaSpec
+                    spec = persona
+
+                full_name = f"{vertical.name}:{name}"
+                registry.register(name, spec, vertical=vertical.name, replace=True)
+                logger.debug(f"Registered persona: {full_name}")
+
+            result.add_info(f"Registered {persona_count} personas: {', '.join(personas.keys())}")
+            logger.debug(f"Applied {persona_count} personas from vertical")
+        except ImportError:
+            result.add_warning("PersonaRegistry not available")
+        except Exception as e:
+            result.add_warning(f"Could not register personas: {e}")
+
+    def apply_capability_provider(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Wire capability provider from vertical to framework.
+
+        Phase 1: Gap fix - Capability providers were defined but never wired.
+
+        The capability provider enables dynamic capability loading for
+        runtime extension of vertical-specific functionality.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Result to update
+        """
+        # Check if vertical provides a capability provider
+        if not hasattr(vertical, "get_capability_provider"):
+            return
+
+        provider = vertical.get_capability_provider()
+        if provider is None:
+            return
+
+        # Count capabilities from provider
+        cap_count = 0
+        if hasattr(provider, "get_capabilities"):
+            caps = provider.get_capabilities()
+            cap_count = len(caps) if caps else 0
+        elif hasattr(provider, "CAPABILITIES"):
+            cap_count = len(provider.CAPABILITIES)
+
+        # Wire to CapabilityLoader if available
+        try:
+            from victor.framework.capability_loader import CapabilityLoader
+
+            # Get or create loader
+            loader = None
+            if hasattr(orchestrator, "_capability_loader"):
+                loader = orchestrator._capability_loader
+            else:
+                loader = CapabilityLoader()
+                # Store for reuse
+                if hasattr(orchestrator, "__dict__"):
+                    orchestrator._capability_loader = loader
+
+            # Load capabilities from provider
+            if hasattr(provider, "get_capabilities"):
+                for cap in provider.get_capabilities():
+                    if hasattr(cap, "name") and hasattr(cap, "handler"):
+                        loader.register_capability(
+                            name=cap.name,
+                            handler=cap.handler,
+                            capability_type=getattr(cap, "capability_type", None),
+                            version=getattr(cap, "version", "1.0"),
+                        )
+
+            # Apply loaded capabilities to orchestrator
+            loader.apply_to(orchestrator)
+
+            result.add_info(f"Wired capability provider with {cap_count} capabilities")
+            logger.debug(
+                f"Applied capability provider from vertical={vertical.name}, "
+                f"capabilities={cap_count}"
+            )
+        except ImportError:
+            result.add_warning("CapabilityLoader not available")
+        except Exception as e:
+            result.add_warning(f"Could not wire capability provider: {e}")
+            logger.debug(f"Capability provider error: {e}", exc_info=True)
+
+
+# =============================================================================
+# Tiered Config Step Handler (Phase 1: Gap Fix)
+# =============================================================================
+
+
+class TieredConfigStepHandler(BaseStepHandler):
+    """Handler for tiered tool configuration application.
+
+    Extracts TieredToolConfig from the vertical and applies it to:
+    1. VerticalContext for storage
+    2. ToolAccessController.VerticalLayer for access filtering
+
+    This handler closes the gap where TieredToolConfig was defined
+    in verticals but never applied to the tool access system.
+    """
+
+    @property
+    def name(self) -> str:
+        return "tiered_config"
+
+    @property
+    def order(self) -> int:
+        return 15  # After tools (10), before prompt (20)
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply tiered tool config from vertical."""
+        # Check if vertical provides tiered tool config
+        tiered_config = None
+        if hasattr(vertical, "get_tiered_tool_config"):
+            tiered_config = vertical.get_tiered_tool_config()
+
+        if tiered_config is None:
+            logger.debug(f"Vertical {vertical.name} does not provide tiered tool config")
+            return
+
+        # Store in context
+        context.apply_tiered_config(tiered_config)
+
+        # Get tool counts for logging
+        mandatory_count = len(tiered_config.mandatory) if tiered_config.mandatory else 0
+        core_count = len(tiered_config.vertical_core) if tiered_config.vertical_core else 0
+        pool_count = len(tiered_config.semantic_pool) if tiered_config.semantic_pool else 0
+
+        logger.debug(
+            f"Applied tiered config: mandatory={mandatory_count}, "
+            f"core={core_count}, pool={pool_count}"
+        )
+
+        # Apply via capability (protocol-first, SOLID compliant)
+        if _check_capability(orchestrator, "tiered_tool_config"):
+            _invoke_capability(orchestrator, "tiered_tool_config", tiered_config)
+            logger.debug("Applied tiered config via capability")
+            return
+
+        # Fallback: try to set on ToolAccessController directly
+        tool_access_controller = None
+        if hasattr(orchestrator, "tool_access_controller"):
+            tool_access_controller = orchestrator.tool_access_controller
+        elif _check_capability(orchestrator, "tool_access_controller"):
+            try:
+                # Use capability registry if available
+                if isinstance(orchestrator, CapabilityRegistryProtocol):
+                    tool_access_controller = orchestrator.get_capability_value(
+                        "tool_access_controller"
+                    )
+            except (KeyError, TypeError):
+                pass
+
+        if tool_access_controller is not None:
+            if hasattr(tool_access_controller, "set_tiered_config"):
+                tool_access_controller.set_tiered_config(tiered_config)
+                logger.debug("Applied tiered config to ToolAccessController")
+            else:
+                result.add_warning(
+                    "ToolAccessController lacks set_tiered_config method; "
+                    "config stored in context only"
+                )
+        else:
+            result.add_warning(
+                "Orchestrator lacks tool_access_controller; " "tiered config stored in context only"
+            )
+
 
 # =============================================================================
 # Context Step Handler
@@ -1009,6 +1278,115 @@ class ContextStepHandler(BaseStepHandler):
 
 
 # =============================================================================
+# Extension Handler Registry (Phase 2: OCP Compliance)
+# =============================================================================
+
+
+@dataclass
+class ExtensionHandler:
+    """Handler for a specific extension type.
+
+    Provides OCP-compliant extension handling where new extension types
+    can be added without modifying the ExtensionsStepHandler.
+
+    Attributes:
+        name: Extension type name (matches VerticalExtensions field)
+        handler: Callable that applies the extension
+        priority: Execution order (lower runs first)
+    """
+
+    name: str
+    handler: Callable[[Any, Any, Any, "VerticalContext", "IntegrationResult"], None]
+    priority: int = 50
+
+
+class ExtensionHandlerRegistry:
+    """Registry for extension handlers (OCP pattern).
+
+    Allows new extension types to be registered without modifying
+    existing code, following the Open/Closed Principle.
+
+    Usage:
+        registry = ExtensionHandlerRegistry.default()
+        registry.register(ExtensionHandler(
+            name="custom_extension",
+            handler=my_handler,
+            priority=60,
+        ))
+    """
+
+    def __init__(self) -> None:
+        self._handlers: Dict[str, ExtensionHandler] = {}
+
+    def register(self, handler: ExtensionHandler, replace: bool = False) -> None:
+        """Register an extension handler.
+
+        Args:
+            handler: ExtensionHandler to register
+            replace: If True, replace existing handler
+        """
+        if handler.name in self._handlers and not replace:
+            logger.warning(f"Extension handler '{handler.name}' already registered")
+            return
+        self._handlers[handler.name] = handler
+        logger.debug(f"Registered extension handler: {handler.name}")
+
+    def unregister(self, name: str) -> bool:
+        """Unregister an extension handler.
+
+        Args:
+            name: Handler name to remove
+
+        Returns:
+            True if handler was removed
+        """
+        if name in self._handlers:
+            del self._handlers[name]
+            return True
+        return False
+
+    def get_ordered_handlers(self) -> List[ExtensionHandler]:
+        """Get handlers in priority order."""
+        return sorted(self._handlers.values(), key=lambda h: h.priority)
+
+    def apply_all(
+        self,
+        orchestrator: Any,
+        extensions: Any,
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply all registered extension handlers.
+
+        Args:
+            orchestrator: Orchestrator instance
+            extensions: VerticalExtensions instance
+            context: Vertical context
+            result: Integration result
+        """
+        for handler in self.get_ordered_handlers():
+            # Get extension value by name
+            ext_value = getattr(extensions, handler.name, None)
+            if ext_value is not None:
+                try:
+                    handler.handler(orchestrator, ext_value, extensions, context, result)
+                except Exception as e:
+                    result.add_warning(f"Extension handler '{handler.name}' failed: {e}")
+                    logger.debug(f"Extension handler error: {e}", exc_info=True)
+
+    @classmethod
+    def default(cls) -> "ExtensionHandlerRegistry":
+        """Create registry with default handlers.
+
+        Returns:
+            Registry with standard extension handlers
+        """
+        registry = cls()
+        # Handlers are registered by ExtensionsStepHandler
+        return registry
+
+
+# =============================================================================
 # Extensions Step Handler
 # =============================================================================
 
@@ -1018,14 +1396,22 @@ class ExtensionsStepHandler(BaseStepHandler):
 
     Coordinates the application of middleware, safety, prompts,
     mode config, and tool dependencies from the vertical extensions.
+
+    OCP Compliance (Phase 2):
+    Uses ExtensionHandlerRegistry for extensible handler registration.
+    New extension types can be added via registry.register() without
+    modifying this class.
     """
 
     def __init__(self):
-        """Initialize with sub-handlers."""
+        """Initialize with sub-handlers and registry."""
         self._middleware_handler = MiddlewareStepHandler()
         self._safety_handler = SafetyStepHandler()
         self._prompt_handler = PromptStepHandler()
         self._config_handler = ConfigStepHandler()
+        # OCP: Extension handler registry for pluggable handlers
+        self._extension_registry = ExtensionHandlerRegistry()
+        self._register_default_extension_handlers()
 
     @property
     def name(self) -> str:
@@ -1035,6 +1421,96 @@ class ExtensionsStepHandler(BaseStepHandler):
     def order(self) -> int:
         return 45  # After config, before middleware
 
+    @property
+    def extension_registry(self) -> ExtensionHandlerRegistry:
+        """Get the extension handler registry for OCP extension."""
+        return self._extension_registry
+
+    def _register_default_extension_handlers(self) -> None:
+        """Register default extension handlers (OCP pattern).
+
+        These handlers implement the core extension processing. Additional
+        handlers can be registered via self.extension_registry.register().
+        """
+        # Note: Default handlers use the existing sub-handler methods
+        # This provides backward compatibility while enabling OCP extension
+
+        def handle_middleware(
+            orchestrator: Any,
+            middleware: List[Any],
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
+
+        def handle_safety(
+            orchestrator: Any,
+            safety_extensions: List[Any],
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._safety_handler.apply_safety_extensions(
+                orchestrator, safety_extensions, context, result
+            )
+
+        def handle_prompts(
+            orchestrator: Any,
+            contributors: List[Any],
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._prompt_handler.apply_contributors(orchestrator, contributors, context, result)
+
+        def handle_mode_config(
+            orchestrator: Any,
+            provider: Any,
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._config_handler.apply_mode_config(orchestrator, provider, context, result)
+
+        def handle_tool_deps(
+            orchestrator: Any,
+            provider: Any,
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._config_handler.apply_tool_dependencies(orchestrator, provider, context, result)
+
+        def handle_enrichment(
+            orchestrator: Any,
+            strategy: Any,
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._apply_enrichment_strategy(orchestrator, strategy, context, result)
+
+        # Register default handlers with priorities
+        self._extension_registry.register(
+            ExtensionHandler("middleware", handle_middleware, priority=10)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("safety_extensions", handle_safety, priority=20)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("prompt_contributors", handle_prompts, priority=30)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("mode_config_provider", handle_mode_config, priority=40)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("tool_dependency_provider", handle_tool_deps, priority=50)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("enrichment_strategy", handle_enrichment, priority=60)
+        )
+
     def _do_apply(
         self,
         orchestrator: Any,
@@ -1042,40 +1518,60 @@ class ExtensionsStepHandler(BaseStepHandler):
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
-        """Apply all vertical extensions."""
+        """Apply all vertical extensions via registry (OCP pattern).
+
+        Uses ExtensionHandlerRegistry to apply extensions, allowing
+        new extension types to be added without modifying this method.
+        """
         extensions = vertical.get_extensions()
         if extensions is None:
             logger.debug("No extensions available for vertical")
             return
 
-        # Apply middleware
-        if extensions.middleware:
-            self._middleware_handler.apply_middleware(
-                orchestrator, extensions.middleware, context, result
-            )
+        # OCP: Apply all registered extension handlers
+        self._extension_registry.apply_all(orchestrator, extensions, context, result)
 
-        # Apply safety extensions
-        if extensions.safety_extensions:
-            self._safety_handler.apply_safety_extensions(
-                orchestrator, extensions.safety_extensions, context, result
-            )
+    def _apply_enrichment_strategy(
+        self,
+        orchestrator: Any,
+        strategy: Any,
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply enrichment strategy from vertical extensions.
 
-        # Apply prompt contributors
-        if extensions.prompt_contributors:
-            self._prompt_handler.apply_contributors(
-                orchestrator, extensions.prompt_contributors, context, result
-            )
+        Stores the strategy in context and registers it with the
+        PromptEnrichmentService if available.
 
-        # Apply mode config
-        if extensions.mode_config_provider:
-            self._config_handler.apply_mode_config(
-                orchestrator, extensions.mode_config_provider, context, result
-            )
+        Args:
+            orchestrator: Orchestrator instance
+            strategy: EnrichmentStrategyProtocol implementation
+            context: Vertical context
+            result: Result to update
+        """
+        # Store in context
+        context.apply_enrichment_strategy(strategy)
 
-        # Apply tool dependencies
-        if extensions.tool_dependency_provider:
-            self._config_handler.apply_tool_dependencies(
-                orchestrator, extensions.tool_dependency_provider, context, result
+        # Try to register with enrichment service via capability
+        if _check_capability(orchestrator, "enrichment_service"):
+            try:
+                service = getattr(orchestrator, "enrichment_service", None)
+                if service and hasattr(service, "register_strategy"):
+                    vertical_name = context.vertical_name or "default"
+                    service.register_strategy(vertical_name, strategy)
+                    logger.debug(f"Registered enrichment strategy for vertical={vertical_name}")
+                    return
+            except Exception as e:
+                logger.debug(f"Failed to register enrichment strategy: {e}")
+
+        # Fallback: try to invoke via capability
+        if _check_capability(orchestrator, "enrichment_strategy"):
+            _invoke_capability(orchestrator, "enrichment_strategy", strategy)
+            logger.debug("Applied enrichment strategy via capability")
+        else:
+            result.add_warning(
+                "Enrichment strategy stored in context only; "
+                "orchestrator lacks enrichment_service capability"
             )
 
 
@@ -1107,6 +1603,7 @@ class StepHandlerRegistry:
         return cls(
             handlers=[
                 ToolStepHandler(),
+                TieredConfigStepHandler(),  # Phase 1: Gap fix
                 PromptStepHandler(),
                 ConfigStepHandler(),
                 ExtensionsStepHandler(),
@@ -1178,6 +1675,7 @@ __all__ = [
     "BaseStepHandler",
     # Concrete handlers
     "ToolStepHandler",
+    "TieredConfigStepHandler",  # Phase 1: Gap fix
     "PromptStepHandler",
     "SafetyStepHandler",
     "ConfigStepHandler",
@@ -1185,8 +1683,10 @@ __all__ = [
     "FrameworkStepHandler",
     "ContextStepHandler",
     "ExtensionsStepHandler",
-    # Registry
+    # Registries
     "StepHandlerRegistry",
+    "ExtensionHandler",  # Phase 2: OCP
+    "ExtensionHandlerRegistry",  # Phase 2: OCP
     # Capability helpers
     "_check_capability",
     "_invoke_capability",

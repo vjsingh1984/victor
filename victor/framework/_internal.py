@@ -37,7 +37,7 @@ from victor.framework.vertical_integration import _check_capability, _invoke_cap
 
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
-    from victor.verticals.base import VerticalBase
+    from victor.core.verticals.base import VerticalBase
 
 
 async def create_orchestrator_from_options(
@@ -218,25 +218,40 @@ def setup_observability_integration(
 def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
     """Apply a custom system prompt to the orchestrator.
 
+    SOLID Compliance (DIP): This function only uses public methods.
+    It never writes to private attributes to maintain proper encapsulation
+    and dependency inversion.
+
     Args:
         orchestrator: AgentOrchestrator instance
         system_prompt: Custom system prompt text
     """
-    # Store the custom system prompt for use in conversation
-    # The orchestrator's prompt_builder will use this if available
-    orchestrator._framework_system_prompt = system_prompt
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     # Use capability-based approach (protocol-first, fallback to hasattr)
+    # SOLID Compliance (DIP): Only use public methods, never write to private attributes
     if _check_capability(orchestrator, "custom_prompt"):
         _invoke_capability(orchestrator, "custom_prompt", system_prompt)
+        logger.debug("Applied system prompt via custom_prompt capability")
     elif _check_capability(orchestrator, "prompt_builder"):
-        # Fallback: try direct prompt builder access
+        # Fallback: try direct prompt builder access via public method only
         prompt_builder = getattr(orchestrator, "prompt_builder", None)
         if prompt_builder:
             if hasattr(prompt_builder, "set_custom_prompt"):
                 prompt_builder.set_custom_prompt(system_prompt)
-            elif hasattr(prompt_builder, "_custom_prompt"):
-                prompt_builder._custom_prompt = system_prompt
+                logger.debug("Applied system prompt via prompt_builder.set_custom_prompt")
+            else:
+                logger.warning(
+                    "Cannot set custom prompt: prompt_builder lacks set_custom_prompt method. "
+                    "Consider implementing CapabilityRegistryProtocol."
+                )
+    else:
+        logger.warning(
+            "Cannot set custom prompt: orchestrator lacks custom_prompt capability "
+            "and prompt_builder. Consider implementing CapabilityRegistryProtocol."
+        )
 
 
 def configure_tools(

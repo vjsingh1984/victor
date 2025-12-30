@@ -20,8 +20,8 @@ placed here in core to:
 2. Enable framework components to work with vertical abstractions
 3. Provide a single source of truth for shared type definitions
 
-These types are re-exported from `victor.verticals.base` and
-`victor.verticals.protocols` for backward compatibility.
+These types are re-exported from `victor.core.verticals.base` and
+`victor.core.verticals.protocols` for backward compatibility.
 
 Type Categories:
     - Stage Types: StageDefinition for workflow stages
@@ -31,7 +31,7 @@ Type Categories:
 
 Note:
     For vertical-specific protocols (MiddlewareProtocol, SafetyExtensionProtocol,
-    etc.), see `victor.verticals.protocols`. Only data types are defined here.
+    etc.), see `victor.core.verticals.protocols`. Only data types are defined here.
 """
 
 from __future__ import annotations
@@ -504,12 +504,12 @@ class VerticalConfigBase:
     """Base configuration for a vertical.
 
     This is a simplified base type that can be extended by VerticalConfig
-    in victor.verticals.base. It provides the core structure without
+    in victor.core.verticals.base. It provides the core structure without
     requiring framework dependencies.
 
     Note:
         For the full VerticalConfig with ToolSet support, use
-        `victor.verticals.base.VerticalConfig` instead.
+        `victor.core.verticals.base.VerticalConfig` instead.
 
     Attributes:
         system_prompt: System prompt text

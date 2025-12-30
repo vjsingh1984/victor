@@ -53,7 +53,7 @@ if TYPE_CHECKING:
         ToolConfiguratorService,
     )
     from victor.observability import EventBus, ObservabilityIntegration
-    from victor.verticals.base import VerticalBase, VerticalConfig
+    from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 
 logger = logging.getLogger(__name__)
@@ -282,13 +282,13 @@ class AgentBuilder:
             self._options.tools = ToolSet.airgapped()
 
         elif preset == BuilderPreset.CODING:
-            from victor.verticals.coding import CodingAssistant
+            from victor.coding import CodingAssistant
 
             self._options.vertical = CodingAssistant
             self._options.tools = ToolSet.default()
 
         elif preset == BuilderPreset.RESEARCH:
-            from victor.verticals.research import ResearchAssistant
+            from victor.research import ResearchAssistant
 
             self._options.vertical = ResearchAssistant
 

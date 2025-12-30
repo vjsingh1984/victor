@@ -50,6 +50,8 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.framework.tool_naming import canonicalize_tool_list, validate_tool_names
+
 logger = logging.getLogger(__name__)
 
 # Singleton instance
@@ -384,6 +386,8 @@ class TeamSpecRegistry:
         """Register multiple team specs from a vertical.
 
         Convenience method for bulk registration with namespace prefixing.
+        Tool names in team member specs are automatically canonicalized
+        to ensure consistency across verticals.
 
         Args:
             vertical_name: Vertical name for namespace
@@ -397,6 +401,9 @@ class TeamSpecRegistry:
         for name, spec in team_specs.items():
             full_name = f"{vertical_name}:{name}"
             try:
+                # Canonicalize tool names in team member specs
+                self._canonicalize_team_tools(spec, full_name)
+
                 self.register(
                     full_name,
                     spec,
@@ -409,6 +416,43 @@ class TeamSpecRegistry:
 
         logger.info(f"Registered {count} team specs from vertical '{vertical_name}'")
         return count
+
+    def _canonicalize_team_tools(self, spec: Any, team_name: str) -> None:
+        """Canonicalize tool names in a team specification.
+
+        Ensures consistent tool naming across all verticals by converting
+        legacy names (e.g., 'read_file') to canonical names (e.g., 'read').
+
+        Args:
+            spec: Team specification object
+            team_name: Team name for logging context
+        """
+        # Check if spec has members attribute (TeamSpec or similar)
+        members = getattr(spec, "members", None)
+        if not members:
+            return
+
+        for member in members:
+            # Check for tools list on member
+            tools = getattr(member, "tools", None)
+            if tools and isinstance(tools, list):
+                # Validate and warn about legacy names
+                legacy = validate_tool_names(tools, context=f"team {team_name}", warn=True)
+
+                # Canonicalize tool names
+                canonical_tools = canonicalize_tool_list(tools)
+
+                # Update member's tools if it has a setter or is mutable
+                if hasattr(member, "tools"):
+                    try:
+                        member.tools = canonical_tools
+                    except AttributeError:
+                        # Frozen dataclass or immutable - log warning
+                        if legacy:
+                            logger.warning(
+                                f"Cannot update frozen member tools in {team_name}. "
+                                f"Consider using canonical names: {legacy}"
+                            )
 
 
 def get_team_registry() -> TeamSpecRegistry:
@@ -487,10 +531,10 @@ def load_all_verticals() -> int:
 
     # Define verticals and their team specs attribute names
     verticals = [
-        ("victor.verticals.coding.teams", "CODING_TEAM_SPECS", "coding"),
-        ("victor.verticals.devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
-        ("victor.verticals.research.teams", "RESEARCH_TEAM_SPECS", "research"),
-        ("victor.verticals.data_analysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
+        ("victor.coding.teams", "CODING_TEAM_SPECS", "coding"),
+        ("victor.devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
+        ("victor.research.teams", "RESEARCH_TEAM_SPECS", "research"),
+        ("victor.dataanalysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
     ]
 
     for module_name, specs_attr, vertical_name in verticals:

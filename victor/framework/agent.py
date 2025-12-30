@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
     from victor.observability import EventBus, ObservabilityIntegration
-    from victor.verticals.base import VerticalBase, VerticalConfig
+    from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 
 class Agent:
@@ -166,7 +166,7 @@ class Agent:
             agent = await Agent.create(tools=ToolSet.coding())
 
             # With vertical (domain-specific assistant)
-            from victor.verticals import CodingAssistant
+            from victor.coding import CodingAssistant
             agent = await Agent.create(vertical=CodingAssistant)
 
             # With observability events
@@ -950,10 +950,17 @@ class Agent:
         if not self._vertical:
             raise AgentError("No vertical configured. Create agent with vertical= parameter.")
 
-        # Get team specs from vertical
-        team_specs = self._vertical.get_team_specs()
-        if not team_specs:
+        # Get team specs using ISP-compliant provider pattern (LSP fix)
+        if not hasattr(self._vertical, "get_team_spec_provider"):
+            raise AgentError(f"Vertical '{self._vertical.name}' does not support teams.")
+
+        team_provider = self._vertical.get_team_spec_provider()
+        if not team_provider or not hasattr(team_provider, "get_team_specs"):
             raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
+
+        team_specs = team_provider.get_team_specs()
+        if not team_specs:
+            raise AgentError(f"Vertical '{self._vertical.name}' has no team specs defined.")
 
         # Get the team specification
         team_spec = team_specs.get(team_name)

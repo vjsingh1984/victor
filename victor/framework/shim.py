@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
     from victor.observability.integration import ObservabilityIntegration
-    from victor.verticals.base import VerticalBase, VerticalConfig
+    from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class FrameworkShim:
             return None
 
         if isinstance(vertical, str):
-            from victor.verticals.base import VerticalRegistry
+            from victor.core.verticals.base import VerticalRegistry
 
             resolved = VerticalRegistry.get(vertical)
             if resolved is None:
@@ -252,139 +252,6 @@ class FrameworkShim:
                 logger.error(f"Vertical integration error: {error}")
             for warning in result.warnings:
                 logger.warning(f"Vertical integration warning: {warning}")
-
-    # =========================================================================
-    # Deprecated Methods - Kept for backward compatibility
-    # These are now handled by VerticalIntegrationPipeline in _apply_vertical()
-    # =========================================================================
-
-    def _apply_vertical_extensions(self, vertical: Type["VerticalBase"]) -> None:
-        """Apply vertical extensions to orchestrator.
-
-        .. deprecated:: 8.0
-            This method is deprecated. Use _apply_vertical() which now
-            delegates to VerticalIntegrationPipeline for unified handling.
-
-        Args:
-            vertical: Vertical class to get extensions from.
-        """
-        import warnings
-
-        warnings.warn(
-            "_apply_vertical_extensions is deprecated, use _apply_vertical() "
-            "which now delegates to VerticalIntegrationPipeline",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Delegate to pipeline
-        pipeline = VerticalIntegrationPipeline()
-        pipeline.apply(self._orchestrator, vertical)
-
-    def _apply_middleware(self, middleware_list: list) -> None:
-        """Apply middleware implementations to orchestrator.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            middleware_list: List of MiddlewareProtocol implementations.
-        """
-        # Delegate to orchestrator protocol method
-        if hasattr(self._orchestrator, "apply_vertical_middleware"):
-            self._orchestrator.apply_vertical_middleware(middleware_list)
-        logger.debug(f"Applied {len(middleware_list)} middleware (deprecated path)")
-
-    def _apply_safety_extensions(self, safety_extensions: list) -> None:
-        """Apply safety extensions to orchestrator.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            safety_extensions: List of SafetyExtensionProtocol implementations.
-        """
-        all_patterns = []
-        for ext in safety_extensions:
-            all_patterns.extend(ext.get_bash_patterns())
-            all_patterns.extend(ext.get_file_patterns())
-
-        if hasattr(self._orchestrator, "apply_vertical_safety_patterns"):
-            self._orchestrator.apply_vertical_safety_patterns(all_patterns)
-        logger.debug(f"Applied {len(all_patterns)} safety patterns (deprecated path)")
-
-    def _apply_prompt_contributors(self, contributors: list) -> None:
-        """Apply prompt contributors to orchestrator.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            contributors: List of PromptContributorProtocol implementations.
-        """
-        merged_hints = {}
-        for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-            merged_hints.update(contributor.get_task_type_hints())
-
-        if hasattr(self._orchestrator, "vertical_context"):
-            self._orchestrator.vertical_context.apply_task_hints(merged_hints)
-        logger.debug(f"Applied {len(merged_hints)} task hints (deprecated path)")
-
-    def _apply_mode_config(self, mode_provider: Any) -> None:
-        """Apply mode configuration provider.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            mode_provider: ModeConfigProviderProtocol implementation.
-        """
-        mode_configs = mode_provider.get_mode_configs()
-        default_mode = mode_provider.get_default_mode()
-        default_budget = mode_provider.get_default_tool_budget()
-
-        if hasattr(self._orchestrator, "vertical_context"):
-            self._orchestrator.vertical_context.apply_mode_configs(
-                mode_configs, default_mode, default_budget
-            )
-        logger.debug(f"Applied {len(mode_configs)} mode configs (deprecated path)")
-
-    def _apply_tool_dependencies(self, dep_provider: Any) -> None:
-        """Apply tool dependency provider.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            dep_provider: ToolDependencyProviderProtocol implementation.
-        """
-        dependencies = dep_provider.get_dependencies()
-        sequences = dep_provider.get_tool_sequences()
-
-        if hasattr(self._orchestrator, "vertical_context"):
-            self._orchestrator.vertical_context.apply_tool_dependencies(dependencies, sequences)
-        logger.debug(f"Applied {len(dependencies)} tool deps (deprecated path)")
-
-    def _apply_system_prompt(self, system_prompt: str) -> None:
-        """Apply a custom system prompt to the orchestrator.
-
-        .. deprecated:: 8.0
-            Now handled by VerticalIntegrationPipeline.
-
-        Args:
-            system_prompt: System prompt text.
-        """
-        if hasattr(self._orchestrator, "vertical_context"):
-            self._orchestrator.vertical_context.apply_system_prompt(system_prompt)
-
-        if hasattr(self._orchestrator, "prompt_builder"):
-            prompt_builder = self._orchestrator.prompt_builder
-            if hasattr(prompt_builder, "set_custom_prompt"):
-                prompt_builder.set_custom_prompt(system_prompt)
-                logger.debug("Applied system prompt via set_custom_prompt")
-            # Fall back to direct attribute
-            elif hasattr(prompt_builder, "_custom_prompt"):
-                prompt_builder._custom_prompt = system_prompt
-                logger.debug("Applied system prompt via _custom_prompt attribute")
 
     def _wire_observability(self) -> None:
         """Wire ObservabilityIntegration to orchestrator.
@@ -513,7 +380,7 @@ def get_vertical(name: Optional[str]) -> Optional[Type["VerticalBase"]]:
     if name is None:
         return None
 
-    from victor.verticals.base import VerticalRegistry
+    from victor.core.verticals.base import VerticalRegistry
 
     # Try exact match first
     result = VerticalRegistry.get(name)
@@ -538,6 +405,6 @@ def list_verticals() -> list[str]:
     Example:
         print(f"Available verticals: {list_verticals()}")
     """
-    from victor.verticals.base import VerticalRegistry
+    from victor.core.verticals.base import VerticalRegistry
 
     return VerticalRegistry.list_names()

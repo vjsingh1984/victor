@@ -93,8 +93,8 @@ from victor.agent.vertical_context import VerticalContext, create_vertical_conte
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.framework.step_handlers import StepHandlerRegistry
-    from victor.verticals.base import VerticalBase, VerticalConfig
-    from victor.verticals.protocols import (
+    from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.core.verticals.protocols import (
         MiddlewareProtocol,
         ModeConfigProviderProtocol,
         PromptContributorProtocol,
@@ -107,7 +107,7 @@ if TYPE_CHECKING:
     )
 
 # Import protocols for runtime isinstance checks
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
     TeamSpecProviderProtocol,
     WorkflowProviderProtocol,
@@ -187,28 +187,29 @@ def _invoke_capability(
     min_version: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
-    """Invoke capability via registry or public method call with optional version check.
+    """Invoke a capability on an object via public methods only.
+
+    SOLID Compliance (DIP): This function only uses public methods.
+    It never writes to private attributes (_attr) to maintain
+    proper encapsulation and dependency inversion.
 
     Uses protocol-based capability invocation. Orchestrators must implement
-    CapabilityRegistryProtocol for proper capability invocation.
-
-    SOLID Compliance:
-    - Uses protocol, not private attribute assignment (DIP)
-    - No direct private attribute writes (SRP)
+    CapabilityRegistryProtocol for proper capability invocation. When the
+    protocol is not implemented, falls back to public method mappings but
+    never resorts to private attribute access.
 
     Args:
-        obj: Object to invoke capability on (should implement CapabilityRegistryProtocol)
-        capability_name: Name of capability
-        *args: Arguments for capability
+        obj: Object implementing the capability (should implement CapabilityRegistryProtocol)
+        capability_name: Name of the capability to invoke
+        *args: Arguments for capability (value to pass to the capability method)
         min_version: Minimum required version (default: None = no check)
-        **kwargs: Keyword arguments for capability
+        **kwargs: Additional arguments for capability
 
     Returns:
-        Result of capability invocation
+        Result of capability invocation, True if capability was invoked successfully
 
     Raises:
-        AttributeError: If capability cannot be invoked
-        IncompatibleVersionError: If capability version is incompatible
+        AttributeError: If capability cannot be invoked via public methods
 
     Example:
         # Invoke without version check
@@ -233,24 +234,10 @@ def _invoke_capability(
             f"implement CapabilityRegistryProtocol. Invoking without version check."
         )
 
-    public_method_mappings = {
-        "enabled_tools": "set_enabled_tools",
-        "vertical_middleware": "apply_vertical_middleware",
-        "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "vertical_context": "set_vertical_context",
-        "rl_hooks": "set_rl_hooks",
-        "team_specs": "set_team_specs",
-        "mode_configs": "set_mode_configs",
-        "default_budget": "set_default_budget",
-        "tool_dependencies": "set_tool_dependencies",
-        "tool_sequences": "set_tool_sequences",
-        "custom_prompt": "set_custom_prompt",
-        "task_type_hints": "set_task_type_hints",
-        "prompt_section": "add_prompt_section",
-        "safety_patterns": "add_safety_patterns",
-    }
+    # Use centralized capability method mappings (single source of truth)
+    from victor.agent.capability_registry import get_method_for_capability
 
-    method_name = public_method_mappings.get(capability_name, f"set_{capability_name}")
+    method_name = get_method_for_capability(capability_name)
     method = getattr(obj, method_name, None)
     if callable(method):
         return method(*args, **kwargs)
@@ -264,6 +251,201 @@ def _invoke_capability(
 
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Extension Handler Registry (OCP Compliance)
+# =============================================================================
+
+
+@dataclass
+class ExtensionHandlerInfo:
+    """Information about an extension handler.
+
+    Attributes:
+        name: Name of the extension type
+        attr_name: Attribute name on VerticalExtensions object
+        handler: Handler function to call
+        order: Execution order (lower = earlier)
+    """
+
+    name: str
+    attr_name: str
+    handler: Callable[
+        ["VerticalIntegrationPipeline", Any, Any, VerticalContext, "IntegrationResult"], None
+    ]
+    order: int = 100
+
+
+class ExtensionHandlerRegistry:
+    """Registry for extension handlers (OCP compliance).
+
+    This registry allows new extension types to be added without modifying
+    the _apply_extensions method. Each extension type registers a handler
+    that will be called when that extension is present.
+
+    Example:
+        registry = ExtensionHandlerRegistry.default()
+
+        # Register a new extension type
+        registry.register(
+            name="chain_factory",
+            attr_name="chain_factory_provider",
+            handler=lambda pipeline, orch, ext, ctx, res: pipeline._apply_chain_factory(orch, ext, ctx, res),
+            order=70,
+        )
+    """
+
+    def __init__(self) -> None:
+        self._handlers: Dict[str, ExtensionHandlerInfo] = {}
+
+    def register(
+        self,
+        name: str,
+        attr_name: str,
+        handler: Callable,
+        order: int = 100,
+    ) -> None:
+        """Register an extension handler.
+
+        Args:
+            name: Name of the extension type
+            attr_name: Attribute name on VerticalExtensions object
+            handler: Handler function (pipeline, orch, ext_value, context, result) -> None
+            order: Execution order (lower = earlier)
+        """
+        self._handlers[name] = ExtensionHandlerInfo(
+            name=name,
+            attr_name=attr_name,
+            handler=handler,
+            order=order,
+        )
+        logger.debug(f"Registered extension handler: {name} (order={order})")
+
+    def unregister(self, name: str) -> bool:
+        """Unregister an extension handler.
+
+        Args:
+            name: Name of the extension type
+
+        Returns:
+            True if handler was removed, False if not found
+        """
+        if name in self._handlers:
+            del self._handlers[name]
+            return True
+        return False
+
+    def get_ordered_handlers(self) -> List[ExtensionHandlerInfo]:
+        """Get handlers sorted by execution order.
+
+        Returns:
+            List of handler info sorted by order
+        """
+        return sorted(self._handlers.values(), key=lambda h: h.order)
+
+    def get_handler(self, name: str) -> Optional[ExtensionHandlerInfo]:
+        """Get a specific handler by name.
+
+        Args:
+            name: Name of the extension type
+
+        Returns:
+            Handler info or None if not found
+        """
+        return self._handlers.get(name)
+
+    @classmethod
+    def default(cls) -> "ExtensionHandlerRegistry":
+        """Create registry with default extension handlers.
+
+        Returns:
+            Registry with built-in extension handlers
+        """
+        registry = cls()
+
+        # Register default handlers in order
+        registry.register(
+            name="middleware",
+            attr_name="middleware",
+            handler=lambda p, o, e, c, r: p._apply_middleware(o, e, c, r),
+            order=10,
+        )
+        registry.register(
+            name="safety",
+            attr_name="safety_extensions",
+            handler=lambda p, o, e, c, r: p._apply_safety(o, e, c, r),
+            order=20,
+        )
+        registry.register(
+            name="prompts",
+            attr_name="prompt_contributors",
+            handler=lambda p, o, e, c, r: p._apply_prompts(o, e, c, r),
+            order=30,
+        )
+        registry.register(
+            name="mode_config",
+            attr_name="mode_config_provider",
+            handler=lambda p, o, e, c, r: p._apply_mode_config(o, e, c, r),
+            order=40,
+        )
+        registry.register(
+            name="tool_deps",
+            attr_name="tool_dependency_provider",
+            handler=lambda p, o, e, c, r: p._apply_tool_deps(o, e, c, r),
+            order=50,
+        )
+
+        return registry
+
+
+# Module-level default registry (lazy initialization)
+_default_extension_registry: Optional[ExtensionHandlerRegistry] = None
+
+
+def get_extension_handler_registry() -> ExtensionHandlerRegistry:
+    """Get the default extension handler registry.
+
+    Returns:
+        The default extension handler registry
+    """
+    global _default_extension_registry
+    if _default_extension_registry is None:
+        _default_extension_registry = ExtensionHandlerRegistry.default()
+    return _default_extension_registry
+
+
+def register_extension_handler(
+    name: str,
+    attr_name: str,
+    handler: Callable,
+    order: int = 100,
+) -> None:
+    """Register a new extension handler (OCP extension point).
+
+    This allows adding new extension types without modifying the
+    _apply_extensions method.
+
+    Args:
+        name: Name of the extension type
+        attr_name: Attribute name on VerticalExtensions object
+        handler: Handler function (pipeline, orch, ext_value, context, result) -> None
+        order: Execution order (lower = earlier)
+
+    Example:
+        def apply_chain_factory(pipeline, orch, chain_factory, ctx, result):
+            chains = chain_factory.create_chains()
+            # Apply chains...
+
+        register_extension_handler(
+            name="chain_factory",
+            attr_name="chain_factory_provider",
+            handler=apply_chain_factory,
+            order=60,
+        )
+    """
+    registry = get_extension_handler_registry()
+    registry.register(name, attr_name, handler, order)
 
 
 # =============================================================================
@@ -405,6 +587,7 @@ class VerticalIntegrationPipeline:
         post_hooks: Optional[List[Callable[[Any, IntegrationResult], None]]] = None,
         step_registry: Optional["StepHandlerRegistry"] = None,
         use_step_handlers: bool = True,
+        extension_registry: Optional[ExtensionHandlerRegistry] = None,
     ):
         """Initialize the pipeline.
 
@@ -414,11 +597,15 @@ class VerticalIntegrationPipeline:
             post_hooks: Callables to run after integration
             step_registry: Custom step handler registry (uses default if None)
             use_step_handlers: If True, use step handlers; if False, use legacy methods
+            extension_registry: Custom extension handler registry (OCP compliance)
         """
         self._strict_mode = strict_mode
         self._pre_hooks = pre_hooks or []
         self._post_hooks = post_hooks or []
         self._use_step_handlers = use_step_handlers
+
+        # Initialize extension handler registry (OCP compliance)
+        self._extension_registry = extension_registry or get_extension_handler_registry()
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -598,7 +785,7 @@ class VerticalIntegrationPipeline:
             Vertical class or None if not found
         """
         if isinstance(vertical, str):
-            from victor.verticals.base import VerticalRegistry
+            from victor.core.verticals.base import VerticalRegistry
 
             resolved = VerticalRegistry.get(vertical)
             if resolved is None:
@@ -765,7 +952,10 @@ class VerticalIntegrationPipeline:
         context: VerticalContext,
         result: IntegrationResult,
     ) -> None:
-        """Apply all vertical extensions.
+        """Apply all vertical extensions using registry (OCP compliant).
+
+        This method uses the ExtensionHandlerRegistry to apply extensions,
+        allowing new extension types to be added without modifying this method.
 
         Args:
             orchestrator: Orchestrator instance
@@ -779,29 +969,22 @@ class VerticalIntegrationPipeline:
                 logger.debug("No extensions available for vertical")
                 return
 
-            # Apply middleware
-            if extensions.middleware:
-                self._apply_middleware(orchestrator, extensions.middleware, context, result)
-
-            # Apply safety extensions
-            if extensions.safety_extensions:
-                self._apply_safety(orchestrator, extensions.safety_extensions, context, result)
-
-            # Apply prompt contributors
-            if extensions.prompt_contributors:
-                self._apply_prompts(orchestrator, extensions.prompt_contributors, context, result)
-
-            # Apply mode config
-            if extensions.mode_config_provider:
-                self._apply_mode_config(
-                    orchestrator, extensions.mode_config_provider, context, result
-                )
-
-            # Apply tool dependencies
-            if extensions.tool_dependency_provider:
-                self._apply_tool_deps(
-                    orchestrator, extensions.tool_dependency_provider, context, result
-                )
+            # Use extension handler registry (OCP compliant)
+            for handler_info in self._extension_registry.get_ordered_handlers():
+                ext_value = getattr(extensions, handler_info.attr_name, None)
+                if ext_value:
+                    try:
+                        handler_info.handler(self, orchestrator, ext_value, context, result)
+                        logger.debug(f"Applied extension: {handler_info.name}")
+                    except Exception as e:
+                        if self._strict_mode:
+                            result.add_error(f"Extension '{handler_info.name}' failed: {e}")
+                        else:
+                            result.add_warning(f"Extension '{handler_info.name}' error: {e}")
+                        logger.debug(
+                            f"Extension '{handler_info.name}' failed: {e}",
+                            exc_info=True,
+                        )
 
         except Exception as e:
             if self._strict_mode:
@@ -828,18 +1011,19 @@ class VerticalIntegrationPipeline:
         result.middleware_count = len(middleware_list)
 
         # Use capability-based approach (protocol-first, fallback to hasattr)
+        # SOLID Compliance (DIP): Only access public methods, no private attributes
         if _check_capability(orchestrator, "vertical_middleware"):
             _invoke_capability(orchestrator, "vertical_middleware", middleware_list)
             logger.debug(f"Applied {len(middleware_list)} middleware via capability")
         elif _check_capability(orchestrator, "middleware_chain"):
-            # Fallback: try middleware chain
-            chain = getattr(orchestrator, "middleware_chain", None) or getattr(
-                orchestrator, "_middleware_chain", None
-            )
+            # Fallback: try middleware chain via public property only (SOLID compliant)
+            chain = getattr(orchestrator, "middleware_chain", None)
             if chain is not None and hasattr(chain, "add"):
                 for mw in middleware_list:
                     chain.add(mw)
                 logger.debug(f"Applied {len(middleware_list)} middleware to chain")
+            else:
+                logger.debug("middleware_chain capability not available via public property")
 
     def _apply_safety(
         self,
@@ -1004,17 +1188,18 @@ class VerticalIntegrationPipeline:
             _invoke_capability(orchestrator, "tool_sequences", sequences)
             logger.debug("Applied tool sequences via capability")
 
-        # Fallback: try tool sequence tracker directly
+        # Fallback: try tool sequence tracker via public property only (SOLID compliant)
+        # SOLID Compliance (DIP): Only access public methods, no private attributes
         if not _check_capability(orchestrator, "tool_dependencies"):
-            tracker = getattr(orchestrator, "tool_sequence_tracker", None) or getattr(
-                orchestrator, "_sequence_tracker", None
-            )
+            tracker = getattr(orchestrator, "tool_sequence_tracker", None)
             if tracker:
                 if hasattr(tracker, "set_dependencies"):
                     tracker.set_dependencies(dependencies)
                 if hasattr(tracker, "set_sequences"):
                     tracker.set_sequences(sequences)
-                logger.debug("Applied tool deps via fallback")
+                logger.debug("Applied tool deps via public fallback")
+            else:
+                logger.debug("tool_sequence_tracker capability not available via public property")
 
     def _attach_context(
         self,
@@ -1391,9 +1576,16 @@ def apply_vertical(
 
 
 __all__ = [
+    # Core classes
     "IntegrationResult",
     "VerticalIntegrationPipeline",
     "OrchestratorVerticalProtocol",
+    # Extension handler registry (OCP compliance)
+    "ExtensionHandlerInfo",
+    "ExtensionHandlerRegistry",
+    "get_extension_handler_registry",
+    "register_extension_handler",
+    # Factory functions
     "create_integration_pipeline",
     "create_integration_pipeline_with_handlers",
     "apply_vertical",

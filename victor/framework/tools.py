@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Set, Union
+from typing import List, Optional, Set, Union
 
 
 class ToolCategory(str, Enum):
@@ -143,6 +143,7 @@ class ToolSet:
     tools: Set[str] = field(default_factory=set)
     categories: Set[str] = field(default_factory=set)
     exclude: Set[str] = field(default_factory=set)
+    _resolved_names_cache: Optional[Set[str]] = field(default=None, repr=False, compare=False)
 
     @classmethod
     def default(cls) -> "ToolSet":
@@ -333,9 +334,31 @@ class ToolSet:
         # Apply exclusions
         return all_tools - self.exclude
 
+    def _get_resolved_names(self) -> Set[str]:
+        """Get resolved tool names with caching.
+
+        This method caches the result of get_tool_names() for O(1)
+        membership checks after the first call.
+
+        Returns:
+            Cached set of resolved tool names
+        """
+        if self._resolved_names_cache is None:
+            # Use object.__setattr__ to bypass frozen dataclass if needed
+            object.__setattr__(self, "_resolved_names_cache", self.get_tool_names())
+        return self._resolved_names_cache
+
+    def invalidate_cache(self) -> None:
+        """Invalidate the resolved names cache.
+
+        Call this after modifying the ToolSet to ensure the cache
+        is rebuilt on next access.
+        """
+        object.__setattr__(self, "_resolved_names_cache", None)
+
     def __contains__(self, tool: str) -> bool:
-        """Check if a tool is in this set."""
-        return tool in self.get_tool_names()
+        """Check if a tool is in this set (cached O(1) after first call)."""
+        return tool in self._get_resolved_names()
 
 
 # Type alias for convenience

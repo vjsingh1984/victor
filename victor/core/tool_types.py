@@ -20,7 +20,7 @@ core and verticals.
 
 Note:
     For backward compatibility, these types are also re-exported from
-    `victor.verticals.protocols`.
+    `victor.core.verticals.protocols`.
 """
 
 from __future__ import annotations

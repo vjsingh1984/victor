@@ -932,5 +932,133 @@ try:
 except ImportError:
     pass
 
+# Chain Registry (Cross-vertical chain discovery)
+try:
+    from victor.framework.chain_registry import (
+        ChainMetadata,
+        ChainRegistry,
+        get_chain,
+        get_chain_registry,
+        register_chain,
+    )
+
+    _CHAIN_REGISTRY_EXPORTS = [
+        "ChainMetadata",
+        "ChainRegistry",
+        "get_chain",
+        "get_chain_registry",
+        "register_chain",
+    ]
+
+    __all__ = list(__all__) + _CHAIN_REGISTRY_EXPORTS
+except ImportError:
+    pass
+
+# Persona Registry (Cross-vertical persona discovery)
+try:
+    from victor.framework.persona_registry import (
+        PersonaRegistry,
+        PersonaSpec,
+        get_persona_registry,
+        get_persona_spec,
+        register_persona_spec,
+    )
+
+    _PERSONA_REGISTRY_EXPORTS = [
+        "PersonaRegistry",
+        "PersonaSpec",
+        "get_persona_registry",
+        "get_persona_spec",
+        "register_persona_spec",
+    ]
+
+    __all__ = list(__all__) + _PERSONA_REGISTRY_EXPORTS
+except ImportError:
+    pass
+
+# Prompt Builder (WS-B - Consolidated prompt building)
+try:
+    from victor.framework.prompt_builder import (
+        PromptBuilder,
+        PromptSection,
+        ToolHint,
+        create_coding_prompt_builder,
+        create_data_analysis_prompt_builder,
+        create_devops_prompt_builder,
+        create_research_prompt_builder,
+    )
+
+    _PROMPT_BUILDER_EXPORTS = [
+        "PromptBuilder",
+        "PromptSection",
+        "ToolHint",
+        "create_coding_prompt_builder",
+        "create_data_analysis_prompt_builder",
+        "create_devops_prompt_builder",
+        "create_research_prompt_builder",
+    ]
+
+    __all__ = list(__all__) + _PROMPT_BUILDER_EXPORTS
+except ImportError:
+    pass
+
+# Prompt Sections (WS-B - Reusable prompt templates)
+try:
+    from victor.framework.prompt_sections import (
+        # Grounding
+        GROUNDING_RULES_EXTENDED,
+        GROUNDING_RULES_MINIMAL,
+        PARALLEL_READ_GUIDANCE,
+        # Coding
+        CODING_GUIDELINES,
+        CODING_IDENTITY,
+        CODING_TOOL_USAGE,
+        # DevOps
+        DEVOPS_COMMON_PITFALLS,
+        DEVOPS_GROUNDING,
+        DEVOPS_IDENTITY,
+        DEVOPS_SECURITY_CHECKLIST,
+        # Research
+        RESEARCH_GROUNDING,
+        RESEARCH_IDENTITY,
+        RESEARCH_QUALITY_CHECKLIST,
+        RESEARCH_SOURCE_HIERARCHY,
+        # Data Analysis
+        DATA_ANALYSIS_GROUNDING,
+        DATA_ANALYSIS_IDENTITY,
+        DATA_ANALYSIS_LIBRARIES,
+        DATA_ANALYSIS_OPERATIONS,
+    )
+
+    _PROMPT_SECTIONS_EXPORTS = [
+        # Grounding
+        "GROUNDING_RULES_EXTENDED",
+        "GROUNDING_RULES_MINIMAL",
+        "PARALLEL_READ_GUIDANCE",
+        # Coding
+        "CODING_GUIDELINES",
+        "CODING_IDENTITY",
+        "CODING_TOOL_USAGE",
+        # DevOps
+        "DEVOPS_COMMON_PITFALLS",
+        "DEVOPS_GROUNDING",
+        "DEVOPS_IDENTITY",
+        "DEVOPS_SECURITY_CHECKLIST",
+        # Research
+        "RESEARCH_GROUNDING",
+        "RESEARCH_IDENTITY",
+        "RESEARCH_QUALITY_CHECKLIST",
+        "RESEARCH_SOURCE_HIERARCHY",
+        # Data Analysis
+        "DATA_ANALYSIS_GROUNDING",
+        "DATA_ANALYSIS_IDENTITY",
+        "DATA_ANALYSIS_LIBRARIES",
+        "DATA_ANALYSIS_OPERATIONS",
+    ]
+
+    __all__ = list(__all__) + _PROMPT_SECTIONS_EXPORTS
+except ImportError:
+    pass
+
 # Version of the framework API
 __version__ = "0.3.0"

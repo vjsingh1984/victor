@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
-from victor.verticals.protocols import MiddlewareProtocol
+from victor.core.verticals.protocols import MiddlewareProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +276,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
         Returns:
             Content with secrets replaced
         """
-        from victor.safety.secrets import mask_secrets
+        from victor.security.safety.secrets import mask_secrets
 
         return mask_secrets(content, replacement=self._replacement)
 
