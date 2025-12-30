@@ -84,6 +84,14 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset SharedToolRegistry singleton
+        try:
+            from victor.agent.shared_tool_registry import SharedToolRegistry
+
+            SharedToolRegistry.reset_instance()
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 
