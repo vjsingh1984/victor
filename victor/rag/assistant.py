@@ -39,6 +39,7 @@ from victor.core.verticals.protocols import (
     TieredToolConfig,
     VerticalExtensions,
 )
+from victor.framework.tool_naming import ToolNames
 
 
 class RAGAssistant(VerticalBase):
@@ -68,6 +69,8 @@ class RAGAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools for RAG operations.
 
+        Uses canonical tool names from victor.tools.tool_names.
+
         Returns:
             List of RAG-specific tool names
         """
@@ -79,13 +82,13 @@ class RAGAssistant(VerticalBase):
             "rag_list",  # List indexed documents
             "rag_delete",  # Delete documents
             "rag_stats",  # Get store statistics
-            # Filesystem for document access
-            "read",
-            "ls",
+            # Filesystem for document access (canonical names)
+            ToolNames.READ,
+            ToolNames.LS,
             # Web for fetching web content
-            "web_fetch",
+            ToolNames.WEB_FETCH,
             # Shell for document processing
-            "shell",
+            ToolNames.SHELL,
         ]
 
     @classmethod
@@ -128,6 +131,8 @@ You: [Use rag_query tool with query="authentication"]
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get RAG-specific workflow stages.
 
+        Uses canonical tool names from victor.tools.tool_names.
+
         Returns:
             Stage definitions for RAG workflow
         """
@@ -141,7 +146,7 @@ You: [Use rag_query tool with query="authentication"]
             "INGESTING": StageDefinition(
                 name="INGESTING",
                 description="Ingesting documents into knowledge base",
-                tools={"rag_ingest", "read", "ls", "web_fetch"},
+                tools={"rag_ingest", ToolNames.READ, ToolNames.LS, ToolNames.WEB_FETCH},
                 next_stages={"INITIAL", "SEARCHING"},
             ),
             "SEARCHING": StageDefinition(
@@ -168,6 +173,8 @@ You: [Use rag_query tool with query="authentication"]
     def get_tiered_tool_config(cls) -> TieredToolConfig:
         """Get tiered tool configuration for RAG.
 
+        Uses canonical tool names from victor.tools.tool_names.
+
         Returns:
             Tool configuration with tiers
         """
@@ -179,7 +186,12 @@ You: [Use rag_query tool with query="authentication"]
                 "rag_stats",
             ],
             stage_tools={
-                "INGESTING": ["rag_ingest", "read", "ls", "web_fetch"],
+                "INGESTING": [
+                    "rag_ingest",
+                    ToolNames.READ,
+                    ToolNames.LS,
+                    ToolNames.WEB_FETCH,
+                ],
                 "SEARCHING": ["rag_search"],
                 "QUERYING": ["rag_query"],
             },
@@ -234,16 +246,73 @@ You: [Use rag_query tool with query="authentication"]
         # Import extension implementations
         from victor.rag.prompts import RAGPromptContributor
         from victor.rag.mode_config import RAGModeConfigProvider
+        from victor.rag.safety import RAGSafetyExtension
+        from victor.rag.tool_dependencies import RAGToolDependencyProvider
 
         return VerticalExtensions(
             middleware=[],  # No special middleware for RAG
-            safety_extensions=[],  # No special safety for RAG
+            safety_extensions=[RAGSafetyExtension()],
             prompt_contributors=[RAGPromptContributor()],
             mode_config_provider=RAGModeConfigProvider(),
-            tool_dependency_provider=None,
+            tool_dependency_provider=RAGToolDependencyProvider(),
             workflow_provider=cls.get_workflow_provider(),
             service_provider=cls.get_service_provider(),
             rl_config_provider=cls.get_rl_config_provider(),
             team_spec_provider=cls.get_team_spec_provider(),
             enrichment_strategy=cls.get_enrichment_strategy(),
         )
+
+    @classmethod
+    def get_workflow_provider(cls):
+        """Get the workflow provider for RAG vertical.
+
+        Returns:
+            RAGWorkflowProvider instance
+        """
+        from victor.rag.workflows import RAGWorkflowProvider
+
+        return RAGWorkflowProvider()
+
+    @classmethod
+    def get_rl_config_provider(cls):
+        """Get the RL configuration provider for RAG vertical.
+
+        Returns:
+            RAGRLConfig instance
+        """
+        from victor.rag.rl import RAGRLConfig
+
+        return RAGRLConfig()
+
+    @classmethod
+    def get_team_spec_provider(cls):
+        """Get the team specification provider for RAG vertical.
+
+        Returns:
+            RAGTeamSpecProvider instance
+        """
+        from victor.rag.teams import RAGTeamSpecProvider
+
+        return RAGTeamSpecProvider()
+
+    @classmethod
+    def get_tool_dependency_provider(cls):
+        """Get the tool dependency provider for RAG vertical.
+
+        Returns:
+            RAGToolDependencyProvider instance
+        """
+        from victor.rag.tool_dependencies import RAGToolDependencyProvider
+
+        return RAGToolDependencyProvider()
+
+    @classmethod
+    def get_safety_extension(cls):
+        """Get the safety extension for RAG vertical.
+
+        Returns:
+            RAGSafetyExtension instance
+        """
+        from victor.rag.safety import RAGSafetyExtension
+
+        return RAGSafetyExtension()
