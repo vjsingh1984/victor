@@ -19,9 +19,23 @@ This package provides workflow definitions for common data analysis tasks:
 - Data cleaning and preparation
 - Statistical analysis
 - Machine Learning pipeline
+
+Supports both standard and streaming execution via StreamingWorkflowExecutor.
+
+Example:
+    provider = DataAnalysisWorkflowProvider()
+
+    # Standard execution
+    executor = provider.create_executor(orchestrator)
+    result = await executor.execute(workflow, context)
+
+    # Streaming execution
+    async for chunk in provider.astream("eda_workflow", orchestrator, context):
+        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
+            print(f"Completed: {chunk.node_name}")
 """
 
-from typing import Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import (
@@ -29,6 +43,12 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     workflow,
 )
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.streaming import WorkflowStreamChunk
+    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 
 
 @workflow("eda_workflow", "Exploratory Data Analysis workflow")
@@ -280,7 +300,21 @@ def ml_pipeline_workflow() -> WorkflowDefinition:
 
 
 class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
-    """Provides data analysis-specific workflows."""
+    """Provides data analysis-specific workflows.
+
+    Includes support for streaming execution via StreamingWorkflowExecutor
+    for real-time progress updates during data analysis workflows.
+
+    Example:
+        provider = DataAnalysisWorkflowProvider()
+
+        # List available workflows
+        print(provider.get_workflow_names())
+
+        # Stream ML pipeline execution
+        async for chunk in provider.astream("ml_pipeline", orchestrator, {}):
+            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+    """
 
     def __init__(self) -> None:
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
@@ -338,6 +372,74 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
             "prediction": "ml_pipeline",
         }
         return mapping.get(task_type.lower())
+
+    def create_executor(
+        self,
+        orchestrator: "AgentOrchestrator",
+    ) -> "WorkflowExecutor":
+        """Create a standard workflow executor.
+
+        Args:
+            orchestrator: Agent orchestrator instance
+
+        Returns:
+            WorkflowExecutor for running workflows
+        """
+        from victor.workflows.executor import WorkflowExecutor
+
+        return WorkflowExecutor(orchestrator)
+
+    def create_streaming_executor(
+        self,
+        orchestrator: "AgentOrchestrator",
+    ) -> "StreamingWorkflowExecutor":
+        """Create a streaming workflow executor.
+
+        Args:
+            orchestrator: Agent orchestrator instance
+
+        Returns:
+            StreamingWorkflowExecutor for real-time progress streaming
+        """
+        from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+
+        return StreamingWorkflowExecutor(orchestrator)
+
+    async def astream(
+        self,
+        workflow_name: str,
+        orchestrator: "AgentOrchestrator",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> AsyncIterator["WorkflowStreamChunk"]:
+        """Stream workflow execution with real-time events.
+
+        Convenience method that creates a streaming executor and
+        streams the specified workflow.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            orchestrator: Agent orchestrator instance
+            context: Initial context data for the workflow
+
+        Yields:
+            WorkflowStreamChunk events during execution
+
+        Raises:
+            ValueError: If workflow_name is not found
+
+        Example:
+            provider = DataAnalysisWorkflowProvider()
+            async for chunk in provider.astream("eda_workflow", orchestrator, {}):
+                if chunk.event_type == WorkflowEventType.NODE_START:
+                    print(f"Starting: {chunk.node_name}")
+        """
+        workflow = self.get_workflow(workflow_name)
+        if not workflow:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        executor = self.create_streaming_executor(orchestrator)
+        async for chunk in executor.astream(workflow, context or {}):
+            yield chunk
 
     def __repr__(self) -> str:
         return f"DataAnalysisWorkflowProvider(workflows={len(self._load_workflows())})"
