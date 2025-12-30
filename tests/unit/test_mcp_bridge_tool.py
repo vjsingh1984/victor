@@ -18,39 +18,15 @@ Updated for context-based injection pattern (Phase 7: Global Tool State Removal)
 """
 
 import pytest
-import warnings
 from unittest.mock import MagicMock, AsyncMock
 
 from victor.tools.mcp_bridge_tool import (
-    configure_mcp_client,
     get_mcp_tool_definitions,
     mcp,
     _prefixed,
     _get_mcp_client,
     _get_mcp_prefix,
 )
-
-
-class TestConfigureMCPClient:
-    """Tests for configure_mcp_client function (deprecated)."""
-
-    def test_configure_emits_deprecation_warning(self):
-        """Test configure_mcp_client emits deprecation warning."""
-        mock_client = MagicMock()
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            configure_mcp_client(mock_client)
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
-
-    def test_configure_with_custom_prefix_emits_warning(self):
-        """Test configure_mcp_client with prefix emits deprecation warning."""
-        mock_client = MagicMock()
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            configure_mcp_client(mock_client, prefix="custom")
-            assert len(w) == 1
 
 
 class TestContextHelpers:

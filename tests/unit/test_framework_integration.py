@@ -41,7 +41,7 @@ from victor.observability import (
     TransitionHistory,
     VictorEvent,
 )
-from victor.verticals.base import (
+from victor.core.verticals.base import (
     StageDefinition,
     VerticalBase,
     VerticalConfig,
@@ -375,16 +375,16 @@ class TestFrameworkInternalHelpers:
         EventBus.reset_instance()
 
     def test_apply_system_prompt(self):
-        """Test apply_system_prompt function."""
+        """Test apply_system_prompt function uses public methods only (DIP compliance)."""
         from victor.framework._internal import apply_system_prompt
 
         mock_orchestrator = MagicMock()
-        mock_orchestrator.prompt_builder = MagicMock()
-        mock_orchestrator.prompt_builder._custom_prompt = None
+        mock_orchestrator.set_custom_prompt = MagicMock()
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
-        assert mock_orchestrator._framework_system_prompt == "Custom prompt text"
+        # Should use public method, not write to private attributes
+        mock_orchestrator.set_custom_prompt.assert_called_once_with("Custom prompt text")
 
 
 class TestAgentVerticalIntegration:

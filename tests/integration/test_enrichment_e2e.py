@@ -511,7 +511,7 @@ class TestVerticalStrategies:
     @pytest.mark.asyncio
     async def test_coding_strategy_integration(self):
         """Coding strategy integrates with enrichment service."""
-        from victor.verticals.coding.enrichment import CodingEnrichmentStrategy
+        from victor.coding.enrichment import CodingEnrichmentStrategy
 
         strategy = CodingEnrichmentStrategy(graph_store=None)
         service = PromptEnrichmentService()
@@ -535,7 +535,7 @@ class TestVerticalStrategies:
     @pytest.mark.asyncio
     async def test_devops_strategy_integration(self):
         """DevOps strategy integrates with enrichment service."""
-        from victor.verticals.devops.enrichment import DevOpsEnrichmentStrategy
+        from victor.devops.enrichment import DevOpsEnrichmentStrategy
 
         strategy = DevOpsEnrichmentStrategy()
         service = PromptEnrichmentService()
@@ -559,7 +559,7 @@ class TestVerticalStrategies:
     @pytest.mark.asyncio
     async def test_data_analysis_strategy_integration(self):
         """Data Analysis strategy integrates with enrichment service."""
-        from victor.verticals.data_analysis.enrichment import (
+        from victor.dataanalysis.enrichment import (
             DataAnalysisEnrichmentStrategy,
         )
 
@@ -582,7 +582,7 @@ class TestVerticalStrategies:
     @pytest.mark.asyncio
     async def test_research_strategy_integration(self):
         """Research strategy integrates with enrichment service."""
-        from victor.verticals.research.enrichment import ResearchEnrichmentStrategy
+        from victor.research.enrichment import ResearchEnrichmentStrategy
 
         strategy = ResearchEnrichmentStrategy(web_search_fn=None)
         service = PromptEnrichmentService()

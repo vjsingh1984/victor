@@ -7,7 +7,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor.memory.entity_memory import EntityType
+from victor.storage.memory.entity_types import EntityType
 
 
 class TestTreeSitterAvailability:
@@ -15,7 +15,7 @@ class TestTreeSitterAvailability:
 
     def test_has_tree_sitter(self):
         """Test Tree-sitter availability check."""
-        from victor.memory.extractors import has_tree_sitter
+        from victor.storage.memory.extractors import has_tree_sitter
 
         # Should return True if tree-sitter is installed
         result = has_tree_sitter()
@@ -23,7 +23,7 @@ class TestTreeSitterAvailability:
 
     def test_create_extractor_with_tree_sitter(self):
         """Test extractor creation prefers Tree-sitter."""
-        from victor.memory.extractors import create_extractor, has_tree_sitter
+        from victor.storage.memory.extractors import create_extractor, has_tree_sitter
 
         extractor = create_extractor(use_tree_sitter=True)
         assert extractor is not None
@@ -35,7 +35,7 @@ class TestTreeSitterAvailability:
 
     def test_create_extractor_without_tree_sitter(self):
         """Test extractor falls back to regex when Tree-sitter disabled."""
-        from victor.memory.extractors import create_extractor
+        from victor.storage.memory.extractors import create_extractor
 
         extractor = create_extractor(use_tree_sitter=False)
         extractors_used = [e.name for e in extractor._extractors]
@@ -54,7 +54,7 @@ class TestTreeSitterEntityExtractor:
     @pytest.fixture
     def extractor(self):
         """Create extractor instance."""
-        from victor.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
+        from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterEntityExtractor
 
         return TreeSitterEntityExtractor(auto_discover_plugins=True)
 
@@ -184,7 +184,7 @@ class TestTreeSitterFileExtractor:
     @pytest.fixture
     def extractor(self):
         """Create file extractor instance."""
-        from victor.memory.extractors.tree_sitter_extractor import TreeSitterFileExtractor
+        from victor.storage.memory.extractors.tree_sitter_extractor import TreeSitterFileExtractor
 
         return TreeSitterFileExtractor()
 
@@ -241,7 +241,7 @@ class TestTreeSitterIntegration:
     @pytest.mark.asyncio
     async def test_full_extraction_pipeline(self):
         """Test complete extraction -> memory pipeline."""
-        from victor.memory import (
+        from victor.storage.memory import (
             EntityMemory,
             create_extractor,
             has_tree_sitter,

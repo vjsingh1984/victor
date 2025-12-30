@@ -22,7 +22,7 @@ import json
 
 import pytest
 
-from victor.native import (
+from victor.processing.native import (
     batch_cosine_similarity,
     compute_batch_signatures,
     compute_signature,

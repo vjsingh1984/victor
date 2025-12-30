@@ -17,7 +17,7 @@
 import pytest
 
 from victor.framework.rl import LearnerType
-from victor.verticals.coding.rl import (
+from victor.coding.rl import (
     CodingRLConfig,
     CodingRLHooks,
     get_default_config,
@@ -123,9 +123,24 @@ class TestCodingRLHooks:
     """Tests for CodingRLHooks."""
 
     @pytest.fixture
-    def hooks(self):
-        """Create fresh hooks for each test."""
-        return CodingRLHooks()
+    def mock_rl_manager(self):
+        """Create a mock RL manager to isolate from global state."""
+        from unittest.mock import Mock
+
+        manager = Mock()
+        manager.record_success = Mock()
+        manager.record_failure = Mock()
+        manager.get_tool_recommendation = Mock(return_value=None)
+        manager.get_patience_recommendation = Mock(return_value=None)
+        return manager
+
+    @pytest.fixture
+    def hooks(self, mock_rl_manager):
+        """Create fresh hooks with isolated RL manager for each test."""
+        hooks = CodingRLHooks()
+        # Inject mock RL manager to avoid global state pollution
+        hooks._rl = mock_rl_manager
+        return hooks
 
     def test_init(self, hooks):
         """Test hooks initialization."""
@@ -174,9 +189,8 @@ class TestCodingRLHooks:
 
         assert threshold == 0.90
 
-    def test_on_tool_success(self, hooks):
-        """Test recording tool success doesn't crash."""
-        # Just verify it doesn't raise
+    def test_on_tool_success(self, hooks, mock_rl_manager):
+        """Test recording tool success calls RL manager."""
         hooks.on_tool_success(
             tool_name="edit_files",
             task_type="refactoring",
@@ -184,9 +198,11 @@ class TestCodingRLHooks:
             model="claude-3-opus",
             duration_ms=1500.0,
         )
+        # Verify the mock was called (no global state dependency)
+        mock_rl_manager.record_success.assert_called_once()
 
-    def test_on_tool_failure(self, hooks):
-        """Test recording tool failure doesn't crash."""
+    def test_on_tool_failure(self, hooks, mock_rl_manager):
+        """Test recording tool failure calls RL manager."""
         hooks.on_tool_failure(
             tool_name="edit_files",
             task_type="refactoring",
@@ -194,15 +210,19 @@ class TestCodingRLHooks:
             model="claude-3-opus",
             error="File not found",
         )
+        # Verify the mock was called
+        mock_rl_manager.record_failure.assert_called_once()
 
-    def test_on_mode_transition(self, hooks):
-        """Test recording mode transition doesn't crash."""
+    def test_on_mode_transition(self, hooks, mock_rl_manager):
+        """Test recording mode transition calls RL manager."""
         hooks.on_mode_transition(
             from_mode="explore",
             to_mode="build",
             success=True,
             task_type="feature",
         )
+        # Verify success path was called
+        mock_rl_manager.record_success.assert_called_once()
 
     def test_repr(self, hooks):
         """Test string representation."""

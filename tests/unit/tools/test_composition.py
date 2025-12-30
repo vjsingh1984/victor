@@ -234,8 +234,12 @@ class TestRunnableBranch:
     @pytest.mark.asyncio
     async def test_branch_first_match(self):
         """Test that first matching branch is used."""
-        is_positive = lambda x: x > 0
-        is_negative = lambda x: x < 0
+
+        def is_positive(x):
+            return x > 0
+
+        def is_negative(x):
+            return x < 0
 
         branch = RunnableBranch(
             (is_positive, RunnableLambda(lambda x: "positive")),
@@ -250,8 +254,12 @@ class TestRunnableBranch:
     @pytest.mark.asyncio
     async def test_branch_with_dict_conditions(self):
         """Test branching based on dict values."""
-        is_python = lambda d: d.get("lang") == "python"
-        is_js = lambda d: d.get("lang") == "javascript"
+
+        def is_python(d):
+            return d.get("lang") == "python"
+
+        def is_js(d):
+            return d.get("lang") == "javascript"
 
         branch = RunnableBranch(
             (is_python, RunnableLambda(lambda d: {**d, "linter": "pylint"})),
@@ -442,7 +450,9 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_chain_with_branch(self):
         """Test chain that includes a branch."""
-        is_dict = lambda x: isinstance(x, dict)
+
+        def is_dict(x):
+            return isinstance(x, dict)
 
         transform = RunnableBranch(
             (is_dict, RunnableLambda(lambda d: {"count": len(d)})),

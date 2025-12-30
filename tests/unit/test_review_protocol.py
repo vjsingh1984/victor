@@ -17,7 +17,7 @@
 import pytest
 from pathlib import Path
 
-from victor.review.protocol import (
+from victor.coding.review.protocol import (
     ComplexityMetrics,
     DuplicationResult,
     FileReview,

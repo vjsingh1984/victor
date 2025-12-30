@@ -10,17 +10,17 @@ not the git-based checkpoints in victor/agent/checkpoints.py.
 import pytest
 from datetime import datetime, timezone
 
-from victor.checkpoints.protocol import (
+from victor.storage.checkpoints.protocol import (
     CheckpointMetadata,
     CheckpointNotFoundError,
 )
-from victor.checkpoints.state_serializer import (
+from victor.storage.checkpoints.state_serializer import (
     StateSerializer,
     serialize_conversation_state,
     deserialize_conversation_state,
 )
-from victor.checkpoints.backends.memory_backend import MemoryCheckpointBackend
-from victor.checkpoints.manager import CheckpointManager
+from victor.storage.checkpoints.backends.memory_backend import MemoryCheckpointBackend
+from victor.storage.checkpoints.manager import CheckpointManager
 
 
 class TestCheckpointMetadata:

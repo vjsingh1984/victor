@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.observability.integration import ObservabilityIntegration
-from victor.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 
 class MockVertical(VerticalBase):

@@ -31,8 +31,8 @@ if sys.platform == "darwin":
 
 @pytest.fixture
 def mock_code_execution_manager():
-    """Mock CodeExecutionManager to avoid Docker startup during tests."""
-    with patch("victor.agent.orchestrator.CodeExecutionManager") as mock_cem:
+    """Mock CodeSandbox to avoid Docker startup during tests."""
+    with patch("victor.tools.code_executor_tool.CodeSandbox") as mock_cem:
         mock_instance = MagicMock()
         mock_instance.start.return_value = None
         mock_instance.stop.return_value = None
@@ -116,7 +116,7 @@ def auto_mock_docker_for_orchestrator(request):
     )
 
     if needs_mock:
-        with patch("victor.agent.orchestrator.CodeExecutionManager") as mock_cem:
+        with patch("victor.tools.code_executor_tool.CodeSandbox") as mock_cem:
             mock_instance = MagicMock()
             mock_instance.start.return_value = None
             mock_instance.stop.return_value = None

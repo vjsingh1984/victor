@@ -22,7 +22,7 @@ from victor.providers.base import (
     Message,
     ToolDefinition,
     ProviderError,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderRateLimitError,
 )
 
@@ -243,7 +243,7 @@ async def test_chat_authentication_error(anthropic_provider):
 
         messages = [Message(role="user", content="Hello")]
 
-        with pytest.raises(ProviderAuthenticationError) as exc_info:
+        with pytest.raises(ProviderAuthError) as exc_info:
             await anthropic_provider.chat(
                 messages=messages,
                 model="claude-sonnet-4-5",

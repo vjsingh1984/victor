@@ -29,7 +29,7 @@ from victor.agent.vertical_context import (
     VerticalContextProtocol,
     MutableVerticalContextProtocol,
 )
-from victor.verticals.prompt_adapter import (
+from victor.core.verticals.prompt_adapter import (
     PromptContributorAdapter,
     CompositePromptContributor,
     create_prompt_adapter,
@@ -41,7 +41,7 @@ from victor.framework.vertical_integration import (
     create_integration_pipeline,
     apply_vertical,
 )
-from victor.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
+from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
 
 
 # =============================================================================
@@ -396,7 +396,7 @@ class TestVerticalIntegrationPipeline:
         pipeline = VerticalIntegrationPipeline()
 
         # Mock the registry lookup
-        with patch("victor.verticals.base.VerticalRegistry") as mock_registry:
+        with patch("victor.core.verticals.base.VerticalRegistry") as mock_registry:
             mock_registry.get.return_value = MockVertical
             mock_registry.list_names.return_value = ["mock_vertical"]
 
@@ -410,7 +410,7 @@ class TestVerticalIntegrationPipeline:
         orchestrator = MockOrchestrator()
         pipeline = VerticalIntegrationPipeline()
 
-        with patch("victor.verticals.base.VerticalRegistry") as mock_registry:
+        with patch("victor.core.verticals.base.VerticalRegistry") as mock_registry:
             mock_registry.get.return_value = None
             mock_registry.list_names.return_value = []
 
@@ -678,7 +678,7 @@ class TestRealVerticalIntegration:
 
     def test_coding_vertical_has_workflow_provider(self):
         """Test that coding vertical provides workflows."""
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         provider = CodingAssistant.get_workflow_provider()
         assert provider is not None
@@ -690,7 +690,7 @@ class TestRealVerticalIntegration:
 
     def test_coding_vertical_has_rl_config(self):
         """Test that coding vertical provides RL config."""
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         rl_config = CodingAssistant.get_rl_config_provider()
         assert rl_config is not None
@@ -701,7 +701,7 @@ class TestRealVerticalIntegration:
 
     def test_coding_vertical_has_team_specs(self):
         """Test that coding vertical provides team specs."""
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         team_provider = CodingAssistant.get_team_spec_provider()
         assert team_provider is not None
@@ -711,7 +711,7 @@ class TestRealVerticalIntegration:
 
     def test_devops_vertical_has_workflow_provider(self):
         """Test that devops vertical provides workflows."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         provider = DevOpsAssistant.get_workflow_provider()
         assert provider is not None
@@ -722,7 +722,7 @@ class TestRealVerticalIntegration:
 
     def test_devops_vertical_has_rl_config(self):
         """Test that devops vertical provides RL config."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         rl_config = DevOpsAssistant.get_rl_config_provider()
         assert rl_config is not None
@@ -731,7 +731,7 @@ class TestRealVerticalIntegration:
 
     def test_devops_vertical_has_team_specs(self):
         """Test that devops vertical provides team specs."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         team_provider = DevOpsAssistant.get_team_spec_provider()
         assert team_provider is not None
@@ -741,7 +741,7 @@ class TestRealVerticalIntegration:
 
     def test_research_vertical_has_workflow_provider(self):
         """Test that research vertical provides workflows."""
-        from victor.verticals.research import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         provider = ResearchAssistant.get_workflow_provider()
         assert provider is not None
@@ -752,7 +752,7 @@ class TestRealVerticalIntegration:
 
     def test_research_vertical_has_rl_config(self):
         """Test that research vertical provides RL config."""
-        from victor.verticals.research import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         rl_config = ResearchAssistant.get_rl_config_provider()
         assert rl_config is not None
@@ -761,7 +761,7 @@ class TestRealVerticalIntegration:
 
     def test_research_vertical_has_team_specs(self):
         """Test that research vertical provides team specs."""
-        from victor.verticals.research import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         team_provider = ResearchAssistant.get_team_spec_provider()
         assert team_provider is not None
@@ -771,7 +771,7 @@ class TestRealVerticalIntegration:
 
     def test_data_analysis_vertical_has_workflow_provider(self):
         """Test that data analysis vertical provides workflows."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         provider = DataAnalysisAssistant.get_workflow_provider()
         assert provider is not None
@@ -782,7 +782,7 @@ class TestRealVerticalIntegration:
 
     def test_data_analysis_vertical_has_rl_config(self):
         """Test that data analysis vertical provides RL config."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         rl_config = DataAnalysisAssistant.get_rl_config_provider()
         assert rl_config is not None
@@ -791,7 +791,7 @@ class TestRealVerticalIntegration:
 
     def test_data_analysis_vertical_has_team_specs(self):
         """Test that data analysis vertical provides team specs."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         team_provider = DataAnalysisAssistant.get_team_spec_provider()
         assert team_provider is not None
@@ -805,7 +805,7 @@ class TestWorkflowProviderProtocol:
 
     def test_coding_workflow_provider_protocol(self):
         """Test that coding workflow provider satisfies protocol."""
-        from victor.verticals.coding.workflows import CodingWorkflowProvider
+        from victor.coding.workflows import CodingWorkflowProvider
 
         provider = CodingWorkflowProvider()
 
@@ -828,7 +828,7 @@ class TestWorkflowProviderProtocol:
 
     def test_devops_workflow_provider_protocol(self):
         """Test that devops workflow provider satisfies protocol."""
-        from victor.verticals.devops.workflows import DevOpsWorkflowProvider
+        from victor.devops.workflows import DevOpsWorkflowProvider
 
         provider = DevOpsWorkflowProvider()
 
@@ -838,7 +838,7 @@ class TestWorkflowProviderProtocol:
 
     def test_research_workflow_provider_protocol(self):
         """Test that research workflow provider satisfies protocol."""
-        from victor.verticals.research.workflows import ResearchWorkflowProvider
+        from victor.research.workflows import ResearchWorkflowProvider
 
         provider = ResearchWorkflowProvider()
 
@@ -848,7 +848,7 @@ class TestWorkflowProviderProtocol:
 
     def test_data_analysis_workflow_provider_protocol(self):
         """Test that data analysis workflow provider satisfies protocol."""
-        from victor.verticals.data_analysis.workflows import DataAnalysisWorkflowProvider
+        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
 
         provider = DataAnalysisWorkflowProvider()
 
@@ -863,7 +863,7 @@ class TestRLConfigCompliance:
 
     def test_coding_rl_config_methods(self):
         """Test that coding RL config has required methods."""
-        from victor.verticals.coding.rl import CodingRLConfig
+        from victor.coding.rl import CodingRLConfig
 
         config = CodingRLConfig()
 
@@ -886,7 +886,7 @@ class TestRLConfigCompliance:
 
     def test_devops_rl_config_methods(self):
         """Test that devops RL config has required methods."""
-        from victor.verticals.devops.rl import DevOpsRLConfig
+        from victor.devops.rl import DevOpsRLConfig
 
         config = DevOpsRLConfig()
 
@@ -895,7 +895,7 @@ class TestRLConfigCompliance:
 
     def test_research_rl_config_methods(self):
         """Test that research RL config has required methods."""
-        from victor.verticals.research.rl import ResearchRLConfig
+        from victor.research.rl import ResearchRLConfig
 
         config = ResearchRLConfig()
 
@@ -904,7 +904,7 @@ class TestRLConfigCompliance:
 
     def test_data_analysis_rl_config_methods(self):
         """Test that data analysis RL config has required methods."""
-        from victor.verticals.data_analysis.rl import DataAnalysisRLConfig
+        from victor.dataanalysis.rl import DataAnalysisRLConfig
 
         config = DataAnalysisRLConfig()
 
@@ -921,7 +921,7 @@ class TestTeamSpecCompliance:
 
     def test_coding_team_specs_structure(self):
         """Test that coding team specs have required structure."""
-        from victor.verticals.coding.teams import CODING_TEAM_SPECS
+        from victor.coding.teams import CODING_TEAM_SPECS
 
         for name, spec in CODING_TEAM_SPECS.items():
             assert hasattr(spec, "name")
@@ -933,7 +933,7 @@ class TestTeamSpecCompliance:
 
     def test_devops_team_specs_structure(self):
         """Test that devops team specs have required structure."""
-        from victor.verticals.devops.teams import DEVOPS_TEAM_SPECS
+        from victor.devops.teams import DEVOPS_TEAM_SPECS
 
         for name, spec in DEVOPS_TEAM_SPECS.items():
             assert hasattr(spec, "name")
@@ -942,7 +942,7 @@ class TestTeamSpecCompliance:
 
     def test_research_team_specs_structure(self):
         """Test that research team specs have required structure."""
-        from victor.verticals.research.teams import RESEARCH_TEAM_SPECS
+        from victor.research.teams import RESEARCH_TEAM_SPECS
 
         for name, spec in RESEARCH_TEAM_SPECS.items():
             assert hasattr(spec, "name")
@@ -951,7 +951,7 @@ class TestTeamSpecCompliance:
 
     def test_data_analysis_team_specs_structure(self):
         """Test that data analysis team specs have required structure."""
-        from victor.verticals.data_analysis.teams import DATA_ANALYSIS_TEAM_SPECS
+        from victor.dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
 
         for name, spec in DATA_ANALYSIS_TEAM_SPECS.items():
             assert hasattr(spec, "name")
@@ -964,7 +964,7 @@ class TestGetTeamForTask:
 
     def test_coding_get_team_for_task(self):
         """Test getting team for coding task types."""
-        from victor.verticals.coding.teams import get_team_for_task
+        from victor.coding.teams import get_team_for_task
 
         team = get_team_for_task("feature")
         assert team is not None
@@ -979,7 +979,7 @@ class TestGetTeamForTask:
 
     def test_devops_get_team_for_task(self):
         """Test getting team for devops task types."""
-        from victor.verticals.devops.teams import get_team_for_task
+        from victor.devops.teams import get_team_for_task
 
         team = get_team_for_task("deploy")
         assert team is not None
@@ -989,7 +989,7 @@ class TestGetTeamForTask:
 
     def test_research_get_team_for_task(self):
         """Test getting team for research task types."""
-        from victor.verticals.research.teams import get_team_for_task
+        from victor.research.teams import get_team_for_task
 
         team = get_team_for_task("research")
         assert team is not None
@@ -999,7 +999,7 @@ class TestGetTeamForTask:
 
     def test_data_analysis_get_team_for_task(self):
         """Test getting team for data analysis task types."""
-        from victor.verticals.data_analysis.teams import get_team_for_task
+        from victor.dataanalysis.teams import get_team_for_task
 
         team = get_team_for_task("eda")
         assert team is not None
@@ -1024,7 +1024,7 @@ class TestAgentWorkflowMethods:
     def test_get_available_workflows_with_vertical(self):
         """Test get_available_workflows returns workflows from vertical."""
         from victor.framework.agent import Agent
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         # Create a mock agent with vertical set
         agent = MagicMock(spec=Agent)
@@ -1048,7 +1048,7 @@ class TestAgentWorkflowMethods:
     def test_get_available_teams_with_vertical(self):
         """Test get_available_teams returns teams from vertical."""
         from victor.framework.agent import Agent
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         agent = MagicMock(spec=Agent)
         agent._vertical = CodingAssistant
@@ -1070,10 +1070,10 @@ class TestAgentWorkflowMethods:
     def test_get_available_workflows_all_verticals(self):
         """Test all verticals provide workflows."""
         from victor.framework.agent import Agent
-        from victor.verticals.coding import CodingAssistant
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.research import ResearchAssistant
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.coding import CodingAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.research import ResearchAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         for vertical_class in [
             CodingAssistant,
@@ -1090,10 +1090,10 @@ class TestAgentWorkflowMethods:
     def test_get_available_teams_all_verticals(self):
         """Test all verticals provide teams."""
         from victor.framework.agent import Agent
-        from victor.verticals.coding import CodingAssistant
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.research import ResearchAssistant
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.coding import CodingAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.research import ResearchAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         for vertical_class in [
             CodingAssistant,

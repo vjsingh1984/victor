@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import pytest
 
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     # Data types
     MiddlewarePriority,
     MiddlewareResult,
@@ -445,7 +445,7 @@ class TestCodingVerticalExtensions:
 
     def test_coding_has_extensions(self):
         """CodingAssistant should provide extensions."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         assert extensions is not None
@@ -453,7 +453,7 @@ class TestCodingVerticalExtensions:
 
     def test_coding_middleware(self):
         """CodingAssistant should provide middleware."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         assert len(extensions.middleware) >= 1
@@ -463,7 +463,7 @@ class TestCodingVerticalExtensions:
 
     def test_coding_safety_patterns(self):
         """CodingAssistant should provide safety patterns."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         patterns = extensions.get_all_safety_patterns()
@@ -475,7 +475,7 @@ class TestCodingVerticalExtensions:
 
     def test_coding_task_hints(self):
         """CodingAssistant should provide task hints."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         hints = extensions.get_all_task_hints()
@@ -486,7 +486,7 @@ class TestCodingVerticalExtensions:
 
     def test_coding_mode_configs(self):
         """CodingAssistant should provide mode configs."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         modes = extensions.get_all_mode_configs()
@@ -501,7 +501,7 @@ class TestResearchVerticalExtensions:
 
     def test_research_has_extensions(self):
         """ResearchAssistant should provide extensions (even if empty)."""
-        from victor.verticals import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         extensions = ResearchAssistant.get_extensions()
         assert extensions is not None
@@ -509,7 +509,7 @@ class TestResearchVerticalExtensions:
 
     def test_research_complete_extensions(self):
         """ResearchAssistant now has complete extensions."""
-        from victor.verticals import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         extensions = ResearchAssistant.get_extensions()
         # Research vertical now has safety extensions defined
@@ -529,13 +529,13 @@ class TestVerticalRLProviderProtocol:
 
     def test_protocol_import(self):
         """Protocol should be importable."""
-        from victor.verticals.protocols import VerticalRLProviderProtocol
+        from victor.core.verticals.protocols import VerticalRLProviderProtocol
 
         assert VerticalRLProviderProtocol is not None
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.verticals.protocols import (
+        from victor.core.verticals.protocols import (
             VerticalRLProviderProtocol,
             RLConfigProviderProtocol,
         )
@@ -562,7 +562,7 @@ class TestVerticalRLProviderProtocol:
 
     def test_vertical_base_has_methods(self):
         """VerticalBase should have the required methods."""
-        from victor.verticals.base import VerticalBase
+        from victor.core.verticals.base import VerticalBase
 
         assert hasattr(VerticalBase, "get_rl_config_provider")
         assert hasattr(VerticalBase, "get_rl_hooks")
@@ -576,13 +576,13 @@ class TestVerticalTeamProviderProtocol:
 
     def test_protocol_import(self):
         """Protocol should be importable."""
-        from victor.verticals.protocols import VerticalTeamProviderProtocol
+        from victor.core.verticals.protocols import VerticalTeamProviderProtocol
 
         assert VerticalTeamProviderProtocol is not None
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.verticals.protocols import (
+        from victor.core.verticals.protocols import (
             VerticalTeamProviderProtocol,
             TeamSpecProviderProtocol,
         )
@@ -604,7 +604,7 @@ class TestVerticalTeamProviderProtocol:
 
     def test_vertical_base_has_methods(self):
         """VerticalBase should have the required methods."""
-        from victor.verticals.base import VerticalBase
+        from victor.core.verticals.base import VerticalBase
 
         assert hasattr(VerticalBase, "get_team_spec_provider")
         # Default implementation returns None
@@ -616,13 +616,13 @@ class TestVerticalWorkflowProviderProtocol:
 
     def test_protocol_import(self):
         """Protocol should be importable."""
-        from victor.verticals.protocols import VerticalWorkflowProviderProtocol
+        from victor.core.verticals.protocols import VerticalWorkflowProviderProtocol
 
         assert VerticalWorkflowProviderProtocol is not None
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.verticals.protocols import (
+        from victor.core.verticals.protocols import (
             VerticalWorkflowProviderProtocol,
             WorkflowProviderProtocol,
         )
@@ -644,7 +644,7 @@ class TestVerticalWorkflowProviderProtocol:
 
     def test_vertical_base_has_methods(self):
         """VerticalBase should have the required methods."""
-        from victor.verticals.base import VerticalBase
+        from victor.core.verticals.base import VerticalBase
 
         assert hasattr(VerticalBase, "get_workflow_provider")
         # Default implementation returns None
@@ -668,7 +668,7 @@ class TestVerticalIntegrationWithProtocols:
 
     def test_coding_vertical_compatibility(self):
         """CodingAssistant should work with the new protocol checks."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         # Verify methods exist (duck typing compatibility)
         assert hasattr(CodingAssistant, "get_workflow_provider")
@@ -678,7 +678,7 @@ class TestVerticalIntegrationWithProtocols:
 
     def test_extensions_include_new_providers(self):
         """VerticalExtensions should include rl_config_provider and team_spec_provider."""
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.protocols import VerticalExtensions
 
         # Create extensions with all providers
         class MockRLProvider:

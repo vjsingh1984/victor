@@ -16,14 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from victor.codebase.graph.registry import create_graph_store
-from victor.codebase.indexer import CodebaseIndex
+from victor.coding.codebase.graph.registry import create_graph_store
+from victor.coding.codebase.indexer import CodebaseIndex
 
 
 @pytest.mark.asyncio
 async def test_indexer_tree_sitter_javascript(tmp_path: Path):
     try:
-        from victor.codebase.tree_sitter_manager import get_parser
+        from victor.coding.codebase.tree_sitter_manager import get_parser
     except Exception:  # pragma: no cover - tree-sitter unavailable
         pytest.skip("tree-sitter not available")
 

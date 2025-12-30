@@ -28,12 +28,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
-from victor.checkpoints.protocol import (
+from victor.storage.checkpoints.protocol import (
     CheckpointData,
     CheckpointMetadata,
     CheckpointNotFoundError,
 )
-from victor.checkpoints.tree import (
+from victor.storage.checkpoints.tree import (
     BranchMetadata,
     BranchStatus,
     BranchManager,
@@ -488,7 +488,7 @@ class TestBranchManager:
 
         await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
-        from victor.checkpoints.tree import CheckpointError
+        from victor.storage.checkpoints.tree import CheckpointError
 
         with pytest.raises(CheckpointError, match="already exists"):
             await branch_manager.create_branch("feature", session_id, checkpoints[1].checkpoint_id)
@@ -547,7 +547,7 @@ class TestBranchManager:
         await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
         # Can't delete unmerged branch without force
-        from victor.checkpoints.tree import CheckpointError
+        from victor.storage.checkpoints.tree import CheckpointError
 
         with pytest.raises(CheckpointError, match="not been merged"):
             await branch_manager.delete_branch("feature", session_id)

@@ -115,12 +115,16 @@ class TestSetupObservabilityIntegration:
 
 
 class TestApplySystemPrompt:
-    """Test system prompt application."""
+    """Test system prompt application.
+
+    SOLID Compliance (DIP): These tests verify that apply_system_prompt
+    only uses public methods and never writes to private attributes.
+    """
 
     def test_apply_with_set_custom_prompt(self):
         """Test applying prompt via orchestrator's set_custom_prompt method.
 
-        The new capability-based approach calls orchestrator.set_custom_prompt
+        The capability-based approach calls orchestrator.set_custom_prompt
         directly when available (via _invoke_capability mapping).
         """
         mock_orchestrator = MagicMock()
@@ -128,31 +132,41 @@ class TestApplySystemPrompt:
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
-        assert mock_orchestrator._framework_system_prompt == "Custom prompt text"
+        # Should call public method only, not write to private attributes
         mock_orchestrator.set_custom_prompt.assert_called_once_with("Custom prompt text")
 
-    def test_apply_with_custom_prompt_attr(self):
-        """Test applying prompt via prompt_builder when no set_custom_prompt.
+    def test_apply_with_prompt_builder_public_method(self):
+        """Test applying prompt via prompt_builder.set_custom_prompt.
 
         When orchestrator doesn't have set_custom_prompt, falls back to
-        prompt_builder.set_custom_prompt or prompt_builder._custom_prompt.
+        prompt_builder.set_custom_prompt (public method only).
         """
         # Create mock without set_custom_prompt so it falls through to prompt_builder
-        mock_orchestrator = MagicMock(spec=["_framework_system_prompt", "prompt_builder"])
-        mock_orchestrator.prompt_builder = MagicMock(spec=["_custom_prompt"])
+        mock_orchestrator = MagicMock(spec=["prompt_builder"])
+        mock_orchestrator.prompt_builder = MagicMock()
+        mock_orchestrator.prompt_builder.set_custom_prompt = MagicMock()
 
         apply_system_prompt(mock_orchestrator, "Another prompt")
 
-        assert mock_orchestrator._framework_system_prompt == "Another prompt"
-        assert mock_orchestrator.prompt_builder._custom_prompt == "Another prompt"
+        # Should call public method on prompt_builder
+        mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with("Another prompt")
 
-    def test_apply_without_prompt_builder(self):
-        """Test applying prompt when no prompt_builder exists."""
-        mock_orchestrator = MagicMock(spec=["_framework_system_prompt"])
+    def test_apply_without_public_method_logs_warning(self):
+        """Test that missing public method logs warning (DIP compliance)."""
+        import logging
 
-        apply_system_prompt(mock_orchestrator, "Orphan prompt")
+        # Create mock without any public set_custom_prompt methods
+        mock_orchestrator = MagicMock(spec=["prompt_builder"])
+        mock_orchestrator.prompt_builder = MagicMock(spec=[])  # No public methods
 
-        assert mock_orchestrator._framework_system_prompt == "Orphan prompt"
+        with patch.object(logging, "getLogger") as mock_get_logger:
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            apply_system_prompt(mock_orchestrator, "Orphan prompt")
+
+            # Should log warning about missing capability
+            mock_logger.warning.assert_called()
 
 
 class TestStreamWithEvents:

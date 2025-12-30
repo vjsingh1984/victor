@@ -21,7 +21,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 # Entity Memory imports
-from victor.memory import (
+from victor.storage.memory import (
     EntityMemory,
     EntityMemoryConfig,
     EntityGraph,
@@ -60,7 +60,7 @@ from victor.workflows.hitl import (
 )
 
 # Checkpoint imports
-from victor.checkpoints import (
+from victor.storage.checkpoints import (
     CheckpointManager,
     SQLiteCheckpointBackend,
 )

@@ -13,7 +13,7 @@ Tests cover:
 import pytest
 from datetime import datetime, timezone
 
-from victor.memory import (
+from victor.storage.memory import (
     EntityType,
     Entity,
     EntityRelation,
@@ -572,7 +572,7 @@ Also see file: config/settings.json for configuration.
     async def test_extract_imports(self, extractor):
         """Test extracting module imports."""
         code = """
-from victor.memory import EntityMemory
+from victor.storage.memory import EntityMemory
 import asyncio
 from typing import Dict, List
 """

@@ -14,7 +14,7 @@
 
 import pytest
 from pathlib import Path
-from victor.codebase.indexer import CodebaseIndex
+from victor.coding.codebase.indexer import CodebaseIndex
 
 
 @pytest.mark.asyncio

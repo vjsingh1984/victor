@@ -17,7 +17,7 @@
 import tempfile
 from pathlib import Path
 
-from victor.codebase.indexer import Symbol, FileMetadata, CodebaseIndex
+from victor.coding.codebase.indexer import Symbol, FileMetadata, CodebaseIndex
 
 
 class TestSymbol:

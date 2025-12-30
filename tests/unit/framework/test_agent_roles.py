@@ -485,9 +485,11 @@ class TestRoleCapabilityCombinations:
         reviewer = ReviewerRole()
 
         # Only executor has both
-        has_both_write_execute = lambda r: (
-            AgentCapability.WRITE in r.capabilities and AgentCapability.EXECUTE in r.capabilities
-        )
+        def has_both_write_execute(r):
+            return (
+                AgentCapability.WRITE in r.capabilities
+                and AgentCapability.EXECUTE in r.capabilities
+            )
 
         assert not has_both_write_execute(manager)
         assert not has_both_write_execute(researcher)

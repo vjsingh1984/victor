@@ -29,89 +29,115 @@ from victor.tools.semantic_selector import SemanticToolSelector
 
 
 class TestTaskTypeCategoryMapping:
-    """Tests for task type to category mapping."""
+    """Tests for task type to category mapping.
+
+    These tests verify that _get_tools_for_task_type queries the registry
+    correctly. The registry is empty in unit tests (no tools registered),
+    so we verify that the method returns results from registry lookups.
+    """
 
     @pytest.fixture
     def selector(self):
         """Create selector without initializing embeddings."""
         return SemanticToolSelector(cache_embeddings=False)
 
-    def test_analysis_task_categories(self, selector):
-        """Test that analysis tasks map to analysis categories."""
-        tools = selector._get_tools_for_task_type("analysis")
-        # Should include code intelligence and analysis tools
-        assert len(tools) > 0
+    def test_analysis_task_type_queries_registry(self, selector):
+        """Test that analysis tasks query the registry."""
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"metrics", "review"}
+            tools = selector._get_tools_for_task_type("analysis")
+            mock_get.assert_called_once_with("analysis")
+            assert "metrics" in tools
+            assert "review" in tools
 
-    def test_action_task_categories(self, selector):
-        """Test that action tasks map to execution categories."""
-        tools = selector._get_tools_for_task_type("action")
-        # Should include execution-related tools
-        assert len(tools) > 0
+    def test_action_task_type_queries_registry(self, selector):
+        """Test that action tasks query the registry."""
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"shell", "sandbox"}
+            tools = selector._get_tools_for_task_type("action")
+            mock_get.assert_called_once_with("action")
+            assert "shell" in tools
 
-    def test_edit_task_categories(self, selector):
-        """Test that edit tasks map to file and refactoring categories."""
-        tools = selector._get_tools_for_task_type("edit")
-        assert len(tools) > 0
+    def test_edit_task_type_queries_registry(self, selector):
+        """Test that edit tasks query the registry."""
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"edit", "write"}
+            tools = selector._get_tools_for_task_type("edit")
+            mock_get.assert_called_once_with("edit")
+            assert "edit" in tools
 
-    def test_search_task_categories(self, selector):
-        """Test that search tasks map to code intel categories."""
-        tools = selector._get_tools_for_task_type("search")
-        assert len(tools) > 0
+    def test_search_task_type_queries_registry(self, selector):
+        """Test that search tasks query the registry."""
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"grep", "search"}
+            tools = selector._get_tools_for_task_type("search")
+            mock_get.assert_called_once_with("search")
+            assert "grep" in tools
 
-    def test_default_task_categories(self, selector):
-        """Test that default tasks get basic tools."""
-        tools = selector._get_tools_for_task_type("default")
-        assert len(tools) > 0
-
-    def test_unknown_task_type_fallback(self, selector):
-        """Test that unknown task types get fallback categories."""
-        tools = selector._get_tools_for_task_type("unknown_type")
-        # Should fall back to file_ops + execution
-        assert len(tools) > 0
+    def test_unknown_task_type_returns_empty(self, selector):
+        """Test that unknown task types return empty from registry."""
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = set()
+            tools = selector._get_tools_for_task_type("unknown_type")
+            mock_get.assert_called_once_with("unknown_type")
+            assert len(tools) == 0
 
 
 class TestNegationAwareExclusion:
-    """Tests for negation-aware tool exclusion."""
+    """Tests for negation-aware tool exclusion.
+
+    These tests verify that _get_excluded_tools_from_negations queries
+    the registry correctly to find tools to exclude.
+    """
 
     @pytest.fixture
     def selector(self):
         return SemanticToolSelector(cache_embeddings=False)
 
-    def test_analyze_negation_excludes_analysis_tools(self, selector):
-        """Test that negated 'analyze' excludes analysis tools."""
+    def test_analyze_negation_queries_registry(self, selector):
+        """Test that negated 'analyze' queries registry for task type."""
         mock_match = MagicMock()
         mock_match.keyword = "analyze"
 
-        excluded = selector._get_excluded_tools_from_negations([mock_match])
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"metrics", "review"}
+            excluded = selector._get_excluded_tools_from_negations([mock_match])
+            mock_get.assert_called_once_with("analyze")
+            assert "metrics" in excluded
+            assert "review" in excluded
 
-        assert "metrics" in excluded or "review" in excluded or "docs_coverage" in excluded
-
-    def test_test_negation_excludes_test_tools(self, selector):
-        """Test that negated 'test' excludes test tools."""
+    def test_test_negation_queries_registry(self, selector):
+        """Test that negated 'test' queries registry."""
         mock_match = MagicMock()
         mock_match.keyword = "test"
 
-        excluded = selector._get_excluded_tools_from_negations([mock_match])
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"test", "shell"}
+            excluded = selector._get_excluded_tools_from_negations([mock_match])
+            mock_get.assert_called_once_with("test")
+            assert "test" in excluded
 
-        assert "test" in excluded
-
-    def test_search_negation_excludes_search_tools(self, selector):
-        """Test that negated 'search' excludes search tools."""
+    def test_search_negation_queries_registry(self, selector):
+        """Test that negated 'search' queries registry."""
         mock_match = MagicMock()
         mock_match.keyword = "search"
 
-        excluded = selector._get_excluded_tools_from_negations([mock_match])
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.return_value = {"grep", "search"}
+            excluded = selector._get_excluded_tools_from_negations([mock_match])
+            mock_get.assert_called_once_with("search")
+            assert "grep" in excluded
 
-        assert "search" in excluded or "grep" in excluded
-
-    def test_multiple_negations(self, selector):
-        """Test multiple negated keywords."""
+    def test_multiple_negations_queries_all(self, selector):
+        """Test multiple negated keywords query registry for each."""
         matches = [MagicMock(keyword="analyze"), MagicMock(keyword="test")]
 
-        excluded = selector._get_excluded_tools_from_negations(matches)
-
-        # Should exclude tools for both keywords
-        assert len(excluded) >= 2
+        with patch("victor.tools.semantic_selector.get_tools_by_task_type") as mock_get:
+            mock_get.side_effect = [{"metrics"}, {"test"}]
+            excluded = selector._get_excluded_tools_from_negations(matches)
+            assert mock_get.call_count == 2
+            assert "metrics" in excluded
+            assert "test" in excluded
 
     def test_empty_negations_no_exclusions(self, selector):
         """Test that empty negations produce no exclusions."""
@@ -330,8 +356,7 @@ class TestClassificationToolStats:
 
         stats = selector.get_classification_tool_stats()
 
-        assert "task_type_categories" in stats
-        assert "keyword_tool_mappings" in stats
+        # Stats now only include cache sizes (legacy constants removed)
         assert "usage_cache_size" in stats
         assert "embedding_cache_size" in stats
 
@@ -341,7 +366,8 @@ class TestClassificationToolStats:
 
         stats = selector.get_classification_tool_stats()
 
-        assert isinstance(stats["task_type_categories"], int)
-        assert isinstance(stats["keyword_tool_mappings"], int)
-        assert stats["task_type_categories"] > 0
-        assert stats["keyword_tool_mappings"] > 0
+        assert isinstance(stats["usage_cache_size"], int)
+        assert isinstance(stats["embedding_cache_size"], int)
+        # Cache sizes start at 0
+        assert stats["usage_cache_size"] >= 0
+        assert stats["embedding_cache_size"] >= 0

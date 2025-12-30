@@ -30,7 +30,7 @@ class TestResearchVerticalIndependence:
     def test_research_imports_without_coding(self):
         """ResearchAssistant can be imported without coding module."""
         # Temporarily make coding module raise ImportError
-        coding_modules = [key for key in sys.modules.keys() if "victor.verticals.coding" in key]
+        coding_modules = [key for key in sys.modules.keys() if "victor.coding" in key]
 
         # Store original modules
         original_modules = {key: sys.modules.get(key) for key in coding_modules}
@@ -42,10 +42,10 @@ class TestResearchVerticalIndependence:
                     del sys.modules[key]
 
             # Import research vertical fresh
-            if "victor.verticals.research" in sys.modules:
-                del sys.modules["victor.verticals.research"]
+            if "victor.research" in sys.modules:
+                del sys.modules["victor.research"]
 
-            from victor.verticals.research import ResearchAssistant
+            from victor.research import ResearchAssistant
 
             # Should be able to access basic properties
             assert ResearchAssistant.name == "research"
@@ -57,8 +57,8 @@ class TestResearchVerticalIndependence:
 
     def test_research_extensions_no_coding_dependency(self):
         """ResearchAssistant extensions don't depend on coding."""
-        from victor.verticals.research import ResearchAssistant
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.research import ResearchAssistant
+        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = ResearchAssistant.get_extensions()
         assert isinstance(extensions, VerticalExtensions)
@@ -70,7 +70,7 @@ class TestResearchVerticalIndependence:
 
     def test_research_provides_valid_tools(self):
         """ResearchAssistant provides valid tool configurations."""
-        from victor.verticals.research import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         tools = ResearchAssistant.get_tools()
 
@@ -86,22 +86,22 @@ class TestDevOpsVerticalIndependence:
 
     def test_devops_imports_without_coding(self):
         """DevOpsAssistant can be imported without coding module."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         assert DevOpsAssistant.name == "devops"
         assert len(DevOpsAssistant.get_tools()) > 0
 
     def test_devops_extensions_no_coding_dependency(self):
         """DevOpsAssistant extensions don't depend on coding."""
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.devops import DevOpsAssistant
+        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = DevOpsAssistant.get_extensions()
         assert isinstance(extensions, VerticalExtensions)
 
     def test_devops_provides_valid_tools(self):
         """DevOpsAssistant provides valid tool configurations."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         tools = DevOpsAssistant.get_tools()
         tool_names = [t["name"] if isinstance(t, dict) else t for t in tools]
@@ -116,14 +116,14 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_middleware(self):
         """CodingAssistant provides middleware."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         assert len(extensions.middleware) >= 1
 
     def test_coding_has_safety_patterns(self):
         """CodingAssistant provides safety patterns."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         patterns = extensions.get_all_safety_patterns()
@@ -131,7 +131,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_task_hints(self):
         """CodingAssistant provides task type hints."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         hints = extensions.get_all_task_hints()
@@ -139,7 +139,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_mode_configs(self):
         """CodingAssistant provides mode configurations."""
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         modes = extensions.get_all_mode_configs()
@@ -162,7 +162,7 @@ class TestBootstrapWithVerticals:
         container = bootstrap_container(settings=settings, vertical="coding")
 
         # Should have registered vertical extensions
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = container.get_optional(VerticalExtensions)
 
@@ -220,7 +220,7 @@ class TestVerticalLoaderIntegration:
 
     def test_loader_loads_coding(self):
         """VerticalLoader loads coding vertical."""
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import get_vertical_loader
 
         loader = get_vertical_loader()
         vertical = loader.load("coding")
@@ -230,7 +230,7 @@ class TestVerticalLoaderIntegration:
 
     def test_loader_loads_research(self):
         """VerticalLoader loads research vertical."""
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import get_vertical_loader
 
         loader = get_vertical_loader()
         vertical = loader.load("research")
@@ -240,7 +240,7 @@ class TestVerticalLoaderIntegration:
 
     def test_loader_loads_devops(self):
         """VerticalLoader loads devops vertical."""
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import get_vertical_loader
 
         loader = get_vertical_loader()
         vertical = loader.load("devops")
@@ -250,7 +250,7 @@ class TestVerticalLoaderIntegration:
 
     def test_loader_raises_for_unknown(self):
         """VerticalLoader raises ValueError for unknown vertical."""
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import get_vertical_loader
 
         loader = get_vertical_loader()
 
@@ -264,7 +264,7 @@ class TestFrameworkShimIntegration:
     def test_shim_accepts_vertical_parameter(self):
         """FrameworkShim constructor accepts vertical parameter."""
         from victor.framework.shim import FrameworkShim
-        from victor.verticals import CodingAssistant
+        from victor.coding import CodingAssistant
         import inspect
 
         # Check that FrameworkShim constructor accepts vertical parameter
@@ -273,20 +273,12 @@ class TestFrameworkShimIntegration:
 
         assert "vertical" in params, "FrameworkShim should accept vertical parameter"
 
-    def test_shim_apply_vertical_extensions_exists(self):
-        """FrameworkShim has _apply_vertical_extensions method."""
+    def test_shim_apply_vertical_exists(self):
+        """FrameworkShim has _apply_vertical method (unified vertical application)."""
         from victor.framework.shim import FrameworkShim
 
-        # Check the method exists
-        assert hasattr(FrameworkShim, "_apply_vertical_extensions")
-
-    def test_vertical_extensions_helpers_exist(self):
-        """FrameworkShim has vertical extension helper methods."""
-        from victor.framework.shim import FrameworkShim
-
-        # Check helper methods exist
-        assert hasattr(FrameworkShim, "_apply_middleware")
-        assert hasattr(FrameworkShim, "_apply_safety_extensions")
+        # Check the method exists - deprecated methods removed, unified _apply_vertical used
+        assert hasattr(FrameworkShim, "_apply_vertical")
 
 
 class TestCLIVerticalFlag:

@@ -93,8 +93,7 @@ class TestProviderRegistry:
         assert "custom_test" in providers
 
         # Cleanup
-        if "custom_test" in ProviderRegistry._providers:
-            del ProviderRegistry._providers["custom_test"]
+        ProviderRegistry.unregister("custom_test")
 
     def test_create_provider(self):
         """Test creating a provider instance."""
@@ -128,8 +127,7 @@ class TestProviderRegistry:
         assert instance.name == "test_create"
 
         # Cleanup
-        if "test_create" in ProviderRegistry._providers:
-            del ProviderRegistry._providers["test_create"]
+        ProviderRegistry.unregister("test_create")
 
 
 class TestMessage:

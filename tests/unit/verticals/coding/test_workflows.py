@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.verticals.coding.workflows import (
+from victor.coding.workflows import (
     CodingWorkflowProvider,
     feature_implementation_workflow,
     quick_feature_workflow,

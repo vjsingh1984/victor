@@ -21,7 +21,7 @@ including TDD cycles, bug fix loops, and feature implementation.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.verticals.coding.workflows.graph_workflows import (
+from victor.coding.workflows.graph_workflows import (
     # State types
     CodingState,
     TestState,
@@ -736,7 +736,7 @@ class TestModuleExports:
 
     def test_workflows_exported_from_package(self):
         """Graph workflows should be exported from workflows package."""
-        from victor.verticals.coding.workflows import (
+        from victor.coding.workflows import (
             CodingState,
             TestState,
             BugFixState,
@@ -753,7 +753,7 @@ class TestModuleExports:
 
     def test_all_state_types_exported(self):
         """All state types should be exported."""
-        from victor.verticals.coding.workflows import (
+        from victor.coding.workflows import (
             CodingState,
             TestState,
             BugFixState,
@@ -766,7 +766,7 @@ class TestModuleExports:
 
     def test_all_workflow_factories_exported(self):
         """All workflow factories should be exported."""
-        from victor.verticals.coding.workflows import (
+        from victor.coding.workflows import (
             create_feature_workflow,
             create_tdd_workflow,
             create_bugfix_workflow,

@@ -19,8 +19,8 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.mcp.client import MCPClient
-from victor.mcp.protocol import MCPTool, MCPResource, MCPToolCallResult
+from victor.integrations.mcp.client import MCPClient
+from victor.integrations.mcp.protocol import MCPTool, MCPResource, MCPToolCallResult
 
 
 class TestMCPClientInit:

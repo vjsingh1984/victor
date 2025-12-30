@@ -7,14 +7,14 @@ from typing import Any, Dict, List
 
 import pytest
 
-from victor.verticals import (
-    CodingAssistant,
-    ResearchAssistant,
+from victor.core.verticals import (
     VerticalBase,
     VerticalConfig,
     VerticalRegistry,
     StageDefinition,
 )
+from victor.coding import CodingAssistant
+from victor.research import ResearchAssistant
 from victor.framework.tools import ToolSet
 
 
@@ -415,7 +415,7 @@ class TestVerticalLoaderSwitch:
 
     def test_loader_switch_clears_extensions(self):
         """Switching verticals should clear cached extensions."""
-        from victor.verticals.vertical_loader import VerticalLoader
+        from victor.core.verticals.vertical_loader import VerticalLoader
 
         loader = VerticalLoader()
 
@@ -434,7 +434,7 @@ class TestVerticalLoaderSwitch:
 
     def test_loader_switch_resets_registered_services(self):
         """Switching verticals should reset _registered_services flag."""
-        from victor.verticals.vertical_loader import VerticalLoader
+        from victor.core.verticals.vertical_loader import VerticalLoader
 
         loader = VerticalLoader()
 
@@ -452,7 +452,7 @@ class TestVerticalLoaderSwitch:
 
     def test_loader_active_vertical_name(self):
         """active_vertical_name should reflect current vertical."""
-        from victor.verticals.vertical_loader import VerticalLoader
+        from victor.core.verticals.vertical_loader import VerticalLoader
 
         loader = VerticalLoader()
         assert loader.active_vertical_name is None
@@ -469,7 +469,7 @@ class TestVerticalLoaderSwitch:
     )
     def test_loader_get_tools_per_vertical(self):
         """Each vertical should have distinct tool sets."""
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals import get_vertical_loader
 
         # Get the singleton loader and reset to clear state from other tests
         loader = get_vertical_loader()
@@ -494,7 +494,7 @@ class TestBootstrapVerticalActivation:
     def test_ensure_bootstrapped_with_vertical(self):
         """ensure_bootstrapped should activate specified vertical."""
         from victor.core.bootstrap import ensure_bootstrapped, get_container
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals import get_vertical_loader
         from victor.config.settings import Settings
 
         # Reset for test
@@ -511,7 +511,7 @@ class TestBootstrapVerticalActivation:
     def test_ensure_bootstrapped_switch_vertical(self):
         """ensure_bootstrapped should switch vertical if different requested."""
         from victor.core.bootstrap import ensure_bootstrapped
-        from victor.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals import get_vertical_loader
         from victor.config.settings import Settings
 
         loader = get_vertical_loader()
@@ -558,7 +558,8 @@ class TestVerticalProtocolMethods:
 
     def test_all_verticals_have_mode_config(self):
         """All built-in verticals should have get_mode_config()."""
-        from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         for vertical in [
             CodingAssistant,
@@ -572,7 +573,8 @@ class TestVerticalProtocolMethods:
 
     def test_all_verticals_have_task_type_hints(self):
         """All built-in verticals should have get_task_type_hints()."""
-        from victor.verticals import DevOpsAssistant, DataAnalysisAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         for vertical in [
             CodingAssistant,
@@ -681,11 +683,11 @@ class TestVerticalIntegration:
 
 
 class TestDirectCodingModuleImport:
-    """Tests that directly import from victor.verticals.coding to improve coverage."""
+    """Tests that directly import from victor.coding to improve coverage."""
 
     def test_coding_assistant_class(self):
         """Test CodingAssistant class directly from module."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         assert DirectCodingAssistant.name == "coding"
         # Version may change, just check it exists
@@ -693,7 +695,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_get_tools(self):
         """Test get_tools method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         tools = DirectCodingAssistant.get_tools()
         assert "read" in tools
@@ -703,7 +705,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_get_system_prompt(self):
         """Test get_system_prompt method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         prompt = DirectCodingAssistant.get_system_prompt()
         assert "Victor" in prompt
@@ -711,7 +713,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_get_stages(self):
         """Test get_stages method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         stages = DirectCodingAssistant.get_stages()
         assert "INITIAL" in stages
@@ -720,7 +722,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_get_provider_hints(self):
         """Test get_provider_hints method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         hints = DirectCodingAssistant.get_provider_hints()
         assert "preferred_providers" in hints
@@ -728,7 +730,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_get_evaluation_criteria(self):
         """Test get_evaluation_criteria method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         criteria = DirectCodingAssistant.get_evaluation_criteria()
         assert len(criteria) > 0
@@ -737,7 +739,7 @@ class TestDirectCodingModuleImport:
 
     def test_coding_customize_config(self):
         """Test customize_config method."""
-        from victor.verticals.coding import CodingAssistant as DirectCodingAssistant
+        from victor.coding import CodingAssistant as DirectCodingAssistant
 
         config = DirectCodingAssistant.get_config()
         assert config.metadata["supports_lsp"] is True
@@ -746,17 +748,17 @@ class TestDirectCodingModuleImport:
 
 
 class TestDirectResearchModuleImport:
-    """Tests that directly import from victor.verticals.research to improve coverage."""
+    """Tests that directly import from victor.research to improve coverage."""
 
     def test_research_assistant_class(self):
         """Test ResearchAssistant class directly from module."""
-        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+        from victor.research import ResearchAssistant as DirectResearchAssistant
 
         assert DirectResearchAssistant.name == "research"
 
     def test_research_get_tools(self):
         """Test get_tools method."""
-        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+        from victor.research import ResearchAssistant as DirectResearchAssistant
 
         tools = DirectResearchAssistant.get_tools()
         assert "web_search" in tools
@@ -765,14 +767,14 @@ class TestDirectResearchModuleImport:
 
     def test_research_get_system_prompt(self):
         """Test get_system_prompt method."""
-        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+        from victor.research import ResearchAssistant as DirectResearchAssistant
 
         prompt = DirectResearchAssistant.get_system_prompt()
         assert "research" in prompt.lower()
 
     def test_research_get_stages(self):
         """Test get_stages method."""
-        from victor.verticals.research import ResearchAssistant as DirectResearchAssistant
+        from victor.research import ResearchAssistant as DirectResearchAssistant
 
         stages = DirectResearchAssistant.get_stages()
         assert isinstance(stages, dict)
@@ -783,20 +785,20 @@ class TestDevOpsDirectImport:
 
     def test_devops_assistant_class(self):
         """Test DevOpsAssistant class."""
-        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+        from victor.devops import DevOpsAssistant as DirectDevOps
 
         assert DirectDevOps.name == "devops"
 
     def test_devops_get_tools(self):
         """Test get_tools method."""
-        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+        from victor.devops import DevOpsAssistant as DirectDevOps
 
         tools = DirectDevOps.get_tools()
         assert isinstance(tools, list)
 
     def test_devops_get_system_prompt(self):
         """Test get_system_prompt method."""
-        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+        from victor.devops import DevOpsAssistant as DirectDevOps
 
         prompt = DirectDevOps.get_system_prompt()
         assert isinstance(prompt, str)
@@ -804,7 +806,7 @@ class TestDevOpsDirectImport:
 
     def test_devops_get_stages(self):
         """Test get_stages method."""
-        from victor.verticals.devops import DevOpsAssistant as DirectDevOps
+        from victor.devops import DevOpsAssistant as DirectDevOps
 
         stages = DirectDevOps.get_stages()
         assert isinstance(stages, dict)
@@ -815,20 +817,20 @@ class TestDataAnalysisDirectImport:
 
     def test_data_analysis_assistant_class(self):
         """Test DataAnalysisAssistant class."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+        from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
         assert DirectDataAnalysis.name == "data_analysis"
 
     def test_data_analysis_get_tools(self):
         """Test get_tools method."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+        from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
         tools = DirectDataAnalysis.get_tools()
         assert isinstance(tools, list)
 
     def test_data_analysis_get_system_prompt(self):
         """Test get_system_prompt method."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+        from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
         prompt = DirectDataAnalysis.get_system_prompt()
         assert isinstance(prompt, str)
@@ -836,7 +838,7 @@ class TestDataAnalysisDirectImport:
 
     def test_data_analysis_get_stages(self):
         """Test get_stages method."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant as DirectDataAnalysis
+        from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
         stages = DirectDataAnalysis.get_stages()
         assert isinstance(stages, dict)
@@ -852,7 +854,7 @@ class TestVerticalHelperFunctions:
 
     def test_get_vertical_by_name(self):
         """Test get_vertical helper function."""
-        from victor.verticals import get_vertical
+        from victor.core.verticals import get_vertical
 
         coding = get_vertical("coding")
         assert coding is not None
@@ -860,7 +862,7 @@ class TestVerticalHelperFunctions:
 
     def test_get_vertical_case_insensitive(self):
         """Test get_vertical with different cases."""
-        from victor.verticals import get_vertical
+        from victor.core.verticals import get_vertical
 
         coding_lower = get_vertical("coding")
         coding_upper = get_vertical("CODING")
@@ -873,21 +875,21 @@ class TestVerticalHelperFunctions:
 
     def test_get_vertical_none(self):
         """Test get_vertical with None."""
-        from victor.verticals import get_vertical
+        from victor.core.verticals import get_vertical
 
         result = get_vertical(None)
         assert result is None
 
     def test_get_vertical_nonexistent(self):
         """Test get_vertical with nonexistent name."""
-        from victor.verticals import get_vertical
+        from victor.core.verticals import get_vertical
 
         result = get_vertical("nonexistent_vertical_12345")
         assert result is None
 
     def test_list_verticals(self):
         """Test list_verticals helper function."""
-        from victor.verticals import list_verticals
+        from victor.core.verticals import list_verticals
 
         names = list_verticals()
         assert isinstance(names, list)

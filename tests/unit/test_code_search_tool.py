@@ -374,7 +374,7 @@ class TestGetOrBuildIndex:
             mock_settings.codebase_graph_store = "sqlite"
             mock_settings.codebase_graph_path = ".victor/graph"
 
-            with patch("victor_coding.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
+            with patch("victor.coding.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_index_instance
 
                 try:
@@ -419,7 +419,7 @@ class TestGetOrBuildIndex:
             mock_settings.codebase_graph_store = "sqlite"
             mock_settings.codebase_graph_path = ".victor/graph"
 
-            with patch("victor_coding.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
+            with patch("victor.coding.codebase.indexer.CodebaseIndex") as MockCodebaseIndex:
                 MockCodebaseIndex.return_value = mock_new_index
 
                 try:

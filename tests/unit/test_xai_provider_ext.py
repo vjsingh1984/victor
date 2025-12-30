@@ -23,7 +23,7 @@ from victor.providers.base import (
     Message,
     ToolDefinition,
     ProviderError,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderRateLimitError,
 )
 
@@ -240,7 +240,7 @@ async def test_chat_authentication_error(xai_provider):
     with patch.object(xai_provider.client, "post", side_effect=error):
         messages = [Message(role="user", content="Hello")]
 
-        with pytest.raises(ProviderAuthenticationError):
+        with pytest.raises(ProviderAuthError):
             await xai_provider.chat(messages=messages, model="grok-beta")
 
 

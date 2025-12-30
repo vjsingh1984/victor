@@ -18,8 +18,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor.cache.config import CacheConfig
-from victor.cache.manager import (
+from victor.storage.cache.config import CacheConfig
+from victor.storage.cache.manager import (
     CacheManager,
     CacheNamespace,
     CacheStats,

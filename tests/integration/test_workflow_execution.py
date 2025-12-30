@@ -352,7 +352,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_coding_workflow_provider(self):
         """Test Coding vertical workflow provider."""
-        from victor.verticals.coding import CodingAssistant
+        from victor.coding import CodingAssistant
 
         provider = CodingAssistant.get_workflow_provider()
         assert provider is not None
@@ -363,7 +363,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_data_analysis_workflow_provider(self):
         """Test Data Analysis vertical workflow provider."""
-        from victor.verticals.data_analysis import DataAnalysisAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
 
         provider = DataAnalysisAssistant.get_workflow_provider()
         assert provider is not None
@@ -373,7 +373,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_research_workflow_provider(self):
         """Test Research vertical workflow provider."""
-        from victor.verticals.research import ResearchAssistant
+        from victor.research import ResearchAssistant
 
         provider = ResearchAssistant.get_workflow_provider()
         assert provider is not None
@@ -384,7 +384,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_devops_workflow_provider(self):
         """Test DevOps vertical workflow provider."""
-        from victor.verticals.devops import DevOpsAssistant
+        from victor.devops import DevOpsAssistant
 
         provider = DevOpsAssistant.get_workflow_provider()
         assert provider is not None
@@ -394,10 +394,10 @@ class TestVerticalWorkflowIntegration:
 
     def test_workflow_definition_validity(self):
         """Test that all vertical workflows pass validation."""
-        from victor.verticals.coding import CodingAssistant
-        from victor.verticals.data_analysis import DataAnalysisAssistant
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.research import ResearchAssistant
+        from victor.coding import CodingAssistant
+        from victor.dataanalysis import DataAnalysisAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.research import ResearchAssistant
 
         verticals = [
             CodingAssistant,

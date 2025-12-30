@@ -16,8 +16,8 @@
 
 import pytest
 
-from victor.cache.tool_cache import ToolCache, _hash_args
-from victor.cache.config import CacheConfig
+from victor.storage.cache.tool_cache import ToolCache, _hash_args
+from victor.storage.cache.config import CacheConfig
 
 
 class TestHashArgs:

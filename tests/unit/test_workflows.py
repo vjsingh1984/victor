@@ -540,6 +540,100 @@ class TestWorkflowRegistry:
         assert len(results) == 1
         assert results[0].name == "a"
 
+    def test_list_metadata_default_lazy(self):
+        """list_metadata with default args doesn't materialize factories."""
+        registry = WorkflowRegistry()
+        factory_called = []
+
+        def create_workflow():
+            factory_called.append(True)
+            return WorkflowDefinition(
+                name="lazy",
+                nodes={"a": AgentNode(id="a", name="A")},
+            )
+
+        registry.register_factory("lazy", create_workflow)
+
+        # list_metadata with default (materialize=False) should not call factory
+        metadata = registry.list_metadata()
+        assert len(factory_called) == 0
+        assert len(metadata) == 0  # Factory not materialized, so no metadata
+
+    def test_list_metadata_materialize_true(self):
+        """list_metadata with materialize=True instantiates all factories."""
+        registry = WorkflowRegistry()
+        factory_called = []
+
+        def create_workflow():
+            factory_called.append(True)
+            return WorkflowDefinition(
+                name="lazy",
+                description="Lazy workflow",
+                nodes={"a": AgentNode(id="a", name="A")},
+            )
+
+        registry.register_factory("lazy", create_workflow)
+
+        # list_metadata with materialize=True should call factory
+        metadata = registry.list_metadata(materialize=True)
+        assert len(factory_called) == 1
+        assert len(metadata) == 1
+        assert metadata[0].name == "lazy"
+        assert metadata[0].description == "Lazy workflow"
+
+    def test_list_metadata_includes_eagerly_registered(self):
+        """list_metadata returns metadata for eagerly registered workflows."""
+        registry = WorkflowRegistry()
+        registry.register(
+            WorkflowDefinition(
+                name="eager",
+                description="Eager workflow",
+                nodes={"a": AgentNode(id="a", name="A")},
+            )
+        )
+
+        # Even with materialize=False, eager registrations have metadata
+        metadata = registry.list_metadata()
+        assert len(metadata) == 1
+        assert metadata[0].name == "eager"
+
+    def test_list_metadata_mixed_registration(self):
+        """list_metadata handles mix of eager and lazy registrations."""
+        registry = WorkflowRegistry()
+
+        # Eager registration
+        registry.register(
+            WorkflowDefinition(
+                name="eager",
+                nodes={"a": AgentNode(id="a", name="A")},
+            )
+        )
+
+        # Lazy registration
+        factory_called = []
+
+        def create_workflow():
+            factory_called.append(True)
+            return WorkflowDefinition(
+                name="lazy",
+                nodes={"b": AgentNode(id="b", name="B")},
+            )
+
+        registry.register_factory("lazy", create_workflow)
+
+        # Without materialize, only eager has metadata
+        metadata = registry.list_metadata(materialize=False)
+        assert len(metadata) == 1
+        assert metadata[0].name == "eager"
+        assert len(factory_called) == 0
+
+        # With materialize, both have metadata
+        metadata = registry.list_metadata(materialize=True)
+        assert len(metadata) == 2
+        assert len(factory_called) == 1
+        names = {m.name for m in metadata}
+        assert names == {"eager", "lazy"}
+
 
 class TestNodeResult:
     """Test NodeResult class."""

@@ -13,8 +13,8 @@
 
 import pytest
 
-from victor.graph.protocol import GraphEdge, GraphNode
-from victor.graph.sqlite_store import SqliteGraphStore
+from victor.storage.graph.protocol import GraphEdge, GraphNode
+from victor.storage.graph.sqlite_store import SqliteGraphStore
 
 
 @pytest.mark.asyncio

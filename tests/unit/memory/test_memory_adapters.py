@@ -27,8 +27,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.memory.unified import MemoryQuery, MemoryResult, MemoryType
-from victor.memory.adapters import (
+from victor.storage.memory.unified import MemoryQuery, MemoryResult, MemoryType
+from victor.storage.memory.adapters import (
     EntityMemoryAdapter,
     ConversationMemoryAdapter,
     GraphMemoryAdapter,

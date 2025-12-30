@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 from victor.config.settings import Settings
-from victor.codebase.hybrid_search import HybridSearchEngine, create_hybrid_search_engine
+from victor.coding.codebase.hybrid_search import HybridSearchEngine, create_hybrid_search_engine
 from victor.agent.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_deduplication import ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig

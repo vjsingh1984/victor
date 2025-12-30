@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.state import (
+from victor.storage.state import (
     ConversationStage,
     ConversationState,
     ConversationStateMachine,
@@ -18,7 +18,7 @@ from victor.state import (
     StateTransition,
     STAGE_KEYWORDS,
 )
-from victor.state.protocols import (
+from victor.storage.state.protocols import (
     StageDetectorProtocol,
     StateObserverProtocol,
     StateProtocol,
@@ -308,14 +308,14 @@ class TestConversationStateMachineIntegration:
 
     def test_import_from_state_package(self):
         """ConversationStateMachine should be importable from state package."""
-        from victor.state import ConversationStateMachine
+        from victor.storage.state import ConversationStateMachine
 
         machine = ConversationStateMachine()
         assert machine.get_stage() == ConversationStage.INITIAL
 
     def test_stage_keywords_available(self):
         """STAGE_KEYWORDS should be available from state package."""
-        from victor.state import STAGE_KEYWORDS
+        from victor.storage.state import STAGE_KEYWORDS
 
         assert ConversationStage.PLANNING in STAGE_KEYWORDS
         assert "plan" in STAGE_KEYWORDS[ConversationStage.PLANNING]

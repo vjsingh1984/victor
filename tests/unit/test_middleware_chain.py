@@ -12,7 +12,7 @@ from victor.agent.middleware_chain import (
     MiddlewareChain,
     MiddlewareAbortError,
 )
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     MiddlewarePriority,
     MiddlewareResult,
 )
@@ -712,7 +712,7 @@ class TestCodingMiddlewareIntegration:
     @pytest.mark.asyncio
     async def test_coding_middleware_in_chain(self):
         """CodingMiddleware should work in MiddlewareChain."""
-        from victor.verticals.coding.middleware import (
+        from victor.coding.middleware import (
             CodeCorrectionMiddleware,
             GitSafetyMiddleware,
         )
@@ -737,7 +737,7 @@ class TestCodingMiddlewareIntegration:
     @pytest.mark.asyncio
     async def test_git_safety_blocks_dangerous_commands(self):
         """GitSafetyMiddleware should block dangerous git operations when configured."""
-        from victor.verticals.coding.middleware import GitSafetyMiddleware
+        from victor.coding.middleware import GitSafetyMiddleware
 
         chain = MiddlewareChain()
         # Need to enable block_dangerous to actually block

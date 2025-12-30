@@ -288,8 +288,11 @@ class TestWorkflowGraph:
         node2 = WorkflowNode(id="success", name="Success", handler=simple_handler)
         node3 = WorkflowNode(id="failure", name="Failure", handler=simple_handler)
 
-        success_condition = lambda state: state.get("result") == "success"
-        failure_condition = lambda state: state.get("result") == "failure"
+        def success_condition(state):
+            return state.get("result") == "success"
+
+        def failure_condition(state):
+            return state.get("result") == "failure"
 
         (
             graph.add_node(node1)

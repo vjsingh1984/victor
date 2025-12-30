@@ -15,12 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from victor.graph.registry import create_graph_store
-from victor.graph.sqlite_store import SqliteGraphStore
-from victor.graph.memory_store import MemoryGraphStore
+from victor.storage.graph.registry import create_graph_store
+from victor.storage.graph.sqlite_store import SqliteGraphStore
+from victor.storage.graph.memory_store import MemoryGraphStore
 
 try:
-    from victor.graph.duckdb_store import DuckDBGraphStore
+    from victor.storage.graph.duckdb_store import DuckDBGraphStore
 except Exception:  # pragma: no cover - optional backend
     DuckDBGraphStore = None
 try:
@@ -30,7 +30,7 @@ try:
 except Exception:  # pragma: no cover - defensive
     DUCKDB_AVAILABLE = False
 try:
-    from victor.graph.lancedb_store import LanceDBGraphStore
+    from victor.storage.graph.lancedb_store import LanceDBGraphStore
 except Exception:  # pragma: no cover - optional backend
     LanceDBGraphStore = None
 try:
@@ -40,7 +40,7 @@ try:
 except Exception:  # pragma: no cover - defensive
     LANCEDB_AVAILABLE = False
 try:
-    from victor.graph.neo4j_store import Neo4jGraphStore
+    from victor.storage.graph.neo4j_store import Neo4jGraphStore
 except Exception:  # pragma: no cover - optional backend
     Neo4jGraphStore = None
 try:

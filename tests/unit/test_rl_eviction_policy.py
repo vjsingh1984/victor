@@ -20,7 +20,7 @@ Tests the RL-based cache eviction policy.
 import pytest
 from unittest.mock import MagicMock
 
-from victor.cache.rl_eviction_policy import (
+from victor.storage.cache.rl_eviction_policy import (
     RLEvictionPolicy,
     CacheEntryState,
     EvictionAction,

@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.vector_stores.models import (
+from victor.storage.vector_stores.models import (
     EmbeddingModelConfig,
     OllamaEmbeddingModel,
     SentenceTransformerModel,
