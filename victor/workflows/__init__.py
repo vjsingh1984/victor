@@ -77,6 +77,9 @@ from victor.workflows.streaming import (
     WorkflowStreamChunk,
     WorkflowStreamContext,
 )
+from victor.workflows.streaming_executor import (
+    StreamingWorkflowExecutor,
+)
 from victor.workflows.yaml_loader import (
     YAMLWorkflowError,
     YAMLWorkflowConfig,
@@ -154,6 +157,7 @@ __all__ = [
     "WorkflowEventType",
     "WorkflowStreamChunk",
     "WorkflowStreamContext",
+    "StreamingWorkflowExecutor",
     # YAML Loader
     "YAMLWorkflowError",
     "YAMLWorkflowConfig",
