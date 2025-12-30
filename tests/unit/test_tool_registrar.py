@@ -379,58 +379,79 @@ class TestPluginInitialization:
         assert registrar.plugin_manager is None
 
 
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 class TestMCPIntegration:
-    """Tests for MCP integration."""
+    """Tests for MCP integration.
 
-    @pytest.fixture
-    def registrar(self):
-        """Create registrar with mocks."""
+    Note: These tests create the registrar with enable_mcp=False to avoid
+    calling _setup_mcp_integration() during __init__. This allows us to
+    properly mock MCPRegistry before calling _setup_mcp_integration() manually.
+
+    The filterwarnings decorator suppresses the expected "coroutine was never awaited"
+    warning that occurs when mocking _create_task in synchronous tests.
+    """
+
+    def _create_registrar(self, mcp_command: str = None):
+        """Create registrar with MCP disabled during init for proper mocking."""
         tools = MagicMock()
         tools.list_tools.return_value = []
         tools.register_dict.return_value = None
         settings = MagicMock()
         settings.load_tool_config.return_value = {}
-        settings.mcp_command = None
+        settings.mcp_command = mcp_command
         settings.use_mcp_tools = False
-        return ToolRegistrar(
-            tools=tools, settings=settings, config=ToolRegistrarConfig(enable_mcp=True)
+        # Create with enable_mcp=False to prevent _setup_mcp_integration during __init__
+        registrar = ToolRegistrar(
+            tools=tools, settings=settings, config=ToolRegistrarConfig(enable_mcp=False)
         )
+        # Enable MCP for manual testing
+        registrar.config = ToolRegistrarConfig(enable_mcp=True)
+        return registrar
 
-    @pytest.mark.skip(reason="MCP registry discover_servers triggers async code requiring event loop")
     @patch("victor.integrations.mcp.registry.MCPRegistry")
-    def test_setup_mcp_registry(self, mock_registry_class, registrar):
+    def test_setup_mcp_registry(self, mock_registry_class):
         """Test MCP registry setup."""
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        # Return servers to trigger full registry initialization path
+        mock_registry.list_servers.return_value = ["discovered_server"]
         mock_registry_class.discover_servers.return_value = mock_registry
 
+        registrar = self._create_registrar()
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         registrar._setup_mcp_integration()
 
         mock_registry_class.discover_servers.assert_called_once()
         assert registrar.mcp_registry is mock_registry
+        # Verify async startup was attempted
+        registrar._create_task.assert_called_once()
 
-    @pytest.mark.skip(reason="MCP registry discover_servers triggers async code requiring event loop")
     @patch("victor.integrations.mcp.registry.MCPRegistry")
-    def test_setup_mcp_with_command(self, mock_registry_class, registrar):
+    def test_setup_mcp_with_command(self, mock_registry_class):
         """Test MCP setup with command from settings."""
-        registrar.settings.mcp_command = "python mcp_server.py"
-
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        # Return servers after registration to trigger async startup path
+        mock_registry.list_servers.return_value = ["settings_mcp"]
         mock_registry_class.discover_servers.return_value = mock_registry
 
+        registrar = self._create_registrar(mcp_command="python mcp_server.py")
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         registrar._setup_mcp_integration()
 
         # Should register server from command
         mock_registry.register_server.assert_called_once()
 
-    @pytest.mark.skip(reason="MCP registry discover_servers triggers async code requiring event loop")
     @patch("victor.tools.mcp_bridge_tool.get_mcp_tool_definitions")
     @patch("victor.integrations.mcp.registry.MCPRegistry")
-    def test_register_mcp_tools(self, mock_registry_class, mock_get_tools, registrar):
+    def test_register_mcp_tools(self, mock_registry_class, mock_get_tools):
         """Test registering MCP tool definitions."""
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        mock_registry.list_servers.return_value = ["server1"]  # Has servers
         mock_registry_class.discover_servers.return_value = mock_registry
 
         mock_get_tools.return_value = [
@@ -438,6 +459,11 @@ class TestMCPIntegration:
             {"name": "mcp_tool2"},
         ]
 
+        registrar = self._create_registrar()
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         count = registrar._setup_mcp_integration()
 
         assert count == 2
