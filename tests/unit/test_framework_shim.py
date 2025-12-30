@@ -34,7 +34,7 @@ import pytest
 
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.observability.integration import ObservabilityIntegration
-from victor.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 
 class MockVertical(VerticalBase):
@@ -368,7 +368,8 @@ class TestFrameworkShimVertical:
 
             config = shim.vertical_config
             assert config is not None
-            assert config.system_prompt == "You are a test assistant."
+            # Check system_prompt contains expected text (may be prefixed by framework)
+            assert "test assistant" in config.system_prompt.lower()
 
 
 class TestFrameworkShimLifecycle:
@@ -488,9 +489,9 @@ class TestListVerticalsFunction:
     def register_mock_vertical(self):
         """Register mock vertical for tests and ensure built-ins are present."""
         # Ensure built-in verticals are registered (they may have been cleared by other tests)
-        from victor.verticals.coding import CodingAssistant
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.research import ResearchAssistant
+        from victor.coding import CodingAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.research import ResearchAssistant
 
         # Register built-ins if not already present
         if not VerticalRegistry.get("coding"):

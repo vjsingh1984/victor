@@ -19,9 +19,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from victor.graph.protocol import GraphNode, GraphEdge
-from victor.graph.registry import create_graph_store
-from victor.graph.memory_store import MemoryGraphStore
+from victor.storage.graph.protocol import GraphNode, GraphEdge
+from victor.storage.graph.registry import create_graph_store
+from victor.storage.graph.memory_store import MemoryGraphStore
 
 
 class TestGraphNode:
@@ -178,19 +178,19 @@ class TestCreateGraphStore:
         with pytest.raises(ValueError, match="Unsupported graph store backend"):
             create_graph_store("invalid_backend", Path("."))
 
-    @patch("victor.graph.registry.DuckDBGraphStore", None)
+    @patch("victor.storage.graph.registry.DuckDBGraphStore", None)
     def test_duckdb_not_installed(self):
         """Test DuckDB raises when not installed."""
         with pytest.raises(ValueError, match="DuckDB.*not installed"):
             create_graph_store("duckdb", Path("."))
 
-    @patch("victor.graph.registry.LanceDBGraphStore", None)
+    @patch("victor.storage.graph.registry.LanceDBGraphStore", None)
     def test_lancedb_not_installed(self):
         """Test LanceDB raises when not installed."""
         with pytest.raises(ValueError, match="LanceDB.*not installed"):
             create_graph_store("lancedb", Path("."))
 
-    @patch("victor.graph.registry.Neo4jGraphStore", None)
+    @patch("victor.storage.graph.registry.Neo4jGraphStore", None)
     def test_neo4j_not_installed(self):
         """Test Neo4j raises when not installed."""
         with pytest.raises(ValueError, match="Neo4j.*not installed"):
@@ -553,7 +553,7 @@ class TestGraphStoreProtocol:
 
     def test_protocol_methods_exist(self):
         """Test that protocol defines all required methods."""
-        from victor.graph.protocol import GraphStoreProtocol
+        from victor.storage.graph.protocol import GraphStoreProtocol
         import inspect
 
         # Get all abstract methods from protocol

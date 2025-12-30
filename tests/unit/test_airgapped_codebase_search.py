@@ -20,10 +20,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import numpy as np
 
-from victor.vector_stores.base import EmbeddingConfig
-from victor.vector_stores.lancedb_provider import LanceDBProvider
-from victor.vector_stores.chromadb_provider import ChromaDBProvider
-from victor.vector_stores.models import SentenceTransformerModel, EmbeddingModelConfig
+from victor.storage.vector_stores.base import EmbeddingConfig
+from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
+from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
+from victor.storage.vector_stores.models import SentenceTransformerModel, EmbeddingModelConfig
 
 # Check if chromadb is available
 import importlib.util
@@ -75,7 +75,7 @@ class TestUnifiedEmbeddingModel:
     @pytest.mark.asyncio
     async def test_unified_model_loads_once(self):
         """Test that unified model is loaded only once and shared via EmbeddingService."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         # Reset singleton to ensure clean state
         EmbeddingService.reset_instance()
@@ -89,12 +89,16 @@ class TestUnifiedEmbeddingModel:
             model_type="sentence-transformers", model_name="all-MiniLM-L12-v2", dimension=384
         )
 
-        with patch.object(EmbeddingService, "get_instance", return_value=mock_service):
+        # Patch at the location where it's imported in the model's initialize() method
+        with patch(
+            "victor.storage.embeddings.service.EmbeddingService.get_instance",
+            return_value=mock_service,
+        ) as mock_get_instance:
             model = SentenceTransformerModel(config)
             await model.initialize()
 
             # Should have called EmbeddingService.get_instance once
-            EmbeddingService.get_instance.assert_called_once_with(model_name="all-MiniLM-L12-v2")
+            mock_get_instance.assert_called_once_with(model_name="all-MiniLM-L12-v2")
             mock_service._ensure_model_loaded.assert_called_once()
 
         # Reset singleton after test
@@ -370,7 +374,7 @@ class TestAirgappedDemo:
             )
 
             with (
-                patch("victor.vector_stores.lancedb_provider.lancedb.connect") as mock_connect,
+                patch("victor.storage.vector_stores.lancedb_provider.lancedb.connect") as mock_connect,
                 patch("sentence_transformers.SentenceTransformer") as MockST,
             ):
 

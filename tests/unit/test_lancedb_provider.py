@@ -17,8 +17,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.vector_stores.base import EmbeddingConfig, SearchResult
-from victor.vector_stores.lancedb_provider import LanceDBProvider
+from victor.storage.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ class TestLanceDBProvider:
 
     def test_initialization(self, lancedb_config):
         """Test provider initialization."""
-        with patch("victor.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", True):
+        with patch("victor.storage.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", True):
             provider = LanceDBProvider(lancedb_config)
 
             assert provider.config == lancedb_config
@@ -75,7 +75,7 @@ class TestLanceDBProvider:
 
     def test_initialization_lancedb_not_available(self, lancedb_config):
         """Test initialization when LanceDB not available."""
-        with patch("victor.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", False):
+        with patch("victor.storage.vector_stores.lancedb_provider.LANCEDB_AVAILABLE", False):
             with pytest.raises(ImportError, match="LanceDB not available"):
                 LanceDBProvider(lancedb_config)
 
@@ -84,7 +84,7 @@ class TestLanceDBProvider:
         """Test initialization with persistent storage."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -113,7 +113,7 @@ class TestLanceDBProvider:
 
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -131,7 +131,7 @@ class TestLanceDBProvider:
         """Test single text embedding."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -151,7 +151,7 @@ class TestLanceDBProvider:
         """Test batch embedding."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -173,7 +173,7 @@ class TestLanceDBProvider:
         """Test indexing single document when table doesn't exist."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -203,7 +203,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.table_names.return_value = ["test_table"]  # Table exists
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -231,7 +231,7 @@ class TestLanceDBProvider:
         """Test batch indexing documents."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -285,7 +285,7 @@ class TestLanceDBProvider:
         mock_search.limit.return_value = mock_search_result
         mock_table.search.return_value = mock_search
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -308,7 +308,7 @@ class TestLanceDBProvider:
         """Test search when table doesn't exist."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -327,7 +327,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.table_names.return_value = ["test_table"]
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -345,7 +345,7 @@ class TestLanceDBProvider:
         """Test delete when table doesn't exist."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -363,7 +363,7 @@ class TestLanceDBProvider:
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.table_names.return_value = ["test_table"]
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -385,7 +385,7 @@ class TestLanceDBProvider:
         mock_db.table_names.return_value = ["test_table"]
         mock_table.count_rows.return_value = 42
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -408,7 +408,7 @@ class TestLanceDBProvider:
         """Test stats when table doesn't exist."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)
@@ -426,7 +426,7 @@ class TestLanceDBProvider:
         """Test cleanup."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        with patch("victor.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.lancedb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension = MagicMock(return_value=3584)

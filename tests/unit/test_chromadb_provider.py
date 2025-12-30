@@ -17,8 +17,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.vector_stores.base import EmbeddingConfig, SearchResult
-from victor.vector_stores.chromadb_provider import ChromaDBProvider
+from victor.storage.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def mock_chromadb():
 
     # Patch chromadb.Client directly instead of through module
     with patch("chromadb.Client") as mock_client_class:
-        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
             mock_client = MagicMock()
             mock_collection = MagicMock()
             mock_collection.name = "test_collection"
@@ -65,7 +65,7 @@ class TestChromaDBProvider:
 
     def test_initialization(self, chroma_config):
         """Test provider initialization."""
-        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
             provider = ChromaDBProvider(chroma_config)
 
             assert provider.config == chroma_config
@@ -76,7 +76,7 @@ class TestChromaDBProvider:
 
     def test_initialization_chromadb_not_available(self, chroma_config):
         """Test initialization when ChromaDB not available."""
-        with patch("victor.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", False):
+        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", False):
             with pytest.raises(ImportError, match="ChromaDB not available"):
                 ChromaDBProvider(chroma_config)
 
@@ -85,7 +85,7 @@ class TestChromaDBProvider:
         """Test initialization with persistent storage."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -114,7 +114,7 @@ class TestChromaDBProvider:
 
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -130,7 +130,7 @@ class TestChromaDBProvider:
         """Test single text embedding."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -150,7 +150,7 @@ class TestChromaDBProvider:
         """Test batch embedding."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -172,7 +172,7 @@ class TestChromaDBProvider:
         """Test indexing single document."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -198,7 +198,7 @@ class TestChromaDBProvider:
         """Test batch indexing documents."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -234,7 +234,7 @@ class TestChromaDBProvider:
             "distances": [[0.1, 0.2]],
         }
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -257,7 +257,7 @@ class TestChromaDBProvider:
         """Test deleting document."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -275,7 +275,7 @@ class TestChromaDBProvider:
         """Test clearing entire index."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096
@@ -296,7 +296,7 @@ class TestChromaDBProvider:
         mock_chroma, mock_client, mock_collection = mock_chromadb
         mock_collection.count.return_value = 42
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             # get_dimension is synchronous, not async
@@ -320,7 +320,7 @@ class TestChromaDBProvider:
         """Test cleanup."""
         mock_chroma, mock_client, mock_collection = mock_chromadb
 
-        with patch("victor.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
+        with patch("victor.storage.vector_stores.chromadb_provider.create_embedding_model") as mock_create:
             mock_embedding_model = AsyncMock()
             mock_embedding_model.initialize = AsyncMock()
             mock_embedding_model.get_dimension.return_value = 4096

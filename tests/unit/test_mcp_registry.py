@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.mcp.registry import (
+from victor.integrations.mcp.registry import (
     ServerStatus,
     MCPServerConfig,
     ServerEntry,
@@ -148,7 +148,7 @@ class TestMCPRegistryConnect:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is True
             assert registry._servers["test"].status == ServerStatus.CONNECTED
@@ -164,7 +164,7 @@ class TestMCPRegistryConnect:
         mock_client = MagicMock()
         mock_client.connect = AsyncMock(return_value=False)
 
-        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is False
             assert registry._servers["test"].status == ServerStatus.FAILED
@@ -180,7 +180,7 @@ class TestMCPRegistryConnect:
         mock_client = MagicMock()
         mock_client.connect = AsyncMock(side_effect=Exception("Connection error"))
 
-        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is False
             assert registry._servers["test"].status == ServerStatus.FAILED
@@ -229,7 +229,7 @@ class TestMCPRegistryConnect:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             results = await registry.connect_all()
             # Only s1 and s3 have auto_connect=True
             assert "s1" in results
@@ -367,7 +367,7 @@ class TestMCPRegistryStartStop:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch("victor.mcp.registry.MCPClient", return_value=mock_client):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             await registry.start()
             assert registry._running is True
             # Clean up
@@ -399,7 +399,7 @@ class TestMCPRegistryCallTool:
     @pytest.mark.asyncio
     async def test_call_tool_success(self):
         """Test successful tool call."""
-        from victor.mcp.protocol import MCPToolCallResult
+        from victor.integrations.mcp.protocol import MCPToolCallResult
 
         registry = MCPRegistry()
         config = MCPServerConfig(name="test", command=["echo"])

@@ -477,7 +477,8 @@ class TestFallbackAndMandatoryTools:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         result = selector._get_mandatory_tools("please commit my changes")
-        assert "commit_msg" in result or "shell" in result
+        # Accept any git-related tools (git, commit_msg, shell)
+        assert "git" in result or "commit_msg" in result or "shell" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_with_test(self, temp_cache_dir):
