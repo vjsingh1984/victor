@@ -49,7 +49,7 @@ from victor.workflows.yaml_loader import (
     load_workflow_from_file,
     load_workflows_from_directory,
 )
-from victor.verticals.protocols import WorkflowProviderProtocol
+from victor.core.verticals.protocols import WorkflowProviderProtocol
 
 logger = logging.getLogger(__name__)
 

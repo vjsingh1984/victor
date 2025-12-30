@@ -130,7 +130,7 @@ class EntitiesCommand(BaseSlashCommand):
     def _list_entities(self, ctx: CommandContext, args: list) -> None:
         """List entities in memory."""
         try:
-            from victor.memory import EntityMemory, EntityType
+            from victor.storage.memory import EntityMemory, EntityType
 
             memory = self._get_entity_memory(ctx)
             if not memory:

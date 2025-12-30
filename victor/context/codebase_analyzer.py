@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor_coding.codebase.ignore_patterns import (
+from victor.coding.codebase.ignore_patterns import (
     DEFAULT_SKIP_DIRS,
     is_hidden_path,
     should_ignore_path,
@@ -1661,7 +1661,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
     """Summarize embedding/cache health for init.md enrichment."""
     root = Path(root_path).resolve() if root_path else Path.cwd()
     try:
-        from victor.cache.embedding_cache_manager import EmbeddingCacheManager
+        from victor.storage.cache.embedding_cache_manager import EmbeddingCacheManager
     except Exception as exc:  # pragma: no cover - optional dependency at runtime
         logger.debug("Embedding manager unavailable: %s", exc)
         return None
@@ -2058,7 +2058,7 @@ async def generate_victor_md_from_index(
     Returns:
         Generated markdown content for .victor/init.md.
     """
-    from victor_coding.codebase.symbol_store import SymbolStore
+    from victor.coding.codebase.symbol_store import SymbolStore
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
@@ -2569,7 +2569,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     """
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-    from victor_coding.codebase.graph.registry import create_graph_store
+    from victor.coding.codebase.graph.registry import create_graph_store
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     graph_dir = root / ".victor" / "graph"
@@ -2693,7 +2693,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Optional richer graph analytics
             try:
                 from victor.tools.graph_tool import GraphAnalyzer
-                from victor_coding.codebase.graph.sqlite_store import SQLiteGraphStore
+                from victor.coding.codebase.graph.sqlite_store import SQLiteGraphStore
 
                 ga = GraphAnalyzer()
                 store = SQLiteGraphStore(graph_db_path)

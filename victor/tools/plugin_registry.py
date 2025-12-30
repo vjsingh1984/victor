@@ -77,8 +77,6 @@ class ToolPluginRegistry:
         plugin_dirs: List of directories to search for plugins
         config: Plugin configuration dictionary
         loaded_plugins: Dictionary of loaded plugins by name
-
-    Note: Previously named `ToolPluginManager`. Alias kept for backward compatibility.
     """
 
     def __init__(
@@ -549,7 +547,3 @@ class ToolPluginRegistry:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - cleanup all plugins."""
         self.cleanup_all()
-
-
-# Backward compatibility alias
-ToolPluginManager = ToolPluginRegistry

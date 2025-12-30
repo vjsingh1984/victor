@@ -14,17 +14,72 @@
 
 """Provider registry for managing and discovering LLM providers."""
 
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Optional, Type
 
+from victor.core.registry import BaseRegistry
 from victor.providers.base import BaseProvider, ProviderNotFoundError
 
 __all__ = ["ProviderRegistry", "ProviderNotFoundError"]
 
 
-class ProviderRegistry:
-    """Registry for LLM provider management."""
+class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
+    """Internal registry implementation for provider management.
 
-    _providers: Dict[str, Type[BaseProvider]] = {}
+    Extends BaseRegistry to provide provider-specific functionality including:
+    - Factory method for instantiating providers
+    - Raises ProviderNotFoundError on missing providers
+    """
+
+    def get_or_raise(self, name: str) -> Type[BaseProvider]:
+        """Get a provider class by name, raising if not found.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            Provider class
+
+        Raises:
+            ProviderNotFoundError: If provider not found
+        """
+        provider = self.get(name)
+        if provider is None:
+            raise ProviderNotFoundError(
+                message=f"Provider '{name}' not found. Available: {', '.join(self.list_all())}",
+                provider=name,
+            )
+        return provider
+
+    def create(self, name: str, **kwargs: Any) -> BaseProvider:
+        """Create a provider instance.
+
+        Args:
+            name: Provider name
+            **kwargs: Provider initialization arguments
+
+        Returns:
+            Provider instance
+
+        Raises:
+            ProviderNotFoundError: If provider not found
+        """
+        provider_class = self.get_or_raise(name)
+        return provider_class(**kwargs)
+
+
+# Singleton instance for backward compatibility
+_registry_instance = _ProviderRegistryImpl()
+
+
+class ProviderRegistry:
+    """Registry for LLM provider management.
+
+    This is a static class facade that maintains backward compatibility
+    with existing code while delegating to a BaseRegistry-based implementation.
+
+    For new code, consider using the instance-based approach via
+    `get_provider_registry()` for better testability.
+    """
 
     @classmethod
     def register(cls, name: str, provider_class: Type[BaseProvider]) -> None:
@@ -34,7 +89,7 @@ class ProviderRegistry:
             name: Provider name (e.g., "ollama", "anthropic")
             provider_class: Provider class
         """
-        cls._providers[name] = provider_class
+        _registry_instance.register(name, provider_class)
 
     @classmethod
     def get(cls, name: str) -> Type[BaseProvider]:
@@ -49,13 +104,19 @@ class ProviderRegistry:
         Raises:
             ProviderNotFoundError: If provider not found
         """
-        provider = cls._providers.get(name)
-        if provider is None:
-            raise ProviderNotFoundError(
-                message=f"Provider '{name}' not found. Available: {', '.join(cls._providers.keys())}",
-                provider=name,
-            )
-        return provider
+        return _registry_instance.get_or_raise(name)
+
+    @classmethod
+    def get_optional(cls, name: str) -> Optional[Type[BaseProvider]]:
+        """Get a provider class by name, returning None if not found.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            Provider class or None if not found
+        """
+        return _registry_instance.get(name)
 
     @classmethod
     def create(cls, name: str, **kwargs: Any) -> BaseProvider:
@@ -71,17 +132,16 @@ class ProviderRegistry:
         Raises:
             ProviderNotFoundError: If provider not found
         """
-        provider_class = cls.get(name)
-        return provider_class(**kwargs)
+        return _registry_instance.create(name, **kwargs)
 
     @classmethod
-    def list_providers(cls) -> list[str]:
+    def list_providers(cls) -> List[str]:
         """List all registered provider names.
 
         Returns:
             List of provider names
         """
-        return list(cls._providers.keys())
+        return _registry_instance.list_all()
 
     @classmethod
     def is_registered(cls, name: str) -> bool:
@@ -93,7 +153,36 @@ class ProviderRegistry:
         Returns:
             True if registered, False otherwise
         """
-        return name in cls._providers
+        return name in _registry_instance
+
+    @classmethod
+    def unregister(cls, name: str) -> bool:
+        """Unregister a provider.
+
+        Args:
+            name: Provider name
+
+        Returns:
+            True if the provider was found and removed, False otherwise
+        """
+        return _registry_instance.unregister(name)
+
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all registered providers."""
+        _registry_instance.clear()
+
+
+def get_provider_registry() -> _ProviderRegistryImpl:
+    """Get the provider registry instance.
+
+    This function provides access to the underlying BaseRegistry-based
+    implementation for testing or advanced use cases.
+
+    Returns:
+        The singleton provider registry instance
+    """
+    return _registry_instance
 
 
 # Auto-register all providers

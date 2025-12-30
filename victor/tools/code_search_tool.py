@@ -212,7 +212,7 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
-    from victor_coding.codebase.indexer import CodebaseIndex
+    from victor.coding.codebase.indexer import CodebaseIndex
 
     # Get cache using DI-aware accessor
     index_cache = _get_index_cache(exec_ctx)
@@ -533,7 +533,7 @@ async def code_search(
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid and results:
             try:
-                from victor_coding.codebase.hybrid_search import create_hybrid_search_engine
+                from victor.coding.codebase.hybrid_search import create_hybrid_search_engine
 
                 # Get keyword search results
                 keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)

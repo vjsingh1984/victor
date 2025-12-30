@@ -21,7 +21,7 @@ audit logging, compliance checking, and report generation.
 import logging
 from typing import Any
 
-from victor.audit import (
+from victor.security.audit import (
     AuditManager,
     AuditReport,
     ComplianceFramework,

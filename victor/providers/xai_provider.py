@@ -34,7 +34,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderError,
     ProviderRateLimitError,
     ProviderTimeoutError,
@@ -553,7 +553,7 @@ class XAIProvider(BaseProvider):
             error_msg = f"HTTP {status_code} error (response body not available)"
 
         if status_code == 401:
-            raise ProviderAuthenticationError(
+            raise ProviderAuthError(
                 message=f"Authentication failed: {error_msg}",
                 provider=self.name,
                 status_code=status_code,

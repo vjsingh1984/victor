@@ -40,10 +40,7 @@ from victor.tools.decorators import tool
 
 
 class CodeSandbox:
-    """Manages a persistent, isolated Docker container for stateful code execution.
-
-    Note: Previously named `CodeExecutionManager`. Alias kept for backward compatibility.
-    """
+    """Manages a persistent, isolated Docker container for stateful code execution."""
 
     def __init__(
         self,
@@ -203,10 +200,6 @@ class CodeSandbox:
                 if file_obj:
                     return file_obj.read()
         raise FileNotFoundError(f"File not found in container: {remote_path}")
-
-
-# Backward compatibility alias
-CodeExecutionManager = CodeSandbox
 
 
 async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:

@@ -205,76 +205,6 @@ from victor.evaluation.evaluation_orchestrator import (
     run_swe_bench_evaluation,
 )
 
-# Backward compatibility aliases for deprecated multilevel harness
-# The multilevel_harness module has been removed. Use:
-# - CodeGenerationBenchmark for HumanEval/MBPP (provider-only)
-# - AgenticBenchmarkRunner for SWE-bench style tasks (with tools)
-#
-# Legacy imports are aliased to the new code_generation_harness for compatibility:
-from enum import Enum
-
-
-class BenchmarkLevel(Enum):
-    """Deprecated: Use CodeGenerationBenchmark for HumanEval."""
-
-    PROVIDER = "provider"
-
-
-# Aliases for backward compatibility
-LevelMetrics = CodeGenMetrics
-TaskExecutionResult = CodeGenResult
-BaseLevelRunner = CodeGenerationRunner
-ProviderLevelRunner = CodeGenerationRunner
-MultiLevelBenchmark = CodeGenerationBenchmark
-create_provider_runner = create_code_gen_runner
-
-
-# Stubs for removed orchestrator/cli runners (not appropriate for HumanEval)
-def create_orchestrator_runner(*args, **kwargs):
-    """Deprecated: Orchestrator mode not appropriate for HumanEval.
-
-    For agentic benchmarks (SWE-bench), use AgenticBenchmarkRunner instead.
-    """
-    raise NotImplementedError(
-        "Orchestrator mode has been removed from HumanEval benchmarks. "
-        "Use CodeGenerationBenchmark for code generation tasks or "
-        "AgenticBenchmarkRunner for agentic tasks requiring tools."
-    )
-
-
-def create_cli_runner(*args, **kwargs):
-    """Deprecated: CLI mode not appropriate for HumanEval.
-
-    For agentic benchmarks (SWE-bench), use AgenticBenchmarkRunner instead.
-    """
-    raise NotImplementedError(
-        "CLI mode has been removed from HumanEval benchmarks. "
-        "Use CodeGenerationBenchmark for code generation tasks or "
-        "AgenticBenchmarkRunner for agentic tasks requiring tools."
-    )
-
-
-# These classes don't exist anymore - raise helpful errors
-class OrchestratorLevelRunner:
-    """Deprecated: Use AgenticBenchmarkRunner for agentic tasks."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            "OrchestratorLevelRunner has been removed. "
-            "Use AgenticBenchmarkRunner for SWE-bench style agentic tasks."
-        )
-
-
-class CLILevelRunner:
-    """Deprecated: Use AgenticBenchmarkRunner for agentic tasks."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            "CLILevelRunner has been removed. "
-            "Use AgenticBenchmarkRunner for SWE-bench style agentic tasks."
-        )
-
-
 __all__ = [
     # Protocol types
     "BenchmarkMetadata",
@@ -332,18 +262,6 @@ __all__ = [
     "ToolUsageValidator",
     "AgenticBenchmarkRunner",
     "generate_agentic_report",
-    # Deprecated multi-level harness (kept for backward compatibility)
-    "BenchmarkLevel",
-    "LevelMetrics",
-    "TaskExecutionResult",
-    "BaseLevelRunner",
-    "ProviderLevelRunner",
-    "OrchestratorLevelRunner",
-    "CLILevelRunner",
-    "MultiLevelBenchmark",
-    "create_provider_runner",
-    "create_orchestrator_runner",
-    "create_cli_runner",
     # SWE-bench loader and workspace management
     "SWEBenchConfig",
     "SWEBenchInstance",

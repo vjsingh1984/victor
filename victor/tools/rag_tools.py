@@ -14,7 +14,7 @@
 
 """RAG Tools - Auto-discovery wrappers for RAG vertical tools.
 
-This module re-exports RAG tools from victor.verticals.rag.tools so they
+This module re-exports RAG tools from victor.rag.tools so they
 can be auto-discovered by the ToolRegistrar.
 
 Tools:
@@ -27,10 +27,10 @@ Tools:
 """
 
 # Re-export RAG tools for auto-discovery
-from victor.verticals.rag.tools.ingest import RAGIngestTool
-from victor.verticals.rag.tools.search import RAGSearchTool
-from victor.verticals.rag.tools.query import RAGQueryTool
-from victor.verticals.rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
+from victor.rag.tools.ingest import RAGIngestTool
+from victor.rag.tools.search import RAGSearchTool
+from victor.rag.tools.query import RAGQueryTool
+from victor.rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
 
 # List of tool classes for auto-discovery
 TOOL_CLASSES = [

@@ -16,6 +16,7 @@
 
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
 
 
@@ -63,20 +64,41 @@ class Hook:
         return self.callback(*args, **kwargs)
 
 
-class ToolRegistry:
-    """Registry for managing available tools."""
+class ToolRegistry(BaseRegistry[str, Any]):
+    """Registry for managing available tools.
+
+    Extends BaseRegistry to provide tool-specific functionality including:
+    - Hook system for pre/post execution callbacks
+    - Tool enable/disable state management
+    - Cost tier filtering
+    - JSON schema generation
+
+    The generic type is Any to avoid circular import with BaseTool,
+    but values are always BaseTool instances.
+    """
 
     def __init__(self) -> None:
         """Initialize tool registry."""
+        super().__init__()
         # Import here to avoid circular dependency
         from victor.tools.base import BaseTool, ToolResult
 
         self._BaseTool = BaseTool
         self._ToolResult = ToolResult
-        self._tools: Dict[str, BaseTool] = {}
+        # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
         self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
         self._after_hooks: List[Union[Hook, Callable]] = []
+
+    @property
+    def _tools(self) -> Dict[str, Any]:
+        """Alias for _items to maintain backward compatibility."""
+        return self._items
+
+    @_tools.setter
+    def _tools(self, value: Dict[str, Any]) -> None:
+        """Setter for _tools alias."""
+        self._items = value
 
     def _wrap_hook(
         self, hook: Union[Hook, Callable], critical: bool = False, name: str = ""
@@ -120,10 +142,14 @@ class ToolRegistry:
         wrapped = self._wrap_hook(hook, critical=critical, name=name)
         self._after_hooks.append(wrapped)
 
-    def register(self, tool: Any, enabled: bool = True) -> None:
+    def register(self, tool: Any, enabled: bool = True) -> None:  # type: ignore[override]
         """Register a tool.
 
         Can register a BaseTool instance or a function decorated with @tool.
+
+        Note:
+            This overrides BaseRegistry.register() to accept tool objects directly
+            instead of key-value pairs. The tool's name property is used as the key.
 
         Args:
             tool: Tool instance or decorated function to register
@@ -131,10 +157,10 @@ class ToolRegistry:
         """
         if hasattr(tool, "Tool"):  # It's a decorated function
             tool_instance = tool.Tool
-            self._tools[tool_instance.name] = tool_instance
+            super().register(tool_instance.name, tool_instance)
             self._tool_enabled[tool_instance.name] = enabled
         elif isinstance(tool, self._BaseTool):  # It's a class instance
-            self._tools[tool.name] = tool
+            super().register(tool.name, tool)
             self._tool_enabled[tool.name] = enabled
         else:
             raise TypeError(
@@ -179,17 +205,20 @@ class ToolRegistry:
                     error="MCP tools should be called via mcp_call",
                 )
 
-        self._tools[name] = DictTool()
+        super().register(name, DictTool())
         self._tool_enabled[name] = enabled
 
-    def unregister(self, name: str) -> None:
+    def unregister(self, name: str) -> bool:  # type: ignore[override]
         """Unregister a tool.
 
         Args:
             name: Tool name to unregister
+
+        Returns:
+            True if the tool was found and removed, False otherwise
         """
-        self._tools.pop(name, None)
         self._tool_enabled.pop(name, None)
+        return super().unregister(name)
 
     def enable_tool(self, name: str) -> bool:
         """Enable a tool by name.
@@ -257,7 +286,7 @@ class ToolRegistry:
         Returns:
             Tool instance or None if not found
         """
-        return self._tools.get(name)
+        return super().get(name)
 
     def list_tools(self, only_enabled: bool = True) -> list:
         """List all registered tools.

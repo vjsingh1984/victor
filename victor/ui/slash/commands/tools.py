@@ -216,7 +216,7 @@ class MCPCommand(BaseSlashCommand):
 
     def execute(self, ctx: CommandContext) -> None:
         try:
-            from victor.mcp.registry import MCPRegistry
+            from victor.integrations.mcp.registry import MCPRegistry
 
             registry = MCPRegistry()
             servers = registry.list_servers()

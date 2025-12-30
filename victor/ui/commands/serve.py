@@ -106,7 +106,7 @@ async def _run_aiohttp_server(host: str, port: int, profile: str) -> None:
     try:
         from pathlib import Path
 
-        from victor.api.server import VictorAPIServer
+        from victor.integrations.api.server import VictorAPIServer
 
         server = VictorAPIServer(
             host=host,
@@ -140,7 +140,7 @@ async def _run_fastapi_server(host: str, port: int, profile: str) -> None:
 
         import uvicorn
 
-        from victor.api.fastapi_server import VictorFastAPIServer
+        from victor.integrations.api.fastapi_server import VictorFastAPIServer
 
         server = VictorFastAPIServer(
             host=host,

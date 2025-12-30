@@ -31,6 +31,7 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     get_registered_workflows,
 )
+from victor.framework.tool_naming import canonicalize_tool_list, validate_tool_names
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,9 @@ class WorkflowRegistry:
     ) -> None:
         """Register a workflow definition.
 
+        Tool names in workflow nodes are automatically canonicalized
+        to ensure consistency across verticals.
+
         Args:
             workflow: The workflow to register
             replace: If True, replace existing workflow with same name
@@ -126,6 +130,9 @@ class WorkflowRegistry:
         if workflow.name in self._definitions and not replace:
             raise ValueError(f"Workflow '{workflow.name}' already registered")
 
+        # Canonicalize tool names in workflow nodes
+        self._canonicalize_workflow_tools(workflow)
+
         errors = workflow.validate()
         if errors:
             raise ValueError(f"Invalid workflow: {'; '.join(errors)}")
@@ -133,6 +140,37 @@ class WorkflowRegistry:
         self._definitions[workflow.name] = workflow
         self._metadata[workflow.name] = WorkflowMetadata.from_definition(workflow)
         logger.info(f"Registered workflow: {workflow.name}")
+
+    def _canonicalize_workflow_tools(self, workflow: WorkflowDefinition) -> None:
+        """Canonicalize tool names in a workflow definition.
+
+        Ensures consistent tool naming across all verticals by converting
+        legacy names (e.g., 'read_file') to canonical names (e.g., 'read').
+
+        Args:
+            workflow: Workflow definition to update
+        """
+        for node in workflow.nodes:
+            # Check for allowed_tools on node
+            allowed_tools = getattr(node, "allowed_tools", None)
+            if allowed_tools and isinstance(allowed_tools, list):
+                # Validate and warn about legacy names
+                legacy = validate_tool_names(
+                    allowed_tools, context=f"workflow {workflow.name}", warn=True
+                )
+
+                # Canonicalize tool names
+                canonical_tools = canonicalize_tool_list(allowed_tools)
+
+                # Update node's allowed_tools
+                try:
+                    node.allowed_tools = canonical_tools
+                except AttributeError:
+                    if legacy:
+                        logger.warning(
+                            f"Cannot update frozen node tools in {workflow.name}. "
+                            f"Consider using canonical names: {legacy}"
+                        )
 
     def register_factory(
         self,
@@ -208,18 +246,24 @@ class WorkflowRegistry:
         names.update(self._factories.keys())
         return sorted(names)
 
-    def list_metadata(self) -> List[WorkflowMetadata]:
+    def list_metadata(self, materialize: bool = False) -> List[WorkflowMetadata]:
         """List metadata for all workflows.
 
-        Note: This will instantiate all factory-registered workflows.
+        Args:
+            materialize: If True, instantiate all factory-registered workflows.
+                        If False (default), only return cached metadata.
+
+        Note: With materialize=False, factories that haven't been accessed
+              won't appear in the results.
 
         Returns:
             List of WorkflowMetadata
         """
-        # Ensure all factories are instantiated
-        for name in self._factories:
-            if name not in self._definitions:
-                self.get(name)
+        if materialize:
+            # Original behavior: ensure all factories are instantiated
+            for name in self._factories:
+                if name not in self._definitions:
+                    self.get(name)
 
         return list(self._metadata.values())
 

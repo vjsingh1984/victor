@@ -24,7 +24,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderError,
     ProviderRateLimitError,
     StreamChunk,
@@ -374,7 +374,7 @@ class AnthropicProvider(BaseProvider):
         error_msg = str(error)
 
         if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise ProviderAuthenticationError(
+            raise ProviderAuthError(
                 message=f"Authentication failed: {error_msg}",
                 provider=self.name,
                 raw_error=error,

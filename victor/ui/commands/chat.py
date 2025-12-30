@@ -14,7 +14,7 @@ from rich.prompt import Confirm, Prompt
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
 from victor.framework.shim import FrameworkShim
-from victor.verticals import get_vertical, list_verticals
+from victor.core.verticals import get_vertical, list_verticals
 from victor.ui.output_formatter import InputReader, create_formatter
 from victor.ui.commands.utils import (
     preload_semantic_index,

@@ -21,7 +21,7 @@ merge conflict detection and resolution.
 import logging
 from typing import Any
 
-from victor.merge import (
+from victor.processing.merge import (
     FileResolution,
     MergeManager,
     ResolutionStrategy,

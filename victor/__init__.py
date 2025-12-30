@@ -37,7 +37,7 @@ Full API (advanced):
 
 For coding-specific features:
     from victor_coding import CodingVertical
-    from victor_coding.codebase import CodebaseIndex
+    from victor.coding.codebase import CodebaseIndex
 """
 
 __version__ = "0.3.0"

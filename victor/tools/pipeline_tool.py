@@ -22,7 +22,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from victor.pipeline import (
+from victor.observability.pipeline import (
     CoverageMetrics,
     PipelineAnalysisResult,
     PipelineManager,

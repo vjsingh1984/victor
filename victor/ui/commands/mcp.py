@@ -8,7 +8,7 @@ import importlib
 
 from rich.console import Console
 
-from victor.mcp.server import MCPServer
+from victor.integrations.mcp.server import MCPServer
 from victor.tools.base import ToolRegistry
 
 mcp_app = typer.Typer(name="mcp", help="Run Victor as an MCP server.")

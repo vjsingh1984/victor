@@ -6,7 +6,7 @@ from rich.prompt import Confirm
 from typing import Optional
 from pathlib import Path
 
-from victor.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
+from victor.storage.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
 
 embeddings_app = typer.Typer(
     name="embeddings", help="Manage Victor embeddings for troubleshooting."

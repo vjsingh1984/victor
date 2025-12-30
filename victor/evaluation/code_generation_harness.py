@@ -395,8 +395,3 @@ def create_code_gen_runner(
     )
 
     return CodeGenerationRunner(provider, model_name, timeout)
-
-
-# Backward compatibility aliases
-ProviderLevelRunner = CodeGenerationRunner
-MultiLevelBenchmark = CodeGenerationBenchmark

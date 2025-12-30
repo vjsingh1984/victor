@@ -12,27 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor Protocols Module.
+"""This module has moved to victor.integrations.protocols.
 
-Provides SOLID-based protocol interfaces for:
-- Provider adaptation (IProviderAdapter)
-- Grounding verification (IGroundingStrategy)
-- Quality assessment (IQualityAssessor)
-
-These protocols enable clean separation of concerns and
-dependency inversion throughout the codebase.
+This stub provides backward compatibility. Please update imports to use:
+    from victor.integrations.protocols import ...
 """
 
-from victor.protocols.provider_adapter import (
+# Re-export all public symbols for backward compatibility
+from victor.integrations.protocols import (
+    # Provider Adapter
     IProviderAdapter,
     ProviderCapabilities,
     ToolCallFormat,
     ToolCall,
     get_provider_adapter,
     register_provider_adapter,
-)
-
-from victor.protocols.grounding import (
+    # Grounding
     IGroundingStrategy,
     GroundingClaimType,
     GroundingClaim,
@@ -42,9 +37,7 @@ from victor.protocols.grounding import (
     SymbolReferenceStrategy,
     ContentMatchStrategy,
     CompositeGroundingVerifier,
-)
-
-from victor.protocols.quality import (
+    # Quality
     IQualityAssessor,
     QualityDimension,
     DimensionScore,
@@ -53,44 +46,37 @@ from victor.protocols.quality import (
     SimpleQualityAssessor,
     ProviderAwareQualityAssessor,
     CompositeQualityAssessor,
-)
-
-from victor.protocols.mode_aware import (
+    # Mode Awareness
     IModeController,
     ModeInfo,
     ModeAwareMixin,
     create_mode_aware_mixin,
-)
-
-from victor.protocols.path_resolver import (
+    # Path Resolution
     IPathResolver,
     PathResolution,
     PathResolver,
     create_path_resolver,
-)
-
-from victor.protocols.lsp_types import (
-    # Enumerations
+    # LSP Types - Enumerations
     DiagnosticSeverity,
     CompletionItemKind,
     SymbolKind,
     DiagnosticTag,
-    # Position and Range
+    # LSP Types - Position and Range
     Position,
     Range,
     Location,
     LocationLink,
-    # Diagnostics
+    # LSP Types - Diagnostics
     DiagnosticRelatedInformation,
     Diagnostic,
-    # Completions
+    # LSP Types - Completions
     CompletionItem,
-    # Hover
+    # LSP Types - Hover
     Hover,
-    # Symbols
+    # LSP Types - Symbols
     DocumentSymbol,
     SymbolInformation,
-    # Text Edits
+    # LSP Types - Text Edits
     TextEdit,
     TextDocumentIdentifier,
     VersionedTextDocumentIdentifier,
