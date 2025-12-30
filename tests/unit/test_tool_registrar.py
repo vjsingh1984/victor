@@ -718,6 +718,144 @@ class TestShutdown:
         await registrar.shutdown()
 
 
+class TestLazyToolLoading:
+    """Tests for lazy tool loading behavior.
+
+    These tests verify that tools are NOT loaded during ToolRegistrar initialization,
+    but ARE loaded on first access (lazy loading pattern for faster startup).
+    """
+
+    @pytest.fixture
+    def mock_tools(self):
+        """Create mock tool registry."""
+        tools = MagicMock()
+        tools.list_tools.return_value = []
+        tools.get.return_value = None
+        return tools
+
+    @pytest.fixture
+    def mock_settings(self):
+        """Create mock settings."""
+        settings = MagicMock()
+        settings.load_tool_config.return_value = {}
+        return settings
+
+    def test_tools_not_loaded_on_init(self, mock_tools, mock_settings):
+        """Test that tools are NOT loaded during registrar initialization.
+
+        This is the key test for lazy loading - _register_dynamic_tools should
+        NOT be called during __init__.
+        """
+        with patch.object(ToolRegistrar, "_register_dynamic_tools") as mock_register:
+            registrar = ToolRegistrar(
+                tools=mock_tools,
+                settings=mock_settings,
+            )
+
+            # Tools should NOT be loaded on init
+            mock_register.assert_not_called()
+
+            # Flag should indicate tools not yet loaded
+            assert registrar._tools_loaded is False
+
+    def test_tools_loaded_on_first_access_via_get_all_tools(self, mock_tools, mock_settings):
+        """Test that tools ARE loaded when first accessed via get_all_tools()."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Before access, tools not loaded
+        assert registrar._tools_loaded is False
+
+        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
+            with patch.object(registrar, "_load_tool_configurations"):
+                # Access tools via get_all_tools
+                registrar.get_all_tools()
+
+                # Now tools should be loaded
+                mock_register.assert_called_once()
+                assert registrar._tools_loaded is True
+
+    def test_tools_loaded_on_first_access_via_get_tool(self, mock_tools, mock_settings):
+        """Test that tools ARE loaded when first accessed via get_tool()."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Before access, tools not loaded
+        assert registrar._tools_loaded is False
+
+        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
+            with patch.object(registrar, "_load_tool_configurations"):
+                # Access tools via get_tool
+                registrar.get_tool("some_tool")
+
+                # Now tools should be loaded
+                mock_register.assert_called_once()
+                assert registrar._tools_loaded is True
+
+    def test_subsequent_accesses_dont_reload_tools(self, mock_tools, mock_settings):
+        """Test that subsequent accesses don't reload tools (only loads once)."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
+            with patch.object(registrar, "_load_tool_configurations"):
+                # First access triggers loading
+                registrar.get_all_tools()
+                assert mock_register.call_count == 1
+
+                # Second access should NOT reload
+                registrar.get_all_tools()
+                assert mock_register.call_count == 1
+
+                # Third access via different method also should NOT reload
+                registrar.get_tool("test")
+                assert mock_register.call_count == 1
+
+    def test_ensure_tools_loaded_is_idempotent(self, mock_tools, mock_settings):
+        """Test that _ensure_tools_loaded() is idempotent."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
+            with patch.object(registrar, "_load_tool_configurations"):
+                # Call multiple times
+                registrar._ensure_tools_loaded()
+                registrar._ensure_tools_loaded()
+                registrar._ensure_tools_loaded()
+
+                # Should only register once
+                assert mock_register.call_count == 1
+
+    def test_tools_loaded_flag_persists_across_accesses(self, mock_tools, mock_settings):
+        """Test that the _tools_loaded flag correctly persists."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Initially not loaded
+        assert registrar._tools_loaded is False
+
+        with patch.object(registrar, "_register_dynamic_tools", return_value=5):
+            with patch.object(registrar, "_load_tool_configurations"):
+                registrar._ensure_tools_loaded()
+
+        # After loading, flag should be True
+        assert registrar._tools_loaded is True
+
+        # And remain True
+        registrar.get_all_tools()
+        assert registrar._tools_loaded is True
+
+
 class TestInitializeMethod:
     """Tests for the main initialize method."""
 

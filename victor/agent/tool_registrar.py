@@ -47,10 +47,7 @@ Usage:
 """
 
 import asyncio
-import importlib
-import inspect
 import logging
-import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -175,6 +172,9 @@ class ToolRegistrar:
         # Tool configuration for context injection (populated in _setup_providers)
         self._tool_config: Dict[str, Any] = {}
 
+        # Lazy loading flag - tools are not loaded until first access
+        self._tools_loaded: bool = False
+
         logger.debug("ToolRegistrar initialized")
 
     def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
@@ -194,12 +194,52 @@ class ToolRegistrar:
             self._mcp_tasks.append(task)
             return task
 
+    def _ensure_tools_loaded(self) -> None:
+        """Ensure tools are loaded (lazy loading pattern).
+
+        This method loads tools on first access rather than during __init__,
+        improving startup time by deferring tool discovery until needed.
+        """
+        if self._tools_loaded:
+            return
+
+        # Register dynamic tools
+        self._stats.dynamic_tools = self._register_dynamic_tools()
+
+        # Load tool configurations
+        self._load_tool_configurations()
+
+        # Mark as loaded
+        self._tools_loaded = True
+        logger.debug(f"Lazy-loaded {self._stats.dynamic_tools} tools")
+
+    def get_tool(self, name: str) -> Optional[Any]:
+        """Get a tool by name, triggering lazy loading if needed.
+
+        Args:
+            name: The name of the tool to retrieve
+
+        Returns:
+            The tool if found, None otherwise
+        """
+        self._ensure_tools_loaded()
+        return self.tools.get(name)
+
+    def get_all_tools(self) -> List[Any]:
+        """Get all registered tools, triggering lazy loading if needed.
+
+        Returns:
+            List of all registered tools
+        """
+        self._ensure_tools_loaded()
+        return self.tools.list_tools()
+
     async def initialize(self) -> RegistrationStats:
         """Initialize all tool registration.
 
         Performs:
         1. Pre-registration setup (providers, configs)
-        2. Dynamic tool discovery and registration
+        2. Dynamic tool discovery and registration (if not already lazy-loaded)
         3. Plugin loading (if enabled)
         4. MCP integration (if enabled)
         5. Tool dependency graph setup (if enabled)
@@ -210,11 +250,11 @@ class ToolRegistrar:
         # Pre-registration setup
         self._setup_providers()
 
-        # Dynamic tool registration
-        self._stats.dynamic_tools = self._register_dynamic_tools()
-
-        # Load tool configurations
-        self._load_tool_configurations()
+        # Dynamic tool registration (skip if already lazy-loaded)
+        if not self._tools_loaded:
+            self._stats.dynamic_tools = self._register_dynamic_tools()
+            self._load_tool_configurations()
+            self._tools_loaded = True
 
         # Plugin loading
         if self.config.enable_plugins:
@@ -274,50 +314,35 @@ class ToolRegistrar:
                 logger.debug(f"Failed to load web tool config: {exc}")
 
     def _register_dynamic_tools(self) -> int:
-        """Dynamically discover and register tools from victor/tools directory.
+        """Register tools from the shared tool registry.
+
+        Uses SharedToolRegistry to get pre-discovered tool definitions,
+        avoiding redundant discovery across multiple orchestrator instances.
+        This significantly reduces memory footprint for concurrent sessions.
 
         Returns:
             Number of tools registered
         """
-        tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
-        excluded_files = {
-            "__init__.py",
-            "base.py",
-            "decorators.py",
-            "semantic_selector.py",
-        }
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        # Get shared tool registry instance
+        shared_registry = SharedToolRegistry.get_instance()
+
+        # Get all tools ready for registration (respects airgapped mode)
+        tools_to_register = shared_registry.get_all_tools_for_registration(
+            airgapped_mode=self.config.airgapped_mode
+        )
+
         registered_count = 0
+        for tool in tools_to_register:
+            try:
+                self.tools.register(tool)
+                registered_count += 1
+            except Exception as e:
+                tool_name = getattr(tool, "name", getattr(tool, "__name__", str(tool)))
+                logger.debug(f"Skipped registering {tool_name}: {e}")
 
-        # Import BaseTool for isinstance checks
-        from victor.tools.base import BaseTool as BaseToolClass
-
-        for filename in os.listdir(tools_dir):
-            if filename.endswith(".py") and filename not in excluded_files:
-                module_name = f"victor.tools.{filename[:-3]}"
-                try:
-                    module = importlib.import_module(module_name)
-                    for _name, obj in inspect.getmembers(module):
-                        # Register @tool decorated functions
-                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
-                            self.tools.register(obj)
-                            registered_count += 1
-                        # Register BaseTool class instances
-                        elif (
-                            inspect.isclass(obj)
-                            and issubclass(obj, BaseToolClass)
-                            and obj is not BaseToolClass
-                            and hasattr(obj, "name")
-                        ):
-                            try:
-                                tool_instance = obj()
-                                self.tools.register(tool_instance)
-                                registered_count += 1
-                            except Exception as e:
-                                logger.debug(f"Skipped registering {_name}: {e}")
-                except Exception as e:
-                    logger.warning(f"Failed to load tools from {module_name}: {e}")
-
-        logger.debug(f"Dynamically registered {registered_count} tools")
+        logger.debug(f"Registered {registered_count} tools from shared registry")
         return registered_count
 
     def _load_tool_configurations(self) -> None:
