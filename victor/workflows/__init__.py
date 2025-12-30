@@ -67,9 +67,15 @@ from victor.workflows.protocols import (
     IWorkflowGraph,
     ICheckpointStore,
     IWorkflowExecutor,
+    IStreamingWorkflowExecutor,
     # Re-export NodeStatus and NodeResult from protocols for graph API users
     NodeStatus as GraphNodeStatus,
     NodeResult as GraphNodeResult,
+)
+from victor.workflows.streaming import (
+    WorkflowEventType,
+    WorkflowStreamChunk,
+    WorkflowStreamContext,
 )
 from victor.workflows.yaml_loader import (
     YAMLWorkflowError,
@@ -141,8 +147,13 @@ __all__ = [
     "IWorkflowGraph",
     "ICheckpointStore",
     "IWorkflowExecutor",
+    "IStreamingWorkflowExecutor",
     "GraphNodeStatus",
     "GraphNodeResult",
+    # Streaming
+    "WorkflowEventType",
+    "WorkflowStreamChunk",
+    "WorkflowStreamContext",
     # YAML Loader
     "YAMLWorkflowError",
     "YAMLWorkflowConfig",

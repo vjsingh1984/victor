@@ -14,7 +14,22 @@ Protocols defined:
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Tuple, Type, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Type,
+    runtime_checkable,
+    TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+    from victor.workflows.streaming import WorkflowStreamChunk
 
 
 class NodeStatus(Enum):
@@ -371,4 +386,101 @@ class IWorkflowExecutor(Protocol):
 
     def cancel(self) -> None:
         """Cancel the currently executing workflow."""
+        ...
+
+
+@runtime_checkable
+class IStreamingWorkflowExecutor(Protocol):
+    """Protocol for streaming workflow execution.
+
+    A streaming workflow executor provides real-time visibility into
+    workflow execution through async iteration and observer patterns.
+
+    Example:
+        executor = MyStreamingExecutor()
+
+        # Async iteration
+        async for chunk in executor.astream(graph, initial_state):
+            print(f"{chunk.event_type}: {chunk.content}")
+
+        # Observer pattern
+        def on_chunk(chunk):
+            print(f"Received: {chunk.event_type}")
+
+        unsubscribe = executor.subscribe(on_chunk)
+        # ... later
+        unsubscribe()
+
+        # Cancellation
+        executor.cancel_workflow("wf_123")
+    """
+
+    async def astream(
+        self,
+        graph: IWorkflowGraph,
+        initial_state: Dict[str, Any],
+        checkpoint_store: Optional[ICheckpointStore] = None,
+    ) -> AsyncIterator["WorkflowStreamChunk"]:
+        """Stream workflow execution events.
+
+        Args:
+            graph: The workflow graph to execute.
+            initial_state: Initial workflow state.
+            checkpoint_store: Optional store for checkpointing.
+
+        Yields:
+            WorkflowStreamChunk events as the workflow executes.
+
+        Example:
+            async for chunk in executor.astream(graph, {"input": "data"}):
+                if chunk.event_type == WorkflowEventType.AGENT_CONTENT:
+                    print(chunk.content, end="")
+        """
+        # Abstract async generator - yield needed for mypy to recognize as generator
+        if False:
+            from victor.workflows.streaming import WorkflowStreamChunk, WorkflowEventType
+
+            yield WorkflowStreamChunk(
+                event_type=WorkflowEventType.WORKFLOW_START,
+                workflow_id="",
+            )
+        raise NotImplementedError
+
+    def subscribe(
+        self,
+        callback: Callable[["WorkflowStreamChunk"], None],
+    ) -> Callable[[], None]:
+        """Subscribe to workflow events using observer pattern.
+
+        Args:
+            callback: Function to call for each workflow event.
+
+        Returns:
+            Unsubscribe function to stop receiving events.
+
+        Example:
+            def handle_chunk(chunk):
+                if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
+                    print(f"Node {chunk.node_id} completed")
+
+            unsubscribe = executor.subscribe(handle_chunk)
+            # ... workflow executes ...
+            unsubscribe()  # Stop receiving events
+        """
+        ...
+
+    def cancel_workflow(self, workflow_id: str) -> bool:
+        """Cancel a running workflow.
+
+        Args:
+            workflow_id: ID of the workflow to cancel.
+
+        Returns:
+            True if the workflow was cancelled, False if not found.
+
+        Example:
+            success = executor.cancel_workflow("wf_123")
+            if success:
+                print("Workflow cancelled")
+        """
         ...
