@@ -254,6 +254,7 @@ class TestProviderFallback:
         with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.side_effect = Exception("Model error")
+            mock_model.get_sentence_embedding_dimension.return_value = 384
             MockST.return_value = mock_model
 
             embedding = await selector._get_sentence_transformer_embedding("test text")

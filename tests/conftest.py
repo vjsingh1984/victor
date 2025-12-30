@@ -52,6 +52,48 @@ def mock_docker_client():
 
 
 @pytest.fixture(autouse=True)
+def reset_singletons():
+    """Reset singleton classifiers before each test for isolation.
+
+    This prevents test pollution from cached singleton state, especially
+    embedding services and classifiers that cache model instances.
+    """
+
+    def _reset_all():
+        # Reset TaskTypeClassifier singleton
+        try:
+            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+
+            TaskTypeClassifier.reset_instance()
+        except ImportError:
+            pass
+
+        # Reset EmbeddingService singleton
+        try:
+            from victor.storage.embeddings.service import EmbeddingService
+
+            EmbeddingService.reset_instance()
+        except ImportError:
+            pass
+
+        # Reset IntentClassifier singleton
+        try:
+            from victor.storage.embeddings.intent_classifier import IntentClassifier
+
+            IntentClassifier.reset_instance()
+        except ImportError:
+            pass
+
+    # Reset before test
+    _reset_all()
+
+    yield
+
+    # Reset after test
+    _reset_all()
+
+
+@pytest.fixture(autouse=True)
 def isolate_environment_variables(monkeypatch):
     """Isolate tests from environment variables and .env files.
 
