@@ -51,11 +51,12 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.core.container import ServiceContainer
+    from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +358,106 @@ class SubAgent:
                 context_size=context_size,
                 duration_seconds=time.time() - start_time,
                 error=error_msg,
+            )
+
+    async def stream_execute(self) -> AsyncIterator["StreamChunk"]:
+        """Execute sub-agent task with streaming output.
+
+        Like execute() but yields chunks as content is generated.
+        Uses orchestrator.stream_chat() instead of .chat().
+
+        Yields:
+            StreamChunk with incremental content and tool calls
+
+        Example:
+            subagent = SubAgent(config, parent_orchestrator)
+            async for chunk in subagent.stream_execute():
+                print(chunk.content, end="", flush=True)
+                if chunk.is_final:
+                    print(f"\\nCompleted: {chunk.metadata}")
+        """
+        from victor.providers.base import StreamChunk
+
+        start_time = time.time()
+
+        try:
+            # Create constrained orchestrator lazily
+            if self.orchestrator is None:
+                self.orchestrator = self._create_constrained_orchestrator()
+
+            logger.info(
+                f"Stream executing {self.config.role.value} sub-agent: "
+                f"{self.config.task[:50]}..."
+            )
+
+            # Stream the task using orchestrator.stream_chat()
+            async for chunk in self.orchestrator.stream_chat(self.config.task):
+                yield chunk
+
+                # If this was the final chunk from the orchestrator, we'll add metadata
+                if chunk.is_final:
+                    # Extract metrics
+                    tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+                    context_size = len(str(self.orchestrator.get_messages()))
+                    duration = time.time() - start_time
+
+                    # Enhance the final chunk with execution metadata
+                    enhanced_metadata = chunk.metadata.copy() if chunk.metadata else {}
+                    enhanced_metadata.update(
+                        {
+                            "tool_calls_used": tool_calls_used,
+                            "context_size": context_size,
+                            "duration_seconds": duration,
+                            "role": self.config.role.value,
+                            "success": True,
+                        }
+                    )
+
+                    # Yield a final chunk with metadata (if not already included)
+                    yield StreamChunk(
+                        content="",
+                        is_final=True,
+                        metadata=enhanced_metadata,
+                    )
+
+                    logger.info(
+                        f"{self.config.role.value} sub-agent stream completed: "
+                        f"{tool_calls_used}/{self.config.tool_budget} tool calls, "
+                        f"{duration:.1f}s"
+                    )
+                    return
+
+        except Exception as e:
+            # Create error chunk
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(
+                f"{self.config.role.value} sub-agent stream failed: {error_msg}",
+                exc_info=True,
+            )
+
+            tool_calls_used = 0
+            context_size = 0
+            if self.orchestrator:
+                tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
+                try:
+                    context_size = len(str(self.orchestrator.get_messages()))
+                except Exception:
+                    pass
+
+            # Yield error chunk with is_final=True
+            yield StreamChunk(
+                content="",
+                is_final=True,
+                metadata={
+                    "error": error_msg,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "tool_calls_used": tool_calls_used,
+                    "context_size": context_size,
+                    "duration_seconds": time.time() - start_time,
+                    "role": self.config.role.value,
+                    "success": False,
+                },
             )
 
 
