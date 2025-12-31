@@ -17,7 +17,8 @@
 This module provides RAG-specific safety patterns for:
 - Bulk deletion warnings
 - Untrusted source ingestion detection
-- PII detection in documents
+- PII detection in documents (delegates to framework)
+- Secret detection (API keys, private keys)
 - Data loss prevention
 
 Example:
@@ -30,12 +31,22 @@ Example:
     for pattern in patterns:
         if pattern.matches(command):
             print(f"Warning: {pattern.description}")
+
+    # Scan document content for PII (uses framework PIIScanner)
+    pii_matches = safety.scan_for_pii(document_content)
 """
 
 import re
 from typing import Dict, List, Tuple
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.security.safety.pii import (
+    PIIScanner,
+    PIIType,
+    PIISeverity,
+    PII_CONTENT_PATTERNS,
+    detect_pii_in_content,
+)
 
 
 # Risk levels
@@ -87,33 +98,9 @@ RAG_DANGER_PATTERNS: List[SafetyPattern] = [
     ),
 ]
 
-# PII detection patterns for document content
-PII_PATTERNS: Dict[str, Tuple[str, str, str]] = {
-    "ssn": (
-        r"\b\d{3}-\d{2}-\d{4}\b",
-        "Social Security Number detected",
-        HIGH,
-    ),
-    "credit_card": (
-        r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b",
-        "Credit card number detected",
-        HIGH,
-    ),
-    "email": (
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-        "Email address detected",
-        LOW,
-    ),
-    "phone": (
-        r"\b(?:\+?1[-.]?)?\(?[0-9]{3}\)?[-.]?[0-9]{3}[-.]?[0-9]{4}\b",
-        "Phone number detected",
-        LOW,
-    ),
-    "ip_address": (
-        r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
-        "IP address detected",
-        LOW,
-    ),
+# RAG-specific secret detection patterns (not standard PII)
+# Standard PII patterns are delegated to victor.security.safety.pii
+SECRET_PATTERNS: Dict[str, Tuple[str, str, str]] = {
     "aws_key": (
         r"(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}",
         "AWS access key detected",
@@ -127,6 +114,16 @@ PII_PATTERNS: Dict[str, Tuple[str, str, str]] = {
     "private_key": (
         r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----",
         "Private key detected",
+        HIGH,
+    ),
+    "github_token": (
+        r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}",
+        "GitHub token detected",
+        HIGH,
+    ),
+    "slack_token": (
+        r"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}",
+        "Slack token detected",
         HIGH,
     ),
 }
@@ -228,21 +225,36 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         ]
 
     def get_pii_patterns(self) -> Dict[str, Tuple[str, str, str]]:
-        """Return patterns for detecting PII in documents.
+        """Return patterns for detecting PII and secrets in documents.
+
+        Combines framework PII patterns with RAG-specific secret patterns.
 
         Returns:
             Dict of pii_type -> (regex_pattern, description, risk_level).
         """
-        return PII_PATTERNS.copy()
+        # Start with framework PII patterns (canonical source)
+        patterns: Dict[str, Tuple[str, str, str]] = {}
+        for pii_type, (pattern, severity) in PII_CONTENT_PATTERNS.items():
+            risk = HIGH if severity in (PIISeverity.CRITICAL, PIISeverity.HIGH) else (
+                MEDIUM if severity == PIISeverity.MEDIUM else LOW
+            )
+            patterns[pii_type.value] = (pattern, f"{pii_type.value.replace('_', ' ').title()} detected", risk)
+
+        # Add RAG-specific secret patterns
+        patterns.update(SECRET_PATTERNS)
+        return patterns
 
     def scan_for_pii(self, content: str) -> List[Dict]:
-        """Scan content for PII.
+        """Scan content for PII and secrets.
+
+        Delegates to framework PIIScanner for standard PII detection,
+        then adds RAG-specific secret pattern scanning.
 
         Args:
             content: Text content to scan
 
         Returns:
-            List of PII match dictionaries with type, severity, and location
+            List of match dictionaries with type, severity, and location
         """
         if not self._include_pii_detection:
             return []
@@ -250,21 +262,42 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         matches = []
         lines = content.split("\n")
 
-        for pii_type, (pattern, description, risk_level) in PII_PATTERNS.items():
+        # Delegate to framework PIIScanner for standard PII
+        pii_matches = detect_pii_in_content(content)
+        for pii_match in pii_matches:
+            # Find line number for the match
+            line_num = 1
+            col = 0
+            for i, line in enumerate(lines, 1):
+                if pii_match.matched_text in line:
+                    line_num = i
+                    col = line.find(pii_match.matched_text)
+                    break
+
+            matches.append({
+                "type": pii_match.pii_type.value,
+                "description": f"{pii_match.pii_type.value.replace('_', ' ').title()} detected",
+                "severity": HIGH if pii_match.severity in (PIISeverity.CRITICAL, PIISeverity.HIGH) else (
+                    MEDIUM if pii_match.severity == PIISeverity.MEDIUM else LOW
+                ),
+                "line": line_num,
+                "column": col,
+                "masked_value": pii_match.matched_text,  # Already masked by PIIMatch
+            })
+
+        # Add RAG-specific secret pattern scanning
+        for secret_type, (pattern, description, risk_level) in SECRET_PATTERNS.items():
             compiled = re.compile(pattern)
             for line_num, line in enumerate(lines, 1):
                 for match in compiled.finditer(line):
-                    matches.append(
-                        {
-                            "type": pii_type,
-                            "description": description,
-                            "severity": risk_level,
-                            "line": line_num,
-                            "column": match.start(),
-                            # Mask the actual value
-                            "masked_value": self._mask_value(match.group(), pii_type),
-                        }
-                    )
+                    matches.append({
+                        "type": secret_type,
+                        "description": description,
+                        "severity": risk_level,
+                        "line": line_num,
+                        "column": match.start(),
+                        "masked_value": self._mask_value(match.group(), secret_type),
+                    })
 
         return matches
 
@@ -352,7 +385,7 @@ __all__ = [
     "RAGSafetyExtension",
     "RAG_DANGER_PATTERNS",
     "INGESTION_SAFETY_PATTERNS",
-    "PII_PATTERNS",
+    "SECRET_PATTERNS",
     "HIGH",
     "MEDIUM",
     "LOW",
