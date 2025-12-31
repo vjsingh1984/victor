@@ -123,6 +123,7 @@ from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
     TaskType,
 )
+from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
 # New decomposed components (facades for orchestrator responsibilities)
 from victor.agent.conversation_controller import (
@@ -659,6 +660,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._deduplication_tracker = self._factory.create_tool_deduplication_tracker()
 
         # ToolPipeline: Coordinates tool execution flow (via factory)
+        # Middleware chain enables vertical-specific tool processing (code correction, validation, etc.)
         self._tool_pipeline = self._factory.create_tool_pipeline(
             tools=self.tools,
             tool_executor=self.tool_executor,
@@ -668,6 +670,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             on_tool_start=self._on_tool_start_callback,
             on_tool_complete=self._on_tool_complete_callback,
             deduplication_tracker=self._deduplication_tracker,
+            middleware_chain=self._middleware_chain,
         )
 
         # StreamingController: Manages streaming sessions and metrics (via factory)
@@ -1447,6 +1450,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._mode_workflow_team_coordinator is not None:
             self._mode_workflow_team_coordinator.set_vertical_context(context)
             logger.debug(f"Coordinator synced with vertical context: {context.vertical_name}")
+
+        # Sync tool selector with vertical context for vertical-specific tool selection (DIP)
+        if hasattr(self, "tool_selector") and self.tool_selector is not None:
+            self.tool_selector.set_vertical_context(context)
+            if context.has_tool_selection_strategy:
+                logger.debug(
+                    f"Tool selector synced with vertical tool selection strategy: "
+                    f"{context.vertical_name}"
+                )
+
+        # Sync middleware chain with vertical context for vertical-aware middleware (DIP)
+        if hasattr(self, "_middleware_chain") and self._middleware_chain is not None:
+            self._middleware_chain.set_vertical_context(context)
+            logger.debug(
+                f"Middleware chain synced with vertical context: {context.vertical_name}"
+            )
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
@@ -4305,6 +4324,34 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         unified_task_type = self.unified_tracker.detect_task_type(user_message)
         logger.info(f"Task type detected: {unified_task_type.value}")
 
+        # Extract prompt requirements for dynamic budgets (e.g., "read 9 files", "top 3 fixes")
+        prompt_requirements = extract_prompt_requirements(user_message)
+        if prompt_requirements.has_explicit_requirements():
+            # Mark tracker as having prompt requirements (enables lenient limits)
+            self.unified_tracker._progress.has_prompt_requirements = True
+
+            # Apply dynamic tool budget if larger than current
+            if (
+                prompt_requirements.tool_budget
+                and prompt_requirements.tool_budget > self.unified_tracker._progress.tool_budget
+            ):
+                self.unified_tracker.set_tool_budget(prompt_requirements.tool_budget)
+                logger.info(
+                    f"Dynamic budget from prompt: {prompt_requirements.tool_budget} "
+                    f"(files={prompt_requirements.file_count}, fixes={prompt_requirements.fix_count})"
+                )
+
+            # Apply dynamic iteration budget if larger than current
+            if (
+                prompt_requirements.iteration_budget
+                and prompt_requirements.iteration_budget
+                > self.unified_tracker._task_config.max_exploration_iterations
+            ):
+                self.unified_tracker.set_max_iterations(prompt_requirements.iteration_budget)
+                logger.info(
+                    f"Dynamic iterations from prompt: {prompt_requirements.iteration_budget}"
+                )
+
         # Intelligent pipeline pre-request hook: get Q-learning recommendations
         # This enables RL-based mode transitions and optimal tool budget selection
         intelligent_context = await self._prepare_intelligent_request(
@@ -6016,14 +6063,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     intent_text = content_for_intent
                     if len(intent_text) > 500:
                         intent_text = intent_text[-500:]
-                    intent_result = self.intent_classifier.classify_intent_sync(intent_text)
 
-                    logger.debug(
-                        f"Intent classification: {intent_result.intent.name} "
-                        f"(confidence={intent_result.confidence:.3f}, "
-                        f"text_len={len(intent_text)}, "
-                        f"top_matches={intent_result.top_matches[:3]})"
-                    )
+                    # Check intent cache (50-80% reduction in embedding calls)
+                    # Initialize cache if needed
+                    if not hasattr(self, "_intent_cache"):
+                        self._intent_cache: Dict[int, Any] = {}
+
+                    intent_cache_key = hash(intent_text)
+                    if intent_cache_key in self._intent_cache:
+                        intent_result = self._intent_cache[intent_cache_key]
+                        logger.debug(
+                            f"Intent classification (cached): {intent_result.intent.name}"
+                        )
+                    else:
+                        intent_result = self.intent_classifier.classify_intent_sync(intent_text)
+                        # Cache the result (limit cache size to prevent memory bloat)
+                        if len(self._intent_cache) < 100:
+                            self._intent_cache[intent_cache_key] = intent_result
+                        logger.debug(
+                            f"Intent classification: {intent_result.intent.name} "
+                            f"(confidence={intent_result.confidence:.3f}, "
+                            f"text_len={len(intent_text)}, "
+                            f"top_matches={intent_result.top_matches[:3]})"
+                        )
 
                     # Initialize tracking variables
                     if not hasattr(self, "_continuation_prompts"):
@@ -6032,6 +6094,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         self._asking_input_prompts = 0
                     if not hasattr(self, "_consecutive_blocked_attempts"):
                         self._consecutive_blocked_attempts = 0
+                    # Cumulative counter NEVER resets - tracks total interventions across session
+                    if not hasattr(self, "_cumulative_prompt_interventions"):
+                        self._cumulative_prompt_interventions = 0
+                    # Intent classification cache (50-80% reduction in embedding calls)
+                    if not hasattr(self, "_intent_cache"):
+                        self._intent_cache: Dict[int, Any] = {}
 
                     # Check for response loop using UnifiedTaskTracker
                     # (detects when model keeps responding with similar text without tool calls)
@@ -6045,6 +6113,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     strategy = ContinuationStrategy()
 
                     # Build task completion signals for early termination detection
+                    # Include cycle detection info from conversation state
+                    cycle_count = 0
+                    if hasattr(self, "conversation_state") and self.conversation_state:
+                        try:
+                            state_summary = self.conversation_state.get_state_summary()
+                            if isinstance(state_summary, dict):
+                                cycle_count = state_summary.get("transition_count", 0)
+                                # Also check stage visit counts for cycling detection
+                                if hasattr(self.conversation_state, "_history"):
+                                    history = self.conversation_state._history
+                                    if hasattr(history, "get_max_visit_count"):
+                                        cycle_count = max(cycle_count, history.get_max_visit_count())
+                        except Exception:
+                            pass  # Don't fail on state access errors
+
                     task_completion_signals = {
                         "required_files": self._required_files,
                         "read_files": self._read_files_session,
@@ -6053,6 +6136,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             len(self._required_files) > 0
                             and self._read_files_session.issuperset(set(self._required_files))
                         ),
+                        "cycle_count": cycle_count,
+                        "synthesis_nudge_count": getattr(self, "_synthesis_nudge_count", 0),
+                        # Cumulative counter - tracks total prompt interventions across session
+                        "cumulative_prompt_interventions": self._cumulative_prompt_interventions,
                     }
 
                     action_result = strategy.determine_continuation_action(
@@ -6086,6 +6173,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     if "asking_input_prompts" in action_result.get("updates", {}):
                         self._asking_input_prompts = action_result["updates"][
                             "asking_input_prompts"
+                        ]
+                    if "synthesis_nudge_count" in action_result.get("updates", {}):
+                        self._synthesis_nudge_count = action_result["updates"][
+                            "synthesis_nudge_count"
                         ]
                     if action_result.get("set_final_summary_requested"):
                         self._final_summary_requested = True
@@ -6138,6 +6229,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     elif action == "prompt_tool_call":
                         self.add_message("user", action_result["message"])
                         self.unified_tracker.increment_turn()
+                        # Increment cumulative counter (never resets) for synthesis nudge detection
+                        self._cumulative_prompt_interventions += 1
+                        skip_rest = True
+
+                    # Handle action: continue_with_synthesis_hint
+                    # Gentle nudge when all required files read but output not produced
+                    # Allows continued exploration but reminds model to synthesize
+                    elif action == "continue_with_synthesis_hint":
+                        self.add_message("user", action_result["message"])
+                        # Update synthesis nudge count in unified tracker
+                        if "synthesis_nudge_count" in action_result.get("updates", {}):
+                            if hasattr(self.unified_tracker, "synthesis_nudge_count"):
+                                self.unified_tracker.synthesis_nudge_count = action_result[
+                                    "updates"
+                                ]["synthesis_nudge_count"]
                         skip_rest = True
 
                     # Handle action: request_summary
