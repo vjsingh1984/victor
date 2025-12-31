@@ -6,13 +6,11 @@ on:
     tags:
       - 'v*'  # Trigger on version tags for PyPI publishing
     paths:
-      - 'packages/**'
-      - 'victor/**'
+      - 'packages/**'  # Only trigger when packages dir exists and has changes
   pull_request:
     branches: [main, develop]
     paths:
-      - 'packages/**'
-      - 'victor/**'
+      - 'packages/**'  # Only trigger when packages dir exists and has changes
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
