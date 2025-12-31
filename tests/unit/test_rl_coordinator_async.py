@@ -32,6 +32,7 @@ from victor.agent.rl.coordinator import (
     get_rl_coordinator_async,
 )
 from victor.agent.rl.base import RLOutcome, RLRecommendation
+from victor.core.database import reset_database, get_database
 
 
 @pytest.fixture
@@ -49,9 +50,13 @@ def temp_storage_path() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def coordinator(temp_storage_path: Path, temp_db_path: Path) -> RLCoordinator:
+def coordinator(temp_storage_path: Path, temp_db_path: Path) -> Generator[RLCoordinator, None, None]:
     """Create a test RLCoordinator with temp database."""
-    return RLCoordinator(storage_path=temp_storage_path, db_path=temp_db_path)
+    reset_database()
+    get_database(temp_db_path)
+    coord = RLCoordinator(storage_path=temp_storage_path, db_path=temp_db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture

@@ -104,19 +104,20 @@ class TestCacheEvictionLearner:
         assert learner.discount_factor == 0.95
         assert learner.epsilon == 0.1
 
+        # Check tables using correct names from Tables enum
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='cache_eviction_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_Q}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_Q} not found"
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='cache_eviction_tool_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_TOOL}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_TOOL} not found"
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='cache_eviction_history';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_CACHE_HISTORY}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_CACHE_HISTORY} not found"
 
     def test_record_single_outcome(
         self, coordinator: RLCoordinator, learner: CacheEvictionLearner

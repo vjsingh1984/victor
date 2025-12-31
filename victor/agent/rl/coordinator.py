@@ -694,22 +694,16 @@ class RLCoordinator:
             learner.record_outcome(outcome)
 
             # Record in shared outcomes table
-            # Note: Uses both learner_name (legacy NOT NULL) and learner_id (new schema)
-            # Also includes timestamp (legacy NOT NULL) alongside created_at (new schema)
-            from datetime import datetime as dt
-
-            timestamp_now = dt.now().isoformat()
             cursor = self.db.cursor()
             cursor.execute(
                 f"""
                 INSERT INTO {Tables.RL_OUTCOME} (
-                    learner_name, learner_id, provider, model, task_type, vertical,
-                    success, quality_score, metadata, timestamp, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    learner_id, provider, model, task_type, vertical,
+                    success, quality_score, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    learner_name,  # legacy column (NOT NULL)
-                    learner_name,  # new column (for index)
+                    learner_name,  # Maps to learner_id column
                     outcome.provider,
                     outcome.model,
                     outcome.task_type,
@@ -717,7 +711,6 @@ class RLCoordinator:
                     1 if outcome.success else 0,
                     outcome.quality_score,
                     outcome.to_dict()["metadata"],  # JSON string
-                    timestamp_now,  # legacy timestamp column (NOT NULL)
                 ),
             )
             self.db.commit()

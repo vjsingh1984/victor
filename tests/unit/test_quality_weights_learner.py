@@ -90,15 +90,16 @@ class TestQualityWeightLearner:
         assert learner.learning_rate == 0.05
         assert learner.momentum == 0.9
 
+        # Check tables using correct names from Tables enum
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='quality_weights';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_QUALITY_WEIGHT}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_QUALITY_WEIGHT} not found"
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='quality_weight_history';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_QUALITY_HISTORY}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_QUALITY_HISTORY} not found"
 
     def test_default_weights(self, learner: QualityWeightLearner) -> None:
         """Test default weights are set correctly."""
