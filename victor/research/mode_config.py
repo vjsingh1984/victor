@@ -89,7 +89,13 @@ _RESEARCH_TASK_BUDGETS: Dict[str, int] = {
 
 
 def _register_research_modes() -> None:
-    """Register research modes with the central registry."""
+    """Register research modes with the central registry.
+
+    This function is idempotent - safe to call multiple times.
+    Called by ResearchModeConfigProvider.__init__ when provider is instantiated
+    during vertical integration. Module-level auto-registration removed to avoid
+    load-order coupling.
+    """
     registry = ModeConfigRegistry.get_instance()
     registry.register_vertical(
         name="research",
@@ -100,8 +106,10 @@ def _register_research_modes() -> None:
     )
 
 
-# Register on module load
-_register_research_modes()
+# NOTE: Import-time auto-registration removed (SOLID compliance)
+# Registration happens when ResearchModeConfigProvider is instantiated during
+# vertical integration. The provider's __init__ calls _register_research_modes()
+# for idempotent registration.
 
 
 # =============================================================================

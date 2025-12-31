@@ -174,35 +174,35 @@ You: [Use rag_query tool with query="authentication"]
         """Get tiered tool configuration for RAG.
 
         Uses canonical tool names from victor.tools.tool_names.
+        Follows core TieredToolConfig schema (LSP compliance).
 
         Returns:
             Tool configuration with tiers
         """
         return TieredToolConfig(
-            always_enabled=[
+            # Mandatory: essential tools for any RAG task
+            mandatory={ToolNames.READ, ToolNames.LS},
+            # Vertical core: RAG-specific tools always available
+            vertical_core={
                 "rag_search",
                 "rag_query",
                 "rag_list",
                 "rag_stats",
-            ],
+            },
+            # Stage tools: tools available at specific workflow stages
+            # Note: Uses sets as per core schema (not lists)
             stage_tools={
-                "INGESTING": [
+                "INGESTING": {
                     "rag_ingest",
                     ToolNames.READ,
                     ToolNames.LS,
                     ToolNames.WEB_FETCH,
-                ],
-                "SEARCHING": ["rag_search"],
-                "QUERYING": ["rag_query"],
+                },
+                "SEARCHING": {"rag_search"},
+                "QUERYING": {"rag_query"},
             },
-            cost_tiers={
-                "rag_search": "low",
-                "rag_query": "low",
-                "rag_list": "free",
-                "rag_stats": "free",
-                "rag_ingest": "medium",
-                "rag_delete": "low",
-            },
+            # Analysis tasks should not have write tools
+            readonly_only_for_analysis=True,
         )
 
     @classmethod

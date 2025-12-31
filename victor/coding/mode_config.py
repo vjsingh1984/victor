@@ -106,8 +106,10 @@ def _register_coding_modes() -> None:
     )
 
 
-# Register on module load
-_register_coding_modes()
+# NOTE: Import-time auto-registration removed (SOLID compliance)
+# Registration happens when CodingModeConfigProvider is instantiated during
+# vertical integration. The provider's __init__ calls _register_coding_modes()
+# for idempotent registration.
 
 
 # =============================================================================

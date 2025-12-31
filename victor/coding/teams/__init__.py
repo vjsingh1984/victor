@@ -146,8 +146,12 @@ class CodingTeamSpecProvider:
         return list_team_types()
 
 
-def _auto_register_teams() -> int:
-    """Auto-register coding teams with global registry.
+def register_coding_teams() -> int:
+    """Register coding teams with global registry.
+
+    This function is called during vertical integration by the framework's
+    step handlers. Import-time auto-registration has been removed to avoid
+    load-order coupling and duplicate registration.
 
     Returns:
         Number of teams registered.
@@ -157,12 +161,13 @@ def _auto_register_teams() -> int:
 
         registry = get_team_registry()
         count = registry.register_from_vertical("coding", CODING_TEAM_SPECS)
-        logger.debug(f"Auto-registered {count} coding teams")
+        logger.debug(f"Registered {count} coding teams via framework integration")
         return count
     except Exception as e:
-        logger.warning(f"Failed to auto-register coding teams: {e}")
+        logger.warning(f"Failed to register coding teams: {e}")
         return 0
 
 
-# Auto-register on import
-_auto_register_teams()
+# NOTE: Import-time auto-registration removed (SOLID compliance)
+# Registration now happens during vertical integration via step_handlers.py
+# This avoids load-order coupling and duplicate registration issues.

@@ -88,8 +88,10 @@ def _register_devops_modes() -> None:
     )
 
 
-# Register on module load
-_register_devops_modes()
+# NOTE: Import-time auto-registration removed (SOLID compliance)
+# Registration happens when DevOpsModeConfigProvider is instantiated during
+# vertical integration. The provider's __init__ calls _register_devops_modes()
+# for idempotent registration.
 
 
 # =============================================================================

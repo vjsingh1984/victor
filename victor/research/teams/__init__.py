@@ -661,8 +661,12 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def _auto_register_teams() -> int:
-    """Auto-register research teams with global registry.
+def register_research_teams() -> int:
+    """Register research teams with global registry.
+
+    This function is called during vertical integration by the framework's
+    step handlers. Import-time auto-registration has been removed to avoid
+    load-order coupling and duplicate registration.
 
     Returns:
         Number of teams registered.
@@ -672,12 +676,13 @@ def _auto_register_teams() -> int:
 
         registry = get_team_registry()
         count = registry.register_from_vertical("research", RESEARCH_TEAM_SPECS)
-        logger.debug(f"Auto-registered {count} research teams")
+        logger.debug(f"Registered {count} research teams via framework integration")
         return count
     except Exception as e:
-        logger.warning(f"Failed to auto-register research teams: {e}")
+        logger.warning(f"Failed to register research teams: {e}")
         return 0
 
 
-# Auto-register on import
-_auto_register_teams()
+# NOTE: Import-time auto-registration removed (SOLID compliance)
+# Registration now happens during vertical integration via step_handlers.py
+# This avoids load-order coupling and duplicate registration issues.
