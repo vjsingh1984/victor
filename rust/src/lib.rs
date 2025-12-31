@@ -32,15 +32,19 @@
 //! - `chunking`: High-performance document chunking for RAG
 //! - `secrets`: High-performance secret detection using compiled regex
 //! - `pattern_match`: Aho-Corasick multi-pattern matching for tool/intent detection
+//! - `extractor`: High-performance tool call extraction from model output
+//! - `sanitizer`: High-performance response sanitization
 
 use pyo3::prelude::*;
 
 mod chunking;
 mod classifier;
 mod dedup;
+mod extractor;
 mod hashing;
 mod json_repair;
 mod pattern_match;
+mod sanitizer;
 mod secrets;
 mod similarity;
 mod streaming_filter;
@@ -144,6 +148,20 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(pattern_match::batch_contains_any, m)?)?;
     m.add_function(wrap_pyfunction!(pattern_match::weighted_pattern_score, m)?)?;
+
+    // Tool call extraction functions (HIGH impact, MEDIUM complexity)
+    m.add_function(wrap_pyfunction!(extractor::extract_file_path, m)?)?;
+    m.add_function(wrap_pyfunction!(extractor::extract_code_blocks, m)?)?;
+    m.add_function(wrap_pyfunction!(extractor::extract_shell_commands, m)?)?;
+    m.add_function(wrap_pyfunction!(extractor::extract_tool_call, m)?)?;
+    m.add_function(wrap_pyfunction!(extractor::batch_extract_file_paths, m)?)?;
+
+    // Response sanitization functions (HIGH impact, MEDIUM complexity)
+    m.add_function(wrap_pyfunction!(sanitizer::sanitize_response, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitizer::is_garbage_content, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitizer::detect_leakage_patterns, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitizer::strip_markup, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitizer::validate_tool_name, m)?)?;
 
     Ok(())
 }
