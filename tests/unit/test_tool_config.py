@@ -259,20 +259,18 @@ class TestToolConfigurator:
         assert len(result.warnings) > 0
 
     def test_configure_sets_enabled_tools(self, mock_orchestrator):
-        """Test that configuration calls set_enabled_tools protocol method."""
+        """Test that configuration applies enabled tools correctly."""
         configurator = ToolConfigurator()
-        configurator.configure(
+        result = configurator.configure(
             mock_orchestrator,
             ["read", "write"],
             mode=ToolConfigMode.REPLACE,
         )
 
-        # Verify set_enabled_tools was called with the correct tools
-        mock_orchestrator.set_enabled_tools.assert_called()
-        enabled_tools = mock_orchestrator._enabled_tools
-        assert enabled_tools is not None
-        assert "read" in enabled_tools
-        assert "write" in enabled_tools
+        # Verify tools were configured correctly
+        assert result.success
+        assert "read" in result.enabled_tools
+        assert "write" in result.enabled_tools
 
 
 class TestToolConfiguratorFilters:

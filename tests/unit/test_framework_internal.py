@@ -124,16 +124,23 @@ class TestApplySystemPrompt:
     def test_apply_with_set_custom_prompt(self):
         """Test applying prompt via orchestrator's set_custom_prompt method.
 
-        The capability-based approach calls orchestrator.set_custom_prompt
-        directly when available (via _invoke_capability mapping).
+        The capability-based approach calls orchestrator.invoke_capability
+        when the object implements CapabilityRegistryProtocol.
         """
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.set_custom_prompt = MagicMock()
+        from victor.framework.protocols import CapabilityRegistryProtocol
+
+        # Mock that implements capability registry
+        mock_orchestrator = MagicMock(spec=CapabilityRegistryProtocol)
+        mock_orchestrator.has_capability.return_value = True
+        mock_orchestrator.invoke_capability = MagicMock(return_value=True)
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
-        # Should call public method only, not write to private attributes
-        mock_orchestrator.set_custom_prompt.assert_called_once_with("Custom prompt text")
+        # Should invoke via capability registry
+        mock_orchestrator.invoke_capability.assert_called_once()
+        call_args = mock_orchestrator.invoke_capability.call_args
+        assert call_args[0][0] == "custom_prompt"
+        assert call_args[0][1] == "Custom prompt text"
 
     def test_apply_with_prompt_builder_public_method(self):
         """Test applying prompt via prompt_builder.set_custom_prompt.

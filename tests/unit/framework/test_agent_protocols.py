@@ -190,8 +190,8 @@ class TestIAgentRoleProtocol:
         """IAgentRole should have name property."""
         from victor.framework.agent_protocols import IAgentRole
 
-        # Check protocol attributes
-        assert hasattr(IAgentRole, "__protocol_attrs__") or "name" in str(IAgentRole)
+        # Check protocol has 'name' attribute (works across Python versions)
+        assert "name" in dir(IAgentRole) or hasattr(IAgentRole, "name")
 
     def test_role_has_capabilities(self):
         """IAgentRole should have capabilities property."""

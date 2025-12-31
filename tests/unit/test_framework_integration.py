@@ -377,14 +377,20 @@ class TestFrameworkInternalHelpers:
     def test_apply_system_prompt(self):
         """Test apply_system_prompt function uses public methods only (DIP compliance)."""
         from victor.framework._internal import apply_system_prompt
+        from victor.framework.protocols import CapabilityRegistryProtocol
 
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.set_custom_prompt = MagicMock()
+        # Create mock that implements capability registry protocol
+        mock_orchestrator = MagicMock(spec=CapabilityRegistryProtocol)
+        mock_orchestrator.has_capability.return_value = True
+        mock_orchestrator.invoke_capability = MagicMock(return_value=True)
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
-        # Should use public method, not write to private attributes
-        mock_orchestrator.set_custom_prompt.assert_called_once_with("Custom prompt text")
+        # Should invoke via capability registry
+        mock_orchestrator.invoke_capability.assert_called_once()
+        call_args = mock_orchestrator.invoke_capability.call_args
+        assert call_args[0][0] == "custom_prompt"
+        assert call_args[0][1] == "Custom prompt text"
 
 
 class TestAgentVerticalIntegration:

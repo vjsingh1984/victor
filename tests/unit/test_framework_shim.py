@@ -234,16 +234,25 @@ class TestFrameworkShimVertical:
 
     @pytest.fixture
     def mock_orchestrator(self):
-        """Create mock orchestrator."""
-        orch = MagicMock()
+        """Create mock orchestrator with capability protocol support."""
+        from victor.framework.protocols import CapabilityRegistryProtocol
+
+        orch = MagicMock(spec=CapabilityRegistryProtocol)
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
+
         # Add protocol methods for tools
         orch._enabled_tools = set()
-        orch.set_enabled_tools = MagicMock(
-            side_effect=lambda tools: setattr(orch, "_enabled_tools", tools)
-        )
+
+        def set_tools(tools):
+            orch._enabled_tools = tools
+
+        orch.set_enabled_tools = MagicMock(side_effect=set_tools)
         orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
+
+        # Add set_custom_prompt method
+        orch.set_custom_prompt = MagicMock()
+
         # Add vertical context storage (set via pipeline)
         orch._vertical_context = None
 
@@ -251,6 +260,26 @@ class TestFrameworkShimVertical:
             orch._vertical_context = context
 
         orch.set_vertical_context = MagicMock(side_effect=set_context)
+
+        # Implement capability protocol methods
+        def has_capability(name, min_version=None):
+            return name in ["enabled_tools", "custom_prompt", "vertical_context"]
+
+        def invoke_capability(name, *args, min_version=None, **kwargs):
+            if name == "enabled_tools" and args:
+                set_tools(args[0])
+                return True
+            elif name == "custom_prompt" and args:
+                orch.set_custom_prompt(args[0])
+                return True
+            elif name == "vertical_context" and args:
+                set_context(args[0])
+                return True
+            return False
+
+        orch.has_capability = MagicMock(side_effect=has_capability)
+        orch.invoke_capability = MagicMock(side_effect=invoke_capability)
+
         return orch
 
     @pytest.fixture(autouse=True)
@@ -272,8 +301,7 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            # Check that set_enabled_tools was called with the correct tools
-            mock_orchestrator.set_enabled_tools.assert_called_once()
+            # Check that tools were applied via capability protocol
             enabled_tools = mock_orchestrator._enabled_tools
             assert "read" in enabled_tools
             assert "write" in enabled_tools
