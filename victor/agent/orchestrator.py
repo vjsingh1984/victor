@@ -1736,6 +1736,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "should_finalize": getattr(result, "should_finalize", False),
                 "should_retry": getattr(result, "should_retry", False),
                 "finalize_reason": getattr(result, "finalize_reason", ""),
+                # Actionable feedback for grounding correction on retry
+                "grounding_feedback": getattr(result, "grounding_feedback", ""),
             }
         except Exception as e:
             logger.debug(f"IntelligentPipeline validate_response failed: {e}")
@@ -5707,6 +5709,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Increment iteration count using context method (single source of truth)
             stream_ctx.increment_iteration()
+
+            # Inject grounding feedback if pending from previous iteration
+            if stream_ctx.pending_grounding_feedback:
+                logger.info("Injecting pending grounding feedback as system message")
+                self.add_message("system", stream_ctx.pending_grounding_feedback)
+                stream_ctx.pending_grounding_feedback = ""  # Clear after injection
+
             unique_resources = self.unified_tracker.unique_resources
             logger.debug(
                 f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
@@ -6043,6 +6052,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         logger.warning(
                             f"IntelligentPipeline detected grounding issues: {issues[:3]}"
                         )
+                    # If retry is allowed, inject grounding feedback as system message
+                    if quality_result.get("should_retry"):
+                        grounding_feedback = quality_result.get("grounding_feedback", "")
+                        if grounding_feedback:
+                            logger.info(
+                                f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
+                            )
+                            # Store feedback for injection in next iteration
+                            stream_ctx.pending_grounding_feedback = grounding_feedback
+
                 # Update quality score for Q-learning outcome recording
                 if quality_result:
                     new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)

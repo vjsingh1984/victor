@@ -105,6 +105,10 @@ class StreamingChatContext:
     total_blocked_attempts: int = 0
     force_tool_execution_attempts: int = 0
 
+    # Grounding feedback for retry
+    pending_grounding_feedback: str = ""
+    """Actionable feedback to inject when grounding fails and retry is allowed."""
+
     # Substantial content threshold for recovery decisions
     substantial_content_threshold: int = 500
 
