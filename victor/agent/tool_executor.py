@@ -341,6 +341,41 @@ class ToolExecutor:
                 f"permission for tool '{tool_name}' (category: {category})",
             )
 
+    def _check_unknown_arguments(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+    ) -> Tuple[bool, List[str]]:
+        """Check for unknown/hallucinated arguments before execution.
+
+        This provides clear, actionable error messages when models invent
+        arguments that don't exist in the tool schema.
+
+        Args:
+            tool: The tool to check arguments for
+            arguments: Arguments to check
+
+        Returns:
+            Tuple of (valid, unknown_args)
+            - valid: True if no unknown arguments found
+            - unknown_args: List of argument names that don't exist in schema
+        """
+        schema = tool.parameters
+        if not schema:
+            return True, []
+
+        # Get valid parameter names from schema
+        properties = schema.get("properties", {})
+        valid_params = set(properties.keys())
+
+        # Find unknown arguments
+        provided_params = set(arguments.keys())
+        unknown = provided_params - valid_params
+
+        if unknown:
+            return False, list(unknown)
+        return True, []
+
     def _validate_arguments(
         self,
         tool: BaseTool,
@@ -364,6 +399,23 @@ class ToolExecutor:
         """
         if self.validation_mode == ValidationMode.OFF:
             return True, None
+
+        # First check for unknown/hallucinated arguments (provides clearer errors)
+        valid, unknown_args = self._check_unknown_arguments(tool, arguments)
+        if not valid:
+            # Get valid parameters for helpful error message
+            schema = tool.parameters
+            valid_params = list(schema.get("properties", {}).keys()) if schema else []
+            error_msg = (
+                f"Unknown argument(s): {', '.join(sorted(unknown_args))}. "
+                f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
+            )
+            self._validation_failures += 1
+            logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
+            if self.validation_mode == ValidationMode.STRICT:
+                return False, ValidationResult.failure([error_msg])
+            else:
+                logger.warning("Proceeding with unknown arguments (lenient mode)")
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
