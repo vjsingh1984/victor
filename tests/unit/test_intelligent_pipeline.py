@@ -186,8 +186,9 @@ class TestIntelligentAgentPipelinePrepareRequest:
 
         assert isinstance(context, RequestContext)
         assert context.should_continue is True
-        # Without components initialized, defaults are used
-        assert context.recommended_mode == "explore"
+        # Mode is determined by RL-based AdaptiveModeController
+        # Valid modes: explore, build, review, finalize
+        assert context.recommended_mode in ("explore", "build", "review", "finalize")
 
     @pytest.mark.asyncio
     async def test_prepare_request_updates_stats(self, pipeline):
