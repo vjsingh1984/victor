@@ -106,13 +106,12 @@ from victor.security.manager import (
     reset_security_manager,
 )
 
-# Submodule imports for convenience (not re-exporting all, just exposing submodules)
-from victor.security import auth
-from victor.security import safety
-from victor.security import audit
+# Submodules exposed via lazy imports to avoid circular import issues
+# Users can still do: from victor.security import auth, safety, audit
+# The submodules are imported on first access via __getattr__
 
 __all__ = [
-    # Submodules
+    # Submodules (lazy loaded)
     "auth",
     "safety",
     "audit",
@@ -147,3 +146,20 @@ __all__ = [
     "get_security_manager",
     "reset_security_manager",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for submodules to avoid circular imports."""
+    if name == "auth":
+        from victor.security import auth
+
+        return auth
+    elif name == "safety":
+        from victor.security import safety
+
+        return safety
+    elif name == "audit":
+        from victor.security import audit
+
+        return audit
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

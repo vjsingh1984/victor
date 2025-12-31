@@ -66,6 +66,8 @@ Usage - Multi-Branch Workflows:
     print(tree.to_ascii())
 """
 
+from typing import TYPE_CHECKING
+
 from victor.storage.checkpoints.protocol import (
     CheckpointMetadata,
     CheckpointDiff,
@@ -78,7 +80,11 @@ from victor.storage.checkpoints.protocol import (
     FieldDiff,
 )
 from victor.storage.checkpoints.manager import CheckpointManager
-from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+
+# SQLiteCheckpointBackend requires aiosqlite - lazy import to avoid import errors
+if TYPE_CHECKING:
+    from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+
 from victor.storage.checkpoints.tree import (
     BranchStatus,
     MergeStrategy,
@@ -118,3 +124,14 @@ __all__ = [
     "BranchManager",
     "BranchStorageProtocol",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for backends with optional dependencies."""
+    if name == "SQLiteCheckpointBackend":
+        from victor.storage.checkpoints.backends.sqlite_backend import (
+            SQLiteCheckpointBackend,
+        )
+
+        return SQLiteCheckpointBackend
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

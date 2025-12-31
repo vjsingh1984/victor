@@ -12,9 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Checkpoint storage backends."""
+"""Checkpoint storage backends.
 
-from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+SQLiteCheckpointBackend requires aiosqlite (optional dependency).
+MemoryCheckpointBackend works without any additional dependencies.
+"""
+
+from typing import TYPE_CHECKING
+
+# MemoryCheckpointBackend has no external dependencies - import eagerly
 from victor.storage.checkpoints.backends.memory_backend import MemoryCheckpointBackend
 
+# SQLiteCheckpointBackend requires aiosqlite - lazy import
+if TYPE_CHECKING:
+    from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+
 __all__ = ["SQLiteCheckpointBackend", "MemoryCheckpointBackend"]
+
+
+def __getattr__(name: str):
+    """Lazy import for backends with optional dependencies."""
+    if name == "SQLiteCheckpointBackend":
+        from victor.storage.checkpoints.backends.sqlite_backend import (
+            SQLiteCheckpointBackend,
+        )
+
+        return SQLiteCheckpointBackend
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
