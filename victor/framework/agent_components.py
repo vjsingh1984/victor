@@ -45,7 +45,7 @@ from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.service_provider import (

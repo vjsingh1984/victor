@@ -57,7 +57,7 @@ from victor.framework.vertical_integration import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.config.settings import Settings
     from victor.observability.integration import ObservabilityIntegration
     from victor.core.verticals.base import VerticalBase, VerticalConfig

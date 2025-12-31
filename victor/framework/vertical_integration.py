@@ -93,7 +93,7 @@ from victor.agent.vertical_context import VerticalContext, create_vertical_conte
 from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.step_handlers import StepHandlerRegistry
     from victor.core.verticals.base import VerticalBase, VerticalConfig
     from victor.core.verticals.protocols import (
@@ -471,6 +471,7 @@ class IntegrationResult:
         workflows_count: Number of workflows registered
         rl_learners_count: Number of RL learners configured
         team_specs_count: Number of team specifications registered
+        step_status: Per-step execution status for detailed auditing
         errors: List of errors encountered
         warnings: List of warnings
         info: List of informational messages
@@ -487,6 +488,7 @@ class IntegrationResult:
     workflows_count: int = 0
     rl_learners_count: int = 0
     team_specs_count: int = 0
+    step_status: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     info: List[str] = field(default_factory=list)
@@ -503,6 +505,50 @@ class IntegrationResult:
     def add_info(self, message: str) -> None:
         """Add an informational message."""
         self.info.append(message)
+
+    def record_step_status(
+        self,
+        step_name: str,
+        status: str,
+        details: Optional[Dict[str, Any]] = None,
+        duration_ms: Optional[float] = None,
+    ) -> None:
+        """Record the execution status of a step handler.
+
+        Tracks per-step status for detailed auditing and debugging.
+        Each step is recorded with its status, optional details, and duration.
+
+        Args:
+            step_name: Unique identifier for the step handler
+            status: Status string - "success", "error", "warning", or "skipped"
+            details: Optional dictionary with additional details (counts, messages, etc.)
+            duration_ms: Optional execution duration in milliseconds
+
+        Example:
+            result.record_step_status(
+                "tools",
+                "success",
+                details={"tools_count": 15, "canonical_count": 12},
+                duration_ms=5.3,
+            )
+        """
+        step_record: Dict[str, Any] = {"status": status}
+        if details is not None:
+            step_record["details"] = details
+        if duration_ms is not None:
+            step_record["duration_ms"] = duration_ms
+        self.step_status[step_name] = step_record
+
+    def get_step_status(self, step_name: str) -> Optional[Dict[str, Any]]:
+        """Get the status record for a specific step.
+
+        Args:
+            step_name: Name of the step to look up
+
+        Returns:
+            Status record dict or None if step not recorded
+        """
+        return self.step_status.get(step_name)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization (SRP: data → dict).
@@ -521,6 +567,7 @@ class IntegrationResult:
             "workflows_count": self.workflows_count,
             "rl_learners_count": self.rl_learners_count,
             "team_specs_count": self.team_specs_count,
+            "step_status": self.step_status,
             "errors": self.errors,
             "warnings": self.warnings,
             "info": self.info,
@@ -590,6 +637,7 @@ class IntegrationResult:
             workflows_count=data.get("workflows_count", 0),
             rl_learners_count=data.get("rl_learners_count", 0),
             team_specs_count=data.get("team_specs_count", 0),
+            step_status=data.get("step_status", {}),
             errors=data.get("errors", []),
             warnings=data.get("warnings", []),
             info=data.get("info", []),

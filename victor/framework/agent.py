@@ -30,7 +30,7 @@ from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.agent.teams.team import TeamFormation
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter

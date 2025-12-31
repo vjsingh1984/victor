@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, TypedDict
 from victor.framework.graph import END, StateGraph, GraphConfig
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 

@@ -71,7 +71,7 @@ from victor.agent.rl.coordinator import RLCoordinator, get_rl_coordinator
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
 

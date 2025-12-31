@@ -30,7 +30,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.tools import ToolSet
 
 # Import canonical ToolCategory and registry from tools.py (single source of truth)

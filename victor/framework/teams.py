@@ -77,7 +77,7 @@ from victor.agent.teams.team import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.agent import Agent
 
 
