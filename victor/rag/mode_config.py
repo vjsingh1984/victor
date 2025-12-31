@@ -12,60 +12,136 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RAG Mode Configuration Provider."""
+"""RAG-specific mode configurations using central registry.
 
-from typing import Dict, Optional
+This module registers RAG-specific operational modes with the central
+ModeConfigRegistry and exports a registry-based provider for protocol
+compatibility.
+"""
 
-from victor.core.verticals.protocols import ModeConfig, ModeConfigProviderProtocol
+from __future__ import annotations
+
+from typing import Dict
+
+from victor.core.mode_config import (
+    ModeConfigRegistry,
+    ModeDefinition,
+    RegistryBasedModeConfigProvider,
+)
 
 
-# RAG-specific mode definitions
-RAG_MODES: Dict[str, ModeConfig] = {
-    "fast": ModeConfig(
-        name="fast",
-        tool_budget=5,
-        max_iterations=10,
-        description="Quick RAG queries with minimal context",
-    ),
-    "standard": ModeConfig(
-        name="standard",
-        tool_budget=10,
-        max_iterations=20,
-        description="Standard RAG operations",
-    ),
-    "thorough": ModeConfig(
-        name="thorough",
-        tool_budget=20,
-        max_iterations=40,
-        description="Thorough search and analysis",
-    ),
-    "bulk_ingest": ModeConfig(
+# =============================================================================
+# RAG-Specific Modes (Registered with Central Registry)
+# =============================================================================
+
+# Vertical-specific modes that extend/override defaults
+_RAG_MODES: Dict[str, ModeDefinition] = {
+    "bulk_ingest": ModeDefinition(
         name="bulk_ingest",
         tool_budget=50,
         max_iterations=100,
-        description="Bulk document ingestion",
+        temperature=0.5,
+        description="Bulk document ingestion with high tool budget",
+        exploration_multiplier=2.0,
+    ),
+    "deep_search": ModeDefinition(
+        name="deep_search",
+        tool_budget=25,
+        max_iterations=50,
+        temperature=0.6,
+        description="Deep search across knowledge base",
+        exploration_multiplier=1.5,
+    ),
+    "synthesis": ModeDefinition(
+        name="synthesis",
+        tool_budget=15,
+        max_iterations=30,
+        temperature=0.7,
+        description="Document synthesis and summarization",
+        exploration_multiplier=1.0,
     ),
 }
 
+# RAG-specific task type budgets
+_RAG_TASK_BUDGETS: Dict[str, int] = {
+    "query": 5,
+    "search": 8,
+    "ingest": 10,
+    "synthesis": 6,
+    "maintenance": 15,
+    "index": 12,
+}
 
-class RAGModeConfigProvider(ModeConfigProviderProtocol):
+
+# =============================================================================
+# Registration (Called at module load)
+# =============================================================================
+
+
+def _register_rag_modes() -> None:
+    """Register RAG-specific modes with the central registry."""
+    registry = ModeConfigRegistry.get_instance()
+    registry.register_vertical(
+        name="rag",
+        modes=_RAG_MODES,
+        task_budgets=_RAG_TASK_BUDGETS,
+    )
+
+
+# Register on module import
+_register_rag_modes()
+
+
+# =============================================================================
+# Provider (Protocol Compatible)
+# =============================================================================
+
+
+class RAGModeConfigProvider(RegistryBasedModeConfigProvider):
     """Mode configuration provider for RAG vertical.
 
-    Provides RAG-specific modes and task budgets.
+    Uses the central ModeConfigRegistry for mode lookups,
+    ensuring consistency with default modes.
     """
 
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
-        """Get mode configurations for RAG vertical.
+    def __init__(self):
+        """Initialize with RAG vertical name."""
+        super().__init__(vertical="rag")
 
-        Returns:
-            Dict mapping mode names to configurations
-        """
-        return RAG_MODES
 
-    def get_default_mode(self) -> str:
-        """Get the default mode name.
+# =============================================================================
+# Convenience Functions
+# =============================================================================
 
-        Returns:
-            Default mode name
-        """
-        return "standard"
+
+def get_rag_mode_config(mode_name: str) -> ModeDefinition:
+    """Get mode configuration for RAG vertical.
+
+    Args:
+        mode_name: Name of the mode
+
+    Returns:
+        ModeDefinition for the requested mode
+    """
+    registry = ModeConfigRegistry.get_instance()
+    return registry.get_mode("rag", mode_name)
+
+
+def get_rag_task_budget(task_type: str) -> int:
+    """Get tool budget for a RAG task type.
+
+    Args:
+        task_type: Type of task
+
+    Returns:
+        Recommended tool budget
+    """
+    registry = ModeConfigRegistry.get_instance()
+    return registry.get_tool_budget("rag", task_type)
+
+
+__all__ = [
+    "RAGModeConfigProvider",
+    "get_rag_mode_config",
+    "get_rag_task_budget",
+]
