@@ -726,3 +726,145 @@ class ToolRegistrar:
                 logger.debug(f"Error shutting down MCP registry: {e}")
 
         logger.debug("ToolRegistrar shutdown complete")
+
+    # =========================================================================
+    # Prewarm API (Phase 3: Scalability)
+    # =========================================================================
+
+    async def prewarm(
+        self,
+        include_plugins: bool = True,
+        include_mcp: bool = True,
+        timeout: float = 10.0,
+    ) -> "PrewarmResult":
+        """Prewarm tool catalogs to reduce cold-start latency.
+
+        This method pre-loads tools, configurations, and optionally starts
+        MCP connections in the background. Call this at application startup
+        or before the first user request to ensure fast tool access.
+
+        Args:
+            include_plugins: Whether to load plugins during prewarm
+            include_mcp: Whether to start MCP connections (async, non-blocking)
+            timeout: Maximum time to wait for prewarm (MCP may continue in background)
+
+        Returns:
+            PrewarmResult with timing and status information
+
+        Example:
+            # At application startup
+            registrar = ToolRegistrar(tools, settings, provider, model)
+            result = await registrar.prewarm()
+            logger.info(f"Prewarmed {result.tools_loaded} tools in {result.duration_ms}ms")
+        """
+        import time
+
+        start_time = time.monotonic()
+        result = PrewarmResult()
+
+        try:
+            # Phase 1: Pre-load dynamic tools (fast, synchronous)
+            if not self._tools_loaded:
+                self._setup_providers()
+                self._stats.dynamic_tools = self._register_dynamic_tools()
+                self._load_tool_configurations()
+                self._tools_loaded = True
+                result.tools_loaded = self._stats.dynamic_tools
+                logger.debug(f"Prewarmed {result.tools_loaded} dynamic tools")
+
+            # Phase 2: Load plugins (if enabled)
+            if include_plugins and self.config.enable_plugins:
+                try:
+                    plugin_count = self._initialize_plugins()
+                    result.plugins_loaded = plugin_count
+                    self._stats.plugin_tools = plugin_count
+                    logger.debug(f"Prewarmed {plugin_count} plugin tools")
+                except Exception as e:
+                    result.warnings.append(f"Plugin prewarm failed: {e}")
+                    logger.debug(f"Plugin prewarm failed: {e}")
+
+            # Phase 3: Start MCP connections in background (async, non-blocking)
+            if include_mcp and (
+                self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False)
+            ):
+                try:
+                    # Start MCP in background task (don't block prewarm)
+                    mcp_task = self._create_mcp_task(self._prewarm_mcp())
+                    result.mcp_started = True
+                    logger.debug("MCP prewarm started in background")
+                except Exception as e:
+                    result.warnings.append(f"MCP prewarm failed to start: {e}")
+                    logger.debug(f"MCP prewarm failed: {e}")
+
+            # Phase 4: Pre-populate tool metadata registry cache
+            try:
+                from victor.tools.metadata_registry import ToolMetadataRegistry
+
+                metadata_registry = ToolMetadataRegistry.get_instance()
+                # Trigger cache population by querying common categories
+                for category in ["core", "filesystem", "search", "git"]:
+                    _ = metadata_registry.get_tools_by_category(category)
+                result.metadata_cached = True
+            except Exception as e:
+                result.warnings.append(f"Metadata cache prewarm failed: {e}")
+
+            result.success = True
+
+        except Exception as e:
+            result.success = False
+            result.error = str(e)
+            logger.warning(f"Prewarm failed: {e}")
+
+        result.duration_ms = (time.monotonic() - start_time) * 1000
+        logger.info(
+            f"Prewarm complete: {result.tools_loaded} tools, "
+            f"{result.plugins_loaded} plugins in {result.duration_ms:.1f}ms"
+        )
+
+        return result
+
+    async def _prewarm_mcp(self) -> None:
+        """Prewarm MCP connections in background."""
+        if not self.mcp_registry:
+            self._initialize_mcp_registry()
+
+        if self.mcp_registry:
+            await self._start_mcp_servers()
+
+
+@dataclass
+class PrewarmResult:
+    """Result of tool catalog prewarm operation.
+
+    Attributes:
+        success: Whether prewarm completed successfully
+        tools_loaded: Number of dynamic tools loaded
+        plugins_loaded: Number of plugin tools loaded
+        mcp_started: Whether MCP prewarm was started (may still be running)
+        metadata_cached: Whether tool metadata was cached
+        duration_ms: Total prewarm duration in milliseconds
+        error: Error message if prewarm failed
+        warnings: Non-fatal warnings during prewarm
+    """
+
+    success: bool = False
+    tools_loaded: int = 0
+    plugins_loaded: int = 0
+    mcp_started: bool = False
+    metadata_cached: bool = False
+    duration_ms: float = 0.0
+    error: Optional[str] = None
+    warnings: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize result to dictionary."""
+        return {
+            "success": self.success,
+            "tools_loaded": self.tools_loaded,
+            "plugins_loaded": self.plugins_loaded,
+            "mcp_started": self.mcp_started,
+            "metadata_cached": self.metadata_cached,
+            "duration_ms": self.duration_ms,
+            "error": self.error,
+            "warnings": self.warnings,
+        }

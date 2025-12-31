@@ -445,7 +445,8 @@ class TestConvertParametersToSchema:
     def test_empty_parameters(self):
         """Test conversion with empty parameters list."""
         schema = BaseTool.convert_parameters_to_schema([])
-        assert schema == {"type": "object", "properties": {}}
+        # additionalProperties: False rejects hallucinated arguments
+        assert schema == {"type": "object", "properties": {}, "additionalProperties": False}
 
     def test_single_required_parameter(self):
         """Test conversion with single required parameter."""
