@@ -768,14 +768,17 @@ class TestLazyToolLoading:
         # Before access, tools not loaded
         assert registrar._tools_loaded is False
 
-        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
-            with patch.object(registrar, "_load_tool_configurations"):
-                # Access tools via get_all_tools
-                registrar.get_all_tools()
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
 
-                # Now tools should be loaded
-                mock_register.assert_called_once()
-                assert registrar._tools_loaded is True
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Access tools via get_all_tools
+            registrar.get_all_tools()
+
+            # Now tools should be loaded via CatalogLoader
+            mock_loader.load.assert_called_once()
+            assert registrar._tools_loaded is True
 
     def test_tools_loaded_on_first_access_via_get_tool(self, mock_tools, mock_settings):
         """Test that tools ARE loaded when first accessed via get_tool()."""
@@ -787,14 +790,17 @@ class TestLazyToolLoading:
         # Before access, tools not loaded
         assert registrar._tools_loaded is False
 
-        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
-            with patch.object(registrar, "_load_tool_configurations"):
-                # Access tools via get_tool
-                registrar.get_tool("some_tool")
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
 
-                # Now tools should be loaded
-                mock_register.assert_called_once()
-                assert registrar._tools_loaded is True
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Access tools via get_tool
+            registrar.get_tool("some_tool")
+
+            # Now tools should be loaded via CatalogLoader
+            mock_loader.load.assert_called_once()
+            assert registrar._tools_loaded is True
 
     def test_subsequent_accesses_dont_reload_tools(self, mock_tools, mock_settings):
         """Test that subsequent accesses don't reload tools (only loads once)."""
@@ -803,19 +809,22 @@ class TestLazyToolLoading:
             settings=mock_settings,
         )
 
-        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
-            with patch.object(registrar, "_load_tool_configurations"):
-                # First access triggers loading
-                registrar.get_all_tools()
-                assert mock_register.call_count == 1
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
 
-                # Second access should NOT reload
-                registrar.get_all_tools()
-                assert mock_register.call_count == 1
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # First access triggers loading
+            registrar.get_all_tools()
+            assert mock_loader.load.call_count == 1
 
-                # Third access via different method also should NOT reload
-                registrar.get_tool("test")
-                assert mock_register.call_count == 1
+            # Second access should NOT reload
+            registrar.get_all_tools()
+            assert mock_loader.load.call_count == 1
+
+            # Third access via different method also should NOT reload
+            registrar.get_tool("test")
+            assert mock_loader.load.call_count == 1
 
     def test_ensure_tools_loaded_is_idempotent(self, mock_tools, mock_settings):
         """Test that _ensure_tools_loaded() is idempotent."""
@@ -824,15 +833,18 @@ class TestLazyToolLoading:
             settings=mock_settings,
         )
 
-        with patch.object(registrar, "_register_dynamic_tools", return_value=5) as mock_register:
-            with patch.object(registrar, "_load_tool_configurations"):
-                # Call multiple times
-                registrar._ensure_tools_loaded()
-                registrar._ensure_tools_loaded()
-                registrar._ensure_tools_loaded()
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
 
-                # Should only register once
-                assert mock_register.call_count == 1
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Call multiple times
+            registrar._ensure_tools_loaded()
+            registrar._ensure_tools_loaded()
+            registrar._ensure_tools_loaded()
+
+            # Should only register once (via CatalogLoader)
+            assert mock_loader.load.call_count == 1
 
     def test_tools_loaded_flag_persists_across_accesses(self, mock_tools, mock_settings):
         """Test that the _tools_loaded flag correctly persists."""
@@ -844,9 +856,12 @@ class TestLazyToolLoading:
         # Initially not loaded
         assert registrar._tools_loaded is False
 
-        with patch.object(registrar, "_register_dynamic_tools", return_value=5):
-            with patch.object(registrar, "_load_tool_configurations"):
-                registrar._ensure_tools_loaded()
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            registrar._ensure_tools_loaded()
 
         # After loading, flag should be True
         assert registrar._tools_loaded is True
@@ -857,7 +872,7 @@ class TestLazyToolLoading:
 
 
 class TestInitializeMethod:
-    """Tests for the main initialize method."""
+    """Tests for the main initialize method using SRP-compliant components."""
 
     @pytest.fixture
     def registrar(self):
@@ -873,39 +888,60 @@ class TestInitializeMethod:
 
     @pytest.mark.asyncio
     async def test_initialize_basic(self, registrar):
-        """Test basic initialization."""
+        """Test basic initialization via CatalogLoader component."""
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
-                    stats = await registrar.initialize()
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
         assert stats.total_tools == 10
+        mock_catalog_loader.load.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_with_plugins(self, registrar):
-        """Test initialization with plugins enabled."""
+        """Test initialization with plugins enabled via PluginLoader component."""
         registrar.config.enable_plugins = True
 
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
+        # Mock the PluginLoader component
+        mock_plugin_loader = MagicMock()
+        mock_plugin_loader.load.return_value = MagicMock(tools_registered=5, plugins_loaded=2)
+        mock_plugin_loader.plugin_manager = MagicMock()
+
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
-                    with patch.object(registrar, "_initialize_plugins", return_value=5):
-                        stats = await registrar.initialize()
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                with patch.object(registrar, "_get_plugin_loader", return_value=mock_plugin_loader):
+                    stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
         assert stats.plugin_tools == 5
+        mock_plugin_loader.load.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_with_tool_graph(self, registrar):
-        """Test initialization with tool graph."""
+        """Test initialization with tool graph via GraphBuilder component."""
         registrar.config.enable_tool_graph = True
         registrar.tool_graph = MagicMock()
-        registrar.tool_graph.add_tool.return_value = None
+
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
+        # Mock the GraphBuilder component
+        mock_graph_builder = MagicMock()
+        mock_graph_builder.build.return_value = MagicMock(tools_registered=8)
 
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                with patch.object(registrar, "_get_graph_builder", return_value=mock_graph_builder):
                     stats = await registrar.initialize()
 
         assert stats.dependency_graph_tools == 8
+        mock_graph_builder.build.assert_called_once()

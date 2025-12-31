@@ -12,56 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool registration, plugin loading, and MCP integration.
+"""Tool registration facade coordinating specialized loaders.
 
-This module encapsulates all tool registration functionality:
-- Dynamic tool discovery from victor/tools directory
-- Plugin system management
-- MCP (Model Context Protocol) integration
-- Tool dependency graph setup
-- Tool configuration loading
+This module provides a unified facade for tool registration, delegating to
+specialized components for each responsibility (SRP compliance).
 
-Design Pattern: Registry Pattern + Facade
-=========================================
-ToolRegistrar acts as a facade for multiple registration systems:
-- ToolRegistry: Core tool registration
-- ToolPluginRegistry: Plugin management
-- MCPRegistry: MCP server discovery
-- ToolDependencyGraph: Tool planning
-
-SRP Consideration (Future Refactoring)
-======================================
-This class currently bundles 5 responsibilities. For stricter SRP compliance,
-consider splitting into:
+Design Pattern: Facade Pattern
+==============================
+ToolRegistrar is a thin facade coordinating four specialized components:
 
 1. ToolCatalogLoader: Dynamic tool discovery from victor/tools
-   - _discover_tools(), _load_tool_module(), _register_dynamic_tools()
+   - Registers tools from SharedToolRegistry
+   - Applies enabled/disabled configuration
 
 2. PluginLoader: Plugin system management
-   - _initialize_plugins(), _load_plugin_package(), _register_plugin_tools()
+   - Discovers and loads tool plugins
+   - Registers plugin tools
 
 3. MCPConnector: MCP server discovery and connection
-   - _setup_mcp_integration(), _connect_mcp_servers()
+   - Auto-discovers MCP servers
+   - Manages connection lifecycle
 
 4. ToolGraphBuilder: Tool dependency graph setup
-   - _build_tool_graph(), _register_graph_dependencies()
+   - Registers tool input/output specs
+   - Provides goal-based tool planning
 
-5. ToolRegistrar (Facade): Thin facade coordinating the above
-   - initialize(), get_stats(), prewarm()
+SOLID Compliance:
+- SRP: Each component has single responsibility
+- OCP: New loaders can be added without modifying facade
+- LSP: Components are substitutable via their protocols
+- ISP: Clients only depend on facade interface
+- DIP: Facade depends on abstractions (component interfaces)
 
-Benefits of split:
-- Each class has single reason to change
-- Easier testing of individual components
-- Plugin/MCP can be disabled without loading their code
-- Clearer dependency injection boundaries
-
-Trade-offs:
-- More files to navigate
-- Increased coordination overhead
-- May be premature if responsibilities are stable
-
-Current status: Acceptable as facade pattern. Split if maintenance
-pain points emerge (e.g., frequent MCP changes breaking plugin code).
+Benefits of this architecture:
+- Each component can be tested in isolation
+- Plugin/MCP code not loaded unless enabled
+- Clear dependency injection boundaries
+- Easy to add new registration sources
 
 Usage:
     from victor.agent.tool_registrar import ToolRegistrar
@@ -87,6 +74,9 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.providers.base import BaseProvider, ToolDefinition
 from victor.tools.base import ToolRegistry, CostTier
+
+# Import specialized components (lazy to avoid circular imports)
+# These are imported at runtime in methods that use them
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +132,20 @@ class RegistrationStats:
 
 
 class ToolRegistrar:
-    """Handles tool registration, plugins, and MCP integration.
+    """Facade for tool registration coordinating specialized components.
 
-    Encapsulates all tool registration functionality:
-    - Dynamic tool discovery from victor/tools directory
-    - Plugin system management
-    - MCP (Model Context Protocol) integration
-    - Tool dependency graph setup
-    - Tool configuration loading
+    This class provides a unified interface for tool registration while
+    delegating to specialized components for each responsibility:
 
-    This component follows the Registry Pattern combined with Facade pattern,
-    providing a unified interface for multiple registration systems.
+    - ToolCatalogLoader: Dynamic tool discovery
+    - PluginLoader: Plugin management
+    - MCPConnector: MCP integration
+    - ToolGraphBuilder: Dependency graph setup
+
+    SOLID Compliance:
+    - SRP: Facade only coordinates, delegates actual work
+    - OCP: New components can be added without modifying facade
+    - DIP: Depends on component interfaces, not implementations
 
     Usage:
         registrar = ToolRegistrar(
@@ -173,7 +166,7 @@ class ToolRegistrar:
         tool_graph: Optional[Any] = None,
         config: Optional[ToolRegistrarConfig] = None,
     ):
-        """Initialize the tool registrar.
+        """Initialize the tool registrar facade.
 
         Args:
             tools: Tool registry to register tools with
@@ -190,10 +183,14 @@ class ToolRegistrar:
         self.tool_graph = tool_graph
         self.config = config or ToolRegistrarConfig()
 
-        # Plugin system
-        self.plugin_manager: Optional[Any] = None
+        # Specialized components (lazy-initialized)
+        self._catalog_loader: Optional[Any] = None
+        self._plugin_loader: Optional[Any] = None
+        self._mcp_connector: Optional[Any] = None
+        self._graph_builder: Optional[Any] = None
 
-        # MCP integration
+        # Legacy compatibility attributes
+        self.plugin_manager: Optional[Any] = None
         self.mcp_registry: Optional[Any] = None
         self._mcp_tasks: List[asyncio.Task] = []
 
@@ -209,7 +206,7 @@ class ToolRegistrar:
         # Lazy loading flag - tools are not loaded until first access
         self._tools_loaded: bool = False
 
-        logger.debug("ToolRegistrar initialized")
+        logger.debug("ToolRegistrar facade initialized")
 
     def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
         """Set callback for creating background tasks.
@@ -218,6 +215,9 @@ class ToolRegistrar:
             callback: Function that takes (coroutine, name) and returns Task
         """
         self._create_background_task = callback
+        # Propagate to MCP connector if initialized
+        if self._mcp_connector:
+            self._mcp_connector.set_task_callback(callback)
 
     def _create_task(self, coro: Any, name: str) -> Optional[asyncio.Task]:
         """Create a background task using callback or directly."""
@@ -228,24 +228,90 @@ class ToolRegistrar:
             self._mcp_tasks.append(task)
             return task
 
+    # =========================================================================
+    # Component Accessors (Lazy Initialization)
+    # =========================================================================
+
+    def _get_catalog_loader(self) -> Any:
+        """Get or create the catalog loader component."""
+        if self._catalog_loader is None:
+            from victor.agent.tool_catalog_loader import ToolCatalogLoader, ToolCatalogConfig
+
+            self._catalog_loader = ToolCatalogLoader(
+                registry=self.tools,
+                settings=self.settings,
+                config=ToolCatalogConfig(
+                    airgapped_mode=self.config.airgapped_mode,
+                ),
+            )
+        return self._catalog_loader
+
+    def _get_plugin_loader(self) -> Any:
+        """Get or create the plugin loader component."""
+        if self._plugin_loader is None:
+            from victor.agent.plugin_loader import PluginLoader, PluginLoaderConfig
+
+            self._plugin_loader = PluginLoader(
+                registry=self.tools,
+                settings=self.settings,
+                config=PluginLoaderConfig(
+                    enabled=self.config.enable_plugins,
+                    plugin_dirs=self.config.plugin_dirs,
+                    disabled_plugins=self.config.disabled_plugins,
+                    plugin_packages=self.config.plugin_packages,
+                ),
+            )
+        return self._plugin_loader
+
+    def _get_mcp_connector(self) -> Any:
+        """Get or create the MCP connector component."""
+        if self._mcp_connector is None:
+            from victor.agent.mcp_connector import MCPConnector, MCPConnectorConfig
+
+            self._mcp_connector = MCPConnector(
+                registry=self.tools,
+                settings=self.settings,
+                config=MCPConnectorConfig(
+                    enabled=self.config.enable_mcp,
+                ),
+                task_callback=self._create_background_task,
+            )
+        return self._mcp_connector
+
+    def _get_graph_builder(self) -> Any:
+        """Get or create the graph builder component."""
+        if self._graph_builder is None:
+            from victor.agent.tool_graph_builder import ToolGraphBuilder, ToolGraphConfig
+
+            self._graph_builder = ToolGraphBuilder(
+                registry=self.tools,
+                tool_graph=self.tool_graph,
+                config=ToolGraphConfig(
+                    enabled=self.config.enable_tool_graph,
+                ),
+            )
+        return self._graph_builder
+
     def _ensure_tools_loaded(self) -> None:
         """Ensure tools are loaded (lazy loading pattern).
 
         This method loads tools on first access rather than during __init__,
         improving startup time by deferring tool discovery until needed.
+
+        Delegates to ToolCatalogLoader component (SRP compliance).
         """
         if self._tools_loaded:
             return
 
-        # Register dynamic tools
-        self._stats.dynamic_tools = self._register_dynamic_tools()
+        # Delegate to catalog loader component
+        catalog_loader = self._get_catalog_loader()
+        result = catalog_loader.load()
 
-        # Load tool configurations
-        self._load_tool_configurations()
+        self._stats.dynamic_tools = result.tools_loaded
 
         # Mark as loaded
         self._tools_loaded = True
-        logger.debug(f"Lazy-loaded {self._stats.dynamic_tools} tools")
+        logger.debug(f"Lazy-loaded {self._stats.dynamic_tools} tools via CatalogLoader")
 
     def get_tool(self, name: str) -> Optional[Any]:
         """Get a tool by name, triggering lazy loading if needed.
@@ -269,14 +335,14 @@ class ToolRegistrar:
         return self.tools.list_tools()
 
     async def initialize(self) -> RegistrationStats:
-        """Initialize all tool registration.
+        """Initialize all tool registration via specialized components.
 
-        Performs:
+        Performs (delegating to SRP-compliant components):
         1. Pre-registration setup (providers, configs)
-        2. Dynamic tool discovery and registration (if not already lazy-loaded)
-        3. Plugin loading (if enabled)
-        4. MCP integration (if enabled)
-        5. Tool dependency graph setup (if enabled)
+        2. Dynamic tool discovery via ToolCatalogLoader
+        3. Plugin loading via PluginLoader
+        4. MCP integration via MCPConnector
+        5. Tool dependency graph via ToolGraphBuilder
 
         Returns:
             RegistrationStats with registration counts
@@ -284,26 +350,36 @@ class ToolRegistrar:
         # Pre-registration setup
         self._setup_providers()
 
-        # Dynamic tool registration (skip if already lazy-loaded)
+        # 1. Dynamic tool registration via CatalogLoader
         if not self._tools_loaded:
-            self._stats.dynamic_tools = self._register_dynamic_tools()
-            self._load_tool_configurations()
+            catalog_loader = self._get_catalog_loader()
+            result = catalog_loader.load()
+            self._stats.dynamic_tools = result.tools_loaded
             self._tools_loaded = True
 
-        # Plugin loading
+        # 2. Plugin loading via PluginLoader
         if self.config.enable_plugins:
-            self._stats.plugin_tools = self._initialize_plugins()
-            self._stats.plugins_loaded = (
-                len(self.plugin_manager.loaded_plugins) if self.plugin_manager else 0
-            )
+            plugin_loader = self._get_plugin_loader()
+            result = plugin_loader.load()
+            self._stats.plugin_tools = result.tools_registered
+            self._stats.plugins_loaded = result.plugins_loaded
+            # Maintain legacy compatibility
+            self.plugin_manager = plugin_loader.plugin_manager
 
-        # MCP integration
+        # 3. MCP integration via MCPConnector
         if self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False):
-            self._stats.mcp_tools = self._setup_mcp_integration()
+            mcp_connector = self._get_mcp_connector()
+            result = await mcp_connector.connect()
+            self._stats.mcp_tools = result.tools_registered
+            self._stats.mcp_servers_connected = result.servers_connected
+            # Maintain legacy compatibility
+            self.mcp_registry = mcp_connector.mcp_registry
 
-        # Tool dependency graph
+        # 4. Tool dependency graph via GraphBuilder
         if self.config.enable_tool_graph and self.tool_graph:
-            self._stats.dependency_graph_tools = self._register_tool_dependencies()
+            graph_builder = self._get_graph_builder()
+            result = graph_builder.build()
+            self._stats.dependency_graph_tools = result.tools_registered
 
         # Calculate totals
         self._stats.total_tools = len(self.tools.list_tools())
@@ -633,6 +709,8 @@ class ToolRegistrar:
     ) -> List[ToolDefinition]:
         """Plan a sequence of tools to satisfy goals using the dependency graph.
 
+        Delegates to ToolGraphBuilder component (SRP compliance).
+
         Args:
             goals: List of goals to achieve
             available_inputs: Already available inputs
@@ -643,24 +721,13 @@ class ToolRegistrar:
         if not goals or not self.tool_graph:
             return []
 
-        available = available_inputs or []
-        plan_names = self.tool_graph.plan(goals, available)
-        tool_defs: List[ToolDefinition] = []
-
-        for name in plan_names:
-            tool = self.tools.get(name)
-            if tool and self.tools.is_tool_enabled(name):
-                tool_defs.append(
-                    ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
-                )
-        return tool_defs
+        graph_builder = self._get_graph_builder()
+        return graph_builder.plan_for_goals(goals, available_inputs)
 
     def infer_goals_from_message(self, user_message: str) -> List[str]:
         """Infer planning goals from user request.
+
+        Delegates to ToolGraphBuilder component (SRP compliance).
 
         Args:
             user_message: User's message
@@ -668,21 +735,8 @@ class ToolRegistrar:
         Returns:
             List of inferred goal names
         """
-        text = user_message.lower()
-        goals: List[str] = []
-
-        if any(kw in text for kw in ["summarize", "summary", "analyze", "overview"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["review", "code review", "audit"]):
-            goals.append("summary")
-        if any(kw in text for kw in ["doc", "documentation", "readme"]):
-            goals.append("documentation")
-        if any(kw in text for kw in ["security", "vulnerability", "secret", "scan"]):
-            goals.append("security_report")
-        if any(kw in text for kw in ["complexity", "metrics", "maintainability", "technical debt"]):
-            goals.append("metrics_report")
-
-        return goals
+        graph_builder = self._get_graph_builder()
+        return graph_builder.infer_goals_from_message(user_message)
 
     def get_stats(self) -> RegistrationStats:
         """Get registration statistics.
@@ -704,9 +758,15 @@ class ToolRegistrar:
     def get_plugin_info(self) -> Dict[str, Any]:
         """Get information about loaded plugins.
 
+        Delegates to PluginLoader component (SRP compliance).
+
         Returns:
             Dictionary with plugin information
         """
+        if self._plugin_loader:
+            return self._plugin_loader.get_summary()
+
+        # Legacy fallback
         if not self.plugin_manager:
             return {"plugins": [], "total": 0}
 
@@ -725,9 +785,15 @@ class ToolRegistrar:
     def get_mcp_info(self) -> Dict[str, Any]:
         """Get information about MCP servers.
 
+        Delegates to MCPConnector component (SRP compliance).
+
         Returns:
             Dictionary with MCP server information
         """
+        if self._mcp_connector:
+            return self._mcp_connector.get_summary()
+
+        # Legacy fallback
         if not self.mcp_registry:
             return {"servers": [], "connected": 0, "total": 0}
 
@@ -746,20 +812,30 @@ class ToolRegistrar:
         }
 
     async def shutdown(self) -> None:
-        """Shutdown MCP connections and cleanup."""
-        # Cancel pending MCP tasks
+        """Shutdown all components and cleanup.
+
+        Delegates to specialized components (SRP compliance).
+        """
+        # Shutdown MCP connector if initialized
+        if self._mcp_connector:
+            try:
+                await self._mcp_connector.shutdown()
+            except Exception as e:
+                logger.debug(f"Error shutting down MCP connector: {e}")
+
+        # Legacy fallback: Cancel pending MCP tasks
         for task in self._mcp_tasks:
             if not task.done():
                 task.cancel()
 
-        # Shutdown MCP registry
-        if self.mcp_registry:
+        # Legacy fallback: Shutdown MCP registry
+        if self.mcp_registry and not self._mcp_connector:
             try:
                 await self.mcp_registry.shutdown()
             except Exception as e:
                 logger.debug(f"Error shutting down MCP registry: {e}")
 
-        logger.debug("ToolRegistrar shutdown complete")
+        logger.debug("ToolRegistrar facade shutdown complete")
 
     # =========================================================================
     # Prewarm API (Phase 3: Scalability)
@@ -772,6 +848,8 @@ class ToolRegistrar:
         timeout: float = 10.0,
     ) -> "PrewarmResult":
         """Prewarm tool catalogs to reduce cold-start latency.
+
+        Delegates to specialized components (SRP compliance).
 
         This method pre-loads tools, configurations, and optionally starts
         MCP connections in the background. Call this at application startup
@@ -797,35 +875,39 @@ class ToolRegistrar:
         result = PrewarmResult()
 
         try:
-            # Phase 1: Pre-load dynamic tools (fast, synchronous)
+            # Phase 1: Pre-load dynamic tools via CatalogLoader
             if not self._tools_loaded:
                 self._setup_providers()
-                self._stats.dynamic_tools = self._register_dynamic_tools()
-                self._load_tool_configurations()
+                catalog_loader = self._get_catalog_loader()
+                load_result = catalog_loader.load()
+                self._stats.dynamic_tools = load_result.tools_loaded
                 self._tools_loaded = True
                 result.tools_loaded = self._stats.dynamic_tools
-                logger.debug(f"Prewarmed {result.tools_loaded} dynamic tools")
+                logger.debug(f"Prewarmed {result.tools_loaded} dynamic tools via CatalogLoader")
 
-            # Phase 2: Load plugins (if enabled)
+            # Phase 2: Load plugins via PluginLoader
             if include_plugins and self.config.enable_plugins:
                 try:
-                    plugin_count = self._initialize_plugins()
-                    result.plugins_loaded = plugin_count
-                    self._stats.plugin_tools = plugin_count
-                    logger.debug(f"Prewarmed {plugin_count} plugin tools")
+                    plugin_loader = self._get_plugin_loader()
+                    load_result = plugin_loader.load()
+                    result.plugins_loaded = load_result.tools_registered
+                    self._stats.plugin_tools = load_result.tools_registered
+                    self.plugin_manager = plugin_loader.plugin_manager
+                    logger.debug(f"Prewarmed {result.plugins_loaded} plugin tools via PluginLoader")
                 except Exception as e:
                     result.warnings.append(f"Plugin prewarm failed: {e}")
                     logger.debug(f"Plugin prewarm failed: {e}")
 
-            # Phase 3: Start MCP connections in background (async, non-blocking)
+            # Phase 3: Start MCP connections via MCPConnector (async, non-blocking)
             if include_mcp and (
                 self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False)
             ):
                 try:
+                    mcp_connector = self._get_mcp_connector()
                     # Start MCP in background task (don't block prewarm)
-                    mcp_task = self._create_mcp_task(self._prewarm_mcp())
+                    self._create_task(mcp_connector.connect(), "mcp_prewarm")
                     result.mcp_started = True
-                    logger.debug("MCP prewarm started in background")
+                    logger.debug("MCP prewarm started in background via MCPConnector")
                 except Exception as e:
                     result.warnings.append(f"MCP prewarm failed to start: {e}")
                     logger.debug(f"MCP prewarm failed: {e}")
@@ -856,14 +938,6 @@ class ToolRegistrar:
         )
 
         return result
-
-    async def _prewarm_mcp(self) -> None:
-        """Prewarm MCP connections in background."""
-        if not self.mcp_registry:
-            self._initialize_mcp_registry()
-
-        if self.mcp_registry:
-            await self._start_mcp_servers()
 
 
 @dataclass
