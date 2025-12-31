@@ -172,6 +172,10 @@ class ArgumentNormalizer:
         # This runs first so subsequent layers work with standard param names
         arguments, was_aliased = self.normalize_parameter_aliases(arguments, tool_name)
 
+        # Layer 0.5: Coerce primitive types (str -> int/float/bool)
+        # Some models (OpenRouter, Fireworks) output integers as strings like "0" or "30"
+        arguments = self._coerce_primitive_types(arguments, tool_name)
+
         # AGGRESSIVE APPROACH: Check if any values look like JSON and try normalization FIRST
         # This ensures we catch malformed JSON even if basic validation passes
         has_json_like_strings = any(
@@ -477,6 +481,103 @@ class ArgumentNormalizer:
                     # This is a last resort for very malformed input
                     pass
         return arguments
+
+    def _coerce_primitive_types(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
+        """
+        Coerce string values to primitive types (int, float, bool) when appropriate.
+
+        Some models (e.g., OpenRouter Llama, Fireworks) output integers as strings
+        like "0", "30", or booleans as "true", "false". This method coerces them
+        to proper Python types.
+
+        Examples:
+            {"line_start": "0", "line_end": "30"} -> {"line_start": 0, "line_end": 30}
+            {"regex": "false"} -> {"regex": False}
+            {"timeout": "30.5"} -> {"timeout": 30.5}
+
+        Args:
+            arguments: Raw arguments from model
+            tool_name: Name of the tool (for logging)
+
+        Returns:
+            Arguments with coerced primitive types
+        """
+        coerced = {}
+        any_coerced = False
+
+        for key, value in arguments.items():
+            if isinstance(value, str):
+                coerced_value = self._try_coerce_string(value)
+                if coerced_value is not value:  # Identity check - was actually coerced
+                    coerced[key] = coerced_value
+                    any_coerced = True
+                    logger.debug(
+                        f"[{self.provider_name}] {tool_name}: Coerced '{key}' from str "
+                        f"'{value}' to {type(coerced_value).__name__} {coerced_value}"
+                    )
+                else:
+                    coerced[key] = value
+            else:
+                coerced[key] = value
+
+        if any_coerced:
+            logger.info(
+                f"[{self.provider_name}] Coerced primitive types for {tool_name}: "
+                f"{[k for k in arguments if coerced.get(k) is not arguments.get(k)]}"
+            )
+
+        return coerced
+
+    def _try_coerce_string(self, value: str) -> Any:
+        """
+        Try to coerce a string value to a primitive type.
+
+        Attempts conversions in order:
+        1. Boolean ("true"/"false", case-insensitive)
+        2. None ("null"/"none", case-insensitive)
+        3. Integer (digits only, with optional negative sign)
+        4. Float (digits with decimal point)
+
+        Args:
+            value: String value to potentially coerce
+
+        Returns:
+            Coerced value or original string if no coercion applies
+        """
+        stripped = value.strip()
+        lower = stripped.lower()
+
+        # Boolean coercion
+        if lower == "true":
+            return True
+        if lower == "false":
+            return False
+
+        # None/null coercion
+        if lower in ("null", "none"):
+            return None
+
+        # Integer coercion (must be all digits, optionally with leading minus)
+        # Don't coerce if it looks like a path or has special chars
+        if stripped.lstrip("-").isdigit() and not stripped.startswith("/"):
+            try:
+                return int(stripped)
+            except ValueError:
+                pass
+
+        # Float coercion (digits with one decimal point)
+        if "." in stripped and not stripped.startswith("/"):
+            parts = stripped.lstrip("-").split(".")
+            if len(parts) == 2 and all(p.isdigit() for p in parts if p):
+                try:
+                    return float(stripped)
+                except ValueError:
+                    pass
+
+        # No coercion - return original
+        return value
 
     def get_stats(self) -> Dict[str, Any]:
         """
