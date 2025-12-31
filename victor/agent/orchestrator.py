@@ -138,6 +138,7 @@ from victor.agent.context_compactor import (
     calculate_parallel_read_budget,
 )
 from victor.agent.continuation_strategy import ContinuationStrategy
+from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import (
     UsageAnalytics,
@@ -185,6 +186,7 @@ from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
 
 # Observability integration (EventBus, hooks, exporters)
+from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 from victor.observability.integration import ObservabilityIntegration
 
 # Intelligent pipeline integration (lazy initialization to avoid circular imports)
@@ -461,6 +463,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.failed_tool_signatures,
             self._tool_capability_warned,
         ) = self._factory.initialize_execution_state()
+
+        # Track files read during this session for task completion detection
+        self._read_files_session: Set[str] = set()
+        # Track required files extracted from user prompts
+        self._required_files: List[str] = []
+        # Track required outputs extracted from user prompts (e.g., "findings table", "top-3 fixes")
+        self._required_outputs: List[str] = []
+        # Flag to track if we've already sent a nudge to produce output
+        self._all_files_read_nudge_sent: bool = False
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes
@@ -787,6 +798,69 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Callback when tool execution completes (from ToolPipeline)."""
         self._metrics_collector.on_tool_complete(result)
 
+        # Emit EventBus event for logging visibility
+        event_bus = EventBus.get_instance()
+        event_bus.publish(
+            VictorEvent(
+                category=EventCategory.TOOL,
+                name="tool.complete",
+                data={
+                    "tool_name": result.tool_name,
+                    "success": result.success,
+                    "result_length": len(str(result.result or "")) if result.result else 0,
+                    "error": str(result.error) if result.error else None,
+                },
+                source="AgentOrchestrator",
+            )
+        )
+
+        # Track read files for task completion detection
+        if result.success and result.tool_name in ("read", "Read", "read_file"):
+            # Extract file path from arguments
+            if result.arguments:
+                file_path = result.arguments.get("path") or result.arguments.get("file_path")
+                if file_path:
+                    self._read_files_session.add(file_path)
+                    logger.debug(f"Tracked read file: {file_path}")
+
+                    # Check if all required files have been read - nudge to produce output
+                    if (
+                        self._required_files
+                        and self._read_files_session.issuperset(set(self._required_files))
+                        and not getattr(self, "_all_files_read_nudge_sent", False)
+                    ):
+                        self._all_files_read_nudge_sent = True
+                        logger.info(
+                            f"All {len(self._required_files)} required files have been read. "
+                            "Agent should now produce the required output."
+                        )
+
+                        # Emit event for observability (helps debug exploration vs. output)
+                        event_bus = EventBus.get_instance()
+                        event_bus.publish(
+                            VictorEvent(
+                                category=EventCategory.STATE,
+                                name="task.all_files_read_nudge",
+                                data={
+                                    "required_files": list(self._required_files),
+                                    "read_files": list(self._read_files_session),
+                                    "required_outputs": self._required_outputs,
+                                    "action": "nudge_output_production",
+                                },
+                                source="AgentOrchestrator",
+                            )
+                        )
+
+                        # Inject nudge message to encourage output production
+                        if self._required_outputs:
+                            outputs_str = ", ".join(self._required_outputs)
+                            self.add_message(
+                                "system",
+                                f"[REMINDER] All required files have been read. "
+                                f"Please now produce the required output: {outputs_str}. "
+                                f"Avoid further exploration - focus on synthesizing findings.",
+                            )
+
         # Emit observability event for tool completion
         if hasattr(self, "_observability") and self._observability:
             iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
@@ -886,6 +960,96 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception as e:
             # Don't let RL errors affect main flow
             logger.warning(f"Failed to send RL reward signal: {e}")
+
+    def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
+        """Extract file paths mentioned in user prompt for task completion tracking.
+
+        Looks for patterns like:
+        - /absolute/path/to/file.py
+        - ./relative/path.py
+        - victor/agent/orchestrator.py
+        - *.py (wildcards not returned)
+
+        Args:
+            user_message: The user's prompt text
+
+        Returns:
+            List of file paths mentioned in the prompt
+        """
+        import re
+
+        required_files: List[str] = []
+
+        # Pattern for file paths (absolute, relative, or module-style)
+        # Matches paths with at least one / and a file extension
+        # Handles: "path/file.py", path/file.py, path/file.py. (sentence end)
+        file_path_pattern = re.compile(
+            r"(?:^|\s|[\"'\-])"  # Start of string, whitespace, quote, or dash (for bullet lists)
+            r"((?:\.{0,2}/)?"  # Optional ./ or ../ or /
+            r"[\w./-]+/"  # At least one directory component
+            r"[\w.-]+\.[a-z]{1,10})"  # Filename with extension
+            r"(?:\s|[\"']|$|[,;:.\)]|\Z)",  # End: space, quote, EOL, punctuation (incl. period, paren)
+            re.IGNORECASE,
+        )
+
+        for match in file_path_pattern.finditer(user_message):
+            path = match.group(1)
+            # Skip wildcards and patterns
+            if "*" not in path and "?" not in path:
+                required_files.append(path)
+
+        # Also look for explicit "read", "analyze", "audit" + file patterns
+        explicit_pattern = re.compile(
+            r"(?:read|analyze|audit|check|review|examine)\s+"
+            r"([/\w.-]+(?:/[\w.-]+)+)",
+            re.IGNORECASE,
+        )
+        for match in explicit_pattern.finditer(user_message):
+            path = match.group(1)
+            if path not in required_files and "*" not in path:
+                required_files.append(path)
+
+        logger.debug(f"Extracted required files from prompt: {required_files}")
+        return required_files
+
+    def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
+        """Extract output requirements from user prompt.
+
+        Looks for patterns indicating required output format:
+        - "create a findings table"
+        - "provide top-3 fixes"
+        - "6-10 findings"
+        - "must output"
+
+        Args:
+            user_message: The user's prompt text
+
+        Returns:
+            List of required output types (e.g., ["findings table", "top-3 fixes"])
+        """
+        import re
+
+        required_outputs: List[str] = []
+        message_lower = user_message.lower()
+
+        # Check for findings table requirement
+        if re.search(r"findings?\s*table|table\s+of\s+findings?", message_lower):
+            required_outputs.append("findings table")
+
+        # Check for top-N fixes requirement
+        if re.search(r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower):
+            required_outputs.append("top-3 fixes")
+
+        # Check for summary requirement
+        if re.search(r"summary\s+of|provide\s+summary|create\s+summary", message_lower):
+            required_outputs.append("summary")
+
+        # Check for numbered findings requirement (e.g., "6-10 findings")
+        if re.search(r"\d+[-–]\d+\s+findings?", message_lower):
+            required_outputs.append("findings table")
+
+        logger.debug(f"Extracted required outputs from prompt: {required_outputs}")
+        return required_outputs
 
     # =====================================================================
     # Component accessors for external use
@@ -1549,6 +1713,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "is_grounded": result.is_grounded,
                 "is_valid": result.is_valid,
                 "grounding_issues": result.grounding_issues,
+                # Grounding failure handling - force finalize after max retries
+                "should_finalize": getattr(result, "should_finalize", False),
+                "should_retry": getattr(result, "should_retry", False),
+                "finalize_reason": getattr(result, "finalize_reason", ""),
             }
         except Exception as e:
             logger.debug(f"IntelligentPipeline validate_response failed: {e}")
@@ -1914,24 +2082,40 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
 
-        This creates a ConversationEmbeddingStore that:
-        - Stores pre-computed message embeddings in LanceDB
-        - Enables O(log n) vector search instead of O(n) on-the-fly embedding
-        - Syncs automatically when messages are added to ConversationStore
+        Uses the module-level singleton to prevent duplicate initialization.
+        The singleton pattern ensures that intelligent_prompt_builder and other
+        components share the same instance.
+
+        The ConversationEmbeddingStore provides:
+        - Pre-computed message embeddings in LanceDB
+        - O(log n) vector search instead of O(n) on-the-fly embedding
+        - Automatic sync when messages are added to ConversationStore
         """
         if self.memory_manager is None:
             return
 
         try:
             from victor.embeddings.service import EmbeddingService
+            import victor.agent.conversation_embedding_store as ces_module
 
             # Get the shared embedding service
             embedding_service = EmbeddingService.get_instance()
 
-            # Create the embedding store
-            self._conversation_embedding_store = ConversationEmbeddingStore(
-                embedding_service=embedding_service,
-            )
+            # Use singleton pattern - check if already exists
+            if ces_module._embedding_store is not None:
+                self._conversation_embedding_store = ces_module._embedding_store
+                logger.debug(
+                    "[AgentOrchestrator] Reusing existing ConversationEmbeddingStore singleton"
+                )
+            else:
+                # Create new instance and register as singleton
+                self._conversation_embedding_store = ConversationEmbeddingStore(
+                    embedding_service=embedding_service,
+                )
+                ces_module._embedding_store = self._conversation_embedding_store
+                logger.debug(
+                    "[AgentOrchestrator] Created ConversationEmbeddingStore singleton"
+                )
 
             # Wire it to the memory manager for automatic sync
             self.memory_manager.set_embedding_store(self._conversation_embedding_store)
@@ -1942,17 +2126,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Initialize async (fire and forget for faster startup).
             # If there's no running event loop (e.g., unit tests), fall back
             # to synchronous initialization to avoid 'coroutine was never awaited' warnings.
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(self._conversation_embedding_store.initialize())
-            except RuntimeError:
+            if not self._conversation_embedding_store.is_initialized:
                 try:
-                    asyncio.run(self._conversation_embedding_store.initialize())
-                except Exception as e:
-                    logger.debug(
-                        "Failed to run ConversationEmbeddingStore.initialize() synchronously: %s",
-                        e,
-                    )
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(self._conversation_embedding_store.initialize())
+                except RuntimeError:
+                    try:
+                        asyncio.run(self._conversation_embedding_store.initialize())
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to run ConversationEmbeddingStore.initialize() synchronously: %s",
+                            e,
+                        )
 
             logger.info(
                 "[AgentOrchestrator] ConversationEmbeddingStore configured. "
@@ -4204,7 +4389,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         ctx.complexity_tool_budget = complexity_tool_budget
 
         # Add task keyword results
-        ctx.is_analysis_task = task_keywords["is_analysis_task"]
+        # Reconcile is_analysis_task from both UnifiedClassifier (keyword-based) and
+        # UnifiedTaskTracker (semantic-based). Either source detecting analysis = analysis task.
+        # This fixes the mismatch where unified_task_type=ANALYZE but is_analysis_task=False
+        ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
+            "analyze", "analysis"
+        )
         ctx.is_action_task = task_keywords["is_action_task"]
         ctx.needs_execution = task_keywords["needs_execution"]
         ctx.coarse_task_type = task_keywords["coarse_task_type"]
@@ -4656,6 +4846,150 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         # Orchestrator-specific: increment turn counter
+        self.unified_tracker.increment_turn()
+
+    async def _execute_extracted_tool_call(
+        self,
+        stream_ctx: StreamingChatContext,
+        extracted_call: ExtractedToolCall,
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute a tool call that was extracted from model text.
+
+        When the model mentions a tool in text but doesn't properly execute it,
+        and we successfully extract the intended call, this method executes it.
+
+        Args:
+            stream_ctx: The streaming context
+            extracted_call: The extracted tool call to execute
+
+        Yields:
+            StreamChunk objects for progress updates
+        """
+        tool_name = extracted_call.tool_name
+        tool_args = extracted_call.arguments
+
+        logger.info(
+            f"[ExtractedToolExecution] Executing {tool_name} with args: "
+            f"{list(tool_args.keys())}"
+        )
+
+        # Show status to user
+        yield self._chunk_generator.generate_tool_start_chunk(
+            tool_name=tool_name,
+            status_msg=f"🔧 Auto-executing {tool_name} from model intent...",
+        )
+
+        # Emit event for observability
+        event_bus = EventBus.get_instance()
+        event_bus.publish(
+            VictorEvent(
+                category=EventCategory.TOOL,
+                name="tool.extracted_execution",
+                data={
+                    "tool_name": tool_name,
+                    "arguments": {k: str(v)[:100] for k, v in tool_args.items()},
+                    "confidence": extracted_call.confidence,
+                },
+                source="AgentOrchestrator",
+            )
+        )
+
+        # Execute the tool
+        try:
+            context = {
+                "cwd": getattr(self.settings, "cwd", "."),
+                "provider": self.provider_name,
+                "model": self.model,
+            }
+
+            result, success, error_msg = await self._execute_tool_with_retry(
+                tool_name, tool_args, context
+            )
+
+            # Update tool usage tracking
+            self.tool_calls_used += 1
+            stream_ctx.tool_calls_used = self.tool_calls_used
+
+            if success:
+                # Format the result
+                result_str = str(result.result) if hasattr(result, "result") else str(result)
+                truncated_result = (
+                    result_str[:2000] + "..." if len(result_str) > 2000 else result_str
+                )
+
+                # Add to messages as if the model had called it
+                # First add a synthetic assistant message indicating the tool call
+                self.add_message(
+                    "assistant",
+                    f"[Auto-executed {tool_name} based on my intent]",
+                )
+                # Then add the tool result
+                self.add_message(
+                    "tool",
+                    truncated_result,
+                    tool_call_id=f"extracted_{tool_name}_{self.tool_calls_used}",
+                    name=tool_name,
+                )
+
+                # Yield success chunk
+                yield self._chunk_generator.generate_tool_complete_chunk(
+                    tool_name=tool_name,
+                    elapsed_time=0.0,  # We don't track this for extracted calls
+                    success=True,
+                )
+
+                logger.info(
+                    f"[ExtractedToolExecution] {tool_name} succeeded. "
+                    f"Result length: {len(result_str)} chars"
+                )
+
+                # Callback for tracking
+                if hasattr(self, "_on_tool_complete_callback"):
+                    from victor.tools.tool_pipeline import ToolCallResult
+                    callback_result = ToolCallResult(
+                        tool_name=tool_name,
+                        tool_call_id=f"extracted_{tool_name}_{self.tool_calls_used}",
+                        result=truncated_result,
+                        success=True,
+                        error=None,
+                        arguments=tool_args,
+                    )
+                    self._on_tool_complete_callback(callback_result)
+
+            else:
+                # Tool failed - add error message
+                self.add_message(
+                    "tool",
+                    f"Error executing {tool_name}: {error_msg}",
+                    tool_call_id=f"extracted_{tool_name}_{self.tool_calls_used}",
+                    name=tool_name,
+                )
+
+                yield self._chunk_generator.generate_tool_complete_chunk(
+                    tool_name=tool_name,
+                    elapsed_time=0.0,
+                    success=False,
+                )
+
+                logger.warning(
+                    f"[ExtractedToolExecution] {tool_name} failed: {error_msg}"
+                )
+
+        except Exception as e:
+            logger.error(f"[ExtractedToolExecution] Exception executing {tool_name}: {e}")
+            self.add_message(
+                "tool",
+                f"Error: {str(e)}",
+                tool_call_id=f"extracted_{tool_name}_{self.tool_calls_used}",
+                name=tool_name,
+            )
+            yield self._chunk_generator.generate_tool_complete_chunk(
+                tool_name=tool_name,
+                elapsed_time=0.0,
+                success=False,
+            )
+
+        # Increment turn counter
         self.unified_tracker.increment_turn()
 
     def _check_tool_budget_with_handler(
@@ -5187,6 +5521,34 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Store context reference for handler delegation methods
         self._current_stream_context = stream_ctx
 
+        # Extract required files and outputs from user prompt for task completion tracking
+        # This enables early termination when all requirements are met
+        self._required_files = self._extract_required_files_from_prompt(user_message)
+        self._required_outputs = self._extract_required_outputs_from_prompt(user_message)
+        self._read_files_session.clear()  # Reset for new session
+        self._all_files_read_nudge_sent = False  # Reset nudge flag for new session
+        logger.debug(
+            f"Task requirements extracted - files: {self._required_files}, "
+            f"outputs: {self._required_outputs}"
+        )
+
+        # Emit observability event for task requirements (helps debug exploration behavior)
+        if self._required_files or self._required_outputs:
+            event_bus = EventBus.get_instance()
+            event_bus.publish(
+                VictorEvent(
+                    category=EventCategory.STATE,
+                    name="task.requirements_extracted",
+                    data={
+                        "required_files": self._required_files,
+                        "required_outputs": self._required_outputs,
+                        "file_count": len(self._required_files),
+                        "output_count": len(self._required_outputs),
+                    },
+                    source="AgentOrchestrator",
+                )
+            )
+
         # Iteration limits - kept as read-only local references for readability
         # (These are configuration values that don't change during the loop)
         max_total_iterations = stream_ctx.max_total_iterations
@@ -5597,6 +5959,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
                     stream_ctx.update_quality_score(new_score)
 
+                # Check for force finalize from grounding failures
+                # This prevents infinite loops when grounding keeps failing
+                if quality_result and quality_result.get("should_finalize"):
+                    finalize_reason = quality_result.get("finalize_reason", "grounding limit exceeded")
+                    logger.warning(
+                        f"Force finalize triggered: {finalize_reason}. "
+                        "Stopping continuation to prevent infinite loop."
+                    )
+                    # Set flag to force completion in continuation logic
+                    self._force_finalize = True
+
             # Check for loop warning using handler delegation (testable)
             unified_loop_warning = self.unified_tracker.check_loop_warning()
             loop_warning_chunk = self._handle_loop_warning_with_handler(
@@ -5670,6 +6043,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Delegated to extracted component (Phase 2E)
                     one_shot_mode = getattr(self.settings, "one_shot_mode", False)
                     strategy = ContinuationStrategy()
+
+                    # Build task completion signals for early termination detection
+                    task_completion_signals = {
+                        "required_files": self._required_files,
+                        "read_files": self._read_files_session,
+                        "required_outputs": self._required_outputs,
+                        "all_files_read": (
+                            len(self._required_files) > 0
+                            and self._read_files_session.issuperset(set(self._required_files))
+                        ),
+                    }
+
                     action_result = strategy.determine_continuation_action(
                         intent_result=intent_result,
                         is_analysis_task=stream_ctx.is_analysis_task,
@@ -5690,6 +6075,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         model=self.model,
                         tool_budget=self.tool_budget,
                         unified_tracker_config=self.unified_tracker.config,
+                        task_completion_signals=task_completion_signals,
                     )
 
                     # Apply state updates from action result
@@ -5715,6 +6101,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             f"Continuation action: {action} - "
                             "Overriding to finish due to repeated response"
                         )
+                    # Override: If force_finalize set from grounding failure, stop continuation
+                    elif getattr(self, "_force_finalize", False):
+                        action = "finish"
+                        logger.info(
+                            f"Continuation action: {action} - "
+                            "Overriding to finish due to grounding failure limit"
+                        )
+                        # Reset the flag after using it
+                        self._force_finalize = False
                     else:
                         logger.info(f"Continuation action: {action} - {action_result['reason']}")
 
@@ -5797,6 +6192,23 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Handle action: request_completion
                     elif action == "request_completion":
                         self.add_message("user", action_result["message"])
+                        skip_rest = True
+
+                    # Handle action: execute_extracted_tool (auto-execute extracted tool call)
+                    # When model mentions tools but doesn't call them, and we can extract
+                    # the intended call from text, execute it directly
+                    elif action == "execute_extracted_tool":
+                        extracted_call = action_result.get("extracted_call")
+                        if extracted_call:
+                            logger.info(
+                                f"Executing extracted tool call: {extracted_call.tool_name} "
+                                f"(confidence: {extracted_call.confidence:.2f})"
+                            )
+                            # Execute the extracted tool call
+                            async for chunk in self._execute_extracted_tool_call(
+                                stream_ctx, extracted_call
+                            ):
+                                yield chunk
                         skip_rest = True
 
                     # Handle action: force_tool_execution (for hallucinated tool mentions)

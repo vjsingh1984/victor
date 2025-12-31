@@ -28,6 +28,26 @@ import re
 from typing import Any, Dict, List, Optional
 
 from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
+
+# Patterns for detecting output requirements in response content
+OUTPUT_REQUIREMENT_PATTERNS = {
+    "findings table": [
+        r"(?i)findings?\s*table",
+        r"(?i)\|[^\|]+\|[^\|]+\|",  # Markdown table syntax
+        r"(?i)finding[s]?\s*:?\s*\n\s*[-\*]",  # Bullet list findings
+    ],
+    "top-3 fixes": [
+        r"(?i)top[- ]?3\s+fix(es)?",
+        r"(?i)recommended\s+fix(es)?",
+        r"(?i)1\.\s+.+\n\s*2\.\s+.+\n\s*3\.",  # Numbered list 1-3
+    ],
+    "summary": [
+        r"(?i)summary\s*:",
+        r"(?i)in\s+summary",
+        r"(?i)conclusion",
+    ],
+}
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +118,51 @@ class ContinuationStrategy:
 
         return mentioned
 
+    def _output_requirements_met(
+        self, content: Optional[str], required_outputs: List[str]
+    ) -> bool:
+        """Check if response content contains required output elements.
+
+        Uses pattern matching to detect common output format elements like
+        findings tables, numbered fix lists, summaries, etc.
+
+        Args:
+            content: Response content to check
+            required_outputs: List of required output elements (e.g., ["findings table", "top-3 fixes"])
+
+        Returns:
+            True if all required outputs are detected in content
+        """
+        if not content or not required_outputs:
+            return False
+
+        content_lower = content.lower()
+
+        for requirement in required_outputs:
+            requirement_key = requirement.lower().strip()
+
+            # Get patterns for this requirement type
+            patterns = OUTPUT_REQUIREMENT_PATTERNS.get(requirement_key, [])
+
+            # If no predefined patterns, use direct substring match
+            if not patterns:
+                # Check for requirement as substring
+                if requirement_key not in content_lower:
+                    return False
+                continue
+
+            # Check if any pattern matches
+            found = False
+            for pattern in patterns:
+                if re.search(pattern, content):
+                    found = True
+                    break
+
+            if not found:
+                return False
+
+        return True
+
     def determine_continuation_action(
         self,
         intent_result: Any,  # IntentClassificationResult
@@ -117,6 +182,7 @@ class ContinuationStrategy:
         model: str,
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
+        task_completion_signals: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -141,6 +207,7 @@ class ContinuationStrategy:
             model: Model name for RL lookups
             tool_budget: Current tool budget
             unified_tracker_config: Config dict from unified tracker
+            task_completion_signals: Optional signals for task completion detection
 
         Returns:
             Dictionary with:
@@ -154,6 +221,42 @@ class ContinuationStrategy:
         from victor.embeddings.intent_classifier import IntentType
 
         updates: Dict[str, Any] = {}
+
+        # TASK COMPLETION CHECK: If all required files read and output requirements met,
+        # finish immediately to prevent prompting loop (prompting loop fix)
+        if task_completion_signals:
+            required_files = task_completion_signals.get("required_files", [])
+            read_files = task_completion_signals.get("read_files", set())
+            required_outputs = task_completion_signals.get("required_outputs", [])
+            all_files_read = task_completion_signals.get("all_files_read", False)
+
+            # Check if all required files have been read
+            if required_files and (all_files_read or read_files.issuperset(set(required_files))):
+                # Check if output requirements are met in the response
+                if self._output_requirements_met(full_content, required_outputs):
+                    logger.info(
+                        "Task completion detected: all required files read and "
+                        "output requirements met - finishing"
+                    )
+                    self._event_bus.publish(
+                        VictorEvent(
+                            category=EventCategory.STATE,
+                            name="continuation.task_complete",
+                            data={
+                                "reason": "task_completion_detected",
+                                "required_files": list(required_files),
+                                "read_files": list(read_files),
+                                "output_requirements": required_outputs,
+                            },
+                            source="ContinuationStrategy",
+                        )
+                    )
+                    return {
+                        "action": "finish",
+                        "message": None,
+                        "reason": "Task completion: all required files read and output requirements met",
+                        "updates": updates,
+                    }
 
         # CRITICAL FIX: If summary was already requested in a previous iteration,
         # we should finish now - don't ask for another summary or loop again.
@@ -290,11 +393,54 @@ class ContinuationStrategy:
         )
 
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
-        # If model says "let me call search()" but didn't actually call it, force action
+        # If model says "let me call search()" but didn't actually call it, try to extract
+        # the intended tool call from the text and execute it automatically.
         if mentioned_tools and len(mentioned_tools) > 0:
-            logger.warning(
+            logger.info(
                 f"Model mentioned tools but didn't call them: {mentioned_tools}. "
-                "This is a hallucinated tool call."
+                "Attempting to extract tool call from text."
+            )
+
+            # Try to extract tool call from the model's text
+            extracted_call = None
+            if full_content:
+                extracted_call = extract_tool_call_from_text(
+                    text=full_content,
+                    mentioned_tools=mentioned_tools,
+                    context=task_completion_signals,  # Pass context for file path hints
+                )
+
+            if extracted_call and extracted_call.confidence >= 0.6:
+                # Successfully extracted tool call - execute it automatically
+                logger.info(
+                    f"Extracted tool call: {extracted_call.tool_name} with confidence "
+                    f"{extracted_call.confidence:.2f}. Will execute automatically."
+                )
+                self._event_bus.publish(
+                    VictorEvent(
+                        category=EventCategory.STATE,
+                        name="continuation.execute_extracted_tool",
+                        data={
+                            "tool_name": extracted_call.tool_name,
+                            "arguments": extracted_call.arguments,
+                            "confidence": extracted_call.confidence,
+                            "mentioned_tools": mentioned_tools,
+                        },
+                        source="ContinuationStrategy",
+                    )
+                )
+                return {
+                    "action": "execute_extracted_tool",
+                    "extracted_call": extracted_call,
+                    "message": None,  # No message to model - we'll execute directly
+                    "reason": f"Extracted {extracted_call.tool_name} call from model text",
+                    "updates": {},
+                }
+
+            # Could not extract - fall back to asking model to retry
+            logger.warning(
+                f"Could not extract tool call from text. Mentioned tools: {mentioned_tools}. "
+                "Will ask model to make proper tool call."
             )
             # Emit ERROR event for hallucinated tool calls
             self._event_bus.emit_error(
@@ -302,6 +448,8 @@ class ContinuationStrategy:
                 context={
                     "mentioned_tools": mentioned_tools,
                     "content_length": content_length,
+                    "extraction_attempted": True,
+                    "extraction_failed": True,
                 },
                 recoverable=True,
             )
@@ -313,6 +461,7 @@ class ContinuationStrategy:
                     data={
                         "reason": "hallucinated_tool_calls",
                         "mentioned_tools": mentioned_tools,
+                        "extraction_failed": True,
                     },
                     source="ContinuationStrategy",
                 )
@@ -321,7 +470,10 @@ class ContinuationStrategy:
                 "action": "force_tool_execution",
                 "message": (
                     f"You mentioned calling {', '.join(mentioned_tools)} but didn't actually make the tool call. "
-                    "Please make the ACTUAL tool call now using the proper format."
+                    "Please make the ACTUAL tool call now. Use the exact tool format:\n"
+                    "For write: write(path='filename.py', content='...')\n"
+                    "For edit: edit(path='filename.py', old_string='...', new_string='...')\n"
+                    "For shell: shell(command='...')"
                 ),
                 "reason": f"Hallucinated tool calls detected: {mentioned_tools}",
                 "updates": {},
