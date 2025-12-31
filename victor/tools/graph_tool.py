@@ -1341,11 +1341,11 @@ async def graph(
         if not analyzer.nodes:
             logger.info("Graph is empty, triggering lazy indexing...")
             try:
-                from victor.coding.codebase.indexer import CodebaseIndexer
+                from victor.coding.codebase.indexer import CodebaseIndex
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()
-                indexer = CodebaseIndexer(project_root)
+                indexer = CodebaseIndex(project_root)
 
                 # Check if we should do full or incremental index
                 if not indexer._is_indexed:
@@ -1580,7 +1580,11 @@ async def graph(
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
             # Request more results to account for filtering, then trim to top_k
             results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k * 3)
-            results = [r for r in results if not _skip_path(r.get("file"))][:top_k]
+            # Filter out stdlib modules and test/build paths
+            results = [
+                r for r in results
+                if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
+            ][:top_k]
             # Re-assign ranks after filtering (1-indexed)
             for i, r in enumerate(results):
                 r["rank"] = i + 1
@@ -1602,7 +1606,11 @@ async def graph(
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
             # Request more results to account for filtering, then trim to top_k
             results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k * 3)
-            results = [r for r in results if not _skip_path(r.get("file"))][:top_k]
+            # Filter out stdlib modules and test/build paths
+            results = [
+                r for r in results
+                if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
+            ][:top_k]
             # Re-assign ranks after filtering (1-indexed)
             for i, r in enumerate(results):
                 r["rank"] = i + 1

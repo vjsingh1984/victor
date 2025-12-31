@@ -56,6 +56,39 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# STANDARD LIBRARY MODULES (exclude from graph to avoid inflating PageRank)
+# =============================================================================
+# These are Python standard library modules that shouldn't be indexed as nodes
+# because they inflate PageRank scores with external dependencies.
+STDLIB_MODULES = frozenset({
+    # Core builtins
+    "abc", "asyncio", "builtins", "collections", "contextlib", "copy",
+    "dataclasses", "datetime", "decimal", "enum", "functools", "gc",
+    "hashlib", "heapq", "importlib", "inspect", "io", "itertools", "json",
+    "logging", "math", "operator", "os", "pathlib", "pickle", "platform",
+    "pprint", "queue", "random", "re", "secrets", "shutil", "signal",
+    "socket", "sqlite3", "ssl", "string", "struct", "subprocess", "sys",
+    "tempfile", "threading", "time", "traceback", "typing", "unittest",
+    "urllib", "uuid", "warnings", "weakref", "xml", "zipfile", "zlib",
+    # Typing extensions
+    "typing_extensions",
+    # Common third-party (can be expanded)
+    "numpy", "pandas", "requests", "aiohttp", "httpx", "pydantic",
+    "pytest", "mock", "unittest.mock",
+})
+
+
+def _is_stdlib_module(module_name: str) -> bool:
+    """Check if a module name is a standard library or common third-party module."""
+    # Check exact match
+    if module_name in STDLIB_MODULES:
+        return True
+    # Check top-level package (e.g., "os.path" -> "os")
+    top_level = module_name.split(".")[0]
+    return top_level in STDLIB_MODULES
+
+
+# =============================================================================
 # LEGACY QUERY DICTIONARIES
 # =============================================================================
 # These hardcoded dictionaries are LEGACY and will be DEPRECATED.
@@ -1729,13 +1762,15 @@ class CodebaseIndex:
                     self._pending_compose_edges.append((owner_id, member, metadata.path))
 
         # Add IMPORTS edges from file to imported module names (cross-file reference scaffold)
+        # Mark stdlib modules so they can be excluded from PageRank while keeping edges
         if self.graph_store and metadata.imports:
             for imp in metadata.imports:
+                is_stdlib = _is_stdlib_module(imp)
                 module_node_id = f"module:{imp}"
                 self._graph_nodes.append(
                     GraphNode(
                         node_id=module_node_id,
-                        type="module",
+                        type="module" if not is_stdlib else "stdlib_module",
                         name=imp,
                         file=metadata.path,
                         lang=metadata.language,
@@ -1746,7 +1781,7 @@ class CodebaseIndex:
                         src=f"file:{metadata.path}",
                         dst=module_node_id,
                         type="IMPORTS",
-                        metadata={"path": metadata.path},
+                        metadata={"path": metadata.path, "is_stdlib": is_stdlib},
                     )
                 )
 
