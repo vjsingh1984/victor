@@ -48,8 +48,15 @@ Integration with verticals:
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+# Self type was added in Python 3.11
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
