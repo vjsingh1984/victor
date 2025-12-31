@@ -73,7 +73,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.core.schema import Tables
+
 logger = logging.getLogger(__name__)
+
+# Table names from centralized schema
+_Q_TABLE = Tables.RL_MODE_Q
+_HISTORY_TABLE = Tables.RL_MODE_HISTORY
+_TASK_TABLE = Tables.RL_MODE_TASK
 
 
 class AgentMode(Enum):
@@ -185,17 +192,19 @@ class QLearningStore:
     """SQLite-backed Q-learning storage for mode transitions.
 
     Stores Q-values for state-action pairs and learns from outcomes.
+    Uses consolidated project.db via ProjectDatabaseManager.
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
-        """Initialize the Q-learning store."""
-        if db_path is None:
-            from victor.config.settings import get_project_paths
+    def __init__(self, project_path: Optional[Path] = None):
+        """Initialize the Q-learning store.
 
-            paths = get_project_paths()
-            db_path = paths.project_victor_dir / "mode_learning.db"
+        Args:
+            project_path: Path to project root. If None, uses current directory.
+        """
+        from victor.core.database import get_project_database
 
-        self.db_path = db_path
+        self._db = get_project_database(project_path)
+        self.db_path = self._db.db_path
         self._initialized = False
 
         # Q-learning parameters
@@ -204,70 +213,70 @@ class QLearningStore:
         self.exploration_rate = 0.1  # Epsilon for epsilon-greedy
 
     def _ensure_initialized(self) -> None:
-        """Ensure database tables exist."""
+        """Ensure database tables exist (handled by ProjectDatabaseManager)."""
         if self._initialized:
             return
 
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # Tables are created by ProjectDatabaseManager via Schema.get_project_schemas()
+        # Just verify they exist
+        conn = self._db.get_connection()
 
-        with sqlite3.connect(self.db_path) as conn:
-            # Q-values table
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS q_values (
-                    state_key TEXT NOT NULL,
-                    action_key TEXT NOT NULL,
-                    q_value REAL NOT NULL DEFAULT 0.0,
-                    visit_count INTEGER NOT NULL DEFAULT 0,
-                    last_updated TEXT NOT NULL,
-                    PRIMARY KEY (state_key, action_key)
-                )
-            """
+        # Create tables if not present (legacy fallback)
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {_Q_TABLE} (
+                state_key TEXT NOT NULL,
+                action_key TEXT NOT NULL,
+                q_value REAL NOT NULL DEFAULT 0.0,
+                visit_count INTEGER NOT NULL DEFAULT 0,
+                last_updated TEXT NOT NULL,
+                PRIMARY KEY (state_key, action_key)
             )
+        """
+        )
 
-            # Transition history for analysis
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS transition_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    profile_name TEXT NOT NULL,
-                    from_mode TEXT NOT NULL,
-                    to_mode TEXT NOT NULL,
-                    trigger TEXT NOT NULL,
-                    state_key TEXT NOT NULL,
-                    action_key TEXT NOT NULL,
-                    reward REAL,
-                    timestamp TEXT NOT NULL
-                )
-            """
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {_HISTORY_TABLE} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_name TEXT NOT NULL,
+                from_mode TEXT NOT NULL,
+                to_mode TEXT NOT NULL,
+                trigger TEXT NOT NULL,
+                state_key TEXT NOT NULL,
+                action_key TEXT NOT NULL,
+                reward REAL,
+                timestamp TEXT NOT NULL
             )
+        """
+        )
 
-            # Task-type specific statistics
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS task_stats (
-                    task_type TEXT PRIMARY KEY,
-                    optimal_tool_budget INTEGER DEFAULT 10,
-                    avg_quality_score REAL DEFAULT 0.5,
-                    avg_completion_rate REAL DEFAULT 0.5,
-                    sample_count INTEGER DEFAULT 0,
-                    last_updated TEXT NOT NULL
-                )
-            """
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {_TASK_TABLE} (
+                task_type TEXT PRIMARY KEY,
+                optimal_tool_budget INTEGER DEFAULT 10,
+                avg_quality_score REAL DEFAULT 0.5,
+                avg_completion_rate REAL DEFAULT 0.5,
+                sample_count INTEGER DEFAULT 0,
+                last_updated TEXT NOT NULL
             )
+        """
+        )
 
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_q_state ON q_values(state_key)
-            """
-            )
+        conn.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_{_Q_TABLE}_state ON {_Q_TABLE}(state_key)
+        """
+        )
 
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_history_profile
-                ON transition_history(profile_name, timestamp)
-            """
-            )
+        conn.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_{_HISTORY_TABLE}_profile
+            ON {_HISTORY_TABLE}(profile_name, timestamp)
+        """
+        )
+        conn.commit()
 
         self._initialized = True
 
@@ -275,25 +284,25 @@ class QLearningStore:
         """Get Q-value for a state-action pair."""
         self._ensure_initialized()
 
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT q_value FROM q_values WHERE state_key = ? AND action_key = ?",
-                (state_key, action_key),
-            ).fetchone()
+        conn = self._db.get_connection()
+        row = conn.execute(
+            f"SELECT q_value FROM {_Q_TABLE} WHERE state_key = ? AND action_key = ?",
+            (state_key, action_key),
+        ).fetchone()
 
-            return row[0] if row else 0.0
+        return row[0] if row else 0.0
 
     def get_all_actions(self, state_key: str) -> Dict[str, float]:
         """Get all Q-values for a state."""
         self._ensure_initialized()
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT action_key, q_value FROM q_values WHERE state_key = ?", (state_key,)
-            ).fetchall()
+        conn = self._db.get_connection()
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?", (state_key,)
+        ).fetchall()
 
-            return {row["action_key"]: row["q_value"] for row in rows}
+        return {row["action_key"]: row["q_value"] for row in rows}
 
     def update_q_value(
         self,
@@ -327,25 +336,26 @@ class QLearningStore:
         )
 
         # Store updated Q-value
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO q_values (state_key, action_key, q_value, visit_count, last_updated)
-                VALUES (?, ?, ?, 1, ?)
-                ON CONFLICT(state_key, action_key) DO UPDATE SET
-                    q_value = ?,
-                    visit_count = visit_count + 1,
-                    last_updated = ?
-            """,
-                (
-                    state_key,
-                    action_key,
-                    new_q,
-                    datetime.now().isoformat(),
-                    new_q,
-                    datetime.now().isoformat(),
-                ),
-            )
+        conn = self._db.get_connection()
+        conn.execute(
+            f"""
+            INSERT INTO {_Q_TABLE} (state_key, action_key, q_value, visit_count, last_updated)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(state_key, action_key) DO UPDATE SET
+                q_value = ?,
+                visit_count = visit_count + 1,
+                last_updated = ?
+        """,
+            (
+                state_key,
+                action_key,
+                new_q,
+                datetime.now().isoformat(),
+                new_q,
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
 
         return new_q
 
@@ -362,24 +372,25 @@ class QLearningStore:
         """Record a transition for analysis."""
         self._ensure_initialized()
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO transition_history
-                (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    profile_name,
-                    from_mode.value,
-                    to_mode.value,
-                    trigger.value,
-                    state_key,
-                    action_key,
-                    reward,
-                    datetime.now().isoformat(),
-                ),
-            )
+        conn = self._db.get_connection()
+        conn.execute(
+            f"""
+            INSERT INTO {_HISTORY_TABLE}
+            (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                profile_name,
+                from_mode.value,
+                to_mode.value,
+                trigger.value,
+                state_key,
+                action_key,
+                reward,
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
 
     def update_task_stats(
         self,
@@ -407,99 +418,100 @@ class QLearningStore:
         """
         self._ensure_initialized()
 
-        with sqlite3.connect(self.db_path) as conn:
-            # Get current stats
-            row = conn.execute(
-                "SELECT * FROM task_stats WHERE task_type = ?", (task_type,)
-            ).fetchone()
+        conn = self._db.get_connection()
+        # Get current stats
+        row = conn.execute(
+            f"SELECT * FROM {_TASK_TABLE} WHERE task_type = ?", (task_type,)
+        ).fetchone()
 
-            if row:
-                current_budget = row[1]
-                current_quality = row[2]
-                current_completion = row[3]
-                count = row[4] + 1
+        if row:
+            current_budget = row[1]
+            current_quality = row[2]
+            current_completion = row[3]
+            count = row[4] + 1
 
-                # Outcome-aware budget adjustment
-                # Use smaller alpha for stability, larger for learning from failures
-                base_alpha = 0.05  # Slower learning for stability
+            # Outcome-aware budget adjustment
+            # Use smaller alpha for stability, larger for learning from failures
+            base_alpha = 0.05  # Slower learning for stability
 
-                if completed and quality_score >= 0.7:
-                    # SUCCESS: Task completed well
-                    if tool_budget_used < current_budget * 0.5:
-                        # Very efficient - gradually decrease budget
-                        # But never drop below what was actually used + buffer
-                        target_budget = max(tool_budget_used + 3, current_budget - 2)
-                        new_budget = int(
-                            (1 - base_alpha) * current_budget + base_alpha * target_budget
-                        )
-                    else:
-                        # Normal completion - keep budget stable, slight move toward usage
-                        alpha = base_alpha * 0.5  # Even slower for stable scenarios
-                        new_budget = int((1 - alpha) * current_budget + alpha * tool_budget_used)
+            if completed and quality_score >= 0.7:
+                # SUCCESS: Task completed well
+                if tool_budget_used < current_budget * 0.5:
+                    # Very efficient - gradually decrease budget
+                    # But never drop below what was actually used + buffer
+                    target_budget = max(tool_budget_used + 3, current_budget - 2)
+                    new_budget = int(
+                        (1 - base_alpha) * current_budget + base_alpha * target_budget
+                    )
                 else:
-                    # FAILURE or low quality
-                    if budget_exhausted:
-                        # Budget was exhausted AND failed - strong signal to increase
-                        # Increase by 20% or at least 5, capped at reasonable max
-                        increase = max(5, int(current_budget * 0.2))
-                        new_budget = min(current_budget + increase, 100)
-                        logger.debug(
-                            f"[QLearningStore] Budget exhaustion failure for {task_type}: "
-                            f"{current_budget} -> {new_budget}"
-                        )
-                    elif quality_score < 0.5:
-                        # Low quality - moderate increase
-                        increase = max(2, int(current_budget * 0.1))
-                        new_budget = min(current_budget + increase, 100)
-                    else:
-                        # Partial success - slight increase
-                        new_budget = min(current_budget + 1, 100)
-
-                # Ensure budget stays within reasonable bounds
-                # Floor: minimum viable budget for the task type
-                min_budget = self._get_min_budget_for_task(task_type)
-                new_budget = max(min_budget, new_budget)
-
-                # Update quality and completion rate with standard EMA
-                alpha = 0.1
-                new_quality = (1 - alpha) * current_quality + alpha * quality_score
-                completion_rate = (1 - alpha) * current_completion + alpha * (
-                    1.0 if completed else 0.0
-                )
+                    # Normal completion - keep budget stable, slight move toward usage
+                    alpha = base_alpha * 0.5  # Even slower for stable scenarios
+                    new_budget = int((1 - alpha) * current_budget + alpha * tool_budget_used)
             else:
-                # First sample - initialize with reasonable defaults
-                count = 1
-                # Don't just use what was used; start with a reasonable baseline
-                new_budget = max(tool_budget_used + 5, self._get_min_budget_for_task(task_type))
-                new_quality = quality_score
-                completion_rate = 1.0 if completed else 0.0
+                # FAILURE or low quality
+                if budget_exhausted:
+                    # Budget was exhausted AND failed - strong signal to increase
+                    # Increase by 20% or at least 5, capped at reasonable max
+                    increase = max(5, int(current_budget * 0.2))
+                    new_budget = min(current_budget + increase, 100)
+                    logger.debug(
+                        f"[QLearningStore] Budget exhaustion failure for {task_type}: "
+                        f"{current_budget} -> {new_budget}"
+                    )
+                elif quality_score < 0.5:
+                    # Low quality - moderate increase
+                    increase = max(2, int(current_budget * 0.1))
+                    new_budget = min(current_budget + increase, 100)
+                else:
+                    # Partial success - slight increase
+                    new_budget = min(current_budget + 1, 100)
 
-            conn.execute(
-                """
-                INSERT INTO task_stats
-                (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(task_type) DO UPDATE SET
-                    optimal_tool_budget = ?,
-                    avg_quality_score = ?,
-                    avg_completion_rate = ?,
-                    sample_count = ?,
-                    last_updated = ?
-            """,
-                (
-                    task_type,
-                    new_budget,
-                    new_quality,
-                    completion_rate,
-                    count,
-                    datetime.now().isoformat(),
-                    new_budget,
-                    new_quality,
-                    completion_rate,
-                    count,
-                    datetime.now().isoformat(),
-                ),
+            # Ensure budget stays within reasonable bounds
+            # Floor: minimum viable budget for the task type
+            min_budget = self._get_min_budget_for_task(task_type)
+            new_budget = max(min_budget, new_budget)
+
+            # Update quality and completion rate with standard EMA
+            alpha = 0.1
+            new_quality = (1 - alpha) * current_quality + alpha * quality_score
+            completion_rate = (1 - alpha) * current_completion + alpha * (
+                1.0 if completed else 0.0
             )
+        else:
+            # First sample - initialize with reasonable defaults
+            count = 1
+            # Don't just use what was used; start with a reasonable baseline
+            new_budget = max(tool_budget_used + 5, self._get_min_budget_for_task(task_type))
+            new_quality = quality_score
+            completion_rate = 1.0 if completed else 0.0
+
+        conn.execute(
+            f"""
+            INSERT INTO {_TASK_TABLE}
+            (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(task_type) DO UPDATE SET
+                optimal_tool_budget = ?,
+                avg_quality_score = ?,
+                avg_completion_rate = ?,
+                sample_count = ?,
+                last_updated = ?
+        """,
+            (
+                task_type,
+                new_budget,
+                new_quality,
+                completion_rate,
+                count,
+                datetime.now().isoformat(),
+                new_budget,
+                new_quality,
+                completion_rate,
+                count,
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
 
     def _get_min_budget_for_task(self, task_type: str) -> int:
         """Get minimum viable budget for a task type.
@@ -525,28 +537,28 @@ class QLearningStore:
         """Get statistics for a task type."""
         self._ensure_initialized()
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM task_stats WHERE task_type = ?", (task_type,)
-            ).fetchone()
+        conn = self._db.get_connection()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f"SELECT * FROM {_TASK_TABLE} WHERE task_type = ?", (task_type,)
+        ).fetchone()
 
-            if row:
-                return {
-                    "task_type": row["task_type"],
-                    "optimal_tool_budget": row["optimal_tool_budget"],
-                    "avg_quality_score": row["avg_quality_score"],
-                    "avg_completion_rate": row["avg_completion_rate"],
-                    "sample_count": row["sample_count"],
-                }
-
-            # Default values
+        if row:
             return {
-                "task_type": task_type,
-                "optimal_tool_budget": 10,
-                "avg_quality_score": 0.5,
-                "avg_completion_rate": 0.5,
-                "sample_count": 0,
+                "task_type": row["task_type"],
+                "optimal_tool_budget": row["optimal_tool_budget"],
+                "avg_quality_score": row["avg_quality_score"],
+                "avg_completion_rate": row["avg_completion_rate"],
+                "sample_count": row["sample_count"],
+            }
+
+        # Default values
+        return {
+            "task_type": task_type,
+            "optimal_tool_budget": 10,
+            "avg_quality_score": 0.5,
+            "avg_completion_rate": 0.5,
+            "sample_count": 0,
             }
 
 

@@ -192,6 +192,10 @@ class ToolSequenceTracker:
             lambda: defaultdict(TransitionStats)
         )
 
+        # Vertical-provided dependencies and sequences
+        self._vertical_dependencies: Dict[str, List[str]] = {}
+        self._vertical_sequences: Dict[str, List[Tuple[str, float]]] = {}
+
         # Pre-load common patterns if enabled
         if self.config.use_predefined_patterns:
             self._load_predefined_patterns()
@@ -405,11 +409,75 @@ class ToolSequenceTracker:
         """Reset all state including learned transitions."""
         self._history = []
         self._transitions = defaultdict(lambda: defaultdict(TransitionStats))
+        self._vertical_dependencies: Dict[str, List[str]] = {}
+        self._vertical_sequences: Dict[str, List[Tuple[str, float]]] = {}
 
         if self.config.use_predefined_patterns:
             self._load_predefined_patterns()
 
         logger.debug("ToolSequenceTracker reset")
+
+    def set_dependencies(self, dependencies: Dict[str, List[str]]) -> None:
+        """Set vertical-provided tool dependencies.
+
+        Tool dependencies define which tools should be available when
+        another tool is used, enabling vertical-specific workflow patterns.
+
+        Args:
+            dependencies: Dict mapping tool names to list of dependent tools.
+                         e.g., {"edit_files": ["read_file", "run_tests"]}
+        """
+        self._vertical_dependencies = dependencies or {}
+
+        # Add dependencies as transition weights
+        for tool, deps in self._vertical_dependencies.items():
+            for dep_tool in deps:
+                # Add moderate weight for vertical dependencies
+                stats = self._transitions[tool][dep_tool]
+                # Blend with existing count (don't override)
+                stats.count = max(stats.count, 3)  # At least 3 pseudo-observations
+
+        logger.debug(f"Set {len(dependencies)} vertical tool dependencies")
+
+    def set_sequences(self, sequences: Dict[str, List[Tuple[str, float]]]) -> None:
+        """Set vertical-provided tool sequences.
+
+        Tool sequences define common workflow patterns for the vertical,
+        with associated transition weights.
+
+        Args:
+            sequences: Dict mapping tool names to list of (next_tool, weight) tuples.
+                      e.g., {"read_file": [("edit_files", 0.4), ("code_search", 0.3)]}
+        """
+        self._vertical_sequences = sequences or {}
+
+        # Merge vertical sequences into transition matrix
+        for from_tool, transitions in self._vertical_sequences.items():
+            for to_tool, weight in transitions:
+                pseudo_count = int(weight * 10)
+                stats = self._transitions[from_tool][to_tool]
+                # Take max of existing and vertical-provided
+                stats.count = max(stats.count, pseudo_count)
+                # Vertical sequences are considered reliable
+                stats.success_rate = max(stats.success_rate, 0.9)
+
+        logger.debug(f"Set {len(sequences)} vertical tool sequences")
+
+    def get_vertical_dependencies(self) -> Dict[str, List[str]]:
+        """Get the vertical-provided tool dependencies.
+
+        Returns:
+            Dict of tool dependencies set via set_dependencies()
+        """
+        return getattr(self, "_vertical_dependencies", {})
+
+    def get_vertical_sequences(self) -> Dict[str, List[Tuple[str, float]]]:
+        """Get the vertical-provided tool sequences.
+
+        Returns:
+            Dict of tool sequences set via set_sequences()
+        """
+        return getattr(self, "_vertical_sequences", {})
 
 
 def create_sequence_tracker(

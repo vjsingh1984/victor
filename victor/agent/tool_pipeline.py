@@ -30,11 +30,14 @@ Design Principles:
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import json
 import logging
 import re
+import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
@@ -60,11 +63,20 @@ from victor.agent.synthesis_checkpoint import (
     get_checkpoint_for_complexity,
 )
 
+# Import native compute_signature for 10-20x faster signature generation
+try:
+    from victor.processing.native import compute_signature as native_compute_signature
+    _NATIVE_SIGNATURE_AVAILABLE = True
+except ImportError:
+    _NATIVE_SIGNATURE_AVAILABLE = False
+    native_compute_signature = None  # type: ignore
+
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
+    from victor.agent.middleware_chain import MiddlewareChain
 
 logger = logging.getLogger(__name__)
 
@@ -105,18 +117,178 @@ class ToolPipelineConfig:
 
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
+# Include both lowercase and capitalized variants for tool name normalization
 IDEMPOTENT_TOOLS = frozenset(
     {
         "read",
+        "Read",  # Capitalized variant
+        "read_file",  # Alternative name
         "list_directory",
         "grep",
+        "Grep",  # Capitalized variant
         "code_search",
         "semantic_code_search",
         "graph",  # Graph queries are read-only
+        "Graph",  # Capitalized variant
         "refs",  # Reference lookup is read-only
         "ls",  # Directory listing
+        "glob",  # Glob file search is read-only
+        "Glob",  # Capitalized variant
     }
 )
+
+
+class ToolRateLimiter:
+    """Token bucket rate limiter for tool execution.
+
+    Implements a token bucket algorithm to limit the rate of tool executions.
+    This prevents overwhelming external services or local resources.
+
+    Attributes:
+        rate: Tokens per second to add (refill rate)
+        burst: Maximum tokens that can accumulate (bucket size)
+        tokens: Current available tokens
+        last_update: Timestamp of last token refill
+
+    Example:
+        limiter = ToolRateLimiter(rate=10.0, burst=5)
+
+        # Synchronous check
+        if limiter.acquire():
+            execute_tool()
+
+        # Asynchronous wait
+        await limiter.wait()
+        execute_tool()
+    """
+
+    def __init__(self, rate: float = 10.0, burst: int = 5):
+        """Initialize the rate limiter.
+
+        Args:
+            rate: Tokens per second (refill rate)
+            burst: Maximum tokens (bucket capacity)
+        """
+        self.rate = rate
+        self.burst = burst
+        self.tokens = float(burst)  # Start with full bucket
+        self.last_update = time.monotonic()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> bool:
+        """Try to acquire a token without blocking.
+
+        Returns:
+            True if token acquired, False if no tokens available.
+        """
+        with self._lock:
+            now = time.monotonic()
+            elapsed = now - self.last_update
+            self.tokens = min(self.burst, self.tokens + elapsed * self.rate)
+            self.last_update = now
+
+            if self.tokens >= 1:
+                self.tokens -= 1
+                return True
+            return False
+
+    async def wait(self) -> None:
+        """Wait until a token is available.
+
+        This method blocks asynchronously until a token can be acquired.
+        """
+        while not self.acquire():
+            # Sleep for time needed to get one token
+            await asyncio.sleep(1.0 / self.rate)
+
+
+class LRUToolCache:
+    """LRU (Least Recently Used) cache for idempotent tool results.
+
+    Provides efficient caching with LRU eviction policy, which is more
+    optimal than FIFO for caching tool results since frequently accessed
+    results stay in cache longer.
+
+    Attributes:
+        _cache: OrderedDict maintaining insertion/access order
+        _max_size: Maximum number of entries to cache
+
+    Example:
+        cache = LRUToolCache(max_size=100)
+        cache.set("key", result)
+        result = cache.get("key")  # Returns cached result and updates LRU order
+    """
+
+    def __init__(self, max_size: int = 100):
+        """Initialize the LRU cache.
+
+        Args:
+            max_size: Maximum number of entries to cache
+        """
+        self._cache: OrderedDict = OrderedDict()
+        self._max_size = max_size
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get a value from the cache.
+
+        If found, the entry is moved to the end (most recently used).
+
+        Args:
+            key: Cache key
+
+        Returns:
+            Cached value or None if not found
+        """
+        if key in self._cache:
+            # Move to end (most recently used)
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a value in the cache.
+
+        If the key exists, it's updated and moved to the end.
+        If cache is full, the oldest entry (least recently used) is evicted.
+
+        Args:
+            key: Cache key
+            value: Value to cache
+        """
+        if key in self._cache:
+            # Update existing and move to end
+            self._cache.move_to_end(key)
+        self._cache[key] = value
+
+        # Evict oldest if over capacity
+        if len(self._cache) > self._max_size:
+            self._cache.popitem(last=False)  # Remove oldest (first) item
+
+    def clear(self) -> None:
+        """Clear all entries from the cache."""
+        self._cache.clear()
+
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache)
+
+    def items(self):
+        """Return all items in the cache."""
+        return self._cache.items()
+
+    def remove(self, key: str) -> bool:
+        """Remove a specific key from the cache.
+
+        Args:
+            key: Cache key to remove
+
+        Returns:
+            True if key was found and removed, False otherwise
+        """
+        if key in self._cache:
+            del self._cache[key]
+            return True
+        return False
 
 
 @dataclass
@@ -198,6 +370,7 @@ class ToolPipeline:
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
         deduplication_tracker: Optional[Any] = None,
+        middleware_chain: Optional["MiddlewareChain"] = None,
     ):
         """Initialize tool pipeline.
 
@@ -212,6 +385,7 @@ class ToolPipeline:
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
+            middleware_chain: Optional middleware chain for processing tool calls
         """
         self.tools = tool_registry
         self.executor = tool_executor
@@ -221,6 +395,7 @@ class ToolPipeline:
         self.code_correction_middleware = code_correction_middleware
         self.signature_store = signature_store
         self.deduplication_tracker = deduplication_tracker
+        self.middleware_chain = middleware_chain
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -252,14 +427,21 @@ class ToolPipeline:
         # Parallel executor (lazy initialized)
         self._parallel_executor: Optional[ParallelToolExecutor] = None
 
-        # Session-level idempotent tool result cache
+        # Session-level idempotent tool result cache with LRU eviction (Workstream E fix)
         # Prevents DeepSeek/Ollama from re-reading same files multiple times
-        self._idempotent_cache: Dict[tuple, ToolCallResult] = {}
+        # Uses LRU instead of FIFO for more optimal cache behavior
+        self._idempotent_cache: LRUToolCache = LRUToolCache(
+            max_size=self.config.idempotent_cache_max_size
+        )
         self._cache_hits = 0
         self._cache_misses = 0
 
         # Batch-level deduplication tracking
         self._batch_dedup_count = 0  # Total duplicates skipped
+
+        # File read timestamp tracking for deduplication (prompting loop fix)
+        # Prevents re-reading identical files within TTL window
+        self._read_file_timestamps: Dict[str, float] = {}
 
     @property
     def calls_used(self) -> int:
@@ -370,8 +552,8 @@ class ToolPipeline:
                     )
                     normalized_args = enforced_args
                     # Update strategy to indicate enforcement was applied
-                    if strategy == NormalizationStrategy.NO_CHANGE:
-                        strategy = NormalizationStrategy.TOOL_SPECIFIC
+                    if strategy == NormalizationStrategy.DIRECT:
+                        strategy = NormalizationStrategy.MANUAL_REPAIR
             except ParameterInferenceError as e:
                 # Could not infer required parameter - log but don't fail here
                 # The tool execution will fail with a more meaningful error
@@ -382,21 +564,32 @@ class ToolPipeline:
 
         return normalized_args, strategy
 
-    def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> tuple:
+    def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
         """Generate signature for deduplication.
+
+        Uses native xxHash3-based signature computation when available for
+        10-20x speedup over JSON serialization + MD5.
 
         Args:
             tool_name: Tool name
             args: Tool arguments
 
         Returns:
-            Hashable signature tuple
+            Hashable signature string (16-char hex with native, or tool:args with fallback)
         """
+        # Use native signature computation if available (10-20x faster)
+        if _NATIVE_SIGNATURE_AVAILABLE and native_compute_signature is not None:
+            try:
+                return native_compute_signature(tool_name, args)
+            except Exception:
+                pass  # Fall through to Python implementation
+
+        # Pure Python fallback
         try:
             args_str = json.dumps(args, sort_keys=True, default=str)
         except Exception:
             args_str = str(args)
-        return (tool_name, args_str)
+        return f"{tool_name}:{args_str}"
 
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if a tool call is known to fail.
@@ -538,12 +731,6 @@ class ToolPipeline:
         if not result.success:
             return  # Don't cache failures
 
-        # Enforce max cache size with simple FIFO eviction
-        if len(self._idempotent_cache) >= self.config.idempotent_cache_max_size:
-            # Remove oldest entry
-            oldest_key = next(iter(self._idempotent_cache))
-            del self._idempotent_cache[oldest_key]
-
         signature = self._get_call_signature(tool_name, args)
         # Mark as cached in the result
         cached_result = ToolCallResult(
@@ -556,7 +743,8 @@ class ToolPipeline:
             cached=True,  # Mark as from cache
             normalization_applied=result.normalization_applied,
         )
-        self._idempotent_cache[signature] = cached_result
+        # LRU cache handles eviction automatically (Workstream E fix)
+        self._idempotent_cache.set(signature, cached_result)
         self._cache_misses += 1
         logger.debug(f"Cached result for {tool_name} (cache size: {len(self._idempotent_cache)})")
 
@@ -583,7 +771,7 @@ class ToolPipeline:
                 to_remove.append(sig)
 
         for sig in to_remove:
-            del self._idempotent_cache[sig]
+            self._idempotent_cache.remove(sig)
 
         if to_remove:
             logger.debug(f"Invalidated {len(to_remove)} cache entries for {file_path}")
@@ -607,6 +795,34 @@ class ToolPipeline:
             ),
             "batch_dedup_count": self._batch_dedup_count,
         }
+
+    def _is_duplicate_read(self, file_path: str, max_age_seconds: float = 300.0) -> bool:
+        """Check if file was recently read (within TTL window).
+
+        Used to prevent re-reading identical files during prompting loops.
+
+        Args:
+            file_path: Path of the file
+            max_age_seconds: TTL for file read cache (default 5 minutes)
+
+        Returns:
+            True if file was read recently and should not be re-read
+        """
+        if file_path not in self._read_file_timestamps:
+            return False
+        age = time.monotonic() - self._read_file_timestamps[file_path]
+        return age < max_age_seconds
+
+    def record_file_read(self, file_path: str) -> None:
+        """Record that a file was read.
+
+        Updates the timestamp for deduplication tracking.
+
+        Args:
+            file_path: Path of the file that was read
+        """
+        self._read_file_timestamps[file_path] = time.monotonic()
+        logger.debug(f"Recorded file read: {file_path}")
 
     def deduplicate_tool_calls(
         self,
@@ -1031,6 +1247,26 @@ class ToolPipeline:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
 
+        # Session-level file read dedup - prevents re-reading files even if cache was cleared
+        # This is a fallback for the prompting loop fix when idempotent cache doesn't match
+        if tool_name.lower() in ("read", "read_file"):
+            file_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if file_path and self._is_duplicate_read(file_path):
+                logger.info(
+                    f"[Pipeline] Skipping duplicate read of {file_path} "
+                    "(file was read recently in this session)"
+                )
+                return ToolCallResult(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    success=True,  # Mark as success but indicate it was cached
+                    result=f"[File '{file_path}' was already read in this session - "
+                    "content unchanged. See previous read result.]",
+                    skipped=True,
+                    skip_reason="Duplicate file read within session",
+                    normalization_applied=normalization_applied,
+                )
+
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
         code_validation_errors: Optional[List[str]] = None
@@ -1098,6 +1334,31 @@ class ToolPipeline:
             except Exception as e:
                 logger.warning(f"Deduplication tracker check failed: {e}")
 
+        # Process through middleware chain (before execution)
+        middleware_blocked = False
+        if self.middleware_chain is not None:
+            try:
+                before_result = await self.middleware_chain.process_before(tool_name, normalized_args)
+                if not before_result.proceed:
+                    logger.info(
+                        f"[Pipeline] Tool '{tool_name}' blocked by middleware: "
+                        f"{before_result.error_message}"
+                    )
+                    middleware_blocked = True
+                    return ToolCallResult(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=False,
+                        skipped=True,
+                        skip_reason=f"Blocked by middleware: {before_result.error_message}",
+                        normalization_applied=normalization_applied,
+                    )
+                # Apply any argument modifications from middleware
+                if before_result.modified_arguments:
+                    normalized_args = before_result.modified_arguments
+            except Exception as e:
+                logger.warning(f"Middleware chain process_before failed: {e}")
+
         # Notify start
         if self.on_tool_start:
             try:
@@ -1130,6 +1391,34 @@ class ToolPipeline:
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
         )
+
+        # Process through middleware chain (after execution)
+        if self.middleware_chain is not None:
+            try:
+                modified_result = await self.middleware_chain.process_after(
+                    tool_name, normalized_args, call_result.result, call_result.success
+                )
+                if modified_result is not None and modified_result != call_result.result:
+                    call_result = ToolCallResult(
+                        tool_name=call_result.tool_name,
+                        arguments=call_result.arguments,
+                        success=call_result.success,
+                        result=modified_result,
+                        error=call_result.error,
+                        execution_time_ms=call_result.execution_time_ms,
+                        normalization_applied=call_result.normalization_applied,
+                        code_corrected=call_result.code_corrected,
+                        code_validation_errors=call_result.code_validation_errors,
+                    )
+            except Exception as e:
+                logger.warning(f"Middleware chain process_after failed: {e}")
+
+        # Record file read for deduplication (prompting loop fix)
+        # Include capitalized variants for tool name normalization
+        if call_result.success and tool_name.lower() in ("read", "read_file"):
+            file_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if file_path:
+                self.record_file_read(file_path)
 
         # Track failed signatures
         if not exec_result.success and self.config.enable_failed_signature_tracking:

@@ -175,7 +175,7 @@ class ToolCallExtractor:
             return self._extract_shell_call(text, context)
         elif tool_lower in ("grep", "search", "find"):
             return self._extract_search_call(text, context)
-        elif tool_lower in ("ls", "list"):
+        elif tool_lower in ("ls", "list", "list_directory"):
             return self._extract_ls_call(text, context)
 
         # Generic extraction attempt
@@ -366,7 +366,10 @@ class ToolCallExtractor:
 
         # Try directory patterns
         dir_patterns = [
-            r"(?:list|ls)\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?",
+            # "explore victor/agent" pattern (common with hallucinated calls)
+            r"(?:explore|list|check|inspect)\s+[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
+            # "list the directory PATH"
+            r"(?:list|ls)\s+(?:the\s+)?(?:directory\s+)?[`'\"]?([a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]*)[`'\"]?",
             r"(?:in|of)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?\s+(?:directory|folder)",
             r"(?:directory|folder)\s+[`'\"]?([a-zA-Z0-9_./-]+)[`'\"]?",
         ]
@@ -376,8 +379,9 @@ class ToolCallExtractor:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 candidate = match.group(1)
-                # Filter out common words
-                if candidate.lower() not in ("the", "a", "an", "this", "that"):
+                # Filter out common words and short matches
+                skip_words = ("the", "a", "an", "this", "that", "to", "and", "or")
+                if candidate.lower() not in skip_words and len(candidate) > 2:
                     path = candidate
                     break
 

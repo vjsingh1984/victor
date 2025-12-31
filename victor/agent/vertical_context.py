@@ -250,6 +250,9 @@ class VerticalContext:
     # Enrichment strategy (Phase 1: Gap fix)
     enrichment_strategy: Optional[Any] = None
 
+    # Tool selection strategy (SOLID: vertical-specific tool selection)
+    tool_selection_strategy: Optional[Any] = None
+
     # ==========================================================================
     # Property Accessors
     # ==========================================================================
@@ -313,6 +316,11 @@ class VerticalContext:
     def has_enrichment_strategy(self) -> bool:
         """Check if enrichment strategy is configured."""
         return self.enrichment_strategy is not None
+
+    @property
+    def has_tool_selection_strategy(self) -> bool:
+        """Check if tool selection strategy is configured."""
+        return self.tool_selection_strategy is not None
 
     # ==========================================================================
     # Mutation Methods (implements MutableVerticalContextProtocol)
@@ -473,6 +481,17 @@ class VerticalContext:
         """
         self.enrichment_strategy = strategy
 
+    def apply_tool_selection_strategy(self, strategy: Any) -> None:
+        """Apply tool selection strategy for vertical-specific tool prioritization.
+
+        The strategy enables verticals to customize tool selection based on
+        domain knowledge, task types, and context.
+
+        Args:
+            strategy: ToolSelectionStrategyProtocol implementation from the vertical
+        """
+        self.tool_selection_strategy = strategy
+
     # ==========================================================================
     # Query Methods
     # ==========================================================================
@@ -612,6 +631,8 @@ class VerticalContext:
             "has_tiered_config": self.tiered_config is not None,
             # Enrichment strategy
             "has_enrichment_strategy": self.enrichment_strategy is not None,
+            # Tool selection strategy
+            "has_tool_selection_strategy": self.tool_selection_strategy is not None,
         }
 
     @classmethod

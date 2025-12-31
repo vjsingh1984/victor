@@ -53,6 +53,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class MessagePriority(int, Enum):
+    """Priority levels for messages during compaction.
+
+    Higher values = more important = preserved longer during compaction.
+    PINNED messages are never compacted away.
+    """
+
+    LOW = 25  # Can be compacted first
+    MEDIUM = 50  # Standard messages
+    HIGH = 75  # Important context
+    CRITICAL = 100  # Error messages, recent context
+    PINNED = 150  # Output requirements - never compacted
+
+
 class CompactionTrigger(Enum):
     """What triggered the compaction."""
 
@@ -251,15 +265,28 @@ class ContextCompactor:
     ERROR_PATTERN = re.compile(r"(?:error|exception|traceback|failed):", re.IGNORECASE)
     PATH_PATTERN = re.compile(r"(?:/[\w./]+|\w:\\[\w\\]+)")
 
+    # Patterns for pinned output requirements (never compacted)
+    PINNED_REQUIREMENT_PATTERNS = [
+        re.compile(r"\bmust\s+output\b", re.IGNORECASE),
+        re.compile(r"\brequired\s+format\b", re.IGNORECASE),
+        re.compile(r"\bfindings\s+table\b", re.IGNORECASE),
+        re.compile(r"\btop[-\s]?\d+\s+fixes\b", re.IGNORECASE),
+        re.compile(r"\bdeliverables?\s*:", re.IGNORECASE),
+        re.compile(r"\bcreate\s+a\s+findings\s+table\b", re.IGNORECASE),
+        re.compile(r"\bprovide\s+top[-\s]?\d+\b", re.IGNORECASE),
+        re.compile(r"\boutput\s+must\s+include\b", re.IGNORECASE),
+        re.compile(r"\brequired\s+outputs?\s*:", re.IGNORECASE),
+    ]
+
     def __init__(
         self,
-        controller: "ConversationController",
+        controller: Optional["ConversationController"] = None,
         config: Optional[CompactorConfig] = None,
     ):
         """Initialize the context compactor.
 
         Args:
-            controller: The ConversationController to wrap
+            controller: The ConversationController to wrap (optional for testing)
             config: Optional compactor configuration
         """
         self.controller = controller
@@ -272,6 +299,70 @@ class ContextCompactor:
         logger.debug(
             f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%})"
         )
+
+    # ========================================================================
+    # Message Priority Assignment
+    # ========================================================================
+
+    def _is_pinned_requirement(self, content: str) -> bool:
+        """Check if content contains pinned output requirement patterns.
+
+        Pinned requirements are output format specifications that must
+        survive compaction so the agent produces the required output.
+
+        Args:
+            content: Message content to check
+
+        Returns:
+            True if content contains pinned requirement patterns
+        """
+        for pattern in self.PINNED_REQUIREMENT_PATTERNS:
+            if pattern.search(content):
+                return True
+        return False
+
+    def _assign_priority(self, message: Dict[str, Any]) -> MessagePriority:
+        """Assign priority level to a message for compaction decisions.
+
+        Priority levels determine which messages are compacted first:
+        - PINNED: Output requirements - never compacted
+        - CRITICAL: Errors, recent context - compacted last
+        - HIGH: Important context
+        - MEDIUM: Standard messages
+        - LOW: Can be compacted first
+
+        Args:
+            message: Message dict with 'role' and 'content'
+
+        Returns:
+            MessagePriority level for this message
+        """
+        content = message.get("content", "")
+        role = message.get("role", "")
+
+        # Check for pinned output requirements first
+        if self._is_pinned_requirement(content):
+            return MessagePriority.PINNED
+
+        # System messages are critical
+        if role == "system":
+            return MessagePriority.CRITICAL
+
+        # Check for error patterns
+        if self.ERROR_PATTERN.search(content):
+            return MessagePriority.CRITICAL
+
+        # User messages with questions are high priority
+        if role == "user" and "?" in content:
+            return MessagePriority.HIGH
+
+        # Default priority based on role
+        if role == "user":
+            return MessagePriority.MEDIUM
+        elif role == "assistant":
+            return MessagePriority.MEDIUM
+
+        return MessagePriority.LOW
 
     # ========================================================================
     # Main Compaction Interface
