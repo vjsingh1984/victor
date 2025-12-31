@@ -514,9 +514,6 @@ async def code_search(
                 )
 
                 if recommendation and recommendation.value is not None:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.debug(
                         f"RL: Learned threshold {recommendation.value:.2f} "
                         f"(current: {similarity_threshold:.2f}, "
@@ -525,9 +522,6 @@ async def code_search(
                     )
 
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.debug(f"Failed to record threshold learning outcome: {e}")
 
         # Optionally combine with keyword search using hybrid RRF
@@ -576,17 +570,11 @@ async def code_search(
                         for hr in hybrid_results
                     ]
 
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.info(
                         f"Hybrid search combined semantic + keyword → {len(results)} results"
                     )
 
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
                 # Fall back to semantic-only results (already have them)
 
