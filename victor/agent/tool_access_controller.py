@@ -503,12 +503,14 @@ class ToolAccessController(IToolAccessController):
         registry: Tool registry for tool lookup
         layers: List of access layers in precedence order
         _cache: Cache for recent decisions (optional optimization)
+        _allowed_tools_cache: Cached bulk allowed tool set (scalability fix)
     """
 
     registry: Optional["ToolRegistry"] = None
     layers: List[AccessLayer] = field(default_factory=list)
     _cache: Dict[str, ToolAccessDecision] = field(default_factory=dict)
     _cache_context_hash: Optional[int] = None
+    _allowed_tools_cache: Optional[Set[str]] = None
 
     def __post_init__(self) -> None:
         """Initialize with default layers if none provided."""
@@ -544,6 +546,7 @@ class ToolAccessController(IToolAccessController):
         ctx_hash = self._get_context_hash(context)
         if ctx_hash != self._cache_context_hash:
             self._cache.clear()
+            self._allowed_tools_cache = None  # Invalidate bulk cache too
             self._cache_context_hash = ctx_hash
 
     def check_access(
@@ -635,7 +638,8 @@ class ToolAccessController(IToolAccessController):
     def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
         """Get all tools allowed in the given context.
 
-        Uses layer-specific optimization when possible.
+        Uses layer-specific optimization and caching for scalability.
+        On large tool sets, this avoids repeated per-tool iteration.
 
         Args:
             context: Access context
@@ -643,6 +647,13 @@ class ToolAccessController(IToolAccessController):
         Returns:
             Set of allowed tool names
         """
+        # Invalidate cache if context changed
+        self._invalidate_cache_if_needed(context)
+
+        # Return cached result if available (scalability optimization)
+        if self._allowed_tools_cache is not None:
+            return self._allowed_tools_cache.copy()
+
         # Get all available tools from registry
         if self.registry is None:
             return set()
@@ -656,6 +667,8 @@ class ToolAccessController(IToolAccessController):
         for layer in self.layers:
             allowed = layer.get_allowed_tools(allowed, context)
 
+        # Cache the result
+        self._allowed_tools_cache = allowed.copy()
         return allowed
 
     def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:

@@ -236,31 +236,63 @@ You: [Use rag_query tool with query="authentication"]
             "Answer is coherent and well-structured",
         ]
 
+    # Extension providers delegated to base class (OCP/caching compliance)
+    # RAG previously overrode get_extensions() directly, bypassing base class caching.
+    # Now we implement the individual getter methods and let VerticalBase.get_extensions()
+    # handle caching and aggregation.
+
     @classmethod
-    def get_extensions(cls) -> VerticalExtensions:
-        """Get RAG vertical extensions.
+    def get_middleware(cls) -> list:
+        """Get RAG middleware (none needed).
 
         Returns:
-            Extension implementations for framework integration
+            Empty list - RAG doesn't use custom middleware
         """
-        # Import extension implementations
-        from victor.rag.prompts import RAGPromptContributor
-        from victor.rag.mode_config import RAGModeConfigProvider
+        return []
+
+    @classmethod
+    def get_safety_extension(cls):
+        """Get RAG safety extension.
+
+        Returns:
+            RAGSafetyExtension instance
+        """
         from victor.rag.safety import RAGSafetyExtension
+
+        return RAGSafetyExtension()
+
+    @classmethod
+    def get_prompt_contributor(cls):
+        """Get RAG prompt contributor.
+
+        Returns:
+            RAGPromptContributor instance
+        """
+        from victor.rag.prompts import RAGPromptContributor
+
+        return RAGPromptContributor()
+
+    @classmethod
+    def get_mode_config_provider(cls):
+        """Get RAG mode configuration provider.
+
+        Returns:
+            RAGModeConfigProvider instance
+        """
+        from victor.rag.mode_config import RAGModeConfigProvider
+
+        return RAGModeConfigProvider()
+
+    @classmethod
+    def get_tool_dependency_provider(cls):
+        """Get RAG tool dependency provider.
+
+        Returns:
+            RAGToolDependencyProvider instance
+        """
         from victor.rag.tool_dependencies import RAGToolDependencyProvider
 
-        return VerticalExtensions(
-            middleware=[],  # No special middleware for RAG
-            safety_extensions=[RAGSafetyExtension()],
-            prompt_contributors=[RAGPromptContributor()],
-            mode_config_provider=RAGModeConfigProvider(),
-            tool_dependency_provider=RAGToolDependencyProvider(),
-            workflow_provider=cls.get_workflow_provider(),
-            service_provider=cls.get_service_provider(),
-            rl_config_provider=cls.get_rl_config_provider(),
-            team_spec_provider=cls.get_team_spec_provider(),
-            enrichment_strategy=cls.get_enrichment_strategy(),
-        )
+        return RAGToolDependencyProvider()
 
     @classmethod
     def get_workflow_provider(cls):
