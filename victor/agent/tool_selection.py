@@ -200,8 +200,8 @@ CATEGORY_KEYWORDS = _FALLBACK_CATEGORY_KEYWORDS
 def detect_categories_from_message(message: str) -> Set[str]:
     """Detect relevant tool categories from keywords in a message.
 
-    Uses registry-based detection with decorator-driven keywords when available,
-    falling back to static CATEGORY_KEYWORDS if registry is empty.
+    Merges registry-based detection (decorator-driven keywords) with
+    static fallback keywords to ensure comprehensive category coverage.
 
     Args:
         message: User message text to analyze
@@ -215,27 +215,28 @@ def detect_categories_from_message(message: str) -> Set[str]:
         >>> detect_categories_from_message("analyze code complexity and metrics")
         {'metrics'}
     """
-    # Try registry-based detection first (decorator-driven)
+    detected: Set[str] = set()
+
+    # Try registry-based detection (decorator-driven)
     try:
         from victor.tools.metadata_registry import detect_categories_from_text
 
         registry_detected = detect_categories_from_text(message)
         if registry_detected:
             logger.debug(f"Registry detected categories: {registry_detected}")
-            return registry_detected
+            detected.update(registry_detected)
     except Exception as e:
         logger.debug(f"Registry category detection failed: {e}")
 
-    # Fallback to static keywords
+    # Always check fallback keywords to ensure coverage
+    # (registry may not have all category keywords defined)
     message_lower = message.lower()
-    detected: Set[str] = set()
-
     for category, keywords in _FALLBACK_CATEGORY_KEYWORDS.items():
         if any(kw in message_lower for kw in keywords):
             detected.add(category)
 
     if detected:
-        logger.debug(f"Fallback detected categories: {detected}")
+        logger.debug(f"Detected categories (merged): {detected}")
 
     return detected
 
