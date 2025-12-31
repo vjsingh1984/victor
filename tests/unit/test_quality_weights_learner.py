@@ -28,13 +28,19 @@ from victor.agent.rl.learners.quality_weights import (
     QualityWeightLearner,
     QualityDimension,
 )
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -84,15 +90,16 @@ class TestQualityWeightLearner:
         assert learner.learning_rate == 0.05
         assert learner.momentum == 0.9
 
+        # Check tables using correct names from Tables enum
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='quality_weights';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_QUALITY_WEIGHT}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_QUALITY_WEIGHT} not found"
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='quality_weight_history';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_QUALITY_HISTORY}';"
         )
-        assert cursor.fetchone() is not None
+        assert cursor.fetchone() is not None, f"Table {Tables.RL_QUALITY_HISTORY} not found"
 
     def test_default_weights(self, learner: QualityWeightLearner) -> None:
         """Test default weights are set correctly."""
@@ -196,14 +203,18 @@ class TestQualityWeightLearner:
         """State persists across learner instances."""
         task_type = "persistent_task"
 
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("quality_weights")  # type: ignore
 
         _record_quality_outcome(learner1, task_type=task_type)
         weights_before = learner1.get_weights(task_type)
-        coordinator1.db.close()
+        reset_database()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("quality_weights")  # type: ignore
 
         weights_after = learner2.get_weights(task_type)
@@ -212,6 +223,8 @@ class TestQualityWeightLearner:
         # Weights should be preserved
         for dim in QualityDimension.ALL:
             assert abs(weights_before[dim] - weights_after[dim]) < 0.01
+
+        reset_database()
 
     def test_weight_bounds(self, learner: QualityWeightLearner) -> None:
         """Weights should stay within bounds."""

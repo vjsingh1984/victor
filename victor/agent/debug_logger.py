@@ -71,12 +71,14 @@ NOISY_LOGGERS = [
 ]
 
 
-def configure_logging_levels(log_level: str = "INFO") -> None:
+def configure_logging_levels(log_level: str = "INFO", file_logging_enabled: bool = True) -> None:
     """Configure logging levels, silencing noisy third-party loggers.
 
     Args:
-        log_level: Desired log level for Victor loggers.
+        log_level: Desired log level for Victor loggers (console).
             Supported: TRACE (5), DEBUG, INFO, WARNING, ERROR, CRITICAL
+        file_logging_enabled: If True, keeps victor logger at INFO minimum
+            to allow file handler to capture INFO+ messages.
     """
     # Handle custom TRACE level
     level_upper = log_level.upper()
@@ -86,7 +88,14 @@ def configure_logging_levels(log_level: str = "INFO") -> None:
         level = getattr(logging, level_upper, logging.INFO)
 
     # Set Victor loggers to desired level
-    logging.getLogger("victor").setLevel(level)
+    # When file logging is enabled, ensure we don't filter out INFO messages
+    # at the logger level (let handlers do the filtering)
+    if file_logging_enabled:
+        # Use the lower of requested level or INFO to ensure file logging works
+        effective_level = min(level, logging.INFO)
+    else:
+        effective_level = level
+    logging.getLogger("victor").setLevel(effective_level)
 
     # Silence noisy third-party loggers (always WARNING or above)
     for logger_name in NOISY_LOGGERS:

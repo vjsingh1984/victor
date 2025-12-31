@@ -44,6 +44,7 @@ import yaml
 @dataclass
 class ModelToolSupport:
     """Tool support information for a model."""
+
     name: str
     supports_tools: bool
     template_has_tools: bool
@@ -141,7 +142,9 @@ def detect_tool_support(template: str) -> ModelToolSupport:
 
     # Extract relevant snippet
     if result.supports_tools:
-        match = re.search(r"\{\{-?\s*if\s+\.?Tools[^}]*\}\}.*?\{\{-?\s*end\s*\}\}", template, re.DOTALL)
+        match = re.search(
+            r"\{\{-?\s*if\s+\.?Tools[^}]*\}\}.*?\{\{-?\s*end\s*\}\}", template, re.DOTALL
+        )
         if match:
             result.template_snippet = match.group(0)[:300]
 
@@ -270,7 +273,8 @@ def print_report(results: List[ModelToolSupport], json_output: bool = False) -> 
     print("=" * 70)
     print("DIAGNOSIS GUIDE")
     print("=" * 70)
-    print("""
+    print(
+        """
 To check if a model supports tools:
 
 1. Run: ollama show <model_name>
@@ -292,7 +296,8 @@ To check if a model supports tools:
    - Create a custom Modelfile with tool template
    - Use: ollama create <new_name> -f Modelfile
    - See: https://ollama.com/blog/tool-support
-""")
+"""
+    )
 
 
 def main():

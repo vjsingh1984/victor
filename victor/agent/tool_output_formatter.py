@@ -347,7 +347,7 @@ These are the actual search results. Reference only the files and matches shown 
 
         try:
             # Lazy import to avoid circular dependencies
-            from victor.serialization import (
+            from victor.processing.serialization import (
                 get_adaptive_serializer,
                 SerializationContext,
             )

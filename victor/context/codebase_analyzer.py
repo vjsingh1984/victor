@@ -32,7 +32,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, is_hidden_path, should_ignore_path
+from victor.coding.codebase.ignore_patterns import (
+    DEFAULT_SKIP_DIRS,
+    is_hidden_path,
+    should_ignore_path,
+)
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 
 logger = logging.getLogger(__name__)
@@ -1657,7 +1661,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
     """Summarize embedding/cache health for init.md enrichment."""
     root = Path(root_path).resolve() if root_path else Path.cwd()
     try:
-        from victor.cache.embedding_cache_manager import EmbeddingCacheManager
+        from victor.storage.cache.embedding_cache_manager import EmbeddingCacheManager
     except Exception as exc:  # pragma: no cover - optional dependency at runtime
         logger.debug("Embedding manager unavailable: %s", exc)
         return None
@@ -2054,7 +2058,7 @@ async def generate_victor_md_from_index(
     Returns:
         Generated markdown content for .victor/init.md.
     """
-    from victor.codebase.symbol_store import SymbolStore
+    from victor.coding.codebase.symbol_store import SymbolStore
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
@@ -2565,11 +2569,11 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     """
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-    from victor.codebase.graph.registry import create_graph_store
+    from victor.coding.codebase.graph.registry import create_graph_store
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
-    graph_dir = root / ".victor" / "graph"
-    graph_db_path = graph_dir / "graph.db"
+    # Use consolidated project.db
+    graph_db_path = root / ".victor" / "project.db"
 
     insights: Dict[str, Any] = {
         "has_graph": False,
@@ -2689,10 +2693,10 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Optional richer graph analytics
             try:
                 from victor.tools.graph_tool import GraphAnalyzer
-                from victor.codebase.graph.sqlite_store import SQLiteGraphStore
+                from victor.storage.graph.sqlite_store import SqliteGraphStore
 
                 ga = GraphAnalyzer()
-                store = SQLiteGraphStore(graph_db_path)
+                store = SqliteGraphStore(project_path=root)
                 nodes = await store.get_all_nodes()
                 edges = await store.get_all_edges()
                 for n in nodes:
@@ -2865,6 +2869,7 @@ async def generate_enhanced_init_md(
     force: bool = False,
     include_dirs: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
+    auto_index: bool = True,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
 
@@ -2876,6 +2881,7 @@ async def generate_enhanced_init_md(
         include_conversations: Whether to include conversation insights (default: True)
         on_progress: Optional callback: fn(stage: str, message: str)
         force: If True, re-index all files ignoring cache.
+        auto_index: If True, automatically build code graph index when missing (default: True)
 
     Returns:
         Enhanced init.md content. Falls back gracefully if LLM fails.
@@ -2953,6 +2959,36 @@ async def generate_enhanced_init_md(
     # Step 2.5: Graph - Add graph-based insights (design patterns, important symbols)
     progress("graph", "Analyzing code graph...")
     graph_insights = await extract_graph_insights(root_path)
+
+    # Auto-build index if graph is missing and auto_index is enabled
+    if not graph_insights.get("has_graph") and auto_index:
+        progress("graph", "No graph data - building index automatically...")
+        try:
+            from victor.config.settings import load_settings
+            from victor.tools.code_search_tool import _get_or_build_index
+
+            root = Path(root_path).resolve() if root_path else Path.cwd()
+            settings = load_settings()
+            # Build the index (this populates the graph database)
+            index, rebuilt = await _get_or_build_index(root, settings, force_reindex=force)
+            status_msg = "Index built" if rebuilt else "Index loaded"
+            # Get graph stats if available
+            if index.graph_store:
+                try:
+                    stats = await index.graph_store.stats()
+                    node_count = stats.get("nodes", 0)
+                    edge_count = stats.get("edges", 0)
+                    if node_count or edge_count:
+                        status_msg += f" ({node_count} symbols, {edge_count} edges)"
+                except Exception:
+                    pass
+            progress("graph", f"{status_msg}, analyzing...")
+            # Re-fetch graph insights after indexing
+            graph_insights = await extract_graph_insights(root_path)
+        except Exception as e:
+            logger.warning(f"Auto-indexing failed: {e}")
+            progress("graph", f"Auto-indexing failed: {e}", complete=True)
+
     if graph_insights.get("has_graph"):
         progress(
             "graph",
@@ -3059,7 +3095,15 @@ async def generate_enhanced_init_md(
         else:
             base_content += "\n" + "\n".join(graph_section)
     else:
-        progress("graph", "No graph data (run 'victor index' first)", complete=True)
+        # Graph data still missing after potential auto-indexing attempt
+        if auto_index:
+            progress(
+                "graph", "Graph indexing incomplete (retry with 'victor index')", complete=True
+            )
+        else:
+            progress(
+                "graph", "No graph data (run 'victor index' or enable auto_index)", complete=True
+            )
 
     # Step 3: Deep - Use LLM to enhance content
     if not use_llm:

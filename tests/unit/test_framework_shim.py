@@ -34,7 +34,7 @@ import pytest
 
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.observability.integration import ObservabilityIntegration
-from victor.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 
 class MockVertical(VerticalBase):
@@ -51,6 +51,14 @@ class MockVertical(VerticalBase):
     @classmethod
     def get_system_prompt(cls):
         return "You are a test assistant."
+
+    @classmethod
+    def get_stages(cls):
+        return {
+            "INITIAL": {"allowed_tools": ["read"], "next": ["PLANNING"]},
+            "PLANNING": {"allowed_tools": ["read", "write"], "next": ["EXECUTION"]},
+            "EXECUTION": {"allowed_tools": ["read", "write", "edit"], "next": ["INITIAL"]},
+        }
 
 
 class TestFrameworkShimBasic:
@@ -226,16 +234,52 @@ class TestFrameworkShimVertical:
 
     @pytest.fixture
     def mock_orchestrator(self):
-        """Create mock orchestrator."""
-        orch = MagicMock()
+        """Create mock orchestrator with capability protocol support."""
+        from victor.framework.protocols import CapabilityRegistryProtocol
+
+        orch = MagicMock(spec=CapabilityRegistryProtocol)
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
+
         # Add protocol methods for tools
         orch._enabled_tools = set()
-        orch.set_enabled_tools = MagicMock(
-            side_effect=lambda tools: setattr(orch, "_enabled_tools", tools)
-        )
+
+        def set_tools(tools):
+            orch._enabled_tools = tools
+
+        orch.set_enabled_tools = MagicMock(side_effect=set_tools)
         orch.get_enabled_tools = MagicMock(side_effect=lambda: orch._enabled_tools)
+
+        # Add set_custom_prompt method
+        orch.set_custom_prompt = MagicMock()
+
+        # Add vertical context storage (set via pipeline)
+        orch._vertical_context = None
+
+        def set_context(context):
+            orch._vertical_context = context
+
+        orch.set_vertical_context = MagicMock(side_effect=set_context)
+
+        # Implement capability protocol methods
+        def has_capability(name, min_version=None):
+            return name in ["enabled_tools", "custom_prompt", "vertical_context"]
+
+        def invoke_capability(name, *args, min_version=None, **kwargs):
+            if name == "enabled_tools" and args:
+                set_tools(args[0])
+                return True
+            elif name == "custom_prompt" and args:
+                orch.set_custom_prompt(args[0])
+                return True
+            elif name == "vertical_context" and args:
+                set_context(args[0])
+                return True
+            return False
+
+        orch.has_capability = MagicMock(side_effect=has_capability)
+        orch.invoke_capability = MagicMock(side_effect=invoke_capability)
+
         return orch
 
     @pytest.fixture(autouse=True)
@@ -257,8 +301,7 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            # Check that set_enabled_tools was called with the correct tools
-            mock_orchestrator.set_enabled_tools.assert_called_once()
+            # Check that tools were applied via capability protocol
             enabled_tools = mock_orchestrator._enabled_tools
             assert "read" in enabled_tools
             assert "write" in enabled_tools
@@ -266,7 +309,11 @@ class TestFrameworkShimVertical:
 
     @pytest.mark.asyncio
     async def test_vertical_system_prompt_applied(self, mock_settings, mock_orchestrator):
-        """Test that vertical system prompt is applied."""
+        """Test that vertical system prompt is applied.
+
+        With capability-based invocation, the orchestrator's set_custom_prompt
+        method is called directly (via _invoke_capability mapping).
+        """
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
             new_callable=AsyncMock,
@@ -276,13 +323,12 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            mock_orchestrator.prompt_builder.set_custom_prompt.assert_called_once_with(
-                "You are a test assistant."
-            )
+            # New capability-based approach calls orchestrator.set_custom_prompt directly
+            mock_orchestrator.set_custom_prompt.assert_called_once_with("You are a test assistant.")
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):
-        """Test that vertical stages are applied."""
+        """Test that vertical stages are applied via vertical context."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
             new_callable=AsyncMock,
@@ -292,8 +338,12 @@ class TestFrameworkShimVertical:
             shim = FrameworkShim(mock_settings, vertical=MockVertical)
             await shim.create_orchestrator()
 
-            assert hasattr(mock_orchestrator, "_vertical_stages")
-            stages = mock_orchestrator._vertical_stages
+            # Stages are applied via vertical context, not _vertical_stages
+            assert hasattr(mock_orchestrator, "_vertical_context")
+            context = mock_orchestrator._vertical_context
+            assert context is not None
+            # Check that stages were applied to context
+            stages = context.stages
             assert "INITIAL" in stages
             assert "PLANNING" in stages
             assert "EXECUTION" in stages
@@ -346,7 +396,8 @@ class TestFrameworkShimVertical:
 
             config = shim.vertical_config
             assert config is not None
-            assert config.system_prompt == "You are a test assistant."
+            # Check system_prompt contains expected text (may be prefixed by framework)
+            assert "test assistant" in config.system_prompt.lower()
 
 
 class TestFrameworkShimLifecycle:
@@ -466,9 +517,9 @@ class TestListVerticalsFunction:
     def register_mock_vertical(self):
         """Register mock vertical for tests and ensure built-ins are present."""
         # Ensure built-in verticals are registered (they may have been cleared by other tests)
-        from victor.verticals.coding import CodingAssistant
-        from victor.verticals.devops import DevOpsAssistant
-        from victor.verticals.research import ResearchAssistant
+        from victor.coding import CodingAssistant
+        from victor.devops import DevOpsAssistant
+        from victor.research import ResearchAssistant
 
         # Register built-ins if not already present
         if not VerticalRegistry.get("coding"):

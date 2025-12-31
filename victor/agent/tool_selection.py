@@ -36,6 +36,12 @@ if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
+    from victor.agent.vertical_context import VerticalContext
+    from victor.core.verticals.protocols import (
+        ToolSelectionContext,
+        ToolSelectionResult,
+        ToolSelectionStrategyProtocol,
+    )
     from victor.providers.base import ToolDefinition
     from victor.tools.base import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
@@ -194,8 +200,8 @@ CATEGORY_KEYWORDS = _FALLBACK_CATEGORY_KEYWORDS
 def detect_categories_from_message(message: str) -> Set[str]:
     """Detect relevant tool categories from keywords in a message.
 
-    Uses registry-based detection with decorator-driven keywords when available,
-    falling back to static CATEGORY_KEYWORDS if registry is empty.
+    Merges registry-based detection (decorator-driven keywords) with
+    static fallback keywords to ensure comprehensive category coverage.
 
     Args:
         message: User message text to analyze
@@ -209,27 +215,28 @@ def detect_categories_from_message(message: str) -> Set[str]:
         >>> detect_categories_from_message("analyze code complexity and metrics")
         {'metrics'}
     """
-    # Try registry-based detection first (decorator-driven)
+    detected: Set[str] = set()
+
+    # Try registry-based detection (decorator-driven)
     try:
         from victor.tools.metadata_registry import detect_categories_from_text
 
         registry_detected = detect_categories_from_text(message)
         if registry_detected:
             logger.debug(f"Registry detected categories: {registry_detected}")
-            return registry_detected
+            detected.update(registry_detected)
     except Exception as e:
         logger.debug(f"Registry category detection failed: {e}")
 
-    # Fallback to static keywords
+    # Always check fallback keywords to ensure coverage
+    # (registry may not have all category keywords defined)
     message_lower = message.lower()
-    detected: Set[str] = set()
-
     for category, keywords in _FALLBACK_CATEGORY_KEYWORDS.items():
         if any(kw in message_lower for kw in keywords):
             detected.add(category)
 
     if detected:
-        logger.debug(f"Fallback detected categories: {detected}")
+        logger.debug(f"Detected categories (merged): {detected}")
 
     return detected
 
@@ -633,6 +640,7 @@ class ToolSelector(ModeAwareMixin):
         tool_selection_config: Optional[Dict[str, Any]] = None,
         fallback_max_tools: int = 8,
         on_selection_recorded: Optional[Callable[[str, int], None]] = None,
+        vertical_context: Optional["VerticalContext"] = None,
     ):
         """Initialize the tool selector.
 
@@ -646,6 +654,7 @@ class ToolSelector(ModeAwareMixin):
             tool_selection_config: Optional config with base_threshold, base_max_tools
             fallback_max_tools: Max tools for fallback selection
             on_selection_recorded: Optional callback for recording selection stats
+            vertical_context: Optional vertical context for vertical-specific tool selection
         """
         self.tools = tools
         self.semantic_selector = semantic_selector
@@ -656,6 +665,9 @@ class ToolSelector(ModeAwareMixin):
         self.tool_selection_config = tool_selection_config or {}
         self.fallback_max_tools = fallback_max_tools
         self._on_selection_recorded = on_selection_recorded
+
+        # Vertical context for vertical-specific tool selection (DIP)
+        self._vertical_context: Optional["VerticalContext"] = vertical_context
 
         # Task tool config loader for YAML-based configuration
         self._task_config_loader: Optional["TaskToolConfigLoader"] = None
@@ -890,6 +902,102 @@ class ToolSelector(ModeAwareMixin):
             )
         else:
             logger.debug("Tiered tool config cleared")
+
+    def set_vertical_context(self, context: Optional["VerticalContext"]) -> None:
+        """Set vertical context for vertical-specific tool selection.
+
+        The vertical context provides the tool_selection_strategy which can
+        prioritize, weight, or exclude tools based on vertical domain knowledge.
+
+        Args:
+            context: VerticalContext instance, or None to disable
+        """
+        self._vertical_context = context
+        if context and context.has_tool_selection_strategy:
+            logger.info(
+                f"Vertical tool selection strategy set for vertical: {context.vertical_name}"
+            )
+        else:
+            logger.debug("Vertical context set (no tool selection strategy)")
+
+    def _apply_vertical_strategy(
+        self,
+        tools: List["ToolDefinition"],
+        user_message: str,
+        task_type: str = "unknown",
+    ) -> List["ToolDefinition"]:
+        """Apply vertical-specific tool selection strategy to reorder/filter tools.
+
+        This implements the Strategy Pattern (OCP) allowing verticals to customize
+        tool selection without modifying the core selection logic.
+
+        Args:
+            tools: List of selected tools
+            user_message: The user's message
+            task_type: Detected task type
+
+        Returns:
+            Reordered/filtered list of tools based on vertical strategy
+        """
+        if not self._vertical_context or not self._vertical_context.has_tool_selection_strategy:
+            return tools
+
+        strategy = self._vertical_context.tool_selection_strategy
+        if not strategy:
+            return tools
+
+        try:
+            # Import here to avoid circular imports
+            from victor.core.verticals.protocols import ToolSelectionContext
+
+            # Get conversation stage if available
+            stage = "exploration"
+            if self.conversation_state:
+                stage = self.conversation_state.current_stage.name.lower()
+
+            # Build context for strategy
+            context = ToolSelectionContext(
+                task_type=task_type,
+                user_message=user_message,
+                conversation_stage=stage,
+                available_tools={t.name for t in tools},
+                recent_tools=[],  # Could be populated from history
+                metadata={
+                    "model": self.model,
+                    "provider": self.provider_name,
+                },
+            )
+
+            # Apply strategy
+            result = strategy.select_tools(context)
+
+            # Reorder based on priority_tools
+            if result.priority_tools:
+                priority_set = set(result.priority_tools)
+                priority_ordered = [t for t in tools if t.name in priority_set]
+                others = [t for t in tools if t.name not in priority_set]
+
+                # Sort priority tools by their position in priority_tools list
+                priority_order = {name: i for i, name in enumerate(result.priority_tools)}
+                priority_ordered.sort(key=lambda t: priority_order.get(t.name, 999))
+
+                tools = priority_ordered + others
+                logger.debug(f"Vertical strategy prioritized tools: {result.priority_tools}")
+
+            # Exclude tools
+            if result.excluded_tools:
+                tools = [t for t in tools if t.name not in result.excluded_tools]
+                logger.debug(f"Vertical strategy excluded tools: {sorted(result.excluded_tools)}")
+
+            # Log reasoning if provided
+            if result.reasoning:
+                logger.info(f"Vertical tool selection: {result.reasoning}")
+
+            return tools
+
+        except Exception as e:
+            logger.warning(f"Failed to apply vertical tool selection strategy: {e}")
+            return tools
 
     def get_tiered_config(self) -> Optional[Any]:
         """Get the tiered tool configuration.
@@ -1267,6 +1375,10 @@ class ToolSelector(ModeAwareMixin):
         if len(tools) > self.fallback_max_tools:
             tools = tools[: self.fallback_max_tools]
 
+        # Apply vertical-specific tool selection strategy (DIP/OCP)
+        # This allows verticals to prioritize/reorder tools based on domain knowledge
+        tools = self._apply_vertical_strategy(tools, user_message)
+
         return tools
 
     def select_keywords(
@@ -1357,6 +1469,10 @@ class ToolSelector(ModeAwareMixin):
 
         # Enforce read-only set during exploration/analysis stages
         selected_tools = self._filter_tools_for_stage(selected_tools, stage)
+
+        # Apply vertical-specific tool selection strategy (DIP/OCP)
+        # This allows verticals to prioritize/reorder tools based on domain knowledge
+        selected_tools = self._apply_vertical_strategy(selected_tools, user_message)
 
         tool_names = [t.name for t in selected_tools]
         tool_names_set = set(tool_names)

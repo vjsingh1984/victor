@@ -99,6 +99,7 @@ docs/
 - [Testing Strategy](TESTING_STRATEGY.md)
 
 ### Architecture
+- [Architecture Roadmap](ARCHITECTURE_ROADMAP.md) - Improvement phases and technical debt
 - [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md)
 - [State Machine](STATE_MACHINE.md) - Conversation state tracking
 - [Verticals](VERTICALS.md) - Domain-specific assistants

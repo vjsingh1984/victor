@@ -1,0 +1,243 @@
+# Mode-Workflow-Team Coordination Configuration
+#
+# This file configures the coordination between agent modes, workflows, and teams.
+# Each mode can specify default workflows, suggested teams, and complexity thresholds.
+
+# Version for schema evolution
+version: "1.0"
+
+# Global settings
+global:
+  # Whether team suggestions are enabled globally
+  team_suggestions_enabled: true
+
+  # Default complexity threshold for team spawning
+  default_auto_spawn_threshold: extreme
+
+  # Default complexity threshold for team suggestions
+  default_suggest_threshold: high
+
+# Mode-specific configurations
+modes:
+  explore:
+    description: "Exploration mode for understanding code without modifications"
+
+    # Workflows available in this mode (empty = none)
+    workflows: []
+
+    # Teams suggested for this mode
+    teams:
+      - research_team
+
+    # Team suggestion settings
+    team_suggestion:
+      enabled: false  # Explore is for single-agent understanding
+
+    # Complexity thresholds (complexity_level -> action)
+    complexity_thresholds:
+      trivial: none
+      low: none
+      medium: none
+      high: suggest
+      extreme: suggest
+
+    # Tool priority adjustments (higher = more likely to be suggested)
+    tool_priorities:
+      read: 1.5
+      overview: 1.3
+      ls: 1.2
+      graph: 1.2
+      search: 1.1
+      edit: 0.5  # Discourage editing in explore mode
+      write: 0.5
+
+    # Additional system prompt content
+    system_prompt_addition: |
+      You are exploring the codebase to understand its structure and patterns.
+      Focus on reading and analyzing code without making modifications.
+
+  plan:
+    description: "Planning mode for analysis and strategy before implementation"
+
+    workflows:
+      - planning_workflow
+      - code_review
+
+    teams:
+      - research_team
+      - review_team
+
+    team_suggestion:
+      enabled: true
+      auto_spawn: false  # Only suggest, don't auto-spawn
+
+    complexity_thresholds:
+      trivial: none
+      low: none
+      medium: suggest
+      high: suggest
+      extreme: suggest  # Planning doesn't auto-spawn teams
+
+    tool_priorities:
+      read: 1.3
+      search: 1.2
+      overview: 1.2
+      graph: 1.1
+      plan_files: 1.5
+      edit: 0.8  # Limited to sandbox in plan mode
+
+    system_prompt_addition: |
+      You are in planning mode. Analyze the codebase and create a detailed plan.
+      Focus on understanding impact, dependencies, and implementation strategy.
+
+  build:
+    description: "Implementation mode for creating and modifying code"
+
+    workflows:
+      - feature_implementation
+      - quick_feature
+      - bug_fix
+      - quick_fix
+
+    teams:
+      - feature_team
+      - bug_fix_team
+      - refactoring_team
+      - testing_team
+
+    team_suggestion:
+      enabled: true
+      auto_spawn: true  # Auto-spawn for high complexity tasks
+
+    complexity_thresholds:
+      trivial: none
+      low: none
+      medium: suggest
+      high: auto_spawn
+      extreme: auto_spawn
+
+    tool_priorities:
+      edit: 1.5
+      write: 1.3
+      bash: 1.2
+      run_tests: 1.2
+      read: 0.9  # Slightly lower to encourage action
+
+    system_prompt_addition: |
+      You are in build mode. Focus on implementing changes and taking action.
+      Read files once to understand, then immediately edit or write.
+
+# Task type to team mapping
+# Used when task type is known but mode doesn't specify a team
+task_team_mapping:
+  feature:
+    primary: feature_team
+    fallback:
+      - implementation_team
+      - development_team
+
+  bugfix:
+    primary: bug_fix_team
+    fallback:
+      - debugging_team
+
+  refactor:
+    primary: refactoring_team
+    fallback:
+      - code_review_team
+
+  review:
+    primary: review_team
+    fallback:
+      - code_review_team
+      - pr_review_team
+
+  test:
+    primary: testing_team
+    fallback:
+      - qa_team
+
+  documentation:
+    primary: documentation_team
+    fallback:
+      - docs_team
+
+  research:
+    primary: deep_research_team
+    fallback:
+      - research_team
+      - analysis_team
+
+  deployment:
+    primary: deployment_team
+    fallback:
+      - devops_team
+      - infrastructure_team
+
+  monitoring:
+    primary: monitoring_team
+    fallback:
+      - observability_team
+
+# Task type to workflow mapping
+task_workflow_mapping:
+  feature:
+    - feature_implementation
+    - quick_feature
+
+  bugfix:
+    - bug_fix
+    - quick_fix
+
+  refactor:
+    - refactoring
+    - code_review
+
+  review:
+    - code_review
+    - pr_review
+    - quick_review
+
+  test:
+    - testing
+    - test_coverage
+
+# Vertical-specific overrides
+# These can override the default mode configs per vertical
+vertical_overrides:
+  coding:
+    build:
+      teams:
+        - feature_team
+        - bug_fix_team
+        - refactoring_team
+        - review_team
+        - testing_team
+        - documentation_team
+
+  research:
+    explore:
+      teams:
+        - deep_research_team
+        - literature_team
+        - fact_check_team
+    plan:
+      teams:
+        - synthesis_team
+        - competitive_team
+
+  devops:
+    build:
+      teams:
+        - deployment_team
+        - container_team
+        - monitoring_team
+
+  data_analysis:
+    build:
+      teams:
+        - eda_team
+        - cleaning_team
+        - statistics_team
+        - ml_team
+        - visualization_team

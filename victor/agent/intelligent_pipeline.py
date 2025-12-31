@@ -111,6 +111,15 @@ class ResponseResult:
     grounding_issues: List[str] = field(default_factory=list)
     improvement_suggestions: List[str] = field(default_factory=list)
     learning_reward: float = 0.0
+    # Grounding failure handling
+    should_finalize: bool = False
+    """True when grounding retries exceeded - finalize with best-effort response."""
+    should_retry: bool = False
+    """True when grounding failed but retries remain."""
+    finalize_reason: str = ""
+    """Reason for forced finalization (e.g., 'grounding failure limit exceeded')."""
+    grounding_feedback: str = ""
+    """Actionable feedback prompt for correcting grounding issues on retry."""
 
 
 @dataclass
@@ -170,6 +179,10 @@ class IntelligentAgentPipeline:
         self._current_context: Optional[RequestContext] = None
         self._session_start = datetime.now()
         self._stats = PipelineStats(profile_name=profile_name)
+
+        # Grounding failure handling
+        self._grounding_failure_count: int = 0
+        self._max_grounding_retries: int = 1  # Only 1 retry, then finalize
 
         # Provider adapter for capability-based behavior
         self._provider_adapter = get_provider_adapter(provider_name)
@@ -321,6 +334,47 @@ class IntelligentAgentPipeline:
             except Exception as e:
                 logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
         return self._grounding_verifier
+
+    def _emit_grounding_event(
+        self,
+        is_grounded: bool,
+        grounding_score: float,
+        task_type: str,
+    ) -> None:
+        """Emit RL event for grounding verification.
+
+        This activates the grounding_threshold learner to learn optimal
+        thresholds based on verification outcomes.
+
+        Args:
+            is_grounded: Whether the response passed grounding verification
+            grounding_score: Confidence score from grounding verifier
+            task_type: Type of task being verified
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            event = RLEvent(
+                type=RLEventType.GROUNDING_CHECK,
+                success=is_grounded,
+                quality_score=grounding_score,
+                provider=self.provider_name,
+                model=self.model,
+                task_type=task_type,
+                threshold_value=grounding_score,
+                metadata={
+                    "is_grounded": is_grounded,
+                },
+            )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"[IntelligentPipeline] Grounding event emission failed: {e}")
 
     async def _get_resilient_executor(self):
         """Lazy initialize resilient executor."""
@@ -565,6 +619,7 @@ class IntelligentAgentPipeline:
         grounding_score = 1.0
         is_grounded = True
         grounding_issues = []
+        grounding_result = None  # Store full result for feedback generation
 
         if await self._get_grounding_verifier():
             grounding_result = await self._grounding_verifier.verify(
@@ -577,6 +632,54 @@ class IntelligentAgentPipeline:
                 f"{issue.issue_type.value}: {issue.description}"
                 for issue in grounding_result.issues
             ]
+
+            # Emit RL event for grounding verification
+            self._emit_grounding_event(
+                is_grounded=is_grounded,
+                grounding_score=grounding_score,
+                task_type=task_type,
+            )
+
+        # Track grounding failures for best-effort finalize logic
+        should_finalize = False
+        should_retry = False
+        finalize_reason = ""
+        grounding_feedback = ""
+
+        if not is_grounded:
+            self._grounding_failure_count += 1
+            if self._grounding_failure_count > self._max_grounding_retries:
+                # Max retries exceeded - force finalize with best-effort response
+                should_finalize = True
+                finalize_reason = "grounding failure limit exceeded"
+                logger.warning(
+                    f"[IntelligentPipeline] Grounding failure count ({self._grounding_failure_count}) "
+                    f"exceeded max retries ({self._max_grounding_retries}). "
+                    f"Forcing best-effort finalize."
+                )
+            else:
+                # Can still retry - generate actionable feedback prompt
+                should_retry = True
+                # Generate feedback from grounding result if available
+                if grounding_result is not None:
+                    grounding_feedback = grounding_result.generate_feedback_prompt()
+                    if grounding_feedback:
+                        logger.info(
+                            f"[IntelligentPipeline] Generated grounding feedback for retry: "
+                            f"{len(grounding_feedback)} chars"
+                        )
+                logger.debug(
+                    f"[IntelligentPipeline] Grounding failed, retry allowed "
+                    f"({self._grounding_failure_count}/{self._max_grounding_retries})"
+                )
+        else:
+            # Grounding succeeded - reset counter
+            if self._grounding_failure_count > 0:
+                logger.debug(
+                    f"[IntelligentPipeline] Grounding succeeded, resetting failure count "
+                    f"from {self._grounding_failure_count} to 0"
+                )
+            self._grounding_failure_count = 0
 
         # Record feedback for learning
         learning_reward = 0.0
@@ -625,6 +728,10 @@ class IntelligentAgentPipeline:
             grounding_issues=grounding_issues,
             improvement_suggestions=improvement_suggestions,
             learning_reward=learning_reward,
+            should_finalize=should_finalize,
+            should_retry=should_retry,
+            finalize_reason=finalize_reason,
+            grounding_feedback=grounding_feedback,
         )
 
         # Notify observers (skip if none)

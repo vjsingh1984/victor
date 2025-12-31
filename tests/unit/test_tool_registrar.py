@@ -379,55 +379,79 @@ class TestPluginInitialization:
         assert registrar.plugin_manager is None
 
 
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 class TestMCPIntegration:
-    """Tests for MCP integration."""
+    """Tests for MCP integration.
 
-    @pytest.fixture
-    def registrar(self):
-        """Create registrar with mocks."""
+    Note: These tests create the registrar with enable_mcp=False to avoid
+    calling _setup_mcp_integration() during __init__. This allows us to
+    properly mock MCPRegistry before calling _setup_mcp_integration() manually.
+
+    The filterwarnings decorator suppresses the expected "coroutine was never awaited"
+    warning that occurs when mocking _create_task in synchronous tests.
+    """
+
+    def _create_registrar(self, mcp_command: str = None):
+        """Create registrar with MCP disabled during init for proper mocking."""
         tools = MagicMock()
         tools.list_tools.return_value = []
         tools.register_dict.return_value = None
         settings = MagicMock()
         settings.load_tool_config.return_value = {}
-        settings.mcp_command = None
+        settings.mcp_command = mcp_command
         settings.use_mcp_tools = False
-        return ToolRegistrar(
-            tools=tools, settings=settings, config=ToolRegistrarConfig(enable_mcp=True)
+        # Create with enable_mcp=False to prevent _setup_mcp_integration during __init__
+        registrar = ToolRegistrar(
+            tools=tools, settings=settings, config=ToolRegistrarConfig(enable_mcp=False)
         )
+        # Enable MCP for manual testing
+        registrar.config = ToolRegistrarConfig(enable_mcp=True)
+        return registrar
 
-    @patch("victor.mcp.registry.MCPRegistry")
-    def test_setup_mcp_registry(self, mock_registry_class, registrar):
+    @patch("victor.integrations.mcp.registry.MCPRegistry")
+    def test_setup_mcp_registry(self, mock_registry_class):
         """Test MCP registry setup."""
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        # Return servers to trigger full registry initialization path
+        mock_registry.list_servers.return_value = ["discovered_server"]
         mock_registry_class.discover_servers.return_value = mock_registry
 
+        registrar = self._create_registrar()
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         registrar._setup_mcp_integration()
 
         mock_registry_class.discover_servers.assert_called_once()
         assert registrar.mcp_registry is mock_registry
+        # Verify async startup was attempted
+        registrar._create_task.assert_called_once()
 
-    @patch("victor.mcp.registry.MCPRegistry")
-    def test_setup_mcp_with_command(self, mock_registry_class, registrar):
+    @patch("victor.integrations.mcp.registry.MCPRegistry")
+    def test_setup_mcp_with_command(self, mock_registry_class):
         """Test MCP setup with command from settings."""
-        registrar.settings.mcp_command = "python mcp_server.py"
-
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        # Return servers after registration to trigger async startup path
+        mock_registry.list_servers.return_value = ["settings_mcp"]
         mock_registry_class.discover_servers.return_value = mock_registry
 
+        registrar = self._create_registrar(mcp_command="python mcp_server.py")
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         registrar._setup_mcp_integration()
 
         # Should register server from command
         mock_registry.register_server.assert_called_once()
 
     @patch("victor.tools.mcp_bridge_tool.get_mcp_tool_definitions")
-    @patch("victor.mcp.registry.MCPRegistry")
-    def test_register_mcp_tools(self, mock_registry_class, mock_get_tools, registrar):
+    @patch("victor.integrations.mcp.registry.MCPRegistry")
+    def test_register_mcp_tools(self, mock_registry_class, mock_get_tools):
         """Test registering MCP tool definitions."""
         mock_registry = MagicMock()
-        mock_registry.list_servers.return_value = []
+        mock_registry.list_servers.return_value = ["server1"]  # Has servers
         mock_registry_class.discover_servers.return_value = mock_registry
 
         mock_get_tools.return_value = [
@@ -435,6 +459,11 @@ class TestMCPIntegration:
             {"name": "mcp_tool2"},
         ]
 
+        registrar = self._create_registrar()
+        # Mock _start_mcp_registry to avoid creating a coroutine
+        registrar._start_mcp_registry = MagicMock(return_value=None)
+        # Mock _create_task to avoid async event loop requirement
+        registrar._create_task = MagicMock(return_value=None)
         count = registrar._setup_mcp_integration()
 
         assert count == 2
@@ -689,8 +718,161 @@ class TestShutdown:
         await registrar.shutdown()
 
 
+class TestLazyToolLoading:
+    """Tests for lazy tool loading behavior.
+
+    These tests verify that tools are NOT loaded during ToolRegistrar initialization,
+    but ARE loaded on first access (lazy loading pattern for faster startup).
+    """
+
+    @pytest.fixture
+    def mock_tools(self):
+        """Create mock tool registry."""
+        tools = MagicMock()
+        tools.list_tools.return_value = []
+        tools.get.return_value = None
+        return tools
+
+    @pytest.fixture
+    def mock_settings(self):
+        """Create mock settings."""
+        settings = MagicMock()
+        settings.load_tool_config.return_value = {}
+        return settings
+
+    def test_tools_not_loaded_on_init(self, mock_tools, mock_settings):
+        """Test that tools are NOT loaded during registrar initialization.
+
+        This is the key test for lazy loading - _register_dynamic_tools should
+        NOT be called during __init__.
+        """
+        with patch.object(ToolRegistrar, "_register_dynamic_tools") as mock_register:
+            registrar = ToolRegistrar(
+                tools=mock_tools,
+                settings=mock_settings,
+            )
+
+            # Tools should NOT be loaded on init
+            mock_register.assert_not_called()
+
+            # Flag should indicate tools not yet loaded
+            assert registrar._tools_loaded is False
+
+    def test_tools_loaded_on_first_access_via_get_all_tools(self, mock_tools, mock_settings):
+        """Test that tools ARE loaded when first accessed via get_all_tools()."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Before access, tools not loaded
+        assert registrar._tools_loaded is False
+
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Access tools via get_all_tools
+            registrar.get_all_tools()
+
+            # Now tools should be loaded via CatalogLoader
+            mock_loader.load.assert_called_once()
+            assert registrar._tools_loaded is True
+
+    def test_tools_loaded_on_first_access_via_get_tool(self, mock_tools, mock_settings):
+        """Test that tools ARE loaded when first accessed via get_tool()."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Before access, tools not loaded
+        assert registrar._tools_loaded is False
+
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Access tools via get_tool
+            registrar.get_tool("some_tool")
+
+            # Now tools should be loaded via CatalogLoader
+            mock_loader.load.assert_called_once()
+            assert registrar._tools_loaded is True
+
+    def test_subsequent_accesses_dont_reload_tools(self, mock_tools, mock_settings):
+        """Test that subsequent accesses don't reload tools (only loads once)."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # First access triggers loading
+            registrar.get_all_tools()
+            assert mock_loader.load.call_count == 1
+
+            # Second access should NOT reload
+            registrar.get_all_tools()
+            assert mock_loader.load.call_count == 1
+
+            # Third access via different method also should NOT reload
+            registrar.get_tool("test")
+            assert mock_loader.load.call_count == 1
+
+    def test_ensure_tools_loaded_is_idempotent(self, mock_tools, mock_settings):
+        """Test that _ensure_tools_loaded() is idempotent."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            # Call multiple times
+            registrar._ensure_tools_loaded()
+            registrar._ensure_tools_loaded()
+            registrar._ensure_tools_loaded()
+
+            # Should only register once (via CatalogLoader)
+            assert mock_loader.load.call_count == 1
+
+    def test_tools_loaded_flag_persists_across_accesses(self, mock_tools, mock_settings):
+        """Test that the _tools_loaded flag correctly persists."""
+        registrar = ToolRegistrar(
+            tools=mock_tools,
+            settings=mock_settings,
+        )
+
+        # Initially not loaded
+        assert registrar._tools_loaded is False
+
+        # Mock the CatalogLoader that the facade delegates to
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = MagicMock(tools_loaded=5)
+
+        with patch.object(registrar, "_get_catalog_loader", return_value=mock_loader):
+            registrar._ensure_tools_loaded()
+
+        # After loading, flag should be True
+        assert registrar._tools_loaded is True
+
+        # And remain True
+        registrar.get_all_tools()
+        assert registrar._tools_loaded is True
+
+
 class TestInitializeMethod:
-    """Tests for the main initialize method."""
+    """Tests for the main initialize method using SRP-compliant components."""
 
     @pytest.fixture
     def registrar(self):
@@ -706,39 +888,60 @@ class TestInitializeMethod:
 
     @pytest.mark.asyncio
     async def test_initialize_basic(self, registrar):
-        """Test basic initialization."""
+        """Test basic initialization via CatalogLoader component."""
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
-                    stats = await registrar.initialize()
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
         assert stats.total_tools == 10
+        mock_catalog_loader.load.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_with_plugins(self, registrar):
-        """Test initialization with plugins enabled."""
+        """Test initialization with plugins enabled via PluginLoader component."""
         registrar.config.enable_plugins = True
 
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
+        # Mock the PluginLoader component
+        mock_plugin_loader = MagicMock()
+        mock_plugin_loader.load.return_value = MagicMock(tools_registered=5, plugins_loaded=2)
+        mock_plugin_loader.plugin_manager = MagicMock()
+
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
-                    with patch.object(registrar, "_initialize_plugins", return_value=5):
-                        stats = await registrar.initialize()
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                with patch.object(registrar, "_get_plugin_loader", return_value=mock_plugin_loader):
+                    stats = await registrar.initialize()
 
         assert stats.dynamic_tools == 10
         assert stats.plugin_tools == 5
+        mock_plugin_loader.load.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_with_tool_graph(self, registrar):
-        """Test initialization with tool graph."""
+        """Test initialization with tool graph via GraphBuilder component."""
         registrar.config.enable_tool_graph = True
         registrar.tool_graph = MagicMock()
-        registrar.tool_graph.add_tool.return_value = None
+
+        # Mock the CatalogLoader component
+        mock_catalog_loader = MagicMock()
+        mock_catalog_loader.load.return_value = MagicMock(tools_loaded=10)
+
+        # Mock the GraphBuilder component
+        mock_graph_builder = MagicMock()
+        mock_graph_builder.build.return_value = MagicMock(tools_registered=8)
 
         with patch.object(registrar, "_setup_providers"):
-            with patch.object(registrar, "_register_dynamic_tools", return_value=10):
-                with patch.object(registrar, "_load_tool_configurations"):
+            with patch.object(registrar, "_get_catalog_loader", return_value=mock_catalog_loader):
+                with patch.object(registrar, "_get_graph_builder", return_value=mock_graph_builder):
                     stats = await registrar.initialize()
 
         assert stats.dependency_graph_tools == 8
+        mock_graph_builder.build.assert_called_once()

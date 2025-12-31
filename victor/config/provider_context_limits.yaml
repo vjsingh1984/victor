@@ -86,28 +86,116 @@ providers:
 
 # Model-specific overrides
 # These take precedence over provider defaults
+# Pattern format: fnmatch patterns (supports *, ?)
 models:
+  # OpenAI Models
+  "gpt-4.1*":
+    context_window: 128000  # GPT-4.1 series has 128k context
   "gpt-4-turbo*":
     context_window: 128000
   "gpt-4o*":
     context_window: 128000
+  "gpt-4o-mini*":
+    context_window: 128000
   "gpt-4*":
-    context_window: 8192
+    context_window: 8192  # Original GPT-4 has 8k context
   "gpt-3.5-turbo*":
     context_window: 16385
+  "o1*":
+    context_window: 128000
+  "o3*":
+    context_window: 128000
+
+  # Anthropic Claude Models
+  "claude-opus-4*":
+    context_window: 200000
+  "claude-sonnet-4*":
+    context_window: 200000
+  "claude-3.5*":
+    context_window: 200000
   "claude-3-opus*":
     context_window: 200000
   "claude-3-sonnet*":
     context_window: 200000
   "claude-3-haiku*":
     context_window: 200000
+  "claude-2*":
+    context_window: 100000
+
+  # Google Gemini Models
+  "gemini-2*":
+    context_window: 1000000
   "gemini-1.5-pro*":
     context_window: 1000000
   "gemini-1.5-flash*":
     context_window: 1000000
+  "gemini-1.0*":
+    context_window: 32768
+  "gemini-pro*":
+    context_window: 32768
+
+  # DeepSeek Models
+  "deepseek-v3*":
+    context_window: 128000
+  "deepseek-chat*":
+    context_window: 128000
+  "deepseek-reasoner*":
+    context_window: 64000
+  "deepseek-r1*":
+    context_window: 64000
+  "deepseek-coder*":
+    context_window: 64000
+
+  # Llama Models
+  "llama-3.3*":
+    context_window: 131072
+  "llama-3.2*":
+    context_window: 131072
+  "llama-3.1*":
+    context_window: 131072
+  "llama3.3*":
+    context_window: 131072
+  "llama3.2*":
+    context_window: 131072
+  "llama3.1*":
+    context_window: 131072
   "llama*70b*":
+    context_window: 131072
+  "llama*8b*":
+    context_window: 131072
+
+  # Qwen Models
+  "qwen3*":
+    context_window: 131072
+  "qwen2.5*":
+    context_window: 131072
+  "qwen25*":
     context_window: 131072
   "qwen*32b*":
     context_window: 131072
+  "qwen*72b*":
+    context_window: 131072
+
+  # Mistral Models
+  "mistral-large*":
+    context_window: 128000
+  "mistral-small*":
+    context_window: 32768
   "mixtral*":
     context_window: 32768
+  "mistral*7b*":
+    context_window: 32768
+  "devstral*":
+    context_window: 32768
+  "codestral*":
+    context_window: 32768
+
+  # xAI Grok Models
+  "grok-2*":
+    context_window: 131072
+  "grok-beta*":
+    context_window: 131072
+
+  # Moonshot Kimi Models
+  "kimi-k2*":
+    context_window: 256000

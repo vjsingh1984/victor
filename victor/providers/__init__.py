@@ -21,7 +21,7 @@ from victor.providers.base import (
     StreamChunk,
     ProviderError,
     ProviderNotFoundError,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
@@ -42,7 +42,7 @@ __all__ = [
     # Error classes
     "ProviderError",
     "ProviderNotFoundError",
-    "ProviderAuthenticationError",
+    "ProviderAuthError",
     "ProviderRateLimitError",
     "ProviderTimeoutError",
     # Circuit breaker

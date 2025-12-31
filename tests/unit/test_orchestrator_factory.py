@@ -459,7 +459,7 @@ class TestCreateToolCache:
 
         with patch("victor.config.settings.get_project_paths") as mock_paths:
             mock_paths.return_value.global_cache_dir = "/tmp/cache"
-            with patch("victor.cache.tool_cache.ToolCache") as mock_cache_cls:
+            with patch("victor.storage.cache.tool_cache.ToolCache") as mock_cache_cls:
                 mock_cache = MagicMock()
                 mock_cache_cls.return_value = mock_cache
                 cache = factory.create_tool_cache()

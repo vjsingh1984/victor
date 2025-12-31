@@ -130,8 +130,6 @@ class TracingProvider:
         with obs.span("my_operation") as span:
             span.set_attribute("key", "value")
             # ... do work ...
-
-    Note: Previously named `ObservabilityManager`. Alias kept for backward compatibility.
     """
 
     def __init__(self) -> None:
@@ -274,10 +272,6 @@ class TracingProvider:
         self._current_trace_id = None
         self._current_span = None
         self._span_stack.clear()
-
-
-# Backward compatibility alias
-ObservabilityManager = TracingProvider
 
 
 # Global instance for convenience with thread safety

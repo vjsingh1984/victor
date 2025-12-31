@@ -234,6 +234,59 @@ from victor.core.agent_commands import (
     create_agent_command_bus,
 )
 
+from victor.core.mode_config import (
+    ModeLevel,
+    ModeDefinition,
+    VerticalModeConfig,
+    DEFAULT_MODES,
+    DEFAULT_TASK_BUDGETS,
+    ModeConfigRegistry,
+    RegistryBasedModeConfigProvider,
+    get_mode_config,
+    get_tool_budget,
+    register_vertical_modes,
+)
+
+from victor.core.tool_dependency_base import (
+    BaseToolDependencyProvider,
+    ToolDependencyConfig,
+)
+
+from victor.core.tool_types import (
+    ToolDependency,
+    ToolDependencyProviderProtocol,
+)
+
+from victor.core.vertical_types import (
+    StageDefinition,
+    TaskTypeHint,
+    StandardTaskHints,
+    StandardGroundingRules,
+    MiddlewarePriority as VerticalMiddlewarePriority,
+    MiddlewareResult as VerticalMiddlewareResult,
+    TieredToolConfig,
+    TieredToolTemplate,
+    VerticalConfigBase,
+)
+
+from victor.core.database import (
+    DatabaseManager,
+    ProjectDatabaseManager,
+    get_database,
+    get_project_database,
+    reset_database,
+    reset_project_database,
+    reset_all_databases,
+)
+
+from victor.core.schema import (
+    Tables,
+    LearnerID,
+    Schema,
+    CURRENT_SCHEMA_VERSION,
+    get_migration_sql,
+)
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -413,4 +466,45 @@ __all__ = [
     "SessionProjection",
     "AgentCommandBus",
     "create_agent_command_bus",
+    # Mode Configuration
+    "ModeLevel",
+    "ModeDefinition",
+    "VerticalModeConfig",
+    "DEFAULT_MODES",
+    "DEFAULT_TASK_BUDGETS",
+    "ModeConfigRegistry",
+    "RegistryBasedModeConfigProvider",
+    "get_mode_config",
+    "get_tool_budget",
+    "register_vertical_modes",
+    # Tool Dependency Base
+    "BaseToolDependencyProvider",
+    "ToolDependencyConfig",
+    # Tool Types
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
+    # Vertical Types (cross-vertical abstractions)
+    "StageDefinition",
+    "TaskTypeHint",
+    "StandardTaskHints",
+    "StandardGroundingRules",
+    "VerticalMiddlewarePriority",
+    "VerticalMiddlewareResult",
+    "TieredToolConfig",
+    "TieredToolTemplate",
+    "VerticalConfigBase",
+    # Database (DatabaseManager now includes async methods directly)
+    "DatabaseManager",
+    "ProjectDatabaseManager",
+    "get_database",
+    "get_project_database",
+    "reset_database",
+    "reset_project_database",
+    "reset_all_databases",
+    # Schema
+    "Tables",
+    "LearnerID",
+    "Schema",
+    "CURRENT_SCHEMA_VERSION",
+    "get_migration_sql",
 ]

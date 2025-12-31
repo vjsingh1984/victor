@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.serialization import (
+from victor.processing.serialization import (
     AdaptiveSerializer,
     SerializationContext,
     SerializationFormat,
@@ -26,7 +26,7 @@ from victor.serialization import (
     serialize,
     reset_adaptive_serializer,
 )
-from victor.serialization.formats import (
+from victor.processing.serialization.formats import (
     JSONEncoder,
     MinifiedJSONEncoder,
     TOONEncoder,
@@ -36,8 +36,8 @@ from victor.serialization.formats import (
     get_format_registry,
     reset_format_registry,
 )
-from victor.serialization.formats import _register_builtin_encoders
-from victor.serialization.capabilities import (
+from victor.processing.serialization.formats import _register_builtin_encoders
+from victor.processing.serialization.capabilities import (
     get_capability_registry,
     reset_capability_registry,
 )
@@ -499,7 +499,7 @@ class TestToolAwareSerialization:
 
     def test_tool_config_registry(self):
         """Test ToolSerializationRegistry."""
-        from victor.serialization.tool_config import (
+        from victor.processing.serialization.tool_config import (
             ToolSerializationRegistry,
             reset_tool_serialization_registry,
         )
@@ -514,7 +514,7 @@ class TestToolAwareSerialization:
 
     def test_tool_output_type(self):
         """Test ToolOutputType enum."""
-        from victor.serialization.tool_config import ToolOutputType
+        from victor.processing.serialization.tool_config import ToolOutputType
 
         assert ToolOutputType.TABULAR.value == "tabular"
         assert ToolOutputType.TEXT.value == "text"
@@ -527,7 +527,7 @@ class TestSerializationSettings:
 
     def test_config_from_settings(self):
         """Test config_from_settings function."""
-        from victor.serialization import config_from_settings
+        from victor.processing.serialization import config_from_settings
 
         config = config_from_settings()
 
@@ -539,7 +539,7 @@ class TestSerializationSettings:
 
     def test_is_serialization_enabled(self):
         """Test is_serialization_enabled function."""
-        from victor.serialization import is_serialization_enabled
+        from victor.processing.serialization import is_serialization_enabled
 
         # Should return True by default
         result = is_serialization_enabled()
@@ -551,7 +551,7 @@ class TestMetricsCollector:
 
     def test_record_and_get_stats(self, tmp_path):
         """Test recording metrics and retrieving stats."""
-        from victor.serialization.metrics import (
+        from victor.processing.serialization.metrics import (
             SerializationMetricsCollector,
             SerializationMetricRecord,
         )
@@ -593,7 +593,7 @@ class TestMetricsCollector:
 
     def test_format_stats(self, tmp_path):
         """Test format statistics aggregation."""
-        from victor.serialization.metrics import (
+        from victor.processing.serialization.metrics import (
             SerializationMetricsCollector,
             SerializationMetricRecord,
         )
@@ -632,7 +632,7 @@ class TestMetricsCollector:
 
     def test_clear_metrics(self, tmp_path):
         """Test clearing metrics."""
-        from victor.serialization.metrics import (
+        from victor.processing.serialization.metrics import (
             SerializationMetricsCollector,
             SerializationMetricRecord,
         )

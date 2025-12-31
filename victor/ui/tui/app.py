@@ -397,8 +397,8 @@ class VictorTUI(App):
                 settings=self.settings,
                 agent=self.agent,
             )
-            # Override /exit handler to use TUI exit
-            self._slash_handler._tui_exit_callback = self.exit
+            # Override /exit handler to use TUI exit via public API
+            self._slash_handler.set_exit_callback(self.exit)
 
         # Show welcome message
         self._conversation_log.add_system_message(f"Connected to {self.provider}/{self.model}")

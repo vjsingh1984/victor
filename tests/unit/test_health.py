@@ -16,7 +16,7 @@
 
 import asyncio
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, AsyncMock
 
 from victor.core.health import (
@@ -71,7 +71,7 @@ class TestComponentHealth:
 
     def test_with_all_fields(self):
         """Test with all fields populated."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         health = ComponentHealth(
             name="test",
             status=HealthStatus.DEGRADED,
@@ -89,7 +89,7 @@ class TestComponentHealth:
 
     def test_to_dict(self):
         """Test conversion to dictionary."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         health = ComponentHealth(
             name="test",
             status=HealthStatus.HEALTHY,
@@ -119,7 +119,7 @@ class TestHealthReport:
 
     def test_basic_creation(self):
         """Test creating health report."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         report = HealthReport(
             status=HealthStatus.HEALTHY,
             components={},
@@ -135,14 +135,14 @@ class TestHealthReport:
         report = HealthReport(
             status=HealthStatus.HEALTHY,
             components={},
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
         assert report.is_healthy is True
 
         report = HealthReport(
             status=HealthStatus.DEGRADED,
             components={},
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
         assert report.is_healthy is False
 
@@ -151,7 +151,7 @@ class TestHealthReport:
         report = HealthReport(
             status=HealthStatus.DEGRADED,
             components={},
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
         assert report.is_degraded is True
 
@@ -167,7 +167,7 @@ class TestHealthReport:
         report = HealthReport(
             status=HealthStatus.UNHEALTHY,
             components=components,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
         unhealthy = report.unhealthy_components
@@ -183,7 +183,7 @@ class TestHealthReport:
         report = HealthReport(
             status=HealthStatus.HEALTHY,
             components=components,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             version="2.0.0",
             uptime_seconds=3600.0,
         )

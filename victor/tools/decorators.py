@@ -130,8 +130,11 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
 def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     """Convert Python type annotation to JSON Schema type.
 
+    Handles both runtime types (e.g., bool) and string annotations
+    from `from __future__ import annotations` (PEP 563).
+
     Args:
-        annotation: Python type annotation
+        annotation: Python type annotation (type or string)
 
     Returns:
         JSON Schema type definition
@@ -139,7 +142,47 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     if annotation == inspect.Parameter.empty:
         return {"type": "string"}
 
-    # Handle Optional[X] -> X with nullable
+    # Handle string annotations from `from __future__ import annotations` (PEP 563)
+    # These are stored as strings like "bool", "int", "Optional[str]", etc.
+    if isinstance(annotation, str):
+        annotation_str = annotation.strip()
+
+        # Handle Optional[X] as string
+        if annotation_str.startswith("Optional[") and annotation_str.endswith("]"):
+            inner = annotation_str[9:-1]  # Extract inner type
+            return _get_json_schema_type(inner)
+
+        # Handle List[X] as string
+        if annotation_str.startswith("List[") and annotation_str.endswith("]"):
+            inner = annotation_str[5:-1]
+            return {"type": "array", "items": _get_json_schema_type(inner)}
+
+        # Handle Dict as string
+        if annotation_str.startswith("Dict[") or annotation_str == "dict":
+            return {"type": "object"}
+
+        # Handle Literal types as enums
+        if annotation_str.startswith("Literal[") and annotation_str.endswith("]"):
+            # Extract literal values: Literal["a", "b"] -> ["a", "b"]
+            inner = annotation_str[8:-1]
+            # Simple parsing for string literals
+            values = [v.strip().strip("'\"") for v in inner.split(",")]
+            return {"type": "string", "enum": values}
+
+        # Basic types as strings
+        if annotation_str == "bool":
+            return {"type": "boolean"}
+        if annotation_str == "int":
+            return {"type": "integer"}
+        if annotation_str == "float":
+            return {"type": "number"}
+        if annotation_str == "str":
+            return {"type": "string"}
+
+        # Default to string for unknown string annotations
+        return {"type": "string"}
+
+    # Handle Optional[X] -> X with nullable (runtime types)
     origin = get_origin(annotation)
     args = get_args(annotation)
 
@@ -163,7 +206,7 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     if origin is dict or annotation is dict:
         return {"type": "object"}
 
-    # Basic types
+    # Basic types (runtime)
     if annotation in (int,):
         return {"type": "integer"}
     if annotation in (float,):
@@ -444,6 +487,7 @@ def _create_tool_class(
         "type": "object",
         "properties": properties,
         "required": required,
+        "additionalProperties": False,  # Reject unknown/hallucinated arguments
     }
 
     # Capture closures

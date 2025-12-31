@@ -57,6 +57,64 @@ from victor.tools.registry import (
     ToolRegistry,
 )
 
+# Re-export tool graph classes
+from victor.tools.tool_graph import (
+    ToolNode,
+    ToolTransition,
+    ToolExecutionGraph,
+    ToolGraphRegistry,
+)
+
+# Re-export typed context
+from victor.tools.context import (
+    DEFAULT_PERMISSIONS,
+    FULL_PERMISSIONS,
+    Permission,
+    SAFE_PERMISSIONS,
+    STANDARD_PERMISSIONS,
+    ToolExecutionContext,
+    create_context,
+    create_full_access_context,
+    create_readonly_context,
+)
+
+# Re-export selection protocol and registry
+from victor.tools.selection import (
+    BaseToolSelectionStrategy,
+    PerformanceProfile,
+    ToolSelectionContext,
+    ToolSelectionStrategy,
+    ToolSelectionStrategyRegistry,
+    ToolSelectorFeatures,
+    get_best_strategy,
+    get_strategy,
+    get_strategy_registry,
+    list_strategies,
+    register_strategy,
+)
+
+# Re-export LCEL-style composition (Promotion 4.3)
+from victor.tools.composition import (
+    Runnable,
+    RunnableConfig,
+    RunnableSequence,
+    RunnableParallel,
+    RunnableBranch,
+    RunnableLambda,
+    RunnablePassthrough,
+    RunnableBinding,
+    ToolRunnable,
+    FunctionToolRunnable,
+    as_runnable,
+    chain,
+    parallel,
+    branch,
+    extract_output,
+    extract_if_success,
+    map_keys,
+    select_keys,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base classes
@@ -79,4 +137,50 @@ __all__ = [
     "ToolRegistry",
     "Hook",
     "HookError",
+    # Tool Graph
+    "ToolNode",
+    "ToolTransition",
+    "ToolExecutionGraph",
+    "ToolGraphRegistry",
+    # Typed Context (Promotion 5)
+    "ToolExecutionContext",
+    "Permission",
+    "DEFAULT_PERMISSIONS",
+    "SAFE_PERMISSIONS",
+    "STANDARD_PERMISSIONS",
+    "FULL_PERMISSIONS",
+    "create_context",
+    "create_readonly_context",
+    "create_full_access_context",
+    # Selection Protocol (Promotion 4)
+    "ToolSelectionStrategy",
+    "BaseToolSelectionStrategy",
+    "PerformanceProfile",
+    "ToolSelectionContext",
+    "ToolSelectorFeatures",
+    "ToolSelectionStrategyRegistry",
+    "get_strategy_registry",
+    "register_strategy",
+    "get_strategy",
+    "get_best_strategy",
+    "list_strategies",
+    # LCEL-style Composition (Promotion 4.3)
+    "Runnable",
+    "RunnableConfig",
+    "RunnableSequence",
+    "RunnableParallel",
+    "RunnableBranch",
+    "RunnableLambda",
+    "RunnablePassthrough",
+    "RunnableBinding",
+    "ToolRunnable",
+    "FunctionToolRunnable",
+    "as_runnable",
+    "chain",
+    "parallel",
+    "branch",
+    "extract_output",
+    "extract_if_success",
+    "map_keys",
+    "select_keys",
 ]

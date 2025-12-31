@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions
 # limitations under the License.
 
-"""Recovery coordinator for streaming chat sessions.
+"""Streaming recovery coordinator for streaming chat sessions.
 
 This module consolidates all recovery and error handling logic previously
 scattered across AgentOrchestrator._handle_stream_chunk and related methods.
 
 Extracted from CRITICAL-001 Phase 2A: Extract RecoveryCoordinator
+
+NOTE: This is StreamingRecoveryCoordinator, distinct from:
+- victor.agent.recovery.coordinator.RecoveryCoordinator (SOLID recovery system)
+The name was changed to avoid confusion between the two different classes.
 """
 
 import logging
@@ -42,11 +46,14 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class RecoveryContext:
-    """Context for recovery decisions.
+class StreamingRecoveryContext:
+    """Context for streaming recovery decisions.
 
-    This dataclass encapsulates all state needed for recovery coordination,
-    eliminating the need for RecoveryCoordinator to hold mutable state.
+    This dataclass encapsulates all state needed for streaming recovery coordination,
+    eliminating the need for StreamingRecoveryCoordinator to hold mutable state.
+
+    NOTE: This is distinct from victor.agent.recovery.protocols.StreamingRecoveryContext
+    which is used by the SOLID recovery system for failure detection/strategy.
 
     Attributes:
         iteration: Current iteration number
@@ -81,7 +88,7 @@ class RecoveryContext:
     is_action_task: bool
 
 
-class RecoveryCoordinator:
+class StreamingRecoveryCoordinator:
     """Coordinates recovery actions during streaming chat sessions.
 
     Responsibilities:
@@ -94,8 +101,11 @@ class RecoveryCoordinator:
     This component centralizes all recovery logic previously scattered across
     AgentOrchestrator, providing a clean interface for recovery coordination.
 
+    NOTE: This is distinct from victor.agent.recovery.coordinator.RecoveryCoordinator
+    which handles failure detection and strategy selection for the SOLID recovery system.
+
     Architecture:
-    - RecoveryCoordinator: High-level coordination and integration logic
+    - StreamingRecoveryCoordinator: High-level streaming session coordination
     - StreamingChatHandler: Low-level stream manipulation and chunk generation
     - RecoveryHandler: Recovery strategy selection and decision-making
     - OrchestratorRecoveryIntegration: Integration between orchestrator and handler
@@ -116,7 +126,7 @@ class RecoveryCoordinator:
         settings: "Settings",
         event_bus: Optional[EventBus] = None,
     ):
-        """Initialize RecoveryCoordinator.
+        """Initialize StreamingRecoveryCoordinator.
 
         Args:
             recovery_handler: Recovery strategy handler (optional)
@@ -141,7 +151,7 @@ class RecoveryCoordinator:
 
     def check_time_limit(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Optional[StreamChunk]:
         """Check if session has exceeded time limit.
 
@@ -181,7 +191,7 @@ class RecoveryCoordinator:
 
     def check_iteration_limit(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Optional[StreamChunk]:
         """Check if session has exceeded iteration limit.
 
@@ -211,7 +221,7 @@ class RecoveryCoordinator:
 
     def check_natural_completion(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         has_tool_calls: bool,
         content_length: int,
     ) -> Optional[StreamChunk]:
@@ -234,7 +244,7 @@ class RecoveryCoordinator:
 
     def check_tool_budget(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         warning_threshold: int = 250,
     ) -> Optional[StreamChunk]:
         """Check tool budget and generate warning if approaching limit.
@@ -259,7 +269,7 @@ class RecoveryCoordinator:
             )
         return None
 
-    def is_budget_exhausted(self, ctx: RecoveryContext) -> bool:
+    def is_budget_exhausted(self, ctx: StreamingRecoveryContext) -> bool:
         """Check if tool budget has been exhausted.
 
         Args:
@@ -272,7 +282,7 @@ class RecoveryCoordinator:
 
     def check_progress(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> bool:
         """Check if session is making progress (not looping).
 
@@ -289,7 +299,7 @@ class RecoveryCoordinator:
 
     def check_blocked_threshold(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         all_blocked: bool,
     ) -> Optional[Tuple[StreamChunk, bool]]:
         """Check if too many tools have been blocked.
@@ -320,7 +330,7 @@ class RecoveryCoordinator:
 
     def check_force_action(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Tuple[bool, Optional[str]]:
         """Check if recovery handler recommends force action.
 
@@ -344,7 +354,7 @@ class RecoveryCoordinator:
 
     def handle_empty_response(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Tuple[Optional[StreamChunk], bool]:
         """Handle empty model response.
 
@@ -373,7 +383,7 @@ class RecoveryCoordinator:
 
     def handle_blocked_tool(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         tool_name: str,
         tool_args: Dict[str, Any],
         block_reason: str,
@@ -405,7 +415,7 @@ class RecoveryCoordinator:
 
     def handle_force_tool_execution(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Tuple[bool, Optional[List[StreamChunk]]]:
         """Handle forced tool execution.
 
@@ -421,7 +431,7 @@ class RecoveryCoordinator:
 
     def handle_force_completion(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Optional[List[StreamChunk]]:
         """Handle forced completion.
 
@@ -459,7 +469,7 @@ class RecoveryCoordinator:
 
     def handle_loop_warning(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Optional[List[StreamChunk]]:
         """Handle loop detection warning.
 
@@ -485,7 +495,7 @@ class RecoveryCoordinator:
 
     async def handle_recovery_with_integration(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         full_content: str,
         tool_calls: Optional[List[Dict[str, Any]]],
         mentioned_tools: Optional[List[str]] = None,
@@ -554,7 +564,7 @@ class RecoveryCoordinator:
     def apply_recovery_action(
         self,
         recovery_action: "OrchestratorRecoveryAction",
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         message_adder: Any = None,
     ) -> Optional[StreamChunk]:
         """Apply a recovery action from the recovery integration.
@@ -642,7 +652,7 @@ class RecoveryCoordinator:
 
     def filter_blocked_tool_calls(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         tool_calls: List[Dict[str, Any]],
     ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
         """Filter out blocked tool calls.
@@ -664,7 +674,7 @@ class RecoveryCoordinator:
 
     def truncate_tool_calls(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
         tool_calls: List[Dict[str, Any]],
         max_calls: int,
     ) -> Tuple[List[Dict[str, Any]], bool]:
@@ -690,7 +700,7 @@ class RecoveryCoordinator:
 
     def get_recovery_prompts(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> List[str]:
         """Get recovery prompts for current context.
 
@@ -710,7 +720,7 @@ class RecoveryCoordinator:
 
     def get_recovery_fallback_message(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> str:
         """Get fallback message when recovery fails.
 
@@ -727,7 +737,7 @@ class RecoveryCoordinator:
 
     def should_use_tools_for_recovery(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> bool:
         """Determine if tools should be used during recovery.
 
@@ -753,7 +763,7 @@ class RecoveryCoordinator:
 
     def format_completion_metrics(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Dict[str, Any]:
         """Format completion metrics for display.
 
@@ -772,7 +782,7 @@ class RecoveryCoordinator:
 
     def format_budget_exhausted_metrics(
         self,
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> Dict[str, Any]:
         """Format budget exhausted metrics.
 
@@ -792,7 +802,7 @@ class RecoveryCoordinator:
     def generate_tool_result_chunks(
         self,
         results: List[Any],  # List[ToolCallResult]
-        ctx: RecoveryContext,
+        ctx: StreamingRecoveryContext,
     ) -> List[StreamChunk]:
         """Generate stream chunks from tool results.
 

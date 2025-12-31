@@ -67,8 +67,6 @@ logs/
 # Distribution
 *.tar.gz
 *.whl
-archive/victor-legacy/
-
 # Documentation builds
 docs/_build/
 site/
@@ -88,6 +86,10 @@ dmypy.json
 # Database
 *.db
 *.sqlite3
+
+# SQLite journal files
+*.db-wal
+*.db-shm
 
 # Temporary files
 tmp/
@@ -178,9 +180,9 @@ vscode-victor/*.vsix
 vscode-victor/webview-ui/node_modules/
 
 # Audit logs (contain sensitive metadata - never commit)
-audit/
+# Use /audit/ to only match root-level audit dir, not victor/security/audit/ source code
+/audit/
 docs/security/audit/
-# Note: victor/audit/ is source code, not logs - it should be tracked
 *.jsonl
 
 # HumanEval benchmark test outputs (orphaned in root)
@@ -205,3 +207,5 @@ MagicMock/
 
 # Development progress reports archive
 docs/archive/progress/
+docs/COMPETITIVE_ANALYSIS.md
+docs/PROMOTION_SPECIFICATION.md

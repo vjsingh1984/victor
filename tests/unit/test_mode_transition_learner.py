@@ -26,13 +26,19 @@ from unittest.mock import patch
 from victor.agent.rl.base import RLOutcome
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.mode_transition import ModeTransitionLearner, AgentMode
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -82,7 +88,7 @@ def _get_q_value_from_db(
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        "SELECT q_value, visit_count FROM mode_transition_q_values WHERE state_key = ? AND action_key = ?",
+        f"SELECT q_value, visit_count FROM {Tables.RL_MODE_Q} WHERE state_key = ? AND action_key = ?",
         (state_key, action_key),
     )
     row = cursor.fetchone()
@@ -101,15 +107,15 @@ class TestModeTransitionLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='mode_transition_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_Q}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='mode_transition_task_stats';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_TASK}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='mode_transition_history';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_MODE_HISTORY}';"
         )
         assert cursor.fetchone() is not None
 
@@ -186,13 +192,17 @@ class TestModeTransitionLearner:
         state_key = "explore:search:low:low:fair:fair"
         action_key = "plan:0"
 
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("mode_transition")  # type: ignore
 
         _record_transition_outcome(learner1, state_key=state_key, action_key=action_key)
-        coordinator1.db.close()
+        reset_database()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("mode_transition")  # type: ignore
 
         q_value, count = _get_q_value_from_db(coordinator2, state_key, action_key)
@@ -202,6 +212,8 @@ class TestModeTransitionLearner:
         # Check state was loaded correctly
         assert state_key in learner2._q_values
         assert action_key in learner2._q_values[state_key]
+
+        reset_database()
 
     def test_get_recommendation_exploitation(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation returns best action in exploitation mode."""
@@ -358,7 +370,7 @@ class TestModeTransitionLearner:
         )
 
         cursor = coordinator.db.cursor()
-        cursor.execute("SELECT * FROM mode_transition_history")
+        cursor.execute(f"SELECT * FROM {Tables.RL_MODE_HISTORY}")
         rows = cursor.fetchall()
 
         assert len(rows) == 1

@@ -25,13 +25,19 @@ from typing import Dict, Tuple
 from victor.agent.rl.base import RLOutcome
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.grounding_threshold import GroundingThresholdLearner
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -71,7 +77,7 @@ def _get_beta_params_from_db(
     """Helper to retrieve Beta parameters from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(
-        "SELECT alpha, beta, sample_count FROM grounding_threshold_params "
+        f"SELECT alpha, beta, sample_count FROM {Tables.RL_GROUNDING_PARAM} "
         "WHERE context_key = ? AND threshold = ?",
         (context_key, threshold),
     )
@@ -89,15 +95,15 @@ class TestGroundingThresholdLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='grounding_threshold_params';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_PARAM}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='grounding_threshold_stats';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_STAT}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='grounding_threshold_history';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_GROUNDING_HISTORY}';"
         )
         assert cursor.fetchone() is not None
 
@@ -195,7 +201,10 @@ class TestGroundingThresholdLearner:
         response_type = "explanation"
         threshold = 0.70
 
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("grounding_threshold")  # type: ignore
 
         _record_grounding_outcome(
@@ -204,9 +213,10 @@ class TestGroundingThresholdLearner:
             response_type=response_type,
             threshold_used=threshold,
         )
-        coordinator1.db.close()
+        reset_database()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("grounding_threshold")  # type: ignore
 
         context_key = f"{provider}:{response_type}"

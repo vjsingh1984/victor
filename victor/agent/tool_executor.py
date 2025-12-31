@@ -34,7 +34,7 @@ from victor.agent.debug_logger import TRACE
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
-from victor.cache.tool_cache import ToolCache
+from victor.storage.cache.tool_cache import ToolCache
 from victor.core.errors import (
     ErrorCategory,
     ErrorHandler,
@@ -58,6 +58,24 @@ from victor.tools.base import (
     ToolResult,
     ValidationResult,
 )
+
+# RL hook integration (lazy import to avoid circular dependencies)
+_rl_hooks = None
+
+
+def _get_rl_hooks():
+    """Get RL hooks registry (lazy initialization)."""
+    global _rl_hooks
+    if _rl_hooks is None:
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks
+
+            _rl_hooks = get_rl_hooks()
+        except ImportError:
+            _rl_hooks = None
+    return _rl_hooks
+
+
 from victor.tools.metadata_registry import (
     get_idempotent_tools as registry_get_idempotent_tools,
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
@@ -83,7 +101,7 @@ class ValidationMode(Enum):
 
 if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
-    from victor.auth.rbac import RBACManager
+    from victor.security.auth.rbac import RBACManager
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +332,7 @@ class ToolExecutor:
             return True, None
         else:
             # Build informative denial message
-            from victor.auth.rbac import Permission
+            from victor.security.auth.rbac import Permission
 
             required_permission = Permission.from_access_mode(access_mode)
             return (
@@ -322,6 +340,41 @@ class ToolExecutor:
                 f"RBAC denied: User '{self.current_user}' lacks '{required_permission.value}' "
                 f"permission for tool '{tool_name}' (category: {category})",
             )
+
+    def _check_unknown_arguments(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+    ) -> Tuple[bool, List[str]]:
+        """Check for unknown/hallucinated arguments before execution.
+
+        This provides clear, actionable error messages when models invent
+        arguments that don't exist in the tool schema.
+
+        Args:
+            tool: The tool to check arguments for
+            arguments: Arguments to check
+
+        Returns:
+            Tuple of (valid, unknown_args)
+            - valid: True if no unknown arguments found
+            - unknown_args: List of argument names that don't exist in schema
+        """
+        schema = tool.parameters
+        if not schema:
+            return True, []
+
+        # Get valid parameter names from schema
+        properties = schema.get("properties", {})
+        valid_params = set(properties.keys())
+
+        # Find unknown arguments
+        provided_params = set(arguments.keys())
+        unknown = provided_params - valid_params
+
+        if unknown:
+            return False, list(unknown)
+        return True, []
 
     def _validate_arguments(
         self,
@@ -346,6 +399,23 @@ class ToolExecutor:
         """
         if self.validation_mode == ValidationMode.OFF:
             return True, None
+
+        # First check for unknown/hallucinated arguments (provides clearer errors)
+        valid, unknown_args = self._check_unknown_arguments(tool, arguments)
+        if not valid:
+            # Get valid parameters for helpful error message
+            schema = tool.parameters
+            valid_params = list(schema.get("properties", {}).keys()) if schema else []
+            error_msg = (
+                f"Unknown argument(s): {', '.join(sorted(unknown_args))}. "
+                f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
+            )
+            self._validation_failures += 1
+            logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
+            if self.validation_mode == ValidationMode.STRICT:
+                return False, ValidationResult.failure([error_msg])
+            else:
+                logger.warning("Proceeding with unknown arguments (lenient mode)")
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
@@ -555,6 +625,9 @@ class ToolExecutor:
             sig = (tool_name, str(sorted(normalized_args.items())))
             self._failed_signatures.add(sig)
 
+        # Emit RL event for tool execution (for learner activation)
+        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
+
         return ToolExecutionResult(
             tool_name=tool_name,
             success=success,
@@ -614,6 +687,71 @@ class ToolExecutor:
                     raise HookError(hook_name, e, tool_name) from e
                 else:
                     logger.warning("After hook '%s' failed (non-critical): %s", hook_name, str(e))
+
+    def _emit_rl_tool_event(
+        self,
+        tool_name: str,
+        success: bool,
+        execution_time: float,
+        context: Dict[str, Any],
+    ) -> None:
+        """Emit RL event for tool execution to activate tool_selector learner.
+
+        This is called after every tool execution to provide feedback to the
+        RL system for learning optimal tool selection.
+
+        Args:
+            tool_name: Name of the tool that was executed
+            success: Whether the tool execution succeeded
+            execution_time: Time taken to execute the tool (seconds)
+            context: Execution context with provider, model, task info
+        """
+        try:
+            rl_hooks = _get_rl_hooks()
+            if rl_hooks is None:
+                return
+
+            from victor.agent.rl.hooks import RLEvent, RLEventType
+
+            # Calculate quality score based on success and execution time
+            # Fast successful executions get higher scores
+            base_quality = 0.9 if success else 0.3
+            time_penalty = min(execution_time / 30.0, 0.3)  # Penalize slow executions
+            quality_score = base_quality - time_penalty
+
+            # Extract provider name - handle both string and Provider object
+            provider = context.get("provider")
+            if provider is not None and not isinstance(provider, str):
+                # Provider is an object - get its name attribute or class name
+                provider = (
+                    getattr(provider, "name", None)
+                    or provider.__class__.__name__.replace("Provider", "").lower()
+                )
+
+            # Extract model name - handle both string and object
+            model = context.get("model")
+            if model is not None and not isinstance(model, str):
+                model = str(model)
+
+            event = RLEvent(
+                type=RLEventType.TOOL_EXECUTED,
+                tool_name=tool_name,
+                success=success,
+                quality_score=quality_score,
+                provider=provider,
+                model=model,
+                task_type=context.get("task_type", "general"),
+                vertical=context.get("vertical", "coding"),
+                metadata={
+                    "execution_time": execution_time,
+                },
+            )
+
+            rl_hooks.emit(event)
+
+        except Exception as e:
+            # RL hook failure should never block tool execution
+            logger.debug("RL tool event emission failed: %s", str(e))
 
     async def _execute_with_retry(
         self,

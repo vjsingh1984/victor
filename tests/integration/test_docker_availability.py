@@ -23,7 +23,7 @@ import pytest
 from unittest.mock import patch
 from docker.errors import DockerException
 
-from victor.tools.code_executor_tool import CodeExecutionManager
+from victor.tools.code_executor_tool import CodeSandbox
 
 
 class TestDockerAvailability:
@@ -33,7 +33,7 @@ class TestDockerAvailability:
         """Test that Docker availability is correctly detected when Docker is running."""
         # This test will pass if Docker is running, skip if not
         try:
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Skip test if Docker is not available (instead of failing)
             if not manager.docker_available:
@@ -56,7 +56,7 @@ class TestDockerAvailability:
         """Test graceful handling when Docker is not available."""
         # Mock docker.from_env() to raise DockerException
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Should handle unavailability gracefully
             assert manager.docker_available is False, "Docker should be detected as unavailable"
@@ -71,14 +71,14 @@ class TestDockerAvailability:
         # Mock docker.from_env() to raise DockerException
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
             with pytest.raises(RuntimeError, match="Docker is not running or not installed"):
-                CodeExecutionManager(require_docker=True)
+                CodeSandbox(require_docker=True)
 
             print("\n✅ require_docker=True correctly raises error when Docker unavailable")
 
     def test_start_with_docker_available(self):
         """Test starting execution manager with Docker available."""
         try:
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             if manager.docker_available:
                 # Should be able to start
@@ -102,7 +102,7 @@ class TestDockerAvailability:
     def test_start_with_docker_unavailable(self):
         """Test starting execution manager with Docker unavailable."""
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Should not raise error when starting without Docker
             manager.start()  # Should return early
@@ -113,7 +113,7 @@ class TestDockerAvailability:
     def test_execute_with_docker_unavailable(self):
         """Test code execution when Docker is unavailable."""
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             result = manager.execute("print('Hello')")
 
@@ -128,7 +128,7 @@ class TestDockerAvailability:
     def test_execute_with_docker_available(self):
         """Test code execution when Docker is available and container is running."""
         try:
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             if not manager.docker_available:
                 pytest.skip("Docker not available")
@@ -155,7 +155,7 @@ class TestDockerAvailability:
     def test_stop_with_docker_unavailable(self):
         """Test stopping manager when Docker is unavailable."""
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Should not raise error
             manager.stop()  # Should return early
@@ -165,7 +165,7 @@ class TestDockerAvailability:
     def test_put_files_with_docker_unavailable(self):
         """Test put_files when Docker is unavailable."""
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Should not raise error
             manager.put_files(["/tmp/test.txt"])  # Should return early
@@ -175,7 +175,7 @@ class TestDockerAvailability:
     def test_get_file_with_docker_unavailable(self):
         """Test get_file when Docker is unavailable."""
         with patch("docker.from_env", side_effect=DockerException("Docker not available")):
-            manager = CodeExecutionManager(require_docker=False)
+            manager = CodeSandbox(require_docker=False)
 
             # Should return empty bytes instead of crashing
             result = manager.get_file("/tmp/test.txt")
@@ -191,7 +191,7 @@ class TestDockerIntegration:
     def test_full_docker_workflow(self):
         """Test complete Docker workflow: start, execute, stop."""
         try:
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             if not manager.docker_available:
                 pytest.skip("Docker not available for integration test")
@@ -257,7 +257,7 @@ print(f"2 + 2 = {result}")
     def test_docker_isolation(self):
         """Test that code runs in isolated Docker environment."""
         try:
-            manager = CodeExecutionManager()
+            manager = CodeSandbox()
 
             if not manager.docker_available:
                 pytest.skip("Docker not available")

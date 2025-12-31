@@ -59,7 +59,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
@@ -207,7 +207,7 @@ class BaseHealthCheck(ABC):
                 timeout=self._timeout,
             )
             health.latency_ms = (time.perf_counter() - start) * 1000
-            health.last_check = datetime.utcnow()
+            health.last_check = datetime.now(timezone.utc)
 
             if health.status == HealthStatus.HEALTHY:
                 self._consecutive_failures = 0
@@ -225,7 +225,7 @@ class BaseHealthCheck(ABC):
                 status=HealthStatus.UNHEALTHY,
                 message=f"Health check timed out after {self._timeout}s",
                 latency_ms=(time.perf_counter() - start) * 1000,
-                last_check=datetime.utcnow(),
+                last_check=datetime.now(timezone.utc),
                 consecutive_failures=self._consecutive_failures,
             )
             self._last_health = health
@@ -238,7 +238,7 @@ class BaseHealthCheck(ABC):
                 status=HealthStatus.UNHEALTHY,
                 message=f"Health check failed: {str(e)}",
                 latency_ms=(time.perf_counter() - start) * 1000,
-                last_check=datetime.utcnow(),
+                last_check=datetime.now(timezone.utc),
                 consecutive_failures=self._consecutive_failures,
             )
             self._last_health = health
@@ -641,7 +641,7 @@ class HealthChecker:
                         name=check.name,
                         status=HealthStatus.UNHEALTHY,
                         message=f"Check error: {result}",
-                        last_check=datetime.utcnow(),
+                        last_check=datetime.now(timezone.utc),
                     )
                 else:
                     component_healths[check.name] = result
@@ -652,7 +652,7 @@ class HealthChecker:
         report = HealthReport(
             status=overall_status,
             components=component_healths,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             version=self._version,
             uptime_seconds=time.time() - self._start_time,
         )

@@ -11,3 +11,184 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Workflow definition and execution system.
+
+This package provides a LangGraph-like workflow DSL for defining
+reusable multi-agent workflows as Python code.
+
+Example:
+    from victor.workflows import WorkflowBuilder, workflow, WorkflowRegistry
+
+    @workflow("code_review", "Review code quality")
+    def code_review_workflow():
+        return (
+            WorkflowBuilder("code_review")
+            .add_agent("analyze", "researcher", "Find code patterns")
+            .add_agent("review", "reviewer", "Review quality")
+            .add_agent("report", "planner", "Summarize findings")
+            .build()
+        )
+
+    # Execute
+    executor = WorkflowExecutor(orchestrator)
+    result = await executor.execute("code_review", {"files": ["main.py"]})
+"""
+
+from victor.workflows.base import BaseWorkflow
+from victor.workflows.definition import (
+    NodeType,
+    WorkflowNode,
+    AgentNode,
+    ConditionNode,
+    ParallelNode,
+    TransformNode,
+    WorkflowDefinition,
+    WorkflowBuilder,
+    workflow,
+    get_registered_workflows,
+)
+from victor.workflows.registry import (
+    WorkflowMetadata,
+    WorkflowRegistry,
+    get_global_registry,
+)
+from victor.workflows.executor import (
+    NodeStatus,
+    NodeResult,
+    WorkflowContext,
+    WorkflowResult,
+    WorkflowExecutor,
+)
+from victor.workflows.protocols import (
+    RetryPolicy,
+    IWorkflowNode,
+    IWorkflowEdge,
+    IWorkflowGraph,
+    ICheckpointStore,
+    IWorkflowExecutor,
+    IStreamingWorkflowExecutor,
+    # Re-export NodeStatus and NodeResult from protocols for graph API users
+    NodeStatus as GraphNodeStatus,
+    NodeResult as GraphNodeResult,
+)
+from victor.workflows.streaming import (
+    WorkflowEventType,
+    WorkflowStreamChunk,
+    WorkflowStreamContext,
+)
+from victor.workflows.streaming_executor import (
+    StreamingWorkflowExecutor,
+)
+from victor.workflows.yaml_loader import (
+    YAMLWorkflowError,
+    YAMLWorkflowConfig,
+    YAMLWorkflowProvider,
+    load_workflow_from_dict,
+    load_workflow_from_yaml,
+    load_workflow_from_file,
+    load_workflows_from_directory,
+)
+from victor.workflows.cache import (
+    WorkflowCacheConfig,
+    CacheEntry,
+    WorkflowCache,
+    WorkflowCacheManager,
+    get_workflow_cache_manager,
+    configure_workflow_cache,
+)
+from victor.workflows.graph_dsl import (
+    State,
+    StateGraph,
+    GraphNode,
+    NodeType as GraphNodeType,
+    NodeFunc,
+    RouterFunc,
+    Compilable,
+    create_graph,
+    compile_graph,
+)
+from victor.workflows.graph import (
+    WorkflowNode as GraphWorkflowNode,
+    WorkflowEdge,
+    ConditionalEdge,
+    WorkflowGraph,
+    DuplicateNodeError,
+    InvalidEdgeError,
+    GraphValidationError,
+)
+
+__all__ = [
+    # Base
+    "BaseWorkflow",
+    # Node types
+    "NodeType",
+    "WorkflowNode",
+    "AgentNode",
+    "ConditionNode",
+    "ParallelNode",
+    "TransformNode",
+    # Definition
+    "WorkflowDefinition",
+    "WorkflowBuilder",
+    "workflow",
+    "get_registered_workflows",
+    # Registry
+    "WorkflowMetadata",
+    "WorkflowRegistry",
+    "get_global_registry",
+    # Executor
+    "NodeStatus",
+    "NodeResult",
+    "WorkflowContext",
+    "WorkflowResult",
+    "WorkflowExecutor",
+    # Protocols (Graph API)
+    "RetryPolicy",
+    "IWorkflowNode",
+    "IWorkflowEdge",
+    "IWorkflowGraph",
+    "ICheckpointStore",
+    "IWorkflowExecutor",
+    "IStreamingWorkflowExecutor",
+    "GraphNodeStatus",
+    "GraphNodeResult",
+    # Streaming
+    "WorkflowEventType",
+    "WorkflowStreamChunk",
+    "WorkflowStreamContext",
+    "StreamingWorkflowExecutor",
+    # YAML Loader
+    "YAMLWorkflowError",
+    "YAMLWorkflowConfig",
+    "YAMLWorkflowProvider",
+    "load_workflow_from_dict",
+    "load_workflow_from_yaml",
+    "load_workflow_from_file",
+    "load_workflows_from_directory",
+    # Cache
+    "WorkflowCacheConfig",
+    "CacheEntry",
+    "WorkflowCache",
+    "WorkflowCacheManager",
+    "get_workflow_cache_manager",
+    "configure_workflow_cache",
+    # StateGraph DSL
+    "State",
+    "StateGraph",
+    "GraphNode",
+    "GraphNodeType",
+    "NodeFunc",
+    "RouterFunc",
+    "Compilable",
+    "create_graph",
+    "compile_graph",
+    # Graph implementation (LangGraph-like API)
+    "GraphWorkflowNode",
+    "WorkflowEdge",
+    "ConditionalEdge",
+    "WorkflowGraph",
+    "DuplicateNodeError",
+    "InvalidEdgeError",
+    "GraphValidationError",
+]

@@ -292,7 +292,7 @@ class OrchestratorFactory(ModeAwareMixin):
             Configured SystemPromptBuilder
         """
         from victor.agent.prompt_builder import SystemPromptBuilder
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.protocols import VerticalExtensions
 
         # Get prompt contributors from vertical extensions
         prompt_contributors = []
@@ -439,9 +439,9 @@ class OrchestratorFactory(ModeAwareMixin):
         if not getattr(self.settings, "tool_cache_enabled", True):
             return None
 
-        from victor.cache.config import CacheConfig
+        from victor.storage.cache.config import CacheConfig
         from victor.config.settings import get_project_paths
-        from victor.cache.tool_cache import ToolCache
+        from victor.storage.cache.tool_cache import ToolCache
 
         # Allow explicit override of cache_dir, otherwise use centralized path
         cache_dir = getattr(self.settings, "tool_cache_dir", None)
@@ -580,7 +580,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         try:
             from victor.agent.middleware_chain import MiddlewareChain
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             middleware_chain = MiddlewareChain()
 
@@ -640,7 +640,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         # Register vertical safety patterns with the safety checker
         try:
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             extensions = self.container.get_optional(VerticalExtensions)
             if extensions and extensions.safety_extensions:
@@ -849,12 +849,12 @@ class OrchestratorFactory(ModeAwareMixin):
         proper dependency management and testability.
 
         Returns:
-            RecoveryCoordinator instance for recovery coordination
+            StreamingRecoveryCoordinator instance for recovery coordination
         """
-        from victor.agent.protocols import RecoveryCoordinatorProtocol
+        from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
 
-        recovery_coordinator = self.container.get(RecoveryCoordinatorProtocol)
-        logger.debug("RecoveryCoordinator created via DI")
+        recovery_coordinator = self.container.get(StreamingRecoveryCoordinatorProtocol)
+        logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
     def create_chunk_generator(self) -> Any:
@@ -948,6 +948,7 @@ class OrchestratorFactory(ModeAwareMixin):
         on_tool_start: Callable,
         on_tool_complete: Callable,
         deduplication_tracker: Optional[Any],
+        middleware_chain: Optional[Any] = None,
     ) -> Any:
         """Create tool pipeline for coordinating tool execution flow.
 
@@ -960,6 +961,7 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_start: Callback invoked when tool execution starts
             on_tool_complete: Callback invoked when tool execution completes
             deduplication_tracker: Optional tracker for preventing duplicate calls
+            middleware_chain: Optional middleware chain for processing tool calls
 
         Returns:
             ToolPipeline instance coordinating tool execution
@@ -980,8 +982,9 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_start=on_tool_start,
             on_tool_complete=on_tool_complete,
             deduplication_tracker=deduplication_tracker,
+            middleware_chain=middleware_chain,
         )
-        logger.debug("ToolPipeline created")
+        logger.debug("ToolPipeline created%s", " with middleware chain" if middleware_chain else "")
         return pipeline
 
     def create_conversation_controller(
@@ -1396,7 +1399,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """
         from victor.agent.message_history import MessageHistory
 
-        max_history = getattr(self.settings, "max_conversation_history", 100)
+        max_history = getattr(self.settings, "max_conversation_history", 100000)
         history = MessageHistory(
             system_prompt=system_prompt,
             max_history_messages=max_history,
@@ -1678,7 +1681,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Get prompt contributors from vertical extensions
         prompt_contributors = []
         try:
-            from victor.verticals.protocols import VerticalExtensions
+            from victor.core.verticals.protocols import VerticalExtensions
 
             extensions = self.container.get_optional(VerticalExtensions)
             if extensions and extensions.prompt_contributors:
@@ -1950,6 +1953,53 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ModeCompletionCriteria created")
         return criteria
 
+    def create_checkpoint_manager(self) -> Optional[Any]:
+        """Create CheckpointManager for time-travel debugging.
+
+        Creates the checkpoint manager based on settings configuration.
+        Returns None if checkpointing is disabled.
+
+        Returns:
+            CheckpointManager instance or None if disabled
+        """
+        if not getattr(self.settings, "checkpoint_enabled", True):
+            logger.debug("Checkpoint system disabled via settings")
+            return None
+
+        try:
+            from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+            from victor.config.settings import get_project_paths
+
+            # Get project paths for checkpoint storage
+            paths = get_project_paths()
+
+            # Create SQLite backend with directory path (not full file path)
+            # SQLiteCheckpointBackend expects storage_path as Path, db_name as filename
+            backend = SQLiteCheckpointBackend(
+                storage_path=paths.project_victor_dir,
+                db_name="checkpoints.db",
+            )
+
+            # Get settings
+            auto_interval = getattr(self.settings, "checkpoint_auto_interval", 5)
+            max_per_session = getattr(self.settings, "checkpoint_max_per_session", 50)
+
+            manager = CheckpointManager(
+                backend=backend,
+                auto_checkpoint_interval=auto_interval,
+                max_checkpoints_per_session=max_per_session,
+            )
+
+            logger.info(
+                f"CheckpointManager created (auto_interval={auto_interval}, "
+                f"max_per_session={max_per_session})"
+            )
+            return manager
+
+        except Exception as e:
+            logger.warning(f"Failed to create CheckpointManager: {e}")
+            return None
+
     def create_workflow_optimization_components(
         self, timeout_seconds: Optional[float] = None
     ) -> WorkflowOptimizationComponents:
@@ -1969,6 +2019,112 @@ class OrchestratorFactory(ModeAwareMixin):
             resource_manager=self.create_resource_manager(),
             mode_completion_criteria=self.create_mode_completion_criteria(),
         )
+
+    def create_mode_workflow_team_coordinator(
+        self,
+        vertical_context: Any,
+    ) -> Any:
+        """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
+
+        The coordinator bridges agent modes, team specifications, and workflows
+        to provide intelligent suggestions for task execution.
+
+        Args:
+            vertical_context: VerticalContext with team specs and workflows
+
+        Returns:
+            ModeWorkflowTeamCoordinator instance
+        """
+        from victor.agent.mode_workflow_team_coordinator import create_coordinator
+
+        # Get team learner from RL coordinator if available
+        team_learner = None
+        try:
+            from victor.agent.protocols import RLCoordinatorProtocol
+
+            rl_coordinator = self.container.get_optional(RLCoordinatorProtocol)
+            if rl_coordinator:
+                team_learner = rl_coordinator.get_learner("team_composition")
+        except Exception as e:
+            logger.debug(f"Could not get team composition learner: {e}")
+
+        # Determine selection strategy from settings
+        selection_strategy = getattr(self.settings, "team_selection_strategy", "hybrid")
+
+        coordinator = create_coordinator(
+            vertical_context=vertical_context,
+            team_learner=team_learner,
+            selection_strategy=selection_strategy,
+        )
+
+        logger.debug(f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}")
+        return coordinator
+
+    # =========================================================================
+    # Orchestrator Decomposition Components (Phase 1)
+    # =========================================================================
+
+    # ARCHIVED: 2024-12-31 - StreamingLoopCoordinator was never integrated
+    # Module moved to: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py
+    # This factory method is preserved for reference but raises NotImplementedError
+    def create_streaming_loop_coordinator(
+        self,
+        termination_handler: Any,
+        tool_call_handler: Any,
+        recovery_handler: Any,
+        chunk_generator: Any,
+        intent_classifier: Any,
+        continuation_strategy: Any,
+    ) -> Any:
+        """ARCHIVED: StreamingLoopCoordinator was extracted but never integrated.
+
+        The streaming loop functionality remains in AgentOrchestrator.
+        This coordinator was moved to: archive/obsolete/2024_12_cleanup/
+
+        Raises:
+            NotImplementedError: This component was never integrated.
+        """
+        raise NotImplementedError(
+            "StreamingLoopCoordinator was archived. "
+            "Streaming loop remains in AgentOrchestrator. "
+            "See: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py"
+        )
+
+    def create_response_processor(
+        self,
+        tool_adapter: Any,
+        tool_registry: Any,
+        sanitizer: Any,
+        shell_resolver: Optional[Any] = None,
+        output_formatter: Optional[Any] = None,
+    ) -> Any:
+        """Create ResponseProcessor for tool call parsing and response handling.
+
+        This processor is extracted from AgentOrchestrator to reduce class size
+        while maintaining the same functionality.
+
+        Args:
+            tool_adapter: Tool calling adapter for parsing
+            tool_registry: Registry for checking enabled tools
+            sanitizer: Validator for tool names and content
+            shell_resolver: Optional resolver for shell variants
+            output_formatter: Optional formatter for tool output
+
+        Returns:
+            ResponseProcessor instance
+        """
+        from victor.agent.response_processor import ResponseProcessor
+
+        processor = ResponseProcessor(
+            tool_adapter=tool_adapter,
+            tool_registry=tool_registry,
+            sanitizer=sanitizer,
+            shell_resolver=shell_resolver,
+            output_formatter=output_formatter,
+        )
+
+        logger.debug("ResponseProcessor created")
+        return processor
 
 
 # Convenience function for creating factory

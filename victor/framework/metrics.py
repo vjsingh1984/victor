@@ -93,9 +93,9 @@ from victor.observability.metrics import (
 
 # =============================================================================
 # OpenTelemetry Integration
-# From: victor/telemetry/__init__.py
+# From: victor/observability/telemetry/__init__.py
 # =============================================================================
-from victor.telemetry import (
+from victor.observability.telemetry import (
     get_meter,
     get_tracer,
     is_telemetry_enabled,

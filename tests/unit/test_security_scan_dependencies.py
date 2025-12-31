@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from pathlib import Path
 
 import pytest
@@ -6,8 +7,17 @@ import pytest
 from victor.tools.security_scanner_tool import scan
 
 
-@pytest.mark.skipif(True, reason="pip-audit may not be available in CI")
+def _pip_audit_available():
+    """Check if pip-audit is available."""
+    return shutil.which("pip-audit") is not None
+
+
+@pytest.mark.skipif(
+    not _pip_audit_available(),
+    reason="pip-audit not installed (install with: pip install pip-audit)",
+)
 def test_security_scan_dependency_hook(tmp_path: Path):
+    """Test dependency vulnerability scanning with pip-audit."""
     req = tmp_path / "requirements.txt"
     req.write_text("flask==0.5\n")
 

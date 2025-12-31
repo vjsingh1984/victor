@@ -722,6 +722,104 @@ class VerificationResult:
         }
         self.confidence = max(0.0, self.confidence - penalty.get(issue.severity, 0.1))
 
+    def generate_feedback_prompt(self, max_issues: int = 3) -> str:
+        """Generate actionable feedback prompt from grounding issues.
+
+        Creates a concise prompt that guides the model to correct specific
+        grounding issues in its response, using suggestions when available.
+
+        Args:
+            max_issues: Maximum number of issues to include (default 3)
+
+        Returns:
+            Feedback prompt string, or empty string if no issues
+        """
+        if not self.issues:
+            return ""
+
+        # Sort by severity (critical first)
+        severity_order = {
+            IssueSeverity.CRITICAL: 0,
+            IssueSeverity.HIGH: 1,
+            IssueSeverity.MEDIUM: 2,
+            IssueSeverity.LOW: 3,
+        }
+        sorted_issues = sorted(self.issues, key=lambda i: severity_order.get(i.severity, 4))[
+            :max_issues
+        ]
+
+        # Build feedback sections by issue type for clarity
+        feedback_parts = []
+
+        # Group corrections by type
+        file_issues = [i for i in sorted_issues if i.issue_type == IssueType.FILE_NOT_FOUND]
+        symbol_issues = [i for i in sorted_issues if i.issue_type == IssueType.SYMBOL_NOT_FOUND]
+        code_issues = [i for i in sorted_issues if i.issue_type == IssueType.CODE_MISMATCH]
+        fabricated = [i for i in sorted_issues if i.issue_type == IssueType.FABRICATED_CONTENT]
+        other_issues = [
+            i
+            for i in sorted_issues
+            if i.issue_type
+            not in (
+                IssueType.FILE_NOT_FOUND,
+                IssueType.SYMBOL_NOT_FOUND,
+                IssueType.CODE_MISMATCH,
+                IssueType.FABRICATED_CONTENT,
+            )
+        ]
+
+        if file_issues:
+            files = [f"'{i.reference}'" for i in file_issues]
+            feedback_parts.append(
+                f"- File(s) not found: {', '.join(files)}. "
+                "Use read_file or list_directory to verify paths before referencing."
+            )
+
+        if symbol_issues:
+            symbols = [f"'{i.reference}'" for i in symbol_issues]
+            feedback_parts.append(
+                f"- Symbol(s) not found: {', '.join(symbols)}. "
+                "Use code_search to find actual function/class names in the codebase."
+            )
+
+        if code_issues:
+            refs = [i.reference for i in code_issues][:2]
+            feedback_parts.append(
+                f"- Code mismatch in: {', '.join(refs)}. "
+                "Quote code exactly as it appears in tool output."
+            )
+
+        if fabricated:
+            refs = [i.reference for i in fabricated][:2]
+            feedback_parts.append(
+                f"- Fabricated content detected: {', '.join(refs)}. "
+                "Only reference content from actual tool output."
+            )
+
+        # Add specific suggestions if available
+        for issue in sorted_issues:
+            if issue.suggestion and issue.suggestion not in str(feedback_parts):
+                feedback_parts.append(f"- {issue.suggestion}")
+
+        # Add any other issues
+        for issue in other_issues:
+            if issue.issue_type not in (
+                IssueType.FILE_NOT_FOUND,
+                IssueType.SYMBOL_NOT_FOUND,
+                IssueType.CODE_MISMATCH,
+                IssueType.FABRICATED_CONTENT,
+            ):
+                feedback_parts.append(f"- {issue.description}")
+
+        if not feedback_parts:
+            return ""
+
+        header = (
+            "GROUNDING CORRECTION REQUIRED: Your previous response contained unverified references. "
+            "Please correct the following issues:\n"
+        )
+        return header + "\n".join(feedback_parts)
+
 
 @dataclass
 class VerifierConfig:
@@ -1119,14 +1217,88 @@ class GroundingVerifier:
 
         # Check for explicit code generation indicators
         task_type = context.get("task_type", "").lower()
-        if task_type in ("code_generation", "create", "create_simple", "test", "testing"):
+        creation_task_types = (
+            "code_generation",
+            "create",
+            "create_simple",
+            "test",
+            "testing",
+            "implementation",
+            "implement",
+            "write",
+            "add",
+            "build",
+        )
+        if task_type in creation_task_types:
             return True
 
-        # Check for test creation task
+        # Check for creation-intent keywords in query
         query = context.get("query", "").lower()
-        test_keywords = ["create test", "write test", "pytest", "test suite", "generate test"]
-        if any(kw in query for kw in test_keywords):
+        creation_keywords = [
+            # Test creation
+            "create test",
+            "write test",
+            "pytest",
+            "test suite",
+            "generate test",
+            "add test",
+            # Code creation
+            "create a",
+            "create the",
+            "write a",
+            "write the",
+            "implement",
+            "add a",
+            "add the",
+            "build a",
+            "build the",
+            "generate",
+            "make a",
+            "make the",
+            # File operations
+            "new file",
+            "new function",
+            "new class",
+            "new module",
+        ]
+        if any(kw in query for kw in creation_keywords):
             return True
+
+        # Check for creation intent in is_action_task flag
+        if context.get("is_action_task", False):
+            # Action tasks are often creation tasks
+            return True
+
+        return False
+
+    def _has_creation_intent_in_response(self, response: str) -> bool:
+        """Detect creation intent from response content.
+
+        Looks for patterns indicating the model is creating new code,
+        not referencing existing code.
+
+        Args:
+            response: Model response text
+
+        Returns:
+            True if response indicates creation intent
+        """
+        response_lower = response.lower()
+
+        # Creation intent patterns
+        creation_patterns = [
+            r"(?:i'll|let me|i will|i can)\s+(?:create|write|implement|add|build)",
+            r"here(?:'s| is) (?:the|a) (?:new|updated|complete)",
+            r"creating (?:a |the )?(?:new |)(?:file|function|class|module)",
+            r"adding (?:a |the )?(?:new |)(?:file|function|class|module)",
+            r"implementing",
+            r"writing (?:a |the )?(?:new |)",
+            r"here(?:'s| is) (?:the |)(?:implementation|code)",
+        ]
+
+        for pattern in creation_patterns:
+            if re.search(pattern, response_lower):
+                return True
 
         return False
 
@@ -1417,8 +1589,16 @@ class GroundingVerifier:
 
         context = context or {}
 
-        # Check if this is a code generation context
+        # Check if this is a code generation context (from context or response content)
         is_code_generation = self._is_generated_code_context(context)
+
+        # Also check response for creation intent patterns
+        if not is_code_generation:
+            is_code_generation = self._has_creation_intent_in_response(response)
+            if is_code_generation:
+                logger.debug("[GroundingVerifier] Creation intent detected in response content")
+                result.metadata["creation_intent_source"] = "response"
+
         result.metadata["is_code_generation"] = is_code_generation
 
         if is_code_generation and self.config.skip_generated_code:

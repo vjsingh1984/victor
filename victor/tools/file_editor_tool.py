@@ -158,7 +158,7 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
 
-from victor.editing import FileEditor
+from victor.coding.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path

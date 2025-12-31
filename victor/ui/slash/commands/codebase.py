@@ -47,7 +47,7 @@ class ReindexCommand(BaseSlashCommand):
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-            from victor.codebase.embeddings.manager import get_embedding_manager
+            from victor.coding.codebase.embeddings.manager import get_embedding_manager
 
             manager = get_embedding_manager()
 
@@ -180,7 +180,7 @@ class InitCommand(BaseSlashCommand):
 
             # Handle update mode
             if update and existing_content:
-                content = self._merge_init_content(existing_content, new_content)
+                content = self.merge_init_content(existing_content, new_content)
                 ctx.console.print("[dim]  Merged with existing content[/]")
             else:
                 content = new_content
@@ -208,8 +208,12 @@ class InitCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Analysis failed:[/] {e}")
             logger.exception("Init error")
 
-    def _merge_init_content(self, existing: str, new: str) -> str:
-        """Merge new analysis with existing content, preserving user sections."""
+    def merge_init_content(self, existing: str, new: str) -> str:
+        """Merge new analysis with existing content, preserving user sections.
+
+        This is a public method for use by CLI commands that also need merging
+        functionality.
+        """
         # Simple merge: keep user-added sections, update auto-generated ones
         # Look for markers like "<!-- AUTO-GENERATED -->" or "## Project Overview"
 

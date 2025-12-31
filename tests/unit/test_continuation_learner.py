@@ -8,6 +8,8 @@ import pytest
 from victor.agent.rl.base import RLOutcome
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.continuation_prompts import ContinuationPromptLearner
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 def _record_outcome(
@@ -50,7 +52,7 @@ def _get_stats(
 ):
     cursor = coordinator.db.cursor()
     cursor.execute(
-        "SELECT * FROM continuation_prompts_stats WHERE context_key = ?",
+        f"SELECT * FROM {Tables.RL_PROMPT_STAT} WHERE context_key = ?",
         (f"{provider}:{model}:{task_type}",),
     )
     return dict(cursor.fetchone() or {})
@@ -58,7 +60,12 @@ def _get_stats(
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
-    return RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+    reset_database()
+    db_path = tmp_path / "rl_test.db"
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    reset_database()
 
 
 @pytest.fixture
@@ -72,7 +79,7 @@ def test_learner_initialization(
     """Learner starts with empty tables and configured learning rate."""
     assert learner.learning_rate == 0.1
     cursor = coordinator.db.cursor()
-    cursor.execute("SELECT count(*) FROM continuation_prompts_stats")
+    cursor.execute(f"SELECT count(*) FROM {Tables.RL_PROMPT_STAT}")
     assert cursor.fetchone()[0] == 0
 
 
@@ -154,7 +161,10 @@ def test_high_quality_decreases_recommendation(
 
 def test_persistence(tmp_path: Path) -> None:
     """Stats persist across learner instances sharing the same DB."""
-    coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+    reset_database()
+    db_path = tmp_path / "rl_test.db"
+    get_database(db_path)
+    coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
     learner1 = coordinator1.get_learner("continuation_prompts")  # type: ignore[return-value]
     _record_outcome(
         learner1,
@@ -165,13 +175,16 @@ def test_persistence(tmp_path: Path) -> None:
         max_prompts_configured=6,
         quality_score=0.8,
     )
-    coordinator1.db.close()
+    reset_database()
 
-    coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+    get_database(db_path)
+    coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
     learner2 = coordinator2.get_learner("continuation_prompts")  # type: ignore[return-value]
     stats = _get_stats(coordinator2, "ollama", "persist-model", "analysis")
     assert stats["total_sessions"] == 1
     assert pytest.approx(stats["avg_quality_score"], rel=1e-3) == 0.8
+
+    reset_database()
 
 
 def test_no_recommendation_with_insufficient_data(

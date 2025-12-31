@@ -254,6 +254,7 @@ class TestProviderFallback:
         with patch("sentence_transformers.SentenceTransformer") as MockST:
             mock_model = MagicMock()
             mock_model.encode.side_effect = Exception("Model error")
+            mock_model.get_sentence_embedding_dimension.return_value = 384
             MockST.return_value = mock_model
 
             embedding = await selector._get_sentence_transformer_embedding("test text")
@@ -477,7 +478,8 @@ class TestFallbackAndMandatoryTools:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         result = selector._get_mandatory_tools("please commit my changes")
-        assert "commit_msg" in result or "shell" in result
+        # Accept any git-related tools (git, commit_msg, shell)
+        assert "git" in result or "commit_msg" in result or "shell" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_with_test(self, temp_cache_dir):

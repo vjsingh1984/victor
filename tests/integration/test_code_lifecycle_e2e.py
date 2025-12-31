@@ -130,13 +130,13 @@ async def agent_with_tools(ollama_coding_provider):
     yield agent
 
     # Cleanup
-    agent.shutdown()
+    await agent.shutdown()
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.skip(reason="Flaky test - depends on non-deterministic LLM output")
+@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
 async def test_full_code_lifecycle_simple(agent_with_tools, temp_workspace):
     """Test creating, enhancing, and executing a simple Python script.
 
@@ -249,7 +249,7 @@ Read the file first, then write the enhanced version."""
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.skip(reason="Flaky test - depends on non-deterministic LLM output")
+@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
 async def test_code_lifecycle_with_bugs(agent_with_tools, temp_workspace):
     """Test creating code with bugs, detecting them, fixing, and re-executing.
 
@@ -365,7 +365,7 @@ and write the corrected version."""
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-@pytest.mark.skip(reason="Flaky test - depends on non-deterministic LLM output")
+@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
 async def test_code_lifecycle_minimal(ollama_coding_provider, temp_workspace):
     """Minimal test that doesn't rely on agent understanding tool usage.
 
@@ -464,7 +464,7 @@ Write the enhanced version back to the same file."""
         print("\n⚠️  Agent didn't add the requested function (may need better prompting)")
 
     # Cleanup
-    agent.shutdown()
+    await agent.shutdown()
 
 
 if __name__ == "__main__":

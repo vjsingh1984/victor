@@ -1,60 +1,26 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""Inline completion API for IDE integration.
+"""This module has moved to victor.processing.completion.
 
-This module provides an extensible completion system for code editors
-and IDE integrations. Supports multiple completion sources:
-- LSP servers for language-aware completions
-- AI models for intelligent suggestions
-- Snippets for template-based completions
+This module is maintained for backward compatibility only.
+Please update your imports to use the new location:
 
-Example usage:
-    from victor.completion import get_completion_manager
-    from pathlib import Path
+    # OLD:
+    from victor.completion import CompletionManager, CompletionParams
 
-    manager = get_completion_manager()
-
-    # Get standard completions
-    completions = await manager.complete(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-    )
-
-    # Get inline (ghost text) completions
-    inline = await manager.complete_inline(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-        file_content="def hello():\n    ",
-    )
-
-    # Stream inline completions
-    async for token in manager.stream_inline_completion(
-        file_path=Path("main.py"),
-        line=10,
-        character=5,
-    ):
-        print(token, end="", flush=True)
+    # NEW (preferred):
+    from victor.processing.completion import CompletionManager, CompletionParams
 """
 
-from victor.completion.protocol import (
+# Re-export everything from the new location for backward compatibility
+from victor.processing.completion import (
+    # Protocol types
     CompletionCapabilities,
     CompletionContext,
     CompletionItem,
     CompletionItemKind,
+    CompletionItemLabelDetails,
     CompletionList,
     CompletionMetrics,
     CompletionParams,
@@ -66,23 +32,16 @@ from victor.completion.protocol import (
     Position,
     Range,
     TextEdit,
-)
-from victor.completion.provider import (
+    # Provider interface
     BaseCompletionProvider,
-    CachingCompletionProvider,
-    CompositeCompletionProvider,
     CompletionProvider,
-    StreamingCompletionProvider,
-)
-from victor.completion.registry import (
+    # Registry and manager
     CompletionProviderRegistry,
-    get_completion_registry,
-    reset_completion_registry,
-)
-from victor.completion.manager import (
     CompletionManager,
-    get_completion_manager,
-    reset_completion_manager,
+    # Built-in providers
+    AICompletionProvider,
+    LSPCompletionProvider,
+    SnippetCompletionProvider,
 )
 
 __all__ = [
@@ -91,6 +50,7 @@ __all__ = [
     "CompletionContext",
     "CompletionItem",
     "CompletionItemKind",
+    "CompletionItemLabelDetails",
     "CompletionList",
     "CompletionMetrics",
     "CompletionParams",
@@ -102,18 +62,14 @@ __all__ = [
     "Position",
     "Range",
     "TextEdit",
-    # Provider classes
+    # Provider interface
     "BaseCompletionProvider",
-    "CachingCompletionProvider",
-    "CompositeCompletionProvider",
     "CompletionProvider",
-    "StreamingCompletionProvider",
-    # Registry
+    # Registry and manager
     "CompletionProviderRegistry",
-    "get_completion_registry",
-    "reset_completion_registry",
-    # Manager
     "CompletionManager",
-    "get_completion_manager",
-    "reset_completion_manager",
+    # Built-in providers
+    "AICompletionProvider",
+    "LSPCompletionProvider",
+    "SnippetCompletionProvider",
 ]

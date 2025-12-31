@@ -625,6 +625,51 @@ class Settings(BaseSettings):
     context_recency_weight: float = 2.0  # Boost for recent messages
     context_semantic_threshold: float = 0.3  # Min similarity for semantic retention
 
+    # ==========================================================================
+    # Checkpoint Settings (Time-Travel Debugging)
+    # ==========================================================================
+    # Controls state checkpointing for conversation replay, forking, and debugging.
+    # Inspired by LangGraph's checkpoint system.
+    checkpoint_enabled: bool = True  # Enable checkpoint system
+    checkpoint_auto_interval: int = 5  # Tool calls between auto-checkpoints
+    checkpoint_max_per_session: int = 50  # Maximum checkpoints to keep per session
+    checkpoint_compression_enabled: bool = True  # Compress checkpoint state data
+    checkpoint_compression_threshold: int = 1024  # Min bytes before compression
+
+    # ==========================================================================
+    # HITL Settings (Human-in-the-Loop)
+    # ==========================================================================
+    # Controls human-in-the-loop workflow interrupts for approval/review/choice.
+    # Integrates with SafetyChecker for high-risk action approval.
+    hitl_default_timeout: float = 300.0  # Default timeout in seconds (5 minutes)
+    hitl_default_fallback: str = "abort"  # Default on timeout: abort, continue, or skip
+    hitl_auto_approve_low_risk: bool = False  # Auto-approve LOW risk actions
+    hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
+
+    # ==========================================================================
+    # Prompt Enrichment Settings (Auto Optimization)
+    # ==========================================================================
+    # Controls automatic prompt enrichment with contextual information.
+    # Enrichment adds relevant context from knowledge graph, web search,
+    # conversation history, etc. to improve prompt quality.
+    #
+    # Trade-off: Higher quality responses vs. latency overhead (~500ms max)
+    # Disable for simple tasks or when agents are confident in context.
+    prompt_enrichment_enabled: bool = True  # Master toggle for prompt enrichment
+    prompt_enrichment_max_tokens: int = 2000  # Max tokens to add via enrichment
+    prompt_enrichment_timeout_ms: float = 500.0  # Timeout in milliseconds
+    prompt_enrichment_cache_enabled: bool = True  # Cache enrichments for repeated prompts
+    prompt_enrichment_cache_ttl: int = 300  # Cache TTL in seconds (5 minutes)
+    prompt_enrichment_strategies: List[str] = Field(
+        default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
+        description="Enabled enrichment strategies (order matters for priority)",
+    )
+    # Per-vertical enrichment toggles (when prompt_enrichment_enabled=True)
+    prompt_enrichment_coding: bool = True  # Knowledge graph, code snippets
+    prompt_enrichment_research: bool = True  # Web search, citations
+    prompt_enrichment_devops: bool = True  # Infrastructure context
+    prompt_enrichment_data_analysis: bool = True  # Schema context, query patterns
+
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
     # Note: plugin_dirs now uses get_project_paths().global_plugins_dir
@@ -1031,102 +1076,20 @@ class Settings(BaseSettings):
     def get_provider_settings(self, provider: str) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
+        Uses the ProviderConfigRegistry for OCP-compliant provider configuration.
+        Each provider has a dedicated strategy class that handles its specific
+        settings (API keys, base URLs, etc.).
+
         Args:
-            provider: Provider name
+            provider: Provider name (or alias like 'gemini' for 'google')
 
         Returns:
             Dictionary of provider settings
         """
-        settings = {}
+        from victor.config.provider_config_registry import get_provider_config_registry
 
-        # Load from profiles.yaml
-        provider_config = self.load_provider_config(provider)
-        if provider_config:
-            settings.update(provider_config.model_dump(exclude_none=True))
-
-        # Use secure API key manager for provider isolation
-        # Only loads the specific provider's key, not all keys
-        from victor.config.api_keys import get_api_key
-
-        # Set provider-specific defaults and load API key
-        # Check Settings instance attributes first, then fallback to API key manager
-        if provider == "anthropic":
-            api_key = self.anthropic_api_key or get_api_key("anthropic")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.anthropic.com")
-
-        elif provider == "openai":
-            api_key = self.openai_api_key or get_api_key("openai")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.openai.com/v1")
-
-        elif provider == "google":
-            api_key = self.google_api_key or get_api_key("google")
-            if api_key:
-                settings["api_key"] = api_key
-
-        elif provider == "xai":
-            # xai_api_key might not exist in Settings, use getattr with default
-            api_key = getattr(self, "xai_api_key", None) or get_api_key("xai")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.x.ai/v1")
-
-        elif provider == "ollama":
-            # Local provider - no API key needed
-            settings.setdefault("base_url", self.ollama_base_url)
-
-        elif provider == "lmstudio":
-            # Local provider - no API key needed
-            urls = getattr(self, "lmstudio_base_urls", []) or []
-            # If provider config supplied a list, merge/override
-            if "base_url" in settings:
-                cfg_url = settings["base_url"]
-                if isinstance(cfg_url, list):
-                    urls = cfg_url
-                elif isinstance(cfg_url, str):
-                    urls = [cfg_url]
-            chosen = None
-            try:
-                import httpx
-
-                for url in urls:
-                    try:
-                        resp = httpx.get(f"{url}/v1/models", timeout=1.5)
-                        if resp.status_code == 200:
-                            chosen = url
-                            break
-                    except Exception:
-                        continue
-            except Exception:
-                pass
-            settings["base_url"] = f"{(chosen or urls[0]).rstrip('/')}/v1"
-
-        elif provider == "vllm":
-            # Local provider - no API key needed
-            settings.setdefault("base_url", self.vllm_base_url)
-
-        elif provider in ("moonshot", "kimi"):
-            api_key = get_api_key("moonshot")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.moonshot.cn/v1")
-
-        elif provider == "deepseek":
-            api_key = get_api_key("deepseek")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.deepseek.com/v1")
-
-        elif provider == "groqcloud":
-            api_key = get_api_key("groqcloud")
-            if api_key:
-                settings["api_key"] = api_key
-            settings.setdefault("base_url", "https://api.groq.com/openai/v1")
-
-        return settings
+        registry = get_provider_config_registry()
+        return registry.get_settings(provider, self)
 
 
 def load_settings() -> Settings:
@@ -1136,3 +1099,7 @@ def load_settings() -> Settings:
         Settings instance
     """
     return Settings()
+
+
+# Alias for compatibility with packages/victor-core
+get_settings = load_settings

@@ -1,0 +1,71 @@
+# Example: Feature Development Pipeline
+# A sequential pipeline for implementing new features
+#
+# Usage:
+#   from victor.agents import load_agents_from_yaml
+#   config = load_agents_from_yaml("feature_development.yaml")
+#   result = await config.ensemble.execute("Add user authentication")
+
+agents:
+  # Researcher gathers context and requirements
+  - name: feature_researcher
+    extends: researcher
+    description: "Analyzes codebase and gathers requirements for new features"
+    constraints:
+      max_iterations: 25
+      max_tool_calls: 40
+
+  # Architect designs the implementation
+  - name: feature_architect
+    description: "Designs implementation approach and identifies files to modify"
+    capabilities:
+      tools:
+        - read_file
+        - glob
+        - grep
+        - code_search
+        - semantic_code_search
+      skills:
+        - architecture
+        - design
+    model_preference: reasoning
+    system_prompt: |
+      You are a software architect. Your role is to:
+      1. Analyze the feature requirements
+      2. Identify components that need modification
+      3. Design a clean implementation approach
+      4. Create a step-by-step implementation plan
+
+      Focus on:
+      - Following existing patterns in the codebase
+      - Maintaining separation of concerns
+      - Considering edge cases and error handling
+
+  # Implementer writes the code
+  - name: feature_implementer
+    extends: coder
+    description: "Implements the feature based on architect's plan"
+    constraints:
+      max_iterations: 50
+      max_tool_calls: 100
+
+  # Reviewer checks the implementation
+  - name: feature_reviewer
+    extends: reviewer
+    description: "Reviews implementation for quality and correctness"
+    capabilities:
+      tools:
+        - read_file
+        - glob
+        - grep
+        - git_diff
+
+ensemble:
+  type: pipeline
+  name: "Feature Development Pipeline"
+  agents:
+    - feature_researcher
+    - feature_architect
+    - feature_implementer
+    - feature_reviewer
+  continue_on_error: false

@@ -26,11 +26,34 @@ To start LMStudio:
 """
 
 import pytest
-from httpx import ConnectError, HTTPError
-import httpx
 
-from victor.providers.base import Message, ToolDefinition
-from victor.providers.openai_provider import OpenAIProvider
+
+# Check if LMStudio is available at module load time
+def _check_lmstudio_available():
+    """Check if LMStudio server is running."""
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(1)
+        result = sock.connect_ex(("localhost", 1234))
+        return result == 0
+    finally:
+        sock.close()
+
+
+# Skip entire module if LMStudio is not available
+pytestmark = pytest.mark.skipif(
+    not _check_lmstudio_available(),
+    reason="LMStudio server not available at localhost:1234",
+)
+
+# These imports are intentionally after pytestmark to avoid loading if LMStudio unavailable
+from httpx import ConnectError, HTTPError  # noqa: E402
+import httpx  # noqa: E402
+
+from victor.providers.base import Message, ToolDefinition  # noqa: E402
+from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
 
 
 @pytest.fixture
@@ -64,33 +87,26 @@ async def lmstudio_provider():
 @pytest.mark.integration
 async def test_lmstudio_server_available():
     """Test LMStudio server availability."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
-            assert response.status_code == 200
-            print("\nLMStudio server is running")
-    except Exception as e:
-        pytest.skip(f"LMStudio server not running: {e}")
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
+        assert response.status_code == 200
+        print("\nLMStudio server is running")
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_lmstudio_list_models():
     """Test listing models from LMStudio."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
-            assert response.status_code == 200
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
+        assert response.status_code == 200
 
-            data = response.json()
-            assert "data" in data
-            assert len(data["data"]) > 0
+        data = response.json()
+        assert "data" in data
+        assert len(data["data"]) > 0
 
-            models = [m["id"] for m in data["data"]]
-            print(f"\nLoaded models in LMStudio: {models}")
-
-    except Exception as e:
-        pytest.skip(f"LMStudio server not running: {e}")
+        models = [m["id"] for m in data["data"]]
+        print(f"\nLoaded models in LMStudio: {models}")
 
 
 @pytest.mark.asyncio

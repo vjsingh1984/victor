@@ -31,17 +31,48 @@ Features:
 """
 
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+
+if TYPE_CHECKING:
+    from victor.tools.cache_manager import CacheNamespace
 
 # Constants
 _DEFAULT_ALLOW_MODIFICATIONS: bool = False
 _DEFAULT_MAX_ROWS: int = 100
 
-# Session-level connection cache (required for connection pooling)
+# Legacy session-level connection cache (use _get_connection_pool() for DI support)
 _connections: Dict[str, Any] = {}
+
+
+def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get the connection pool, preferring DI-injected cache if available.
+
+    Args:
+        exec_ctx: Execution context that may contain cache_manager
+
+    Returns:
+        Connection pool dict-like object
+    """
+    # Try to get from execution context (DI pattern)
+    if exec_ctx is not None:
+        # Check for ToolExecutionContext with cache_manager
+        from victor.tools.context import ToolExecutionContext
+
+        if isinstance(exec_ctx, ToolExecutionContext):
+            if exec_ctx.cache_manager is not None:
+                return exec_ctx.connection_pool
+        elif isinstance(exec_ctx, dict):
+            # Legacy dict context - check for cache_manager
+            cache_manager = exec_ctx.get("cache_manager")
+            if cache_manager is not None:
+                return cache_manager.connection_pool
+
+    # Fallback to global cache for backward compatibility
+    return _connections
+
 
 # Dangerous SQL patterns that should be blocked
 DANGEROUS_PATTERNS = [
@@ -58,13 +89,16 @@ DANGEROUS_PATTERNS = [
 
 
 # Helper functions for db-specific connections
-async def _connect_sqlite(database: str) -> Dict[str, Any]:
+async def _connect_sqlite(
+    database: str, connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Connect to SQLite database."""
+    pool = connection_pool if connection_pool is not None else _connections
     try:
         conn = sqlite3.connect(database)
         conn.row_factory = sqlite3.Row  # Enable column names
         connection_id = f"sqlite_{id(conn)}"
-        _connections[connection_id] = conn
+        pool[connection_id] = conn
 
         return {
             "success": True,
@@ -75,8 +109,11 @@ async def _connect_sqlite(database: str) -> Dict[str, Any]:
         return {"success": False, "error": f"SQLite connection failed: {str(e)}"}
 
 
-async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+async def _connect_postgresql(
+    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Connect to PostgreSQL database."""
+    pool = connection_pool if connection_pool is not None else _connections
     try:
         import psycopg2
 
@@ -89,7 +126,7 @@ async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         connection_id = f"postgresql_{id(conn)}"
-        _connections[connection_id] = conn
+        pool[connection_id] = conn
 
         return {
             "success": True,
@@ -105,8 +142,11 @@ async def _connect_postgresql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": f"PostgreSQL connection failed: {str(e)}"}
 
 
-async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+async def _connect_mysql(
+    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Connect to MySQL database."""
+    pool = connection_pool if connection_pool is not None else _connections
     try:
         import mysql.connector
 
@@ -119,7 +159,7 @@ async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         connection_id = f"mysql_{id(conn)}"
-        _connections[connection_id] = conn
+        pool[connection_id] = conn
 
         return {
             "success": True,
@@ -135,8 +175,11 @@ async def _connect_mysql(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": f"MySQL connection failed: {str(e)}"}
 
 
-async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+async def _connect_sqlserver(
+    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Connect to SQL Server database."""
+    pool = connection_pool if connection_pool is not None else _connections
     try:
         import pyodbc
 
@@ -150,7 +193,7 @@ async def _connect_sqlserver(kwargs: Dict[str, Any]) -> Dict[str, Any]:
 
         conn = pyodbc.connect(conn_string)
         connection_id = f"sqlserver_{id(conn)}"
-        _connections[connection_id] = conn
+        pool[connection_id] = conn
 
         return {
             "success": True,
@@ -170,10 +213,11 @@ async def _do_connect(
     port: Optional[int],
     username: Optional[str],
     password: Optional[str],
+    connection_pool: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Internal connect handler."""
     if db_type == "sqlite":
-        return await _connect_sqlite(database)
+        return await _connect_sqlite(database, connection_pool)
     elif db_type == "postgresql":
         return await _connect_postgresql(
             {
@@ -182,7 +226,8 @@ async def _do_connect(
                 "port": port,
                 "username": username,
                 "password": password,
-            }
+            },
+            connection_pool,
         )
     elif db_type == "mysql":
         return await _connect_mysql(
@@ -192,19 +237,27 @@ async def _do_connect(
                 "port": port,
                 "username": username,
                 "password": password,
-            }
+            },
+            connection_pool,
         )
     elif db_type == "sqlserver":
         return await _connect_sqlserver(
-            {"database": database, "host": host, "username": username, "password": password}
+            {"database": database, "host": host, "username": username, "password": password},
+            connection_pool,
         )
     else:
         return {"success": False, "error": f"Unsupported database type: {db_type}"}
 
 
-async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -> Dict[str, Any]:
+async def _do_query(
+    connection_id: str,
+    sql: str,
+    limit: Optional[int] = None,
+    connection_pool: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Internal query handler."""
-    if not connection_id or connection_id not in _connections:
+    pool = connection_pool if connection_pool is not None else _connections
+    if not connection_id or connection_id not in pool:
         return {
             "success": False,
             "error": "Invalid or missing connection_id. Use action='connect' first.",
@@ -225,7 +278,7 @@ async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -
                 }
 
     try:
-        conn = _connections[connection_id]
+        conn = pool[connection_id]
         cursor = conn.cursor()
         cursor.execute(sql)
 
@@ -264,13 +317,16 @@ async def _do_query(connection_id: str, sql: str, limit: Optional[int] = None) -
         return {"success": False, "error": f"Query failed: {str(e)}"}
 
 
-async def _do_tables(connection_id: str) -> Dict[str, Any]:
+async def _do_tables(
+    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Internal list tables handler."""
-    if not connection_id or connection_id not in _connections:
+    pool = connection_pool if connection_pool is not None else _connections
+    if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
     try:
-        conn = _connections[connection_id]
+        conn = pool[connection_id]
         cursor = conn.cursor()
 
         if connection_id.startswith("sqlite"):
@@ -294,16 +350,19 @@ async def _do_tables(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to list tables: {str(e)}"}
 
 
-async def _do_describe(connection_id: str, table: str) -> Dict[str, Any]:
+async def _do_describe(
+    connection_id: str, table: str, connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Internal describe table handler."""
-    if not connection_id or connection_id not in _connections:
+    pool = connection_pool if connection_pool is not None else _connections
+    if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
     if not table:
         return {"success": False, "error": "Missing required parameter: table"}
 
     try:
-        conn = _connections[connection_id]
+        conn = pool[connection_id]
         cursor = conn.cursor()
 
         if connection_id.startswith("sqlite"):
@@ -355,13 +414,16 @@ async def _do_describe(connection_id: str, table: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to describe table: {str(e)}"}
 
 
-async def _do_schema(connection_id: str) -> Dict[str, Any]:
+async def _do_schema(
+    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Internal get schema handler."""
-    if not connection_id or connection_id not in _connections:
+    pool = connection_pool if connection_pool is not None else _connections
+    if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
     # Get list of tables first
-    tables_result = await _do_tables(connection_id)
+    tables_result = await _do_tables(connection_id, pool)
     if not tables_result["success"]:
         return tables_result
 
@@ -370,7 +432,7 @@ async def _do_schema(connection_id: str) -> Dict[str, Any]:
 
     try:
         for table in tables_result["tables"]:
-            describe_result = await _do_describe(connection_id, table)
+            describe_result = await _do_describe(connection_id, table, pool)
             if describe_result["success"]:
                 schema_info["tables"].append({"name": table, "columns": describe_result["columns"]})
 
@@ -380,15 +442,18 @@ async def _do_schema(connection_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Schema inspection failed: {str(e)}"}
 
 
-async def _do_disconnect(connection_id: str) -> Dict[str, Any]:
+async def _do_disconnect(
+    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Internal disconnect handler."""
-    if not connection_id or connection_id not in _connections:
+    pool = connection_pool if connection_pool is not None else _connections
+    if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
     try:
-        conn = _connections[connection_id]
+        conn = pool[connection_id]
         conn.close()
-        del _connections[connection_id]
+        del pool[connection_id]
 
         return {"success": True, "message": f"Disconnected from database: {connection_id}"}
 
@@ -415,6 +480,7 @@ async def database(
     sql: Optional[str] = None,
     table: Optional[str] = None,
     limit: Optional[int] = None,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server.
@@ -467,39 +533,42 @@ async def database(
     """
     action_lower = action.lower().strip()
 
+    # Get connection pool using DI-aware accessor
+    pool = _get_connection_pool(_exec_ctx)
+
     if action_lower == "connect":
         if not database:
             return {"success": False, "error": "Missing required parameter: database"}
-        return await _do_connect(database, db_type, host, port, username, password)
+        return await _do_connect(database, db_type, host, port, username, password, pool)
 
     elif action_lower == "query":
         if not connection_id:
             return {"success": False, "error": "Missing required parameter: connection_id"}
         if not sql:
             return {"success": False, "error": "Missing required parameter: sql"}
-        return await _do_query(connection_id, sql, limit)
+        return await _do_query(connection_id, sql, limit, pool)
 
     elif action_lower == "tables":
         if not connection_id:
             return {"success": False, "error": "Missing required parameter: connection_id"}
-        return await _do_tables(connection_id)
+        return await _do_tables(connection_id, pool)
 
     elif action_lower == "describe":
         if not connection_id:
             return {"success": False, "error": "Missing required parameter: connection_id"}
         if not table:
             return {"success": False, "error": "Missing required parameter: table"}
-        return await _do_describe(connection_id, table)
+        return await _do_describe(connection_id, table, pool)
 
     elif action_lower == "schema":
         if not connection_id:
             return {"success": False, "error": "Missing required parameter: connection_id"}
-        return await _do_schema(connection_id)
+        return await _do_schema(connection_id, pool)
 
     elif action_lower == "disconnect":
         if not connection_id:
             return {"success": False, "error": "Missing required parameter: connection_id"}
-        return await _do_disconnect(connection_id)
+        return await _do_disconnect(connection_id, pool)
 
     else:
         return {

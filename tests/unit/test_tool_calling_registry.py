@@ -104,6 +104,11 @@ class TestToolCallingAdapterRegistry:
         adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
+    def test_get_adapter_cerebras(self):
+        """Test getting Cerebras adapter uses OpenAI format."""
+        adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="llama-3.3-70b")
+        assert isinstance(adapter, OpenAIToolCallingAdapter)
+
     def test_get_adapter_unknown_provider(self):
         """Test unknown provider falls back to OpenAI-compatible."""
         adapter = ToolCallingAdapterRegistry.get_adapter("unknown_provider", model="some-model")

@@ -174,10 +174,7 @@ async def demo_run_with_args(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Running only TestMath class with verbose output...")
-    result = await run_tests(
-        path=str(temp_dir),
-        pytest_args=["-k", "TestMath", "-v"]
-    )
+    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "TestMath", "-v"])
 
     if "error" not in result:
         summary = result.get("summary", {})
@@ -193,10 +190,7 @@ async def demo_run_passing_only(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Excluding the intentionally failing test...")
-    result = await run_tests(
-        path=str(temp_dir),
-        pytest_args=["-k", "not failing_example"]
-    )
+    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "not failing_example"])
 
     if "error" not in result:
         summary = result.get("summary", {})
@@ -205,7 +199,7 @@ async def demo_run_passing_only(temp_dir: Path):
         print(f"   Passed: {summary.get('passed', 0)}")
         print(f"   Failed: {summary.get('failed', 0)}")
 
-        if summary.get('failed', 0) == 0:
+        if summary.get("failed", 0) == 0:
             print("\n   🎉 All tests passed!")
 
 

@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from victor.mcp.registry import MCPRegistry, MCPServerConfig, ServerStatus
+from victor.integrations.mcp.registry import MCPRegistry, MCPServerConfig, ServerStatus
 
 
 class TestMCPServerConfig:

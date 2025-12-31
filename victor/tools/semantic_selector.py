@@ -31,7 +31,7 @@ import numpy as np
 
 from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
-from victor.embeddings.service import EmbeddingService
+from victor.storage.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
@@ -47,6 +47,23 @@ if TYPE_CHECKING:
     from victor.agent.unified_classifier import ClassificationResult
 
 logger = logging.getLogger(__name__)
+
+
+# Lazy hook initialization to avoid circular imports
+_rl_hooks = None
+
+
+def _get_rl_hooks():
+    """Lazy load RL hooks registry."""
+    global _rl_hooks
+    if _rl_hooks is None:
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks
+
+            _rl_hooks = get_rl_hooks()
+        except ImportError:
+            _rl_hooks = None
+    return _rl_hooks
 
 
 # Cost tier warning messages for user visibility
@@ -424,11 +441,9 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save embedding cache: {e}")
 
-    # DEPRECATED: Category alias mappings (migrate to @tool(execution_category=...) metadata)
-    # This enables using logical names (file_ops, git_ops) that map to
-    # auto-generated metadata categories (filesystem, git, etc.)
-    # TODO: Remove once all tools have proper execution_category in @tool decorator
-    CATEGORY_ALIASES = {
+    # Category alias mappings for logical category names
+    # Maps logical names (file_ops, git_ops) to registry categories
+    _CATEGORY_ALIASES = {
         "file_ops": ["filesystem", "code"],
         "git_ops": ["git", "merge"],
         "analysis": ["code", "pipeline", "security", "audit", "code_quality"],
@@ -444,28 +459,11 @@ class SemanticToolSelector:
         "audit": ["audit"],
     }
 
-    # DEPRECATED: Fallback tools for each logical category
-    # Migrate to ToolMetadataRegistry.get_fallback_tools_for_category() instead.
-    # These will be removed once all tools have proper metadata in @tool decorator.
-    # NOTE: Uses canonical short names for token efficiency
-    FALLBACK_CATEGORY_TOOLS = {
-        "file_ops": ["read", "write", "edit", "ls"],
-        "git_ops": ["shell", "commit_msg", "pr"],
-        "analysis": ["docs_coverage", "metrics"],
-        "refactoring": ["extract", "inline", "rename"],
-        "generation": ["docs", "search", "grep"],
-        "execution": ["shell", "sandbox", "test"],
-        "code_intel": ["symbol", "refs", "search", "grep"],
-        "web": ["web", "fetch", "summarize"],
-        "workflows": ["workflow", "batch", "cicd"],
-    }
-
     def get_tools_for_logical_category(self, logical_category: str) -> List[str]:
         """Get tools for a logical category using the registry.
 
         Maps logical category names (file_ops, git_ops) to registry categories
-        and returns the combined list of tools. Falls back to hardcoded lists
-        if registry has no matches.
+        and returns the combined list of tools.
 
         Args:
             logical_category: Logical category name (file_ops, git_ops, etc.)
@@ -474,7 +472,7 @@ class SemanticToolSelector:
             List of tool names for the category
         """
         # Get registry categories for this logical category
-        registry_categories = self.CATEGORY_ALIASES.get(logical_category, [])
+        registry_categories = self._CATEGORY_ALIASES.get(logical_category, [])
 
         # Collect tools from all registry categories
         tools = set()
@@ -482,56 +480,7 @@ class SemanticToolSelector:
         for category in registry_categories:
             tools.update(registry.get_tools_by_category(category))
 
-        # If registry has tools, use them
-        if tools:
-            return list(tools)
-
-        # Fallback to hardcoded list (deprecated)
-        return self.FALLBACK_CATEGORY_TOOLS.get(logical_category, [])
-
-    # DEPRECATED: Mandatory tools for specific keywords
-    # Migrate to @tool(mandatory_keywords=["diff", "show changes"]) decorator metadata.
-    # Use ToolMetadataRegistry.get_tools_matching_mandatory_keywords() for primary lookup.
-    # This static dict is used as fallback for tools not yet migrated.
-    # TODO: Remove once all tools have mandatory_keywords in @tool decorator
-    # NOTE: Uses canonical short names for token efficiency
-    MANDATORY_TOOL_KEYWORDS = {
-        "diff": ["shell"],
-        "show changes": ["shell"],
-        "git diff": ["shell"],
-        "show diff": ["shell"],
-        "compare": ["shell"],
-        "commit": ["commit_msg", "shell"],
-        "pull request": ["pr"],
-        "pr": ["pr"],
-        "test": ["shell", "test"],
-        "run": ["shell"],
-        "execute": ["shell"],
-        "install": ["shell"],
-        # Prefer semantic search, but keep keyword search available as a fallback
-        "search": ["web", "search", "grep"],
-        "find": ["symbol", "refs"],
-        "refactor": ["extract", "inline", "rename"],
-        "security": ["scan"],
-        "scan": ["scan"],
-        "review": ["review"],
-        "document": ["docs"],
-        "docs": ["docs", "docs_coverage"],
-        # File explanation requires reading the file first - prevents hallucination
-        "explain": ["read"],
-        "describe": ["read"],
-        "what does": ["read"],
-        # Count operations are more efficient with shell
-        "count": ["shell", "ls"],
-        "how many": ["shell", "ls"],
-        # Analysis tasks need semantic search tools for codebase understanding
-        "analyze": ["search", "grep", "symbol", "graph"],
-        "analyze codebase": ["search", "graph", "symbol"],
-        "codebase analysis": ["search", "graph", "symbol"],
-        "understand": ["search", "read", "symbol"],
-        "explore codebase": ["search", "ls", "read"],
-        "architecture": ["arch_summary", "graph", "search", "symbol"],
-    }
+        return list(tools)
 
     # Conceptual query patterns that strongly prefer semantic_code_search over code_search
     # When these patterns are detected, code_search is excluded from mandatory tools
@@ -653,8 +602,8 @@ class SemanticToolSelector:
     def _get_mandatory_tools(self, query: str) -> List[str]:
         """Get tools that MUST be included based on keywords.
 
-        Uses registry-based lookup with static fallback for backward compatibility.
-        Tools can declare mandatory keywords via @tool(mandatory_keywords=["show diff"]).
+        Uses registry-based lookup. Tools declare mandatory keywords via
+        @tool(mandatory_keywords=["show diff"]).
 
         Args:
             query: User query
@@ -662,38 +611,13 @@ class SemanticToolSelector:
         Returns:
             List of tool names that are mandatory for this query
         """
-        mandatory: Set[str] = set()
-        query_lower = query.lower()
-
-        # Check if this is a conceptual query that should strongly prefer semantic search
-        is_conceptual = self._is_conceptual_query(query)
-
-        # PRIMARY: Use registry-based mandatory keyword lookup (decorator-driven)
-        # This enables tools to declare their own mandatory phrases via @tool decorator
-        registry_mandatory = get_tools_matching_mandatory_keywords(query)
-        if registry_mandatory:
+        # Use registry-based mandatory keyword lookup (decorator-driven)
+        mandatory = get_tools_matching_mandatory_keywords(query)
+        if mandatory:
             logger.log(
                 TRACE,
-                f"Registry mandatory tools: {registry_mandatory}",
+                f"Registry mandatory tools: {mandatory}",
             )
-            mandatory.update(registry_mandatory)
-
-        # FALLBACK: Use static MANDATORY_TOOL_KEYWORDS for backward compatibility
-        # This ensures tools not yet migrated to decorator syntax still work
-        for keyword, tools in self.MANDATORY_TOOL_KEYWORDS.items():
-            if self._keyword_in_text(query_lower, keyword):
-                # For conceptual queries, exclude code_search from search-related tools
-                # to force the LLM to use semantic_code_search instead
-                if is_conceptual and keyword in ["search", "find"]:
-                    filtered_tools = [t for t in tools if t != "code_search"]
-                    mandatory.update(filtered_tools)
-                    logger.log(
-                        TRACE,
-                        f"Static mandatory tools for '{keyword}' (conceptual, excluding code_search): {filtered_tools}",
-                    )
-                else:
-                    mandatory.update(tools)
-                    logger.log(TRACE, f"Static mandatory tools for '{keyword}': {tools}")
 
         return list(mandatory)
 
@@ -1403,6 +1327,15 @@ class SemanticToolSelector:
         if self._last_cost_warnings:
             logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type="default",
+            classification_aware=False,
+            excluded_count=0,
+        )
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
@@ -1531,6 +1464,15 @@ class SemanticToolSelector:
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
             logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
+
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type="default",
+            classification_aware=False,
+            excluded_count=0,
+        )
 
         # Convert to ToolDefinition
         return [
@@ -1696,46 +1638,11 @@ class SemanticToolSelector:
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
     # ========================================================================
 
-    # DEPRECATED: Task type to logical category mapping
-    # Migrate to @tool(task_types=["analysis", "action"]) decorator metadata.
-    # Use ToolMetadataRegistry.get_tools_by_task_type() for primary lookup.
-    # TODO: Remove once all tools have task_types in @tool decorator
-    TASK_TYPE_CATEGORIES = {
-        "analysis": ["analysis", "code_intel", "file_ops"],
-        "action": ["execution", "git_ops", "file_ops"],
-        "generation": ["file_ops", "generation", "refactoring"],
-        "search": ["code_intel", "file_ops"],
-        "edit": ["file_ops", "refactoring", "git_ops"],
-        "default": ["file_ops", "execution"],
-    }
-
-    # DEPRECATED: Tools to exclude based on negated keywords
-    # This mapping is used for negation detection to exclude irrelevant tools.
-    # Migrate to @tool(keywords=["analyze", "review"]) decorator metadata.
-    # The negation logic will use ToolMetadataRegistry.get_tools_by_keywords() instead.
-    # TODO: Remove once negation uses registry-based keyword lookup
-    # NOTE: Uses canonical short names for token efficiency
-    KEYWORD_TOOL_MAPPING = {
-        "analyze": ["docs_coverage", "metrics", "review"],
-        "review": ["review", "docs_coverage"],
-        "test": ["test", "shell"],
-        "run": ["shell", "test"],
-        "execute": ["shell", "sandbox"],
-        "search": ["grep", "search", "web"],
-        "find": ["symbol", "refs", "grep"],
-        "create": ["write", "docs"],
-        "generate": ["docs", "write"],
-        "refactor": ["extract", "inline", "rename"],
-        "edit": ["edit", "write"],
-        "commit": ["commit_msg", "shell"],
-        "deploy": ["shell"],
-    }
-
     def _get_tools_for_task_type(self, task_type_str: str) -> List[str]:
         """Get relevant tools based on task type.
 
-        Uses registry-based lookup with static fallback for backward compatibility.
-        Tools can declare their task types via @tool(task_types=["analysis", "edit"]).
+        Uses registry-based lookup. Tools declare their task types via
+        @tool(task_types=["analysis", "edit"]).
 
         Args:
             task_type_str: Task type as string (e.g., "analysis", "action")
@@ -1743,30 +1650,14 @@ class SemanticToolSelector:
         Returns:
             List of tool names relevant to this task type
         """
-        tools: Set[str] = set()
-
-        # PRIMARY: Use registry-based task type lookup (decorator-driven)
-        # This enables tools to declare their own task types via @tool decorator
+        # Use registry-based task type lookup (decorator-driven)
         registry_tools = get_tools_by_task_type(task_type_str)
         if registry_tools:
             logger.log(
                 TRACE,
                 f"Registry task-type tools for '{task_type_str}': {registry_tools}",
             )
-            tools.update(registry_tools)
-
-        # FALLBACK: Use static TASK_TYPE_CATEGORIES for backward compatibility
-        # This ensures tools not yet migrated to decorator syntax still work
-        categories = self.TASK_TYPE_CATEGORIES.get(task_type_str, ["file_ops", "execution"])
-        for category in categories:
-            category_tools = self.get_tools_for_logical_category(category)
-            tools.update(category_tools)
-            logger.log(
-                TRACE,
-                f"Static category '{category}' tools: {category_tools}",
-            )
-
-        return list(tools)
+        return list(registry_tools)
 
     def _get_excluded_tools_from_negations(
         self,
@@ -1774,8 +1665,8 @@ class SemanticToolSelector:
     ) -> Set[str]:
         """Get tools that should be excluded based on negated keywords.
 
-        Uses registry-based lookup with static fallback for backward compatibility.
-        When user says "don't analyze", this excludes tools with task_type="analyze".
+        Uses registry-based lookup. When user says "don't analyze", this
+        excludes tools with task_type="analyze".
 
         Args:
             negated_keywords: List of KeywordMatch objects with negated keywords
@@ -1788,7 +1679,7 @@ class SemanticToolSelector:
         for match in negated_keywords:
             keyword = match.keyword if hasattr(match, "keyword") else str(match)
 
-            # PRIMARY: Use registry-based task type lookup (decorator-driven)
+            # Use registry-based task type lookup (decorator-driven)
             # If keyword matches a task type, exclude tools declared for that type
             registry_excluded = get_tools_by_task_type(keyword)
             if registry_excluded:
@@ -1796,15 +1687,6 @@ class SemanticToolSelector:
                 logger.log(
                     TRACE,
                     f"Registry excluding tools for negated task_type '{keyword}': {registry_excluded}",
-                )
-
-            # FALLBACK: Use static KEYWORD_TOOL_MAPPING for backward compatibility
-            if keyword in self.KEYWORD_TOOL_MAPPING:
-                static_excluded = self.KEYWORD_TOOL_MAPPING[keyword]
-                excluded.update(static_excluded)
-                logger.log(
-                    TRACE,
-                    f"Static excluding tools for negated '{keyword}': {static_excluded}",
                 )
 
         return excluded
@@ -1993,6 +1875,15 @@ class SemanticToolSelector:
         # Generate cost warnings
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
 
+        # Emit semantic match event for RL learning
+        self._emit_semantic_match_event(
+            selected_tools=selected_tools,
+            threshold=similarity_threshold,
+            task_type=task_type_str,
+            classification_aware=True,
+            excluded_count=len(excluded_tools),
+        )
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
@@ -2006,8 +1897,6 @@ class SemanticToolSelector:
             Dictionary with selection statistics
         """
         stats = {
-            "task_type_categories": len(self.TASK_TYPE_CATEGORIES),
-            "keyword_tool_mappings": len(self.KEYWORD_TOOL_MAPPING),
             "usage_cache_size": len(self._tool_usage_cache),
             "embedding_cache_size": len(self._tool_embedding_cache),
         }
@@ -2075,3 +1964,59 @@ class SemanticToolSelector:
 
         if self._client:
             await self._client.aclose()
+
+    def _emit_semantic_match_event(
+        self,
+        selected_tools: List[Tuple[Any, float]],
+        threshold: float,
+        task_type: str = "default",
+        classification_aware: bool = False,
+        excluded_count: int = 0,
+    ) -> None:
+        """Emit semantic match event for RL learning.
+
+        Args:
+            selected_tools: List of (tool, score) tuples
+            threshold: Similarity threshold used
+            task_type: Task type from classification (if available)
+            classification_aware: Whether classification was used
+            excluded_count: Number of tools excluded by negation
+        """
+        hooks = _get_rl_hooks()
+        if hooks is None:
+            return
+
+        try:
+            from victor.agent.rl.hooks import RLEvent, RLEventType
+
+            # Calculate selection quality metrics
+            avg_score = (
+                sum(score for _, score in selected_tools) / len(selected_tools)
+                if selected_tools
+                else 0.0
+            )
+            tool_names = [t.name for t, _ in selected_tools]
+
+            event = RLEvent(
+                type=RLEventType.SEMANTIC_MATCH,
+                success=len(selected_tools) > 0,
+                quality_score=avg_score,
+                tool_name=",".join(tool_names[:5]),  # First 5 tools
+                context={
+                    "threshold": threshold,
+                    "tools_selected": len(selected_tools),
+                    "task_type": task_type,
+                    "classification_aware": classification_aware,
+                    "excluded_count": excluded_count,
+                    "avg_similarity": avg_score,
+                    "top_scores": [s for _, s in selected_tools[:3]],  # Top 3 scores
+                },
+            )
+            hooks.emit(event)
+            logger.log(
+                TRACE,
+                f"Emitted semantic_match event: {len(selected_tools)} tools, "
+                f"threshold={threshold:.3f}, avg_score={avg_score:.3f}",
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit semantic_match event: {e}")

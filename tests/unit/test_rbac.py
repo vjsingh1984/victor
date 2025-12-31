@@ -21,7 +21,7 @@ import threading
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from victor.auth.rbac import (
+from victor.security.auth.rbac import (
     Permission,
     Role,
     User,

@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, patch
 
 from victor.tools.merge_tool import MergeConflictTool
 from victor.tools.base import CostTier
-from victor.merge import (
+from victor.processing.merge import (
     ConflictComplexity,
     ConflictHunk,
     ConflictType,

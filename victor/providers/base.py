@@ -86,7 +86,7 @@ from victor.core.errors import (
     ProviderNotFoundError,
     ProviderTimeoutError,
     ProviderRateLimitError,
-    ProviderAuthError as ProviderAuthenticationError,  # Alias for backward compatibility
+    ProviderAuthError,
     ProviderConnectionError,
     ProviderInvalidResponseError,
 )
@@ -132,7 +132,7 @@ class BaseProvider(ABC):
                 name=f"provider_{self.__class__.__name__}",
                 failure_threshold=circuit_breaker_failure_threshold,
                 recovery_timeout=circuit_breaker_recovery_timeout,
-                excluded_exceptions=(ProviderAuthenticationError,),
+                excluded_exceptions=(ProviderAuthError,),
             )
 
     @property

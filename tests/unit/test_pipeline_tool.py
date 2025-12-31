@@ -21,7 +21,7 @@ from datetime import datetime
 
 from victor.tools.pipeline_tool import PipelineAnalyzerTool
 from victor.tools.base import CostTier
-from victor.pipeline import (
+from victor.observability.pipeline import (
     CoverageMetrics,
     PipelineAnalysisResult,
     PipelineConfig,

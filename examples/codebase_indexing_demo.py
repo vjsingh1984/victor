@@ -18,7 +18,7 @@ This shows how to use the CodebaseIndex to understand a codebase.
 """
 
 import asyncio
-from victor.codebase.indexer import CodebaseIndex
+from victor_coding.codebase.indexer import CodebaseIndex
 
 
 async def main():

@@ -670,9 +670,14 @@ class EndSessionHandler(CommandHandler[EndSessionCommand]):
         started_at = session.get("started_at")
         duration = 0.0
         if started_at:
-            from datetime import datetime as dt
+            from datetime import datetime as dt, timezone
 
-            duration = (dt.utcnow() - started_at).total_seconds()
+            # Handle both naive and aware datetimes
+            now = dt.now(timezone.utc)
+            if started_at.tzinfo is None:
+                # Treat naive datetime as UTC
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            duration = (now - started_at).total_seconds()
 
         event = SessionEndedEvent(
             session_id=command.session_id,

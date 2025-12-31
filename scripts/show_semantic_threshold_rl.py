@@ -24,9 +24,7 @@ from victor.agent.rl.coordinator import get_rl_coordinator
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Show semantic threshold RL learning status"
-    )
+    parser = argparse.ArgumentParser(description="Show semantic threshold RL learning status")
     parser.add_argument(
         "--model",
         help="Filter by embedding model (e.g., 'bge-small', 'bge-large')",
@@ -131,8 +129,8 @@ def main():
             print(f"  Zero Result Rate: {stats['zero_result_count'] / stats['total_searches']:.1%}")
             print(f"  Low Quality Rate: {stats['low_quality_count'] / stats['total_searches']:.1%}")
             print(f"  Avg Threshold: {stats['avg_threshold']:.2f}")
-            if stats['recommended_threshold'] is not None:
-                change = stats['recommended_threshold'] - stats['avg_threshold']
+            if stats["recommended_threshold"] is not None:
+                change = stats["recommended_threshold"] - stats["avg_threshold"]
                 print(f"  ✨ Recommended: {stats['recommended_threshold']:.2f} ({change:+.2f})")
             print()
 
@@ -151,6 +149,7 @@ def main():
         for i, row in enumerate(recent, 1):
             outcome = dict(row)
             import json
+
             metadata = json.loads(outcome.get("metadata", "{}"))
 
             context = f"{outcome['provider']}:{outcome['task_type']}:{outcome['model']}"
@@ -185,7 +184,7 @@ def main():
             model_task = f"{stats['embedding_model']}:{stats['task_type']}"
             if model_task not in recommendations:
                 recommendations[model_task] = {}
-            recommendations[model_task][stats['tool_name']] = stats['recommended_threshold']
+            recommendations[model_task][stats["tool_name"]] = stats["recommended_threshold"]
 
         import yaml
 

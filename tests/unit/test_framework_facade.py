@@ -429,28 +429,28 @@ class TestMetricsFacade:
     def test_setup_opentelemetry_reexport_identity(self):
         """Verify setup_opentelemetry is same function from both modules."""
         from victor.framework.metrics import setup_opentelemetry as facade_func
-        from victor.telemetry import setup_opentelemetry as original_func
+        from victor.observability.telemetry import setup_opentelemetry as original_func
 
         assert facade_func is original_func
 
     def test_get_tracer_reexport_identity(self):
         """Verify get_tracer is same function from both modules."""
         from victor.framework.metrics import get_tracer as facade_func
-        from victor.telemetry import get_tracer as original_func
+        from victor.observability.telemetry import get_tracer as original_func
 
         assert facade_func is original_func
 
     def test_get_meter_reexport_identity(self):
         """Verify get_meter is same function from both modules."""
         from victor.framework.metrics import get_meter as facade_func
-        from victor.telemetry import get_meter as original_func
+        from victor.observability.telemetry import get_meter as original_func
 
         assert facade_func is original_func
 
     def test_is_telemetry_enabled_reexport_identity(self):
         """Verify is_telemetry_enabled is same function from both modules."""
         from victor.framework.metrics import is_telemetry_enabled as facade_func
-        from victor.telemetry import is_telemetry_enabled as original_func
+        from victor.observability.telemetry import is_telemetry_enabled as original_func
 
         assert facade_func is original_func
 

@@ -537,19 +537,31 @@ class TestSameFileLoopDetection:
 class TestTaskClassifierIntegration:
     """Tests for task classifier integration with progress tracker.
 
-    Note: These tests use @pytest.mark.skip decorator because they are
-    integration tests that interact with the ComplexityClassifier which
-    has internal caching that causes test isolation issues when run in
-    the full test suite. They pass individually but fail in full suite runs.
-
-    The underlying functionality is tested in:
-    - test_complexity_classifier.py (classifier tests)
-    - Other tests in this file (LoopDetector core functionality)
+    These tests interact with ComplexityClassifier and TaskTypeClassifier.
+    We reset the singleton instances before each test to ensure isolation.
     """
 
-    @pytest.mark.skip(
-        reason="Integration test with ComplexityClassifier - flaky due to test isolation"
-    )
+    @pytest.fixture(autouse=True)
+    def reset_classifier_singletons(self):
+        """Reset singleton classifiers before each test for isolation."""
+        # Reset TaskTypeClassifier singleton (used by ComplexityClassifier)
+        try:
+            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+
+            TaskTypeClassifier.reset_instance()
+        except ImportError:
+            pass  # TaskTypeClassifier not available
+
+        yield
+
+        # Reset again after test
+        try:
+            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+
+            TaskTypeClassifier.reset_instance()
+        except ImportError:
+            pass
+
     def test_create_tracker_from_simple_classification(self):
         """Test creating tracker from SIMPLE task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
@@ -565,9 +577,6 @@ class TestTaskClassifierIntegration:
         assert tracker.config.max_total_iterations == 3
         assert "SIMPLE" in hint
 
-    @pytest.mark.skip(
-        reason="Integration test with ComplexityClassifier - flaky due to test isolation"
-    )
     def test_create_tracker_from_complex_classification(self):
         """Test creating tracker from COMPLEX task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
@@ -583,9 +592,6 @@ class TestTaskClassifierIntegration:
         assert tracker.task_type == TaskType.ANALYSIS
         assert "COMPLEX" in hint
 
-    @pytest.mark.skip(
-        reason="Integration test with ComplexityClassifier - flaky due to test isolation"
-    )
     def test_create_tracker_from_generation_classification(self):
         """Test creating tracker from GENERATION task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
@@ -603,9 +609,6 @@ class TestTaskClassifierIntegration:
         assert tracker.task_type == TaskType.ACTION
         assert "GENERATE" in hint
 
-    @pytest.mark.skip(
-        reason="Integration test with ComplexityClassifier - flaky due to test isolation"
-    )
     def test_classify_and_create_tracker_convenience(self):
         """Test the convenience function classify_and_create_tracker."""
         from victor.agent.loop_detector import classify_and_create_tracker
@@ -617,9 +620,6 @@ class TestTaskClassifierIntegration:
         assert tracker.remaining_budget == 2
         assert "SIMPLE" in hint
 
-    @pytest.mark.skip(
-        reason="Integration test with ComplexityClassifier - flaky due to test isolation"
-    )
     def test_tracker_enforces_task_budget(self):
         """Test that tracker correctly enforces task-specific budgets."""
         from victor.agent.loop_detector import classify_and_create_tracker

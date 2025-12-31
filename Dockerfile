@@ -16,7 +16,7 @@
 # Multi-stage build for optimized image size
 
 # Stage 1: Builder
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL description="Enterprise-Ready AI Coding Assistant"
@@ -37,16 +37,27 @@ COPY requirements.txt pyproject.toml README.md ./
 COPY victor ./victor
 
 # Install Python dependencies
+# Option 1: Install from main package (current, includes all features)
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e . && \
     pip install --no-cache-dir lancedb
 
+# Option 2: Install from split packages (uncomment to use)
+# This provides the same functionality via the new package structure
+# RUN pip install --no-cache-dir --upgrade pip && \
+#     pip install --no-cache-dir ./packages/victor-core && \
+#     pip install --no-cache-dir ./packages/victor-coding && \
+#     pip install --no-cache-dir ./packages/victor-ai && \
+#     pip install --no-cache-dir lancedb
+
 # Pre-download embedding model for air-gapped deployment
-# This downloads all-MiniLM-L12-v2 (120MB) during build time
+# This downloads BAAI/bge-small-en-v1.5 (130MB) during build time - the core default
 # Model will be cached in Docker image at ~/.cache/huggingface/
+# Note: Must use string constant to avoid victor import chain (requires FastAPI)
 RUN python3 -c "from sentence_transformers import SentenceTransformer; \
-    print('📦 Pre-downloading embedding model: all-MiniLM-L12-v2'); \
-    model = SentenceTransformer('all-MiniLM-L12-v2'); \
+    MODEL = 'BAAI/bge-small-en-v1.5'; \
+    print(f'📦 Pre-downloading embedding model: {MODEL}'); \
+    model = SentenceTransformer(MODEL); \
     print('✅ Embedding model cached in Docker image'); \
     print(f'📊 Model dimension: {model.get_sentence_embedding_dimension()}'); \
     import os; print(f'📂 Cache location: {os.path.expanduser(\"~/.cache\")}')"

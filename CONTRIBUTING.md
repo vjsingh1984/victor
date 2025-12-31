@@ -1,203 +1,105 @@
 <div align="center">
 
-![Victor Logo](./assets/victor-logo.png)
-
 # Contributing to Victor
 
 </div>
 
-Thank you for your interest in contributing to Victor! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to Victor!
 
-## Code of Conduct
+## Contribution Workflow
 
-Be respectful, constructive, and collaborative. We're building something useful together.
-
-## Getting Started
-
-### 1. Fork and Clone
-
-```bash
-git clone https://github.com/YOUR_USERNAME/victor.git
-cd victor
+```mermaid
+graph LR
+    A[Fork] --> B[Branch]
+    B --> C[Code]
+    C --> D[Test]
+    D --> E[Lint]
+    E --> F[PR]
+    F --> G[Review]
+    G --> H[Merge]
 ```
 
-### 2. Set Up Development Environment
+---
+
+## Quick Start
 
 ```bash
+# 1. Fork and clone
+git clone https://github.com/YOUR_USERNAME/victor.git
+cd victor
+
+# 2. Set up environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -e ".[dev]"
-```
 
-### 2.5 Repository Layout
-
-- Active code lives under `victor/` (providers, tools, orchestrator, CLI).
-- Prefer `docs/` and `docker/` as canonical homes for documentation.
-
-### 3. Create a Branch
-
-```bash
+# 3. Create branch
 git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/your-bug-fix
 ```
 
-## Development Workflow
+---
 
-### Running Tests
+## Commands Reference
 
-```bash
-# All tests
-pytest
+| Task | Command |
+|------|---------|
+| Run tests | `pytest` |
+| Single test | `pytest tests/unit/test_X.py::test_name` |
+| Coverage | `pytest --cov --cov-report=html` |
+| Format | `black victor tests` |
+| Lint | `ruff check victor tests` |
+| Type check | `mypy victor` |
+| All checks | `black . && ruff check . && mypy victor && pytest` |
 
-# Specific test
-pytest tests/unit/test_providers.py::test_ollama_provider
+---
 
-# With coverage
-pytest --cov --cov-report=html
-```
+## Adding Components
 
-### Code Quality
+### New Provider
 
-We use several tools to maintain code quality:
-
-```bash
-# Format code
-black victor tests
-
-# Lint
-ruff check victor tests
-
-# Type check
-mypy victor
-
-# Run all checks
-black . && ruff check . && mypy victor && pytest
-```
-
-### Pre-commit Hooks
-
-Install pre-commit hooks to automatically check code before commits:
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-## Contribution Guidelines
-
-### Adding a New Provider
-
-1. Create a new file in `victor/providers/`
+1. Create `victor/providers/my_provider.py`
 2. Inherit from `BaseProvider`
-3. Implement required methods: `chat()`, `stream()`, `supports_tools()`
-4. Add configuration to example profiles
-5. Write tests in `tests/unit/providers/`
+3. Implement: `chat()`, `stream_chat()`, `supports_tools()`
+4. Register in `ProviderRegistry`
+5. Add tests in `tests/unit/providers/`
 6. Update documentation
 
-Example:
+### New Tool
 
-```python
-from victor.providers.base import BaseProvider
-
-class MyProvider(BaseProvider):
-    async def chat(self, messages, **kwargs):
-        # Implementation
-        pass
-```
-
-### Adding a New Tool
-
-1. Create tool in `victor/tools/`
+1. Create `victor/tools/my_tool.py`
 2. Inherit from `BaseTool`
-3. Define JSON schema
+3. Define `name`, `description`, `parameters`, `cost_tier`
 4. Implement `execute()` method
 5. Add tests
-6. Update documentation
+6. Run `python scripts/generate_tool_catalog.py`
 
-### Code Style
+---
 
-- Use type hints for all function signatures
-- Write docstrings for public APIs (Google style)
-- Keep functions focused and small
-- Prefer composition over inheritance
-- Use async/await for I/O operations
+## Code Style
 
-Example:
+| Requirement | Details |
+|-------------|---------|
+| Type hints | All public APIs |
+| Docstrings | Google style |
+| Line length | 100 chars (black enforced) |
+| I/O | Async/await |
+| HTTP mocking | Use `respx` |
 
-```python
-async def fetch_completion(
-    self,
-    prompt: str,
-    *,
-    temperature: float = 0.7,
-    max_tokens: int = 1000,
-) -> CompletionResponse:
-    """Fetch completion from the LLM provider.
+---
 
-    Args:
-        prompt: The input prompt
-        temperature: Sampling temperature (0-2)
-        max_tokens: Maximum tokens to generate
+## PR Checklist
 
-    Returns:
-        CompletionResponse with generated text
+| Check | Command | Required |
+|-------|---------|:--------:|
+| Tests pass | `pytest` | Yes |
+| Formatted | `black --check .` | Yes |
+| No lint errors | `ruff check .` | Yes |
+| Types valid | `mypy victor` | Yes |
+| Docs updated | Manual | If applicable |
 
-    Raises:
-        ProviderError: If the API request fails
-    """
-    # Implementation
-```
+---
 
-### Testing Guidelines
-
-- Write tests for all new features
-- Aim for >80% code coverage
-- Use pytest fixtures for common setup
-- Mock external API calls
-- Test error cases and edge conditions
-
-Example test structure:
-
-```python
-import pytest
-from victor.providers.ollama_provider import OllamaProvider
-
-@pytest.fixture
-async def ollama_provider():
-    return OllamaProvider(base_url="http://localhost:11434")
-
-@pytest.mark.asyncio
-async def test_ollama_chat(ollama_provider, respx_mock):
-    # Mock the API response
-    respx_mock.post("http://localhost:11434/api/chat").mock(
-        return_value={"message": {"content": "Hello!"}}
-    )
-
-    response = await ollama_provider.chat([
-        {"role": "user", "content": "Hi"}
-    ])
-
-    assert response.content == "Hello!"
-```
-
-### Documentation
-
-- Update README.md for new features
-- Add docstrings to public APIs
-- Create examples in `examples/` directory
-- Update DESIGN.md for architectural changes
-
-## Pull Request Process
-
-### Before Submitting
-
-1. Ensure all tests pass: `pytest`
-2. Check code quality: `black . && ruff check .`
-3. Update documentation if needed
-4. Add entry to CHANGELOG.md (create if needed)
-
-### PR Description Template
+## PR Template
 
 ```markdown
 ## Description
@@ -216,47 +118,25 @@ Describe testing performed
 - [ ] Tests pass locally
 - [ ] Code follows style guidelines
 - [ ] Documentation updated
-- [ ] No breaking changes (or documented)
 ```
 
-### Review Process
-
-1. Maintainers will review your PR
-2. Address feedback and comments
-3. Once approved, PR will be merged
-4. Your contribution will be credited
+---
 
 ## Areas We Need Help With
 
-### High Priority
-- Additional provider integrations (Cohere, Mistral, etc.)
-- Enhanced tool calling capabilities
-- Performance optimizations
-- Documentation improvements
+| Priority | Areas |
+|----------|-------|
+| **High** | Provider integrations, tool capabilities, performance |
+| **Medium** | Examples, integration tests, CI/CD, Docker |
+| **Good First** | Bug fixes, doc typos, test coverage |
 
-### Medium Priority
-- More example use cases
-- Integration tests
-- CI/CD improvements
-- Docker support
-
-### Good First Issues
-- Bug fixes
-- Documentation typos
-- Small feature enhancements
-- Test coverage improvements
+---
 
 ## Questions?
 
-- Open an issue for bugs or feature requests
-- Start a discussion for questions or ideas
-- Check existing issues before creating new ones
+- **Bugs/Features**: [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
+- **Questions**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
 
-## Recognition
-
-All contributors will be:
-- Listed in CONTRIBUTORS.md
-- Credited in release notes
-- Acknowledged in project documentation
+All contributors will be credited in CONTRIBUTORS.md and release notes.
 
 Thank you for contributing to Victor!

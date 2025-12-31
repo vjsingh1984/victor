@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist/
+build/
+*.egg
+.pytest_cache
+.coverage
+htmlcov/
+.tox
+.mypy_cache
+.ruff_cache
+venv/
+.venv/
+
+# Rust build artifacts
+target/
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation
+docs/_build/
+*.md
+!README.md
+
+# Tests (optional, remove to include tests)
+# tests/
+
+# Development files
+.env
+.env.local
+*.log
+*.tmp
+
+# Victor data
+.victor/
+*.db
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db

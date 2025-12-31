@@ -2,17 +2,49 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
 
+if TYPE_CHECKING:
+    from victor.tools.cache_manager import CacheNamespace
+
 logger = logging.getLogger(__name__)
 
 
-# Cache for semantic indexes to avoid re-embedding on every call
+# Legacy cache for semantic indexes (use _get_index_cache() for DI support)
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Get the index cache, preferring DI-injected cache if available.
+
+    Args:
+        exec_ctx: Execution context that may contain cache_manager
+
+    Returns:
+        Cache dict-like object for index storage
+    """
+    # Try to get from execution context (DI pattern)
+    if exec_ctx is not None:
+        # Check for ToolExecutionContext with cache_manager
+        from victor.tools.context import ToolExecutionContext
+
+        if isinstance(exec_ctx, ToolExecutionContext):
+            if exec_ctx.cache_manager is not None:
+                # Return the namespace's internal dict-like interface
+                return exec_ctx.index_cache
+        elif isinstance(exec_ctx, dict):
+            # Legacy dict context - check for cache_manager
+            cache_manager = exec_ctx.get("cache_manager")
+            if cache_manager is not None:
+                return cache_manager.index_cache
+
+    # Fallback to global cache for backward compatibility
+    return _INDEX_CACHE
+
 
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
@@ -162,18 +194,30 @@ def _keyword_score(text: str, query: str) -> int:
 
 
 async def _get_or_build_index(
-    root: Path, settings: Any, force_reindex: bool = False
+    root: Path,
+    settings: Any,
+    force_reindex: bool = False,
+    exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Any, bool]:
     """Return cached CodebaseIndex or build/update one. Returns (index, rebuilt?).
 
     Uses intelligent caching:
-    1. In-memory cache for same session
+    1. In-memory cache for same session (DI-aware)
     2. Persistent disk storage in {root}/.victor/embeddings/
     3. Incremental updates for changed files only (not full rebuild)
-    """
-    from victor.codebase.indexer import CodebaseIndex
 
-    cache_entry = _INDEX_CACHE.get(str(root))
+    Args:
+        root: Root path for the codebase
+        settings: Application settings
+        force_reindex: Force full re-index
+        exec_ctx: Execution context for DI-based cache access
+    """
+    from victor.coding.codebase.indexer import CodebaseIndex
+
+    # Get cache using DI-aware accessor
+    index_cache = _get_index_cache(exec_ctx)
+
+    cache_entry = index_cache.get(str(root))
     cached_index = cache_entry["index"] if cache_entry else None
     last_mtime = cache_entry["latest_mtime"] if cache_entry else 0.0
 
@@ -187,7 +231,7 @@ async def _get_or_build_index(
         else:
             # Files changed - do incremental update instead of full rebuild
             await cached_index.incremental_reindex()
-            _INDEX_CACHE[str(root)]["latest_mtime"] = latest
+            index_cache[str(root)]["latest_mtime"] = latest
             return cached_index, False  # Not a full rebuild
 
     # Default persist directory is {root}/.victor/embeddings/ for project-local storage
@@ -233,7 +277,7 @@ async def _get_or_build_index(
         await index.ensure_indexed(auto_reindex=True)
         rebuilt = False
 
-    _INDEX_CACHE[str(root)] = {
+    index_cache[str(root)] = {
         "index": index,
         "latest_mtime": latest,
         "indexed_at": time.time(),
@@ -403,7 +447,9 @@ async def code_search(
                 filter_metadata["is_test_file"] = test
                 filters_applied.append(f"test={test}")
 
-        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=reindex)
+        index, rebuilt = await _get_or_build_index(
+            root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
+        )
 
         # Get semantic search configuration from settings
         similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.5)
@@ -468,9 +514,6 @@ async def code_search(
                 )
 
                 if recommendation and recommendation.value is not None:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.debug(
                         f"RL: Learned threshold {recommendation.value:.2f} "
                         f"(current: {similarity_threshold:.2f}, "
@@ -479,15 +522,12 @@ async def code_search(
                     )
 
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.debug(f"Failed to record threshold learning outcome: {e}")
 
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid and results:
             try:
-                from victor.codebase.hybrid_search import create_hybrid_search_engine
+                from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
                 keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)
@@ -530,17 +570,11 @@ async def code_search(
                         for hr in hybrid_results
                     ]
 
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.info(
                         f"Hybrid search combined semantic + keyword → {len(results)} results"
                     )
 
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
                 # Fall back to semantic-only results (already have them)
 
@@ -582,7 +616,7 @@ async def code_search(
             "metadata": {
                 "rebuilt": rebuilt,
                 "root": str(root_path),
-                "indexed_at": _INDEX_CACHE[str(root_path)]["indexed_at"],
+                "indexed_at": _get_index_cache(_exec_ctx)[str(root_path)]["indexed_at"],
                 "filters_applied": filters_applied if filters_applied else None,
                 "chunking_strategy": "BODY_AWARE",
                 "importance_weighted": True,

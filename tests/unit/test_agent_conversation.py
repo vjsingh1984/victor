@@ -26,7 +26,7 @@ class TestMessageHistory:
         manager = MessageHistory()
         assert manager.messages == []
         assert manager.system_prompt == ""
-        assert manager._max_history == 100
+        assert manager._max_history == 100000
 
     def test_init_with_system_prompt(self):
         """Test MessageHistory with system prompt."""

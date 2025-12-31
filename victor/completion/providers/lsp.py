@@ -86,7 +86,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
 
         Args:
             priority: Provider priority (default 80 - high)
-            lsp_manager: Optional LSPManager instance
+            lsp_manager: Optional LSPConnectionPool instance
         """
         super().__init__(priority=priority)
         self._lsp_manager = lsp_manager
@@ -113,9 +113,9 @@ class LSPCompletionProvider(BaseCompletionProvider):
             return self._lsp_manager
 
         try:
-            from victor.lsp.manager import LSPManager
+            from victor.coding.lsp.manager import LSPConnectionPool
 
-            self._lsp_manager = LSPManager()
+            self._lsp_manager = LSPConnectionPool()
             return self._lsp_manager
         except ImportError:
             logger.debug("LSP manager not available")

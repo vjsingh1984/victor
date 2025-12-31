@@ -5,123 +5,110 @@
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
-- [Core Concepts](#core-concepts)
-- [System Design](#system-design)
-- [Module Deep Dives](#module-deep-dives)
-- [Adding New Features](#adding-new-features)
+- [Design Patterns](#design-patterns)
+- [Core Systems](#core-systems)
+- [Adding Components](#adding-components)
+- [Phase 4 Features](#phase-4-features)
 - [Development Workflow](#development-workflow)
 - [Best Practices](#best-practices)
 
-## Architecture Overview
+---
 
-Victor follows a layered architecture with clear separation of concerns:
+## Architecture Overview
 
 ```mermaid
 graph TB
-    subgraph "Presentation Layer"
-        CLI[CLI Interface]
+    subgraph Presentation
+        CLI[CLI/TUI]
         MCP[MCP Server]
     end
 
-    subgraph "Application Layer"
-        Agent[Agent Orchestrator]
+    subgraph Application
+        Agent[Orchestrator]
         Context[Context Manager]
-        Editor[Multi-File Editor]
     end
 
-    subgraph "Domain Layer"
+    subgraph Domain
         Tools[Tool Registry]
         Providers[Provider Registry]
-        Embeddings[Embedding Registry]
     end
 
-    subgraph "Infrastructure Layer"
+    subgraph Infrastructure
         Config[Configuration]
         Storage[File System]
-        Network[HTTP Client]
     end
 
     CLI --> Agent
     MCP --> Agent
-    Agent --> Context
     Agent --> Tools
     Agent --> Providers
-    Editor --> Storage
     Tools --> Storage
-    Tools --> Network
-    Context --> Embeddings
-
-    style Agent fill:#f9f,stroke:#333,stroke-width:4px
-    style Tools fill:#bbf,stroke:#333,stroke-width:2px
-    style Providers fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 ### Design Principles
 
-1. **Provider Abstraction**: Unified interface for all LLM providers
-2. **Tool Registry**: Dynamic tool discovery and registration
-3. **Plugin Architecture**: Easy extension without core modifications
-4. **Type Safety**: Pydantic models throughout
-5. **Async First**: All I/O operations are async
-6. **Transaction-Based**: Atomic operations with rollback support
+| Principle | Implementation |
+|-----------|----------------|
+| Provider Abstraction | Unified interface for all LLMs |
+| Tool Registry | Dynamic discovery and registration |
+| Plugin Architecture | Extension without core changes |
+| Type Safety | Pydantic models throughout |
+| Async First | All I/O operations async |
+| Transaction-Based | Atomic operations with rollback |
 
-## Core Concepts
+---
 
-### 1. Provider System
+## Design Patterns
+
+### Pattern Matrix
+
+| Pattern | When to Use | Example |
+|---------|-------------|---------|
+| **Facade** | Simplify complex subsystem | `AgentOrchestrator` |
+| **Strategy** | Pluggable algorithms | `ToolSelector` |
+| **Observer** | Event-driven | `EventBus` |
+| **Protocol** | Duck typing contracts | `IRegistry` |
+| **Registry** | Dynamic lookup | `ProviderRegistry` |
+| **Adapter** | Normalize interfaces | `ToolCallingAdapter` |
+
+### Key Abstractions
+
+| Abstraction | Location | Purpose |
+|-------------|----------|---------|
+| `BaseProvider` | `victor/providers/base.py` | LLM interface |
+| `BaseTool` | `victor/tools/base.py` | Tool interface |
+| `ServiceProvider` | `victor/agent/service_provider.py` | DI container |
+| `StateGraph` | `victor/framework/graph.py` | Workflow DSL |
+
+---
+
+## Core Systems
+
+### Provider System
 
 ```mermaid
 classDiagram
     class BaseProvider {
         <<abstract>>
-        +generate(messages, **kwargs) ChatResponse
-        +generate_stream(messages, **kwargs) AsyncIterator
-        #_normalize_response(response) ChatResponse
-        #_normalize_tool_calls(tools) List~ToolCall~
+        +chat(messages) ChatResponse
+        +stream_chat(messages) AsyncIterator
+        +supports_tools() bool
     }
-
-    class OllamaProvider {
-        -base_url: str
-        -client: httpx.AsyncClient
-        +generate() ChatResponse
-        +generate_stream() AsyncIterator
-        -_convert_tools() List~Dict~
-    }
-
-    class AnthropicProvider {
-        -api_key: str
-        -client: Anthropic
-        +generate() ChatResponse
-        +generate_stream() AsyncIterator
-    }
-
-    class OpenAIProvider {
-        -api_key: str
-        -client: OpenAI
-        +generate() ChatResponse
-        +generate_stream() AsyncIterator
-    }
-
     BaseProvider <|-- OllamaProvider
     BaseProvider <|-- AnthropicProvider
     BaseProvider <|-- OpenAIProvider
-
-    class ProviderRegistry {
-        -providers: Dict
-        +register(name, provider)
-        +get(name) BaseProvider
-        +list() List~str~
-    }
-
-    ProviderRegistry --> BaseProvider
 ```
 
-**Key Points**:
-- All providers implement `BaseProvider` interface
-- Response normalization ensures consistent output
-- Tool call translation handles provider-specific formats
-- Async streaming for real-time responses
+**Required Methods**:
 
-### 2. Tool System
+| Method | Return | Description |
+|--------|--------|-------------|
+| `chat()` | `ChatResponse` | Synchronous completion |
+| `stream_chat()` | `AsyncIterator` | Streaming completion |
+| `supports_tools()` | `bool` | Tool calling support |
+| `name` | `str` | Provider identifier |
+
+### Tool System
 
 ```mermaid
 classDiagram
@@ -129,582 +116,272 @@ classDiagram
         <<abstract>>
         +name: str
         +description: str
-        +parameters: List~ToolParameter~
-        +execute(**kwargs) ToolResult
+        +parameters: List[ToolParameter]
+        +cost_tier: CostTier
+        +execute() ToolResult
     }
-
-    class ToolParameter {
-        +name: str
-        +type: str
-        +description: str
-        +required: bool
-    }
-
-    class ToolResult {
-        +success: bool
-        +output: str
-        +error: str
-    }
-
-    class FileSystemTool {
-        +execute(**kwargs) ToolResult
-        -_read_file(path) str
-        -_write_file(path, content)
-    }
-
-    class DatabaseTool {
-        -connections: Dict
-        +execute(**kwargs) ToolResult
-        -_connect(params) str
-        -_query(sql) ToolResult
-    }
-
-    class DockerTool {
-        +execute(**kwargs) ToolResult
-        -_run_docker_command(args) tuple
-    }
-
-    BaseTool <|-- FileSystemTool
-    BaseTool <|-- DatabaseTool
-    BaseTool <|-- DockerTool
-    BaseTool --> ToolParameter
-    BaseTool --> ToolResult
-
-    class ToolRegistry {
-        -_tools: Dict
-        +register(tool: BaseTool)
-        +get(name: str) BaseTool
-        +list_tools() List~BaseTool~
-    }
-
-    ToolRegistry --> BaseTool
 ```
 
-**Key Points**:
-- Standardized tool interface
-- Self-describing with parameters
-- Consistent result format
-- Registry pattern for discovery
+**Tool Properties**:
 
-### 3. Agent Orchestrator
+| Property | Type | Purpose |
+|----------|------|---------|
+| `name` | `str` | Unique identifier |
+| `description` | `str` | LLM-visible description |
+| `parameters` | `List[ToolParameter]` | JSON Schema params |
+| `cost_tier` | `CostTier` | FREE/LOW/MEDIUM/HIGH |
+| `priority` | `Priority` | Selection weight |
+| `access_mode` | `AccessMode` | READONLY/WRITE/EXECUTE |
+
+### Agent Orchestrator
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Agent
-    participant Context
-    participant Provider
-    participant Tool
-
     User->>Agent: chat(message)
-    Agent->>Context: add_message(user, message)
     Agent->>Context: get_messages()
-    Context-->>Agent: conversation_history
-
     Agent->>Provider: generate(messages, tools)
-    Provider-->>Agent: response
-
-    alt Has Tool Calls
-        Agent->>Tool: execute(**params)
-        Tool-->>Agent: ToolResult
-        Agent->>Context: add_message(tool, result)
-        Agent->>Provider: generate(updated_messages)
-        Provider-->>Agent: final_response
-    end
-
-    Agent->>Context: add_message(assistant, response)
+    Provider-->>Agent: response + tool_calls
+    Agent->>Tool: execute(params)
+    Tool-->>Agent: ToolResult
+    Agent->>Provider: generate(updated)
     Agent-->>User: ChatResponse
 ```
 
-**Key Points**:
-- Manages conversation flow
-- Coordinates tool execution
-- Handles multi-turn interactions
-- Context window management
+---
 
-## System Design
+## Adding Components
 
-### Request Flow
-
-```mermaid
-flowchart TD
-    Start([User Request]) --> Parse{Parse<br/>Command}
-
-    Parse -->|Chat| Agent[Agent Orchestrator]
-    Parse -->|MCP| MCP[MCP Server]
-    Parse -->|Direct| Tool[Tool Execution]
-
-    Agent --> Context[Get Context]
-    Context --> Provider[Select Provider]
-    Provider --> Generate[Generate Response]
-
-    Generate --> HasTools{Has Tool<br/>Calls?}
-    HasTools -->|Yes| ExecTools[Execute Tools]
-    ExecTools --> UpdateContext[Update Context]
-    UpdateContext --> Provider
-
-    HasTools -->|No| Format[Format Response]
-    Format --> Return([Return to User])
-
-    MCP --> Discovery[Tool Discovery]
-    Discovery --> Execute[Execute via MCP]
-    Execute --> Return
-
-    Tool --> DirectExec[Direct Execution]
-    DirectExec --> Return
-
-    style Agent fill:#f96,stroke:#333,stroke-width:3px
-    style Provider fill:#6f9,stroke:#333,stroke-width:2px
-    style ExecTools fill:#69f,stroke:#333,stroke-width:2px
-```
-
-### Multi-File Editing System
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-
-    Idle --> Planning: start_transaction()
-    Planning --> Editing: add_edit()
-    Editing --> Editing: add_edit()
-    Editing --> Validating: commit()
-
-    Validating --> Applying: validation_success
-    Validating --> Failed: validation_error
-
-    Applying --> Backup: create_backups()
-    Backup --> Writing: apply_changes()
-    Writing --> Success: all_writes_ok
-    Writing --> Rollback: write_error
-
-    Rollback --> Failed: restore_backups()
-    Success --> [*]
-    Failed --> [*]
-
-    Editing --> Idle: cancel()
-    Failed --> Idle: reset()
-```
-
-**Transaction Properties**:
-- **Atomic**: All edits succeed or none do
-- **Consistent**: Files remain in valid state
-- **Isolated**: No partial state visible
-- **Durable**: Changes persist after commit
-
-### MCP Protocol Integration
-
-```mermaid
-sequenceDiagram
-    participant Claude as Claude Desktop
-    participant MCP as Victor MCP Server
-    participant Registry as Tool Registry
-    participant Tool as Tool Implementation
-
-    Claude->>MCP: initialize()
-    MCP-->>Claude: {capabilities, version}
-
-    Claude->>MCP: list_tools()
-    MCP->>Registry: list_tools()
-    Registry-->>MCP: [tools...]
-    MCP-->>Claude: {tools: [...]}
-
-    Claude->>MCP: call_tool(name, params)
-    MCP->>Registry: get(name)
-    Registry-->>MCP: tool
-    MCP->>Tool: execute(**params)
-    Tool-->>MCP: ToolResult
-    MCP-->>Claude: {result: ...}
-```
-
-## Module Deep Dives
-
-### Provider Module (`victor/providers/`)
-
-**Purpose**: Abstract LLM provider differences
-
-```python
-# Base Provider Interface
-class BaseProvider:
-    async def generate(
-        self,
-        messages: List[Message],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
-    ) -> ChatResponse:
-        """Generate completion from messages."""
-        raise NotImplementedError
-
-    async def generate_stream(
-        self,
-        messages: List[Message],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
-    ) -> AsyncIterator[ChatResponse]:
-        """Stream completion chunks."""
-        raise NotImplementedError
-```
-
-**Provider Lifecycle**:
+### New Provider
 
 ```mermaid
 flowchart LR
-    Init[Initialize] --> Config[Load Config]
-    Config --> Client[Create Client]
-    Client --> Ready[Ready]
-    Ready --> Generate[Generate]
-    Generate --> Parse[Parse Response]
-    Parse --> Normalize[Normalize]
-    Normalize --> Return[Return Response]
-    Return --> Ready
-    Ready --> Close[Close]
-    Close --> End([End])
+    A[Create File] --> B[Inherit BaseProvider]
+    B --> C[Implement Methods]
+    C --> D[Register]
+    D --> E[Test]
+    E --> F[Document]
 ```
 
-### Tool Module (`victor/tools/`)
+**Steps**:
 
-**Tool Execution Pipeline**:
+1. Create `victor/providers/my_provider.py`
+2. Inherit from `BaseProvider`
+3. Implement required methods
+4. Register in `ProviderRegistry`
+5. Add tests in `tests/unit/providers/`
+6. Update documentation
 
-```mermaid
-flowchart TD
-    Receive[Receive Tool Call] --> Validate{Validate<br/>Parameters}
-    Validate -->|Invalid| Error[Return Error]
-    Validate -->|Valid| Safety{Safety<br/>Checks}
-
-    Safety -->|Blocked| Deny[Deny Execution]
-    Safety -->|Allowed| Execute[Execute Operation]
-
-    Execute --> Success{Success?}
-    Success -->|Yes| Format[Format Output]
-    Success -->|No| CatchError[Catch Error]
-
-    Format --> Result[Return ToolResult]
-    CatchError --> Result
-    Deny --> Result
-    Error --> Result
-
-    Result --> Log[Log Execution]
-    Log --> End([End])
-```
-
-**Database Tool Architecture**:
-
-```mermaid
-graph TB
-    subgraph "DatabaseTool"
-        Connect[Connect Operation]
-        Query[Query Operation]
-        Schema[Schema Operations]
-        Disconnect[Disconnect]
-    end
-
-    subgraph "Connection Pool"
-        SQLite[SQLite Connections]
-        Postgres[PostgreSQL Connections]
-        MySQL[MySQL Connections]
-    end
-
-    subgraph "Safety Layer"
-        Validate[SQL Validation]
-        Dangerous[Dangerous Pattern Detection]
-        ReadOnly[Read-Only Mode]
-    end
-
-    Connect --> SQLite
-    Connect --> Postgres
-    Connect --> MySQL
-
-    Query --> Validate
-    Validate --> Dangerous
-    Dangerous --> ReadOnly
-    ReadOnly --> Execution[Execute Query]
-
-    Schema --> Inspection[Schema Inspection]
-```
-
-### Context Management (`victor/context/`)
-
-**Context Window Strategy**:
-
-```mermaid
-flowchart TD
-    Start([New Message]) --> Count{Token<br/>Count}
-    Count -->|Under Limit| Add[Add to Context]
-    Count -->|Over Limit| Strategy{Pruning<br/>Strategy}
-
-    Strategy -->|Sliding| Remove[Remove Oldest]
-    Strategy -->|Semantic| Compress[Semantic Compression]
-    Strategy -->|Summary| Summarize[Summarize Old Messages]
-
-    Remove --> Add
-    Compress --> Add
-    Summarize --> Add
-
-    Add --> Index[Update Search Index]
-    Index --> Save[Persist to Disk]
-    Save --> End([Ready])
-```
-
-## Adding New Features
-
-### Adding a New Provider
-
-```mermaid
-flowchart TD
-    Start([New Provider]) --> Inherit[Inherit BaseProvider]
-    Inherit --> Implement[Implement Methods]
-
-    Implement --> Gen[generate()]
-    Implement --> Stream[generate_stream()]
-    Implement --> Norm[_normalize_response()]
-
-    Gen --> Client[Create HTTP Client]
-    Stream --> Client
-    Norm --> Format[Format to ChatResponse]
-
-    Client --> Test[Write Unit Tests]
-    Format --> Test
-
-    Test --> Register[Register in Registry]
-    Register --> Config[Add to Config Schema]
-    Config --> Docs[Update Documentation]
-    Docs --> Example[Create Example]
-    Example --> End([Complete])
-
-    style Start fill:#9f9
-    style End fill:#9f9
-```
-
-**Step-by-Step**:
-
-1. **Create provider file**: `victor/providers/my_provider.py`
+**Template**:
 
 ```python
-from typing import List, Optional, AsyncIterator
-from victor.providers.base import BaseProvider, ChatResponse, Message
-import httpx
+from victor.providers.base import BaseProvider, ChatResponse
 
 class MyProvider(BaseProvider):
-    def __init__(self, api_key: str, base_url: str):
-        super().__init__()
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {api_key}"}
-        )
-
-    async def generate(
-        self,
-        messages: List[Message],
-        **kwargs
-    ) -> ChatResponse:
-        # Implementation
-        response = await self.client.post(
-            "/chat",
-            json={"messages": messages, **kwargs}
-        )
-        return self._normalize_response(response.json())
-
-    def _normalize_response(self, response: dict) -> ChatResponse:
-        # Convert provider format to ChatResponse
-        return ChatResponse(
-            content=response["output"],
-            role="assistant",
-            model=response["model"]
-        )
-```
-
-2. **Register provider**: Update `victor/providers/registry.py`
-
-3. **Add tests**: `tests/unit/providers/test_my_provider.py`
-
-4. **Update config**: Add to `profiles.yaml.example`
-
-5. **Document**: Add to README and PROVIDERS.md
-
-### Adding a New Tool
-
-```mermaid
-flowchart TD
-    Start([New Tool Idea]) --> Design[Design Interface]
-    Design --> Params[Define Parameters]
-    Params --> Impl[Implement execute()]
-
-    Impl --> Safety{Needs<br/>Safety?}
-    Safety -->|Yes| Checks[Add Safety Checks]
-    Safety -->|No| Test
-
-    Checks --> Test[Write Tests]
-    Test --> Register[Register in Registry]
-    Register --> MCP[Verify MCP Exposure]
-    MCP --> Docs[Write Documentation]
-    Docs --> Example[Create Example]
-    Example --> End([Complete])
-
-    style Start fill:#9f9
-    style End fill:#9f9
-```
-
-**Example: Custom Tool**:
-
-```python
-from typing import Any, List
-from victor.tools.base import BaseTool, ToolParameter, ToolResult
-
-class MyCustomTool(BaseTool):
-    """Custom tool for specific operations."""
 
     @property
     def name(self) -> str:
-        return "my_custom_tool"
+        return "my_provider"
+
+    async def chat(self, messages, **kwargs) -> ChatResponse:
+        # Implementation
+        pass
+
+    async def stream_chat(self, messages, **kwargs):
+        # Implementation
+        pass
+
+    def supports_tools(self) -> bool:
+        return True
+```
+
+### New Tool
+
+**Steps**:
+
+1. Create `victor/tools/my_tool.py`
+2. Inherit from `BaseTool`
+3. Define properties and `execute()`
+4. Register in orchestrator
+5. Add tests
+6. Run `python scripts/generate_tool_catalog.py`
+
+**Template**:
+
+```python
+from victor.tools.base import BaseTool, ToolResult, CostTier
+
+class MyTool(BaseTool):
+    @property
+    def name(self) -> str:
+        return "my_tool"
 
     @property
     def description(self) -> str:
-        return """Perform custom operations.
-
-        Operations:
-        - operation1: Does X
-        - operation2: Does Y
-
-        Example:
-        my_custom_tool(operation="operation1", param="value")
-        """
+        return "Does something useful"
 
     @property
-    def parameters(self) -> List[ToolParameter]:
+    def parameters(self) -> list:
         return [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation to perform",
-                required=True
-            ),
-            ToolParameter(
-                name="param",
-                type="string",
-                description="Operation parameter",
-                required=False
-            )
+            {"name": "param", "type": "string", "required": True}
         ]
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        operation = kwargs.get("operation")
+    @property
+    def cost_tier(self) -> CostTier:
+        return CostTier.LOW
 
-        if operation == "operation1":
-            result = self._operation1(kwargs)
-            return ToolResult(
-                success=True,
-                output=result,
-                error=""
-            )
-
-        return ToolResult(
-            success=False,
-            output="",
-            error=f"Unknown operation: {operation}"
-        )
+    async def execute(self, **kwargs) -> ToolResult:
+        return ToolResult(success=True, output="Done")
 ```
+
+### New Model Support
+
+Edit `victor/config/model_capabilities.yaml`:
+
+```yaml
+models:
+  "my-model*":
+    native_tool_calls: true
+    parallel_tool_calls: true
+    recommended_tool_budget: 15
+```
+
+> **Note**: No code changes required - `ModelCapabilityLoader` auto-discovers patterns.
+
+---
+
+## Phase 4 Features
+
+### StateGraph DSL
+
+| Feature | Description |
+|---------|-------------|
+| Typed State | TypedDict schemas |
+| Conditional Edges | Branch on state |
+| Cycles | Retry loops |
+| Checkpointing | Resume workflows |
+
+```python
+from victor.framework.graph import StateGraph, END
+
+graph = StateGraph(MyState)
+graph.add_node("process", process_fn)
+graph.add_conditional_edge("process", condition, {"retry": "process", "done": END})
+graph.set_entry_point("process")
+app = graph.compile()
+```
+
+### Multi-Agent Teams
+
+| Formation | Description |
+|-----------|-------------|
+| SEQUENTIAL | One after another |
+| PARALLEL | Simultaneous |
+| PIPELINE | Output flows through |
+| HIERARCHICAL | Manager coordinates |
+
+```python
+from victor.framework.teams import AgentTeam, TeamMemberSpec, TeamFormation
+
+team = await AgentTeam.create(
+    orchestrator=orchestrator,
+    name="Team",
+    goal="Implement feature",
+    members=[TeamMemberSpec(role="executor", goal="Write code")],
+    formation=TeamFormation.PIPELINE,
+)
+```
+
+### Dynamic Capability Loading
+
+```python
+from victor.framework import CapabilityLoader, capability, CapabilityType
+
+@capability(name="custom", capability_type=CapabilityType.TOOL)
+def custom_handler(**kwargs):
+    pass
+
+loader = CapabilityLoader()
+loader.load_from_module("my_plugin.capabilities")
+loader.apply_to(orchestrator)
+```
+
+---
 
 ## Development Workflow
 
-### Feature Development Lifecycle
+### Contribution Flow
 
 ```mermaid
-gitGraph
-    commit id: "main"
-    branch feature/new-tool
-    checkout feature/new-tool
-    commit id: "implement tool"
-    commit id: "add tests"
-    commit id: "update docs"
-    checkout main
-    merge feature/new-tool tag: "v0.2.0"
-    branch fix/bug-123
-    checkout fix/bug-123
-    commit id: "fix bug"
-    commit id: "add test"
-    checkout main
-    merge fix/bug-123 tag: "v0.2.1"
+graph LR
+    A[Fork] --> B[Branch]
+    B --> C[Code]
+    C --> D[Test]
+    D --> E[Lint]
+    E --> F[PR]
+    F --> G[Review]
+    G --> H[Merge]
 ```
 
-### Code Review Checklist
+### Commands
 
-```mermaid
-flowchart TD
-    PR[Pull Request] --> Tests{Tests<br/>Pass?}
-    Tests -->|No| FixTests[Fix Tests]
-    FixTests --> Tests
+| Task | Command |
+|------|---------|
+| Test | `pytest` |
+| Single test | `pytest tests/unit/test_X.py::test_name` |
+| Coverage | `pytest --cov --cov-report=html` |
+| Format | `black victor tests` |
+| Lint | `ruff check victor tests` |
+| Type check | `mypy victor` |
+| All checks | `black . && ruff check . && mypy victor && pytest` |
 
-    Tests -->|Yes| Coverage{Coverage<br/>OK?}
-    Coverage -->|No| AddTests[Add Tests]
-    AddTests --> Coverage
+### PR Checklist
 
-    Coverage -->|Yes| Lint{Linting<br/>Pass?}
-    Lint -->|No| FixLint[Fix Lint]
-    FixLint --> Lint
+| Check | Command |
+|-------|---------|
+| Tests pass | `pytest` |
+| Code formatted | `black --check .` |
+| No lint errors | `ruff check .` |
+| Types valid | `mypy victor` |
+| Docs updated | Manual review |
 
-    Lint -->|Yes| Types{Types<br/>OK?}
-    Types -->|No| FixTypes[Fix Types]
-    FixTypes --> Types
-
-    Types -->|Yes| Docs{Docs<br/>Updated?}
-    Docs -->|No| UpdateDocs[Update Docs]
-    UpdateDocs --> Docs
-
-    Docs -->|Yes| Review[Manual Review]
-    Review --> Approve{Approved?}
-    Approve -->|No| Changes[Request Changes]
-    Changes --> PR
-
-    Approve -->|Yes| Merge[Merge]
-    Merge --> End([Complete])
-
-    style Merge fill:#9f9
-```
+---
 
 ## Best Practices
 
-### 1. Error Handling
+### Error Handling
 
 ```python
-# Good: Specific error handling
-async def execute(self, **kwargs):
+async def execute(self, **kwargs) -> ToolResult:
     try:
-        result = await self._perform_operation(kwargs)
-        return ToolResult(success=True, output=result, error="")
+        result = await self._operation(kwargs)
+        return ToolResult(success=True, output=result)
     except ValidationError as e:
-        logger.error("Validation failed: %s", e)
-        return ToolResult(success=False, output="", error=f"Validation: {e}")
-    except ConnectionError as e:
-        logger.error("Connection failed: %s", e)
-        return ToolResult(success=False, output="", error=f"Connection: {e}")
+        return ToolResult(success=False, error=f"Validation: {e}")
     except Exception as e:
         logger.exception("Unexpected error")
-        return ToolResult(success=False, output="", error=str(e))
+        return ToolResult(success=False, error=str(e))
 ```
 
-### 2. Async Best Practices
+### Async Patterns
 
 ```python
-# Good: Use async context managers
-async with self.client as client:
-    response = await client.post(url, json=data)
+# Good: Batch operations
+results = await asyncio.gather(op1(), op2(), op3())
 
-# Good: Batch async operations
-results = await asyncio.gather(
-    self.operation1(),
-    self.operation2(),
-    self.operation3()
-)
+# Good: Context managers
+async with client as c:
+    response = await c.post(url, json=data)
 
-# Good: Stream processing
-async for chunk in provider.generate_stream(messages):
+# Good: Streaming
+async for chunk in provider.stream_chat(messages):
     yield chunk
 ```
 
-### 3. Type Hints
+### Type Hints
 
 ```python
-# Good: Complete type hints
 from typing import List, Optional, Dict, Any
 
 async def process(
@@ -713,73 +390,48 @@ async def process(
     options: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, str]]:
     """Process items with options."""
-    results: List[Dict[str, str]] = []
-    for item in items:
-        result = await self._process_item(item, options or {})
-        results.append(result)
-    return results
+    ...
 ```
 
-### 4. Logging
+### Logging
 
 ```python
 import logging
-
 logger = logging.getLogger(__name__)
 
-# Good: Structured logging with context
-logger.info("Processing request", extra={
-    "operation": operation,
-    "user_id": user_id,
-    "request_id": request_id
-})
-
-# Good: Log levels
-logger.debug("Detailed debugging info")
-logger.info("General information")
+logger.debug("Detailed info")
+logger.info("General info", extra={"operation": op})
 logger.warning("Warning condition")
 logger.error("Error occurred", exc_info=True)
 ```
 
-### 5. Testing
+### Testing
 
 ```python
-# Good: Comprehensive test coverage
-class TestMyTool:
-    @pytest.fixture
-    def tool(self):
-        return MyTool(config={"key": "value"})
+@pytest.fixture
+def tool():
+    return MyTool()
 
-    async def test_success_case(self, tool):
-        """Test successful execution."""
-        result = await tool.execute(operation="test")
-        assert result.success
-        assert "expected" in result.output
+async def test_success(tool):
+    result = await tool.execute(operation="test")
+    assert result.success
 
-    async def test_error_handling(self, tool):
-        """Test error handling."""
-        result = await tool.execute(operation="invalid")
-        assert not result.success
-        assert "error" in result.error.lower()
-
-    async def test_edge_cases(self, tool):
-        """Test edge cases."""
-        # Empty input
-        result = await tool.execute()
-        assert not result.success
-
-        # Large input
-        result = await tool.execute(data="x" * 10000)
-        assert result.success
+async def test_error(tool):
+    result = await tool.execute(operation="invalid")
+    assert not result.success
 ```
 
 ---
 
-**Next**: See [USER_GUIDE.md](USER_GUIDE.md) for end-user documentation
+## Related Documentation
 
-**Related**:
-- [TESTING_STRATEGY.md](TESTING_STRATEGY.md) - Testing approach
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [ARCHITECTURE_DEEP_DIVE.md](ARCHITECTURE_DEEP_DIVE.md) - Detailed architecture
+| Document | Description |
+|----------|-------------|
+| [USER_GUIDE.md](USER_GUIDE.md) | End-user guide |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines |
+| [TOOL_CATALOG.md](TOOL_CATALOG.md) | All 45 tools |
+| [WORKFLOW_DSL.md](guides/WORKFLOW_DSL.md) | StateGraph guide |
 
-*Last Updated: 2025-11-24*
+---
+
+*Last Updated: 2025-12-30*

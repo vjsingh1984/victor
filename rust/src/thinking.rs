@@ -78,16 +78,14 @@ const CIRCULAR_PATTERNS: &[&str] = &[
 static STOPWORDS: OnceLock<AHashSet<&'static str>> = OnceLock::new();
 
 const STOPWORD_LIST: &[&str] = &[
-    "let", "me", "i", "the", "a", "an", "to", "and", "of", "in", "for",
-    "is", "it", "this", "that", "with", "be", "on", "as", "at", "by",
-    "from", "or", "but", "not", "are", "was", "were", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "must", "shall", "can", "need", "now",
-    "just", "also", "very", "well", "here", "there", "when", "where",
-    "what", "which", "who", "how", "why", "all", "each", "every", "both",
-    "few", "more", "most", "other", "some", "such", "no", "nor", "only",
-    "own", "same", "so", "than", "too", "about", "into", "through",
-    "during", "before", "after", "above", "below", "between",
+    "let", "me", "i", "the", "a", "an", "to", "and", "of", "in", "for", "is", "it", "this", "that",
+    "with", "be", "on", "as", "at", "by", "from", "or", "but", "not", "are", "was", "were", "been",
+    "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may",
+    "might", "must", "shall", "can", "need", "now", "just", "also", "very", "well", "here",
+    "there", "when", "where", "what", "which", "who", "how", "why", "all", "each", "every", "both",
+    "few", "more", "most", "other", "some", "such", "no", "nor", "only", "own", "same", "so",
+    "than", "too", "about", "into", "through", "during", "before", "after", "above", "below",
+    "between",
 ];
 
 fn get_stopwords() -> &'static AHashSet<&'static str> {
@@ -226,7 +224,8 @@ impl ThinkingDetector {
                 self.stalling_detected += 1;
                 self.add_to_history(pattern);
 
-                let guidance = generate_guidance("stalling", self.consecutive_stalls, &category, 0.0);
+                let guidance =
+                    generate_guidance("stalling", self.consecutive_stalls, &category, 0.0);
                 return (true, guidance);
             }
         } else {
@@ -515,13 +514,7 @@ pub fn count_circular_patterns(text: &str) -> usize {
 pub fn find_circular_patterns(text: &str) -> Vec<(usize, usize, String)> {
     get_circular_matcher()
         .find_iter(text)
-        .map(|m| {
-            (
-                m.start(),
-                m.end(),
-                text[m.start()..m.end()].to_string(),
-            )
-        })
+        .map(|m| (m.start(), m.end(), text[m.start()..m.end()].to_string()))
         .collect()
 }
 
@@ -575,7 +568,10 @@ mod tests {
         assert_eq!(categorize_thinking("Let me read the file"), "file_read");
         assert_eq!(categorize_thinking("I need to search for"), "search");
         assert_eq!(categorize_thinking("Let me analyze this"), "analysis");
-        assert_eq!(categorize_thinking("I'll implement the feature"), "implementation");
+        assert_eq!(
+            categorize_thinking("I'll implement the feature"),
+            "implementation"
+        );
         assert_eq!(categorize_thinking("Okay so"), "general");
     }
 
@@ -619,7 +615,11 @@ mod tests {
         Python::with_gil(|py| {
             let dict = stats.downcast_bound::<pyo3::types::PyDict>(py).unwrap();
             assert_eq!(
-                dict.get_item("history_size").unwrap().unwrap().extract::<usize>().unwrap(),
+                dict.get_item("history_size")
+                    .unwrap()
+                    .unwrap()
+                    .extract::<usize>()
+                    .unwrap(),
                 0
             );
         });

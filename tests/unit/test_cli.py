@@ -64,51 +64,55 @@ class TestConfigureLogging:
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("DEBUG", stream=stream)
+        _configure_logging("DEBUG", stream=stream, file_logging=False)
 
-        # Check that root logger level is set
+        # Root logger is always set to DEBUG (handlers do the filtering)
         assert logging.root.level == logging.DEBUG
+        assert any(h.level == logging.DEBUG for h in logging.root.handlers)
 
     def test_configure_logging_info_level(self):
         """Test INFO level configuration."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("INFO", stream=stream)
-        assert logging.root.level == logging.INFO
+        _configure_logging("INFO", stream=stream, file_logging=False)
+        # configure_logging sets root to DEBUG but handler to specified level
+        assert any(h.level == logging.INFO for h in logging.root.handlers)
 
     def test_configure_logging_warning_level(self):
         """Test WARNING level configuration."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("WARNING", stream=stream)
-        assert logging.root.level == logging.WARNING
+        _configure_logging("WARNING", stream=stream, file_logging=False)
+        # configure_logging sets root to DEBUG but handler to specified level
+        assert any(h.level == logging.WARNING for h in logging.root.handlers)
 
     def test_configure_logging_error_level(self):
         """Test ERROR level configuration."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("ERROR", stream=stream)
-        assert logging.root.level == logging.ERROR
+        _configure_logging("ERROR", stream=stream, file_logging=False)
+        # configure_logging sets root to DEBUG but handler to specified level
+        assert any(h.level == logging.ERROR for h in logging.root.handlers)
 
     def test_configure_logging_invalid_level_defaults_to_warning(self):
         """Test that invalid level defaults to WARNING."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("INVALID", stream=stream)
-        # getattr returns WARNING for invalid levels
-        assert logging.root.level == logging.WARNING
+        _configure_logging("INVALID", stream=stream, file_logging=False)
+        # configure_logging sets root to DEBUG but handler to WARNING for invalid levels
+        assert any(h.level == logging.WARNING for h in logging.root.handlers)
 
     def test_configure_logging_case_insensitive(self):
         """Test that level is case insensitive."""
         from victor.ui.commands.utils import configure_logging as _configure_logging
 
         stream = io.StringIO()
-        _configure_logging("debug", stream=stream)
-        assert logging.root.level == logging.DEBUG
+        _configure_logging("debug", stream=stream, file_logging=False)
+        assert any(h.level == logging.DEBUG for h in logging.root.handlers)
 
 
 # =============================================================================
@@ -441,7 +445,7 @@ class TestCheckCodebaseIndex:
         from victor.ui.commands.utils import check_codebase_index
 
         # Patch the import inside the function
-        with patch.dict("sys.modules", {"victor.codebase.indexer": None}):
+        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": None}):
             # Should not raise
             await check_codebase_index("/tmp", mock_console)
 
@@ -453,7 +457,7 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.side_effect = Exception("Test error")
 
-        with patch.dict("sys.modules", {"victor.codebase.indexer": MagicMock()}):
+        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": MagicMock()}):
             with patch(
                 "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
             ):
@@ -468,7 +472,7 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.return_value = (False, [], [])
 
-        with patch("victor.codebase.indexer.CodebaseIndex", return_value=mock_index):
+        with patch("victor.coding.codebase.indexer.CodebaseIndex", return_value=mock_index):
             await check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
 

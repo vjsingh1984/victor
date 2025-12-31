@@ -21,7 +21,7 @@ This module provides JSON file-based session persistence:
 - Auto-save functionality
 - Session metadata (timestamp, model, provider, etc.)
 
-The primary class is `SessionPersistence` (formerly `SessionManager`).
+The primary class is `SessionPersistence`.
 
 For in-memory message history, see `victor.agent.message_history.MessageHistory`.
 For SQLite-based persistence with token management, see `victor.agent.conversation_memory.ConversationStore`.
@@ -43,8 +43,6 @@ Usage:
 
     # Load a session
     data = persistence.load_session(session_id)
-
-Note: `SessionManager` is kept as an alias for backward compatibility.
 """
 
 import json
@@ -126,8 +124,6 @@ class SessionPersistence:
     Sessions are stored as JSON files in {project}/.victor/sessions/ by default.
     Each session includes the conversation history, metadata, and optionally
     tool usage statistics.
-
-    Note: Previously named `SessionManager`. Alias kept for backward compatibility.
     """
 
     def __init__(self, session_dir: Optional[Path] = None):
@@ -399,10 +395,6 @@ class SessionPersistence:
         if not sessions:
             return None
         return self.load_session(sessions[0].session_id)
-
-
-# Backward compatibility alias
-SessionManager = SessionPersistence
 
 
 # Default singleton instance

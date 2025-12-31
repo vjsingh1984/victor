@@ -87,8 +87,6 @@ class ProjectContextLoader:
     - Smart file selection based on relevance
     - Message prioritization
     - Context window optimization
-
-    Note: Previously named `ContextManager`. Alias kept for backward compatibility.
     """
 
     def __init__(
@@ -388,7 +386,3 @@ class ProjectContextLoader:
                 "assistant": len([m for m in self.context.messages if m.role == "assistant"]),
             },
         }
-
-
-# Backward compatibility alias
-ContextManager = ProjectContextLoader

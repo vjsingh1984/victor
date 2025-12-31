@@ -1695,6 +1695,251 @@ export class VictorClient {
     }
 
     // =========================================================================
+    // Teams API
+    // =========================================================================
+
+    /**
+     * Create a new agent team.
+     */
+    async createTeam(config: {
+        name: string;
+        goal: string;
+        formation: string;
+        members: Array<{
+            id: string;
+            role: string;
+            name: string;
+            goal: string;
+        }>;
+        totalToolBudget?: number;
+    }): Promise<string> {
+        try {
+            const response = await this.client.post('/teams', {
+                name: config.name,
+                goal: config.goal,
+                formation: config.formation,
+                members: config.members,
+                total_tool_budget: config.totalToolBudget || 100,
+            });
+            return response.data.team_id;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * List all teams.
+     */
+    async listTeams(status?: string): Promise<unknown[]> {
+        try {
+            const params: Record<string, unknown> = {};
+            if (status) {
+                params.status = status;
+            }
+            const response = await this.client.get('/teams', { params });
+            return response.data.teams || [];
+        } catch (error) {
+            console.error('List teams error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get team details.
+     */
+    async getTeam(teamId: string): Promise<unknown | null> {
+        try {
+            const response = await this.client.get(`/teams/${teamId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get team error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Start a team execution.
+     */
+    async startTeam(teamId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.post(`/teams/${teamId}/start`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Cancel a running team.
+     */
+    async cancelTeam(teamId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.post(`/teams/${teamId}/cancel`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Clear completed/failed teams.
+     */
+    async clearTeams(): Promise<{
+        success: boolean;
+        cleared: number;
+    }> {
+        try {
+            const response = await this.client.post('/teams/clear');
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * Get team messages (inter-agent communication).
+     */
+    async getTeamMessages(teamId: string): Promise<{
+        messages: Array<{
+            id: string;
+            timestamp: number;
+            sender_id: string;
+            sender_role: string;
+            type: string;
+            content: string;
+        }>;
+    }> {
+        try {
+            const response = await this.client.get(`/teams/${teamId}/messages`);
+            return response.data;
+        } catch (error) {
+            console.error('Get team messages error:', error);
+            return { messages: [] };
+        }
+    }
+
+    // =========================================================================
+    // Workflows API
+    // =========================================================================
+
+    /**
+     * List available workflow templates.
+     */
+    async listWorkflowTemplates(): Promise<Array<{
+        id: string;
+        name: string;
+        description: string;
+        category: string;
+        steps: Array<{
+            id: string;
+            name: string;
+            type: string;
+            role?: string;
+            goal?: string;
+        }>;
+        parameters?: Array<{
+            name: string;
+            type: string;
+            description: string;
+            required: boolean;
+            default?: unknown;
+            options?: string[];
+        }>;
+        estimated_duration?: string;
+        tags?: string[];
+    }>> {
+        try {
+            const response = await this.client.get('/workflows/templates');
+            return response.data.templates || [];
+        } catch (error) {
+            console.error('List workflow templates error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get workflow template details.
+     */
+    async getWorkflowTemplate(templateId: string): Promise<unknown | null> {
+        try {
+            const response = await this.client.get(`/workflows/templates/${templateId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get workflow template error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Execute a workflow.
+     */
+    async executeWorkflow(
+        templateId: string,
+        parameters: Record<string, unknown>
+    ): Promise<string> {
+        try {
+            const response = await this.client.post('/workflows/execute', {
+                template_id: templateId,
+                parameters,
+            });
+            return response.data.execution_id;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    /**
+     * List workflow executions.
+     */
+    async listWorkflowExecutions(status?: string): Promise<unknown[]> {
+        try {
+            const params: Record<string, unknown> = {};
+            if (status) {
+                params.status = status;
+            }
+            const response = await this.client.get('/workflows/executions', { params });
+            return response.data.executions || [];
+        } catch (error) {
+            console.error('List workflow executions error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get workflow execution details.
+     */
+    async getWorkflowExecution(executionId: string): Promise<unknown | null> {
+        try {
+            const response = await this.client.get(`/workflows/executions/${executionId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get workflow execution error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Cancel a workflow execution.
+     */
+    async cancelWorkflowExecution(executionId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            const response = await this.client.post(`/workflows/executions/${executionId}/cancel`);
+            return response.data;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    // =========================================================================
     // Error Handling
     // =========================================================================
 

@@ -26,12 +26,8 @@ import sqlite3
 
 def main():
     parser = argparse.ArgumentParser(description="Show continuation prompt RL learning status")
-    parser.add_argument(
-        "--provider", help="Filter by provider name (e.g., 'ollama', 'anthropic')"
-    )
-    parser.add_argument(
-        "--model", help="Filter by model name (e.g., 'qwen3-coder-tools:30b-128k')"
-    )
+    parser.add_argument("--provider", help="Filter by provider name (e.g., 'ollama', 'anthropic')")
+    parser.add_argument("--model", help="Filter by model name (e.g., 'qwen3-coder-tools:30b-128k')")
     parser.add_argument(
         "--export",
         metavar="FILE",
@@ -50,14 +46,16 @@ def main():
     conn = sqlite3.connect(str(coordinator.db_path))
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT context_key, provider, model, task_type, total_sessions,
                successful_sessions, stuck_loop_count, forced_completion_count,
                avg_quality_score, avg_prompts_used, current_max_prompts,
                recommended_max_prompts
         FROM continuation_prompts_stats
         ORDER BY total_sessions DESC
-    """)
+    """
+    )
 
     print("=" * 80)
     print("CONTINUATION PROMPT RL LEARNING STATUS")
@@ -71,7 +69,20 @@ def main():
         return
 
     for row in rows:
-        context_key, provider, model, task_type, total, successful, stuck, forced, avg_quality, avg_prompts, current_max, recommended = row
+        (
+            context_key,
+            provider,
+            model,
+            task_type,
+            total,
+            successful,
+            stuck,
+            forced,
+            avg_quality,
+            avg_prompts,
+            current_max,
+            recommended,
+        ) = row
 
         # Apply filters if provided
         if args.provider and provider != args.provider:
@@ -98,11 +109,13 @@ def main():
     # Export recommendations if requested
     if args.export:
         # Query for recommendations from database
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT provider, model, task_type, recommended_max_prompts
             FROM continuation_prompts_stats
             WHERE recommended_max_prompts IS NOT NULL
-        """)
+        """
+        )
 
         recommendations = {}
         for provider, model, task_type, recommended in cursor.fetchall():

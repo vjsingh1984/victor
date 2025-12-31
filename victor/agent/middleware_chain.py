@@ -25,7 +25,7 @@ Design:
 
 Usage:
     from victor.agent.middleware_chain import MiddlewareChain
-    from victor.verticals.protocols import MiddlewareProtocol
+    from victor.core.verticals.protocols import MiddlewareProtocol
 
     # Create chain
     chain = MiddlewareChain()
@@ -44,13 +44,16 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
-from victor.verticals.protocols import (
+from victor.core.verticals.protocols import (
     MiddlewarePriority,
     MiddlewareProtocol,
     MiddlewareResult,
 )
+
+if TYPE_CHECKING:
+    from victor.agent.vertical_context import VerticalContext
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +69,17 @@ class MiddlewareChain:
         _enabled: Whether the chain is enabled
     """
 
-    def __init__(self) -> None:
-        """Initialize an empty middleware chain."""
+    def __init__(self, vertical_context: Optional["VerticalContext"] = None) -> None:
+        """Initialize an empty middleware chain.
+
+        Args:
+            vertical_context: Optional vertical context for DIP-compliant
+                vertical-specific middleware behavior
+        """
         self._middleware: List[MiddlewareProtocol] = []
         self._enabled: bool = True
         self._sorted: bool = True
+        self._vertical_context: Optional["VerticalContext"] = vertical_context
 
     @property
     def enabled(self) -> bool:
@@ -81,6 +90,27 @@ class MiddlewareChain:
     def enabled(self, value: bool) -> None:
         """Enable or disable the middleware chain."""
         self._enabled = value
+
+    @property
+    def vertical_context(self) -> Optional["VerticalContext"]:
+        """Get the current vertical context."""
+        return self._vertical_context
+
+    def set_vertical_context(self, context: Optional["VerticalContext"]) -> None:
+        """Set vertical context for vertical-aware middleware processing.
+
+        This enables middleware to access vertical-specific configuration
+        and behavior (DIP compliance).
+
+        Args:
+            context: VerticalContext instance or None to clear
+        """
+        self._vertical_context = context
+        if context:
+            logger.debug(
+                "MiddlewareChain vertical context set: %s",
+                context.vertical_name,
+            )
 
     def add(self, middleware: MiddlewareProtocol) -> None:
         """Add middleware to the chain.
@@ -161,7 +191,13 @@ class MiddlewareChain:
 
         applicable = self._get_applicable_middleware(tool_name)
         current_args = arguments.copy()
+
+        # Initialize metadata with vertical context info (DIP - provides vertical
+        # awareness to middleware without tight coupling)
         aggregated_metadata: Dict[str, Any] = {}
+        if self._vertical_context:
+            aggregated_metadata["vertical_name"] = self._vertical_context.vertical_name
+            aggregated_metadata["vertical_mode"] = getattr(self._vertical_context, "mode", None)
 
         for middleware in applicable:
             try:
@@ -337,16 +373,19 @@ class MiddlewareAbortError(Exception):
 
 def create_middleware_chain(
     middleware_list: Optional[List[MiddlewareProtocol]] = None,
+    vertical_context: Optional["VerticalContext"] = None,
 ) -> MiddlewareChain:
     """Create a middleware chain with optional initial middleware.
 
     Args:
         middleware_list: Optional list of middleware to add
+        vertical_context: Optional vertical context for DIP-compliant
+            vertical-specific middleware behavior
 
     Returns:
         Configured MiddlewareChain
     """
-    chain = MiddlewareChain()
+    chain = MiddlewareChain(vertical_context=vertical_context)
     if middleware_list:
         for mw in middleware_list:
             chain.add(mw)

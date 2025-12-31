@@ -30,11 +30,14 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.tools import ToolSet
 
-# Import canonical ToolCategory from tools.py (single source of truth)
-from victor.framework.tools import ToolCategory, _CATEGORY_TOOLS
+# Import canonical ToolCategory and registry from tools.py (single source of truth)
+from victor.framework.tools import ToolCategory, get_category_registry
+
+# Import capability helpers for protocol-based access
+from victor.framework.vertical_integration import _check_capability, _invoke_capability
 
 
 # =============================================================================
@@ -347,8 +350,10 @@ class ToolConfigurator:
         Returns:
             Set of available tool names
         """
-        if hasattr(orchestrator, "tools") and orchestrator.tools:
-            return set(orchestrator.tools.keys())
+        # Check for tools attribute
+        tools = getattr(orchestrator, "tools", None)
+        if tools:
+            return set(tools.keys())
         return set()
 
     def _get_current_tools(self, orchestrator: "AgentOrchestrator") -> Set[str]:
@@ -360,7 +365,7 @@ class ToolConfigurator:
         Returns:
             Set of enabled tool names
         """
-        # Use ToolsProtocol method if available (proper API)
+        # Use capability-based check first (protocol-first approach)
         if hasattr(orchestrator, "get_enabled_tools") and callable(orchestrator.get_enabled_tools):
             return orchestrator.get_enabled_tools()
 
@@ -378,15 +383,19 @@ class ToolConfigurator:
             orchestrator: Target orchestrator
             tools: Tools to enable
         """
-        # Use ToolsProtocol method if available (proper API)
-        if hasattr(orchestrator, "set_enabled_tools") and callable(orchestrator.set_enabled_tools):
+        # Use capability-based approach (protocol-first, fallback to hasattr)
+        if _check_capability(orchestrator, "enabled_tools"):
+            _invoke_capability(orchestrator, "enabled_tools", tools)
+        elif hasattr(orchestrator, "set_enabled_tools") and callable(
+            orchestrator.set_enabled_tools
+        ):
             orchestrator.set_enabled_tools(tools)
         else:
             # Fallback: log warning as this indicates protocol non-compliance
             import logging
 
             logging.getLogger(__name__).warning(
-                "Orchestrator does not implement set_enabled_tools(); "
+                "Orchestrator does not implement enabled_tools capability; "
                 "tool configuration may not be applied properly"
             )
 
@@ -497,9 +506,20 @@ class ToolConfigBuilder:
         )
     """
 
-    # Reference canonical category→tools mapping from tools.py (single source of truth)
-    # Note: This is a class-level alias, not a copy
-    CATEGORY_TOOLS: Dict[ToolCategory, Set[str]] = _CATEGORY_TOOLS
+    @staticmethod
+    def get_category_tools(category: ToolCategory) -> Set[str]:
+        """Get tools for a category using the registry.
+
+        This replaces static CATEGORY_TOOLS with dynamic registry lookup.
+        Supports custom categories registered by plugins/verticals.
+
+        Args:
+            category: Tool category to look up
+
+        Returns:
+            Set of tool names in the category
+        """
+        return get_category_registry().get_tools(category.value)
 
     def __init__(self) -> None:
         """Initialize builder."""
@@ -555,7 +575,7 @@ class ToolConfigBuilder:
             Self for chaining
         """
         self._categories.add(category)
-        category_tools = self.CATEGORY_TOOLS.get(category, set())
+        category_tools = self.get_category_tools(category)
         self._enabled.update(category_tools)
         return self
 
@@ -568,7 +588,7 @@ class ToolConfigBuilder:
         Returns:
             Self for chaining
         """
-        category_tools = self.CATEGORY_TOOLS.get(category, set())
+        category_tools = self.get_category_tools(category)
         self._disabled.update(category_tools)
         return self
 

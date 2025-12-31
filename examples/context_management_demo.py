@@ -20,7 +20,7 @@ Usage:
     python examples/context_management_demo.py
 """
 
-from victor.context import ContextManager, PruningStrategy
+from victor.context import ProjectContextLoader, PruningStrategy
 
 
 def main():
@@ -30,7 +30,7 @@ def main():
 
     # Create context manager
     print("\n📊 Creating context manager...")
-    ctx = ContextManager(
+    ctx = ProjectContextLoader(
         model="gpt-4",
         max_tokens=128000,
         reserved_tokens=4096,
@@ -111,7 +111,7 @@ def main():
     print("-" * 70)
 
     for strategy in [PruningStrategy.FIFO, PruningStrategy.PRIORITY, PruningStrategy.SMART]:
-        test_ctx = ContextManager(
+        test_ctx = ProjectContextLoader(
             model="gpt-4",
             max_tokens=1000,  # Small window for demo
             reserved_tokens=100,
@@ -149,7 +149,7 @@ def main():
     print("  ✓ Context window optimization")
 
 
-def print_stats(ctx: ContextManager) -> None:
+def print_stats(ctx: ProjectContextLoader) -> None:
     """Print context stats."""
     stats = ctx.get_stats()
     print(f"   Tokens: {stats['total_tokens']:,}/{ctx.max_tokens:,}")

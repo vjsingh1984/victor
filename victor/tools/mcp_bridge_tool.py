@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from victor.mcp.client import MCPClient
+from victor.integrations.mcp.client import MCPClient
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
@@ -39,22 +39,6 @@ def _get_mcp_prefix(context: Optional[Dict[str, Any]] = None) -> str:
 def _prefixed(name: str, context: Optional[Dict[str, Any]] = None) -> str:
     prefix = _get_mcp_prefix(context)
     return f"{prefix}_{name}"
-
-
-def configure_mcp_client(client: MCPClient, prefix: str = "mcp") -> None:
-    """Configure MCP client globally.
-
-    DEPRECATED: Use context-based injection instead.
-    This function is kept for backward compatibility with orchestrator imports.
-    """
-    import warnings
-
-    warnings.warn(
-        "configure_mcp_client() is deprecated. Use context-based injection instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    # No-op for backward compatibility - orchestrator should use context injection
 
 
 def get_mcp_tool_definitions(context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:

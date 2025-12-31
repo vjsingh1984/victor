@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TestResult:
     """Result from a single test."""
+
     name: str
     passed: bool
     output: str = ""
@@ -52,6 +53,7 @@ class TestResult:
 @dataclass
 class TestSuite:
     """Collection of test results."""
+
     name: str
     results: List[TestResult] = field(default_factory=list)
 
@@ -507,7 +509,9 @@ class LiveChatTester:
                 duration_ms=duration,
             )
 
-    async def test_tool_usage(self, prompt: str, expected_tools: List[str], timeout: float = 90.0) -> TestResult:
+    async def test_tool_usage(
+        self, prompt: str, expected_tools: List[str], timeout: float = 90.0
+    ) -> TestResult:
         """Test that a prompt triggers expected tools."""
         import time
 
@@ -590,7 +594,11 @@ def print_results(console: Console, suites: List[TestSuite]):
         for result in suite.results:
             status = "[green]PASS[/]" if result.passed else "[red]FAIL[/]"
             time_str = f"{result.duration_ms:.1f}" if result.duration_ms > 0 else "-"
-            details = result.error if result.error else (result.output[:60] + "..." if len(result.output) > 60 else result.output)
+            details = (
+                result.error
+                if result.error
+                else (result.output[:60] + "..." if len(result.output) > 60 else result.output)
+            )
             # Clean up ANSI codes for display
             details = details.replace("\n", " ").strip()
 
@@ -601,15 +609,19 @@ def print_results(console: Console, suites: List[TestSuite]):
 
     # Summary
     if total_failed > 0:
-        console.print(Panel(
-            f"[red]FAILED[/] - {total_passed}/{total_tests} tests passed, {total_failed} failed",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                f"[red]FAILED[/] - {total_passed}/{total_tests} tests passed, {total_failed} failed",
+                border_style="red",
+            )
+        )
     else:
-        console.print(Panel(
-            f"[green]ALL PASSED[/] - {total_passed}/{total_tests} tests passed",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                f"[green]ALL PASSED[/] - {total_passed}/{total_tests} tests passed",
+                border_style="green",
+            )
+        )
 
 
 async def run_tests(args):
@@ -617,14 +629,16 @@ async def run_tests(args):
     console = Console()
     suites = []
 
-    console.print(Panel(
-        f"[bold]Victor Test Harness[/]\n\n"
-        f"Provider: {args.provider}\n"
-        f"Model: {args.model}\n"
-        f"Vertical: {args.vertical or 'all'}",
-        title="Configuration",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Victor Test Harness[/]\n\n"
+            f"Provider: {args.provider}\n"
+            f"Model: {args.model}\n"
+            f"Vertical: {args.vertical or 'all'}",
+            title="Configuration",
+            border_style="blue",
+        )
+    )
 
     # Test slash commands
     if args.commands or args.all:
@@ -694,7 +708,9 @@ async def run_tests(args):
         console.print("\n")
         print_results(console, suites)
     else:
-        console.print("[yellow]No tests run. Use --all, --commands, --verticals, --modes, or --chat[/]")
+        console.print(
+            "[yellow]No tests run. Use --all, --commands, --verticals, --modes, or --chat[/]"
+        )
 
 
 def main():
@@ -720,9 +736,13 @@ Examples:
     parser.add_argument("--chat", action="store_true", help="Test live chat (requires provider)")
 
     parser.add_argument("--vertical", type=str, help="Test specific vertical")
-    parser.add_argument("--with-agent", action="store_true", help="Initialize agent for command tests")
+    parser.add_argument(
+        "--with-agent", action="store_true", help="Initialize agent for command tests"
+    )
 
-    parser.add_argument("--provider", type=str, default="ollama", help="Provider to use (default: ollama)")
+    parser.add_argument(
+        "--provider", type=str, default="ollama", help="Provider to use (default: ollama)"
+    )
     parser.add_argument("--model", type=str, default="qwen3-coder:30b", help="Model to use")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")

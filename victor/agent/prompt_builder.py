@@ -21,13 +21,20 @@ Builds provider-specific system prompts based on:
 """
 
 import logging
-from typing import Optional, Set, List, Dict, Any
+from typing import TYPE_CHECKING, Optional, Set, List, Dict, Any
 
 from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
 from victor.agent.provider_tool_guidance import (
     get_tool_guidance_strategy,
     ToolGuidanceStrategy,
 )
+
+if TYPE_CHECKING:
+    from victor.framework.enrichment import (
+        PromptEnrichmentService,
+        EnrichmentContext,
+        EnrichedPrompt,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +57,18 @@ PARALLEL READS: For exploration tasks, batch multiple read calls together.
 - Each file read is limited to ~8K chars (~230 lines) to fit context
 - List files first (ls), then batch-read relevant ones in parallel
 - Example: To understand a module, read all .py files in that directory at once
+""".strip()
+
+# Concise mode guidance to reduce verbosity
+CONCISE_MODE_GUIDANCE = """
+OUTPUT STYLE: CONCISE
+- Be direct and brief. No unnecessary preamble or summary.
+- Skip "I'll" and "Let me" phrases - just do the action.
+- No explanations unless explicitly requested.
+- For code: Show the code, minimal commentary.
+- For actions: Report result, not the process.
+- For questions: Answer directly, then stop.
+- Maximum 3 sentences for simple queries.
 """.strip()
 
 # Extended grounding rules for local models that need more explicit guidance
@@ -347,6 +366,9 @@ class SystemPromptBuilder:
         tool_guidance_strategy: Optional[ToolGuidanceStrategy] = None,
         task_type: str = "medium",
         available_tools: Optional[List[str]] = None,
+        enrichment_service: Optional["PromptEnrichmentService"] = None,
+        vertical: Optional[str] = None,
+        concise_mode: bool = False,
     ):
         """Initialize the prompt builder.
 
@@ -359,6 +381,9 @@ class SystemPromptBuilder:
             tool_guidance_strategy: Optional provider-specific tool guidance strategy (GAP-5)
             task_type: Task complexity level (simple, medium, complex) for guidance
             available_tools: List of available tool names for guidance context
+            enrichment_service: Optional prompt enrichment service for context injection
+            vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
+            concise_mode: If True, adds guidance to produce brief, direct responses
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
@@ -368,6 +393,9 @@ class SystemPromptBuilder:
         self.prompt_contributors = prompt_contributors or []
         self.task_type = task_type
         self.available_tools = available_tools or []
+        self.enrichment_service = enrichment_service
+        self.vertical = vertical or "coding"
+        self.concise_mode = concise_mode
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -518,6 +546,66 @@ class SystemPromptBuilder:
 
         return self._tool_guidance.get_synthesis_checkpoint_prompt(tool_count)
 
+    async def enrich_prompt(
+        self,
+        prompt: str,
+        context: Optional["EnrichmentContext"] = None,
+    ) -> "EnrichedPrompt":
+        """Enrich a user prompt with contextual information.
+
+        Uses the enrichment service to inject relevant context based on the
+        vertical (coding, research, devops, data_analysis). This can include:
+        - Knowledge graph symbols for coding tasks
+        - Web search results for research tasks
+        - Infrastructure context for devops tasks
+        - Schema context for data analysis tasks
+
+        Args:
+            prompt: The user prompt to enrich
+            context: Optional enrichment context with session/task metadata.
+                     If not provided, a basic context will be created.
+
+        Returns:
+            EnrichedPrompt with the enriched prompt text and metadata.
+            If enrichment is disabled or unavailable, returns the original prompt.
+        """
+        # Import here to avoid circular imports
+        from victor.framework.enrichment import EnrichmentContext, EnrichedPrompt
+
+        # If no enrichment service, return original prompt
+        if not self.enrichment_service:
+            logger.debug("No enrichment service available, returning original prompt")
+            return EnrichedPrompt(
+                original_prompt=prompt,
+                enriched_prompt=prompt,
+            )
+
+        # Create default context if not provided
+        if context is None:
+            context = EnrichmentContext(
+                task_type=self.task_type,
+            )
+
+        try:
+            result = await self.enrichment_service.enrich(
+                prompt=prompt,
+                vertical=self.vertical,
+                context=context,
+            )
+            logger.info(
+                "Prompt enriched: vertical=%s, enrichments=%d, tokens_added=%d",
+                self.vertical,
+                result.enrichment_count,
+                result.total_tokens_added,
+            )
+            return result
+        except Exception as e:
+            logger.warning("Prompt enrichment failed: %s", e)
+            return EnrichedPrompt(
+                original_prompt=prompt,
+                enriched_prompt=prompt,
+            )
+
     def build(self) -> str:
         """Build the system prompt.
 
@@ -534,6 +622,11 @@ class SystemPromptBuilder:
         else:
             # Fall back to provider-specific prompt
             base_prompt = self._build_for_provider()
+
+        # Prepend concise mode guidance if enabled
+        if self.concise_mode:
+            base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
+            logger.debug("Concise mode enabled - added brevity guidance to prompt")
 
         # Append provider-specific tool guidance if available (GAP-5)
         tool_guidance = self.get_provider_tool_guidance()
@@ -858,6 +951,7 @@ def build_system_prompt(
     tool_adapter: Optional[BaseToolCallingAdapter] = None,
     capabilities: Optional[ToolCallingCapabilities] = None,
     prompt_contributors: Optional[list] = None,
+    concise_mode: bool = False,
 ) -> str:
     """Build a system prompt (convenience function).
 
@@ -867,6 +961,7 @@ def build_system_prompt(
         tool_adapter: Optional tool calling adapter
         capabilities: Optional pre-computed capabilities
         prompt_contributors: Optional list of PromptContributorProtocol implementations
+        concise_mode: If True, adds guidance for brief, direct responses
 
     Returns:
         System prompt string
@@ -877,5 +972,6 @@ def build_system_prompt(
         tool_adapter=tool_adapter,
         capabilities=capabilities,
         prompt_contributors=prompt_contributors,
+        concise_mode=concise_mode,
     )
     return builder.build()

@@ -285,14 +285,8 @@ class VerticalLayer(AccessLayer):
         if self._tiered_config is None:
             return True, "No vertical restrictions"
 
-        # Get all allowed tools from tiered config
-        allowed = set()
-        if hasattr(self._tiered_config, "core_tools"):
-            allowed.update(self._tiered_config.core_tools or [])
-        if hasattr(self._tiered_config, "extension_tools"):
-            allowed.update(self._tiered_config.extension_tools or [])
-        if hasattr(self._tiered_config, "optional_tools"):
-            allowed.update(self._tiered_config.optional_tools or [])
+        # Get all allowed tools from tiered config (ISP fix: support both interfaces)
+        allowed = self._get_allowed_from_config()
 
         if not allowed:
             return True, "Vertical has no tool restrictions"
@@ -303,20 +297,47 @@ class VerticalLayer(AccessLayer):
         vertical_name = context.vertical_name if context else "active"
         return False, f"Tool '{tool_name}' not in {vertical_name} vertical's tool set"
 
-    def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
-        """Get tools allowed by vertical."""
-        if self._tiered_config is None:
-            return all_tools.copy()
+    def _get_allowed_from_config(self) -> Set[str]:
+        """Extract allowed tools from tiered config (ISP-compliant).
 
-        allowed = set()
+        Supports both legacy interface (core_tools/extension_tools/optional_tools)
+        and TieredToolConfig interface (mandatory/vertical_core/semantic_pool).
+        """
+        if self._tiered_config is None:
+            return set()
+
+        allowed: Set[str] = set()
+
+        # TieredToolConfig interface (preferred)
+        if hasattr(self._tiered_config, "mandatory"):
+            allowed.update(self._tiered_config.mandatory or set())
+        if hasattr(self._tiered_config, "vertical_core"):
+            allowed.update(self._tiered_config.vertical_core or set())
+        if hasattr(self._tiered_config, "semantic_pool"):
+            allowed.update(self._tiered_config.semantic_pool or set())
+
+        # Use helper method if available (TieredToolConfig.get_all_tools())
+        if hasattr(self._tiered_config, "get_all_tools"):
+            allowed.update(self._tiered_config.get_all_tools() or set())
+
+        # Legacy interface fallback (deprecated)
         if hasattr(self._tiered_config, "core_tools"):
             allowed.update(self._tiered_config.core_tools or [])
         if hasattr(self._tiered_config, "extension_tools"):
             allowed.update(self._tiered_config.extension_tools or [])
         if hasattr(self._tiered_config, "optional_tools"):
             allowed.update(self._tiered_config.optional_tools or [])
+
+        return allowed
+
+    def get_allowed_tools(
+        self, all_tools: Set[str], context: Optional[ToolAccessContext]
+    ) -> Set[str]:
+        """Get tools allowed by vertical (ISP fix: uses unified config extraction)."""
+        if self._tiered_config is None:
+            return all_tools.copy()
+
+        allowed = self._get_allowed_from_config()
 
         if not allowed:
             return all_tools.copy()
@@ -482,12 +503,14 @@ class ToolAccessController(IToolAccessController):
         registry: Tool registry for tool lookup
         layers: List of access layers in precedence order
         _cache: Cache for recent decisions (optional optimization)
+        _allowed_tools_cache: Cached bulk allowed tool set (scalability fix)
     """
 
     registry: Optional["ToolRegistry"] = None
     layers: List[AccessLayer] = field(default_factory=list)
     _cache: Dict[str, ToolAccessDecision] = field(default_factory=dict)
     _cache_context_hash: Optional[int] = None
+    _allowed_tools_cache: Optional[Set[str]] = None
 
     def __post_init__(self) -> None:
         """Initialize with default layers if none provided."""
@@ -523,6 +546,7 @@ class ToolAccessController(IToolAccessController):
         ctx_hash = self._get_context_hash(context)
         if ctx_hash != self._cache_context_hash:
             self._cache.clear()
+            self._allowed_tools_cache = None  # Invalidate bulk cache too
             self._cache_context_hash = ctx_hash
 
     def check_access(
@@ -614,7 +638,8 @@ class ToolAccessController(IToolAccessController):
     def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
         """Get all tools allowed in the given context.
 
-        Uses layer-specific optimization when possible.
+        Uses layer-specific optimization and caching for scalability.
+        On large tool sets, this avoids repeated per-tool iteration.
 
         Args:
             context: Access context
@@ -622,6 +647,13 @@ class ToolAccessController(IToolAccessController):
         Returns:
             Set of allowed tool names
         """
+        # Invalidate cache if context changed
+        self._invalidate_cache_if_needed(context)
+
+        # Return cached result if available (scalability optimization)
+        if self._allowed_tools_cache is not None:
+            return self._allowed_tools_cache.copy()
+
         # Get all available tools from registry
         if self.registry is None:
             return set()
@@ -635,6 +667,8 @@ class ToolAccessController(IToolAccessController):
         for layer in self.layers:
             allowed = layer.get_allowed_tools(allowed, context)
 
+        # Cache the result
+        self._allowed_tools_cache = allowed.copy()
         return allowed
 
     def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:

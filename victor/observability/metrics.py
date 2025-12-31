@@ -56,7 +56,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import mean, median, quantiles
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -109,7 +109,7 @@ class Metric(ABC):
         self.description = description
         self._labels = MetricLabels(labels or {})
         self._lock = threading.RLock()
-        self._created_at = datetime.utcnow()
+        self._created_at = datetime.now(timezone.utc)
 
     @abstractmethod
     def collect(self) -> Dict[str, Any]:

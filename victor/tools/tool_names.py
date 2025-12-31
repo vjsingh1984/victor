@@ -128,11 +128,6 @@ class ToolNames:
     WEB_FETCH = "web_fetch"  # web_fetch (fetch URL content)
     SUMMARIZE = "summarize"  # web_summarize → summarize
 
-    # Deprecated aliases (kept for backward compatibility imports)
-    SEARCH = CODE_SEARCH  # Deprecated: use CODE_SEARCH instead
-    WEB = WEB_SEARCH  # Deprecated: use WEB_SEARCH instead
-    FETCH = WEB_FETCH  # Deprecated: use WEB_FETCH instead
-
     # ==========================================================================
     # CODE INTELLIGENCE
     # ==========================================================================
@@ -232,10 +227,7 @@ TOOL_ALIASES: Dict[str, str] = {
     "code_search": ToolNames.GREP,
     # Search - semantic (AI-powered) code search
     "semantic_code_search": ToolNames.CODE_SEARCH,
-    "search": ToolNames.CODE_SEARCH,  # Short alias for backward compatibility
     # Web tools
-    "web": ToolNames.WEB_SEARCH,  # Short alias for backward compatibility
-    "fetch": ToolNames.WEB_FETCH,  # Short alias for backward compatibility
     "web_summarize": ToolNames.SUMMARIZE,
     # Code Intelligence
     "find_symbol": ToolNames.SYMBOL,

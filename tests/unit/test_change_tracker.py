@@ -19,7 +19,7 @@ import tempfile
 import pytest
 
 from victor.agent.change_tracker import (
-    ChangeTracker,
+    FileChangeHistory,
     ChangeType,
     FileChange,
     ChangeGroup,
@@ -35,7 +35,7 @@ def tracker():
 
     reset_change_tracker()
     with tempfile.TemporaryDirectory() as tmpdir:
-        tracker = ChangeTracker(storage_dir=Path(tmpdir), max_history=50)
+        tracker = FileChangeHistory(project_path=Path(tmpdir), max_history=50)
         yield tracker
 
 
@@ -150,8 +150,8 @@ class TestChangeGroup:
         assert group.timestamp is not None
 
 
-class TestChangeTracker:
-    """Tests for the ChangeTracker class."""
+class TestFileChangeHistory:
+    """Tests for the FileChangeHistory class."""
 
     def test_begin_change_group(self, tracker):
         """Test beginning a change group."""

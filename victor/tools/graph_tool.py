@@ -33,8 +33,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-from victor.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-from victor.codebase.graph.registry import create_graph_store
+from victor.coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor.coding.codebase.graph.registry import create_graph_store
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -1211,6 +1211,7 @@ async def graph(
     include_neighbors: bool = False,
     neighbors_edge_types: Optional[List[str]] = None,
     neighbors_limit: int = 3,
+    granularity: Literal["file", "package"] = "file",
 ) -> Dict[str, Any]:
     """[GRAPH] Query codebase STRUCTURE for relationships, impact, and importance.
 
@@ -1327,14 +1328,42 @@ async def graph(
         graph(mode="module_pagerank", file="package", top_k=10)
     """
     try:
-        # Get graph store
-        graph_dir = Path(".victor/graph")
-        graph_dir.mkdir(parents=True, exist_ok=True)
-        graph_path = graph_dir / "graph.db"
-        store = create_graph_store("sqlite", graph_path)
+        # Get graph store (uses consolidated project.db by default)
+        store = create_graph_store("sqlite", project_path=Path.cwd())
 
         # Load into analyzer
         analyzer = await _load_graph(store)
+
+        # Lazy indexing: if graph is empty, trigger automatic indexing
+        if not analyzer.nodes:
+            logger.info("Graph is empty, triggering lazy indexing...")
+            try:
+                from victor.coding.codebase.indexer import CodebaseIndex
+
+                # Get project root (current working directory or from context)
+                project_root = Path.cwd()
+                indexer = CodebaseIndex(project_root)
+
+                # Check if we should do full or incremental index
+                if not indexer._is_indexed:
+                    logger.info("Building initial code graph index (this may take a moment)...")
+                    await indexer.index_codebase()
+                else:
+                    # Index exists but graph is empty - rebuild graph from index
+                    logger.info("Rebuilding graph from existing index...")
+                    await indexer.incremental_reindex()
+
+                # Reload the graph after indexing
+                analyzer = await _load_graph(store)
+                logger.info(f"Graph indexed: {len(analyzer.nodes)} nodes loaded")
+
+            except Exception as index_err:
+                logger.warning(f"Lazy indexing failed: {index_err}")
+                return {
+                    "error": "Graph is empty and automatic indexing failed.",
+                    "details": str(index_err),
+                    "hint": "Run 'victor index' manually to build the code graph.",
+                }
 
         default_excludes = [
             "tests/",
@@ -1546,8 +1575,17 @@ async def graph(
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
-            results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k)
-            results = [r for r in results if not _skip_path(r.get("file"))]
+            # Request more results to account for filtering, then trim to top_k
+            results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k * 3)
+            # Filter out stdlib modules and test/build paths
+            results = [
+                r
+                for r in results
+                if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
+            ][:top_k]
+            # Re-assign ranks after filtering (1-indexed)
+            for i, r in enumerate(results):
+                r["rank"] = i + 1
             if structured:
                 results = _add_callsites(_add_edge_counts(results))
                 return {
@@ -1564,8 +1602,17 @@ async def graph(
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
-            results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k)
-            results = [r for r in results if not _skip_path(r.get("file"))]
+            # Request more results to account for filtering, then trim to top_k
+            results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k * 3)
+            # Filter out stdlib modules and test/build paths
+            results = [
+                r
+                for r in results
+                if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
+            ][:top_k]
+            # Re-assign ranks after filtering (1-indexed)
+            for i, r in enumerate(results):
+                r["rank"] = i + 1
             if structured:
                 results = _add_callsites(_add_edge_counts(results))
                 return {
@@ -1669,16 +1716,16 @@ async def graph(
 
         # Module-level analysis modes
         elif mode == "module_pagerank":
-            # Determine granularity from file parameter or default to "file"
-            granularity: Literal["file", "package"] = "file"
+            # Use granularity parameter, but also support legacy file="package" approach
+            effective_granularity: Literal["file", "package"] = granularity
             if file and file in ("package", "packages", "directory", "dir"):
-                granularity = "package"
+                effective_granularity = "package"
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
             module_results = []
             module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
-                granularity, weighted_edges
+                effective_granularity, weighted_edges
             )
             # Build node->module map
             node_to_module: Dict[str, str] = {}
@@ -1722,7 +1769,7 @@ async def graph(
                     elif etype == "COMPOSED_OF":
                         module_edge_counts[src_mod]["composed_of"] += 1
             for r in analyzer.module_pagerank(
-                granularity=granularity,
+                granularity=effective_granularity,
                 edge_types=weighted_edges,
                 top_k=top_k,
             ):
@@ -1762,28 +1809,29 @@ async def graph(
             if structured:
                 return {
                     "mode": "module_pagerank",
-                    "granularity": granularity,
+                    "granularity": effective_granularity,
                     "description": "Architectural importance at module level (avoids utility function bias)",
                     "modules": module_results if include_modules else [],
                     "symbols": [] if include_symbols else [],
                 }
             return {
                 "mode": "module_pagerank",
-                "granularity": granularity,
+                "granularity": effective_granularity,
                 "description": "Architectural importance at module level (avoids utility function bias)",
                 "results": module_results,
             }
 
         elif mode == "module_centrality":
-            granularity = "file"
+            # Use granularity parameter, but also support legacy file="package" approach
+            effective_granularity_c: Literal["file", "package"] = granularity
             if file and file in ("package", "packages", "directory", "dir"):
-                granularity = "package"
+                effective_granularity_c = "package"
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
             module_results = []
             module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
-                granularity, weighted_edges
+                effective_granularity_c, weighted_edges
             )
             node_to_module: Dict[str, str] = {}
             for mod, nodes in module_to_nodes.items():
@@ -1824,7 +1872,7 @@ async def graph(
                     elif etype == "COMPOSED_OF":
                         module_edge_counts[src_mod]["composed_of"] += 1
             for r in analyzer.module_centrality(
-                granularity=granularity,
+                granularity=effective_granularity_c,
                 edge_types=weighted_edges,
                 top_k=top_k,
             ):
@@ -1867,14 +1915,14 @@ async def graph(
             if structured:
                 return {
                     "mode": "module_centrality",
-                    "granularity": granularity,
+                    "granularity": effective_granularity_c,
                     "description": "Most connected modules (hub detection)",
                     "modules": module_results if include_modules else [],
                     "symbols": [] if include_symbols else [],
                 }
             return {
                 "mode": "module_centrality",
-                "granularity": granularity,
+                "granularity": effective_granularity_c,
                 "description": "Most connected modules (hub detection)",
                 "results": module_results,
             }
@@ -1883,7 +1931,6 @@ async def graph(
             source_module = file or source
             if not source_module:
                 return {"error": "file parameter required for 'call_flow' mode (source module)"}
-            granularity = "file"
             # Use node as target if provided
             return analyzer.call_flow(
                 source_module=source_module,

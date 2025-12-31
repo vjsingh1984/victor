@@ -25,13 +25,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.cache.config import CacheConfig
-from victor.cache.tiered_cache import (
+from victor.storage.cache.config import CacheConfig
+from victor.storage.cache.tiered_cache import (
     TieredCache,
     ResponseCache,
     EmbeddingCache,
-    CacheManager,
 )
+from victor.storage.cache.manager import CacheManager
 
 
 # ============================================================================
@@ -486,14 +486,22 @@ class TestEmbeddingCache:
 class TestBackwardCompatibility:
     """Tests for backward compatibility."""
 
-    def test_cache_manager_alias(self):
-        """Test CacheManager is an alias for TieredCache."""
-        assert CacheManager is TieredCache
+    def test_legacy_cache_manager_alias(self):
+        """Test legacy CacheManager import is an alias for TieredCache.
+
+        The legacy module has an alias: CacheManager = TieredCache.
+        This test verifies that the legacy path still works.
+        """
+        from victor.cache.tiered_cache import CacheManager as LegacyCacheManager
+        from victor.cache.tiered_cache import TieredCache as LegacyTieredCache
+
+        # The legacy module has CacheManager = TieredCache
+        assert LegacyCacheManager is LegacyTieredCache
 
     def test_cache_manager_usage(self, tmp_path):
-        """Test CacheManager works as TieredCache."""
+        """Test CacheManager provides namespace-based caching."""
         config = CacheConfig(disk_path=tmp_path / "cache")
         cache = CacheManager(config)
-        cache.set("key", "value")
-        assert cache.get("key") == "value"
-        cache.close()
+        ns = cache.namespace("test")
+        ns.set("key", "value")
+        assert ns.get("key") == "value"

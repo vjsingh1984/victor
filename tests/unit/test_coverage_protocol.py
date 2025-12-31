@@ -18,7 +18,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from victor.coverage.protocol import (
+from victor.coding.coverage.protocol import (
     BranchCoverage,
     CoverageDiff,
     CoverageReport,

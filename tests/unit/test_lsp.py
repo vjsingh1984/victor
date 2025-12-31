@@ -16,13 +16,13 @@
 
 import pytest
 
-from victor.lsp.config import (
+from victor.coding.lsp.config import (
     LSPServerConfig,
     LANGUAGE_SERVERS,
     get_server_for_file,
     get_language_id,
 )
-from victor.lsp.client import (
+from victor.coding.lsp.client import (
     Position,
     Range,
     Location,
@@ -30,8 +30,8 @@ from victor.lsp.client import (
     CompletionItem,
     Hover,
 )
-from victor.lsp.manager import (
-    LSPManager,
+from victor.coding.lsp.manager import (
+    LSPConnectionPool,
     LSPStatus,
     get_lsp_manager,
     reset_lsp_manager,
@@ -333,14 +333,14 @@ class TestHover:
         assert hover.contents == "**Bold text**"
 
 
-class TestLSPManager:
-    """Tests for LSPManager."""
+class TestLSPConnectionPool:
+    """Tests for LSPConnectionPool."""
 
     @pytest.fixture
     def manager(self):
         """Create a fresh LSP manager."""
         reset_lsp_manager()
-        return LSPManager(workspace_root="/tmp/test")
+        return LSPConnectionPool(workspace_root="/tmp/test")
 
     def test_create_manager(self, manager):
         """Test creating a manager."""

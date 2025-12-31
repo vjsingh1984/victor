@@ -23,7 +23,7 @@ import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
-from victor.cache.tiered_cache import TieredCache
+from victor.storage.cache.tiered_cache import TieredCache
 
 logger = logging.getLogger(__name__)
 

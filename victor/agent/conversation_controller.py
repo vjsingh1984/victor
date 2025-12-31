@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
@@ -50,6 +51,39 @@ class MessageImportance:
 
 
 logger = logging.getLogger(__name__)
+
+
+# Patterns for pinned output requirements (never compacted)
+# These patterns indicate user-specified deliverable format requirements
+# that must survive compaction to prevent the agent from losing focus
+PINNED_REQUIREMENT_PATTERNS = [
+    re.compile(r"\bmust\s+output\b", re.IGNORECASE),
+    re.compile(r"\brequired\s+format\b", re.IGNORECASE),
+    re.compile(r"\bfindings\s+table\b", re.IGNORECASE),
+    re.compile(r"\btop[-\s]?\d+\s+fixes\b", re.IGNORECASE),
+    re.compile(r"\bdeliverables?\s*:", re.IGNORECASE),
+    re.compile(r"\bcreate\s+a\s+findings\s+table\b", re.IGNORECASE),
+    re.compile(r"\bprovide\s+top[-\s]?\d+\b", re.IGNORECASE),
+    re.compile(r"\boutput\s+must\s+include\b", re.IGNORECASE),
+    re.compile(r"\brequired\s+outputs?\s*:", re.IGNORECASE),
+    re.compile(r"\b\d+[-–]\d+\s+findings\b", re.IGNORECASE),  # "6-10 findings"
+    re.compile(r"\bprioritize\s+\d+[-–]\d+\s+findings\b", re.IGNORECASE),
+]
+
+
+def _is_pinned_content(content: str) -> bool:
+    """Check if content contains pinned output requirement patterns.
+
+    Args:
+        content: Message content to check
+
+    Returns:
+        True if content contains pinned requirement patterns
+    """
+    for pattern in PINNED_REQUIREMENT_PATTERNS:
+        if pattern.search(content):
+            return True
+    return False
 
 
 @dataclass
@@ -107,6 +141,7 @@ class ConversationController:
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summaries: List[str] = []
+        self._current_plan: Optional[Any] = None
 
     @property
     def messages(self) -> List[Message]:
@@ -123,6 +158,23 @@ class ConversationController:
     @property
     def system_prompt(self) -> Optional[str]:
         return self._system_prompt
+
+    @property
+    def current_plan(self) -> Optional[Any]:
+        """Get the current execution plan.
+
+        Returns:
+            The current ExecutionPlan or None if no plan is active.
+        """
+        return self._current_plan
+
+    def set_current_plan(self, plan: Optional[Any]) -> None:
+        """Set the current execution plan.
+
+        Args:
+            plan: The ExecutionPlan to set, or None to clear.
+        """
+        self._current_plan = plan
 
     def set_system_prompt(self, prompt: str) -> None:
         self._system_prompt = prompt
@@ -393,6 +445,13 @@ class ConversationController:
             # Skip system message in scoring (always kept)
             if msg.role == "system":
                 scored.append(MessageImportance(msg, i, 1000.0, "system"))
+                continue
+
+            # Pinned output requirements (never compacted)
+            # These contain user's deliverable format specifications
+            if _is_pinned_content(msg.content):
+                scored.append(MessageImportance(msg, i, 999.0, "pinned_requirement"))
+                logger.debug(f"Message {i} marked as pinned (output requirement)")
                 continue
 
             # Role-based scoring

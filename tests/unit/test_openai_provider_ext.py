@@ -23,7 +23,7 @@ from victor.providers.base import (
     Message,
     ToolDefinition,
     ProviderError,
-    ProviderAuthenticationError,
+    ProviderAuthError,
     ProviderRateLimitError,
 )
 
@@ -299,7 +299,7 @@ async def test_chat_authentication_error(openai_provider):
 
         messages = [Message(role="user", content="Hello")]
 
-        with pytest.raises(ProviderAuthenticationError) as exc_info:
+        with pytest.raises(ProviderAuthError) as exc_info:
             await openai_provider.chat(
                 messages=messages,
                 model="gpt-4",

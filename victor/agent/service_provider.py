@@ -173,10 +173,16 @@ class OrchestratorServiceProvider:
             ParallelExecutorProtocol,
             ResponseCompleterProtocol,
             StreamingHandlerProtocol,
-            RecoveryCoordinatorProtocol,
+            StreamingRecoveryCoordinatorProtocol,
             ChunkGeneratorProtocol,
             ToolPlannerProtocol,
             TaskCoordinatorProtocol,
+            # Memory protocols
+            UnifiedMemoryCoordinatorProtocol,
+            # New coordinator protocols (WS-D)
+            ToolCoordinatorProtocol,
+            StateCoordinatorProtocol,
+            PromptCoordinatorProtocol,
         )
 
         # ToolRegistry - shared tool definitions
@@ -236,7 +242,7 @@ class OrchestratorServiceProvider:
         # RecoveryHandler - model failure recovery with Q-learning
         self._register_recovery_handler(container)
 
-        # CodeExecutionManager - manages code execution sandboxes
+        # CodeSandbox - manages code execution sandboxes
         container.register(
             CodeExecutionManagerProtocol,
             lambda c: self._create_code_execution_manager(),
@@ -395,6 +401,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
+        # ToolCacheManager - singleton for internal tool state (indexes, connections)
+        self._register_tool_cache_manager(container)
+
         # UsageLogger - singleton for usage logging
         container.register(
             UsageLoggerProtocol,
@@ -469,9 +478,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SCOPED,
         )
 
-        # RecoveryCoordinator - singleton for recovery coordination
+        # StreamingRecoveryCoordinator - singleton for streaming session recovery
         container.register(
-            RecoveryCoordinatorProtocol,
+            StreamingRecoveryCoordinatorProtocol,
             lambda c: self._create_recovery_coordinator(),
             ServiceLifetime.SINGLETON,
         )
@@ -499,6 +508,34 @@ class OrchestratorServiceProvider:
 
         # PathResolver - singleton for centralized path resolution
         self._register_path_resolver(container)
+
+        # UnifiedMemoryCoordinator - singleton for federated memory search
+        self._register_unified_memory_coordinator(container)
+
+        # =========================================================================
+        # New Coordinators (WS-D: Orchestrator SOLID Fixes)
+        # =========================================================================
+
+        # ToolCoordinator - scoped for tool selection/budget/execution coordination
+        container.register(
+            ToolCoordinatorProtocol,
+            lambda c: self._create_tool_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # StateCoordinator - scoped for conversation state management
+        container.register(
+            StateCoordinatorProtocol,
+            lambda c: self._create_state_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
+
+        # PromptCoordinator - scoped for system prompt assembly
+        container.register(
+            PromptCoordinatorProtocol,
+            lambda c: self._create_prompt_coordinator(),
+            ServiceLifetime.SCOPED,
+        )
 
         logger.debug("Registered singleton orchestrator services")
 
@@ -584,10 +621,18 @@ class OrchestratorServiceProvider:
             ToolRegistrar instance
         """
         from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-        from victor.agent.protocols import ToolRegistryProtocol
+        from victor.agent.protocols import ToolRegistryProtocol, ToolDependencyGraphProtocol
 
         # Get ToolRegistry from container
         tool_registry = container.get(ToolRegistryProtocol)
+
+        # Get ToolDependencyGraph from container for tool planning
+        tool_graph = None
+        if getattr(self._settings, "enable_tool_graph", True):
+            try:
+                tool_graph = container.get(ToolDependencyGraphProtocol)
+            except Exception:
+                pass  # Tool graph is optional
 
         # Build config from settings
         config = ToolRegistrarConfig(
@@ -602,6 +647,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
             provider=None,  # Will be set later by orchestrator
             model=getattr(self._settings, "model", None),
+            tool_graph=tool_graph,  # Pass tool graph for tool planning
             config=config,
         )
 
@@ -753,7 +799,7 @@ class OrchestratorServiceProvider:
 
         return MessageHistory(
             system_prompt="",  # Will be set by orchestrator
-            max_history_messages=getattr(self._settings, "max_conversation_history", 100),
+            max_history_messages=getattr(self._settings, "max_conversation_history", 100000),
         )
 
     # =========================================================================
@@ -770,6 +816,30 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
+    def _register_unified_memory_coordinator(self, container: ServiceContainer) -> None:
+        """Register UnifiedMemoryCoordinator as singleton.
+
+        The UnifiedMemoryCoordinator provides federated search across all
+        memory backends (entity, conversation, graph, embeddings) with
+        pluggable ranking strategies.
+        """
+        from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
+
+        def create_memory_coordinator(_: ServiceContainer) -> Any:
+            try:
+                from victor.memory.unified import get_memory_coordinator
+
+                return get_memory_coordinator()
+            except ImportError as e:
+                logger.warning(f"UnifiedMemoryCoordinator not available: {e}")
+                return _NullMemoryCoordinator()
+
+        container.register(
+            UnifiedMemoryCoordinatorProtocol,
+            create_memory_coordinator,
+            ServiceLifetime.SINGLETON,
+        )
+
     def _register_tool_access_controller(self, container: ServiceContainer) -> None:
         """Register ToolAccessController as scoped service."""
         from victor.agent.protocols import IToolAccessController
@@ -783,6 +853,26 @@ class OrchestratorServiceProvider:
                 registry=c.get_or_none("ToolRegistryProtocol"),
             ),
             ServiceLifetime.SCOPED,
+        )
+
+    def _register_tool_cache_manager(self, container: ServiceContainer) -> None:
+        """Register ToolCacheManager as singleton.
+
+        The ToolCacheManager provides centralized cache management for tools,
+        replacing module-level caches like _INDEX_CACHE in code_search_tool.py
+        and _connections in database_tool.py.
+
+        This enables:
+        - Proper test isolation (caches can be cleared between tests)
+        - DI-based tool configuration
+        - Unified cache statistics and monitoring
+        """
+        from victor.tools.cache_manager import ToolCacheManager
+
+        container.register(
+            ToolCacheManager,
+            lambda c: ToolCacheManager(),
+            ServiceLifetime.SINGLETON,
         )
 
     def _register_budget_manager(self, container: ServiceContainer) -> None:
@@ -814,10 +904,10 @@ class OrchestratorServiceProvider:
     # =========================================================================
 
     def _create_code_execution_manager(self) -> Any:
-        """Create CodeExecutionManager instance."""
-        from victor.tools.code_executor_tool import CodeExecutionManager
+        """Create CodeSandbox instance."""
+        from victor.tools.code_executor_tool import CodeSandbox
 
-        manager = CodeExecutionManager()
+        manager = CodeSandbox()
         manager.start()
         return manager
 
@@ -903,7 +993,7 @@ class OrchestratorServiceProvider:
 
     def _create_task_type_hinter(self) -> Any:
         """Create TaskTypeHinter wrapper."""
-        from victor.verticals.coding.prompts import get_task_type_hint
+        from victor.coding.prompts import get_task_type_hint
 
         class TaskTypeHinter:
             """Wrapper for task type hint retrieval."""
@@ -948,14 +1038,10 @@ class OrchestratorServiceProvider:
 
     def _create_mcp_bridge(self) -> Any:
         """Create MCP bridge wrapper."""
-        from victor.tools.mcp_bridge_tool import configure_mcp_client, get_mcp_tool_definitions
+        from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 
         class MCPBridge:
             """Wrapper for MCP bridge functionality."""
-
-            def configure_client(self, client: Any, prefix: str = "mcp") -> None:
-                """Configure the MCP client."""
-                configure_mcp_client(client, prefix)
 
             def get_tool_definitions(self) -> list:
                 """Return MCP tools as Victor tool definitions."""
@@ -1069,7 +1155,7 @@ class OrchestratorServiceProvider:
 
     def _create_tool_cache(self) -> Any:
         """Create ToolCache instance."""
-        from victor.cache.tool_cache import ToolCache
+        from victor.storage.cache.tool_cache import ToolCache
 
         enabled = getattr(self._settings, "enable_tool_cache", True)
         ttl = getattr(self._settings, "tool_cache_ttl", 300)
@@ -1274,9 +1360,9 @@ class OrchestratorServiceProvider:
         and recovery integration.
 
         Returns:
-            RecoveryCoordinator instance
+            StreamingRecoveryCoordinator instance
         """
-        from victor.agent.recovery_coordinator import RecoveryCoordinator
+        from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
         from victor.agent.protocols import (
             RecoveryHandlerProtocol,
             StreamingHandlerProtocol,
@@ -1300,7 +1386,7 @@ class OrchestratorServiceProvider:
         # Get unified tracker from DI container
         unified_tracker = self.container.get(TaskTrackerProtocol)
 
-        return RecoveryCoordinator(
+        return StreamingRecoveryCoordinator(
             recovery_handler=recovery_handler,
             recovery_integration=recovery_integration,
             streaming_handler=streaming_handler,
@@ -1378,6 +1464,132 @@ class OrchestratorServiceProvider:
             unified_tracker=unified_tracker,
             prompt_builder=prompt_builder,
             settings=self._settings,
+        )
+
+    # =========================================================================
+    # New Coordinator Factory Methods (WS-D: Orchestrator SOLID Fixes)
+    # =========================================================================
+
+    def _create_tool_coordinator(self) -> Any:
+        """Create ToolCoordinator instance.
+
+        The ToolCoordinator provides a centralized interface for tool-related
+        operations: selection, budgeting, and execution coordination.
+
+        Returns:
+            ToolCoordinator instance
+        """
+        from victor.agent.tool_coordinator import (
+            ToolCoordinator,
+            ToolCoordinatorConfig,
+        )
+        from victor.agent.protocols import (
+            ToolPipelineProtocol,
+            ToolSelectorProtocol,
+            IBudgetManager,
+            ToolCacheProtocol,
+        )
+
+        # Get dependencies from DI container (optional for some)
+        tool_pipeline = self.container.get_optional(ToolPipelineProtocol)
+        tool_selector = self.container.get_optional(ToolSelectorProtocol)
+        budget_manager = self.container.get_optional(IBudgetManager)
+        tool_cache = self.container.get_optional(ToolCacheProtocol)
+
+        # Build config from settings
+        config = ToolCoordinatorConfig(
+            default_budget=getattr(self._settings, "tool_budget", 25),
+            enable_caching=getattr(self._settings, "enable_tool_cache", True),
+            max_tools_per_selection=getattr(self._settings, "max_tools_per_selection", 15),
+            selection_threshold=getattr(self._settings, "tool_selection_threshold", 0.3),
+        )
+
+        # Note: tool_pipeline may be None if not yet registered
+        # The coordinator handles this gracefully
+        if tool_pipeline is None:
+            logger.debug("ToolPipeline not available for ToolCoordinator")
+            return None
+
+        return ToolCoordinator(
+            tool_pipeline=tool_pipeline,
+            tool_selector=tool_selector,
+            budget_manager=budget_manager,
+            tool_cache=tool_cache,
+            config=config,
+        )
+
+    def _create_state_coordinator(self) -> Any:
+        """Create StateCoordinator instance.
+
+        The StateCoordinator provides a centralized interface for conversation
+        state and stage transition management.
+
+        Returns:
+            StateCoordinator instance
+        """
+        from victor.agent.state_coordinator import (
+            StateCoordinator,
+            StateCoordinatorConfig,
+        )
+        from victor.agent.protocols import (
+            ConversationControllerProtocol,
+            ConversationStateMachineProtocol,
+        )
+
+        # Get dependencies from DI container
+        conversation_controller = self.container.get_optional(ConversationControllerProtocol)
+        state_machine = self.container.get_optional(ConversationStateMachineProtocol)
+
+        # Build config from settings
+        config = StateCoordinatorConfig(
+            enable_auto_transitions=getattr(self._settings, "enable_auto_stage_transitions", True),
+            enable_history_tracking=True,
+            max_history_length=100,
+            emit_events=getattr(self._settings, "enable_observability", True),
+        )
+
+        # Note: conversation_controller may be None if not yet registered
+        if conversation_controller is None:
+            logger.debug("ConversationController not available for StateCoordinator")
+            return None
+
+        return StateCoordinator(
+            conversation_controller=conversation_controller,
+            state_machine=state_machine,
+            config=config,
+        )
+
+    def _create_prompt_coordinator(self) -> Any:
+        """Create PromptCoordinator instance.
+
+        The PromptCoordinator provides a centralized interface for system
+        prompt assembly using PromptBuilder and vertical context.
+
+        Returns:
+            PromptCoordinator instance
+        """
+        from victor.agent.prompt_coordinator import (
+            PromptCoordinator,
+            PromptCoordinatorConfig,
+        )
+        from victor.framework.prompt_builder import PromptBuilder
+
+        # Build config from settings
+        config = PromptCoordinatorConfig(
+            default_grounding_mode=getattr(self._settings, "grounding_mode", "minimal"),
+            enable_task_hints=getattr(self._settings, "enable_task_hints", True),
+            enable_vertical_sections=True,
+            enable_safety_rules=True,
+            max_context_tokens=getattr(self._settings, "max_context_tokens", 2000),
+        )
+
+        # Get base identity from settings or use default
+        base_identity = getattr(self._settings, "base_identity", None)
+
+        return PromptCoordinator(
+            prompt_builder=PromptBuilder(),
+            config=config,
+            base_identity=base_identity,
         )
 
 
@@ -1474,6 +1686,58 @@ class _NullRecoveryHandler:
 
     def get_diagnostics(self) -> dict:
         return {"enabled": False}
+
+
+class _NullMemoryCoordinator:
+    """No-op memory coordinator implementation for disabled mode."""
+
+    async def search_all(
+        self,
+        query: str,
+        limit: int = 20,
+        memory_types: Optional[list] = None,
+        session_id: Optional[str] = None,
+        filters: Optional[dict] = None,
+        min_relevance: float = 0.0,
+    ) -> list:
+        return []
+
+    async def search_type(
+        self,
+        memory_type: Any,
+        query: str,
+        limit: int = 20,
+        **kwargs: Any,
+    ) -> list:
+        return []
+
+    async def store(
+        self,
+        memory_type: Any,
+        key: str,
+        value: Any,
+        metadata: Optional[dict] = None,
+    ) -> bool:
+        return False
+
+    async def get(
+        self,
+        memory_type: Any,
+        key: str,
+    ) -> Optional[Any]:
+        return None
+
+    def register_provider(self, provider: Any) -> None:
+        pass
+
+    def unregister_provider(self, memory_type: Any) -> bool:
+        return False
+
+    def get_registered_types(self) -> list:
+        return []
+
+    def get_stats(self) -> dict:
+        return {"enabled": False, "providers": []}
 
 
 # =============================================================================

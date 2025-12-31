@@ -24,13 +24,17 @@ This package contains all slash command implementations organized by category:
 - mode: mode, build, explore, plan
 - metrics: cost, metrics, serialization, learning, mlstats
 - codebase: reindex, review, init
+- checkpoint: checkpoint (save, list, restore, diff, timeline)
+- entities: entities (list, search, show, related, stats, clear)
 
 Commands are auto-discovered and registered when the slash module is loaded.
 """
 
 # Import all command modules to trigger registration
 from victor.ui.slash.commands import (
+    checkpoint,
     codebase,
+    entities,
     metrics,
     mode,
     model,
@@ -41,7 +45,9 @@ from victor.ui.slash.commands import (
 )
 
 __all__ = [
+    "checkpoint",
     "codebase",
+    "entities",
     "metrics",
     "mode",
     "model",

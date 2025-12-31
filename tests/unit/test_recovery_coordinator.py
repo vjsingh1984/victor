@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions
 # limitations under the License.
 
-"""Unit tests for RecoveryCoordinator.
+"""Unit tests for StreamingRecoveryCoordinator.
 
-Tests all 23 methods of RecoveryCoordinator with mocked dependencies.
+Tests all 23 methods of StreamingRecoveryCoordinator with mocked dependencies.
+Note: Renamed from RecoveryCoordinator to avoid naming conflict with
+victor.agent.recovery.coordinator.RecoveryCoordinator (SOLID recovery system).
 """
 
 import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from typing import Any, Dict, List, Optional
 
-from victor.agent.recovery_coordinator import RecoveryCoordinator, RecoveryContext
+from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator, StreamingRecoveryContext
 from victor.providers.base import StreamChunk
 
 
@@ -110,8 +112,8 @@ def recovery_coordinator(
     mock_unified_tracker,
     mock_settings,
 ):
-    """Create RecoveryCoordinator with mocked dependencies."""
-    return RecoveryCoordinator(
+    """Create StreamingRecoveryCoordinator with mocked dependencies."""
+    return StreamingRecoveryCoordinator(
         recovery_handler=mock_recovery_handler,
         recovery_integration=mock_recovery_integration,
         streaming_handler=mock_streaming_handler,
@@ -139,8 +141,8 @@ def mock_streaming_context():
 
 @pytest.fixture
 def recovery_context(mock_streaming_context):
-    """Create RecoveryContext for testing."""
-    return RecoveryContext(
+    """Create StreamingRecoveryContext for testing."""
+    return StreamingRecoveryContext(
         iteration=5,
         elapsed_time=10.0,
         tool_calls_used=3,
@@ -323,7 +325,7 @@ class TestConditionChecking:
 
     def test_check_force_action_no_recovery_handler(self, recovery_context):
         """Test check_force_action when no recovery handler."""
-        coordinator = RecoveryCoordinator(
+        coordinator = StreamingRecoveryCoordinator(
             recovery_handler=None,
             recovery_integration=None,
             streaming_handler=Mock(),
@@ -393,7 +395,7 @@ class TestActionHandling:
 
     def test_handle_force_tool_execution_no_recovery_handler(self, recovery_context):
         """Test handle_force_tool_execution with no recovery handler."""
-        coordinator = RecoveryCoordinator(
+        coordinator = StreamingRecoveryCoordinator(
             recovery_handler=None,
             recovery_integration=None,
             streaming_handler=Mock(),
@@ -457,7 +459,7 @@ class TestActionHandling:
         mock_integration = Mock()
         mock_integration.enabled = False
 
-        coordinator = RecoveryCoordinator(
+        coordinator = StreamingRecoveryCoordinator(
             recovery_handler=None,
             recovery_integration=mock_integration,
             streaming_handler=Mock(),
@@ -604,7 +606,7 @@ class TestPromptAndMessageGeneration:
 
     def test_get_recovery_prompts_no_handler(self, recovery_context):
         """Test get_recovery_prompts with no recovery handler."""
-        coordinator = RecoveryCoordinator(
+        coordinator = StreamingRecoveryCoordinator(
             recovery_handler=None,
             recovery_integration=None,
             streaming_handler=Mock(),
@@ -705,7 +707,7 @@ class TestEdgeCases:
         mock_unified_tracker = Mock()
         mock_settings = Mock()
 
-        coordinator = RecoveryCoordinator(
+        coordinator = StreamingRecoveryCoordinator(
             recovery_handler=None,
             recovery_integration=None,
             streaming_handler=mock_streaming_handler,

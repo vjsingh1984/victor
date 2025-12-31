@@ -276,7 +276,9 @@ class RLDataMigrator:
             total_selections = data.get("total_selections", 0)
 
             print(f"   Found {len(q_table)} global Q-values")
-            print(f"   Found {sum(len(tasks) for tasks in q_table_by_task.values())} task-specific Q-values")
+            print(
+                f"   Found {sum(len(tasks) for tasks in q_table_by_task.values())} task-specific Q-values"
+            )
 
             if dry_run:
                 for provider, q_value in list(q_table.items())[:3]:

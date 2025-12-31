@@ -337,6 +337,7 @@ class BaseTool(ABC):
         schema = {
             "type": "object",
             "properties": properties,
+            "additionalProperties": False,  # Reject unknown/hallucinated arguments
         }
 
         if required:

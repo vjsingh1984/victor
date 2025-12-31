@@ -90,6 +90,140 @@ class TestVerificationResult:
 
         assert result_low.confidence > result_high.confidence
 
+    def test_generate_feedback_prompt_empty_issues(self):
+        """Should return empty string when no issues."""
+        result = VerificationResult(is_grounded=True, confidence=1.0)
+        assert result.generate_feedback_prompt() == ""
+
+    def test_generate_feedback_prompt_file_not_found(self):
+        """Should generate feedback for file not found issues."""
+        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.FILE_NOT_FOUND,
+                severity=IssueSeverity.HIGH,
+                description="File 'missing.py' not found",
+                reference="missing.py",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt()
+        assert "GROUNDING CORRECTION REQUIRED" in feedback
+        assert "missing.py" in feedback
+        assert "read_file" in feedback or "list_directory" in feedback
+
+    def test_generate_feedback_prompt_symbol_not_found(self):
+        """Should generate feedback for symbol not found issues."""
+        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.SYMBOL_NOT_FOUND,
+                severity=IssueSeverity.MEDIUM,
+                description="Symbol 'process_data' not found",
+                reference="process_data",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt()
+        assert "GROUNDING CORRECTION REQUIRED" in feedback
+        assert "process_data" in feedback
+        assert "code_search" in feedback
+
+    def test_generate_feedback_prompt_code_mismatch(self):
+        """Should generate feedback for code mismatch issues."""
+        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.CODE_MISMATCH,
+                severity=IssueSeverity.HIGH,
+                description="Code doesn't match file content",
+                reference="main.py:15",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt()
+        assert "GROUNDING CORRECTION REQUIRED" in feedback
+        assert "main.py" in feedback
+        assert "Quote code exactly" in feedback
+
+    def test_generate_feedback_prompt_fabricated_content(self):
+        """Should generate feedback for fabricated content issues."""
+        result = VerificationResult(is_grounded=False, confidence=0.3)
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.FABRICATED_CONTENT,
+                severity=IssueSeverity.CRITICAL,
+                description="Content appears fabricated",
+                reference="imaginary_class.py",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt()
+        assert "GROUNDING CORRECTION REQUIRED" in feedback
+        assert "Fabricated content" in feedback
+        assert "tool output" in feedback
+
+    def test_generate_feedback_prompt_includes_suggestion(self):
+        """Should include issue suggestions in feedback."""
+        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.FILE_NOT_FOUND,
+                severity=IssueSeverity.HIGH,
+                description="File not found",
+                reference="config.py",
+                suggestion="Did you mean 'settings.py'?",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt()
+        assert "Did you mean 'settings.py'?" in feedback
+
+    def test_generate_feedback_prompt_max_issues(self):
+        """Should respect max_issues parameter."""
+        result = VerificationResult(is_grounded=False, confidence=0.1)
+        # Add 5 issues
+        for i in range(5):
+            result.add_issue(
+                GroundingIssue(
+                    issue_type=IssueType.FILE_NOT_FOUND,
+                    severity=IssueSeverity.MEDIUM,
+                    description=f"File {i} not found",
+                    reference=f"file{i}.py",
+                )
+            )
+
+        # Default max is 3
+        feedback = result.generate_feedback_prompt(max_issues=2)
+        # Should only include 2 file references (grouped together)
+        assert feedback.count("file") < 5
+
+    def test_generate_feedback_prompt_prioritizes_severity(self):
+        """Should include critical issues first."""
+        result = VerificationResult(is_grounded=False, confidence=0.5)
+        # Add low severity first
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.PATH_INVALID,
+                severity=IssueSeverity.LOW,
+                description="Minor path issue",
+                reference="low.py",
+            )
+        )
+        # Add critical severity second
+        result.add_issue(
+            GroundingIssue(
+                issue_type=IssueType.FABRICATED_CONTENT,
+                severity=IssueSeverity.CRITICAL,
+                description="Fabricated content",
+                reference="critical.py",
+            )
+        )
+
+        feedback = result.generate_feedback_prompt(max_issues=1)
+        # Critical issue should be included
+        assert "Fabricated content" in feedback
+
 
 class TestGroundingVerifier:
     """Tests for GroundingVerifier."""
@@ -231,8 +365,12 @@ class MyClass:
         assert result.confidence > 0.5
 
     @pytest.mark.asyncio
-    async def test_verify_fabricated_code_snippet(self, verifier):
+    async def test_verify_fabricated_code_snippet(self, temp_project):
         """Should flag likely fabricated code."""
+        # Use skip_generated_code=False to actually verify the code snippet
+        config = VerifierConfig(skip_generated_code=False)
+        verifier = GroundingVerifier(project_root=str(temp_project), config=config)
+
         response = """
         Here's the implementation:
 

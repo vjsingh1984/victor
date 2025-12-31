@@ -139,24 +139,25 @@ class FileChangeHistory:
 
     Uses SQLite for persistent storage and maintains an in-memory
     stack for fast undo/redo operations.
-
-    Note: Previously named `ChangeTracker`. Alias kept for backward compatibility.
     """
 
     def __init__(
         self,
         storage_dir: Optional[Path] = None,
-        max_history: int = 100,
+        max_history: int = 10000,
         session_id: Optional[str] = None,
+        project_path: Optional[Path] = None,
     ):
         """Initialize the file change history.
 
         Args:
-            storage_dir: Directory to store change history. Defaults to {project}/.victor/changes/
-            max_history: Maximum number of change groups to keep
+            storage_dir: Deprecated, ignored. Uses consolidated project.db.
+            max_history: Maximum number of change groups to keep (default 10000 for historical analysis)
             session_id: Current session identifier
+            project_path: Path to project root for database access.
         """
         from victor.config.settings import get_project_paths
+        from victor.core.database import get_project_database
 
         self.storage_dir = storage_dir or get_project_paths().changes_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -170,8 +171,9 @@ class FileChangeHistory:
         # Current change group being built
         self._current_group: Optional[ChangeGroup] = None
 
-        # Database connection
-        self._db_path = self.storage_dir / "changes.db"
+        # Use consolidated project.db via ProjectDatabaseManager
+        self._db = get_project_database(project_path)
+        self._db_path = self._db.db_path
         self._init_database()
 
         # Load recent history
@@ -184,12 +186,17 @@ class FileChangeHistory:
         return f"session_{int(time.time() * 1000)}"
 
     def _init_database(self) -> None:
-        """Initialize SQLite database for persistent storage."""
-        conn = sqlite3.connect(str(self._db_path))
-        cursor = conn.cursor()
+        """Initialize database tables with correct schema."""
+        conn = self._db.get_connection()
 
-        # Create tables
-        cursor.execute(
+        # Check if tables need recreation (wrong schema)
+        if self._needs_schema_rebuild(conn):
+            conn.execute("DROP TABLE IF EXISTS file_changes")
+            conn.execute("DROP TABLE IF EXISTS change_groups")
+            conn.commit()
+
+        # Create tables with correct schema
+        conn.execute(
             """
             CREATE TABLE IF NOT EXISTS change_groups (
                 id TEXT PRIMARY KEY,
@@ -203,7 +210,7 @@ class FileChangeHistory:
         """
         )
 
-        cursor.execute(
+        conn.execute(
             """
             CREATE TABLE IF NOT EXISTS file_changes (
                 id TEXT PRIMARY KEY,
@@ -222,21 +229,21 @@ class FileChangeHistory:
         """
         )
 
-        cursor.execute(
+        conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_groups_session
             ON change_groups(session_id)
         """
         )
 
-        cursor.execute(
+        conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_groups_timestamp
             ON change_groups(timestamp DESC)
         """
         )
 
-        cursor.execute(
+        conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_changes_path
             ON file_changes(file_path)
@@ -244,11 +251,44 @@ class FileChangeHistory:
         )
 
         conn.commit()
-        conn.close()
+
+    def _needs_schema_rebuild(self, conn: sqlite3.Connection) -> bool:
+        """Check if tables exist with wrong schema and need rebuild."""
+        try:
+            # Check change_groups columns
+            cursor = conn.execute("PRAGMA table_info(change_groups)")
+            group_cols = {row[1] for row in cursor.fetchall()}
+            required_group = {
+                "id",
+                "session_id",
+                "timestamp",
+                "description",
+                "tool_name",
+                "undone",
+                "data",
+            }
+            if group_cols and not required_group.issubset(group_cols):
+                return True
+
+            # Check file_changes columns AND types (id must be TEXT, not INTEGER)
+            cursor = conn.execute("PRAGMA table_info(file_changes)")
+            change_cols = {row[1]: row[2] for row in cursor.fetchall()}
+            if change_cols:
+                # Check required columns exist
+                required_change = {"id", "group_id", "change_type", "file_path", "timestamp"}
+                if not required_change.issubset(change_cols.keys()):
+                    return True
+                # Check id column type is TEXT (not INTEGER)
+                if change_cols.get("id", "").upper() != "TEXT":
+                    return True
+
+            return False
+        except sqlite3.OperationalError:
+            return False
 
     def _load_recent_history(self) -> None:
         """Load recent change history from database."""
-        conn = sqlite3.connect(str(self._db_path))
+        conn = self._db.get_connection()
         cursor = conn.cursor()
 
         # Load recent non-undone groups
@@ -270,7 +310,7 @@ class FileChangeHistory:
             except Exception as e:
                 logger.warning(f"Failed to load change group: {e}")
 
-        conn.close()
+        # Connection managed by ProjectDatabaseManager
         logger.debug(f"Loaded {len(self._undo_stack)} change groups from history")
 
     @staticmethod
@@ -381,7 +421,7 @@ class FileChangeHistory:
 
     def _save_group(self, group: ChangeGroup) -> None:
         """Save a change group to the database."""
-        conn = sqlite3.connect(str(self._db_path))
+        conn = self._db.get_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -426,7 +466,7 @@ class FileChangeHistory:
             )
 
         conn.commit()
-        conn.close()
+        # Connection managed by ProjectDatabaseManager
 
     def _trim_history(self) -> None:
         """Trim history to max_history size."""
@@ -437,12 +477,12 @@ class FileChangeHistory:
 
     def _delete_group(self, group_id: str) -> None:
         """Delete a change group from the database."""
-        conn = sqlite3.connect(str(self._db_path))
+        conn = self._db.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM file_changes WHERE group_id = ?", (group_id,))
         cursor.execute("DELETE FROM change_groups WHERE id = ?", (group_id,))
         conn.commit()
-        conn.close()
+        # Connection managed by ProjectDatabaseManager
 
     def can_undo(self) -> bool:
         """Check if undo is available."""
@@ -625,7 +665,7 @@ class FileChangeHistory:
         Returns:
             List of FileChange objects
         """
-        conn = sqlite3.connect(str(self._db_path))
+        conn = self._db.get_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -659,7 +699,7 @@ class FileChangeHistory:
                 )
             )
 
-        conn.close()
+        # Connection managed by ProjectDatabaseManager
         return changes
 
     def clear_history(self) -> int:
@@ -673,19 +713,15 @@ class FileChangeHistory:
         self._undo_stack.clear()
         self._redo_stack.clear()
 
-        conn = sqlite3.connect(str(self._db_path))
+        conn = self._db.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM file_changes WHERE 1=1")
         cursor.execute("DELETE FROM change_groups WHERE 1=1")
         conn.commit()
-        conn.close()
+        # Connection managed by ProjectDatabaseManager
 
         logger.info(f"Cleared {count} change groups from history")
         return count
-
-
-# Backward compatibility alias
-ChangeTracker = FileChangeHistory
 
 
 # Global instance for easy access

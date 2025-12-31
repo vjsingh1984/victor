@@ -36,14 +36,16 @@ logger = logging.getLogger(__name__)
 
 class ComplexityLevel(Enum):
     """Task complexity levels for benchmarking."""
-    SIMPLE = "simple"      # Single file read, basic questions
-    MEDIUM = "medium"      # Multi-file exploration, analysis
-    COMPLEX = "complex"    # Cross-codebase tracing, synthesis
+
+    SIMPLE = "simple"  # Single file read, basic questions
+    MEDIUM = "medium"  # Multi-file exploration, analysis
+    COMPLEX = "complex"  # Cross-codebase tracing, synthesis
 
 
 @dataclass
 class BenchmarkPrompt:
     """A benchmark prompt with metadata."""
+
     text: str
     complexity: ComplexityLevel
     requires_tools: bool = True
@@ -54,6 +56,7 @@ class BenchmarkPrompt:
 @dataclass
 class BatchResult:
     """Result from a single model in a batch."""
+
     profile: str
     provider: str
     success: bool
@@ -66,6 +69,7 @@ class BatchResult:
 @dataclass
 class BatchMetrics:
     """Aggregated metrics for a batch."""
+
     batch_id: int
     complexity: ComplexityLevel
     prompt: str
@@ -92,14 +96,14 @@ BENCHMARK_PROMPTS: Dict[ComplexityLevel, List[BenchmarkPrompt]] = {
             ComplexityLevel.SIMPLE,
             requires_tools=True,
             expected_tool_count=1,
-            tags=["file-read", "summarization"]
+            tags=["file-read", "summarization"],
         ),
         BenchmarkPrompt(
             "What is the version of Python required by this project? Check pyproject.toml.",
             ComplexityLevel.SIMPLE,
             requires_tools=True,
             expected_tool_count=1,
-            tags=["file-read", "extraction"]
+            tags=["file-read", "extraction"],
         ),
     ],
     ComplexityLevel.MEDIUM: [
@@ -108,21 +112,21 @@ BENCHMARK_PROMPTS: Dict[ComplexityLevel, List[BenchmarkPrompt]] = {
             ComplexityLevel.MEDIUM,
             requires_tools=True,
             expected_tool_count=2,
-            tags=["directory-listing", "file-read", "analysis"]
+            tags=["directory-listing", "file-read", "analysis"],
         ),
         BenchmarkPrompt(
             "Search for 'CostTier' in the codebase and explain what tiers exist and their purpose.",
             ComplexityLevel.MEDIUM,
             requires_tools=True,
             expected_tool_count=2,
-            tags=["code-search", "analysis"]
+            tags=["code-search", "analysis"],
         ),
         BenchmarkPrompt(
             "Read victor/tools/base.py and identify the abstract methods that tool implementations must define.",
             ComplexityLevel.MEDIUM,
             requires_tools=True,
             expected_tool_count=1,
-            tags=["file-read", "code-analysis"]
+            tags=["file-read", "code-analysis"],
         ),
     ],
     ComplexityLevel.COMPLEX: [
@@ -131,14 +135,14 @@ BENCHMARK_PROMPTS: Dict[ComplexityLevel, List[BenchmarkPrompt]] = {
             ComplexityLevel.COMPLEX,
             requires_tools=True,
             expected_tool_count=3,
-            tags=["multi-file", "architecture", "comparison"]
+            tags=["multi-file", "architecture", "comparison"],
         ),
         BenchmarkPrompt(
             "Trace the flow from user input to tool execution. Start from cli.py, follow through orchestrator.py, and identify the key function calls.",
             ComplexityLevel.COMPLEX,
             requires_tools=True,
             expected_tool_count=4,
-            tags=["tracing", "multi-file", "flow-analysis"]
+            tags=["tracing", "multi-file", "flow-analysis"],
         ),
     ],
 }
@@ -177,7 +181,9 @@ class RLBenchmarkHarness:
         timeout_seconds: int = 120,
     ):
         self.project_dir = project_dir
-        self.output_dir = output_dir or Path(f"/tmp/rl-benchmark-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        self.output_dir = output_dir or Path(
+            f"/tmp/rl-benchmark-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        )
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout_seconds
         self.batch_metrics: List[BatchMetrics] = []
@@ -192,12 +198,7 @@ class RLBenchmarkHarness:
         output_file = self.output_dir / f"batch{batch_id}_{profile}.log"
         start_time = time.time()
 
-        cmd = [
-            "victor", "chat",
-            "-p", profile,
-            "--plain",
-            prompt
-        ]
+        cmd = ["victor", "chat", "-p", profile, "--plain", prompt]
 
         try:
             result = subprocess.run(
@@ -210,7 +211,7 @@ class RLBenchmarkHarness:
             duration = time.time() - start_time
 
             # Write output to file
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(result.stdout)
                 if result.stderr:
                     f.write(f"\n--- STDERR ---\n{result.stderr}")
@@ -291,14 +292,15 @@ class RLBenchmarkHarness:
         # Run cloud providers in parallel
         logger.info(f"\nRunning {len(self.CLOUD_PROFILES)} cloud providers in parallel...")
         cloud_tasks = [
-            self.run_single_model(profile, prompt.text, batch_id)
-            for profile in self.CLOUD_PROFILES
+            self.run_single_model(profile, prompt.text, batch_id) for profile in self.CLOUD_PROFILES
         ]
         cloud_results = await asyncio.gather(*cloud_tasks)
 
         for result in cloud_results:
             status = "ok" if result.success else "FAIL"
-            logger.info(f"  [{batch_id}] {result.profile}: {status} ({result.duration_seconds:.1f}s)")
+            logger.info(
+                f"  [{batch_id}] {result.profile}: {status} ({result.duration_seconds:.1f}s)"
+            )
             metrics.results.append(result)
 
         # Run Ollama sequentially if requested
@@ -307,7 +309,9 @@ class RLBenchmarkHarness:
             for profile in self.OLLAMA_PROFILES:
                 result = await self.run_single_model(profile, prompt.text, batch_id)
                 status = "ok" if result.success else "FAIL"
-                logger.info(f"  [{batch_id}] {result.profile}: {status} ({result.duration_seconds:.1f}s)")
+                logger.info(
+                    f"  [{batch_id}] {result.profile}: {status} ({result.duration_seconds:.1f}s)"
+                )
                 metrics.results.append(result)
 
         self.batch_metrics.append(metrics)
@@ -356,7 +360,9 @@ class RLBenchmarkHarness:
                         "total": 0,
                         "success": 0,
                         "total_duration": 0.0,
-                        "by_complexity": {c.value: {"total": 0, "success": 0} for c in ComplexityLevel}
+                        "by_complexity": {
+                            c.value: {"total": 0, "success": 0} for c in ComplexityLevel
+                        },
                     }
 
                 stats = provider_stats[provider]
@@ -379,30 +385,32 @@ class RLBenchmarkHarness:
         for provider, stats in sorted(
             provider_stats.items(),
             key=lambda x: x[1]["success"] / max(x[1]["total"], 1),
-            reverse=True
+            reverse=True,
         ):
             success_rate = stats["success"] / max(stats["total"], 1)
             avg_duration = stats["total_duration"] / max(stats["success"], 1)
 
-            summary["provider_rankings"].append({
-                "provider": provider,
-                "success_rate": round(success_rate, 3),
-                "total_runs": stats["total"],
-                "successful_runs": stats["success"],
-                "avg_duration_seconds": round(avg_duration, 2),
-                "by_complexity": {
-                    c: {
-                        "success_rate": round(v["success"] / max(v["total"], 1), 3),
-                        "runs": v["total"]
-                    }
-                    for c, v in stats["by_complexity"].items()
-                    if v["total"] > 0
+            summary["provider_rankings"].append(
+                {
+                    "provider": provider,
+                    "success_rate": round(success_rate, 3),
+                    "total_runs": stats["total"],
+                    "successful_runs": stats["success"],
+                    "avg_duration_seconds": round(avg_duration, 2),
+                    "by_complexity": {
+                        c: {
+                            "success_rate": round(v["success"] / max(v["total"], 1), 3),
+                            "runs": v["total"],
+                        }
+                        for c, v in stats["by_complexity"].items()
+                        if v["total"] > 0
+                    },
                 }
-            })
+            )
 
         # Save summary
         summary_file = self.output_dir / "experiment_summary.json"
-        with open(summary_file, 'w') as f:
+        with open(summary_file, "w") as f:
             json.dump(summary, f, indent=2)
 
         logger.info(f"\n{'='*50}")
@@ -432,10 +440,7 @@ class RLBenchmarkHarness:
             data = json.load(f)
 
         q_table = data.get("q_table", {})
-        return {
-            k: v for k, v in q_table.items()
-            if k not in self.MOCK_PROVIDERS
-        }
+        return {k: v for k, v in q_table.items() if k not in self.MOCK_PROVIDERS}
 
 
 async def main():
@@ -455,9 +460,9 @@ async def main():
     )
 
     # Show filtered Q-table
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("FILTERED Q-TABLE (excluding mock providers)")
-    print("="*50)
+    print("=" * 50)
     q_table = harness.get_filtered_q_table()
     for provider, q_value in sorted(q_table.items(), key=lambda x: -x[1]):
         print(f"  {provider:12} Q={q_value:.4f}")

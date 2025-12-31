@@ -22,7 +22,7 @@ import pytest
 from victor.agent.message_history import MessageHistory
 from victor.agent.session import (
     Session,
-    SessionManager,
+    SessionPersistence,
     SessionMetadata,
     get_session_manager,
 )
@@ -38,7 +38,7 @@ def temp_session_dir():
 @pytest.fixture
 def session_manager(temp_session_dir):
     """Create a session manager with temporary storage."""
-    return SessionManager(session_dir=temp_session_dir)
+    return SessionPersistence(session_dir=temp_session_dir)
 
 
 @pytest.fixture
@@ -129,8 +129,8 @@ class TestSession:
         assert restored.conversation_state["stage"] == "exploring"
 
 
-class TestSessionManager:
-    """Tests for SessionManager class."""
+class TestSessionPersistence:
+    """Tests for SessionPersistence class."""
 
     def test_save_session(self, session_manager, sample_conversation):
         """save_session should create a session file."""

@@ -42,8 +42,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set
 
 from victor.agent.subagents.base import (
     SubAgent,
@@ -54,6 +55,7 @@ from victor.agent.subagents.base import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -310,8 +312,6 @@ class SubAgentOrchestrator:
             for i, result in enumerate(results.results):
                 print(f"Task {i}: {'Success' if result.success else 'Failed'}")
         """
-        import time
-
         start_time = time.time()
         semaphore = asyncio.Semaphore(max_concurrent)
 
@@ -379,6 +379,111 @@ class SubAgentOrchestrator:
             total_duration=total_duration,
             errors=errors,
         )
+
+    async def stream_spawn(
+        self,
+        role: SubAgentRole,
+        task: str,
+        *,
+        tool_budget: Optional[int] = None,
+        allowed_tools: Optional[List[str]] = None,
+        context_limit: Optional[int] = None,
+        can_spawn_subagents: bool = False,
+        timeout_seconds: int = 300,
+    ) -> AsyncIterator["StreamChunk"]:
+        """Spawn a sub-agent with streaming output.
+
+        Like spawn() but yields StreamChunk as agent generates content.
+        Useful for real-time progress display during long-running tasks.
+
+        Args:
+            role: Sub-agent role specialization
+            task: Task description for the sub-agent
+            tool_budget: Maximum tool calls (default: role-specific)
+            allowed_tools: List of allowed tools (default: role-specific)
+            context_limit: Maximum context size (default: role-specific)
+            can_spawn_subagents: Whether sub-agent can spawn children
+            timeout_seconds: Maximum execution time
+
+        Yields:
+            StreamChunk with incremental content and tool calls
+
+        Example:
+            async for chunk in orchestrator.stream_spawn(
+                SubAgentRole.RESEARCHER,
+                "Find all API endpoints",
+            ):
+                print(chunk.content, end="", flush=True)
+                if chunk.is_final:
+                    print(f"\\nDone: {chunk.metadata}")
+        """
+        from victor.providers.base import StreamChunk
+
+        # Apply role-specific defaults
+        effective_budget = tool_budget or ROLE_DEFAULT_BUDGETS.get(role, 15)
+        effective_tools = allowed_tools or ROLE_DEFAULT_TOOLS.get(role, ["read", "ls"])
+        effective_context = context_limit or ROLE_DEFAULT_CONTEXT.get(role, 50000)
+
+        # Create configuration
+        config = SubAgentConfig(
+            role=role,
+            task=task,
+            allowed_tools=effective_tools,
+            tool_budget=effective_budget,
+            context_limit=effective_context,
+            can_spawn_subagents=can_spawn_subagents,
+            timeout_seconds=timeout_seconds,
+        )
+
+        # Create sub-agent
+        subagent = SubAgent(config, self.parent)
+        self.active_subagents.add(subagent)
+
+        start_time = time.time()
+
+        try:
+            # Stream with manual timeout checking per chunk
+            async for chunk in subagent.stream_execute():
+                # Check timeout before yielding each chunk
+                elapsed = time.time() - start_time
+                if elapsed > timeout_seconds:
+                    logger.warning(
+                        f"{role.value} sub-agent stream timed out after {timeout_seconds}s"
+                    )
+                    yield StreamChunk(
+                        content="",
+                        is_final=True,
+                        metadata={
+                            "error": f"Timeout after {timeout_seconds}s",
+                            "timeout": True,
+                            "role": role.value,
+                            "task": task[:200],
+                            "duration_seconds": float(timeout_seconds),
+                            "success": False,
+                        },
+                    )
+                    return
+
+                yield chunk
+
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(f"{role.value} sub-agent stream spawn failed: {error_msg}", exc_info=True)
+            yield StreamChunk(
+                content="",
+                is_final=True,
+                metadata={
+                    "error": error_msg,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "role": role.value,
+                    "duration_seconds": time.time() - start_time,
+                    "success": False,
+                },
+            )
+
+        finally:
+            self.active_subagents.discard(subagent)
 
     def get_active_count(self) -> int:
         """Get number of currently active sub-agents.

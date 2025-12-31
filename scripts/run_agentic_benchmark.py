@@ -309,7 +309,9 @@ async def run_benchmark(
                 metrics.task_results.append(result)
                 if result.is_success:
                     metrics.passed += 1
-                    logger.info(f"  PASSED - {result.trace.turns} turns, {len(result.trace.tool_calls)} tool calls")
+                    logger.info(
+                        f"  PASSED - {result.trace.turns} turns, {len(result.trace.tool_calls)} tool calls"
+                    )
                 else:
                     metrics.failed += 1
                     logger.warning(f"  FAILED - {result.trace.validations}")
@@ -360,7 +362,9 @@ Efficiency Metrics:
             "avg_tool_calls": metrics.avg_tool_calls,
             "avg_edit_accuracy": metrics.avg_edit_accuracy,
             "avg_turns": metrics.avg_turns,
-            "avg_duration": metrics.total_time_seconds / metrics.total_tasks if metrics.total_tasks > 0 else 0,
+            "avg_duration": (
+                metrics.total_time_seconds / metrics.total_tasks if metrics.total_tasks > 0 else 0
+            ),
             "total_duration": metrics.total_time_seconds,
         },
         "tasks": [
@@ -421,12 +425,14 @@ def main():
         help="JSON file with task definitions (uses built-in samples if not provided)",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         dest="output_file",
         help="Output file for results (JSON)",
     )
     parser.add_argument(
-        "-n", "--max-tasks",
+        "-n",
+        "--max-tasks",
         type=int,
         help="Maximum number of tasks to run",
     )
@@ -449,13 +455,15 @@ def main():
         help="Maximum tool calls per task (default: 30)",
     )
     parser.add_argument(
-        "-p", "--parallel",
+        "-p",
+        "--parallel",
         type=int,
         default=1,
         help="Maximum number of tasks to run in parallel (default: 1 for sequential)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )

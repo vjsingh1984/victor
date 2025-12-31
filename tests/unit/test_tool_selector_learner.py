@@ -26,13 +26,23 @@ from unittest.mock import patch
 from victor.agent.rl.base import RLOutcome
 from victor.agent.rl.coordinator import RLCoordinator
 from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+from victor.core.database import reset_database, get_database
+from victor.core.schema import Tables
 
 
 @pytest.fixture
 def coordinator(tmp_path: Path) -> RLCoordinator:
     """Fixture for RLCoordinator, ensuring a clean database for each test."""
+    # Reset the global singleton to ensure fresh database for each test
+    reset_database()
     db_path = tmp_path / "rl_test.db"
-    return RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    # Initialize the database singleton with temp path BEFORE creating coordinator
+    # This ensures RLCoordinator uses the temp database, not ~/.victor/victor.db
+    get_database(db_path)
+    coord = RLCoordinator(storage_path=tmp_path, db_path=db_path)
+    yield coord
+    # Reset again after the test to clean up
+    reset_database()
 
 
 @pytest.fixture
@@ -80,12 +90,12 @@ def _get_q_value_from_db(
     cursor = coordinator.db.cursor()
     if task_type:
         cursor.execute(
-            "SELECT q_value, selection_count FROM tool_selector_task_q_values WHERE tool_name = ? AND task_type = ?",
+            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_TASK} WHERE tool_name = ? AND task_type = ?",
             (tool_name, task_type),
         )
     else:
         cursor.execute(
-            "SELECT q_value, selection_count FROM tool_selector_q_values WHERE tool_name = ?",
+            f"SELECT q_value, selection_count FROM {Tables.RL_TOOL_Q} WHERE tool_name = ?",
             (tool_name,),
         )
     row = cursor.fetchone()
@@ -103,15 +113,15 @@ class TestToolSelectorLearner:
 
         cursor = learner.db.cursor()
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='tool_selector_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_Q}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='tool_selector_task_q_values';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_TASK}';"
         )
         assert cursor.fetchone() is not None
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='tool_selector_outcomes';"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{Tables.RL_TOOL_OUTCOME}';"
         )
         assert cursor.fetchone() is not None
 
@@ -177,13 +187,23 @@ class TestToolSelectorLearner:
 
     def test_persistence(self, tmp_path: Path) -> None:
         """State persists across learner instances."""
-        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        # Reset to ensure clean state
+        reset_database()
+        db_path = tmp_path / "rl_test.db"
+
+        # Initialize DB singleton with temp path
+        get_database(db_path)
+        coordinator1 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner1 = coordinator1.get_learner("tool_selector")  # type: ignore
 
         _record_tool_outcome(learner1, tool_name="edit")
-        coordinator1.db.close()
 
-        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=tmp_path / "rl_test.db")
+        # Reset the singleton to simulate new session (don't call close directly)
+        reset_database()
+
+        # Re-initialize with same temp path to test persistence
+        get_database(db_path)
+        coordinator2 = RLCoordinator(storage_path=tmp_path, db_path=db_path)
         learner2 = coordinator2.get_learner("tool_selector")  # type: ignore
 
         q_value, count = _get_q_value_from_db(coordinator2, "edit")
@@ -192,6 +212,9 @@ class TestToolSelectorLearner:
 
         # Check state was loaded correctly
         assert learner2._tool_selection_counts.get("edit", 0) == 1
+
+        # Clean up
+        reset_database()
 
     def test_get_recommendation(self, learner: ToolSelectorLearner) -> None:
         """Test get_recommendation returns correct values."""

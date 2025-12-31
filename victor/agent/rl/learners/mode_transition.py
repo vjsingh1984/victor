@@ -33,6 +33,7 @@ from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +119,10 @@ class ModeTransitionLearner(BaseLearner):
         """Create tables for mode transition learning."""
         cursor = self.db.cursor()
 
-        # Q-values table (unified with coordinator's database)
+        # Q-values table (uses Tables constants)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS mode_transition_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_Q} (
                 state_key TEXT NOT NULL,
                 action_key TEXT NOT NULL,
                 q_value REAL NOT NULL DEFAULT 0.0,
@@ -134,8 +135,8 @@ class ModeTransitionLearner(BaseLearner):
 
         # Task-type statistics for budget optimization
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS mode_transition_task_stats (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_TASK} (
                 task_type TEXT PRIMARY KEY,
                 optimal_tool_budget INTEGER DEFAULT 10,
                 avg_quality_score REAL DEFAULT 0.5,
@@ -148,8 +149,8 @@ class ModeTransitionLearner(BaseLearner):
 
         # Transition history for analysis
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS mode_transition_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 from_mode TEXT NOT NULL,
                 to_mode TEXT NOT NULL,
@@ -166,15 +167,15 @@ class ModeTransitionLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_mode_transition_state
-            ON mode_transition_q_values(state_key)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_mode_q_state
+            ON {Tables.RL_MODE_Q}(state_key)
             """
         )
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_mode_transition_history_task
-            ON mode_transition_history(task_type, timestamp)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_mode_history_task
+            ON {Tables.RL_MODE_HISTORY}(task_type, timestamp)
             """
         )
 
@@ -187,7 +188,7 @@ class ModeTransitionLearner(BaseLearner):
 
         # Load Q-values
         try:
-            cursor.execute("SELECT * FROM mode_transition_q_values")
+            cursor.execute(f"SELECT * FROM {Tables.RL_MODE_Q}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 state_key = row_dict["state_key"]
@@ -206,7 +207,7 @@ class ModeTransitionLearner(BaseLearner):
 
         # Load task stats
         try:
-            cursor.execute("SELECT * FROM mode_transition_task_stats")
+            cursor.execute(f"SELECT * FROM {Tables.RL_MODE_TASK}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 task_type = row_dict["task_type"]
@@ -306,8 +307,8 @@ class ModeTransitionLearner(BaseLearner):
 
         # Save Q-value
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO mode_transition_q_values
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_MODE_Q}
             (state_key, action_key, q_value, visit_count, last_updated)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -322,8 +323,8 @@ class ModeTransitionLearner(BaseLearner):
 
         # Save transition history
         cursor.execute(
-            """
-            INSERT INTO mode_transition_history
+            f"""
+            INSERT INTO {Tables.RL_MODE_HISTORY}
             (from_mode, to_mode, task_type, state_key, action_key, reward, success, quality_score, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -383,8 +384,8 @@ class ModeTransitionLearner(BaseLearner):
         # Save to database
         cursor = self.db.cursor()
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO mode_transition_task_stats
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_MODE_TASK}
             (task_type, optimal_tool_budget, avg_quality_score, avg_completion_rate, sample_count, last_updated)
             VALUES (?, ?, ?, ?, ?, ?)
             """,

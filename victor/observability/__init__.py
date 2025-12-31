@@ -189,4 +189,11 @@ __all__ = [
     "with_timeout",
 ] + _OTEL_EXPORTS
 
+# Submodules - access via victor.observability.analytics, etc.
+from victor.observability import analytics
+from victor.observability import debug
+from victor.observability import profiler
+from victor.observability import telemetry
+from victor.observability import pipeline
+
 __version__ = "0.2.0"

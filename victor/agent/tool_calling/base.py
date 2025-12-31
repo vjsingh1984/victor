@@ -20,6 +20,7 @@ LLM providers, abstracting away provider-specific formats and behaviors.
 """
 
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -28,6 +29,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 from victor.providers.base import ToolDefinition
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -435,29 +438,109 @@ class FallbackParsingMixin:
             warnings=warnings,
         )
 
-    def parse_from_content(
+    def parse_python_call_from_content(
         self,
         content: str,
         validate_name_fn: Optional[Callable[[str], bool]] = None,
+        valid_tool_names: Optional[set] = None,
     ) -> ToolCallParseResult:
-        """Parse tool calls from content using all fallback methods.
+        """Parse Python-style function calls from content (fallback).
 
-        Tries JSON first, then XML parsing.
+        Handles text-based tool calls like:
+        - read_file(path='foo.py')
+        - shell(command="ls -la")
+        - edit(file_path='/path', old_string="x", new_string="y")
+
+        Common with open-weight models on OpenAI-compatible providers
+        (Cerebras, Groq, Together, etc.) that output tool calls as text.
 
         Args:
             content: Response content to parse
             validate_name_fn: Optional function to validate tool names
+            valid_tool_names: Optional set of valid tool names
 
         Returns:
             ToolCallParseResult with parsed tool calls
         """
-        # Try JSON first (higher confidence)
+        if not content:
+            return ToolCallParseResult()
+
+        try:
+            from victor.agent.tool_calling.text_extractor import (
+                PythonCallExtractor,
+                ExtractionResult,
+            )
+
+            extractor = PythonCallExtractor(strict_mode=False)
+            result = extractor.extract_from_text(content, valid_tool_names)
+
+            if not result.success:
+                return ToolCallParseResult(remaining_content=content)
+
+            # Convert ExtractedToolCall to ToolCall
+            tool_calls: List[ToolCall] = []
+            for extracted in result.tool_calls:
+                # Validate name if validator provided
+                if validate_name_fn and not validate_name_fn(extracted.name):
+                    result.warnings.append(f"Skipped invalid tool name: {extracted.name}")
+                    continue
+
+                tool_calls.append(ToolCall(name=extracted.name, arguments=extracted.arguments))
+
+            if not tool_calls:
+                return ToolCallParseResult(
+                    remaining_content=content,
+                    warnings=result.warnings,
+                )
+
+            return ToolCallParseResult(
+                tool_calls=tool_calls,
+                remaining_content=result.remaining_content,
+                parse_method="python_call_fallback",
+                confidence=result.confidence,
+                warnings=result.warnings,
+            )
+
+        except ImportError:
+            logger.debug("text_extractor module not available for Python call parsing")
+            return ToolCallParseResult(remaining_content=content)
+        except Exception as e:
+            logger.debug(f"Python call parsing failed: {e}")
+            return ToolCallParseResult(remaining_content=content)
+
+    def parse_from_content(
+        self,
+        content: str,
+        validate_name_fn: Optional[Callable[[str], bool]] = None,
+        valid_tool_names: Optional[set] = None,
+    ) -> ToolCallParseResult:
+        """Parse tool calls from content using all fallback methods.
+
+        Tries methods in order of confidence:
+        1. JSON parsing (highest confidence)
+        2. XML parsing
+        3. Python-style function call parsing (for open-weight models)
+
+        Args:
+            content: Response content to parse
+            validate_name_fn: Optional function to validate tool names
+            valid_tool_names: Optional set of valid tool names for Python parsing
+
+        Returns:
+            ToolCallParseResult with parsed tool calls
+        """
+        # Try JSON first (highest confidence)
         result = self.parse_json_from_content(content, validate_name_fn)
         if result.tool_calls:
             return result
 
         # Try XML parsing
         result = self.parse_xml_from_content(content, validate_name_fn)
+        if result.tool_calls:
+            return result
+
+        # Try Python-style function call parsing (for open-weight models)
+        result = self.parse_python_call_from_content(content, validate_name_fn, valid_tool_names)
         if result.tool_calls:
             return result
 

@@ -35,6 +35,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +105,10 @@ class ToolSelectorLearner(BaseLearner):
         """Create tables for tool selector stats."""
         cursor = self.db.cursor()
 
-        # Global tool Q-values table
+        # Global tool Q-values table (uses Tables constants)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tool_selector_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_Q} (
                 tool_name TEXT PRIMARY KEY,
                 q_value REAL NOT NULL,
                 selection_count INTEGER DEFAULT 0,
@@ -119,8 +120,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Task-specific tool Q-values table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tool_selector_task_q_values (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_TASK} (
                 tool_name TEXT NOT NULL,
                 task_type TEXT NOT NULL,
                 q_value REAL NOT NULL,
@@ -134,8 +135,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Tool execution outcomes table (for detailed analysis)
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tool_selector_outcomes (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_OUTCOME} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tool_name TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -150,15 +151,15 @@ class ToolSelectorLearner(BaseLearner):
 
         # Indexes
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_tool_selector_task
-            ON tool_selector_task_q_values(tool_name, task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_tool_q_task
+            ON {Tables.RL_TOOL_TASK}(tool_name, task_type)
             """
         )
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_tool_selector_outcomes_tool
-            ON tool_selector_outcomes(tool_name, task_type)
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_rl_tool_outcome_tool
+            ON {Tables.RL_TOOL_OUTCOME}(tool_name, task_type)
             """
         )
 
@@ -171,7 +172,7 @@ class ToolSelectorLearner(BaseLearner):
 
         # Load global Q-values
         try:
-            cursor.execute("SELECT * FROM tool_selector_q_values")
+            cursor.execute(f"SELECT * FROM {Tables.RL_TOOL_Q}")
             for row in cursor.fetchall():
                 stats = dict(row)
                 tool_name = stats["tool_name"]
@@ -184,7 +185,7 @@ class ToolSelectorLearner(BaseLearner):
 
         # Load task-specific Q-values
         try:
-            cursor.execute("SELECT * FROM tool_selector_task_q_values")
+            cursor.execute(f"SELECT * FROM {Tables.RL_TOOL_TASK}")
             for row in cursor.fetchall():
                 stats = dict(row)
                 tool_name = stats["tool_name"]
@@ -266,8 +267,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Save global Q-value
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO tool_selector_q_values
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_TOOL_Q}
             (tool_name, q_value, selection_count, success_count, last_updated)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -282,8 +283,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Save task-specific Q-value
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO tool_selector_task_q_values
+            f"""
+            INSERT OR REPLACE INTO {Tables.RL_TOOL_TASK}
             (tool_name, task_type, q_value, selection_count, success_count, last_updated)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -299,8 +300,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Save detailed outcome for analysis
         cursor.execute(
-            """
-            INSERT INTO tool_selector_outcomes
+            f"""
+            INSERT INTO {Tables.RL_TOOL_OUTCOME}
             (tool_name, task_type, success, quality_score, reward, metadata, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,

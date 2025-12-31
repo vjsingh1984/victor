@@ -888,6 +888,14 @@ class TestToolExecutorValidateArguments:
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_tool"
         mock_tool.validate_parameters_detailed = MagicMock()
+        # Add parameters schema so unknown arg check passes
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "arg": {"type": "string"},
+            },
+        }
         return mock_tool, ValidationResult
 
     def test_validate_arguments_off_mode(self, mock_tool_with_validation):
@@ -1039,6 +1047,130 @@ class TestToolExecutorValidateArguments:
         # Error can be either "Invalid arguments" with errors or fallback message
         assert "Invalid arguments" in result.error or "validation failed" in result.error.lower()
         mock_tool.execute.assert_not_called()
+
+
+class TestToolExecutorUnknownArguments:
+    """Tests for unknown/hallucinated argument detection."""
+
+    @pytest.fixture
+    def mock_tool_with_schema(self):
+        """Create a mock tool with a defined parameter schema."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "test_tool"
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path"},
+                "content": {"type": "string", "description": "File content"},
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        }
+        return mock_tool
+
+    def test_check_unknown_arguments_valid(self, mock_tool_with_schema):
+        """Test that valid arguments pass the check."""
+        from victor.agent.tool_executor import ValidationMode
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        valid, unknown = executor._check_unknown_arguments(
+            mock_tool_with_schema, {"path": "/test", "content": "hello"}
+        )
+
+        assert valid is True
+        assert unknown == []
+
+    def test_check_unknown_arguments_detects_invented_args(self, mock_tool_with_schema):
+        """Test that invented/hallucinated arguments are detected."""
+        from victor.agent.tool_executor import ValidationMode
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        valid, unknown = executor._check_unknown_arguments(
+            mock_tool_with_schema, {"path": "/test", "files": ["a.py"], "target": "foo"}
+        )
+
+        assert valid is False
+        assert set(unknown) == {"files", "target"}
+
+    def test_validate_arguments_rejects_unknown_in_strict_mode(self, mock_tool_with_schema):
+        """Test that STRICT mode rejects unknown arguments with helpful error."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        mock_tool_with_schema.validate_parameters_detailed = MagicMock(
+            return_value=ValidationResult.success()
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        should_proceed, result = executor._validate_arguments(
+            mock_tool_with_schema, {"path": "/test", "invented_arg": "value"}
+        )
+
+        assert should_proceed is False
+        assert result is not None
+        assert "Unknown argument(s): invented_arg" in result.errors[0]
+        assert "Valid parameters" in result.errors[0]
+        assert "path" in result.errors[0]
+        assert "content" in result.errors[0]
+
+    def test_validate_arguments_warns_unknown_in_lenient_mode(self, mock_tool_with_schema):
+        """Test that LENIENT mode warns but proceeds with unknown arguments."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import ValidationResult
+
+        mock_tool_with_schema.validate_parameters_detailed = MagicMock(
+            return_value=ValidationResult.success()
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.LENIENT,
+        )
+
+        should_proceed, result = executor._validate_arguments(
+            mock_tool_with_schema, {"path": "/test", "invented_arg": "value"}
+        )
+
+        # LENIENT mode proceeds despite unknown args
+        assert should_proceed is True
+        assert executor._validation_failures == 1  # Still counted as failure
+
+    def test_check_unknown_arguments_empty_schema(self):
+        """Test that tools with empty schema allow any arguments."""
+        from victor.agent.tool_executor import ValidationMode
+
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "flexible_tool"
+        mock_tool.parameters = {}
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        valid, unknown = executor._check_unknown_arguments(
+            mock_tool, {"any": "arg", "is": "allowed"}
+        )
+
+        assert valid is True
+        assert unknown == []
 
 
 class TestToolExecutorHooks:

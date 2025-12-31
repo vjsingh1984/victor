@@ -41,7 +41,7 @@ from victor.observability import (
     TransitionHistory,
     VictorEvent,
 )
-from victor.verticals.base import (
+from victor.core.verticals.base import (
     StageDefinition,
     VerticalBase,
     VerticalConfig,
@@ -375,16 +375,22 @@ class TestFrameworkInternalHelpers:
         EventBus.reset_instance()
 
     def test_apply_system_prompt(self):
-        """Test apply_system_prompt function."""
+        """Test apply_system_prompt function uses public methods only (DIP compliance)."""
         from victor.framework._internal import apply_system_prompt
+        from victor.framework.protocols import CapabilityRegistryProtocol
 
-        mock_orchestrator = MagicMock()
-        mock_orchestrator.prompt_builder = MagicMock()
-        mock_orchestrator.prompt_builder._custom_prompt = None
+        # Create mock that implements capability registry protocol
+        mock_orchestrator = MagicMock(spec=CapabilityRegistryProtocol)
+        mock_orchestrator.has_capability.return_value = True
+        mock_orchestrator.invoke_capability = MagicMock(return_value=True)
 
         apply_system_prompt(mock_orchestrator, "Custom prompt text")
 
-        assert mock_orchestrator._framework_system_prompt == "Custom prompt text"
+        # Should invoke via capability registry
+        mock_orchestrator.invoke_capability.assert_called_once()
+        call_args = mock_orchestrator.invoke_capability.call_args
+        assert call_args[0][0] == "custom_prompt"
+        assert call_args[0][1] == "Custom prompt text"
 
 
 class TestAgentVerticalIntegration:
@@ -414,8 +420,8 @@ class TestAgentVerticalIntegration:
             def get_system_prompt(cls) -> str:
                 return "You are a test assistant specialized in testing."
 
-        # Get config
-        config = TestVertical.get_config()
+        # Get config (use_cache=False to avoid stale cached config)
+        config = TestVertical.get_config(use_cache=False)
 
         assert config.system_prompt == "You are a test assistant specialized in testing."
         assert config.tools is not None

@@ -30,6 +30,11 @@ Strategy:
 
 Algorithm: Thompson Sampling with Beta priors
 
+Enrichment Learning:
+- Tracks which enrichment types improve task success
+- Uses Thompson Sampling to learn optimal enrichment strategies per vertical
+- Integrates with PromptEnrichmentService via callback
+
 Sprint 5: Advanced RL Patterns
 """
 
@@ -43,6 +48,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +236,13 @@ class PromptTemplateLearner(BaseLearner):
         # Sample counts per context
         self._sample_counts: Dict[Tuple[str, str], int] = {}
 
+        # Beta distributions for enrichment types per vertical
+        # Key: (vertical, enrichment_type, task_type) -> BetaDistribution
+        self._enrichment_posteriors: Dict[Tuple[str, str, str], BetaDistribution] = {}
+
+        # Sample counts for enrichments
+        self._enrichment_sample_counts: Dict[Tuple[str, str], int] = {}
+
         # Load state from database
         self._load_state()
 
@@ -239,8 +252,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Style posteriors table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_styles (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_STYLE} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
                 style TEXT NOT NULL,
@@ -255,8 +268,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Element posteriors table
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_elements (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_ELEMENT} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
                 element TEXT NOT NULL,
@@ -271,8 +284,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Learning history
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prompt_template_history (
+            f"""
+            CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -284,17 +297,56 @@ class PromptTemplateLearner(BaseLearner):
             """
         )
 
-        # Indexes
+        # Enrichment tracking table
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_prompt_styles_context
-            ON prompt_template_styles(task_type, provider)
+            CREATE TABLE IF NOT EXISTS agent_enrichment_stats (
+                vertical TEXT NOT NULL,
+                enrichment_type TEXT NOT NULL,
+                task_type TEXT,
+                alpha REAL NOT NULL DEFAULT 1.0,
+                beta REAL NOT NULL DEFAULT 1.0,
+                sample_count INTEGER NOT NULL DEFAULT 0,
+                total_quality_improvement REAL NOT NULL DEFAULT 0.0,
+                last_updated TEXT NOT NULL,
+                PRIMARY KEY (vertical, enrichment_type, task_type)
+            )
+            """
+        )
+
+        # Enrichment history table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_enrichment_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vertical TEXT NOT NULL,
+                enrichment_type TEXT NOT NULL,
+                enrichment_count INTEGER NOT NULL,
+                task_type TEXT,
+                task_success INTEGER NOT NULL,
+                quality_improvement REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+            """
+        )
+
+        # Indexes
+        cursor.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_agent_prompt_style_context
+            ON {Tables.AGENT_PROMPT_STYLE}(task_type, provider)
+            """
+        )
+        cursor.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS idx_agent_prompt_element_context
+            ON {Tables.AGENT_PROMPT_ELEMENT}(task_type, provider)
             """
         )
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_prompt_elements_context
-            ON prompt_template_elements(task_type, provider)
+            CREATE INDEX IF NOT EXISTS idx_agent_enrichment_stats_vertical
+            ON agent_enrichment_stats(vertical, enrichment_type)
             """
         )
 
@@ -307,7 +359,7 @@ class PromptTemplateLearner(BaseLearner):
 
         try:
             # Load style posteriors
-            cursor.execute("SELECT * FROM prompt_template_styles")
+            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_STYLE}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 key = (row_dict["task_type"], row_dict["provider"], row_dict["style"])
@@ -322,7 +374,7 @@ class PromptTemplateLearner(BaseLearner):
                 )
 
             # Load element posteriors
-            cursor.execute("SELECT * FROM prompt_template_elements")
+            cursor.execute(f"SELECT * FROM {Tables.AGENT_PROMPT_ELEMENT}")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 key = (row_dict["task_type"], row_dict["provider"], row_dict["element"])
@@ -334,10 +386,38 @@ class PromptTemplateLearner(BaseLearner):
         except Exception as e:
             logger.debug(f"RL: Could not load prompt template state: {e}")
 
+        # Load enrichment posteriors
+        try:
+            cursor.execute("SELECT * FROM agent_enrichment_stats")
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                key = (
+                    row_dict["vertical"],
+                    row_dict["enrichment_type"],
+                    row_dict.get("task_type", ""),
+                )
+                self._enrichment_posteriors[key] = BetaDistribution(
+                    alpha=row_dict["alpha"],
+                    beta=row_dict["beta"],
+                )
+                context_key = (row_dict["vertical"], row_dict["enrichment_type"])
+                self._enrichment_sample_counts[context_key] = max(
+                    self._enrichment_sample_counts.get(context_key, 0),
+                    row_dict["sample_count"],
+                )
+        except Exception as e:
+            logger.debug(f"RL: Could not load enrichment state: {e}")
+
         if self._style_posteriors:
             logger.info(
                 f"RL: Loaded prompt template posteriors for "
                 f"{len(self._style_posteriors)} style contexts"
+            )
+
+        if self._enrichment_posteriors:
+            logger.info(
+                f"RL: Loaded enrichment posteriors for "
+                f"{len(self._enrichment_posteriors)} enrichment contexts"
             )
 
     def _get_context_key(self, task_type: str, provider: str) -> Tuple[str, str]:
@@ -452,8 +532,8 @@ class PromptTemplateLearner(BaseLearner):
         # Save style posterior
         style_posterior = self._get_style_posterior(task_type, provider, template.style)
         cursor.execute(
-            """
-            INSERT OR REPLACE INTO prompt_template_styles
+            f"""
+            INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_STYLE}
             (task_type, provider, style, alpha, beta, sample_count, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
@@ -472,8 +552,8 @@ class PromptTemplateLearner(BaseLearner):
         for element in template.elements:
             element_posterior = self._get_element_posterior(task_type, provider, element)
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO prompt_template_elements
+                f"""
+                INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_ELEMENT}
                 (task_type, provider, element, alpha, beta, sample_count, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -490,8 +570,8 @@ class PromptTemplateLearner(BaseLearner):
 
         # Save history
         cursor.execute(
-            """
-            INSERT INTO prompt_template_history
+            f"""
+            INSERT INTO {Tables.AGENT_PROMPT_HISTORY}
             (task_type, provider, model, template_used, success, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -692,6 +772,225 @@ class PromptTemplateLearner(BaseLearner):
         """
         return self._compute_success_score(outcome)
 
+    # =========================================================================
+    # Enrichment Tracking Methods
+    # =========================================================================
+
+    def _get_enrichment_posterior(
+        self, vertical: str, enrichment_type: str, task_type: str = ""
+    ) -> BetaDistribution:
+        """Get or create posterior for an enrichment type.
+
+        Args:
+            vertical: Vertical name (coding, research, etc.)
+            enrichment_type: Type of enrichment (knowledge_graph, web_search, etc.)
+            task_type: Optional task type for more specific learning
+
+        Returns:
+            BetaDistribution for this enrichment context
+        """
+        key = (vertical.lower(), enrichment_type.lower(), task_type.lower())
+        if key not in self._enrichment_posteriors:
+            self._enrichment_posteriors[key] = BetaDistribution()
+        return self._enrichment_posteriors[key]
+
+    def record_enrichment_outcome(
+        self,
+        vertical: str,
+        enrichment_type: str,
+        enrichment_count: int,
+        task_success: bool,
+        quality_improvement: float,
+        task_type: Optional[str] = None,
+    ) -> None:
+        """Record enrichment outcome and update posteriors.
+
+        This method is designed to be used as a callback from
+        PromptEnrichmentService.on_outcome().
+
+        Args:
+            vertical: Vertical name (coding, research, devops, data_analysis)
+            enrichment_type: Type of enrichment applied
+            enrichment_count: Number of enrichments applied
+            task_success: Whether the task succeeded
+            quality_improvement: Quality improvement score (-1.0 to 1.0)
+            task_type: Optional specific task type
+        """
+        task_type = task_type or ""
+
+        # Only update if enrichments were actually used
+        if enrichment_count == 0:
+            return
+
+        # Compute success signal
+        # Combine task success and quality improvement
+        success_score = 0.6 * (1.0 if task_success else 0.0) + 0.4 * (
+            (quality_improvement + 1.0) / 2.0
+        )
+        success = success_score >= 0.5
+
+        # Update enrichment posterior
+        posterior = self._get_enrichment_posterior(vertical, enrichment_type, task_type)
+        posterior.update(success)
+
+        # Update sample count
+        context_key = (vertical.lower(), enrichment_type.lower())
+        self._enrichment_sample_counts[context_key] = (
+            self._enrichment_sample_counts.get(context_key, 0) + 1
+        )
+
+        # Save to database
+        self._save_enrichment_to_db(
+            vertical=vertical,
+            enrichment_type=enrichment_type,
+            task_type=task_type,
+            enrichment_count=enrichment_count,
+            task_success=task_success,
+            quality_improvement=quality_improvement,
+        )
+
+        logger.debug(
+            f"RL: Enrichment outcome recorded: vertical={vertical}, "
+            f"type={enrichment_type}, success={success}"
+        )
+
+    def _save_enrichment_to_db(
+        self,
+        vertical: str,
+        enrichment_type: str,
+        task_type: str,
+        enrichment_count: int,
+        task_success: bool,
+        quality_improvement: float,
+    ) -> None:
+        """Save enrichment stats and history to database.
+
+        Args:
+            vertical: Vertical name
+            enrichment_type: Type of enrichment
+            task_type: Task type
+            enrichment_count: Number of enrichments
+            task_success: Whether task succeeded
+            quality_improvement: Quality improvement score
+        """
+        cursor = self.db.cursor()
+        timestamp = datetime.now().isoformat()
+        context_key = (vertical.lower(), enrichment_type.lower())
+        sample_count = self._enrichment_sample_counts.get(context_key, 0)
+
+        # Get posterior values
+        posterior = self._get_enrichment_posterior(vertical, enrichment_type, task_type)
+
+        # Save/update stats
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO agent_enrichment_stats
+            (vertical, enrichment_type, task_type, alpha, beta, sample_count,
+             total_quality_improvement, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                vertical.lower(),
+                enrichment_type.lower(),
+                task_type.lower(),
+                posterior.alpha,
+                posterior.beta,
+                sample_count,
+                quality_improvement,  # Accumulate over time
+                timestamp,
+            ),
+        )
+
+        # Save history
+        cursor.execute(
+            """
+            INSERT INTO agent_enrichment_history
+            (vertical, enrichment_type, enrichment_count, task_type,
+             task_success, quality_improvement, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                vertical.lower(),
+                enrichment_type.lower(),
+                enrichment_count,
+                task_type.lower(),
+                1 if task_success else 0,
+                quality_improvement,
+                timestamp,
+            ),
+        )
+
+        self.db.commit()
+
+    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> Dict[str, float]:
+        """Get posterior mean probabilities for each enrichment type.
+
+        Args:
+            vertical: Vertical name
+            task_type: Optional task type for filtering
+
+        Returns:
+            Dictionary of enrichment_type -> probability
+        """
+        probabilities = {}
+        for key, posterior in self._enrichment_posteriors.items():
+            v, etype, ttype = key
+            if v == vertical.lower():
+                if not task_type or ttype == task_type.lower():
+                    probabilities[etype] = posterior.mean()
+        return probabilities
+
+    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> Dict[str, bool]:
+        """Get recommendation on which enrichment types to use.
+
+        Uses Thompson Sampling to decide which enrichments are worth applying.
+
+        Args:
+            vertical: Vertical name
+            task_type: Optional task type
+
+        Returns:
+            Dictionary of enrichment_type -> should_use (True/False)
+        """
+        recommendations = {}
+        enrichment_types = [
+            "knowledge_graph",
+            "code_snippet",
+            "conversation",
+            "web_search",
+            "schema",
+            "tool_history",
+            "project_context",
+        ]
+
+        for etype in enrichment_types:
+            posterior = self._get_enrichment_posterior(vertical, etype, task_type)
+            # Use Thompson Sampling: sample from posterior
+            sample = posterior.sample()
+            recommendations[etype] = sample > 0.5
+
+        return recommendations
+
+    def create_enrichment_callback(self):
+        """Create a callback function for PromptEnrichmentService.
+
+        Returns:
+            Callback function that can be passed to service.on_outcome()
+        """
+        from victor.framework.enrichment import EnrichmentOutcome
+
+        def callback(outcome: EnrichmentOutcome) -> None:
+            self.record_enrichment_outcome(
+                vertical=outcome.vertical or "unknown",
+                enrichment_type=outcome.enrichment_type,
+                enrichment_count=outcome.enrichment_count,
+                task_success=outcome.task_success,
+                quality_improvement=outcome.quality_improvement,
+                task_type=outcome.task_type,
+            )
+
+        return callback
+
     def export_metrics(self) -> Dict[str, Any]:
         """Export learner metrics for monitoring.
 
@@ -722,6 +1021,17 @@ class PromptTemplateLearner(BaseLearner):
                         "probability": context_styles[best],
                     }
 
+        # Get enrichment stats
+        enrichment_stats = {}
+        for key, posterior in self._enrichment_posteriors.items():
+            vertical, etype, ttype = key
+            context = f"{vertical}:{etype}"
+            if context not in enrichment_stats:
+                enrichment_stats[context] = {
+                    "probability": posterior.mean(),
+                    "sample_count": self._enrichment_sample_counts.get((vertical, etype), 0),
+                }
+
         return {
             "learner": self.name,
             "contexts_learned": len(self._sample_counts),
@@ -732,4 +1042,8 @@ class PromptTemplateLearner(BaseLearner):
             "tracked_selections": len(self._recent_selections),
             "top_styles_by_context": top_styles,
             "samples_per_context": {f"{k[0]}:{k[1]}": v for k, v in self._sample_counts.items()},
+            # Enrichment stats
+            "enrichment_posteriors_count": len(self._enrichment_posteriors),
+            "enrichment_samples_total": sum(self._enrichment_sample_counts.values()),
+            "enrichment_stats": enrichment_stats,
         }

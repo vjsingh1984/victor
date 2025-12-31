@@ -188,7 +188,7 @@ class SerializationCommand(BaseSlashCommand):
         subcommand = self._get_arg(ctx, 0, "summary").lower()
 
         try:
-            from victor.serialization.adaptive import get_adaptive_serializer
+            from victor.processing.serialization.adaptive import get_adaptive_serializer
 
             serializer = get_adaptive_serializer()
             stats = serializer.get_stats()

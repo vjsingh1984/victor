@@ -14,11 +14,13 @@
 
 """Tests for MCP client module."""
 
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.mcp.client import MCPClient
-from victor.mcp.protocol import MCPTool, MCPResource, MCPToolCallResult
+from victor.integrations.mcp.client import MCPClient
+from victor.integrations.mcp.protocol import MCPTool, MCPResource, MCPToolCallResult
 
 
 class TestMCPClientInit:
@@ -606,3 +608,226 @@ class TestMCPClientReconnect:
 
         assert result is False
         assert client._running is False
+
+
+class TestMCPClientResourceManagement:
+    """Tests for resource management and cleanup."""
+
+    @pytest.mark.asyncio
+    async def test_cleanup_method_exists(self):
+        """Test that cleanup() method exists as public API."""
+        client = MCPClient()
+        assert hasattr(client, "cleanup")
+        assert callable(client.cleanup)
+
+    @pytest.mark.asyncio
+    async def test_cleanup_closes_process(self):
+        """Test cleanup properly terminates subprocess."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.stdin = MagicMock()
+        mock_process.stdout = MagicMock()
+        mock_process.stderr = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+        client.initialized = True
+        client._running = True
+
+        await client.cleanup()
+
+        assert client.process is None
+        assert client.initialized is False
+        assert client._running is False
+        mock_process.stdin.close.assert_called_once()
+        mock_process.stdout.close.assert_called_once()
+        mock_process.stderr.close.assert_called_once()
+        mock_process.terminate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_cancels_health_task(self):
+        """Test cleanup cancels health monitoring task."""
+        client = MCPClient()
+
+        # Create a real asyncio task that we can cancel
+        async def dummy_task():
+            await asyncio.sleep(100)
+
+        task = asyncio.create_task(dummy_task())
+        client._health_task = task
+
+        await client.cleanup()
+
+        assert task.cancelled() or task.done()
+        assert client._health_task is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_emits_disconnect_callback(self):
+        """Test cleanup emits disconnect callback with reason."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+
+        callback = MagicMock()
+        client._on_disconnect_callbacks.append(callback)
+
+        await client.cleanup(reason="test_reason")
+
+        callback.assert_called_once_with("test_reason")
+
+    @pytest.mark.asyncio
+    async def test_cleanup_handles_exception_gracefully(self):
+        """Test cleanup handles exceptions without raising."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.stdin = MagicMock()
+        mock_process.stdin.close.side_effect = Exception("Close failed")
+        mock_process.stdout = MagicMock()
+        mock_process.stderr = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+
+        # Should not raise
+        await client.cleanup()
+
+        assert client.process is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_is_idempotent(self):
+        """Test cleanup can be called multiple times safely."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+
+        # First cleanup
+        await client.cleanup()
+        assert client.process is None
+
+        # Second cleanup should not raise
+        await client.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_close_is_alias_for_cleanup(self):
+        """Test close() method works as alias for cleanup()."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+        client.initialized = True
+        client._running = True
+
+        await client.close()
+
+        assert client.process is None
+        assert client.initialized is False
+        assert client._running is False
+
+
+class TestMCPClientAsyncContextManager:
+    """Tests for async context manager support."""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_without_command(self):
+        """Test context manager works without auto-connect command."""
+        async with MCPClient() as client:
+            assert client is not None
+            assert not client.initialized
+            # Should be able to connect manually if needed
+
+    @pytest.mark.asyncio
+    async def test_context_manager_cleanup_on_exit(self):
+        """Test context manager calls cleanup on exit."""
+        client = MCPClient()
+        with patch.object(client, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+            async with client:
+                pass
+            mock_cleanup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_context_manager_cleanup_on_exception(self):
+        """Test context manager calls cleanup even when exception occurs."""
+        client = MCPClient()
+        with patch.object(client, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+            with pytest.raises(ValueError):
+                async with client:
+                    raise ValueError("Test error")
+            mock_cleanup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_context_manager_with_command_success(self):
+        """Test context manager auto-connects when command provided."""
+        with patch("subprocess.Popen") as mock_popen:
+            mock_process = MagicMock()
+            mock_process.wait = MagicMock()  # For cleanup
+            mock_popen.return_value = mock_process
+
+            client = MCPClient(command=["python", "server.py"], health_check_interval=0)
+
+            with patch.object(client, "initialize", new_callable=AsyncMock) as mock_init:
+                mock_init.return_value = True
+
+                async with client:
+                    assert client._running is True
+                    # initialized is set by initialize() which is mocked
+                    # The mock returns True so connect() succeeds
+                    mock_init.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_context_manager_with_command_failure_raises(self):
+        """Test context manager raises ConnectionError on connect failure."""
+        with patch("subprocess.Popen") as mock_popen:
+            mock_popen.side_effect = Exception("Process failed")
+
+            client = MCPClient(command=["python", "server.py"])
+
+            with pytest.raises(ConnectionError) as exc_info:
+                async with client:
+                    pass
+
+            assert "Failed to connect" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_context_manager_stores_command_for_reconnect(self):
+        """Test that command provided in __init__ is stored for reconnection."""
+        command = ["python", "server.py"]
+        client = MCPClient(command=command)
+
+        assert client._command == command
+        assert client._auto_connect_command == command
+
+    def test_init_with_command_parameter(self):
+        """Test MCPClient accepts command parameter in __init__."""
+        command = ["python", "server.py"]
+        client = MCPClient(command=command)
+
+        assert client._command == command
+
+
+class TestMCPClientDestructor:
+    """Tests for destructor behavior."""
+
+    def test_destructor_cleanup_on_garbage_collection(self):
+        """Test __del__ attempts cleanup when process still active."""
+        client = MCPClient()
+        mock_process = MagicMock()
+        mock_process.stdin = MagicMock()
+        mock_process.stdout = MagicMock()
+        mock_process.stderr = MagicMock()
+        mock_process.wait = MagicMock()
+        client.process = mock_process
+
+        # Manually call __del__ to simulate garbage collection
+        client.__del__()
+
+        # Process should be cleaned up
+        assert client.process is None
+
+    def test_destructor_safe_when_no_process(self):
+        """Test __del__ is safe when no process exists."""
+        client = MCPClient()
+        client.process = None
+        client._sandboxed_process = None
+
+        # Should not raise
+        client.__del__()

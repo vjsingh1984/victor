@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.2.3"
+version = "0.3.0"
 description = "Enterprise-Ready AI Coding Assistant - Code to Victory with Any AI"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -56,6 +56,7 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
+    "typing_extensions>=4.0",  # For Self type on Python 3.10
 
     # Async
     "httpx>=0.27",
@@ -139,6 +140,19 @@ build = [
     # Binary distribution
     "pyinstaller>=6.0",
     "pyinstaller-hooks-contrib>=2024.0",
+]
+
+# HTTP API server for IDE integrations (VS Code, JetBrains, etc.)
+# Usage: pip install victor[api]
+api = [
+    "fastapi>=0.109",
+    "uvicorn>=0.27",
+]
+
+# Checkpoint persistence with SQLite backend
+# Usage: pip install victor[checkpoints]
+checkpoints = [
+    "aiosqlite>=0.19",
 ]
 
 # Google Gemini provider (using new google-genai SDK)
@@ -339,6 +353,9 @@ markers = [
     "integration: marks tests as integration tests (require external services)",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "unit: marks tests as unit tests",
+    "workflows: marks workflow-related tests",
+    "agents: marks multi-agent tests",
+    "hitl: marks human-in-the-loop tests",
 ]
 filterwarnings = [
     # Ignore PytestCollectionWarning for non-test classes in victor module

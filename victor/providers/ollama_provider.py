@@ -402,8 +402,15 @@ class OllamaProvider(BaseProvider):
                 except Exception:
                     pass  # Fall through to original error
 
+            # Include error body for better debugging
+            error_body = ""
+            try:
+                error_body = e.response.text[:500]
+            except Exception:
+                pass
+            logger.error(f"Ollama HTTP error {e.response.status_code}: {error_body}")
             raise ProviderError(
-                message=f"HTTP error: {e.response.status_code}",
+                message=f"HTTP error {e.response.status_code}: {error_body}",
                 provider=self.name,
                 status_code=e.response.status_code,
                 raw_error=e,
@@ -545,8 +552,15 @@ class OllamaProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
+            # Include error body for better debugging
+            error_body = ""
+            try:
+                error_body = e.response.text[:500]
+            except Exception:
+                pass
+            logger.error(f"Ollama streaming HTTP error {e.response.status_code}: {error_body}")
             raise ProviderError(
-                message=f"HTTP error: {e.response.status_code}",
+                message=f"HTTP error {e.response.status_code}: {error_body}",
                 provider=self.name,
                 status_code=e.response.status_code,
                 raw_error=e,

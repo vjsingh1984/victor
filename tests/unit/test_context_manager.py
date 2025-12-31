@@ -132,14 +132,14 @@ class TestContextWindow:
         assert len(cw.files) == 1
 
 
-class TestContextManager:
-    """Tests for ContextManager class."""
+class TestProjectContextLoader:
+    """Tests for ProjectContextLoader class."""
 
     def test_context_manager_init_defaults(self):
         """Test context manager with default values."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         assert cm.model == "gpt-4"
         assert cm.context.max_tokens == 128000
         assert cm.pruning_strategy == PruningStrategy.SMART
@@ -147,9 +147,9 @@ class TestContextManager:
 
     def test_context_manager_custom_params(self):
         """Test context manager with custom parameters."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             model="claude-3",
             max_tokens=200000,
             reserved_tokens=8192,
@@ -164,9 +164,9 @@ class TestContextManager:
 
     def test_count_tokens_basic(self):
         """Test token counting with basic text."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         text = "Hello, world!"
         tokens = cm.count_tokens(text)
         assert tokens > 0
@@ -174,17 +174,17 @@ class TestContextManager:
 
     def test_count_tokens_empty(self):
         """Test token counting with empty string."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         tokens = cm.count_tokens("")
         assert tokens == 0
 
     def test_add_message(self):
         """Test adding messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         initial_count = len(cm.context.messages)
         cm.add_message("user", "Hello there!")
         assert len(cm.context.messages) == initial_count + 1
@@ -192,26 +192,26 @@ class TestContextManager:
 
     def test_add_message_updates_tokens(self):
         """Test that adding message updates token count."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         initial_tokens = cm.context.total_tokens
         cm.add_message("user", "This is a test message with several words.")
         assert cm.context.total_tokens > initial_tokens
 
     def test_add_message_with_priority(self):
         """Test adding message with custom priority."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_message("system", "Important system message", priority=10)
         assert cm.context.messages[-1].priority == 10
 
     def test_get_context_for_prompt(self):
         """Test getting context for LLM prompt."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_message("user", "Hello")
         cm.add_message("assistant", "Hi there!")
 
@@ -223,9 +223,9 @@ class TestContextManager:
 
     def test_add_file(self):
         """Test adding file to context."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/test/file.py", "print('hello')", relevance_score=0.8)
         assert len(cm.context.files) == 1
         assert cm.context.files[0].path == "/test/file.py"
@@ -233,18 +233,18 @@ class TestContextManager:
 
     def test_add_file_updates_tokens(self):
         """Test that adding file updates token count."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         initial_tokens = cm.context.total_tokens
         cm.add_file("/test/file.py", "print('hello world')")
         assert cm.context.total_tokens > initial_tokens
 
     def test_add_file_with_line_range(self):
         """Test adding file with line range."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         content = "line1\nline2\nline3\nline4\nline5"
         cm.add_file("/test/file.py", content, line_range=(1, 3))
         assert len(cm.context.files) == 1
@@ -253,9 +253,9 @@ class TestContextManager:
 
     def test_get_context_for_prompt_with_files(self):
         """Test getting context with files included."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/test/file.py", "print('hello')", relevance_score=0.9)
         cm.add_message("user", "What does this file do?")
 
@@ -267,9 +267,9 @@ class TestContextManager:
 
     def test_format_file_context_with_line_range(self):
         """Test formatting file context with line ranges."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/test/file.py", "print('hello')", line_range=(10, 20))
 
         context = cm.get_context_for_prompt()
@@ -278,9 +278,9 @@ class TestContextManager:
 
     def test_format_file_context_sorted_by_relevance(self):
         """Test that files are sorted by relevance in context."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/low.py", "low relevance", relevance_score=0.3)
         cm.add_file("/high.py", "high relevance", relevance_score=0.9)
         cm.add_file("/mid.py", "mid relevance", relevance_score=0.6)
@@ -294,10 +294,10 @@ class TestContextManager:
 
     def test_auto_prune_triggered(self):
         """Test that auto-prune is triggered when threshold exceeded."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
         # Create manager with small max_tokens to easily trigger pruning
-        cm = ContextManager(max_tokens=100, reserved_tokens=10, prune_threshold=0.5)
+        cm = ProjectContextLoader(max_tokens=100, reserved_tokens=10, prune_threshold=0.5)
 
         # Add enough content to exceed threshold
         cm.add_message("user", "x" * 50)  # Will exceed 50% of available 90 tokens
@@ -306,9 +306,9 @@ class TestContextManager:
 
     def test_prune_fifo_keeps_recent_messages(self):
         """Test FIFO pruning keeps recent messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=200,
             reserved_tokens=20,
             prune_threshold=0.6,
@@ -329,9 +329,9 @@ class TestContextManager:
 
     def test_prune_by_priority(self):
         """Test priority-based pruning removes low-priority first."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=200,
             reserved_tokens=20,
             prune_threshold=0.6,
@@ -350,9 +350,9 @@ class TestContextManager:
 
     def test_prune_smart_keeps_edges(self):
         """Test smart pruning keeps first and last messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=200,
             reserved_tokens=20,
             prune_threshold=0.6,
@@ -371,9 +371,9 @@ class TestContextManager:
 
     def test_multiple_files_in_context(self):
         """Test having multiple files in context."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/file1.py", "content1")
         cm.add_file("/file2.py", "content2")
         cm.add_file("/file3.py", "content3")
@@ -383,17 +383,17 @@ class TestContextManager:
 
     def test_message_metadata(self):
         """Test message with metadata."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_message("user", "Test", metadata={"tool_call": "read_file"})
         assert cm.context.messages[-1].metadata["tool_call"] == "read_file"
 
     def test_context_window_properties(self):
         """Test ContextWindow property calculations."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(max_tokens=10000, reserved_tokens=1000)
+        cm = ProjectContextLoader(max_tokens=10000, reserved_tokens=1000)
         cm.add_message("user", "Hello" * 100)  # Add some tokens
 
         # Check properties work
@@ -401,14 +401,14 @@ class TestContextManager:
         assert cm.context.usage_percentage >= 0
 
 
-class TestContextManagerClear:
+class TestProjectContextLoaderClear:
     """Tests for clearing context."""
 
     def test_clear_files(self):
         """Test clearing file context."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/file1.py", "content1")
         cm.add_file("/file2.py", "content2")
 
@@ -423,9 +423,9 @@ class TestContextManagerClear:
 
     def test_clear_messages_keep_system(self):
         """Test clearing messages while keeping system messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_message("system", "System prompt", priority=10)
         cm.add_message("user", "User message")
         cm.add_message("assistant", "Assistant response")
@@ -439,9 +439,9 @@ class TestContextManagerClear:
 
     def test_clear_messages_all(self):
         """Test clearing all messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_message("system", "System prompt")
         cm.add_message("user", "User message")
 
@@ -453,14 +453,14 @@ class TestContextManagerClear:
         assert cm.context.total_tokens == 0
 
 
-class TestContextManagerStats:
+class TestProjectContextLoaderStats:
     """Tests for statistics."""
 
     def test_get_stats(self):
         """Test getting context statistics."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(max_tokens=100000)
+        cm = ProjectContextLoader(max_tokens=100000)
         cm.add_message("system", "System prompt")
         cm.add_message("user", "User message")
         cm.add_message("assistant", "Response")
@@ -480,15 +480,15 @@ class TestContextManagerStats:
         assert stats["messages_by_role"]["assistant"] == 1
 
 
-class TestContextManagerEncoderFallback:
+class TestProjectContextLoaderEncoderFallback:
     """Tests for encoder fallback behavior."""
 
     def test_unknown_model_fallback(self):
         """Test that unknown model falls back to cl100k_base encoding."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
         # Use an unknown model name
-        cm = ContextManager(model="unknown-model-xyz-123")
+        cm = ProjectContextLoader(model="unknown-model-xyz-123")
 
         # Should still be able to count tokens
         tokens = cm.count_tokens("Hello, world!")
@@ -496,14 +496,14 @@ class TestContextManagerEncoderFallback:
         assert isinstance(tokens, int)
 
 
-class TestContextManagerPruningDetails:
+class TestProjectContextLoaderPruningDetails:
     """Detailed tests for pruning strategies."""
 
     def test_prune_fifo_recalculates_tokens(self):
         """Test FIFO pruning recalculates token count correctly."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=500,
             reserved_tokens=50,
             prune_threshold=0.7,
@@ -520,9 +520,9 @@ class TestContextManagerPruningDetails:
 
     def test_prune_priority_keeps_system_messages(self):
         """Test priority pruning keeps system messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=300,
             reserved_tokens=30,
             prune_threshold=0.6,
@@ -540,9 +540,9 @@ class TestContextManagerPruningDetails:
 
     def test_prune_smart_adds_gap_indicator(self):
         """Test smart pruning adds gap indicator when messages are removed."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=400,
             reserved_tokens=40,
             prune_threshold=0.6,
@@ -563,9 +563,9 @@ class TestContextManagerPruningDetails:
 
     def test_prune_smart_keeps_first_user_message(self):
         """Test smart pruning keeps the first user message."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=300,
             reserved_tokens=30,
             prune_threshold=0.5,
@@ -584,9 +584,9 @@ class TestContextManagerPruningDetails:
 
     def test_prune_default_fallback(self):
         """Test default pruning fallback to FIFO."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=200,
             reserved_tokens=20,
             prune_threshold=0.5,
@@ -605,9 +605,9 @@ class TestFileContextLineRange:
 
     def test_add_file_extracts_line_range(self):
         """Test that line_range properly extracts lines."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         content = "line 0\nline 1\nline 2\nline 3\nline 4"
         cm.add_file("/test.py", content, line_range=(1, 3))
 
@@ -620,9 +620,9 @@ class TestFileContextLineRange:
 
     def test_format_file_shows_line_range(self):
         """Test that formatted file context shows line range."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager()
+        cm = ProjectContextLoader()
         cm.add_file("/test.py", "content", line_range=(10, 20))
 
         formatted = cm._format_file_context()
@@ -634,9 +634,9 @@ class TestAutoPruneOutput:
 
     def test_auto_prune_prints_status(self, capsys):
         """Test that auto-prune prints status messages."""
-        from victor.context.manager import ContextManager
+        from victor.context.manager import ProjectContextLoader
 
-        cm = ContextManager(
+        cm = ProjectContextLoader(
             max_tokens=100,
             reserved_tokens=10,
             prune_threshold=0.5,

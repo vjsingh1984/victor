@@ -14,7 +14,7 @@
 
 """Tests for MCP protocol module."""
 
-from victor.mcp.protocol import (
+from victor.integrations.mcp.protocol import (
     MCPTool,
     MCPToolCallResult,
     MCPResource,

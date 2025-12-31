@@ -219,6 +219,11 @@ class UnifiedTaskProgress:
     # Manual stop
     forced_stop: Optional[str] = None
 
+    # Soft limit tracking (for lenient budget enforcement)
+    soft_limit_warning_given: bool = False
+    has_prompt_requirements: bool = False  # True if prompt had explicit file/fix counts
+    soft_limit_buffer: float = 1.2  # Allow 20% overage before hard stop
+
     # Log deduplication - only log forcing completion once
     completion_forcing_logged: bool = False
 
@@ -889,13 +894,31 @@ class UnifiedTaskTracker(ModeAwareMixin):
                 details=details,
             )
 
-        # Tool budget check
-        if self._progress.tool_calls >= self._progress.tool_budget:
+        # Tool budget check with soft limits
+        tool_budget = self._progress.tool_budget
+        tool_calls = self._progress.tool_calls
+
+        # Soft limit: warn at 80%, allow up to buffer (120% by default)
+        soft_warning_threshold = int(tool_budget * 0.8)
+        hard_stop_threshold = int(tool_budget * self._progress.soft_limit_buffer)
+
+        # If prompt had explicit requirements, be more lenient
+        if self._progress.has_prompt_requirements:
+            hard_stop_threshold = int(tool_budget * 1.5)  # Allow 50% overage
+
+        if tool_calls >= hard_stop_threshold:
             return StopDecision(
                 should_stop=True,
                 reason=StopReason.TOOL_BUDGET,
-                hint=f"Tool budget exceeded ({self._progress.tool_calls}/{self._progress.tool_budget})",
+                hint=f"Tool budget exceeded ({tool_calls}/{tool_budget}, hard limit: {hard_stop_threshold})",
                 details=details,
+            )
+        elif tool_calls >= soft_warning_threshold and not self._progress.soft_limit_warning_given:
+            # Log soft limit warning but don't stop
+            self._progress.soft_limit_warning_given = True
+            logger.warning(
+                f"UnifiedTaskTracker: Approaching tool budget "
+                f"({tool_calls}/{tool_budget}). Consider wrapping up."
             )
 
         # Loop check
@@ -1137,7 +1160,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def _update_stage(self, tool_name: str) -> None:
         """Update conversation stage based on tool usage."""
         canonical = get_canonical_name(tool_name)
-        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.SEARCH}:
+        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
             if self._progress.stage == ConversationStage.INITIAL:
                 self._progress.stage = ConversationStage.READING
 
@@ -1412,7 +1435,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         elif canonical == ToolNames.LS:
             path = arguments.get("path", "")
             return f"dir:{path}" if path else None
-        elif canonical in {ToolNames.GREP, ToolNames.SEARCH}:
+        elif canonical in {ToolNames.GREP, ToolNames.CODE_SEARCH}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:50]}" if query else None
@@ -1799,6 +1822,88 @@ def create_tracker_with_negation_awareness(
         "matched_keywords": [m.keyword for m in result.matched_keywords],
         "recommended_budget": result.recommended_tool_budget,
         "source": result.source,
+    }
+
+    return tracker, task_type, details
+
+
+def create_tracker_with_prompt_requirements(
+    message: str,
+    history: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[UnifiedTaskTracker, TaskType, Dict[str, Any]]:
+    """Create a tracker using prompt requirement extraction.
+
+    This function extracts explicit requirements from the prompt (e.g.,
+    "read 9 files", "top 3 fixes") and adjusts budgets dynamically.
+
+    Combines:
+    - Negation-aware keyword classification
+    - Prompt requirement extraction for dynamic budgets
+    - Soft limits instead of hard stops
+
+    Args:
+        message: User message to classify
+        history: Optional conversation history for context boosting
+
+    Returns:
+        Tuple of (tracker, task_type, details with prompt_requirements)
+
+    Example:
+        tracker, task_type, details = create_tracker_with_prompt_requirements(
+            "Review 9 files and provide top 3 fixes"
+        )
+        print(details["prompt_requirements"]["file_count"])  # 9
+        print(details["prompt_requirements"]["fix_count"])   # 3
+        print(details["prompt_requirements"]["tool_budget"]) # 40+ (dynamic)
+    """
+    from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
+
+    # First, use negation-aware classification
+    tracker = UnifiedTaskTracker()
+    task_type, result = tracker.detect_task_type_with_negation(message, history)
+
+    # Extract explicit requirements from prompt
+    prompt_requirements = extract_prompt_requirements(message)
+
+    # Apply dynamic budgets if requirements were found
+    if prompt_requirements.has_explicit_requirements():
+        # Mark that we have explicit prompt requirements (enables lenient limits)
+        tracker._progress.has_prompt_requirements = True
+
+        # Use the larger of: default budget or extracted requirement budget
+        current_budget = tracker._progress.tool_budget
+        if prompt_requirements.tool_budget and prompt_requirements.tool_budget > current_budget:
+            tracker.set_tool_budget(prompt_requirements.tool_budget, user_override=False)
+            logger.info(
+                f"UnifiedTaskTracker: Dynamic budget from prompt requirements: "
+                f"{prompt_requirements.tool_budget} (files={prompt_requirements.file_count}, "
+                f"fixes={prompt_requirements.fix_count})"
+            )
+
+        # Also adjust max iterations if needed
+        current_iterations = tracker._task_config.max_exploration_iterations
+        if (
+            prompt_requirements.iteration_budget
+            and prompt_requirements.iteration_budget > current_iterations
+        ):
+            tracker.set_max_iterations(prompt_requirements.iteration_budget, user_override=False)
+            logger.info(
+                f"UnifiedTaskTracker: Dynamic iterations from prompt requirements: "
+                f"{prompt_requirements.iteration_budget}"
+            )
+
+    details = {
+        "task_type": task_type.value,
+        "confidence": result.confidence,
+        "is_action_task": result.is_action_task,
+        "is_analysis_task": result.is_analysis_task,
+        "is_generation_task": result.is_generation_task,
+        "needs_execution": result.needs_execution,
+        "negated_keywords": [m.keyword for m in result.negated_keywords],
+        "matched_keywords": [m.keyword for m in result.matched_keywords],
+        "recommended_budget": tracker._progress.tool_budget,  # Use adjusted budget
+        "source": result.source,
+        "prompt_requirements": prompt_requirements.to_dict(),
     }
 
     return tracker, task_type, details

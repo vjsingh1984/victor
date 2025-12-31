@@ -63,7 +63,7 @@ def benchmark_deduplication():
     print("DEDUPLICATION BENCHMARK")
     print("=" * 60)
 
-    from victor.native import (
+    from victor.processing.native import (
         rolling_hash_blocks,
         normalize_block,
         find_duplicate_blocks,
@@ -113,7 +113,7 @@ def benchmark_similarity():
     print("SIMILARITY BENCHMARK")
     print("=" * 60)
 
-    from victor.native import (
+    from victor.processing.native import (
         cosine_similarity,
         batch_cosine_similarity,
         top_k_similar,
@@ -165,7 +165,7 @@ def benchmark_json_repair():
     print("JSON REPAIR BENCHMARK")
     print("=" * 60)
 
-    from victor.native import (
+    from victor.processing.native import (
         repair_json,
         extract_json_objects,
         is_native_available,
@@ -218,7 +218,7 @@ def benchmark_hashing():
     print("HASHING BENCHMARK")
     print("=" * 60)
 
-    from victor.native import (
+    from victor.processing.native import (
         compute_signature,
         compute_batch_signatures,
         signature_similarity,
@@ -236,10 +236,7 @@ def benchmark_hashing():
         "encoding": "utf-8",
     }
 
-    tool_calls = [
-        ("read_file", {"path": f"/file_{i}.py"})
-        for i in range(100)
-    ]
+    tool_calls = [("read_file", {"path": f"/file_{i}.py"}) for i in range(100)]
 
     print(f"\nTest data:")
     print(f"  Simple args:  {len(simple_args)} keys")
@@ -273,7 +270,7 @@ def main():
     print("VICTOR NATIVE EXTENSIONS BENCHMARK")
     print("=" * 60)
 
-    from victor.native import is_native_available, get_native_version
+    from victor.processing.native import is_native_available, get_native_version
 
     print(f"\nNative extensions available: {is_native_available()}")
     if is_native_available():

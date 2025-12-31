@@ -8,11 +8,16 @@ Phase 7.6 Refactoring:
 - configure_tools() now delegates to ToolConfigurator
 - stream_with_events() uses EventRegistry for conversion
 - setup_observability_integration() uses AgentBridge patterns
+
+Phase 8.0 - Vertical Integration Unification:
+- Added vertical parameter to create_orchestrator_from_options()
+- Uses VerticalIntegrationPipeline for consistent vertical application
+- Achieves parity with FrameworkShim CLI path
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
 from victor.framework.events import (
     Event,
@@ -27,8 +32,12 @@ from victor.framework.events import (
 )
 from victor.framework.tools import ToolSet
 
+# Import capability helpers for protocol-based access
+from victor.framework.vertical_integration import _check_capability, _invoke_capability
+
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
+    from victor.core.verticals.base import VerticalBase
 
 
 async def create_orchestrator_from_options(
@@ -45,6 +54,7 @@ async def create_orchestrator_from_options(
     system_prompt: Optional[str] = None,
     enable_observability: bool = True,
     session_id: Optional[str] = None,
+    vertical: Optional[Union[Type["VerticalBase"], str]] = None,
 ) -> Any:
     """Create an AgentOrchestrator from framework options.
 
@@ -65,12 +75,14 @@ async def create_orchestrator_from_options(
         system_prompt: Optional custom system prompt (e.g., from a vertical)
         enable_observability: Whether to auto-initialize ObservabilityIntegration
         session_id: Optional session ID for event correlation
+        vertical: Optional vertical class or name to apply
 
     Returns:
         Configured AgentOrchestrator instance
     """
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import load_settings
+    from victor.core.bootstrap import ensure_bootstrapped
 
     # Load settings
     settings = load_settings()
@@ -85,6 +97,18 @@ async def create_orchestrator_from_options(
     if airgapped:
         settings.airgapped_mode = True
 
+    # Resolve vertical name for bootstrap
+    vertical_name = None
+    if vertical:
+        if isinstance(vertical, str):
+            vertical_name = vertical
+        elif hasattr(vertical, "name"):
+            vertical_name = vertical.name
+
+    # Bootstrap with vertical context BEFORE orchestrator creation
+    # This ensures vertical services are registered with correct vertical name
+    ensure_bootstrapped(settings, vertical=vertical_name)
+
     # Create orchestrator using from_settings
     orchestrator = await AgentOrchestrator.from_settings(
         settings,
@@ -94,17 +118,25 @@ async def create_orchestrator_from_options(
 
     # Override provider/model if specified
     if provider != "anthropic" or model:
-        # Need to switch provider/model
-        if hasattr(orchestrator, "provider_manager"):
-            await orchestrator.provider_manager.switch_provider(
-                provider, model or orchestrator.model
+        # Need to switch provider/model - use capability-based check
+        if hasattr(orchestrator, "_provider_manager") or hasattr(orchestrator, "provider_manager"):
+            pm = getattr(orchestrator, "_provider_manager", None) or getattr(
+                orchestrator, "provider_manager", None
             )
+            if pm:
+                await pm.switch_provider(provider, model or orchestrator.model)
+
+    # Apply vertical configuration using unified pipeline
+    # This achieves parity with FrameworkShim CLI path
+    if vertical:
+        apply_vertical_to_orchestrator(orchestrator, vertical)
 
     # Configure tools if specified using ToolConfigurator
     if tools:
         configure_tools(orchestrator, tools, airgapped=airgapped)
 
     # Apply custom system prompt (e.g., from vertical)
+    # Note: This is in addition to any prompt from vertical
     if system_prompt:
         apply_system_prompt(orchestrator, system_prompt)
 
@@ -113,6 +145,45 @@ async def create_orchestrator_from_options(
         setup_observability_integration(orchestrator, session_id)
 
     return orchestrator
+
+
+def apply_vertical_to_orchestrator(
+    orchestrator: Any,
+    vertical: Union[Type["VerticalBase"], str],
+) -> None:
+    """Apply vertical configuration to orchestrator using integration pipeline.
+
+    This provides parity with FrameworkShim by using the same
+    VerticalIntegrationPipeline for both SDK and CLI paths.
+
+    Args:
+        orchestrator: AgentOrchestrator instance
+        vertical: Vertical class or name string
+    """
+    from victor.framework.vertical_integration import (
+        VerticalIntegrationPipeline,
+        IntegrationResult,
+    )
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Create and apply pipeline
+    pipeline = VerticalIntegrationPipeline()
+    result = pipeline.apply(orchestrator, vertical)
+
+    if result.success:
+        logger.info(
+            f"Applied vertical '{result.vertical_name}' via SDK path: "
+            f"tools={len(result.tools_applied)}, "
+            f"middleware={result.middleware_count}, "
+            f"safety={result.safety_patterns_count}"
+        )
+    else:
+        for error in result.errors:
+            logger.error(f"Vertical integration error: {error}")
+        for warning in result.warnings:
+            logger.warning(f"Vertical integration warning: {warning}")
 
 
 def setup_observability_integration(
@@ -147,21 +218,40 @@ def setup_observability_integration(
 def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
     """Apply a custom system prompt to the orchestrator.
 
+    SOLID Compliance (DIP): This function only uses public methods.
+    It never writes to private attributes to maintain proper encapsulation
+    and dependency inversion.
+
     Args:
         orchestrator: AgentOrchestrator instance
         system_prompt: Custom system prompt text
     """
-    # Store the custom system prompt for use in conversation
-    # The orchestrator's prompt_builder will use this if available
-    orchestrator._framework_system_prompt = system_prompt
+    import logging
 
-    # If orchestrator has a prompt_builder, configure it
-    if hasattr(orchestrator, "prompt_builder"):
-        # Add vertical prompt as additional context
-        if hasattr(orchestrator.prompt_builder, "set_custom_prompt"):
-            orchestrator.prompt_builder.set_custom_prompt(system_prompt)
-        elif hasattr(orchestrator.prompt_builder, "_custom_prompt"):
-            orchestrator.prompt_builder._custom_prompt = system_prompt
+    logger = logging.getLogger(__name__)
+
+    # Use capability-based approach (protocol-first, fallback to hasattr)
+    # SOLID Compliance (DIP): Only use public methods, never write to private attributes
+    if _check_capability(orchestrator, "custom_prompt"):
+        _invoke_capability(orchestrator, "custom_prompt", system_prompt)
+        logger.debug("Applied system prompt via custom_prompt capability")
+    elif _check_capability(orchestrator, "prompt_builder"):
+        # Fallback: try direct prompt builder access via public method only
+        prompt_builder = getattr(orchestrator, "prompt_builder", None)
+        if prompt_builder:
+            if hasattr(prompt_builder, "set_custom_prompt"):
+                prompt_builder.set_custom_prompt(system_prompt)
+                logger.debug("Applied system prompt via prompt_builder.set_custom_prompt")
+            else:
+                logger.warning(
+                    "Cannot set custom prompt: prompt_builder lacks set_custom_prompt method. "
+                    "Consider implementing CapabilityRegistryProtocol."
+                )
+    else:
+        logger.warning(
+            "Cannot set custom prompt: orchestrator lacks custom_prompt capability "
+            "and prompt_builder. Consider implementing CapabilityRegistryProtocol."
+        )
 
 
 def configure_tools(

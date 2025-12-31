@@ -22,6 +22,6 @@ Handles:
 - Message prioritization
 """
 
-from victor.context.manager import ContextManager, ContextWindow, PruningStrategy
+from victor.context.manager import ProjectContextLoader, ContextWindow, PruningStrategy
 
-__all__ = ["ContextManager", "ContextWindow", "PruningStrategy"]
+__all__ = ["ProjectContextLoader", "ContextWindow", "PruningStrategy"]

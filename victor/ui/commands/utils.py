@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import logging.handlers
 import os
 import signal
 import sys
@@ -17,7 +18,7 @@ from victor.agent.safety import (
     RiskLevel,
     set_confirmation_callback,
 )
-from victor.codebase.indexer import CodebaseIndex
+from victor.coding.codebase.indexer import CodebaseIndex
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 logger = logging.getLogger(__name__)
@@ -26,9 +27,124 @@ console = Console()
 # Global reference for signal handler cleanup
 _current_agent: Optional[AgentOrchestrator] = None
 
+# Default log file location
+DEFAULT_LOG_DIR = Path.home() / ".victor" / "logs"
+DEFAULT_LOG_FILE = DEFAULT_LOG_DIR / "victor.log"
 
-def configure_logging(log_level: str, stream: Optional[Any] = None) -> None:
-    """Configure logging to stderr (separate from Rich console output)."""
+
+def configure_logging(
+    log_level: str,
+    stream: Optional[Any] = None,
+    file_logging: bool = True,
+    file_level: str = "INFO",
+    console_level: str = "WARNING",
+    log_file: Optional[Path] = None,
+    event_logging: bool = True,
+    session_id: Optional[str] = None,
+    repo_path: Optional[str] = None,
+) -> None:
+    """Configure logging with dual output: file (INFO) and console (WARNING).
+
+    Args:
+        log_level: Overall log level (for backward compatibility)
+        stream: Stream for console output (default stderr)
+        file_logging: Enable file logging (default True)
+        file_level: Log level for file output (default INFO)
+        console_level: Log level for console output (default WARNING)
+        log_file: Path to log file (default ~/.victor/logs/victor.log)
+        event_logging: Enable EventBus → logging integration (default True)
+        session_id: Optional session identifier for log context
+        repo_path: Optional repo path for log context
+    """
+    # Get the root logger
+    root_logger = logging.getLogger()
+
+    # Clear existing handlers
+    root_logger.handlers.clear()
+
+    # Set root logger to lowest level (handlers will filter)
+    root_logger.setLevel(logging.DEBUG)
+
+    # Console log format (concise)
+    console_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    console_formatter = logging.Formatter(console_format)
+
+    # File log format (includes session/repo context for multi-session debugging)
+    # Auto-detect repo from cwd if not provided
+    if repo_path is None:
+        repo_path = os.path.basename(os.getcwd())
+    if session_id is None:
+        import uuid
+
+        session_id = str(uuid.uuid4())[:8]  # Short session ID
+
+    file_format = f"%(asctime)s - {repo_path}-{session_id} - %(name)s - %(levelname)s - %(message)s"
+    file_formatter = logging.Formatter(file_format)
+
+    # Console handler (WARNING by default, can be overridden by log_level)
+    console_handler = logging.StreamHandler(stream or sys.stderr)
+    effective_console_level = getattr(logging, log_level.upper(), None)
+    if effective_console_level is None:
+        effective_console_level = getattr(logging, console_level.upper(), logging.WARNING)
+    console_handler.setLevel(effective_console_level)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+
+    # File handler (INFO by default) with rotation
+    if file_logging:
+        try:
+            log_path = log_file or DEFAULT_LOG_FILE
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Use RotatingFileHandler to prevent unbounded growth
+            # Max 10MB per file, keep 5 backup files
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(getattr(logging, file_level.upper(), logging.INFO))
+            file_handler.setFormatter(file_formatter)
+            root_logger.addHandler(file_handler)
+            logger.debug(
+                f"File logging enabled: {log_path} (session={session_id}, repo={repo_path})"
+            )
+        except Exception as e:
+            # Don't fail if file logging can't be set up
+            logger.warning(f"Could not enable file logging: {e}")
+
+    # EventBus → Logging integration
+    # This routes observability events to the logging system
+    if event_logging:
+        try:
+            from victor.observability.event_bus import EventBus
+            from victor.observability.exporters import LoggingExporter
+
+            event_bus = EventBus.get_instance()
+            # Add logging exporter if not already present
+            # Check by type to avoid duplicate exporters
+            has_logging_exporter = any(
+                isinstance(exp, LoggingExporter) for exp in event_bus._exporters
+            )
+            if not has_logging_exporter:
+                logging_exporter = LoggingExporter(
+                    "victor.events",
+                    log_level=logging.INFO,
+                    include_data=True,
+                )
+                event_bus.add_exporter(logging_exporter)
+                logger.debug("EventBus → Logging integration enabled")
+        except Exception as e:
+            # Don't fail if event logging can't be set up
+            logger.debug(f"Could not enable event logging: {e}")
+
+
+def configure_logging_simple(log_level: str, stream: Optional[Any] = None) -> None:
+    """Simple logging configuration (backward compatible, console only).
+
+    Use this for quick scripts or when file logging is not desired.
+    """
     logging.basicConfig(
         level=getattr(logging, log_level.upper(), logging.WARNING),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",

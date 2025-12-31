@@ -384,8 +384,8 @@ def _register_vertical_services(
         vertical_name = getattr(settings, "default_vertical", None) or "coding"
 
     try:
-        from victor.verticals.vertical_loader import get_vertical_loader
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.protocols import VerticalExtensions
 
         # Load and activate the vertical
         loader = get_vertical_loader()
@@ -482,8 +482,8 @@ def _ensure_vertical_activated(
         vertical_name: Vertical name to ensure is active
     """
     try:
-        from victor.verticals.vertical_loader import get_vertical_loader
-        from victor.verticals.protocols import VerticalExtensions
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.protocols import VerticalExtensions
 
         loader = get_vertical_loader()
         current_vertical = loader.active_vertical_name

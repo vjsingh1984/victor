@@ -29,6 +29,7 @@ from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app
+from victor.ui.commands.rag import rag_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
 from victor.ui.commands.test_provider import test_provider_app
@@ -51,6 +52,7 @@ app.add_typer(mcp_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app)
 app.add_typer(providers_app)
+app.add_typer(rag_app)
 app.add_typer(security_app)
 app.add_typer(serve_app)
 app.add_typer(test_provider_app)

@@ -8,6 +8,9 @@ from victor.agent.stream_handler import StreamChunk
 from victor.config.settings import Settings, ProfileConfig
 
 
+# Singleton reset is handled globally in tests/conftest.py
+
+
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
