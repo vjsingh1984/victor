@@ -204,7 +204,9 @@ async def run_swe_bench(
             # Update metrics
             if result.is_success:
                 metrics.passed += 1
-                logger.info(f"  PASSED - {result.trace.turns} turns, {len(result.trace.tool_calls)} tool calls")
+                logger.info(
+                    f"  PASSED - {result.trace.turns} turns, {len(result.trace.tool_calls)} tool calls"
+                )
             else:
                 metrics.failed += 1
                 logger.warning(f"  FAILED - {result.error_message or 'validation failed'}")
@@ -298,7 +300,8 @@ def main():
         help="Specific instance IDs to run",
     )
     parser.add_argument(
-        "-n", "--max-tasks",
+        "-n",
+        "--max-tasks",
         type=int,
         help="Maximum number of tasks to run",
     )
@@ -340,7 +343,8 @@ def main():
 
     # Output
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         dest="output_file",
         help="Output file for results (JSON)",
     )
@@ -352,7 +356,8 @@ def main():
         help="Don't cache cloned repositories",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )

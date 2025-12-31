@@ -534,7 +534,8 @@ class BufferedExporter(BaseExporter):
         # Check if we should flush
         should_flush = (
             len(self._buffer) >= self._batch_size
-            or (datetime.now(timezone.utc) - self._last_flush).total_seconds() >= self._flush_interval
+            or (datetime.now(timezone.utc) - self._last_flush).total_seconds()
+            >= self._flush_interval
         )
 
         if should_flush:

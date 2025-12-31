@@ -450,9 +450,7 @@ class EnrichmentCache:
             return
 
         # Sort by timestamp and remove oldest 20%
-        sorted_entries = sorted(
-            self._cache.items(), key=lambda x: x[1].timestamp
-        )
+        sorted_entries = sorted(self._cache.items(), key=lambda x: x[1].timestamp)
         to_remove = max(1, len(sorted_entries) // 5)
 
         for key, _ in sorted_entries[:to_remove]:
@@ -515,16 +513,11 @@ class PromptEnrichmentService:
         self._max_tokens = max_tokens
         self._timeout_ms = timeout_ms
         self._strategies: Dict[str, EnrichmentStrategyProtocol] = {}
-        self._cache = (
-            EnrichmentCache(ttl_seconds=cache_ttl_seconds)
-            if cache_enabled
-            else None
-        )
+        self._cache = EnrichmentCache(ttl_seconds=cache_ttl_seconds) if cache_enabled else None
         self._outcome_callbacks: List[Callable[[EnrichmentOutcome], None]] = []
 
         logger.debug(
-            "PromptEnrichmentService initialized: max_tokens=%d, "
-            "timeout_ms=%.1f, cache=%s",
+            "PromptEnrichmentService initialized: max_tokens=%d, " "timeout_ms=%.1f, cache=%s",
             max_tokens,
             timeout_ms,
             "enabled" if cache_enabled else "disabled",

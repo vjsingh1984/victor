@@ -70,68 +70,68 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: status, diff, stage, commit, log, branch, create_pr, analyze_conflicts, suggest_commit",
-                required=True
-            ),
-            ToolParameter(
-                name="files",
-                type="array",
-                description="Files to stage (for stage operation)",
-                required=False
-            ),
-            ToolParameter(
-                name="message",
-                type="string",
-                description="Commit message (for commit operation)",
-                required=False
-            ),
-            ToolParameter(
-                name="branch",
-                type="string",
-                description="Branch name (for branch operations)",
-                required=False
-            ),
-            ToolParameter(
-                name="staged",
-                type="boolean",
-                description="Show staged changes (for diff operation, default: false)",
-                required=False
-            ),
-            ToolParameter(
-                name="limit",
-                type="integer",
-                description="Number of commits to show (for log operation, default: 10)",
-                required=False
-            ),
-            ToolParameter(
-                name="generate_ai",
-                type="boolean",
-                description="Use AI to generate message (for commit operation, default: true if provider available)",
-                required=False
-            ),
-            ToolParameter(
-                name="pr_title",
-                type="string",
-                description="PR title (for create_pr, auto-generated if not provided)",
-                required=False
-            ),
-            ToolParameter(
-                name="pr_description",
-                type="string",
-                description="PR description (for create_pr, auto-generated if not provided)",
-                required=False
-            ),
-            ToolParameter(
-                name="base_branch",
-                type="string",
-                description="Base branch for PR (default: main)",
-                required=False
-            )
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: status, diff, stage, commit, log, branch, create_pr, analyze_conflicts, suggest_commit",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="files",
+                    type="array",
+                    description="Files to stage (for stage operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="message",
+                    type="string",
+                    description="Commit message (for commit operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="branch",
+                    type="string",
+                    description="Branch name (for branch operations)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="staged",
+                    type="boolean",
+                    description="Show staged changes (for diff operation, default: false)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="limit",
+                    type="integer",
+                    description="Number of commits to show (for log operation, default: 10)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="generate_ai",
+                    type="boolean",
+                    description="Use AI to generate message (for commit operation, default: true if provider available)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="pr_title",
+                    type="string",
+                    description="PR title (for create_pr, auto-generated if not provided)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="pr_description",
+                    type="string",
+                    description="PR description (for create_pr, auto-generated if not provided)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="base_branch",
+                    type="string",
+                    description="Base branch for PR (default: main)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -148,9 +148,7 @@ Example workflows:
 
         if not operation:
             return ToolResult(
-                success=False,
-                output="",
-                error="Missing required parameter: operation"
+                success=False, output="", error="Missing required parameter: operation"
             )
 
         try:
@@ -173,18 +171,10 @@ Example workflows:
             elif operation == "suggest_commit":
                 return await self._suggest_commit(kwargs)
             else:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown operation: {operation}"
-                )
+                return ToolResult(success=False, output="", error=f"Unknown operation: {operation}")
 
         except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Git operation error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Git operation error: {str(e)}")
 
     def _run_git(self, *args: str) -> Tuple[bool, str, str]:
         """Run git command.
@@ -197,10 +187,7 @@ Example workflows:
         """
         try:
             result = subprocess.run(
-                ["git"] + list(args),
-                capture_output=True,
-                text=True,
-                timeout=30
+                ["git"] + list(args), capture_output=True, text=True, timeout=30
             )
             return result.returncode == 0, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -219,9 +206,7 @@ Example workflows:
         _, long_status, _ = self._run_git("status")
 
         return ToolResult(
-            success=True,
-            output=f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
-            error=""
+            success=True, output=f"Short status:\n{stdout}\n\nFull status:\n{long_status}", error=""
         )
 
     async def _diff(self, kwargs: Dict[str, Any]) -> ToolResult:
@@ -241,7 +226,7 @@ Example workflows:
             return ToolResult(
                 success=True,
                 output="No changes to show" if not staged else "No staged changes",
-                error=""
+                error="",
             )
 
         return ToolResult(success=True, output=stdout, error="")
@@ -264,9 +249,7 @@ Example workflows:
         _, status, _ = self._run_git("status", "--short")
 
         return ToolResult(
-            success=True,
-            output=f"Files staged successfully\n\nStatus:\n{status}",
-            error=""
+            success=True, output=f"Files staged successfully\n\nStatus:\n{status}", error=""
         )
 
     async def _commit(self, kwargs: Dict[str, Any]) -> ToolResult:
@@ -283,15 +266,11 @@ Example workflows:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="No commit message provided and AI generation failed"
+                    error="No commit message provided and AI generation failed",
                 )
 
         if not message:
-            return ToolResult(
-                success=False,
-                output="",
-                error="No commit message provided"
-            )
+            return ToolResult(success=False, output="", error="No commit message provided")
 
         # Commit with message
         success, stdout, stderr = self._run_git("commit", "-m", message)
@@ -299,21 +278,14 @@ Example workflows:
         if not success:
             return ToolResult(success=False, output="", error=stderr)
 
-        return ToolResult(
-            success=True,
-            output=f"Committed successfully:\n{stdout}",
-            error=""
-        )
+        return ToolResult(success=True, output=f"Committed successfully:\n{stdout}", error="")
 
     async def _log(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Show commit history."""
         limit = kwargs.get("limit", 10)
 
         success, stdout, stderr = self._run_git(
-            "log",
-            f"-{limit}",
-            "--pretty=format:%h - %s (%an, %ar)",
-            "--graph"
+            "log", f"-{limit}", "--pretty=format:%h - %s (%an, %ar)", "--graph"
         )
 
         if not success:
@@ -346,9 +318,7 @@ Example workflows:
         """Generate AI commit message from diff."""
         if not self.provider:
             return ToolResult(
-                success=False,
-                output="",
-                error="No LLM provider available for AI generation"
+                success=False, output="", error="No LLM provider available for AI generation"
             )
 
         # Get staged diff
@@ -358,11 +328,7 @@ Example workflows:
             return ToolResult(success=False, output="", error=stderr)
 
         if not diff:
-            return ToolResult(
-                success=False,
-                output="",
-                error="No staged changes to analyze"
-            )
+            return ToolResult(success=False, output="", error="No staged changes to analyze")
 
         # Get list of changed files
         _, files, _ = self._run_git("diff", "--staged", "--name-only")
@@ -392,28 +358,20 @@ Generate ONLY the commit message, nothing else."""
                 model=self.model or "default",
                 messages=[Message(role="user", content=prompt)],
                 temperature=0.3,  # Lower temperature for consistency
-                max_tokens=200
+                max_tokens=200,
             )
 
             message = response.content.strip()
 
             # Clean up message
-            message = message.replace('"', '').replace("'", "")
+            message = message.replace('"', "").replace("'", "")
             if message.startswith("Commit message:"):
                 message = message.replace("Commit message:", "").strip()
 
-            return ToolResult(
-                success=True,
-                output=message,
-                error=""
-            )
+            return ToolResult(success=True, output=message, error="")
 
         except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"AI generation failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"AI generation failed: {str(e)}")
 
     async def _create_pr(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Create pull request with auto-generated description."""
@@ -435,11 +393,7 @@ Generate ONLY the commit message, nothing else."""
 
             if success and diff:
                 # Get commit log
-                _, log, _ = self._run_git(
-                    "log",
-                    f"{base_branch}..HEAD",
-                    "--pretty=format:- %s"
-                )
+                _, log, _ = self._run_git("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
 
                 # Generate PR content
                 prompt = f"""Generate a pull request title and description for these changes.
@@ -473,7 +427,7 @@ DESCRIPTION:
                         model=self.model or "default",
                         messages=[Message(role="user", content=prompt)],
                         temperature=0.5,
-                        max_tokens=500
+                        max_tokens=500,
                     )
 
                     content = response.content.strip()
@@ -501,50 +455,46 @@ DESCRIPTION:
             pr_description = "Automatically generated PR description"
 
         # Create PR using gh CLI (GitHub CLI must be installed)
-        success, stdout, stderr = self._run_git(
-            "push", "--set-upstream", "origin", current_branch
-        )
+        success, stdout, stderr = self._run_git("push", "--set-upstream", "origin", current_branch)
 
         if not success:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to push branch: {stderr}"
-            )
+            return ToolResult(success=False, output="", error=f"Failed to push branch: {stderr}")
 
         # Try to create PR with gh
         try:
             result = subprocess.run(
                 [
-                    "gh", "pr", "create",
-                    "--base", base_branch,
-                    "--head", current_branch,
-                    "--title", pr_title,
-                    "--body", pr_description
+                    "gh",
+                    "pr",
+                    "create",
+                    "--base",
+                    base_branch,
+                    "--head",
+                    current_branch,
+                    "--title",
+                    pr_title,
+                    "--body",
+                    pr_description,
                 ],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
 
             if result.returncode == 0:
                 return ToolResult(
-                    success=True,
-                    output=f"PR created successfully!\n\n{result.stdout}",
-                    error=""
+                    success=True, output=f"PR created successfully!\n\n{result.stdout}", error=""
                 )
             else:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Failed to create PR: {result.stderr}"
+                    success=False, output="", error=f"Failed to create PR: {result.stderr}"
                 )
 
         except FileNotFoundError:
             return ToolResult(
                 success=False,
                 output="",
-                error="GitHub CLI (gh) not found. Install with: brew install gh"
+                error="GitHub CLI (gh) not found. Install with: brew install gh",
             )
 
     async def _analyze_conflicts(self, kwargs: Dict[str, Any]) -> ToolResult:
@@ -556,18 +506,10 @@ DESCRIPTION:
             return ToolResult(success=False, output="", error=stderr)
 
         # Find conflicted files (marked with UU)
-        conflicted = [
-            line.split()[-1]
-            for line in status.split("\n")
-            if line.startswith("UU")
-        ]
+        conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
 
         if not conflicted:
-            return ToolResult(
-                success=True,
-                output="No merge conflicts detected",
-                error=""
-            )
+            return ToolResult(success=True, output="No merge conflicts detected", error="")
 
         # Analyze each conflicted file
         analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
@@ -590,8 +532,10 @@ DESCRIPTION:
                     start = content.find("<<<<<<< ")
                     end = content.find(">>>>>>> ", start)
                     if end != -1:
-                        conflict_section = content[start:end+50]
-                        analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
+                        conflict_section = content[start : end + 50]
+                        analysis.append(
+                            f"   First conflict preview:\n   {conflict_section[:200]}..."
+                        )
 
             except Exception as e:
                 analysis.append(f"   Error reading file: {e}")
@@ -608,8 +552,4 @@ DESCRIPTION:
         analysis.append("3. Stage resolved files: git add <file>")
         analysis.append("4. Continue: git merge --continue or git rebase --continue")
 
-        return ToolResult(
-            success=True,
-            output="\n".join(analysis),
-            error=""
-        )
+        return ToolResult(success=True, output="\n".join(analysis), error="")

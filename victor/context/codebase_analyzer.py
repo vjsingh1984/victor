@@ -3097,9 +3097,13 @@ async def generate_enhanced_init_md(
     else:
         # Graph data still missing after potential auto-indexing attempt
         if auto_index:
-            progress("graph", "Graph indexing incomplete (retry with 'victor index')", complete=True)
+            progress(
+                "graph", "Graph indexing incomplete (retry with 'victor index')", complete=True
+            )
         else:
-            progress("graph", "No graph data (run 'victor index' or enable auto_index)", complete=True)
+            progress(
+                "graph", "No graph data (run 'victor index' or enable auto_index)", complete=True
+            )
 
     # Step 3: Deep - Use LLM to enhance content
     if not use_llm:

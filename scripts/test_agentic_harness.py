@@ -30,10 +30,7 @@ from victor.evaluation.protocol import (
     TaskStatus,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -106,13 +103,15 @@ async def mock_agent_callback(
     )
 
     # Simulate tool usage
-    trace.tool_calls.append(ToolCall(
-        name="read_file",
-        arguments={"path": "main.py"},
-        result="def sum_range(start, end):\n    return sum(range(start, end))\n",
-        success=True,
-        timestamp=time.time(),
-    ))
+    trace.tool_calls.append(
+        ToolCall(
+            name="read_file",
+            arguments={"path": "main.py"},
+            result="def sum_range(start, end):\n    return sum(range(start, end))\n",
+            success=True,
+            timestamp=time.time(),
+        )
+    )
     trace.turns += 1
 
     # Simulate thinking and file edit
@@ -143,23 +142,27 @@ async def mock_agent_callback(
     # Apply the fix
     main_py.write_text(fixed_code)
 
-    trace.tool_calls.append(ToolCall(
-        name="file_edit",
-        arguments={"path": "main.py", "content": fixed_code},
-        result="File edited successfully",
-        success=True,
-        timestamp=time.time(),
-    ))
+    trace.tool_calls.append(
+        ToolCall(
+            name="file_edit",
+            arguments={"path": "main.py", "content": fixed_code},
+            result="File edited successfully",
+            success=True,
+            timestamp=time.time(),
+        )
+    )
     trace.turns += 1
 
     # Record file edit
-    trace.file_edits.append(FileEdit(
-        path="main.py",
-        action="modify",
-        before_content=buggy_code,
-        after_content=fixed_code,
-        diff=f"- {buggy_code}\n+ {fixed_code}",
-    ))
+    trace.file_edits.append(
+        FileEdit(
+            path="main.py",
+            action="modify",
+            before_content=buggy_code,
+            after_content=fixed_code,
+            diff=f"- {buggy_code}\n+ {fixed_code}",
+        )
+    )
 
     # Generate a patch
     trace.generated_patch = f"""--- a/main.py
@@ -214,8 +217,10 @@ async def run_test():
             TaskStatus.ERROR: "[ERR]",
             TaskStatus.TIMEOUT: "[TIME]",
         }.get(result.status, "[?]")
-        print(f"  {status_icon} Task {current}/{total}: {result.task_id} "
-              f"(score: {result.overall_score:.3f})")
+        print(
+            f"  {status_icon} Task {current}/{total}: {result.task_id} "
+            f"(score: {result.overall_score:.3f})"
+        )
 
     print("\nRunning benchmark...")
     print("-" * 40)

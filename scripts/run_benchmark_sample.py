@@ -58,7 +58,7 @@ async def evaluate_solution(task, solution: str, analyzer: CodeQualityAnalyzer) 
     # Create test file
     full_code = solution + "\n\n" + task.test_code
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(full_code)
         temp_path = f.name
 
@@ -96,6 +96,7 @@ async def run_with_canonical_solutions(num_tasks: int = 3):
     # Load tasks
     runner = HumanEvalRunner()
     from victor.evaluation import EvaluationConfig, BenchmarkType
+
     config = EvaluationConfig(
         benchmark=BenchmarkType.HUMAN_EVAL,
         model="verification",
@@ -163,9 +164,11 @@ async def run_with_canonical_solutions(num_tasks: int = 3):
             print(f"  Pass@{k}: {score:.2%}")
 
     # Average quality
-    quality_scores = [r["code_quality"]["overall_score"]
-                     for r in results
-                     if r.get("code_quality") and "overall_score" in r["code_quality"]]
+    quality_scores = [
+        r["code_quality"]["overall_score"]
+        for r in results
+        if r.get("code_quality") and "overall_score" in r["code_quality"]
+    ]
     if quality_scores:
         avg_quality = sum(quality_scores) / len(quality_scores)
         print(f"\nAverage Code Quality: {avg_quality:.1f}/100")
@@ -195,7 +198,7 @@ async def main():
     results = await run_with_canonical_solutions(args.tasks)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             json.dump(results, f, indent=2, default=str)
         print(f"\nResults saved to: {args.output}")
 

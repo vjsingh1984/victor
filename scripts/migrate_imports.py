@@ -77,17 +77,29 @@ def find_python_files(path: Path) -> List[Path]:
     for py_file in path.rglob("*.py"):
         # Skip common directories to ignore
         parts = py_file.parts
-        if any(skip in parts for skip in [
-            "__pycache__", ".git", ".venv", "venv", "node_modules",
-            "build", "dist", ".eggs", "*.egg-info"
-        ]):
+        if any(
+            skip in parts
+            for skip in [
+                "__pycache__",
+                ".git",
+                ".venv",
+                "venv",
+                "node_modules",
+                "build",
+                "dist",
+                ".eggs",
+                "*.egg-info",
+            ]
+        ):
             continue
         files.append(py_file)
 
     return sorted(files)
 
 
-def analyze_file(file_path: Path, patterns: List[Tuple[re.Pattern, str]]) -> List[Tuple[int, str, str]]:
+def analyze_file(
+    file_path: Path, patterns: List[Tuple[re.Pattern, str]]
+) -> List[Tuple[int, str, str]]:
     """Analyze a file for imports that need updating.
 
     Returns:
@@ -140,9 +152,7 @@ def apply_changes(file_path: Path, changes: List[Tuple[int, str, str]]) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate imports from victor.* to victor_coding.*"
-    )
+    parser = argparse.ArgumentParser(description="Migrate imports from victor.* to victor_coding.*")
     parser.add_argument(
         "--check",
         action="store_true",

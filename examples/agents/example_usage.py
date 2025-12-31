@@ -142,26 +142,28 @@ async def example_yaml_loading():
     print("\n=== YAML Configuration Loading ===\n")
 
     # Load from dictionary (simulating YAML)
-    config = load_agents_from_dict({
-        "agents": [
-            {
-                "name": "custom_researcher",
-                "extends": "researcher",  # Extend preset
-                "constraints": {
-                    "max_iterations": 20,
+    config = load_agents_from_dict(
+        {
+            "agents": [
+                {
+                    "name": "custom_researcher",
+                    "extends": "researcher",  # Extend preset
+                    "constraints": {
+                        "max_iterations": 20,
+                    },
                 },
+                {
+                    "name": "rapid_coder",
+                    "extends": "coder",
+                    "model_preference": "fast",
+                },
+            ],
+            "ensemble": {
+                "type": "pipeline",
+                "agents": ["custom_researcher", "rapid_coder"],
             },
-            {
-                "name": "rapid_coder",
-                "extends": "coder",
-                "model_preference": "fast",
-            },
-        ],
-        "ensemble": {
-            "type": "pipeline",
-            "agents": ["custom_researcher", "rapid_coder"],
-        },
-    })
+        }
+    )
 
     print(f"Loaded {len(config.agents)} agents")
     for name, agent in config.agents.items():
@@ -230,16 +232,20 @@ async def example_entity_graph():
     await graph.add_entity(validator)
 
     # Add relationships
-    await graph.add_relation(EntityRelation(
-        source_id=module.id,
-        target_id=auth_class.id,
-        relation_type=RelationType.CONTAINS,
-    ))
-    await graph.add_relation(EntityRelation(
-        source_id=auth_class.id,
-        target_id=validator.id,
-        relation_type=RelationType.DEPENDS_ON,
-    ))
+    await graph.add_relation(
+        EntityRelation(
+            source_id=module.id,
+            target_id=auth_class.id,
+            relation_type=RelationType.CONTAINS,
+        )
+    )
+    await graph.add_relation(
+        EntityRelation(
+            source_id=auth_class.id,
+            target_id=validator.id,
+            relation_type=RelationType.DEPENDS_ON,
+        )
+    )
 
     # Query graph
     neighbors = await graph.get_neighbors(module.id, depth=2)
@@ -293,9 +299,7 @@ class OrderProcessor:
 '''
 
         # Write to temp file for extraction
-        with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.py', delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 

@@ -72,68 +72,68 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: request, test",
-                required=True,
-            ),
-            ToolParameter(
-                name="method",
-                type="string",
-                description="HTTP method: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS",
-                required=True,
-            ),
-            ToolParameter(
-                name="url",
-                type="string",
-                description="Request URL",
-                required=True,
-            ),
-            ToolParameter(
-                name="headers",
-                type="object",
-                description="Request headers (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="params",
-                type="object",
-                description="Query parameters (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="json",
-                type="object",
-                description="JSON body (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="data",
-                type="object",
-                description="Form data (dict)",
-                required=False,
-            ),
-            ToolParameter(
-                name="auth",
-                type="string",
-                description="Authentication: 'Bearer TOKEN' or 'Basic USER:PASS'",
-                required=False,
-            ),
-            ToolParameter(
-                name="expected_status",
-                type="integer",
-                description="Expected status code (for test operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="follow_redirects",
-                type="boolean",
-                description="Follow redirects (default: true)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: request, test",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="method",
+                    type="string",
+                    description="HTTP method: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="url",
+                    type="string",
+                    description="Request URL",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="headers",
+                    type="object",
+                    description="Request headers (dict)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="params",
+                    type="object",
+                    description="Query parameters (dict)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="json",
+                    type="object",
+                    description="JSON body (dict)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="data",
+                    type="object",
+                    description="Form data (dict)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="auth",
+                    type="string",
+                    description="Authentication: 'Bearer TOKEN' or 'Basic USER:PASS'",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="expected_status",
+                    type="integer",
+                    description="Expected status code (for test operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="follow_redirects",
+                    type="boolean",
+                    description="Follow redirects (default: true)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -168,9 +168,7 @@ Example workflows:
                 )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"HTTP error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"HTTP error: {str(e)}")
 
     async def _request(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Make HTTP request."""
@@ -178,9 +176,7 @@ Example workflows:
         url = kwargs.get("url")
 
         if not url:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: url"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: url")
 
         # Prepare request
         headers = kwargs.get("headers", {})
@@ -201,7 +197,9 @@ Example workflows:
             # Make request
             start_time = time.time()
 
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=follow_redirects) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout, follow_redirects=follow_redirects
+            ) as client:
                 response = await client.request(
                     method=method,
                     url=url,
@@ -242,9 +240,7 @@ Example workflows:
                 error=f"Request timed out after {self.timeout} seconds",
             )
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Request failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Request failed: {str(e)}")
 
     async def _test(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Test API endpoint with validation."""
@@ -266,12 +262,14 @@ Example workflows:
         if expected_status is not None:
             passed = response["status_code"] == expected_status
             all_passed = all_passed and passed
-            validations.append({
-                "test": "Status code",
-                "expected": expected_status,
-                "actual": response["status_code"],
-                "passed": passed,
-            })
+            validations.append(
+                {
+                    "test": "Status code",
+                    "expected": expected_status,
+                    "actual": response["status_code"],
+                    "passed": passed,
+                }
+            )
 
         # Build test result
         test_result = {

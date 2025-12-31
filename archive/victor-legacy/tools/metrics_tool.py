@@ -69,26 +69,26 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: complexity, maintainability, debt, profile, analyze, report",
-                required=True,
-            ),
-            ToolParameter(
-                name="file",
-                type="string",
-                description="Source file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="threshold",
-                type="integer",
-                description="Complexity threshold",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: complexity, maintainability, debt, profile, analyze, report",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="file",
+                    type="string",
+                    description="Source file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="threshold",
+                    type="integer",
+                    description="Complexity threshold",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -132,9 +132,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Metrics operation failed")
-            return ToolResult(
-                success=False, output="", error=f"Metrics error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Metrics error: {str(e)}")
 
     async def _calculate_complexity(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Calculate cyclomatic complexity."""
@@ -150,9 +148,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse
         content = file_obj.read_text()
@@ -171,12 +167,14 @@ Example workflows:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 complexity = self._compute_complexity(node)
-                complexities.append({
-                    "name": node.name,
-                    "complexity": complexity,
-                    "line": node.lineno,
-                    "status": self._get_complexity_status(complexity, threshold),
-                })
+                complexities.append(
+                    {
+                        "name": node.name,
+                        "complexity": complexity,
+                        "line": node.lineno,
+                        "status": self._get_complexity_status(complexity, threshold),
+                    }
+                )
 
         # Sort by complexity
         complexities.sort(key=lambda x: x["complexity"], reverse=True)
@@ -204,7 +202,9 @@ Example workflows:
         if complex:
             report.append("High complexity functions:")
             for func in complex[:10]:
-                report.append(f"  {func['status']} {func['name']}: {func['complexity']} (line {func['line']})")
+                report.append(
+                    f"  {func['status']} {func['name']}: {func['complexity']} (line {func['line']})"
+                )
             report.append("")
 
         report.append("Recommendations:")
@@ -234,9 +234,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read file
         content = file_obj.read_text()
@@ -312,9 +310,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         content = file_obj.read_text()
 

@@ -172,16 +172,12 @@ class MCPServer:
                 return self._create_response(msg_id, {"pong": True})
 
             else:
-                return self._create_error(
-                    msg_id, -32601, f"Method not found: {mcp_msg.method}"
-                )
+                return self._create_error(msg_id, -32601, f"Method not found: {mcp_msg.method}")
 
         except Exception as e:
             return self._create_error(None, -32700, f"Parse error: {str(e)}")
 
-    async def _handle_initialize(
-        self, msg_id: str, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _handle_initialize(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle initialize request.
 
         Args:
@@ -220,9 +216,7 @@ class MCPServer:
 
         return self._create_response(msg_id, {"tools": tools})
 
-    async def _handle_call_tool(
-        self, msg_id: str, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _handle_call_tool(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle call tool request.
 
         Args:
@@ -271,9 +265,7 @@ class MCPServer:
         resources = [r.model_dump() for r in self.resources]
         return self._create_response(msg_id, {"resources": resources})
 
-    async def _handle_read_resource(
-        self, msg_id: str, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _handle_read_resource(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle read resource request.
 
         Args:
@@ -313,9 +305,7 @@ class MCPServer:
                 return self._create_response(msg_id, resource_content.model_dump())
 
             except Exception as e:
-                return self._create_error(
-                    msg_id, -32603, f"Error reading resource: {str(e)}"
-                )
+                return self._create_error(msg_id, -32603, f"Error reading resource: {str(e)}")
 
         return self._create_error(msg_id, -32001, "Resource type not supported")
 
@@ -331,9 +321,7 @@ class MCPServer:
         """
         return {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
-    def _create_error(
-        self, msg_id: Optional[str], code: int, message: str
-    ) -> Dict[str, Any]:
+    def _create_error(self, msg_id: Optional[str], code: int, message: str) -> Dict[str, Any]:
         """Create error response.
 
         Args:
@@ -376,15 +364,11 @@ class MCPServer:
                 print(json.dumps(response), flush=True)
 
             except json.JSONDecodeError as e:
-                error_response = self._create_error(
-                    None, -32700, f"Parse error: {str(e)}"
-                )
+                error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
                 print(json.dumps(error_response), flush=True)
 
             except Exception as e:
-                error_response = self._create_error(
-                    None, -32603, f"Internal error: {str(e)}"
-                )
+                error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
                 print(json.dumps(error_response), flush=True)
 
     def get_server_info(self) -> Dict[str, Any]:

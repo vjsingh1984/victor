@@ -269,9 +269,7 @@ class TestIntegrationWithTaskTracker:
             create_tracker_with_prompt_requirements,
         )
 
-        tracker, _, _ = create_tracker_with_prompt_requirements(
-            "Read 5 files and provide 3 fixes"
-        )
+        tracker, _, _ = create_tracker_with_prompt_requirements("Read 5 files and provide 3 fixes")
 
         assert tracker._progress.has_prompt_requirements is True
         # Soft limit buffer should allow 50% overage (set in should_stop)

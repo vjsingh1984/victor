@@ -78,74 +78,74 @@ Safety:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: ps, images, pull, run, stop, start, restart, rm, rmi, logs, stats, inspect, networks, volumes, exec",
-                required=True,
-            ),
-            ToolParameter(
-                name="container",
-                type="string",
-                description="Container name or ID",
-                required=False,
-            ),
-            ToolParameter(
-                name="image",
-                type="string",
-                description="Image name (e.g., nginx:latest)",
-                required=False,
-            ),
-            ToolParameter(
-                name="name",
-                type="string",
-                description="Container name (for run operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="ports",
-                type="array",
-                description="Port mappings (e.g., ['80:80', '443:443'])",
-                required=False,
-            ),
-            ToolParameter(
-                name="env",
-                type="array",
-                description="Environment variables (e.g., ['KEY=value'])",
-                required=False,
-            ),
-            ToolParameter(
-                name="volumes",
-                type="array",
-                description="Volume mappings (e.g., ['/host:/container'])",
-                required=False,
-            ),
-            ToolParameter(
-                name="command",
-                type="string",
-                description="Command to execute (for run or exec)",
-                required=False,
-            ),
-            ToolParameter(
-                name="detach",
-                type="boolean",
-                description="Run container in background (default: true)",
-                required=False,
-            ),
-            ToolParameter(
-                name="all",
-                type="boolean",
-                description="Include stopped containers (for ps)",
-                required=False,
-            ),
-            ToolParameter(
-                name="tail",
-                type="integer",
-                description="Number of log lines to show (default: 100)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: ps, images, pull, run, stop, start, restart, rm, rmi, logs, stats, inspect, networks, volumes, exec",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="container",
+                    type="string",
+                    description="Container name or ID",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="image",
+                    type="string",
+                    description="Image name (e.g., nginx:latest)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="name",
+                    type="string",
+                    description="Container name (for run operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="ports",
+                    type="array",
+                    description="Port mappings (e.g., ['80:80', '443:443'])",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="env",
+                    type="array",
+                    description="Environment variables (e.g., ['KEY=value'])",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="volumes",
+                    type="array",
+                    description="Volume mappings (e.g., ['/host:/container'])",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="command",
+                    type="string",
+                    description="Command to execute (for run or exec)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="detach",
+                    type="boolean",
+                    description="Run container in background (default: true)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="all",
+                    type="boolean",
+                    description="Include stopped containers (for ps)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="tail",
+                    type="integer",
+                    description="Number of log lines to show (default: 100)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -214,9 +214,7 @@ Safety:
                 )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Docker error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Docker error: {str(e)}")
 
     def _check_docker(self) -> bool:
         """Check if Docker CLI is available."""
@@ -312,9 +310,7 @@ Safety:
         image = kwargs.get("image")
 
         if not image:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: image"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: image")
 
         args = ["pull", image]
         success, stdout, stderr = self._run_docker_command(args, timeout=300)  # 5 minutes
@@ -329,9 +325,7 @@ Safety:
         image = kwargs.get("image")
 
         if not image:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: image"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: image")
 
         args = ["run"]
 
@@ -446,9 +440,7 @@ Safety:
         image = kwargs.get("image")
 
         if not image:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: image"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: image")
 
         args = ["rmi", image]
         success, stdout, stderr = self._run_docker_command(args)
@@ -543,9 +535,7 @@ Safety:
             )
 
         if not command:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: command"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: command")
 
         args = ["exec", container] + command.split()
         success, stdout, stderr = self._run_docker_command(args)

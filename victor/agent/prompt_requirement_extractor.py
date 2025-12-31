@@ -99,9 +99,7 @@ class PromptRequirements:
             min_tools_per_file: Minimum tools needed per file (read + process)
         """
         # Find the largest file-related requirement
-        file_requirements = [
-            c for c in [self.file_count, self.finding_count] if c is not None
-        ]
+        file_requirements = [c for c in [self.file_count, self.finding_count] if c is not None]
 
         if file_requirements:
             max_files = max(file_requirements)
@@ -119,14 +117,16 @@ class PromptRequirements:
 
     def has_explicit_requirements(self) -> bool:
         """Check if any explicit requirements were found."""
-        return any([
-            self.file_count,
-            self.fix_count,
-            self.finding_count,
-            self.step_count,
-            self.example_count,
-            self.recommendation_count,
-        ])
+        return any(
+            [
+                self.file_count,
+                self.fix_count,
+                self.finding_count,
+                self.step_count,
+                self.example_count,
+                self.recommendation_count,
+            ]
+        )
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for logging/serialization."""

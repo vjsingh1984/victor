@@ -1579,7 +1579,8 @@ async def graph(
             results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k * 3)
             # Filter out stdlib modules and test/build paths
             results = [
-                r for r in results
+                r
+                for r in results
                 if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
             ][:top_k]
             # Re-assign ranks after filtering (1-indexed)
@@ -1605,7 +1606,8 @@ async def graph(
             results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k * 3)
             # Filter out stdlib modules and test/build paths
             results = [
-                r for r in results
+                r
+                for r in results
                 if not _skip_path(r.get("file")) and r.get("type") != "stdlib_module"
             ][:top_k]
             # Re-assign ranks after filtering (1-indexed)

@@ -182,15 +182,15 @@ def test_root():
     response = client.get("/api/v1/")
     assert response.status_code == 200
 ''',
-        "fastapi_requirements": '''fastapi>=0.104.0
+        "fastapi_requirements": """fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-multipart>=0.0.6
 pytest>=7.4.0
 httpx>=0.25.0
-''',
-        "pyproject_fastapi": '''[tool.black]
+""",
+        "pyproject_fastapi": """[tool.black]
 line-length = 100
 
 [tool.ruff]
@@ -202,8 +202,8 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-''',
-        "readme_fastapi": '''# FastAPI Application
+""",
+        "readme_fastapi": """# FastAPI Application
 
 Production-ready FastAPI application.
 
@@ -228,7 +228,7 @@ pytest
 ## API Documentation
 
 Visit http://localhost:8000/docs for interactive API documentation.
-''',
+""",
         "cli_main": '''"""CLI application."""
 
 import click
@@ -247,7 +247,7 @@ def hello(name):
 if __name__ == '__main__':
     cli()
 ''',
-        "dockerfile": '''FROM python:3.11-slim
+        "dockerfile": """FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -259,8 +259,8 @@ COPY . .
 EXPOSE 8000
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
-''',
-        "docker_compose": '''version: '3.8'
+""",
+        "docker_compose": """version: '3.8'
 
 services:
   app:
@@ -271,8 +271,8 @@ services:
       - ENV=development
     volumes:
       - .:/app
-''',
-        "gitignore_python": '''# Python
+""",
+        "gitignore_python": """# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -299,8 +299,8 @@ dist/
 .coverage
 htmlcov/
 .pytest_cache/
-''',
-        "gitignore_node": '''# Dependencies
+""",
+        "gitignore_node": """# Dependencies
 node_modules/
 
 # Production
@@ -318,14 +318,14 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-''',
-        "env_example": '''# Application
+""",
+        "env_example": """# Application
 PROJECT_NAME=My FastAPI App
 API_V1_STR=/api/v1
 
 # Database (if needed)
 # DATABASE_URL=postgresql://user:password@localhost/dbname
-''',
+""",
     }
 
     def __init__(self):
@@ -373,44 +373,44 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: create, list, add_file, init_git",
-                required=True,
-            ),
-            ToolParameter(
-                name="template",
-                type="string",
-                description="Template name (for create operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="name",
-                type="string",
-                description="Project name (for create operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="path",
-                type="string",
-                description="File path (for add_file operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="content",
-                type="string",
-                description="File content (for add_file operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="force",
-                type="boolean",
-                description="Overwrite existing files (default: false)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: create, list, add_file, init_git",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="template",
+                    type="string",
+                    description="Template name (for create operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="name",
+                    type="string",
+                    description="Project name (for create operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="File path (for add_file operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="content",
+                    type="string",
+                    description="File content (for add_file operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="force",
+                    type="boolean",
+                    description="Overwrite existing files (default: false)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -450,9 +450,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Scaffold operation failed")
-            return ToolResult(
-                success=False, output="", error=f"Scaffold error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Scaffold error: {str(e)}")
 
     async def _create_project(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Create new project from template."""
@@ -466,9 +464,7 @@ Example workflows:
             )
 
         if not name:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: name"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: name")
 
         if template not in self.TEMPLATES:
             available = ", ".join(self.TEMPLATES.keys())
@@ -575,9 +571,7 @@ Example workflows:
         content = kwargs.get("content", "")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         file_path = Path(path)
 

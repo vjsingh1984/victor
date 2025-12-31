@@ -37,7 +37,9 @@ class AnthropicProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs)
+        super().__init__(
+            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+        )
         self.client = AsyncAnthropic(
             api_key=api_key,
             base_url=base_url,
@@ -93,10 +95,12 @@ class AnthropicProvider(BaseProvider):
                 if msg.role == "system":
                     system_message = msg.content
                 else:
-                    conversation_messages.append({
-                        "role": msg.role,
-                        "content": msg.content,
-                    })
+                    conversation_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": msg.content,
+                        }
+                    )
 
             # Build request parameters
             request_params = {
@@ -156,10 +160,12 @@ class AnthropicProvider(BaseProvider):
                 if msg.role == "system":
                     system_message = msg.content
                 else:
-                    conversation_messages.append({
-                        "role": msg.role,
-                        "content": msg.content,
-                    })
+                    conversation_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": msg.content,
+                        }
+                    )
 
             # Build request parameters
             request_params = {
@@ -222,11 +228,13 @@ class AnthropicProvider(BaseProvider):
             if block.type == "text":
                 content += block.text
             elif block.type == "tool_use":
-                tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "arguments": block.input,
-                })
+                tool_calls.append(
+                    {
+                        "id": block.id,
+                        "name": block.name,
+                        "arguments": block.input,
+                    }
+                )
 
         # Parse usage
         usage = None

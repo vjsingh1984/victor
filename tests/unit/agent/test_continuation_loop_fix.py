@@ -486,17 +486,17 @@ class TestBestEffortFinalize:
 
         # Mock grounding verifier to return ungrounded result
         mock_verifier = AsyncMock()
-        mock_verifier.verify = AsyncMock(return_value=MagicMock(
-            is_grounded=False,
-            confidence=0.3,
-            issues=[],
-        ))
+        mock_verifier.verify = AsyncMock(
+            return_value=MagicMock(
+                is_grounded=False,
+                confidence=0.3,
+                issues=[],
+            )
+        )
         pipeline._grounding_verifier = mock_verifier
 
         # Mock the lazy initializer to return True
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -523,16 +523,16 @@ class TestBestEffortFinalize:
 
         # Mock grounding verifier to return ungrounded result
         mock_verifier = AsyncMock()
-        mock_verifier.verify = AsyncMock(return_value=MagicMock(
-            is_grounded=False,
-            confidence=0.4,
-            issues=[],
-        ))
+        mock_verifier.verify = AsyncMock(
+            return_value=MagicMock(
+                is_grounded=False,
+                confidence=0.4,
+                issues=[],
+            )
+        )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -558,16 +558,16 @@ class TestBestEffortFinalize:
 
         # Mock grounding verifier to return grounded result
         mock_verifier = AsyncMock()
-        mock_verifier.verify = AsyncMock(return_value=MagicMock(
-            is_grounded=True,
-            confidence=0.9,
-            issues=[],
-        ))
+        mock_verifier.verify = AsyncMock(
+            return_value=MagicMock(
+                is_grounded=True,
+                confidence=0.9,
+                issues=[],
+            )
+        )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             await pipeline.process_response(

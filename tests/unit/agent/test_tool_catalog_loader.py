@@ -140,9 +140,7 @@ class TestToolCatalogLoaderLoad:
     def test_load_respects_airgapped_mode(self, mock_registry, mock_settings):
         """Test that load() passes airgapped_mode to SharedToolRegistry."""
         config = ToolCatalogConfig(airgapped_mode=True)
-        loader = ToolCatalogLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         mock_shared = MagicMock()
         mock_shared.get_all_tools_for_registration.return_value = []

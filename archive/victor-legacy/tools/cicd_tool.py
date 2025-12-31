@@ -32,9 +32,7 @@ class CICDTool(BaseTool):
             "jobs": {
                 "test": {
                     "runs-on": "ubuntu-latest",
-                    "strategy": {
-                        "matrix": {"python-version": ["3.10", "3.11", "3.12"]}
-                    },
+                    "strategy": {"matrix": {"python-version": ["3.10", "3.11", "3.12"]}},
                     "steps": [
                         {"uses": "actions/checkout@v4"},
                         {
@@ -86,7 +84,10 @@ class CICDTool(BaseTool):
                         {"name": "Build package", "run": "python -m build"},
                         {
                             "name": "Publish to PyPI",
-                            "env": {"TWINE_USERNAME": "__token__", "TWINE_PASSWORD": "${{ secrets.PYPI_TOKEN }}"},
+                            "env": {
+                                "TWINE_USERNAME": "__token__",
+                                "TWINE_PASSWORD": "${{ secrets.PYPI_TOKEN }}",
+                            },
                             "run": "twine upload dist/*",
                         },
                     ],
@@ -169,44 +170,44 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: generate, validate, list_templates, create_workflow",
-                required=True,
-            ),
-            ToolParameter(
-                name="platform",
-                type="string",
-                description="CI/CD platform: github, gitlab, circle",
-                required=False,
-            ),
-            ToolParameter(
-                name="workflow",
-                type="string",
-                description="Workflow template name",
-                required=False,
-            ),
-            ToolParameter(
-                name="type",
-                type="string",
-                description="Workflow type: test, build, deploy, release",
-                required=False,
-            ),
-            ToolParameter(
-                name="file",
-                type="string",
-                description="Configuration file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="output",
-                type="string",
-                description="Output file path",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: generate, validate, list_templates, create_workflow",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="platform",
+                    type="string",
+                    description="CI/CD platform: github, gitlab, circle",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="workflow",
+                    type="string",
+                    description="Workflow template name",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="type",
+                    type="string",
+                    description="Workflow type: test, build, deploy, release",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="file",
+                    type="string",
+                    description="Configuration file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="output",
+                    type="string",
+                    description="Output file path",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -246,9 +247,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("CI/CD operation failed")
-            return ToolResult(
-                success=False, output="", error=f"CI/CD error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"CI/CD error: {str(e)}")
 
     async def _generate_config(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Generate CI/CD configuration."""
@@ -323,9 +322,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and validate YAML
         try:
@@ -364,13 +361,10 @@ Example workflows:
                 # Check for best practices
                 if "steps" in job:
                     has_checkout = any(
-                        step.get("uses", "").startswith("actions/checkout")
-                        for step in job["steps"]
+                        step.get("uses", "").startswith("actions/checkout") for step in job["steps"]
                     )
                     if not has_checkout:
-                        warnings.append(
-                            f"Job '{job_name}': No checkout step (usually needed)"
-                        )
+                        warnings.append(f"Job '{job_name}': No checkout step (usually needed)")
 
         # Build report
         report = []
@@ -470,12 +464,13 @@ Example workflows:
             )
 
         # Use generate_config
-        return await self._generate_config({
-            "platform": platform,
-            "workflow": workflow,
-            "output": output_path,
-        })
-
+        return await self._generate_config(
+            {
+                "platform": platform,
+                "workflow": workflow,
+                "output": output_path,
+            }
+        )
 
     def _get_gitlab_template(self, workflow: str) -> Optional[Dict[str, Any]]:
         """Get GitLab CI template."""
@@ -509,7 +504,12 @@ Example workflows:
                         "docker": [{"image": "cimg/python:3.12"}],
                         "steps": [
                             "checkout",
-                            {"run": {"name": "Install dependencies", "command": "pip install -e .[dev]"}},
+                            {
+                                "run": {
+                                    "name": "Install dependencies",
+                                    "command": "pip install -e .[dev]",
+                                }
+                            },
                             {"run": {"name": "Run tests", "command": "pytest"}},
                         ],
                     },

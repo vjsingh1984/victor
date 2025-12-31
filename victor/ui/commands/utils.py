@@ -75,6 +75,7 @@ def configure_logging(
         repo_path = os.path.basename(os.getcwd())
     if session_id is None:
         import uuid
+
         session_id = str(uuid.uuid4())[:8]  # Short session ID
 
     file_format = f"%(asctime)s - {repo_path}-{session_id} - %(name)s - %(levelname)s - %(message)s"
@@ -106,7 +107,9 @@ def configure_logging(
             file_handler.setLevel(getattr(logging, file_level.upper(), logging.INFO))
             file_handler.setFormatter(file_formatter)
             root_logger.addHandler(file_handler)
-            logger.debug(f"File logging enabled: {log_path} (session={session_id}, repo={repo_path})")
+            logger.debug(
+                f"File logging enabled: {log_path} (session={session_id}, repo={repo_path})"
+            )
         except Exception as e:
             # Don't fail if file logging can't be set up
             logger.warning(f"Could not enable file logging: {e}")

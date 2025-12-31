@@ -175,9 +175,9 @@ class TestPromptContributorAdapterWiring:
         # Verify conversion
         edit_hint = context.get_task_hint("edit")
         assert edit_hint is not None, "edit hint should exist"
-        assert isinstance(edit_hint, TaskTypeHint), (
-            "Dict format should be converted to TaskTypeHint"
-        )
+        assert isinstance(
+            edit_hint, TaskTypeHint
+        ), "Dict format should be converted to TaskTypeHint"
         assert edit_hint.hint == "Read file first"
         assert edit_hint.tool_budget == 5
 
@@ -203,12 +203,10 @@ class TestPromptContributorAdapterWiring:
         for hint_name in expected_hints:
             hint = context.get_task_hint(hint_name)
             assert hint is not None, f"Hint '{hint_name}' should exist"
-            assert isinstance(hint, TaskTypeHint), (
-                f"Hint '{hint_name}' should be TaskTypeHint after adapter normalization"
-            )
-            assert hint.task_type == hint_name, (
-                f"Hint task_type should be '{hint_name}'"
-            )
+            assert isinstance(
+                hint, TaskTypeHint
+            ), f"Hint '{hint_name}' should be TaskTypeHint after adapter normalization"
+            assert hint.task_type == hint_name, f"Hint task_type should be '{hint_name}'"
 
     def test_adapter_wrap_preserves_existing_contributor(self):
         """Wrapping existing contributor via adapter should preserve data."""
@@ -275,9 +273,7 @@ class TestPromptStepHandlerIntegration:
             def get_priority(self):
                 return 50
 
-        handler.apply_contributors(
-            orchestrator, [LegacyDictContributor()], context, result
-        )
+        handler.apply_contributors(orchestrator, [LegacyDictContributor()], context, result)
 
         # Context should have normalized TaskTypeHint
         hint = context.get_task_hint("task1")

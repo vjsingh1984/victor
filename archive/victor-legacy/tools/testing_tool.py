@@ -64,44 +64,44 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: generate_tests, generate_fixture, analyze_coverage, scaffold, mock_data",
-                required=True,
-            ),
-            ToolParameter(
-                name="file",
-                type="string",
-                description="Source file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="target",
-                type="string",
-                description="Target function/class name for test generation",
-                required=False,
-            ),
-            ToolParameter(
-                name="output",
-                type="string",
-                description="Output test file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="name",
-                type="string",
-                description="Fixture or mock data name",
-                required=False,
-            ),
-            ToolParameter(
-                name="type",
-                type="string",
-                description="Data type for fixtures (list, dict, object, etc.)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: generate_tests, generate_fixture, analyze_coverage, scaffold, mock_data",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="file",
+                    type="string",
+                    description="Source file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="target",
+                    type="string",
+                    description="Target function/class name for test generation",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="output",
+                    type="string",
+                    description="Output test file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="name",
+                    type="string",
+                    description="Fixture or mock data name",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="type",
+                    type="string",
+                    description="Data type for fixtures (list, dict, object, etc.)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -143,9 +143,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Test generation failed")
-            return ToolResult(
-                success=False, output="", error=f"Test generation error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Test generation error: {str(e)}")
 
     async def _generate_tests(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Generate unit tests for a file or function."""
@@ -162,9 +160,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse file
         content = file_obj.read_text()
@@ -269,9 +265,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse file
         content = file_obj.read_text()
@@ -621,7 +615,7 @@ Example workflows:
             lines.append("    }")
         elif data_type == "object":
             lines.append("    class MockObject:")
-            lines.append('        def __init__(self):')
+            lines.append("        def __init__(self):")
             lines.append('            self.attr1 = "value1"')
             lines.append('            self.attr2 = "value2"')
             lines.append("")
@@ -656,27 +650,27 @@ Example workflows:
     def _build_mock_data(self, name: str, data_type: str) -> str:
         """Build mock data."""
         if data_type == "list":
-            return f'''{name} = [
+            return f"""{name} = [
     {{"id": 1, "name": "Mock 1", "active": True}},
     {{"id": 2, "name": "Mock 2", "active": False}},
     {{"id": 3, "name": "Mock 3", "active": True}},
-]'''
+]"""
         elif data_type == "dict":
-            return f'''{name} = {{
+            return f"""{name} = {{
     "name": "Test User",
     "email": "test@example.com",
     "age": 25,
     "active": True,
-}}'''
+}}"""
         elif data_type == "user":
-            return f'''{name} = {{
+            return f"""{name} = {{
     "id": 123,
     "username": "testuser",
     "email": "test@example.com",
     "first_name": "Test",
     "last_name": "User",
     "created_at": "2025-01-01T00:00:00Z",
-}}'''
+}}"""
         else:
             return f'{name} = "mock_value"'
 

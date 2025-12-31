@@ -84,7 +84,9 @@ def print_banner(profile: str, num_tasks: int, parallel: int):
     print()
 
 
-def create_agent_callback(profile: str, timeout: int = 120, base_url: str = None, model_override: str = None):
+def create_agent_callback(
+    profile: str, timeout: int = 120, base_url: str = None, model_override: str = None
+):
     """Create an agent callback that uses Victor's providers.
 
     Returns a callback function compatible with EvaluationHarness.run_evaluation().
@@ -182,6 +184,7 @@ def create_retry_callback(provider, model_name: str, timeout: int = 120):
     Returns:
         Async callback function for retry with feedback
     """
+
     async def retry_callback(task: BenchmarkTask, previous_code: str, feedback_prompt: str) -> str:
         """Generate corrected code based on feedback."""
         messages = [Message(role="user", content=feedback_prompt)]
@@ -335,16 +338,18 @@ async def run_code_gen_benchmark(
     if output_file:
         output_path = Path(output_file)
     else:
-        output_path = Path(f"/tmp/victor_codegen_{profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        output_path = Path(
+            f"/tmp/victor_codegen_{profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(output_data, f, indent=2, default=str)
 
     print(f"\nResults saved to: {output_path}")
 
     # Also save report
     report = benchmark.generate_report()
-    report_path = output_path.with_suffix('.txt')
+    report_path = output_path.with_suffix(".txt")
     report_path.write_text(report)
     print(f"Report saved to: {report_path}")
 
@@ -483,16 +488,18 @@ async def run_benchmark(
     if output_file:
         output_path = Path(output_file)
     else:
-        output_path = Path(f"/tmp/victor_benchmark_{profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        output_path = Path(
+            f"/tmp/victor_benchmark_{profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(output_data, f, indent=2, default=str)
 
     print(f"\nResults saved to: {output_path}")
 
     # Also generate markdown report
     report = harness.generate_report(result, format="markdown")
-    report_path = output_path.with_suffix('.md')
+    report_path = output_path.with_suffix(".md")
     report_path.write_text(report)
     print(f"Report saved to: {report_path}")
 
@@ -500,9 +507,7 @@ async def run_benchmark(
 
 
 async def main():
-    parser = argparse.ArgumentParser(
-        description="Run HumanEval benchmark with Victor agent"
-    )
+    parser = argparse.ArgumentParser(description="Run HumanEval benchmark with Victor agent")
     parser.add_argument(
         "--profile",
         type=str,

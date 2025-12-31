@@ -140,9 +140,7 @@ class TestToolGraphBuilderBuild:
 
     def test_build_registers_default_tools(self, mock_registry, mock_tool_graph):
         """Test that build() registers default tool dependencies."""
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         result = builder.build()
 
@@ -154,9 +152,7 @@ class TestToolGraphBuilderBuild:
 
     def test_build_includes_cost_tiers(self, mock_registry, mock_tool_graph):
         """Test that build() includes cost tiers in tool registration."""
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         builder.build()
 
@@ -185,9 +181,7 @@ class TestToolGraphBuilderBuild:
         """Test that build() handles errors gracefully."""
         mock_tool_graph.add_tool.side_effect = Exception("Graph error")
 
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         result = builder.build()
 
@@ -247,13 +241,9 @@ class TestToolGraphBuilderPlanForGoals:
 
         assert result == []
 
-    def test_plan_for_goals_returns_tool_definitions(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_returns_tool_definitions(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals returns ToolDefinition objects."""
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         result = builder.plan_for_goals(["summary"])
 
@@ -261,29 +251,19 @@ class TestToolGraphBuilderPlanForGoals:
         assert result[0].name == "code_search"
         assert result[1].name == "read_file"
 
-    def test_plan_for_goals_passes_available_inputs(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_passes_available_inputs(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals passes available inputs to graph."""
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         builder.plan_for_goals(["summary"], available_inputs=["file_contents"])
 
-        mock_tool_graph.plan.assert_called_once_with(
-            ["summary"], ["file_contents"]
-        )
+        mock_tool_graph.plan.assert_called_once_with(["summary"], ["file_contents"])
 
-    def test_plan_for_goals_skips_disabled_tools(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_skips_disabled_tools(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals skips disabled tools."""
         mock_registry.is_tool_enabled.side_effect = lambda name: name != "read_file"
 
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         result = builder.plan_for_goals(["summary"])
 
@@ -291,15 +271,11 @@ class TestToolGraphBuilderPlanForGoals:
         assert len(result) == 1
         assert result[0].name == "code_search"
 
-    def test_plan_for_goals_skips_missing_tools(
-        self, mock_registry, mock_tool_graph
-    ):
+    def test_plan_for_goals_skips_missing_tools(self, mock_registry, mock_tool_graph):
         """Test that plan_for_goals skips tools not in registry."""
         mock_tool_graph.plan.return_value = ["code_search", "nonexistent_tool"]
 
-        builder = ToolGraphBuilder(
-            registry=mock_registry, tool_graph=mock_tool_graph
-        )
+        builder = ToolGraphBuilder(registry=mock_registry, tool_graph=mock_tool_graph)
 
         result = builder.plan_for_goals(["summary"])
 

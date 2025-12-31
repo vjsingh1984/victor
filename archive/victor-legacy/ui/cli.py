@@ -192,6 +192,7 @@ async def run_interactive(
     except Exception as e:
         console.print(f"[bold red]Error:[/] {str(e)}")
         import traceback
+
         console.print(traceback.format_exc())
         raise typer.Exit(1)
 
@@ -291,9 +292,7 @@ def profiles_cmd() -> None:
         )
 
     console.print(table)
-    console.print(
-        f"\n[dim]Config file: {settings.get_config_dir() / 'profiles.yaml'}[/]"
-    )
+    console.print(f"\n[dim]Config file: {settings.get_config_dir() / 'profiles.yaml'}[/]")
 
 
 @app.command()
@@ -345,6 +344,7 @@ async def list_models_async(provider: str) -> None:
                     if modified:
                         # Format timestamp
                         from datetime import datetime
+
                         try:
                             dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))
                             modified = dt.strftime("%Y-%m-%d")
@@ -358,9 +358,7 @@ async def list_models_async(provider: str) -> None:
                     )
 
                 console.print(table)
-                console.print(
-                    f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]"
-                )
+                console.print(f"\n[dim]Use a model with: [bold]victor --profile <profile>[/dim]")
 
                 await ollama.close()
 
@@ -370,9 +368,7 @@ async def list_models_async(provider: str) -> None:
 
         else:
             console.print(f"[yellow]Model listing not yet implemented for {provider}[/]")
-            console.print(
-                "Currently only Ollama supports model listing via CLI"
-            )
+            console.print("Currently only Ollama supports model listing via CLI")
 
     except Exception as e:
         console.print(f"[red]Error:[/] {e}")

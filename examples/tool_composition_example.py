@@ -151,9 +151,7 @@ async def example_conditional():
     markdown_processor = RunnableLambda(
         lambda d: {"file_type": "Documentation", "path": d.get("path")}
     )
-    default_processor = RunnableLambda(
-        lambda d: {"file_type": "Unknown", "path": d.get("path")}
-    )
+    default_processor = RunnableLambda(lambda d: {"file_type": "Unknown", "path": d.get("path")})
 
     branch = RunnableBranch(
         (is_python_file, python_processor),
@@ -229,11 +227,7 @@ async def example_complex_pipeline():
         return {"files_read": len(results), "results": results}
 
     # Build the pipeline
-    pipeline = (
-        list_dir
-        | RunnableLambda(filter_python_files)
-        | RunnableLambda(read_files_parallel)
-    )
+    pipeline = list_dir | RunnableLambda(filter_python_files) | RunnableLambda(read_files_parallel)
 
     # Execute
     result = await pipeline.invoke({"path": "victor/tools", "depth": 1})

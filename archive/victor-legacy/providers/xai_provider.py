@@ -39,7 +39,9 @@ class XAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs)
+        super().__init__(
+            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+        )
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={
@@ -90,10 +92,7 @@ class XAIProvider(BaseProvider):
         """
         try:
             # Convert messages to API format
-            api_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            api_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request payload
             payload = {
@@ -153,10 +152,7 @@ class XAIProvider(BaseProvider):
         """
         try:
             # Convert messages
-            api_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            api_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request payload
             payload = {
@@ -182,6 +178,7 @@ class XAIProvider(BaseProvider):
 
                     if line.startswith("data: "):
                         import json
+
                         try:
                             chunk_data = json.loads(line[6:])
                             chunk = self._parse_stream_chunk(chunk_data)

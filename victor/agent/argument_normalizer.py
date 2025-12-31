@@ -482,9 +482,7 @@ class ArgumentNormalizer:
                     pass
         return arguments
 
-    def _coerce_primitive_types(
-        self, arguments: Dict[str, Any], tool_name: str
-    ) -> Dict[str, Any]:
+    def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """
         Coerce string values to primitive types (int, float, bool) when appropriate.
 

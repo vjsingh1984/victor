@@ -7,11 +7,12 @@ Apply this patch to orchestrator.py to fix the critical tool execution bug.
 # PATCH 1: Fix tool execution counter in _stream_chat_impl
 # Location: victor/agent/orchestrator.py, around line 2800-3000
 
+
 def patch_tool_execution_counter():
     """
     Find this section in _stream_chat_impl and add the missing counter update:
     """
-    
+
     # FIND THIS CODE (around line 2950):
     """
     if tool_calls:
@@ -24,7 +25,7 @@ def patch_tool_execution_counter():
             # Record tool call in unified tracker (single source of truth)
             self.unified_tracker.record_tool_call(tool_name, tool_args)
     """
-    
+
     # ADD THIS AFTER THE ABOVE BLOCK:
     """
         # Execute tool calls and update counters
@@ -73,18 +74,19 @@ def patch_tool_execution_counter():
 # PATCH 2: Add timeout protection to stream_chat
 # Location: victor/agent/orchestrator.py, around line 2400
 
+
 def patch_timeout_protection():
     """
     Wrap the stream_chat method with timeout protection:
     """
-    
+
     # FIND THIS METHOD:
     """
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         async for chunk in self._stream_chat_impl(user_message):
             yield chunk
     """
-    
+
     # REPLACE WITH:
     """
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
@@ -107,11 +109,12 @@ def patch_timeout_protection():
 # PATCH 3: Simplify tool selection (optional but recommended)
 # Location: victor/agent/tool_selection.py
 
+
 def patch_tool_selection():
     """
     Add a simple fallback tool selection method:
     """
-    
+
     # ADD THIS METHOD TO ToolSelector class:
     """
     def select_tools_fallback(self, user_message: str) -> List[ToolDefinition]:
@@ -151,7 +154,7 @@ def patch_tool_selection():
         
         return tools[:10]  # Limit to 10 tools
     """
-    
+
     # MODIFY select_tools method to use fallback:
     """
     async def select_tools(self, user_message: str, **kwargs) -> List[ToolDefinition]:
@@ -178,18 +181,19 @@ def patch_tool_selection():
 # PATCH 4: Add emergency stop mechanism
 # Location: victor/agent/orchestrator.py
 
+
 def patch_emergency_stop():
     """
     Add emergency stop mechanism to prevent runaway loops:
     """
-    
+
     # ADD THIS TO __init__ method:
     """
     # Emergency stop mechanism
     self._emergency_stop_threshold = 100  # Max iterations before emergency stop
     self._iteration_count = 0
     """
-    
+
     # ADD THIS CHECK IN _stream_chat_impl main loop:
     """
     # Emergency stop check
@@ -210,7 +214,7 @@ def verify_patches():
     """
     Script to verify the patches are working:
     """
-    
+
     verification_code = '''
 import asyncio
 import logging
@@ -249,7 +253,7 @@ async def test_no_infinite_loop():
 if __name__ == "__main__":
     asyncio.run(test_no_infinite_loop())
 '''
-    
+
     return verification_code
 
 

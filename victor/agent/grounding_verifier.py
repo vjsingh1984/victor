@@ -744,9 +744,9 @@ class VerificationResult:
             IssueSeverity.MEDIUM: 2,
             IssueSeverity.LOW: 3,
         }
-        sorted_issues = sorted(
-            self.issues, key=lambda i: severity_order.get(i.severity, 4)
-        )[:max_issues]
+        sorted_issues = sorted(self.issues, key=lambda i: severity_order.get(i.severity, 4))[
+            :max_issues
+        ]
 
         # Build feedback sections by issue type for clarity
         feedback_parts = []
@@ -757,8 +757,10 @@ class VerificationResult:
         code_issues = [i for i in sorted_issues if i.issue_type == IssueType.CODE_MISMATCH]
         fabricated = [i for i in sorted_issues if i.issue_type == IssueType.FABRICATED_CONTENT]
         other_issues = [
-            i for i in sorted_issues
-            if i.issue_type not in (
+            i
+            for i in sorted_issues
+            if i.issue_type
+            not in (
                 IssueType.FILE_NOT_FOUND,
                 IssueType.SYMBOL_NOT_FOUND,
                 IssueType.CODE_MISMATCH,
@@ -801,8 +803,12 @@ class VerificationResult:
 
         # Add any other issues
         for issue in other_issues:
-            if issue.issue_type not in (IssueType.FILE_NOT_FOUND, IssueType.SYMBOL_NOT_FOUND,
-                                        IssueType.CODE_MISMATCH, IssueType.FABRICATED_CONTENT):
+            if issue.issue_type not in (
+                IssueType.FILE_NOT_FOUND,
+                IssueType.SYMBOL_NOT_FOUND,
+                IssueType.CODE_MISMATCH,
+                IssueType.FABRICATED_CONTENT,
+            ):
                 feedback_parts.append(f"- {issue.description}")
 
         if not feedback_parts:
@@ -1590,9 +1596,7 @@ class GroundingVerifier:
         if not is_code_generation:
             is_code_generation = self._has_creation_intent_in_response(response)
             if is_code_generation:
-                logger.debug(
-                    "[GroundingVerifier] Creation intent detected in response content"
-                )
+                logger.debug("[GroundingVerifier] Creation intent detected in response content")
                 result.metadata["creation_intent_source"] = "response"
 
         result.metadata["is_code_generation"] = is_code_generation

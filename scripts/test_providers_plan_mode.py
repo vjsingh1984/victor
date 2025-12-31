@@ -27,6 +27,7 @@ PROVIDERS = [
     {"name": "OpenAI/GPT-4.1", "profile": "gpt-4.1"},
 ]
 
+
 def test_provider(profile: str, name: str) -> dict:
     """Test a provider and return timing results."""
     print(f"\n{'='*60}")
@@ -34,13 +35,16 @@ def test_provider(profile: str, name: str) -> dict:
     print(f"{'='*60}")
 
     cmd = [
-        "victor", "chat",
+        "victor",
+        "chat",
         "--no-tui",
-        "--profile", profile,
-        "--mode", "plan",
+        "--profile",
+        profile,
+        "--mode",
+        "plan",
         "--plain",
         "--quiet",
-        TEST_PROMPT
+        TEST_PROMPT,
     ]
 
     start_time = time.perf_counter()
@@ -51,7 +55,7 @@ def test_provider(profile: str, name: str) -> dict:
             capture_output=True,
             text=True,
             timeout=120,  # 2 minute timeout
-            cwd=Path(__file__).parent.parent
+            cwd=Path(__file__).parent.parent,
         )
 
         end_time = time.perf_counter()
@@ -76,7 +80,7 @@ def test_provider(profile: str, name: str) -> dict:
             "success": success,
             "time_seconds": elapsed,
             "output_length": len(output),
-            "error": result.stderr if not success else None
+            "error": result.stderr if not success else None,
         }
 
     except subprocess.TimeoutExpired:
@@ -86,16 +90,12 @@ def test_provider(profile: str, name: str) -> dict:
             "profile": profile,
             "success": False,
             "time_seconds": 120,
-            "error": "Timeout"
+            "error": "Timeout",
         }
     except Exception as e:
         print(f"✗ Error: {e}")
-        return {
-            "provider": name,
-            "profile": profile,
-            "success": False,
-            "error": str(e)
-        }
+        return {"provider": name, "profile": profile, "success": False, "error": str(e)}
+
 
 def main():
     """Run tests for all providers."""
@@ -107,8 +107,11 @@ def main():
     # Check if native extensions are available
     try:
         from victor_native import is_native_available
+
         native = is_native_available()
-        print(f"Native extensions: {'✓ Available (Rust/SIMD)' if native else '✗ Not available (Python fallback)'}")
+        print(
+            f"Native extensions: {'✓ Available (Rust/SIMD)' if native else '✗ Not available (Python fallback)'}"
+        )
     except ImportError:
         print("Native extensions: ✗ Not installed")
 
@@ -128,7 +131,9 @@ def main():
     for r in results:
         status = "✓" if r.get("success") else "✗"
         time_str = f"{r.get('time_seconds', 0):.2f}s"
-        output_str = f"{r.get('output_length', 0)} chars" if r.get("success") else r.get("error", "N/A")[:20]
+        output_str = (
+            f"{r.get('output_length', 0)} chars" if r.get("success") else r.get("error", "N/A")[:20]
+        )
         print(f"{r['provider']:<20} {status:<10} {time_str:<10} {output_str:<10}")
 
     # Save results
@@ -136,6 +141,7 @@ def main():
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nResults saved to: {results_file}")
+
 
 if __name__ == "__main__":
     main()

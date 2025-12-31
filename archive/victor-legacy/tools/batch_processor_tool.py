@@ -74,62 +74,62 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: search, replace, analyze, transform, list",
-                required=True,
-            ),
-            ToolParameter(
-                name="path",
-                type="string",
-                description="Directory path to process",
-                required=True,
-            ),
-            ToolParameter(
-                name="file_pattern",
-                type="string",
-                description="File pattern (glob) to match (default: *.*)",
-                required=False,
-            ),
-            ToolParameter(
-                name="pattern",
-                type="string",
-                description="Search pattern (for search operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="find",
-                type="string",
-                description="Text to find (for replace operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="replace",
-                type="string",
-                description="Replacement text (for replace operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="regex",
-                type="boolean",
-                description="Use regex for pattern matching (default: false)",
-                required=False,
-            ),
-            ToolParameter(
-                name="dry_run",
-                type="boolean",
-                description="Preview changes without applying (default: false)",
-                required=False,
-            ),
-            ToolParameter(
-                name="max_files",
-                type="integer",
-                description="Maximum files to process (default: 1000)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: search, replace, analyze, transform, list",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="Directory path to process",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="file_pattern",
+                    type="string",
+                    description="File pattern (glob) to match (default: *.*)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="pattern",
+                    type="string",
+                    description="Search pattern (for search operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="find",
+                    type="string",
+                    description="Text to find (for replace operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="replace",
+                    type="string",
+                    description="Replacement text (for replace operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="regex",
+                    type="boolean",
+                    description="Use regex for pattern matching (default: false)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="dry_run",
+                    type="boolean",
+                    description="Preview changes without applying (default: false)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="max_files",
+                    type="integer",
+                    description="Maximum files to process (default: 1000)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -171,9 +171,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Batch processing failed")
-            return ToolResult(
-                success=False, output="", error=f"Batch processing error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Batch processing error: {str(e)}")
 
     async def _batch_search(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Search pattern across multiple files."""
@@ -192,9 +190,7 @@ Example workflows:
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         # Find matching files
         files = list(path_obj.rglob(file_pattern))[:max_files]
@@ -237,9 +233,7 @@ Example workflows:
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         # Find matching files
         files = list(path_obj.rglob(file_pattern))[:max_files]
@@ -257,9 +251,7 @@ Example workflows:
         )
 
         # Build report
-        report = self._build_replace_report(
-            path_obj, find_text, replace_text, results, dry_run
-        )
+        report = self._build_replace_report(path_obj, find_text, replace_text, results, dry_run)
 
         return ToolResult(
             success=True,
@@ -274,15 +266,11 @@ Example workflows:
         max_files = kwargs.get("max_files", 1000)
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         # Find matching files
         files = list(path_obj.rglob(file_pattern))[:max_files]
@@ -322,15 +310,11 @@ Example workflows:
         max_files = kwargs.get("max_files", 1000)
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         # Find matching files
         files = list(path_obj.rglob(file_pattern))[:max_files]
@@ -371,15 +355,11 @@ Example workflows:
                 if use_regex:
                     for line_num, line in enumerate(content.split("\n"), 1):
                         if re.search(pattern, line):
-                            matches.append(
-                                {"line": line_num, "text": line.strip()[:100]}
-                            )
+                            matches.append({"line": line_num, "text": line.strip()[:100]})
                 else:
                     for line_num, line in enumerate(content.split("\n"), 1):
                         if pattern in line:
-                            matches.append(
-                                {"line": line_num, "text": line.strip()[:100]}
-                            )
+                            matches.append({"line": line_num, "text": line.strip()[:100]})
 
                 if matches:
                     return {"file": str(file_path), "matches": matches}
@@ -422,8 +402,10 @@ Example workflows:
                     new_content = content.replace(find_text, replace_text)
 
                 if new_content != original:
-                    count = content.count(find_text) if not use_regex else len(
-                        re.findall(find_text, content)
+                    count = (
+                        content.count(find_text)
+                        if not use_regex
+                        else len(re.findall(find_text, content))
                     )
 
                     if not dry_run:
@@ -485,9 +467,7 @@ Example workflows:
 
         return results
 
-    def _build_search_report(
-        self, path: Path, pattern: str, results: List[Dict[str, Any]]
-    ) -> str:
+    def _build_search_report(self, path: Path, pattern: str, results: List[Dict[str, Any]]) -> str:
         """Build search results report."""
         report = []
         report.append(f"Batch Search Results: '{pattern}' in {path}")
@@ -499,7 +479,11 @@ Example workflows:
         report.append("")
 
         for result in results[:20]:  # Show first 20 files
-            rel_path = Path(result["file"]).relative_to(path) if path.is_dir() else Path(result["file"]).name
+            rel_path = (
+                Path(result["file"]).relative_to(path)
+                if path.is_dir()
+                else Path(result["file"]).name
+            )
             report.append(f"📄 {rel_path}")
             for match in result["matches"][:5]:  # Show first 5 matches per file
                 report.append(f"  Line {match['line']}: {match['text']}")
@@ -532,7 +516,11 @@ Example workflows:
         report.append("")
 
         for result in results[:30]:  # Show first 30
-            rel_path = Path(result["file"]).relative_to(path) if path.is_dir() else Path(result["file"]).name
+            rel_path = (
+                Path(result["file"]).relative_to(path)
+                if path.is_dir()
+                else Path(result["file"]).name
+            )
             if "error" in result:
                 report.append(f"❌ {rel_path}: {result['error']}")
             else:
@@ -548,9 +536,7 @@ Example workflows:
 
         return "\n".join(report)
 
-    def _build_analyze_report(
-        self, path: Path, results: List[Dict[str, Any]]
-    ) -> str:
+    def _build_analyze_report(self, path: Path, results: List[Dict[str, Any]]) -> str:
         """Build analysis report."""
         report = []
         report.append(f"Batch Analysis Report: {path}")

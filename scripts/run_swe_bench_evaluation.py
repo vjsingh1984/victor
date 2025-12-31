@@ -97,8 +97,10 @@ def progress_callback(progress: TaskProgress, stage: EvaluationStage) -> None:
         print(f"   Error: {progress.error_message}")
 
     if stage == EvaluationStage.COMPLETED and progress.score:
-        print(f"   Score: {progress.score.overall_score:.3f} "
-              f"(F2P: {progress.score.f2p_score:.3f}, P2P: {progress.score.p2p_score:.3f})")
+        print(
+            f"   Score: {progress.score.overall_score:.3f} "
+            f"(F2P: {progress.score.f2p_score:.3f}, P2P: {progress.score.p2p_score:.3f})"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,149 +127,111 @@ Examples:
     # Dataset options
     dataset_group = parser.add_argument_group("Dataset Options")
     dataset_group.add_argument(
-        "--dataset", "-d",
+        "--dataset",
+        "-d",
         type=Path,
-        help="Path to JSONL dataset file (default: load from HuggingFace)"
+        help="Path to JSONL dataset file (default: load from HuggingFace)",
     )
     dataset_group.add_argument(
         "--dataset-name",
         default="princeton-nlp/SWE-bench_Lite",
-        help="HuggingFace dataset name (default: princeton-nlp/SWE-bench_Lite)"
+        help="HuggingFace dataset name (default: princeton-nlp/SWE-bench_Lite)",
     )
     dataset_group.add_argument(
-        "--max-tasks", "-n",
-        type=int,
-        default=0,
-        help="Maximum number of tasks to run (0 = all)"
+        "--max-tasks", "-n", type=int, default=0, help="Maximum number of tasks to run (0 = all)"
     )
     dataset_group.add_argument(
-        "--instance-ids", "-i",
+        "--instance-ids", "-i", nargs="+", default=[], help="Specific instance IDs to run"
+    )
+    dataset_group.add_argument(
+        "--repos",
+        "-r",
         nargs="+",
         default=[],
-        help="Specific instance IDs to run"
-    )
-    dataset_group.add_argument(
-        "--repos", "-r",
-        nargs="+",
-        default=[],
-        help="Filter by repository names (e.g., django/django)"
+        help="Filter by repository names (e.g., django/django)",
     )
 
     # Agent options
     agent_group = parser.add_argument_group("Agent Options")
     agent_group.add_argument(
-        "--profile", "-p",
-        default="default",
-        help="Victor profile name (default: default)"
+        "--profile", "-p", default="default", help="Victor profile name (default: default)"
     )
     agent_group.add_argument(
-        "--max-turns",
-        type=int,
-        default=20,
-        help="Maximum agent turns per task (default: 20)"
+        "--max-turns", type=int, default=20, help="Maximum agent turns per task (default: 20)"
     )
     agent_group.add_argument(
-        "--max-tool-calls",
-        type=int,
-        default=50,
-        help="Maximum tool calls per task (default: 50)"
+        "--max-tool-calls", type=int, default=50, help="Maximum tool calls per task (default: 50)"
     )
 
     # Output options
     output_group = parser.add_argument_group("Output Options")
     output_group.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=Path("./swe_bench_results"),
-        help="Output directory for results (default: ./swe_bench_results)"
+        help="Output directory for results (default: ./swe_bench_results)",
     )
     output_group.add_argument(
         "--save-traces",
         action="store_true",
         default=True,
-        help="Save execution traces (default: True)"
+        help="Save execution traces (default: True)",
     )
     output_group.add_argument(
         "--no-save-traces",
         action="store_false",
         dest="save_traces",
-        help="Don't save execution traces"
+        help="Don't save execution traces",
     )
     output_group.add_argument(
         "--save-patches",
         action="store_true",
         default=True,
-        help="Save generated patches (default: True)"
+        help="Save generated patches (default: True)",
     )
     output_group.add_argument(
         "--no-save-patches",
         action="store_false",
         dest="save_patches",
-        help="Don't save generated patches"
+        help="Don't save generated patches",
     )
 
     # Execution options
     exec_group = parser.add_argument_group("Execution Options")
     exec_group.add_argument(
-        "--parallel", "-j",
-        type=int,
-        default=1,
-        help="Number of parallel tasks (default: 1)"
+        "--parallel", "-j", type=int, default=1, help="Number of parallel tasks (default: 1)"
     )
     exec_group.add_argument(
         "--timeout",
         type=int,
         default=1800,
-        help="Timeout per task in seconds (default: 1800 = 30 min)"
+        help="Timeout per task in seconds (default: 1800 = 30 min)",
     )
     exec_group.add_argument(
         "--continue-on-error",
         action="store_true",
         default=True,
-        help="Continue running after task failures (default: True)"
+        help="Continue running after task failures (default: True)",
     )
     exec_group.add_argument(
         "--stop-on-error",
         action="store_false",
         dest="continue_on_error",
-        help="Stop on first task failure"
+        help="Stop on first task failure",
     )
 
     # Cache options
     cache_group = parser.add_argument_group("Cache Options")
-    cache_group.add_argument(
-        "--workspace-cache",
-        type=Path,
-        help="Directory for workspace cache"
-    )
-    cache_group.add_argument(
-        "--baseline-cache",
-        type=Path,
-        help="Directory for baseline cache"
-    )
-    cache_group.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable all caching"
-    )
+    cache_group.add_argument("--workspace-cache", type=Path, help="Directory for workspace cache")
+    cache_group.add_argument("--baseline-cache", type=Path, help="Directory for baseline cache")
+    cache_group.add_argument("--no-cache", action="store_true", help="Disable all caching")
 
     # Logging options
     log_group = parser.add_argument_group("Logging Options")
-    log_group.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose logging"
-    )
-    log_group.add_argument(
-        "--log-file",
-        type=Path,
-        help="Write logs to file"
-    )
-    log_group.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Suppress progress output"
-    )
+    log_group.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    log_group.add_argument("--log-file", type=Path, help="Write logs to file")
+    log_group.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
 
     return parser.parse_args()
 
@@ -376,6 +340,7 @@ async def main() -> int:
         logger.error(f"Evaluation failed: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

@@ -191,9 +191,7 @@ class MCPClient:
         if not self.initialized:
             return None
 
-        response = await self._send_request(
-            MCPMessageType.READ_RESOURCE, {"uri": uri}
-        )
+        response = await self._send_request(MCPMessageType.READ_RESOURCE, {"uri": uri})
 
         if response and "result" in response:
             return response["result"].get("content")

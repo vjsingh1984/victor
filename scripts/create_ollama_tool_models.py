@@ -94,7 +94,7 @@ TOOL_CAPABLE_MODELS = {
 
 # Templates for different chat formats
 TOOL_TEMPLATES = {
-    "chatml": '''{{- if .System }}
+    "chatml": """{{- if .System }}
 <|im_start|>system
 {{ .System }}
 {{- if .Tools }}
@@ -130,9 +130,8 @@ For each function call, return a json object with function name and arguments wi
 <|im_end|>
 {{- end }}
 <|im_start|>assistant
-''',
-
-    "chatml_xml": '''{{- if .System }}
+""",
+    "chatml_xml": """{{- if .System }}
 <|im_start|>system
 {{ .System }}
 {{- if .Tools }}
@@ -170,9 +169,8 @@ For each function call, return the call within <tool_call></tool_call> XML tags:
 <|im_end|>
 {{- end }}
 <|im_start|>assistant
-''',
-
-    "deepseek": '''{{- if .System }}
+""",
+    "deepseek": """{{- if .System }}
 <|begin▁of▁sentence|>{{ .System }}
 {{- if .Tools }}
 
@@ -199,9 +197,8 @@ Assistant: {{ .Content }}
 {{- end }}
 {{- end }}
 {{- end }}
-Assistant:''',
-
-    "gemma": '''{{- if .System }}
+Assistant:""",
+    "gemma": """{{- if .System }}
 <start_of_turn>system
 {{ .System }}
 {{- if .Tools }}
@@ -228,13 +225,14 @@ To use a tool, output JSON: {"name": "tool_name", "arguments": {...}}
 <end_of_turn>
 {{- end }}
 <start_of_turn>model
-''',
+""",
 }
 
 
 @dataclass
 class ModelInfo:
     """Information about an Ollama model."""
+
     name: str
     has_tools: bool
     template: str

@@ -92,38 +92,38 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: generate_docstrings, generate_api_docs, generate_readme, add_type_hints, analyze_docs",
-                required=True,
-            ),
-            ToolParameter(
-                name="file",
-                type="string",
-                description="Source file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="output",
-                type="string",
-                description="Output file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="section",
-                type="string",
-                description="README section to generate",
-                required=False,
-            ),
-            ToolParameter(
-                name="format",
-                type="string",
-                description="Documentation format: markdown, rst, google, numpy",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: generate_docstrings, generate_api_docs, generate_readme, add_type_hints, analyze_docs",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="file",
+                    type="string",
+                    description="Source file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="output",
+                    type="string",
+                    description="Output file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="section",
+                    type="string",
+                    description="README section to generate",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="format",
+                    type="string",
+                    description="Documentation format: markdown, rst, google, numpy",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -165,9 +165,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Documentation generation failed")
-            return ToolResult(
-                success=False, output="", error=f"Documentation error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Documentation error: {str(e)}")
 
     async def _generate_docstrings(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Generate docstrings for functions and classes."""
@@ -183,9 +181,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse file
         content = file_obj.read_text()
@@ -205,20 +201,24 @@ Example workflows:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 if not ast.get_docstring(node):
-                    items_to_document.append({
-                        "type": "function",
-                        "name": node.name,
-                        "node": node,
-                        "line": node.lineno,
-                    })
+                    items_to_document.append(
+                        {
+                            "type": "function",
+                            "name": node.name,
+                            "node": node,
+                            "line": node.lineno,
+                        }
+                    )
             elif isinstance(node, ast.ClassDef):
                 if not ast.get_docstring(node):
-                    items_to_document.append({
-                        "type": "class",
-                        "name": node.name,
-                        "node": node,
-                        "line": node.lineno,
-                    })
+                    items_to_document.append(
+                        {
+                            "type": "class",
+                            "name": node.name,
+                            "node": node,
+                            "line": node.lineno,
+                        }
+                    )
 
         if not items_to_document:
             return ToolResult(
@@ -237,12 +237,14 @@ Example workflows:
             else:
                 docstring = self._generate_class_docstring(item["node"], doc_format)
 
-            generated_docs.append({
-                "name": item["name"],
-                "type": item["type"],
-                "line": item["line"],
-                "docstring": docstring,
-            })
+            generated_docs.append(
+                {
+                    "name": item["name"],
+                    "type": item["type"],
+                    "line": item["line"],
+                    "docstring": docstring,
+                }
+            )
 
             # Insert docstring into code
             # Find the line after function/class definition
@@ -309,9 +311,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse file
         content = file_obj.read_text()
@@ -415,9 +415,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # This is a placeholder - full implementation would use AST transformation
         report = []
@@ -454,9 +452,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read and parse file
         content = file_obj.read_text()
@@ -626,28 +622,36 @@ Example:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 if not node.name.startswith("_"):  # Public functions only
-                    functions.append({
-                        "name": node.name,
-                        "docstring": ast.get_docstring(node) or "No description",
-                        "args": [arg.arg for arg in node.args.args],
-                    })
+                    functions.append(
+                        {
+                            "name": node.name,
+                            "docstring": ast.get_docstring(node) or "No description",
+                            "args": [arg.arg for arg in node.args.args],
+                        }
+                    )
 
             elif isinstance(node, ast.ClassDef):
                 methods = []
                 for item in node.body:
                     if isinstance(item, ast.FunctionDef):
                         if not item.name.startswith("_") or item.name in ("__init__", "__str__"):
-                            methods.append({
-                                "name": item.name,
-                                "docstring": ast.get_docstring(item) or "No description",
-                                "args": [arg.arg for arg in item.args.args if arg.arg != "self"],
-                            })
+                            methods.append(
+                                {
+                                    "name": item.name,
+                                    "docstring": ast.get_docstring(item) or "No description",
+                                    "args": [
+                                        arg.arg for arg in item.args.args if arg.arg != "self"
+                                    ],
+                                }
+                            )
 
-                classes.append({
-                    "name": node.name,
-                    "docstring": ast.get_docstring(node) or "No description",
-                    "methods": methods,
-                })
+                classes.append(
+                    {
+                        "name": node.name,
+                        "docstring": ast.get_docstring(node) or "No description",
+                        "methods": methods,
+                    }
+                )
 
         return {
             "module": module_name,

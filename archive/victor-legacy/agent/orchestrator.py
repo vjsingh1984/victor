@@ -168,7 +168,9 @@ class AgentOrchestrator:
         for tool_call in tool_calls:
             # Validate tool call structure
             if not isinstance(tool_call, dict):
-                self.console.print(f"[yellow]⚠ Skipping invalid tool call (not a dict): {tool_call}[/]")
+                self.console.print(
+                    f"[yellow]⚠ Skipping invalid tool call (not a dict): {tool_call}[/]"
+                )
                 continue
 
             tool_name = tool_call.get("name")

@@ -245,9 +245,7 @@ def _clean_prompt(prompt: str) -> str:
         Cleaned prompt with question patterns removed
     """
     # Build pattern from question words
-    question_pattern = (
-        r"^(" + "|".join(re.escape(w) for w in QUESTION_WORDS) + r")\s+"
-    )
+    question_pattern = r"^(" + "|".join(re.escape(w) for w in QUESTION_WORDS) + r")\s+"
 
     cleaned = re.sub(question_pattern, "", prompt.lower(), flags=re.IGNORECASE)
     return cleaned
@@ -265,9 +263,7 @@ def _extract_significant_words(text: str, min_length: int) -> List[str]:
     """
     words = re.findall(r"\b[a-zA-Z]+\b", text)
 
-    significant = [
-        w for w in words if len(w) >= min_length and w.lower() not in STOP_WORDS
-    ]
+    significant = [w for w in words if len(w) >= min_length and w.lower() not in STOP_WORDS]
 
     return significant
 

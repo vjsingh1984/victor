@@ -982,16 +982,12 @@ class ToolSelector(ModeAwareMixin):
                 priority_ordered.sort(key=lambda t: priority_order.get(t.name, 999))
 
                 tools = priority_ordered + others
-                logger.debug(
-                    f"Vertical strategy prioritized tools: {result.priority_tools}"
-                )
+                logger.debug(f"Vertical strategy prioritized tools: {result.priority_tools}")
 
             # Exclude tools
             if result.excluded_tools:
                 tools = [t for t in tools if t.name not in result.excluded_tools]
-                logger.debug(
-                    f"Vertical strategy excluded tools: {sorted(result.excluded_tools)}"
-                )
+                logger.debug(f"Vertical strategy excluded tools: {sorted(result.excluded_tools)}")
 
             # Log reasoning if provided
             if result.reasoning:

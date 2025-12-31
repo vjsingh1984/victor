@@ -65,62 +65,62 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: rename, extract_function, inline_variable, organize_imports",
-                required=True,
-            ),
-            ToolParameter(
-                name="file",
-                type="string",
-                description="File path to refactor",
-                required=False,
-            ),
-            ToolParameter(
-                name="old_name",
-                type="string",
-                description="Current symbol name (for rename)",
-                required=False,
-            ),
-            ToolParameter(
-                name="new_name",
-                type="string",
-                description="New symbol name (for rename)",
-                required=False,
-            ),
-            ToolParameter(
-                name="start_line",
-                type="integer",
-                description="Start line for extraction",
-                required=False,
-            ),
-            ToolParameter(
-                name="end_line",
-                type="integer",
-                description="End line for extraction",
-                required=False,
-            ),
-            ToolParameter(
-                name="function_name",
-                type="string",
-                description="Name for extracted function",
-                required=False,
-            ),
-            ToolParameter(
-                name="scope",
-                type="string",
-                description="Scope: file (single file) or project (all files)",
-                required=False,
-            ),
-            ToolParameter(
-                name="preview",
-                type="boolean",
-                description="Preview changes without applying (default: false)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: rename, extract_function, inline_variable, organize_imports",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="file",
+                    type="string",
+                    description="File path to refactor",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="old_name",
+                    type="string",
+                    description="Current symbol name (for rename)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="new_name",
+                    type="string",
+                    description="New symbol name (for rename)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="start_line",
+                    type="integer",
+                    description="Start line for extraction",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="end_line",
+                    type="integer",
+                    description="End line for extraction",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="function_name",
+                    type="string",
+                    description="Name for extracted function",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="scope",
+                    type="string",
+                    description="Scope: file (single file) or project (all files)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="preview",
+                    type="boolean",
+                    description="Preview changes without applying (default: false)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -160,9 +160,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Refactoring failed")
-            return ToolResult(
-                success=False, output="", error=f"Refactoring error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Refactoring error: {str(e)}")
 
     async def _rename_symbol(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Rename a symbol (variable, function, class)."""
@@ -181,9 +179,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read file
         content = file_obj.read_text()
@@ -217,15 +213,17 @@ Example workflows:
             modified_line = line
 
             # Use word boundaries for safe replacement
-            pattern = r'\b' + re.escape(old_name) + r'\b'
+            pattern = r"\b" + re.escape(old_name) + r"\b"
 
             if re.search(pattern, line):
                 modified_line = re.sub(pattern, new_name, line)
-                changes.append({
-                    "line": line_num,
-                    "old": line,
-                    "new": modified_line,
-                })
+                changes.append(
+                    {
+                        "line": line_num,
+                        "old": line,
+                        "new": modified_line,
+                    }
+                )
 
             modified_lines.append(modified_line)
 
@@ -284,9 +282,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read file
         content = file_obj.read_text()
@@ -301,7 +297,7 @@ Example workflows:
             )
 
         # Extract code block (0-indexed)
-        extracted_lines = lines[start_line - 1:end_line]
+        extracted_lines = lines[start_line - 1 : end_line]
         code_block = "\n".join(extracted_lines)
 
         # Determine indentation
@@ -338,7 +334,7 @@ Example workflows:
             new_function += f"{base_indent}    return {returns_str}\n"
 
         # Build modified content
-        modified_lines = lines[:start_line - 1]  # Before extraction
+        modified_lines = lines[: start_line - 1]  # Before extraction
 
         # Add function call
         call_indent = " " * indent
@@ -407,9 +403,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read file
         content = file_obj.read_text()
@@ -447,23 +441,27 @@ Example workflows:
         for line_num, line in enumerate(lines, 1):
             if line_num == assignment_line:
                 # Skip assignment line
-                changes.append({
-                    "line": line_num,
-                    "action": "removed",
-                    "content": line,
-                })
+                changes.append(
+                    {
+                        "line": line_num,
+                        "action": "removed",
+                        "content": line,
+                    }
+                )
                 continue
 
             # Replace variable usage
-            pattern = r'\b' + re.escape(variable_name) + r'\b'
+            pattern = r"\b" + re.escape(variable_name) + r"\b"
             if re.search(pattern, line):
                 modified_line = re.sub(pattern, value_expr, line)
-                changes.append({
-                    "line": line_num,
-                    "action": "modified",
-                    "old": line,
-                    "new": modified_line,
-                })
+                changes.append(
+                    {
+                        "line": line_num,
+                        "action": "modified",
+                        "old": line,
+                        "new": modified_line,
+                    }
+                )
                 modified_lines.append(modified_line)
             else:
                 modified_lines.append(line)
@@ -524,9 +522,7 @@ Example workflows:
 
         file_obj = Path(file_path)
         if not file_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {file_path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {file_path}")
 
         # Read file
         content = file_obj.read_text()
@@ -707,14 +703,16 @@ Example workflows:
         """Find best location to insert extracted function."""
         # Simple heuristic: insert at the beginning of file (after imports)
         for i, line in enumerate(lines):
-            if line.strip() and not line.strip().startswith("import") and not line.strip().startswith("from"):
+            if (
+                line.strip()
+                and not line.strip().startswith("import")
+                and not line.strip().startswith("from")
+            ):
                 return max(0, i - 1)
 
         return 0
 
-    def _find_variable_assignment(
-        self, tree: ast.AST, name: str
-    ) -> Optional[Dict[str, Any]]:
+    def _find_variable_assignment(self, tree: ast.AST, name: str) -> Optional[Dict[str, Any]]:
         """Find simple variable assignment."""
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -737,12 +735,43 @@ Example workflows:
         """Check if module is from standard library."""
         # Common stdlib modules
         stdlib_modules = {
-            "abc", "ast", "asyncio", "collections", "concurrent", "contextlib",
-            "copy", "dataclasses", "datetime", "decimal", "enum", "functools",
-            "hashlib", "io", "itertools", "json", "logging", "math", "os",
-            "pathlib", "pickle", "re", "shutil", "socket", "sqlite3", "string",
-            "subprocess", "sys", "tempfile", "threading", "time", "typing",
-            "unittest", "urllib", "uuid", "warnings", "weakref",
+            "abc",
+            "ast",
+            "asyncio",
+            "collections",
+            "concurrent",
+            "contextlib",
+            "copy",
+            "dataclasses",
+            "datetime",
+            "decimal",
+            "enum",
+            "functools",
+            "hashlib",
+            "io",
+            "itertools",
+            "json",
+            "logging",
+            "math",
+            "os",
+            "pathlib",
+            "pickle",
+            "re",
+            "shutil",
+            "socket",
+            "sqlite3",
+            "string",
+            "subprocess",
+            "sys",
+            "tempfile",
+            "threading",
+            "time",
+            "typing",
+            "unittest",
+            "urllib",
+            "uuid",
+            "warnings",
+            "weakref",
         }
 
         # Get top-level module

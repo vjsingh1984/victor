@@ -236,10 +236,7 @@ def benchmark_hashing():
         "encoding": "utf-8",
     }
 
-    tool_calls = [
-        ("read_file", {"path": f"/file_{i}.py"})
-        for i in range(100)
-    ]
+    tool_calls = [("read_file", {"path": f"/file_{i}.py"}) for i in range(100)]
 
     print(f"\nTest data:")
     print(f"  Simple args:  {len(simple_args)} keys")

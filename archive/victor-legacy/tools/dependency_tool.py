@@ -75,32 +75,32 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: list, outdated, security, generate, update, tree, check",
-                required=True,
-            ),
-            ToolParameter(
-                name="package",
-                type="string",
-                description="Specific package name",
-                required=False,
-            ),
-            ToolParameter(
-                name="output",
-                type="string",
-                description="Output file path",
-                required=False,
-            ),
-            ToolParameter(
-                name="format",
-                type="string",
-                description="Output format: txt, json, freeze",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: list, outdated, security, generate, update, tree, check",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="package",
+                    type="string",
+                    description="Specific package name",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="output",
+                    type="string",
+                    description="Output file path",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="format",
+                    type="string",
+                    description="Output format: txt, json, freeze",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -146,9 +146,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Dependency operation failed")
-            return ToolResult(
-                success=False, output="", error=f"Dependency error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Dependency error: {str(e)}")
 
     async def _list_packages(self, kwargs: Dict[str, Any]) -> ToolResult:
         """List installed packages."""
@@ -319,12 +317,14 @@ Example workflows:
                 vulns = self.VULN_PACKAGES[pkg_name]
                 for version_range, cve in vulns.items():
                     if self._version_matches(pkg_version, version_range):
-                        vulnerabilities.append({
-                            "package": pkg["name"],
-                            "version": pkg_version,
-                            "cve": cve,
-                            "affected": version_range,
-                        })
+                        vulnerabilities.append(
+                            {
+                                "package": pkg["name"],
+                                "version": pkg_version,
+                                "cve": cve,
+                                "affected": version_range,
+                            }
+                        )
 
         # Build report
         report = []

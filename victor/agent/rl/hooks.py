@@ -312,7 +312,9 @@ class RLHookRegistry:
         if self._coordinator is None:
             # Only warn once about missing coordinator (expected during early startup)
             if not self._warned_no_coordinator:
-                logger.debug("RL: No coordinator set, events will be dispatched once coordinator is connected")
+                logger.debug(
+                    "RL: No coordinator set, events will be dispatched once coordinator is connected"
+                )
                 self._warned_no_coordinator = True
             return
 

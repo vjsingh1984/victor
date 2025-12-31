@@ -160,9 +160,7 @@ class ContinuationStrategy:
 
         return mentioned
 
-    def _output_requirements_met(
-        self, content: Optional[str], required_outputs: List[str]
-    ) -> bool:
+    def _output_requirements_met(self, content: Optional[str], required_outputs: List[str]) -> bool:
         """Check if response content contains required output elements.
 
         Uses pre-compiled pattern matching to detect common output format elements
@@ -333,7 +331,9 @@ class ContinuationStrategy:
                     updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
 
                     # Gentle nudge message - not forceful
-                    output_hints = ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                    output_hints = (
+                        ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                    )
                     return {
                         "action": "continue_with_synthesis_hint",
                         "message": (
@@ -364,7 +364,9 @@ class ContinuationStrategy:
                         source="ContinuationStrategy",
                     )
                 )
-                output_hints = ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                output_hints = (
+                    ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                )
                 return {
                     "action": "request_summary",
                     "message": (
@@ -378,7 +380,9 @@ class ContinuationStrategy:
 
             # CUMULATIVE INTERVENTION CHECK: If we've had too many prompt interventions
             # across the session, nudge or force synthesis (prevents sessions that never finish)
-            cumulative_interventions = task_completion_signals.get("cumulative_prompt_interventions", 0)
+            cumulative_interventions = task_completion_signals.get(
+                "cumulative_prompt_interventions", 0
+            )
             if cumulative_interventions >= 5 and is_analysis_task:
                 # Log for observability
                 logger.info(
@@ -397,7 +401,9 @@ class ContinuationStrategy:
                         source="ContinuationStrategy",
                     )
                 )
-                output_hints = ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                output_hints = (
+                    ", ".join(required_outputs[:3]) if required_outputs else "your findings"
+                )
                 # After 8+ interventions, force synthesis; before that, just nudge
                 if cumulative_interventions >= 8:
                     return {

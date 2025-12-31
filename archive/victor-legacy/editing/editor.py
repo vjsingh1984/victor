@@ -69,7 +69,7 @@ class FileEditor:
         self,
         backup_dir: Optional[str] = None,
         auto_backup: bool = True,
-        console: Optional[Console] = None
+        console: Optional[Console] = None,
     ):
         """Initialize file editor.
 
@@ -99,10 +99,7 @@ class FileEditor:
             raise RuntimeError("Transaction already in progress")
 
         transaction_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        self.current_transaction = EditTransaction(
-            id=transaction_id,
-            description=description
-        )
+        self.current_transaction = EditTransaction(id=transaction_id, description=description)
 
         self.console.print(f"\n[bold cyan]📝 Started transaction:[/] {transaction_id}")
         if description:
@@ -124,11 +121,7 @@ class FileEditor:
         if path_obj.exists():
             raise FileExistsError(f"File already exists: {path}")
 
-        operation = EditOperation(
-            type=OperationType.CREATE,
-            path=path,
-            new_content=content
-        )
+        operation = EditOperation(type=OperationType.CREATE, path=path, new_content=content)
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[green]+ Create:[/] {path}")
@@ -151,10 +144,7 @@ class FileEditor:
         old_content = path_obj.read_text()
 
         operation = EditOperation(
-            type=OperationType.MODIFY,
-            path=path,
-            old_content=old_content,
-            new_content=new_content
+            type=OperationType.MODIFY, path=path, old_content=old_content, new_content=new_content
         )
 
         self.current_transaction.operations.append(operation)
@@ -176,11 +166,7 @@ class FileEditor:
         # Read current content for backup
         old_content = path_obj.read_text() if path_obj.is_file() else None
 
-        operation = EditOperation(
-            type=OperationType.DELETE,
-            path=path,
-            old_content=old_content
-        )
+        operation = EditOperation(type=OperationType.DELETE, path=path, old_content=old_content)
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[red]- Delete:[/] {path}")
@@ -203,11 +189,7 @@ class FileEditor:
         if new_path_obj.exists():
             raise FileExistsError(f"Target already exists: {new_path}")
 
-        operation = EditOperation(
-            type=OperationType.RENAME,
-            path=old_path,
-            new_path=new_path
-        )
+        operation = EditOperation(type=OperationType.RENAME, path=old_path, new_path=new_path)
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[blue]→ Rename:[/] {old_path} → {new_path}")
@@ -239,23 +221,35 @@ class FileEditor:
 
     def _show_create_preview(self, op: EditOperation) -> None:
         """Show preview for file creation."""
-        lines = (op.new_content or "").split('\n')
-        preview = '\n'.join(lines[:20])
+        lines = (op.new_content or "").split("\n")
+        preview = "\n".join(lines[:20])
         if len(lines) > 20:
             preview += f"\n... ({len(lines) - 20} more lines)"
 
         # Detect language from file extension
         ext = Path(op.path).suffix
         lang_map = {
-            '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
-            '.java': 'java', '.go': 'go', '.rs': 'rust', '.cpp': 'cpp',
-            '.c': 'c', '.rb': 'ruby', '.sh': 'bash', '.yaml': 'yaml',
-            '.yml': 'yaml', '.json': 'json', '.md': 'markdown'
+            ".py": "python",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".java": "java",
+            ".go": "go",
+            ".rs": "rust",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".rb": "ruby",
+            ".sh": "bash",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".json": "json",
+            ".md": "markdown",
         }
-        language = lang_map.get(ext, 'text')
+        language = lang_map.get(ext, "text")
 
         syntax = Syntax(preview, language, theme="monokai", line_numbers=True)
-        self.console.print(Panel(syntax, title=f"New File ({len(lines)} lines)", border_style="green"))
+        self.console.print(
+            Panel(syntax, title=f"New File ({len(lines)} lines)", border_style="green")
+        )
 
     def _show_modify_preview(self, op: EditOperation, context_lines: int) -> None:
         """Show diff preview for file modification."""
@@ -263,14 +257,10 @@ class FileEditor:
         new_lines = (op.new_content or "").splitlines(keepends=True)
 
         diff = difflib.unified_diff(
-            old_lines,
-            new_lines,
-            fromfile=f"a/{op.path}",
-            tofile=f"b/{op.path}",
-            n=context_lines
+            old_lines, new_lines, fromfile=f"a/{op.path}", tofile=f"b/{op.path}", n=context_lines
         )
 
-        diff_text = ''.join(diff)
+        diff_text = "".join(diff)
         if diff_text:
             syntax = Syntax(diff_text, "diff", theme="monokai", line_numbers=False)
             self.console.print(Panel(syntax, title="Diff", border_style="yellow"))
@@ -280,26 +270,30 @@ class FileEditor:
     def _show_delete_preview(self, op: EditOperation) -> None:
         """Show preview for file deletion."""
         if op.old_content:
-            lines = op.old_content.split('\n')
-            preview = '\n'.join(lines[:10])
+            lines = op.old_content.split("\n")
+            preview = "\n".join(lines[:10])
             if len(lines) > 10:
                 preview += f"\n... ({len(lines) - 10} more lines)"
 
-            self.console.print(Panel(
-                f"[red]File will be deleted ({len(lines)} lines)[/]\n\n{preview}",
-                title="Deleted Content (preview)",
-                border_style="red"
-            ))
+            self.console.print(
+                Panel(
+                    f"[red]File will be deleted ({len(lines)} lines)[/]\n\n{preview}",
+                    title="Deleted Content (preview)",
+                    border_style="red",
+                )
+            )
         else:
             self.console.print("[red]File will be deleted[/]")
 
     def _show_rename_preview(self, op: EditOperation) -> None:
         """Show preview for file rename."""
-        self.console.print(Panel(
-            f"[blue]Old:[/] {op.path}\n[blue]New:[/] {op.new_path}",
-            title="Rename",
-            border_style="blue"
-        ))
+        self.console.print(
+            Panel(
+                f"[blue]Old:[/] {op.path}\n[blue]New:[/] {op.new_path}",
+                title="Rename",
+                border_style="blue",
+            )
+        )
 
     def commit(self, dry_run: bool = False) -> bool:
         """Commit the transaction (apply all changes).
@@ -316,7 +310,9 @@ class FileEditor:
         if self.current_transaction.committed:
             raise RuntimeError("Transaction already committed")
 
-        self.console.print(f"\n[bold cyan]{'🔍 Dry Run' if dry_run else '💾 Committing'}:[/] {len(self.current_transaction.operations)} operations")
+        self.console.print(
+            f"\n[bold cyan]{'🔍 Dry Run' if dry_run else '💾 Committing'}:[/] {len(self.current_transaction.operations)} operations"
+        )
 
         if dry_run:
             self.console.print("[dim]Dry run mode - no changes will be applied[/]")
@@ -495,10 +491,34 @@ class FileEditor:
             "description": self.current_transaction.description,
             "operations": len(self.current_transaction.operations),
             "by_type": {
-                "create": len([op for op in self.current_transaction.operations if op.type == OperationType.CREATE]),
-                "modify": len([op for op in self.current_transaction.operations if op.type == OperationType.MODIFY]),
-                "delete": len([op for op in self.current_transaction.operations if op.type == OperationType.DELETE]),
-                "rename": len([op for op in self.current_transaction.operations if op.type == OperationType.RENAME]),
+                "create": len(
+                    [
+                        op
+                        for op in self.current_transaction.operations
+                        if op.type == OperationType.CREATE
+                    ]
+                ),
+                "modify": len(
+                    [
+                        op
+                        for op in self.current_transaction.operations
+                        if op.type == OperationType.MODIFY
+                    ]
+                ),
+                "delete": len(
+                    [
+                        op
+                        for op in self.current_transaction.operations
+                        if op.type == OperationType.DELETE
+                    ]
+                ),
+                "rename": len(
+                    [
+                        op
+                        for op in self.current_transaction.operations
+                        if op.type == OperationType.RENAME
+                    ]
+                ),
             },
             "committed": self.current_transaction.committed,
             "rolled_back": self.current_transaction.rolled_back,

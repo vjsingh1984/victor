@@ -60,62 +60,147 @@ class QuestionClassificationResult:
     @property
     def should_auto_continue(self) -> bool:
         """Whether Victor should auto-continue based on question type."""
-        return self.question_type in (
-            QuestionType.RHETORICAL,
-            QuestionType.CONTINUATION,
-        ) and self.confidence >= 0.6
+        return (
+            self.question_type
+            in (
+                QuestionType.RHETORICAL,
+                QuestionType.CONTINUATION,
+            )
+            and self.confidence >= 0.6
+        )
 
 
 # Compiled patterns for efficient matching
 # Pattern format: (regex, question_type, confidence)
 QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
     # RHETORICAL/CONTINUATION - auto-continue
-    (re.compile(r"\bshould\s+i\s+(?:continue|proceed|go\s+ahead)\b", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.95),
-    (re.compile(r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.95),
-    (re.compile(r"\bshall\s+i\s+(?:continue|proceed|go\s+on)\b", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.95),
-    (re.compile(r"\bdo\s+you\s+want\s+me\s+to\s+(?:continue|proceed)\b", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.90),
-    (re.compile(r"\bready\s+(?:to|for)\s+(?:continue|proceed|move\s+on)\?", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.85),
-    (re.compile(r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b", re.IGNORECASE),
-     QuestionType.CONTINUATION, 0.80),
-    (re.compile(r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?", re.IGNORECASE),
-     QuestionType.RHETORICAL, 0.80),
-    (re.compile(r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?", re.IGNORECASE),
-     QuestionType.RHETORICAL, 0.85),
-    (re.compile(r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?", re.IGNORECASE),
-     QuestionType.RHETORICAL, 0.80),
-    (re.compile(r"\bmake\s+sense\?", re.IGNORECASE),
-     QuestionType.RHETORICAL, 0.85),
-
+    (
+        re.compile(r"\bshould\s+i\s+(?:continue|proceed|go\s+ahead)\b", re.IGNORECASE),
+        QuestionType.CONTINUATION,
+        0.95,
+    ),
+    (
+        re.compile(
+            r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b", re.IGNORECASE
+        ),
+        QuestionType.CONTINUATION,
+        0.95,
+    ),
+    (
+        re.compile(r"\bshall\s+i\s+(?:continue|proceed|go\s+on)\b", re.IGNORECASE),
+        QuestionType.CONTINUATION,
+        0.95,
+    ),
+    (
+        re.compile(r"\bdo\s+you\s+want\s+me\s+to\s+(?:continue|proceed)\b", re.IGNORECASE),
+        QuestionType.CONTINUATION,
+        0.90,
+    ),
+    (
+        re.compile(r"\bready\s+(?:to|for)\s+(?:continue|proceed|move\s+on)\?", re.IGNORECASE),
+        QuestionType.CONTINUATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b", re.IGNORECASE
+        ),
+        QuestionType.CONTINUATION,
+        0.80,
+    ),
+    (
+        re.compile(
+            r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?", re.IGNORECASE
+        ),
+        QuestionType.RHETORICAL,
+        0.80,
+    ),
+    (
+        re.compile(r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?", re.IGNORECASE),
+        QuestionType.RHETORICAL,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?", re.IGNORECASE
+        ),
+        QuestionType.RHETORICAL,
+        0.80,
+    ),
+    (re.compile(r"\bmake\s+sense\?", re.IGNORECASE), QuestionType.RHETORICAL, 0.85),
     # CLARIFICATION - needs user input
-    (re.compile(r"\bwhich\s+(?:one|option|approach|method|file|directory)\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.90),
-    (re.compile(r"\bwhat\s+(?:should|would)\s+(?:i|we|you)\s+(?:name|call)\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.85),
-    (re.compile(r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.85),
-    (re.compile(r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.85),
-    (re.compile(r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.80),
-
+    (
+        re.compile(r"\bwhich\s+(?:one|option|approach|method|file|directory)\b", re.IGNORECASE),
+        QuestionType.CLARIFICATION,
+        0.90,
+    ),
+    (
+        re.compile(r"\bwhat\s+(?:should|would)\s+(?:i|we|you)\s+(?:name|call)\b", re.IGNORECASE),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b", re.IGNORECASE),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b", re.IGNORECASE
+        ),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b", re.IGNORECASE
+        ),
+        QuestionType.CLARIFICATION,
+        0.80,
+    ),
     # INFORMATION - needs specific user data
-    (re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:api|access|secret)\s*(?:key|token)\b", re.IGNORECASE),
-     QuestionType.INFORMATION, 0.95),
-    (re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:username|password|credentials)\b", re.IGNORECASE),
-     QuestionType.INFORMATION, 0.95),
-    (re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:database|db|server)\s+(?:url|host|connection)\b", re.IGNORECASE),
-     QuestionType.INFORMATION, 0.90),
-    (re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b", re.IGNORECASE),
-     QuestionType.INFORMATION, 0.85),
-    (re.compile(r"\bcan\s+you\s+(?:provide|share|give\s+me)\s+(?:your|the)\b", re.IGNORECASE),
-     QuestionType.INFORMATION, 0.80),
-    (re.compile(r"\bwhat\s+(?:version|framework|library)\s+(?:are\s+you|should\s+(?:i|we))\s+us(?:e|ing)\b", re.IGNORECASE),
-     QuestionType.CLARIFICATION, 0.80),
+    (
+        re.compile(
+            r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:api|access|secret)\s*(?:key|token)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.INFORMATION,
+        0.95,
+    ),
+    (
+        re.compile(
+            r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:username|password|credentials)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.INFORMATION,
+        0.95,
+    ),
+    (
+        re.compile(
+            r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:database|db|server)\s+(?:url|host|connection)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.INFORMATION,
+        0.90,
+    ),
+    (
+        re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b", re.IGNORECASE),
+        QuestionType.INFORMATION,
+        0.85,
+    ),
+    (
+        re.compile(r"\bcan\s+you\s+(?:provide|share|give\s+me)\s+(?:your|the)\b", re.IGNORECASE),
+        QuestionType.INFORMATION,
+        0.80,
+    ),
+    (
+        re.compile(
+            r"\bwhat\s+(?:version|framework|library)\s+(?:are\s+you|should\s+(?:i|we))\s+us(?:e|ing)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.CLARIFICATION,
+        0.80,
+    ),
 ]
 
 
@@ -136,9 +221,7 @@ class QuestionTypeClassifier:
     def __init__(self):
         """Initialize the classifier."""
         self._patterns = QUESTION_PATTERNS
-        logger.debug(
-            f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns"
-        )
+        logger.debug(f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns")
 
     @classmethod
     def get_instance(cls) -> "QuestionTypeClassifier":

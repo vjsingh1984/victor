@@ -447,7 +447,9 @@ class ToolCallExtractor:
             # Remove common leading whitespace
             lines = match.group(1).split("\n")
             min_indent = min(len(line) - len(line.lstrip()) for line in lines if line.strip())
-            dedented = "\n".join(line[min_indent:] if len(line) > min_indent else line for line in lines)
+            dedented = "\n".join(
+                line[min_indent:] if len(line) > min_indent else line for line in lines
+            )
             return dedented.strip()
 
         return None

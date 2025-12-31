@@ -72,22 +72,28 @@ def get_rl_learning_stats() -> Dict[str, Any]:
     cursor.execute("SELECT COUNT(*) FROM semantic_threshold_stats")
     total_contexts = cursor.fetchone()[0]
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT COUNT(*) FROM semantic_threshold_stats
         WHERE recommended_threshold IS NOT NULL
-    """)
+    """
+    )
     total_recommendations = cursor.fetchone()[0]
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT context_key, embedding_model, task_type, tool_name,
                total_searches, zero_result_count, low_quality_count,
                avg_threshold, recommended_threshold
         FROM semantic_threshold_stats
-    """)
+    """
+    )
 
     by_context = {}
     for row in cursor.fetchall():
-        key, model, task_type, tool, total, zero_count, low_quality, avg_threshold, recommended = row
+        key, model, task_type, tool, total, zero_count, low_quality, avg_threshold, recommended = (
+            row
+        )
         zero_rate = (zero_count / total) if total > 0 else 0
         low_quality_rate = (low_quality / total) if total > 0 else 0
 
@@ -155,10 +161,10 @@ def print_dashboard(watch_mode: bool = False):
             print()
 
             for key, ctx in sorted(
-                rl_stats["by_context"].items(),
-                key=lambda x: x[1]["total_searches"],
-                reverse=True
-            )[:10]:  # Top 10 by activity
+                rl_stats["by_context"].items(), key=lambda x: x[1]["total_searches"], reverse=True
+            )[
+                :10
+            ]:  # Top 10 by activity
                 print(f"  {ctx['model']}:{ctx['task_type']} → {ctx['tool']}")
                 print(f"    Searches: {ctx['total_searches']:>4}  |  ", end="")
                 print(f"Zero Results: {format_percentage(ctx['zero_result_rate'])}  |  ", end="")
@@ -195,7 +201,9 @@ def print_dashboard(watch_mode: bool = False):
 
             print(f"{i:2}. [{timestamp}] {search['model']}:{search['task']}:{search['tool']}")
             print(f"    Query: '{search['query']}'")
-            print(f"    Results: {search['results']:>3}  |  Threshold: {search['threshold']:.2f}{flag_str}")
+            print(
+                f"    Results: {search['results']:>3}  |  Threshold: {search['threshold']:.2f}{flag_str}"
+            )
             print()
 
     # Configuration Recommendations
@@ -226,12 +234,8 @@ def print_dashboard(watch_mode: bool = False):
 
     # Check if RL is disabled
     if not rl_stats["enabled"]:
-        recommendations.append(
-            "ℹ️  RL threshold learning is disabled. Enable with:"
-        )
-        recommendations.append(
-            "   enable_semantic_threshold_rl_learning: true"
-        )
+        recommendations.append("ℹ️  RL threshold learning is disabled. Enable with:")
+        recommendations.append("   enable_semantic_threshold_rl_learning: true")
 
     # Export suggestions
     if rl_stats["enabled"] and rl_stats["recommendations"] > 0:
@@ -257,15 +261,21 @@ def print_dashboard(watch_mode: bool = False):
 
     if rl_stats["enabled"] and rl_stats["total_outcomes"] > 0:
         # Calculate overall metrics
-        total_false_neg = sum(
-            ctx["zero_result_rate"] * ctx["total_searches"]
-            for ctx in rl_stats["by_context"].values()
-        ) / rl_stats["total_outcomes"]
+        total_false_neg = (
+            sum(
+                ctx["zero_result_rate"] * ctx["total_searches"]
+                for ctx in rl_stats["by_context"].values()
+            )
+            / rl_stats["total_outcomes"]
+        )
 
-        total_low_qual = sum(
-            ctx["low_quality_rate"] * ctx["total_searches"]
-            for ctx in rl_stats["by_context"].values()
-        ) / rl_stats["total_outcomes"]
+        total_low_qual = (
+            sum(
+                ctx["low_quality_rate"] * ctx["total_searches"]
+                for ctx in rl_stats["by_context"].values()
+            )
+            / rl_stats["total_outcomes"]
+        )
 
         print(f"Overall False Negative Rate: {format_percentage(total_false_neg)}")
         print(f"Overall Low Quality Rate:    {format_percentage(total_low_qual)}")

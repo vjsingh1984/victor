@@ -95,38 +95,38 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: review_file, review_directory, security_scan, complexity, best_practices",
-                required=True,
-            ),
-            ToolParameter(
-                name="path",
-                type="string",
-                description="File or directory path to review",
-                required=True,
-            ),
-            ToolParameter(
-                name="include_metrics",
-                type="boolean",
-                description="Include detailed metrics (default: false)",
-                required=False,
-            ),
-            ToolParameter(
-                name="severity",
-                type="string",
-                description="Minimum severity: low, medium, high, critical (default: low)",
-                required=False,
-            ),
-            ToolParameter(
-                name="file_pattern",
-                type="string",
-                description="File pattern for directory review (default: *.py)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: review_file, review_directory, security_scan, complexity, best_practices",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="File or directory path to review",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="include_metrics",
+                    type="boolean",
+                    description="Include detailed metrics (default: false)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="severity",
+                    type="string",
+                    description="Minimum severity: low, medium, high, critical (default: low)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="file_pattern",
+                    type="string",
+                    description="File pattern for directory review (default: *.py)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -168,9 +168,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Code review failed")
-            return ToolResult(
-                success=False, output="", error=f"Code review error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Code review error: {str(e)}")
 
     async def _review_file(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Review a single file."""
@@ -178,28 +176,20 @@ Example workflows:
         include_metrics = kwargs.get("include_metrics", False)
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         file_path = Path(path)
         if not file_path.exists():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {path}")
 
         if not file_path.is_file():
-            return ToolResult(
-                success=False, output="", error=f"Path is not a file: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path is not a file: {path}")
 
         # Read file content
         try:
             content = file_path.read_text()
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Failed to read file: {e}"
-            )
+            return ToolResult(success=False, output="", error=f"Failed to read file: {e}")
 
         # Perform review
         issues = []
@@ -237,15 +227,11 @@ Example workflows:
         include_metrics = kwargs.get("include_metrics", False)
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         dir_path = Path(path)
         if not dir_path.exists():
-            return ToolResult(
-                success=False, output="", error=f"Directory not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Directory not found: {path}")
 
         # Find all matching files
         files = list(dir_path.rglob(pattern))
@@ -285,9 +271,7 @@ Example workflows:
                     logger.warning("Failed to review %s: %s", file_path, e)
 
         # Build summary report
-        report = self._build_summary_report(
-            dir_path, file_count, all_issues, include_metrics
-        )
+        report = self._build_summary_report(dir_path, file_count, all_issues, include_metrics)
 
         return ToolResult(
             success=True,
@@ -301,15 +285,11 @@ Example workflows:
         severity = kwargs.get("severity", "low")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         # Collect all security issues
         security_issues = []
@@ -352,15 +332,11 @@ Example workflows:
         path = kwargs.get("path")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         complexity_data = []
 
@@ -392,15 +368,11 @@ Example workflows:
         path = kwargs.get("path")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         best_practice_issues = []
 
@@ -444,9 +416,7 @@ Example workflows:
                             "file": str(file_path),
                             "line": line_num,
                             "code": line.strip(),
-                            "recommendation": self._get_security_recommendation(
-                                issue_type
-                            ),
+                            "recommendation": self._get_security_recommendation(issue_type),
                         }
                     )
 
@@ -504,9 +474,7 @@ Example workflows:
 
         return issues
 
-    def _check_documentation(
-        self, content: str, file_path: Path
-    ) -> List[Dict[str, Any]]:
+    def _check_documentation(self, content: str, file_path: Path) -> List[Dict[str, Any]]:
         """Check documentation coverage."""
         issues = []
 
@@ -693,16 +661,12 @@ Example workflows:
 
         if by_file:
             report.append("Top Files with Issues:")
-            for file_name, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[
-                :10
-            ]:
+            for file_name, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:10]:
                 report.append(f"  {Path(file_name).name}: {count} issues")
 
         return "\n".join(report)
 
-    def _build_security_report(
-        self, path: Path, issues: List[Dict[str, Any]]
-    ) -> str:
+    def _build_security_report(self, path: Path, issues: List[Dict[str, Any]]) -> str:
         """Build security scan report."""
         report = [f"Security Scan Report: {path}"]
         report.append("=" * 70)
@@ -736,9 +700,7 @@ Example workflows:
 
         return "\n".join(report)
 
-    def _build_complexity_report(
-        self, path: Path, complexity_data: List[Dict[str, Any]]
-    ) -> str:
+    def _build_complexity_report(self, path: Path, complexity_data: List[Dict[str, Any]]) -> str:
         """Build complexity analysis report."""
         report = [f"Complexity Analysis Report: {path}"]
         report.append("=" * 70)
@@ -752,23 +714,17 @@ Example workflows:
         report.append("")
 
         # Sort by complexity
-        sorted_data = sorted(
-            complexity_data, key=lambda x: x.get("metric", 0), reverse=True
-        )
+        sorted_data = sorted(complexity_data, key=lambda x: x.get("metric", 0), reverse=True)
 
         for item in sorted_data[:20]:  # Top 20
-            report.append(
-                f"  {item['code']} - Complexity: {item.get('metric', 'N/A')}"
-            )
+            report.append(f"  {item['code']} - Complexity: {item.get('metric', 'N/A')}")
             report.append(f"    File: {item['file']}:{item['line']}")
             report.append(f"    Recommendation: {item['recommendation']}")
             report.append("")
 
         return "\n".join(report)
 
-    def _build_best_practices_report(
-        self, path: Path, issues: List[Dict[str, Any]]
-    ) -> str:
+    def _build_best_practices_report(self, path: Path, issues: List[Dict[str, Any]]) -> str:
         """Build best practices report."""
         report = [f"Best Practices Report: {path}"]
         report.append("=" * 70)

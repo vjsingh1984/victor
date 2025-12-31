@@ -380,18 +380,16 @@ Implement the function to pass the test cases shown in the docstring."""
             # For GENERATION tasks with a provider available, use direct provider call
             # This avoids tool hallucination issues where models try to read/write files
             if is_generation and self._provider:
-                return await self._execute_generation_task(
-                    task, prompt, start_time
-                )
+                return await self._execute_generation_task(task, prompt, start_time)
 
             # Reset conversation for clean state (if method exists)
-            if hasattr(self._orchestrator, 'clear_history'):
+            if hasattr(self._orchestrator, "clear_history"):
                 self._orchestrator.clear_history()
-            elif hasattr(self._orchestrator, 'reset'):
+            elif hasattr(self._orchestrator, "reset"):
                 self._orchestrator.reset()
-            elif hasattr(self._orchestrator, '_conversation_controller'):
+            elif hasattr(self._orchestrator, "_conversation_controller"):
                 # Clear through conversation controller
-                if hasattr(self._orchestrator._conversation_controller, 'clear'):
+                if hasattr(self._orchestrator._conversation_controller, "clear"):
                     self._orchestrator._conversation_controller.clear()
 
             # Run the orchestrator loop
@@ -646,12 +644,16 @@ class CLILevelRunner(BaseLevelRunner):
         try:
             # Build CLI command with automation flags
             cmd = [
-                "python", "-m", "victor.ui.cli",
+                "python",
+                "-m",
+                "victor.ui.cli",
                 "chat",
-                "--profile", self._profile,
+                "--profile",
+                self._profile,
                 "--no-stream",  # Don't stream for cleaner output
                 "--quiet",  # Suppress status messages
-                "--log-level", "ERROR",  # Suppress logging noise
+                "--log-level",
+                "ERROR",  # Suppress logging noise
             ]
 
             # Choose output mode
@@ -795,7 +797,11 @@ class CLILevelRunner(BaseLevelRunner):
                     curr_indent = len(line) - len(line.lstrip())
                     # End of function if we're back to func_indent or less
                     # (and it's a non-empty line)
-                    if curr_indent <= func_indent and line.strip() and not line.strip().startswith("def "):
+                    if (
+                        curr_indent <= func_indent
+                        and line.strip()
+                        and not line.strip().startswith("def ")
+                    ):
                         break
                     code_lines.append(line)
 
@@ -861,9 +867,7 @@ class MultiLevelBenchmark:
     async def run_benchmark(
         self,
         tasks: list[BenchmarkTask],
-        test_callback: Callable[
-            [BenchmarkTask, str], Awaitable[tuple[bool, int, int]]
-        ],
+        test_callback: Callable[[BenchmarkTask, str], Awaitable[tuple[bool, int, int]]],
         config: EvaluationConfig,
         progress_callback: Optional[
             Callable[[BenchmarkLevel, int, int, TaskExecutionResult], None]
@@ -924,16 +928,18 @@ class MultiLevelBenchmark:
                     metrics.total_tokens_output += result.tokens_output
                     metrics.total_time_seconds += result.duration_seconds
 
-                    metrics.task_metrics.append({
-                        "task_id": result.task_id,
-                        "success": result.success,
-                        "turns": result.turns,
-                        "tool_calls": result.tool_calls,
-                        "tokens": result.tokens_input + result.tokens_output,
-                        "duration": round(result.duration_seconds, 2),
-                        "tests_passed": result.tests_passed,
-                        "tests_total": result.tests_total,
-                    })
+                    metrics.task_metrics.append(
+                        {
+                            "task_id": result.task_id,
+                            "success": result.success,
+                            "turns": result.turns,
+                            "tool_calls": result.tool_calls,
+                            "tokens": result.tokens_input + result.tokens_output,
+                            "duration": round(result.duration_seconds, 2),
+                            "tests_passed": result.tests_passed,
+                            "tests_total": result.tests_total,
+                        }
+                    )
 
                     # Progress callback
                     if progress_callback:
@@ -1124,9 +1130,7 @@ def create_orchestrator_runner(
     )
 
     # Pass provider and model_name for tools-free generation task fallback
-    return OrchestratorLevelRunner(
-        orchestrator, timeout, provider=provider, model_name=model_name
-    )
+    return OrchestratorLevelRunner(orchestrator, timeout, provider=provider, model_name=model_name)
 
 
 def create_cli_runner(

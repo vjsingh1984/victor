@@ -93,74 +93,74 @@ Safety:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: connect, query, schema, tables, describe, disconnect",
-                required=True,
-            ),
-            ToolParameter(
-                name="db_type",
-                type="string",
-                description="Database type: sqlite, postgresql, mysql, sqlserver",
-                required=False,
-            ),
-            ToolParameter(
-                name="database",
-                type="string",
-                description="Database name or path (for SQLite)",
-                required=False,
-            ),
-            ToolParameter(
-                name="host",
-                type="string",
-                description="Database host (default: localhost)",
-                required=False,
-            ),
-            ToolParameter(
-                name="port",
-                type="integer",
-                description="Database port",
-                required=False,
-            ),
-            ToolParameter(
-                name="username",
-                type="string",
-                description="Database username",
-                required=False,
-            ),
-            ToolParameter(
-                name="password",
-                type="string",
-                description="Database password",
-                required=False,
-            ),
-            ToolParameter(
-                name="connection_id",
-                type="string",
-                description="Connection ID (returned from connect)",
-                required=False,
-            ),
-            ToolParameter(
-                name="sql",
-                type="string",
-                description="SQL query to execute",
-                required=False,
-            ),
-            ToolParameter(
-                name="table",
-                type="string",
-                description="Table name (for describe operation)",
-                required=False,
-            ),
-            ToolParameter(
-                name="limit",
-                type="integer",
-                description="Maximum rows to return (default: 100)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: connect, query, schema, tables, describe, disconnect",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="db_type",
+                    type="string",
+                    description="Database type: sqlite, postgresql, mysql, sqlserver",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="database",
+                    type="string",
+                    description="Database name or path (for SQLite)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="host",
+                    type="string",
+                    description="Database host (default: localhost)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="port",
+                    type="integer",
+                    description="Database port",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="username",
+                    type="string",
+                    description="Database username",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="password",
+                    type="string",
+                    description="Database password",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="connection_id",
+                    type="string",
+                    description="Connection ID (returned from connect)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="sql",
+                    type="string",
+                    description="SQL query to execute",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="table",
+                    type="string",
+                    description="Table name (for describe operation)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="limit",
+                    type="integer",
+                    description="Maximum rows to return (default: 100)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -203,9 +203,7 @@ Safety:
                 )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Database error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Database error: {str(e)}")
 
     async def _connect(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Connect to database.
@@ -254,9 +252,7 @@ Safety:
             )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"SQLite connection failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"SQLite connection failed: {str(e)}")
 
     async def _connect_postgresql(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Connect to PostgreSQL database."""
@@ -322,9 +318,7 @@ Safety:
                 error="MySQL support requires: pip install mysql-connector-python",
             )
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"MySQL connection failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"MySQL connection failed: {str(e)}")
 
     async def _connect_sqlserver(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Connect to SQL Server database."""
@@ -376,9 +370,7 @@ Safety:
             )
 
         if not sql:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: sql"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: sql")
 
         # Check for dangerous patterns
         if not self.allow_modifications:
@@ -419,9 +411,7 @@ Safety:
                     "limited": len(rows) == limit,
                 }
 
-                return ToolResult(
-                    success=True, output=json.dumps(output, indent=2), error=""
-                )
+                return ToolResult(success=True, output=json.dumps(output, indent=2), error="")
             else:
                 # Non-SELECT query (INSERT, UPDATE, DELETE)
                 conn.commit()
@@ -441,9 +431,7 @@ Safety:
         connection_id = kwargs.get("connection_id")
 
         if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+            return ToolResult(success=False, output="", error="Invalid or missing connection_id")
 
         # Get list of tables first
         tables_result = await self._tables(kwargs)
@@ -461,27 +449,19 @@ Safety:
                 )
                 if describe_result.success:
                     table_info = json.loads(describe_result.output)
-                    schema_info["tables"].append(
-                        {"name": table, "columns": table_info["columns"]}
-                    )
+                    schema_info["tables"].append({"name": table, "columns": table_info["columns"]})
 
-            return ToolResult(
-                success=True, output=json.dumps(schema_info, indent=2), error=""
-            )
+            return ToolResult(success=True, output=json.dumps(schema_info, indent=2), error="")
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Schema inspection failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Schema inspection failed: {str(e)}")
 
     async def _tables(self, kwargs: Dict[str, Any]) -> ToolResult:
         """List all tables in database."""
         connection_id = kwargs.get("connection_id")
 
         if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+            return ToolResult(success=False, output="", error="Invalid or missing connection_id")
 
         try:
             conn = self.connections[connection_id]
@@ -496,9 +476,7 @@ Safety:
             elif connection_id.startswith("sqlserver"):
                 sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME"
             else:
-                return ToolResult(
-                    success=False, output="", error="Unknown database type"
-                )
+                return ToolResult(success=False, output="", error="Unknown database type")
 
             cursor.execute(sql)
             rows = cursor.fetchall()
@@ -512,9 +490,7 @@ Safety:
             )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Failed to list tables: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Failed to list tables: {str(e)}")
 
     async def _describe(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Describe table structure."""
@@ -522,14 +498,10 @@ Safety:
         table = kwargs.get("table")
 
         if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+            return ToolResult(success=False, output="", error="Invalid or missing connection_id")
 
         if not table:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: table"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: table")
 
         try:
             conn = self.connections[connection_id]
@@ -559,8 +531,7 @@ Safety:
                 )
                 rows = cursor.fetchall()
                 columns = [
-                    {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
-                    for row in rows
+                    {"name": row[0], "type": row[1], "nullable": row[2] == "YES"} for row in rows
                 ]
 
             elif connection_id.startswith("mysql"):
@@ -578,7 +549,9 @@ Safety:
 
             else:
                 return ToolResult(
-                    success=False, output="", error="Describe not implemented for this database type"
+                    success=False,
+                    output="",
+                    error="Describe not implemented for this database type",
                 )
 
             return ToolResult(
@@ -591,18 +564,14 @@ Safety:
             )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Failed to describe table: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Failed to describe table: {str(e)}")
 
     async def _disconnect(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Disconnect from database."""
         connection_id = kwargs.get("connection_id")
 
         if not connection_id or connection_id not in self.connections:
-            return ToolResult(
-                success=False, output="", error="Invalid or missing connection_id"
-            )
+            return ToolResult(success=False, output="", error="Invalid or missing connection_id")
 
         try:
             conn = self.connections[connection_id]
@@ -616,9 +585,7 @@ Safety:
             )
 
         except Exception as e:
-            return ToolResult(
-                success=False, output="", error=f"Disconnect failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Disconnect failed: {str(e)}")
 
     def __del__(self):
         """Cleanup: close all connections."""

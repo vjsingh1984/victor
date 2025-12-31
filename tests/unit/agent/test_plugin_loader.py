@@ -148,9 +148,7 @@ class TestPluginLoaderLoad:
     def test_load_disabled_returns_empty_result(self, mock_registry, mock_settings):
         """Test that load() returns empty result when disabled."""
         config = PluginLoaderConfig(enabled=False)
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         result = loader.load()
 
@@ -182,9 +180,7 @@ class TestPluginLoaderLoad:
     def test_load_disables_specified_plugins(self, mock_registry, mock_settings):
         """Test that load() disables specified plugins."""
         config = PluginLoaderConfig(disabled_plugins={"bad_plugin"})
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         mock_plugin_registry = MagicMock()
         mock_plugin_registry.loaded_plugins = {}
@@ -204,9 +200,7 @@ class TestPluginLoaderLoad:
     def test_load_loads_package_plugins(self, mock_registry, mock_settings):
         """Test that load() loads plugins from packages."""
         config = PluginLoaderConfig(plugin_packages=["my.plugin"])
-        loader = PluginLoader(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        loader = PluginLoader(registry=mock_registry, settings=mock_settings, config=config)
 
         mock_plugin = MagicMock()
         mock_plugin_registry = MagicMock()

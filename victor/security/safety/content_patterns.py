@@ -188,9 +188,7 @@ def has_content_warnings(content: str) -> bool:
 
 def get_high_severity_warnings(content: str) -> List[ContentWarningMatch]:
     """Get only high-severity content warnings."""
-    return [
-        m for m in scan_content_warnings(content) if m.level == ContentWarningLevel.HIGH
-    ]
+    return [m for m in scan_content_warnings(content) if m.level == ContentWarningLevel.HIGH]
 
 
 def detect_misinformation_risk(content: str) -> List[Tuple[str, str]]:

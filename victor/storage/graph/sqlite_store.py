@@ -231,7 +231,9 @@ class SqliteGraphStore(GraphStoreProtocol):
             placeholders = ",".join("?" for _ in edge_types)
             type_clause = f" AND type IN ({placeholders})"
             params.extend(edge_types)
-        query = f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE} WHERE src=?{type_clause}"
+        query = (
+            f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE} WHERE src=?{type_clause}"
+        )
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(query, params)
@@ -290,7 +292,9 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Clear all nodes, edges, and file mtimes for this repo (full rebuild)."""
         async with self._lock:
             conn = self._connect()
-            conn.executescript(f"DELETE FROM {_EDGE_TABLE}; DELETE FROM {_NODE_TABLE}; DELETE FROM {_MTIME_TABLE};")
+            conn.executescript(
+                f"DELETE FROM {_EDGE_TABLE}; DELETE FROM {_NODE_TABLE}; DELETE FROM {_MTIME_TABLE};"
+            )
             conn.commit()
 
     async def stats(self) -> Dict[str, Any]:
@@ -422,7 +426,9 @@ class SqliteGraphStore(GraphStoreProtocol):
                 placeholders = ",".join("?" for _ in node_ids)
                 conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
                 conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
-                conn.execute(f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})", node_ids)
+                conn.execute(
+                    f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})", node_ids
+                )
 
             conn.execute(f"DELETE FROM {_MTIME_TABLE} WHERE file = ?", (file,))
             conn.commit()

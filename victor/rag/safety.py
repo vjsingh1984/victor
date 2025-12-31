@@ -235,10 +235,16 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         # Start with framework PII patterns (canonical source)
         patterns: Dict[str, Tuple[str, str, str]] = {}
         for pii_type, (pattern, severity) in PII_CONTENT_PATTERNS.items():
-            risk = HIGH if severity in (PIISeverity.CRITICAL, PIISeverity.HIGH) else (
-                MEDIUM if severity == PIISeverity.MEDIUM else LOW
+            risk = (
+                HIGH
+                if severity in (PIISeverity.CRITICAL, PIISeverity.HIGH)
+                else (MEDIUM if severity == PIISeverity.MEDIUM else LOW)
             )
-            patterns[pii_type.value] = (pattern, f"{pii_type.value.replace('_', ' ').title()} detected", risk)
+            patterns[pii_type.value] = (
+                pattern,
+                f"{pii_type.value.replace('_', ' ').title()} detected",
+                risk,
+            )
 
         # Add RAG-specific secret patterns
         patterns.update(SECRET_PATTERNS)
@@ -274,30 +280,36 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
                     col = line.find(pii_match.matched_text)
                     break
 
-            matches.append({
-                "type": pii_match.pii_type.value,
-                "description": f"{pii_match.pii_type.value.replace('_', ' ').title()} detected",
-                "severity": HIGH if pii_match.severity in (PIISeverity.CRITICAL, PIISeverity.HIGH) else (
-                    MEDIUM if pii_match.severity == PIISeverity.MEDIUM else LOW
-                ),
-                "line": line_num,
-                "column": col,
-                "masked_value": pii_match.matched_text,  # Already masked by PIIMatch
-            })
+            matches.append(
+                {
+                    "type": pii_match.pii_type.value,
+                    "description": f"{pii_match.pii_type.value.replace('_', ' ').title()} detected",
+                    "severity": (
+                        HIGH
+                        if pii_match.severity in (PIISeverity.CRITICAL, PIISeverity.HIGH)
+                        else (MEDIUM if pii_match.severity == PIISeverity.MEDIUM else LOW)
+                    ),
+                    "line": line_num,
+                    "column": col,
+                    "masked_value": pii_match.matched_text,  # Already masked by PIIMatch
+                }
+            )
 
         # Add RAG-specific secret pattern scanning
         for secret_type, (pattern, description, risk_level) in SECRET_PATTERNS.items():
             compiled = re.compile(pattern)
             for line_num, line in enumerate(lines, 1):
                 for match in compiled.finditer(line):
-                    matches.append({
-                        "type": secret_type,
-                        "description": description,
-                        "severity": risk_level,
-                        "line": line_num,
-                        "column": match.start(),
-                        "masked_value": self._mask_value(match.group(), secret_type),
-                    })
+                    matches.append(
+                        {
+                            "type": secret_type,
+                            "description": description,
+                            "severity": risk_level,
+                            "line": line_num,
+                            "column": match.start(),
+                            "masked_value": self._mask_value(match.group(), secret_type),
+                        }
+                    )
 
         return matches
 

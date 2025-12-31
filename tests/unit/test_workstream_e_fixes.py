@@ -69,9 +69,7 @@ class TestEventBusDropOldestWarning:
         EventBus.reset_instance()
 
     @pytest.mark.asyncio
-    async def test_drop_oldest_logs_warning_on_first_drop(
-        self, small_queue_event_bus, caplog
-    ):
+    async def test_drop_oldest_logs_warning_on_first_drop(self, small_queue_event_bus, caplog):
         """Test that DROP_OLDEST logs a WARNING on first event drop."""
         from victor.observability.event_bus import EventCategory, VictorEvent
 
@@ -91,14 +89,11 @@ class TestEventBusDropOldestWarning:
         # Should have a WARNING log about dropping events
         warning_logs = [r for r in caplog.records if r.levelno == logging.WARNING]
         assert any(
-            "dropping" in r.message.lower() or "drop" in r.message.lower()
-            for r in warning_logs
+            "dropping" in r.message.lower() or "drop" in r.message.lower() for r in warning_logs
         ), "Expected WARNING log about dropping events"
 
     @pytest.mark.asyncio
-    async def test_drop_oldest_warning_is_rate_limited(
-        self, small_queue_event_bus, caplog
-    ):
+    async def test_drop_oldest_warning_is_rate_limited(self, small_queue_event_bus, caplog):
         """Test that DROP_OLDEST warnings are rate-limited (max 1 per minute)."""
         from victor.observability.event_bus import EventCategory, VictorEvent
 
@@ -126,9 +121,7 @@ class TestEventBusDropOldestWarning:
         assert len(warning_logs) <= 1, "Expected rate-limited warnings (max 1)"
 
     @pytest.mark.asyncio
-    async def test_drop_oldest_warning_interval_respected(
-        self, small_queue_event_bus, caplog
-    ):
+    async def test_drop_oldest_warning_interval_respected(self, small_queue_event_bus, caplog):
         """Test that warnings are emitted again after interval passes."""
         from victor.observability.event_bus import EventCategory, VictorEvent
 
@@ -442,9 +435,7 @@ class TestToolPipelineIdempotentCacheLRU:
         )
 
     @pytest.mark.asyncio
-    async def test_idempotent_cache_uses_lru_eviction(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_idempotent_cache_uses_lru_eviction(self, pipeline, mock_tool_executor):
         """Test that idempotent cache uses LRU eviction instead of FIFO."""
         from victor.agent.tool_executor import ToolExecutionResult
 
@@ -464,25 +455,15 @@ class TestToolPipelineIdempotentCacheLRU:
         mock_tool_executor.execute = AsyncMock(side_effect=mock_execute)
 
         # Read 3 files (fills cache of size 3)
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "file1.py"}}], {}
-        )
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "file2.py"}}], {}
-        )
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "file3.py"}}], {}
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "file1.py"}}], {})
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "file2.py"}}], {})
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "file3.py"}}], {})
 
         # Access file1 to make it most recently used
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "file1.py"}}], {}
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "file1.py"}}], {})
 
         # Read a 4th file (should evict file2, not file1)
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "file4.py"}}], {}
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "file4.py"}}], {})
 
         # Verify LRU cache state directly:
         # file1 should be in cache (most recently accessed before file4)
@@ -506,4 +487,6 @@ class TestToolPipelineIdempotentCacheLRU:
         assert pipeline._idempotent_cache.get(sig_file4) is not None, "file4 should be in LRU cache"
 
         # file2 should have been evicted (LRU victim)
-        assert pipeline._idempotent_cache.get(sig_file2) is None, "file2 should have been evicted from LRU cache"
+        assert (
+            pipeline._idempotent_cache.get(sig_file2) is None
+        ), "file2 should have been evicted from LRU cache"

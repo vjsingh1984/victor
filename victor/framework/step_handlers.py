@@ -1678,10 +1678,20 @@ class ExtensionsStepHandler(BaseStepHandler):
             try:
                 provider.register_services(container, settings)
                 # Count registered services if method available
-                required = provider.get_required_services() if hasattr(provider, "get_required_services") else []
-                optional = provider.get_optional_services() if hasattr(provider, "get_optional_services") else []
+                required = (
+                    provider.get_required_services()
+                    if hasattr(provider, "get_required_services")
+                    else []
+                )
+                optional = (
+                    provider.get_optional_services()
+                    if hasattr(provider, "get_optional_services")
+                    else []
+                )
                 total = len(required) + len(optional)
-                result.add_info(f"Registered {total} vertical services ({len(required)} required, {len(optional)} optional)")
+                result.add_info(
+                    f"Registered {total} vertical services ({len(required)} required, {len(optional)} optional)"
+                )
                 logger.debug(f"Registered vertical services: {total} total")
             except Exception as e:
                 result.add_warning(f"Failed to register vertical services: {e}")

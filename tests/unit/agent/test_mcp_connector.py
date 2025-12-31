@@ -136,9 +136,7 @@ class TestMCPConnectorInit:
         settings = MagicMock()
         callback = MagicMock()
 
-        connector = MCPConnector(
-            registry=registry, settings=settings, task_callback=callback
-        )
+        connector = MCPConnector(registry=registry, settings=settings, task_callback=callback)
 
         assert connector._task_callback is callback
 
@@ -174,9 +172,7 @@ class TestMCPConnectorConnect:
     async def test_connect_disabled_returns_empty_result(self, mock_registry, mock_settings):
         """Test that connect() returns empty result when disabled."""
         config = MCPConnectorConfig(enabled=False)
-        connector = MCPConnector(
-            registry=mock_registry, settings=mock_settings, config=config
-        )
+        connector = MCPConnector(registry=mock_registry, settings=mock_settings, config=config)
 
         result = await connector.connect()
 
@@ -207,9 +203,7 @@ class TestMCPConnectorConnect:
         assert connector.is_connected is True
 
     @pytest.mark.asyncio
-    async def test_connect_registers_mcp_command_from_settings(
-        self, mock_registry, mock_settings
-    ):
+    async def test_connect_registers_mcp_command_from_settings(self, mock_registry, mock_settings):
         """Test that connect() registers MCP command from settings."""
         mock_settings.use_mcp_tools = True
         mock_settings.mcp_command = "npx mcp-server"

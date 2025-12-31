@@ -440,9 +440,7 @@ class QLearningStore:
                     # Very efficient - gradually decrease budget
                     # But never drop below what was actually used + buffer
                     target_budget = max(tool_budget_used + 3, current_budget - 2)
-                    new_budget = int(
-                        (1 - base_alpha) * current_budget + base_alpha * target_budget
-                    )
+                    new_budget = int((1 - base_alpha) * current_budget + base_alpha * target_budget)
                 else:
                     # Normal completion - keep budget stable, slight move toward usage
                     alpha = base_alpha * 0.5  # Even slower for stable scenarios
@@ -474,9 +472,7 @@ class QLearningStore:
             # Update quality and completion rate with standard EMA
             alpha = 0.1
             new_quality = (1 - alpha) * current_quality + alpha * quality_score
-            completion_rate = (1 - alpha) * current_completion + alpha * (
-                1.0 if completed else 0.0
-            )
+            completion_rate = (1 - alpha) * current_completion + alpha * (1.0 if completed else 0.0)
         else:
             # First sample - initialize with reasonable defaults
             count = 1
@@ -559,7 +555,7 @@ class QLearningStore:
             "avg_quality_score": 0.5,
             "avg_completion_rate": 0.5,
             "sample_count": 0,
-            }
+        }
 
 
 class AdaptiveModeController:

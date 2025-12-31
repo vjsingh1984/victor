@@ -155,32 +155,32 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: scan_secrets, scan_dependencies, scan_config, scan_all, check_file",
-                required=True,
-            ),
-            ToolParameter(
-                name="path",
-                type="string",
-                description="File or directory path to scan",
-                required=True,
-            ),
-            ToolParameter(
-                name="severity",
-                type="string",
-                description="Minimum severity: low, medium, high, critical (default: medium)",
-                required=False,
-            ),
-            ToolParameter(
-                name="exclude",
-                type="array",
-                description="Patterns to exclude (e.g., ['*.test.js', 'node_modules/'])",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: scan_secrets, scan_dependencies, scan_config, scan_all, check_file",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="path",
+                    type="string",
+                    description="File or directory path to scan",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="severity",
+                    type="string",
+                    description="Minimum severity: low, medium, high, critical (default: medium)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="exclude",
+                    type="array",
+                    description="Patterns to exclude (e.g., ['*.test.js', 'node_modules/'])",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -222,9 +222,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Security scan failed")
-            return ToolResult(
-                success=False, output="", error=f"Security scan error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Security scan error: {str(e)}")
 
     async def _scan_secrets(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Scan for secrets in code."""
@@ -233,15 +231,11 @@ Example workflows:
         exclude = kwargs.get("exclude", [])
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         secrets_found = []
 
@@ -281,9 +275,7 @@ Example workflows:
         path = kwargs.get("path")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
 
@@ -316,15 +308,11 @@ Example workflows:
         path = kwargs.get("path")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         path_obj = Path(path)
         if not path_obj.exists():
-            return ToolResult(
-                success=False, output="", error=f"Path not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"Path not found: {path}")
 
         config_issues = []
 
@@ -388,15 +376,11 @@ Example workflows:
         path = kwargs.get("path")
 
         if not path:
-            return ToolResult(
-                success=False, output="", error="Missing required parameter: path"
-            )
+            return ToolResult(success=False, output="", error="Missing required parameter: path")
 
         file_path = Path(path)
         if not file_path.exists() or not file_path.is_file():
-            return ToolResult(
-                success=False, output="", error=f"File not found: {path}"
-            )
+            return ToolResult(success=False, output="", error=f"File not found: {path}")
 
         secrets = self._check_file_for_secrets(file_path)
 
@@ -459,9 +443,7 @@ Example workflows:
                     version = version.strip()
 
                     if package in self.VULNERABLE_PACKAGES:
-                        for vuln_version, description in self.VULNERABLE_PACKAGES[
-                            package
-                        ].items():
+                        for vuln_version, description in self.VULNERABLE_PACKAGES[package].items():
                             # Simple version check (would need proper version parsing in production)
                             vulnerabilities.append(
                                 {
@@ -503,9 +485,7 @@ Example workflows:
                 return True
         return False
 
-    def _build_secrets_report(
-        self, path: Path, secrets: List[Dict[str, Any]]
-    ) -> str:
+    def _build_secrets_report(self, path: Path, secrets: List[Dict[str, Any]]) -> str:
         """Build secrets scan report."""
         report = []
         report.append(f"Secrets Scan Report: {path}")
@@ -546,9 +526,7 @@ Example workflows:
 
         return "\n".join(report)
 
-    def _build_dependency_report(
-        self, path: Path, vulnerabilities: List[Dict[str, Any]]
-    ) -> str:
+    def _build_dependency_report(self, path: Path, vulnerabilities: List[Dict[str, Any]]) -> str:
         """Build dependency scan report."""
         report = []
         report.append(f"Dependency Scan Report: {path}")
@@ -576,9 +554,7 @@ Example workflows:
 
         return "\n".join(report)
 
-    def _build_config_report(
-        self, path: Path, issues: List[Dict[str, Any]]
-    ) -> str:
+    def _build_config_report(self, path: Path, issues: List[Dict[str, Any]]) -> str:
         """Build configuration scan report."""
         report = []
         report.append(f"Configuration Security Report: {path}")
@@ -600,9 +576,7 @@ Example workflows:
 
         return "\n".join(report)
 
-    def _build_file_secrets_report(
-        self, file_path: Path, secrets: List[Dict[str, Any]]
-    ) -> str:
+    def _build_file_secrets_report(self, file_path: Path, secrets: List[Dict[str, Any]]) -> str:
         """Build file secrets report."""
         report = []
         report.append(f"File Secrets Check: {file_path}")

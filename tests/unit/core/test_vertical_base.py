@@ -100,12 +100,10 @@ class TestGetExtensionsLSPCompliance:
         extensions = FailingVertical.get_extensions(use_cache=False)
 
         # Must still return a valid object, not None (LSP compliance)
-        assert extensions is not None, (
-            "get_extensions() returned None on exception - LSP violation"
-        )
-        assert isinstance(extensions, VerticalExtensions), (
-            f"Expected VerticalExtensions, got {type(extensions)}"
-        )
+        assert extensions is not None, "get_extensions() returned None on exception - LSP violation"
+        assert isinstance(
+            extensions, VerticalExtensions
+        ), f"Expected VerticalExtensions, got {type(extensions)}"
 
         # Verify the returned extensions have proper default values
         assert extensions.middleware == []
@@ -124,7 +122,9 @@ class TestGetExtensionsLSPCompliance:
         # Verify default values for list fields
         assert isinstance(extensions.middleware, list), "middleware should be a list"
         assert isinstance(extensions.safety_extensions, list), "safety_extensions should be a list"
-        assert isinstance(extensions.prompt_contributors, list), "prompt_contributors should be a list"
+        assert isinstance(
+            extensions.prompt_contributors, list
+        ), "prompt_contributors should be a list"
 
         # Verify optional fields can be None (this is allowed)
         # But the container itself must exist
@@ -175,9 +175,9 @@ class TestGetExtensionsLSPCompliance:
         extensions2 = AnotherVertical.get_extensions(use_cache=False)
 
         # Both must return VerticalExtensions (LSP)
-        assert type(extensions1) == type(extensions2), (
-            "LSP violation: different subclasses return different types"
-        )
+        assert type(extensions1) == type(
+            extensions2
+        ), "LSP violation: different subclasses return different types"
         assert isinstance(extensions1, VerticalExtensions)
         assert isinstance(extensions2, VerticalExtensions)
 

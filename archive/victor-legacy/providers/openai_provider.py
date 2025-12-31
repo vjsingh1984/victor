@@ -39,7 +39,9 @@ class OpenAIProvider(BaseProvider):
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
-        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs)
+        super().__init__(
+            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+        )
         self.client = AsyncOpenAI(
             api_key=api_key,
             organization=organization,
@@ -89,10 +91,7 @@ class OpenAIProvider(BaseProvider):
         """
         try:
             # Convert messages to OpenAI format
-            openai_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request parameters
             request_params = {
@@ -143,10 +142,7 @@ class OpenAIProvider(BaseProvider):
         """
         try:
             # Convert messages
-            openai_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Build request parameters
             request_params = {

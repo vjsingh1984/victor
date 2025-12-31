@@ -107,10 +107,7 @@ class ContextManager:
             self.encoder = tiktoken.get_encoding("cl100k_base")
 
         # Context window
-        self.context = ContextWindow(
-            max_tokens=max_tokens,
-            reserved_tokens=reserved_tokens
-        )
+        self.context = ContextWindow(max_tokens=max_tokens, reserved_tokens=reserved_tokens)
 
     def count_tokens(self, text: str) -> int:
         """Count tokens in text.
@@ -124,11 +121,7 @@ class ContextManager:
         return len(self.encoder.encode(text))
 
     def add_message(
-        self,
-        role: str,
-        content: str,
-        priority: int = 5,
-        metadata: Optional[Dict[str, Any]] = None
+        self, role: str, content: str, priority: int = 5, metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """Add a message to context.
 
@@ -141,11 +134,7 @@ class ContextManager:
         tokens = self.count_tokens(content)
 
         message = Message(
-            role=role,
-            content=content,
-            tokens=tokens,
-            priority=priority,
-            metadata=metadata or {}
+            role=role, content=content, tokens=tokens, priority=priority, metadata=metadata or {}
         )
 
         self.context.messages.append(message)
@@ -160,7 +149,7 @@ class ContextManager:
         path: str,
         content: str,
         relevance_score: float = 1.0,
-        line_range: Optional[Tuple[int, int]] = None
+        line_range: Optional[Tuple[int, int]] = None,
     ) -> None:
         """Add a file to context.
 
@@ -172,9 +161,9 @@ class ContextManager:
         """
         # Extract line range if specified
         if line_range:
-            lines = content.split('\n')
+            lines = content.split("\n")
             start, end = line_range
-            content = '\n'.join(lines[start:end])
+            content = "\n".join(lines[start:end])
 
         tokens = self.count_tokens(content)
 
@@ -183,7 +172,7 @@ class ContextManager:
             content=content,
             tokens=tokens,
             relevance_score=relevance_score,
-            line_range=line_range
+            line_range=line_range,
         )
 
         self.context.files.append(file_ctx)
@@ -204,17 +193,11 @@ class ContextManager:
         # Add file context as system messages
         if self.context.files:
             file_content = self._format_file_context()
-            messages.append({
-                "role": "system",
-                "content": file_content
-            })
+            messages.append({"role": "system", "content": file_content})
 
         # Add conversation messages
         for msg in self.context.messages:
-            messages.append({
-                "role": msg.role,
-                "content": msg.content
-            })
+            messages.append({"role": msg.role, "content": msg.content})
 
         return messages
 
@@ -280,7 +263,9 @@ class ContextManager:
         tokens_to_remove = self.context.total_tokens - target_tokens
 
         # Sort by priority (lowest first)
-        sorted_messages = sorted(self.context.messages, key=lambda m: (m.role == "system", m.priority))
+        sorted_messages = sorted(
+            self.context.messages, key=lambda m: (m.role == "system", m.priority)
+        )
 
         removed_tokens = 0
         messages_to_keep = []
@@ -311,7 +296,11 @@ class ContextManager:
         for msg in reversed(self.context.messages):
             if msg.role == "system" or msg == first_user:
                 continue
-            if recent_tokens + msg.tokens <= (target_tokens - sum(m.tokens for m in system_messages) - (first_user.tokens if first_user else 0)):
+            if recent_tokens + msg.tokens <= (
+                target_tokens
+                - sum(m.tokens for m in system_messages)
+                - (first_user.tokens if first_user else 0)
+            ):
                 recent_messages.insert(0, msg)
                 recent_tokens += msg.tokens
             else:
@@ -323,13 +312,19 @@ class ContextManager:
             new_messages.append(first_user)
 
         # Add gap indicator if we skipped messages
-        if len(self.context.messages) > len(system_messages) + len(recent_messages) + (1 if first_user else 0):
-            new_messages.append(Message(
-                role="system",
-                content="[... earlier conversation pruned for context length ...]",
-                tokens=self.count_tokens("[... earlier conversation pruned for context length ...]"),
-                priority=10
-            ))
+        if len(self.context.messages) > len(system_messages) + len(recent_messages) + (
+            1 if first_user else 0
+        ):
+            new_messages.append(
+                Message(
+                    role="system",
+                    content="[... earlier conversation pruned for context length ...]",
+                    tokens=self.count_tokens(
+                        "[... earlier conversation pruned for context length ...]"
+                    ),
+                    priority=10,
+                )
+            )
 
         new_messages.extend(recent_messages)
 
@@ -377,5 +372,5 @@ class ContextManager:
                 "system": len([m for m in self.context.messages if m.role == "system"]),
                 "user": len([m for m in self.context.messages if m.role == "user"]),
                 "assistant": len([m for m in self.context.messages if m.role == "assistant"]),
-            }
+            },
         }

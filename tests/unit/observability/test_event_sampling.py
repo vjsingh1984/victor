@@ -236,10 +236,7 @@ class TestEventBatcher:
         config = BatchConfig(enabled=True, batch_size=3)
         batcher = EventBatcher(config)
 
-        events = [
-            VictorEvent(category=EventCategory.TOOL, name=f"event{i}")
-            for i in range(3)
-        ]
+        events = [VictorEvent(category=EventCategory.TOOL, name=f"event{i}") for i in range(3)]
 
         # First two events don't flush
         assert batcher.add_event(events[0]) is None
@@ -358,10 +355,12 @@ class TestEventBusSamplingIntegration:
         bus.subscribe(EventCategory.TOOL, handler)
 
         # Configure 0% sampling for TOOL events
-        bus.configure_sampling(SamplingConfig(
-            rates={EventCategory.TOOL: 0.0},
-            preserve_critical=False,
-        ))
+        bus.configure_sampling(
+            SamplingConfig(
+                rates={EventCategory.TOOL: 0.0},
+                preserve_critical=False,
+            )
+        )
 
         # Event should be dropped
         event = VictorEvent(
@@ -380,10 +379,12 @@ class TestEventBusSamplingIntegration:
         bus.subscribe(EventCategory.TOOL, handler)
 
         # Configure then disable sampling
-        bus.configure_sampling(SamplingConfig(
-            rates={EventCategory.TOOL: 0.0},
-            preserve_critical=False,
-        ))
+        bus.configure_sampling(
+            SamplingConfig(
+                rates={EventCategory.TOOL: 0.0},
+                preserve_critical=False,
+            )
+        )
         bus.disable_sampling()
 
         event = VictorEvent(category=EventCategory.TOOL, name="test")
@@ -394,10 +395,12 @@ class TestEventBusSamplingIntegration:
     def test_sampling_metrics(self):
         """Should track sampling metrics."""
         bus = EventBus.get_instance()
-        bus.configure_sampling(SamplingConfig(
-            rates={EventCategory.TOOL: 0.0},
-            preserve_critical=False,
-        ))
+        bus.configure_sampling(
+            SamplingConfig(
+                rates={EventCategory.TOOL: 0.0},
+                preserve_critical=False,
+            )
+        )
 
         event = VictorEvent(
             category=EventCategory.TOOL,

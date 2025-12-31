@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 @dataclass
 class BenchmarkResult:
     """Result of a single benchmark query."""
+
     query: str
     config_name: str
     results_count: int
@@ -43,6 +44,7 @@ class BenchmarkResult:
 @dataclass
 class BenchmarkConfig:
     """Configuration for a benchmark run."""
+
     name: str
     enable_hybrid_search: bool = False
     hybrid_semantic_weight: float = 0.6
@@ -76,9 +78,7 @@ def load_queries(queries_file: Optional[str]) -> List[str]:
 
 
 async def run_query_benchmark(
-    query: str,
-    config: BenchmarkConfig,
-    root_path: str = "."
+    query: str, config: BenchmarkConfig, root_path: str = "."
 ) -> BenchmarkResult:
     """Run a single query with given configuration."""
     from victor.config.settings import Settings
@@ -142,14 +142,10 @@ async def run_query_benchmark(
 
 
 async def run_benchmark_suite(
-    queries: List[str],
-    configs: List[BenchmarkConfig],
-    root_path: str = "."
+    queries: List[str], configs: List[BenchmarkConfig], root_path: str = "."
 ) -> Dict[str, List[BenchmarkResult]]:
     """Run full benchmark suite across all configs."""
-    results_by_config: Dict[str, List[BenchmarkResult]] = {
-        config.name: [] for config in configs
-    }
+    results_by_config: Dict[str, List[BenchmarkResult]] = {config.name: [] for config in configs}
 
     total_runs = len(queries) * len(configs)
     current_run = 0
@@ -177,8 +173,7 @@ async def run_benchmark_suite(
 
 
 def print_benchmark_report(
-    results_by_config: Dict[str, List[BenchmarkResult]],
-    configs: List[BenchmarkConfig]
+    results_by_config: Dict[str, List[BenchmarkResult]], configs: List[BenchmarkConfig]
 ):
     """Print comprehensive benchmark report."""
     print("=" * 80)
@@ -201,7 +196,9 @@ def print_benchmark_report(
         avg_results = sum(r.results_count for r in results) / len(results)
         success_rate = sum(1 for r in results if r.results_count > 0) / len(results)
 
-        print(f"{config.name:<20} {len(results):<8} {avg_time:<12.0f} {avg_results:<12.1f} {success_rate:<10.1%}")
+        print(
+            f"{config.name:<20} {len(results):<8} {avg_time:<12.0f} {avg_results:<12.1f} {success_rate:<10.1%}"
+        )
 
     print()
 

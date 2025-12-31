@@ -212,10 +212,7 @@ class OllamaProvider(BaseProvider):
         """
         payload: Dict[str, Any] = {
             "model": model,
-            "messages": [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ],
+            "messages": [{"role": msg.role, "content": msg.content} for msg in messages],
             "stream": stream,
             "options": {
                 "temperature": temperature,
@@ -244,7 +241,9 @@ class OllamaProvider(BaseProvider):
         payload.update(kwargs)
         return payload
 
-    def _normalize_tool_calls(self, tool_calls: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(
+        self, tool_calls: Optional[List[Dict[str, Any]]]
+    ) -> Optional[List[Dict[str, Any]]]:
         """Normalize tool calls from Ollama's OpenAI-compatible format.
 
         Ollama returns tool calls in OpenAI format:
@@ -264,14 +263,13 @@ class OllamaProvider(BaseProvider):
 
         normalized = []
         for call in tool_calls:
-            if isinstance(call, dict) and 'function' in call:
+            if isinstance(call, dict) and "function" in call:
                 # OpenAI format
-                function = call.get('function', {})
-                normalized.append({
-                    'name': function.get('name'),
-                    'arguments': function.get('arguments', {})
-                })
-            elif isinstance(call, dict) and 'name' in call:
+                function = call.get("function", {})
+                normalized.append(
+                    {"name": function.get("name"), "arguments": function.get("arguments", {})}
+                )
+            elif isinstance(call, dict) and "name" in call:
                 # Already normalized
                 normalized.append(call)
             else:

@@ -47,9 +47,7 @@ def test_rl_config_has_get_rl_config_method(vertical: str, module_path: str, con
     ), f"{config_class} must implement get_rl_config() per RLConfigProviderProtocol"
 
     # Verify the method is callable
-    assert callable(
-        config.get_rl_config
-    ), f"{config_class}.get_rl_config must be callable"
+    assert callable(config.get_rl_config), f"{config_class}.get_rl_config must be callable"
 
 
 @pytest.mark.parametrize(

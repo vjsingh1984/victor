@@ -58,9 +58,7 @@ class MCPTool(BaseModel):
 
     name: str = Field(description="Tool name")
     description: str = Field(description="Tool description")
-    parameters: List[MCPParameter] = Field(
-        default_factory=list, description="Tool parameters"
-    )
+    parameters: List[MCPParameter] = Field(default_factory=list, description="Tool parameters")
     version: str = Field(default="1.0.0", description="Tool version")
 
 

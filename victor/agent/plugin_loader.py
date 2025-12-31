@@ -232,8 +232,7 @@ class PluginLoader:
         plugins = self.get_plugin_info()
         return {
             "plugins": [
-                {"name": p.name, "version": p.version, "tools": p.tool_count}
-                for p in plugins
+                {"name": p.name, "version": p.version, "tools": p.tool_count} for p in plugins
             ],
             "total": len(plugins),
         }

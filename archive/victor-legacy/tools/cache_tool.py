@@ -65,20 +65,20 @@ Example workflows:
     def parameters(self) -> Dict[str, Any]:
         """Get tool parameters."""
         return self.convert_parameters_to_schema(
-        [
-            ToolParameter(
-                name="operation",
-                type="string",
-                description="Operation: stats, clear, info",
-                required=True,
-            ),
-            ToolParameter(
-                name="namespace",
-                type="string",
-                description="Cache namespace (for clear operation)",
-                required=False,
-            ),
-        ]
+            [
+                ToolParameter(
+                    name="operation",
+                    type="string",
+                    description="Operation: stats, clear, info",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="namespace",
+                    type="string",
+                    description="Cache namespace (for clear operation)",
+                    required=False,
+                ),
+            ]
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -116,9 +116,7 @@ Example workflows:
 
         except Exception as e:
             logger.exception("Cache operation failed")
-            return ToolResult(
-                success=False, output="", error=f"Cache error: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Cache error: {str(e)}")
 
     async def _get_stats(self, kwargs: Dict[str, Any]) -> ToolResult:
         """Get cache statistics."""
@@ -130,9 +128,7 @@ Example workflows:
         report.append("")
 
         report.append("Performance:")
-        report.append(
-            f"  Memory Hit Rate: {stats.get('memory_hit_rate', 0):.2%}"
-        )
+        report.append(f"  Memory Hit Rate: {stats.get('memory_hit_rate', 0):.2%}")
         report.append(f"  Disk Hit Rate: {stats.get('disk_hit_rate', 0):.2%}")
         report.append("")
 
@@ -205,9 +201,7 @@ Example workflows:
         if config.enable_disk:
             size_mb = config.disk_max_size / (1024 * 1024)
             report.append(f"  Max Size: {size_mb:.0f} MB")
-            report.append(
-                f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)"
-            )
+            report.append(f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)")
             report.append(f"  Path: {config.disk_path}")
         report.append("")
 

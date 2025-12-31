@@ -258,7 +258,15 @@ class FileChangeHistory:
             # Check change_groups columns
             cursor = conn.execute("PRAGMA table_info(change_groups)")
             group_cols = {row[1] for row in cursor.fetchall()}
-            required_group = {"id", "session_id", "timestamp", "description", "tool_name", "undone", "data"}
+            required_group = {
+                "id",
+                "session_id",
+                "timestamp",
+                "description",
+                "tool_name",
+                "undone",
+                "data",
+            }
             if group_cols and not required_group.issubset(group_cols):
                 return True
 

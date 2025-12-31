@@ -2,7 +2,7 @@
 # This module has been reorganized to victor.storage.embeddings/
 
 # Re-export all public symbols
-from victor.storage.embeddings import * # noqa: F403
+from victor.storage.embeddings import *  # noqa: F403
 
 # Re-export submodules for backwards compatibility
 from victor.storage.embeddings import service
