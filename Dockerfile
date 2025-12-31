@@ -16,7 +16,7 @@
 # Multi-stage build for optimized image size
 
 # Stage 1: Builder
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL description="Enterprise-Ready AI Coding Assistant"

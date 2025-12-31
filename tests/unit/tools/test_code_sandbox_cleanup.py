@@ -36,9 +36,10 @@ class TestCodeSandboxContextManager:
 
     def test_context_manager_calls_start_and_stop(self):
         """Verify context manager calls start() on enter and stop() on exit."""
-        with patch.object(CodeSandbox, "start") as mock_start, patch.object(
-            CodeSandbox, "stop"
-        ) as mock_stop:
+        with (
+            patch.object(CodeSandbox, "start") as mock_start,
+            patch.object(CodeSandbox, "stop") as mock_stop,
+        ):
             sandbox = CodeSandbox(require_docker=False)
 
             with sandbox:
@@ -49,9 +50,7 @@ class TestCodeSandboxContextManager:
 
     def test_context_manager_stops_on_exception(self):
         """Verify stop() is called even when exception occurs."""
-        with patch.object(CodeSandbox, "start"), patch.object(
-            CodeSandbox, "stop"
-        ) as mock_stop:
+        with patch.object(CodeSandbox, "start"), patch.object(CodeSandbox, "stop") as mock_stop:
             sandbox = CodeSandbox(require_docker=False)
 
             with pytest.raises(ValueError):
@@ -110,9 +109,10 @@ class TestCleanupFunctions:
         mock_client = Mock()
         mock_client.containers.list.return_value = [mock_container1, mock_container2]
 
-        with patch(
-            "victor.tools.code_executor_tool.DOCKER_AVAILABLE", True
-        ), patch("victor.tools.code_executor_tool.docker") as mock_docker:
+        with (
+            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
+            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+        ):
             mock_docker.from_env.return_value = mock_client
 
             cleaned = cleanup_orphaned_containers()
@@ -137,9 +137,10 @@ class TestCleanupFunctions:
         mock_client = Mock()
         mock_client.containers.list.return_value = [mock_container]
 
-        with patch(
-            "victor.tools.code_executor_tool.DOCKER_AVAILABLE", True
-        ), patch("victor.tools.code_executor_tool.docker") as mock_docker:
+        with (
+            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
+            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+        ):
             mock_docker.from_env.return_value = mock_client
 
             # Should not raise, just log warning
@@ -165,11 +166,10 @@ class TestContainerLabeling:
         mock_client.images.pull.return_value = None
         mock_client.containers.run.return_value = mock_container
 
-        with patch(
-            "victor.tools.code_executor_tool.DOCKER_AVAILABLE", True
-        ), patch(
-            "victor.tools.code_executor_tool.docker"
-        ) as mock_docker:
+        with (
+            patch("victor.tools.code_executor_tool.DOCKER_AVAILABLE", True),
+            patch("victor.tools.code_executor_tool.docker") as mock_docker,
+        ):
             mock_docker.from_env.return_value = mock_client
 
             sandbox = CodeSandbox()
@@ -180,9 +180,7 @@ class TestContainerLabeling:
             # Verify labels were passed to container creation
             call_kwargs = mock_client.containers.run.call_args[1]
             assert "labels" in call_kwargs
-            assert call_kwargs["labels"] == {
-                SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE
-            }
+            assert call_kwargs["labels"] == {SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE}
 
 
 class TestSandboxResourceCleanup:
