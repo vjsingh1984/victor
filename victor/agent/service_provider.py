@@ -173,7 +173,7 @@ class OrchestratorServiceProvider:
             ParallelExecutorProtocol,
             ResponseCompleterProtocol,
             StreamingHandlerProtocol,
-            RecoveryCoordinatorProtocol,
+            StreamingRecoveryCoordinatorProtocol,
             ChunkGeneratorProtocol,
             ToolPlannerProtocol,
             TaskCoordinatorProtocol,
@@ -478,9 +478,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SCOPED,
         )
 
-        # RecoveryCoordinator - singleton for recovery coordination
+        # StreamingRecoveryCoordinator - singleton for streaming session recovery
         container.register(
-            RecoveryCoordinatorProtocol,
+            StreamingRecoveryCoordinatorProtocol,
             lambda c: self._create_recovery_coordinator(),
             ServiceLifetime.SINGLETON,
         )
@@ -1360,9 +1360,9 @@ class OrchestratorServiceProvider:
         and recovery integration.
 
         Returns:
-            RecoveryCoordinator instance
+            StreamingRecoveryCoordinator instance
         """
-        from victor.agent.recovery_coordinator import RecoveryCoordinator
+        from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
         from victor.agent.protocols import (
             RecoveryHandlerProtocol,
             StreamingHandlerProtocol,
@@ -1386,7 +1386,7 @@ class OrchestratorServiceProvider:
         # Get unified tracker from DI container
         unified_tracker = self.container.get(TaskTrackerProtocol)
 
-        return RecoveryCoordinator(
+        return StreamingRecoveryCoordinator(
             recovery_handler=recovery_handler,
             recovery_integration=recovery_integration,
             streaming_handler=streaming_handler,

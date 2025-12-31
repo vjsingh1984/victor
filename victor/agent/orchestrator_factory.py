@@ -849,12 +849,12 @@ class OrchestratorFactory(ModeAwareMixin):
         proper dependency management and testability.
 
         Returns:
-            RecoveryCoordinator instance for recovery coordination
+            StreamingRecoveryCoordinator instance for recovery coordination
         """
-        from victor.agent.protocols import RecoveryCoordinatorProtocol
+        from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
 
-        recovery_coordinator = self.container.get(RecoveryCoordinatorProtocol)
-        logger.debug("RecoveryCoordinator created via DI")
+        recovery_coordinator = self.container.get(StreamingRecoveryCoordinatorProtocol)
+        logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
     def create_chunk_generator(self) -> Any:
@@ -2064,6 +2064,9 @@ class OrchestratorFactory(ModeAwareMixin):
     # Orchestrator Decomposition Components (Phase 1)
     # =========================================================================
 
+    # ARCHIVED: 2024-12-31 - StreamingLoopCoordinator was never integrated
+    # Module moved to: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py
+    # This factory method is preserved for reference but raises NotImplementedError
     def create_streaming_loop_coordinator(
         self,
         termination_handler: Any,
@@ -2073,36 +2076,19 @@ class OrchestratorFactory(ModeAwareMixin):
         intent_classifier: Any,
         continuation_strategy: Any,
     ) -> Any:
-        """Create StreamingLoopCoordinator for managing streaming iteration loop.
+        """ARCHIVED: StreamingLoopCoordinator was extracted but never integrated.
 
-        This coordinator is extracted from AgentOrchestrator to reduce class size
-        while maintaining the same functionality.
+        The streaming loop functionality remains in AgentOrchestrator.
+        This coordinator was moved to: archive/obsolete/2024_12_cleanup/
 
-        Args:
-            termination_handler: Handler for loop termination conditions
-            tool_call_handler: Handler for tool call processing
-            recovery_handler: Handler for recovery integration
-            chunk_generator: Generator for stream chunks
-            intent_classifier: Classifier for response intent
-            continuation_strategy: Strategy for continuation decisions
-
-        Returns:
-            StreamingLoopCoordinator instance
+        Raises:
+            NotImplementedError: This component was never integrated.
         """
-        from victor.agent.streaming_loop_coordinator import StreamingLoopCoordinator
-
-        coordinator = StreamingLoopCoordinator(
-            termination_handler=termination_handler,
-            tool_call_handler=tool_call_handler,
-            recovery_handler=recovery_handler,
-            chunk_generator=chunk_generator,
-            intent_classifier=intent_classifier,
-            continuation_strategy=continuation_strategy,
-            settings=self.settings,
+        raise NotImplementedError(
+            "StreamingLoopCoordinator was archived. "
+            "Streaming loop remains in AgentOrchestrator. "
+            "See: archive/obsolete/2024_12_cleanup/streaming_loop_coordinator.py"
         )
-
-        logger.debug("StreamingLoopCoordinator created")
-        return coordinator
 
     def create_response_processor(
         self,

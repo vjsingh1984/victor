@@ -57,7 +57,7 @@ from rich.console import Console
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.recovery_coordinator import RecoveryCoordinator
+    from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
@@ -4617,16 +4617,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             stream_ctx: Streaming context
 
         Returns:
-            RecoveryContext with all necessary state
+            StreamingRecoveryContext with all necessary state
         """
-        from victor.agent.recovery_coordinator import RecoveryContext
+        from victor.agent.recovery_coordinator import StreamingRecoveryContext
 
         # Get elapsed time from streaming controller
         elapsed_time = 0.0
         if self._streaming_controller.current_session:
             elapsed_time = time.time() - self._streaming_controller.current_session.start_time
 
-        return RecoveryContext(
+        return StreamingRecoveryContext(
             iteration=stream_ctx.total_iterations,
             elapsed_time=elapsed_time,
             tool_calls_used=self.tool_calls_used,

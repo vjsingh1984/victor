@@ -1011,7 +1011,7 @@ class RecoveryHandlerProtocol(Protocol):
 
 
 @runtime_checkable
-class RecoveryCoordinatorProtocol(Protocol):
+class StreamingRecoveryCoordinatorProtocol(Protocol):
     """Protocol for recovery coordination during streaming sessions.
 
     Centralizes all recovery and error handling logic for streaming chat,
@@ -1022,6 +1022,9 @@ class RecoveryCoordinatorProtocol(Protocol):
     - Filtering and truncation (blocked tools, budget limits)
     - Prompt and message generation (recovery prompts, fallback messages)
     - Metrics formatting (completion, budget exhausted)
+
+    Note: Renamed from RecoveryCoordinatorProtocol to avoid confusion with
+    victor.agent.recovery.coordinator.RecoveryCoordinator (SOLID recovery system).
 
     Extracted from CRITICAL-001 Phase 2A.
     """
@@ -2108,7 +2111,7 @@ __all__ = [
     "ConversationEmbeddingStoreProtocol",
     # Recovery protocols
     "RecoveryHandlerProtocol",
-    "RecoveryCoordinatorProtocol",
+    "StreamingRecoveryCoordinatorProtocol",
     # Utility service protocols
     "DebugLoggerProtocol",
     "TaskTypeHinterProtocol",
