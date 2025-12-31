@@ -30,7 +30,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     PromptEnrichmentService,
     EnrichmentContext,
     ContextEnrichment,

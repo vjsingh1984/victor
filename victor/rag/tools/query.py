@@ -18,7 +18,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from victor.agent.prompt_enrichment import EnrichmentContext
+from victor.framework.enrichment import EnrichmentContext
 from victor.tools.base import BaseTool, CostTier, ToolResult
 from victor.rag.enrichment import get_rag_enrichment_strategy
 

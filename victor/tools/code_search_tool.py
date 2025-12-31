@@ -527,7 +527,7 @@ async def code_search(
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid and results:
             try:
-                from victor.coding.codebase.hybrid_search import create_hybrid_search_engine
+                from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
                 keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)

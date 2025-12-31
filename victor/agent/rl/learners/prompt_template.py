@@ -977,7 +977,7 @@ class PromptTemplateLearner(BaseLearner):
         Returns:
             Callback function that can be passed to service.on_outcome()
         """
-        from victor.agent.prompt_enrichment import EnrichmentOutcome
+        from victor.framework.enrichment import EnrichmentOutcome
 
         def callback(outcome: EnrichmentOutcome) -> None:
             self.record_enrichment_outcome(

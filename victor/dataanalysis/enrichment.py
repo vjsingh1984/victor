@@ -36,7 +36,7 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Awaitable
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,

@@ -39,7 +39,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,

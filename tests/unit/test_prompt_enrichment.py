@@ -27,7 +27,7 @@ import asyncio
 import pytest
 from typing import List
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     PromptEnrichmentService,
     EnrichmentContext,
     ContextEnrichment,

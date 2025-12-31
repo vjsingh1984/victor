@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Awaitable
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,

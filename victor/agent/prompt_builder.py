@@ -30,7 +30,7 @@ from victor.agent.provider_tool_guidance import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.prompt_enrichment import (
+    from victor.framework.enrichment import (
         PromptEnrichmentService,
         EnrichmentContext,
         EnrichedPrompt,
@@ -57,6 +57,18 @@ PARALLEL READS: For exploration tasks, batch multiple read calls together.
 - Each file read is limited to ~8K chars (~230 lines) to fit context
 - List files first (ls), then batch-read relevant ones in parallel
 - Example: To understand a module, read all .py files in that directory at once
+""".strip()
+
+# Concise mode guidance to reduce verbosity
+CONCISE_MODE_GUIDANCE = """
+OUTPUT STYLE: CONCISE
+- Be direct and brief. No unnecessary preamble or summary.
+- Skip "I'll" and "Let me" phrases - just do the action.
+- No explanations unless explicitly requested.
+- For code: Show the code, minimal commentary.
+- For actions: Report result, not the process.
+- For questions: Answer directly, then stop.
+- Maximum 3 sentences for simple queries.
 """.strip()
 
 # Extended grounding rules for local models that need more explicit guidance
@@ -356,6 +368,7 @@ class SystemPromptBuilder:
         available_tools: Optional[List[str]] = None,
         enrichment_service: Optional["PromptEnrichmentService"] = None,
         vertical: Optional[str] = None,
+        concise_mode: bool = False,
     ):
         """Initialize the prompt builder.
 
@@ -370,6 +383,7 @@ class SystemPromptBuilder:
             available_tools: List of available tool names for guidance context
             enrichment_service: Optional prompt enrichment service for context injection
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
+            concise_mode: If True, adds guidance to produce brief, direct responses
         """
         self.provider_name = (provider_name or "").lower()
         self.model = model or ""
@@ -381,6 +395,7 @@ class SystemPromptBuilder:
         self.available_tools = available_tools or []
         self.enrichment_service = enrichment_service
         self.vertical = vertical or "coding"
+        self.concise_mode = concise_mode
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -555,7 +570,7 @@ class SystemPromptBuilder:
             If enrichment is disabled or unavailable, returns the original prompt.
         """
         # Import here to avoid circular imports
-        from victor.agent.prompt_enrichment import EnrichmentContext, EnrichedPrompt
+        from victor.framework.enrichment import EnrichmentContext, EnrichedPrompt
 
         # If no enrichment service, return original prompt
         if not self.enrichment_service:
@@ -607,6 +622,11 @@ class SystemPromptBuilder:
         else:
             # Fall back to provider-specific prompt
             base_prompt = self._build_for_provider()
+
+        # Prepend concise mode guidance if enabled
+        if self.concise_mode:
+            base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
+            logger.debug("Concise mode enabled - added brevity guidance to prompt")
 
         # Append provider-specific tool guidance if available (GAP-5)
         tool_guidance = self.get_provider_tool_guidance()
@@ -931,6 +951,7 @@ def build_system_prompt(
     tool_adapter: Optional[BaseToolCallingAdapter] = None,
     capabilities: Optional[ToolCallingCapabilities] = None,
     prompt_contributors: Optional[list] = None,
+    concise_mode: bool = False,
 ) -> str:
     """Build a system prompt (convenience function).
 
@@ -940,6 +961,7 @@ def build_system_prompt(
         tool_adapter: Optional tool calling adapter
         capabilities: Optional pre-computed capabilities
         prompt_contributors: Optional list of PromptContributorProtocol implementations
+        concise_mode: If True, adds guidance for brief, direct responses
 
     Returns:
         System prompt string
@@ -950,5 +972,6 @@ def build_system_prompt(
         tool_adapter=tool_adapter,
         capabilities=capabilities,
         prompt_contributors=prompt_contributors,
+        concise_mode=concise_mode,
     )
     return builder.build()

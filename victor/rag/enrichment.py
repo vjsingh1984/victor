@@ -49,7 +49,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.agent.prompt_enrichment import (
+from victor.framework.enrichment import (
     ContextEnrichment,
     EnrichmentContext,
     EnrichmentPriority,
