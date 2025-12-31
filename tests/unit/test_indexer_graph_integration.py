@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from victor.coding.codebase.graph.sqlite_store import SqliteGraphStore
+from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.coding.codebase.indexer import CodebaseIndex
 
 

@@ -15,10 +15,11 @@
 """Tests for continuation strategy."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.embeddings.intent_classifier import IntentType
+from victor.embeddings.question_classifier import QuestionType, QuestionClassificationResult
 
 
 # =============================================================================
@@ -275,11 +276,23 @@ class TestDetermineContinuationAction:
         assert result["action"] == "return_to_user"
 
     def test_continue_asking_input_auto_respond(self, strategy, base_kwargs):
-        """Test auto-responds to asking input intent."""
+        """Test auto-responds to asking input intent when question is rhetorical."""
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.ASKING_INPUT
 
-        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+        # Mock classify_question to return a rhetorical question that should auto-continue
+        # Note: should_auto_continue is a property computed from question_type and confidence
+        mock_result = QuestionClassificationResult(
+            question_type=QuestionType.RHETORICAL,
+            confidence=0.9,  # >= 0.6 so should_auto_continue will be True
+            matched_pattern="Should I proceed?",
+        )
+        with patch(
+            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+        ):
+            result = strategy.determine_continuation_action(
+                intent_result=mock_intent, **base_kwargs
+            )
 
         assert result["action"] == "continue_asking_input"
         assert "asking_input_prompts" in result["updates"]
@@ -291,7 +304,20 @@ class TestDetermineContinuationAction:
         mock_intent = MagicMock()
         mock_intent.intent = IntentType.ASKING_INPUT
 
-        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+        # Mock classify_question to return a rhetorical question (which would normally auto-continue)
+        # But since we hit max prompts, it should return to user instead
+        # Note: should_auto_continue is a property computed from question_type and confidence
+        mock_result = QuestionClassificationResult(
+            question_type=QuestionType.RHETORICAL,
+            confidence=0.9,  # >= 0.6 so should_auto_continue will be True
+            matched_pattern="Should I proceed?",
+        )
+        with patch(
+            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+        ):
+            result = strategy.determine_continuation_action(
+                intent_result=mock_intent, **base_kwargs
+            )
 
         assert result["action"] == "return_to_user"
 

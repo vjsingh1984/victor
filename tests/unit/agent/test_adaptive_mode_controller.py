@@ -42,21 +42,23 @@ from victor.agent.adaptive_mode_controller import (
 
 
 @pytest.fixture
-def tmp_db_path(tmp_path: Path) -> Path:
-    """Create a temporary database path for testing."""
-    return tmp_path / "mode_learning_test.db"
+def tmp_project_path(tmp_path: Path) -> Path:
+    """Create a temporary project path for testing."""
+    victor_dir = tmp_path / ".victor"
+    victor_dir.mkdir(parents=True, exist_ok=True)
+    return tmp_path
 
 
 @pytest.fixture
-def q_store(tmp_db_path: Path) -> QLearningStore:
+def q_store(tmp_project_path: Path) -> QLearningStore:
     """Create a QLearningStore with temporary database."""
-    return QLearningStore(db_path=tmp_db_path)
+    return QLearningStore(project_path=tmp_project_path)
 
 
 @pytest.fixture
-def controller(tmp_db_path: Path) -> AdaptiveModeController:
+def controller(tmp_project_path: Path) -> AdaptiveModeController:
     """Create an AdaptiveModeController with temporary database."""
-    q_store = QLearningStore(db_path=tmp_db_path)
+    q_store = QLearningStore(project_path=tmp_project_path)
     return AdaptiveModeController(
         profile_name="test_profile",
         q_store=q_store,
@@ -64,9 +66,9 @@ def controller(tmp_db_path: Path) -> AdaptiveModeController:
 
 
 @pytest.fixture
-def controller_with_provider(tmp_db_path: Path) -> AdaptiveModeController:
+def controller_with_provider(tmp_project_path: Path) -> AdaptiveModeController:
     """Create an AdaptiveModeController with provider configuration."""
-    q_store = QLearningStore(db_path=tmp_db_path)
+    q_store = QLearningStore(project_path=tmp_project_path)
     return AdaptiveModeController(
         profile_name="test_profile",
         q_store=q_store,
@@ -475,9 +477,9 @@ class TestProviderThresholds:
         assert "min_iterations_before_loop" in thresholds
         assert "no_tool_threshold" in thresholds
 
-    def test_get_iteration_thresholds_anthropic(self, tmp_db_path: Path):
+    def test_get_iteration_thresholds_anthropic(self, tmp_project_path: Path):
         """Test Anthropic-specific iteration thresholds."""
-        q_store = QLearningStore(db_path=tmp_db_path)
+        q_store = QLearningStore(project_path=tmp_project_path)
         controller = AdaptiveModeController(
             profile_name="test",
             q_store=q_store,
@@ -488,9 +490,9 @@ class TestProviderThresholds:
         assert thresholds["min_iterations_before_loop"] == 3
         assert thresholds["no_tool_threshold"] == 2
 
-    def test_get_iteration_thresholds_deepseek(self, tmp_db_path: Path):
+    def test_get_iteration_thresholds_deepseek(self, tmp_project_path: Path):
         """Test DeepSeek-specific iteration thresholds (reasoning model)."""
-        q_store = QLearningStore(db_path=tmp_db_path)
+        q_store = QLearningStore(project_path=tmp_project_path)
         controller = AdaptiveModeController(
             profile_name="test",
             q_store=q_store,
@@ -509,13 +511,13 @@ class TestProviderThresholds:
         assert "min_quality" in thresholds
         assert "grounding_threshold" in thresholds
 
-    def test_get_quality_thresholds_with_provider_adapter(self, tmp_db_path: Path):
+    def test_get_quality_thresholds_with_provider_adapter(self, tmp_project_path: Path):
         """Test quality thresholds from provider adapter."""
         mock_adapter = MagicMock()
         mock_adapter.capabilities.quality_threshold = 0.85
         mock_adapter.capabilities.grounding_strictness = 0.75
 
-        q_store = QLearningStore(db_path=tmp_db_path)
+        q_store = QLearningStore(project_path=tmp_project_path)
         controller = AdaptiveModeController(
             profile_name="test",
             q_store=q_store,
@@ -695,10 +697,10 @@ class TestRecordOutcome:
 
         assert reward == 0.0
 
-    def test_record_outcome_with_mode_transition_learner(self, tmp_db_path: Path):
+    def test_record_outcome_with_mode_transition_learner(self, tmp_project_path: Path):
         """Test recording outcome with ModeTransitionLearner integration."""
         mock_learner = MagicMock()
-        q_store = QLearningStore(db_path=tmp_db_path)
+        q_store = QLearningStore(project_path=tmp_project_path)
 
         controller = AdaptiveModeController(
             profile_name="test",
@@ -898,13 +900,13 @@ class TestOptimalToolBudget:
 
         assert budget > 0
 
-    def test_get_optimal_tool_budget_with_learner(self, tmp_db_path: Path):
+    def test_get_optimal_tool_budget_with_learner(self, tmp_project_path: Path):
         """Test optimal budget from ModeTransitionLearner when available."""
         mock_learner = MagicMock()
         mock_learner.get_optimal_budget.return_value = 15
         mock_learner.get_task_stats.return_value = {"sample_count": 100}
 
-        q_store = QLearningStore(db_path=tmp_db_path)
+        q_store = QLearningStore(project_path=tmp_project_path)
         controller = AdaptiveModeController(
             profile_name="test",
             q_store=q_store,

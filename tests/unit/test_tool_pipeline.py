@@ -398,8 +398,10 @@ class TestToolPipelineParallelExecution:
     @pytest.mark.asyncio
     async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
         """Test that parallel execution skips repeated failing calls."""
-        # Add a failed signature
-        parallel_pipeline._failed_signatures.add(("failing_tool", '{"x": 1}'))
+        # Add a failed signature using the actual signature format
+        # Compute the signature the same way the pipeline does
+        failing_sig = parallel_pipeline._get_call_signature("failing_tool", {"x": 1})
+        parallel_pipeline._failed_signatures.add(failing_sig)
 
         tool_calls = [
             {"name": "test_tool", "arguments": {"a": 1}},
@@ -499,8 +501,12 @@ class TestToolPipelineNormalization:
     def test_get_call_signature_json(self, pipeline):
         """Test generating call signature."""
         sig = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
-        assert sig[0] == "test_tool"
-        assert isinstance(sig[1], str)
+        # Signature is a string (either hex hash from native or tool:args from fallback)
+        assert isinstance(sig, str)
+        assert len(sig) > 0
+        # Same args should produce same signature
+        sig2 = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
+        assert sig == sig2
 
     def test_get_call_signature_non_serializable(self, pipeline):
         """Test generating call signature with non-serializable args."""
@@ -509,9 +515,9 @@ class TestToolPipelineNormalization:
             pass
 
         sig = pipeline._get_call_signature("test_tool", {"obj": NonSerializable()})
-        assert sig[0] == "test_tool"
-        # Should fall back to str()
-        assert isinstance(sig[1], str)
+        # Signature is a string even with non-serializable args (uses str() fallback)
+        assert isinstance(sig, str)
+        assert len(sig) > 0
 
 
 class TestToolPipelineCodeCorrection:
