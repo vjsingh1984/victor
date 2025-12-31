@@ -103,6 +103,20 @@ class ToolCallingAdapterRegistry:
                 "deepseek": OpenAIToolCallingAdapter,
                 # Groq Cloud uses OpenAI-compatible API format
                 "groqcloud": OpenAIToolCallingAdapter,
+                # Cerebras uses OpenAI-compatible API format
+                "cerebras": OpenAIToolCallingAdapter,
+                # Fireworks uses OpenAI-compatible API format
+                "fireworks": OpenAIToolCallingAdapter,
+                # Mistral uses OpenAI-compatible API format
+                "mistral": OpenAIToolCallingAdapter,
+                # OpenRouter uses OpenAI-compatible API format
+                "openrouter": OpenAIToolCallingAdapter,
+                # Moonshot/Kimi uses OpenAI-compatible API format
+                "moonshot": OpenAIToolCallingAdapter,
+                # xAI/Grok uses OpenAI-compatible API format
+                "xai": OpenAIToolCallingAdapter,
+                # Together AI uses OpenAI-compatible API format
+                "together": OpenAIToolCallingAdapter,
             }
 
         # Check for exact match
