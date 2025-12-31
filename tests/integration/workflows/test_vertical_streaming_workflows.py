@@ -90,7 +90,6 @@ def dataanalysis_provider():
 # ============ CodingWorkflowProvider Tests ============
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestCodingWorkflowProviderStreaming:
@@ -108,6 +107,7 @@ class TestCodingWorkflowProviderStreaming:
         executor = coding_provider.create_streaming_executor(mock_orchestrator)
         assert isinstance(executor, StreamingWorkflowExecutor)
 
+    @pytest.mark.asyncio
     async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, coding_provider):
         """Test astream raises ValueError for unknown workflow name."""
         with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
@@ -134,7 +134,6 @@ class TestCodingWorkflowProviderStreaming:
 # ============ DevOpsWorkflowProvider Tests ============
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestDevOpsWorkflowProviderStreaming:
@@ -152,6 +151,7 @@ class TestDevOpsWorkflowProviderStreaming:
         executor = devops_provider.create_streaming_executor(mock_orchestrator)
         assert isinstance(executor, StreamingWorkflowExecutor)
 
+    @pytest.mark.asyncio
     async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, devops_provider):
         """Test astream raises ValueError for unknown workflow name."""
         with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
@@ -178,7 +178,6 @@ class TestDevOpsWorkflowProviderStreaming:
 # ============ ResearchWorkflowProvider Tests ============
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestResearchWorkflowProviderStreaming:
@@ -196,6 +195,7 @@ class TestResearchWorkflowProviderStreaming:
         executor = research_provider.create_streaming_executor(mock_orchestrator)
         assert isinstance(executor, StreamingWorkflowExecutor)
 
+    @pytest.mark.asyncio
     async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, research_provider):
         """Test astream raises ValueError for unknown workflow name."""
         with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
@@ -222,7 +222,6 @@ class TestResearchWorkflowProviderStreaming:
 # ============ DataAnalysisWorkflowProvider Tests ============
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestDataAnalysisWorkflowProviderStreaming:
@@ -242,6 +241,7 @@ class TestDataAnalysisWorkflowProviderStreaming:
         executor = dataanalysis_provider.create_streaming_executor(mock_orchestrator)
         assert isinstance(executor, StreamingWorkflowExecutor)
 
+    @pytest.mark.asyncio
     async def test_astream_raises_for_unknown_workflow(
         self, mock_orchestrator, dataanalysis_provider
     ):
@@ -270,7 +270,6 @@ class TestDataAnalysisWorkflowProviderStreaming:
 # ============ Cross-Vertical Tests ============
 
 
-@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestCrossVerticalStreamingConsistency:

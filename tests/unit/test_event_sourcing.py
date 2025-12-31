@@ -17,7 +17,7 @@
 import pytest
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -149,7 +149,7 @@ class TestEvent:
         """Test deserialization."""
         data = {
             "event_id": "test-id",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": 1,
             "data": {"order_id": "123", "customer": "Test"},
         }

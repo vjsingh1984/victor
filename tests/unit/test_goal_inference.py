@@ -74,7 +74,9 @@ def test_security_keyword_tool_selection_with_mocked_registry():
             names = [t.name for t in tools]
             assert "scan" in names
         finally:
-            orch.shutdown()
+            import asyncio
+
+            asyncio.run(orch.shutdown())
 
 
 def test_metrics_keyword_tool_selection_with_mocked_registry():
@@ -90,4 +92,6 @@ def test_metrics_keyword_tool_selection_with_mocked_registry():
             names = [t.name for t in tools]
             assert "metrics" in names
         finally:
-            orch.shutdown()
+            import asyncio
+
+            asyncio.run(orch.shutdown())

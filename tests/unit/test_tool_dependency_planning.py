@@ -83,7 +83,9 @@ def test_planned_tools_prepended_to_selection():
         # Planned tools should be at the start
         assert names[:3] == ["search", "read", "docs_coverage"]
     finally:
-        orch.shutdown()
+        import asyncio
+
+        asyncio.run(orch.shutdown())
 
 
 def test_keyword_matching_uses_registry():
@@ -111,7 +113,9 @@ def test_docs_keyword_matching_with_mock_registry():
             names = [t.name for t in tools]
             assert "docs_coverage" in names
         finally:
-            orch.shutdown()
+            import asyncio
+
+            asyncio.run(orch.shutdown())
 
 
 def test_registry_keyword_lookup():

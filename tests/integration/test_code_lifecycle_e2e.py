@@ -130,7 +130,7 @@ async def agent_with_tools(ollama_coding_provider):
     yield agent
 
     # Cleanup
-    agent.shutdown()
+    await agent.shutdown()
 
 
 @pytest.mark.asyncio
@@ -464,7 +464,7 @@ Write the enhanced version back to the same file."""
         print("\n⚠️  Agent didn't add the requested function (may need better prompting)")
 
     # Cleanup
-    agent.shutdown()
+    await agent.shutdown()
 
 
 if __name__ == "__main__":
