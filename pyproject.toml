@@ -148,6 +148,12 @@ api = [
     "uvicorn>=0.27",
 ]
 
+# Checkpoint persistence with SQLite backend
+# Usage: pip install victor[checkpoints]
+checkpoints = [
+    "aiosqlite>=0.19",
+]
+
 # Google Gemini provider (using new google-genai SDK)
 # Usage: pip install victor[google]
 google = [
