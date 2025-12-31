@@ -1578,8 +1578,12 @@ async def graph(
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
-            results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k)
-            results = [r for r in results if not _skip_path(r.get("file"))]
+            # Request more results to account for filtering, then trim to top_k
+            results = analyzer.pagerank(edge_types=weighted_edges, top_k=top_k * 3)
+            results = [r for r in results if not _skip_path(r.get("file"))][:top_k]
+            # Re-assign ranks after filtering (1-indexed)
+            for i, r in enumerate(results):
+                r["rank"] = i + 1
             if structured:
                 results = _add_callsites(_add_edge_counts(results))
                 return {
@@ -1596,8 +1600,12 @@ async def graph(
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
-            results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k)
-            results = [r for r in results if not _skip_path(r.get("file"))]
+            # Request more results to account for filtering, then trim to top_k
+            results = analyzer.degree_centrality(edge_types=weighted_edges, top_k=top_k * 3)
+            results = [r for r in results if not _skip_path(r.get("file"))][:top_k]
+            # Re-assign ranks after filtering (1-indexed)
+            for i, r in enumerate(results):
+                r["rank"] = i + 1
             if structured:
                 results = _add_callsites(_add_edge_counts(results))
                 return {
