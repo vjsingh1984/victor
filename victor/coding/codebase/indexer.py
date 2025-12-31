@@ -60,22 +60,76 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # These are Python standard library modules that shouldn't be indexed as nodes
 # because they inflate PageRank scores with external dependencies.
-STDLIB_MODULES = frozenset({
-    # Core builtins
-    "abc", "asyncio", "builtins", "collections", "contextlib", "copy",
-    "dataclasses", "datetime", "decimal", "enum", "functools", "gc",
-    "hashlib", "heapq", "importlib", "inspect", "io", "itertools", "json",
-    "logging", "math", "operator", "os", "pathlib", "pickle", "platform",
-    "pprint", "queue", "random", "re", "secrets", "shutil", "signal",
-    "socket", "sqlite3", "ssl", "string", "struct", "subprocess", "sys",
-    "tempfile", "threading", "time", "traceback", "typing", "unittest",
-    "urllib", "uuid", "warnings", "weakref", "xml", "zipfile", "zlib",
-    # Typing extensions
-    "typing_extensions",
-    # Common third-party (can be expanded)
-    "numpy", "pandas", "requests", "aiohttp", "httpx", "pydantic",
-    "pytest", "mock", "unittest.mock",
-})
+STDLIB_MODULES = frozenset(
+    {
+        # Core builtins
+        "abc",
+        "asyncio",
+        "builtins",
+        "collections",
+        "contextlib",
+        "copy",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "enum",
+        "functools",
+        "gc",
+        "hashlib",
+        "heapq",
+        "importlib",
+        "inspect",
+        "io",
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "operator",
+        "os",
+        "pathlib",
+        "pickle",
+        "platform",
+        "pprint",
+        "queue",
+        "random",
+        "re",
+        "secrets",
+        "shutil",
+        "signal",
+        "socket",
+        "sqlite3",
+        "ssl",
+        "string",
+        "struct",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "time",
+        "traceback",
+        "typing",
+        "unittest",
+        "urllib",
+        "uuid",
+        "warnings",
+        "weakref",
+        "xml",
+        "zipfile",
+        "zlib",
+        # Typing extensions
+        "typing_extensions",
+        # Common third-party (can be expanded)
+        "numpy",
+        "pandas",
+        "requests",
+        "aiohttp",
+        "httpx",
+        "pydantic",
+        "pytest",
+        "mock",
+        "unittest.mock",
+    }
+)
 
 
 def _is_stdlib_module(module_name: str) -> bool:
@@ -2356,7 +2410,7 @@ class BackgroundIndexerService:
     ):
         self.root = root
         self.interval_seconds = interval_seconds
-        self._indexer: Optional[CodebaseIndexer] = None
+        self._indexer: Optional["CodebaseIndex"] = None
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._running = False
@@ -2435,7 +2489,7 @@ class BackgroundIndexerService:
     def _run_incremental_reindex(self) -> None:
         """Perform incremental reindex using mtime detection."""
         if self._indexer is None:
-            self._indexer = CodebaseIndexer(self.root)
+            self._indexer = CodebaseIndex(self.root)
 
         # Only reindex if there are changes (mtime-based detection)
         if not self._indexer._is_stale and self._indexer._is_indexed:

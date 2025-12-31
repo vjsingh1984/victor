@@ -1003,8 +1003,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Also look for explicit "read", "analyze", "audit" + file patterns
         explicit_pattern = re.compile(
-            r"(?:read|analyze|audit|check|review|examine)\s+"
-            r"([/\w.-]+(?:/[\w.-]+)+)",
+            r"(?:read|analyze|audit|check|review|examine)\s+" r"([/\w.-]+(?:/[\w.-]+)+)",
             re.IGNORECASE,
         )
         for match in explicit_pattern.finditer(user_message):
@@ -1188,17 +1187,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._recovery_integration
 
     @property
-    def recovery_coordinator(self) -> "RecoveryCoordinator":
+    def recovery_coordinator(self) -> "StreamingRecoveryCoordinator":
         """Get the recovery coordinator for centralized recovery logic.
 
-        The RecoveryCoordinator consolidates all recovery and error handling
+        The StreamingRecoveryCoordinator consolidates all recovery and error handling
         logic for streaming sessions, including condition checking, action
         handling, and recovery integration.
 
         Extracted from CRITICAL-001 Phase 2A.
 
         Returns:
-            RecoveryCoordinator instance for recovery coordination
+            StreamingRecoveryCoordinator instance for recovery coordination
         """
         return self._recovery_coordinator
 
@@ -1463,9 +1462,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync middleware chain with vertical context for vertical-aware middleware (DIP)
         if hasattr(self, "_middleware_chain") and self._middleware_chain is not None:
             self._middleware_chain.set_vertical_context(context)
-            logger.debug(
-                f"Middleware chain synced with vertical context: {context.vertical_name}"
-            )
+            logger.debug(f"Middleware chain synced with vertical context: {context.vertical_name}")
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
@@ -2174,9 +2171,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     embedding_service=embedding_service,
                 )
                 ces_module._embedding_store = self._conversation_embedding_store
-                logger.debug(
-                    "[AgentOrchestrator] Created ConversationEmbeddingStore singleton"
-                )
+                logger.debug("[AgentOrchestrator] Created ConversationEmbeddingStore singleton")
 
             # Wire it to the memory manager for automatic sync
             self.memory_manager.set_embedding_store(self._conversation_embedding_store)
@@ -4482,7 +4477,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # UnifiedTaskTracker (semantic-based). Either source detecting analysis = analysis task.
         # This fixes the mismatch where unified_task_type=ANALYZE but is_analysis_task=False
         ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
-            "analyze", "analysis"
+            "analyze",
+            "analysis",
         )
         ctx.is_action_task = task_keywords["is_action_task"]
         ctx.needs_execution = task_keywords["needs_execution"]
@@ -5035,6 +5031,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Callback for tracking
                 if hasattr(self, "_on_tool_complete_callback"):
                     from victor.tools.tool_pipeline import ToolCallResult
+
                     callback_result = ToolCallResult(
                         tool_name=tool_name,
                         tool_call_id=f"extracted_{tool_name}_{self.tool_calls_used}",
@@ -5060,9 +5057,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     success=False,
                 )
 
-                logger.warning(
-                    f"[ExtractedToolExecution] {tool_name} failed: {error_msg}"
-                )
+                logger.warning(f"[ExtractedToolExecution] {tool_name} failed: {error_msg}")
 
         except Exception as e:
             logger.error(f"[ExtractedToolExecution] Exception executing {tool_name}: {e}")
@@ -6110,7 +6105,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Check for force finalize from grounding failures
                 # This prevents infinite loops when grounding keeps failing
                 if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get("finalize_reason", "grounding limit exceeded")
+                    finalize_reason = quality_result.get(
+                        "finalize_reason", "grounding limit exceeded"
+                    )
                     logger.warning(
                         f"Force finalize triggered: {finalize_reason}. "
                         "Stopping continuation to prevent infinite loop."
@@ -6173,9 +6170,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     intent_cache_key = hash(intent_text)
                     if intent_cache_key in self._intent_cache:
                         intent_result = self._intent_cache[intent_cache_key]
-                        logger.debug(
-                            f"Intent classification (cached): {intent_result.intent.name}"
-                        )
+                        logger.debug(f"Intent classification (cached): {intent_result.intent.name}")
                     else:
                         intent_result = self.intent_classifier.classify_intent_sync(intent_text)
                         # Cache the result (limit cache size to prevent memory bloat)
@@ -6225,7 +6220,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                                 if hasattr(self.conversation_state, "_history"):
                                     history = self.conversation_state._history
                                     if hasattr(history, "get_max_visit_count"):
-                                        cycle_count = max(cycle_count, history.get_max_visit_count())
+                                        cycle_count = max(
+                                            cycle_count, history.get_max_visit_count()
+                                        )
                         except Exception:
                             pass  # Don't fail on state access errors
 

@@ -81,11 +81,10 @@ def run_sync(coro: Awaitable[T]) -> T:
         result = run_sync(async_fetch())
     """
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # We're in an async context - can't nest asyncio.run()
         raise RuntimeError(
-            "Cannot use run_sync() from within an async context. "
-            "Use 'await' instead."
+            "Cannot use run_sync() from within an async context. " "Use 'await' instead."
         )
     except RuntimeError:
         # No running loop - safe to use asyncio.run()
@@ -180,9 +179,7 @@ class SyncAsyncBridge:
         return run_sync(coro)
 
     @classmethod
-    def sync_method(
-        cls, async_method: Callable[..., Awaitable[T]]
-    ) -> Callable[..., T]:
+    def sync_method(cls, async_method: Callable[..., Awaitable[T]]) -> Callable[..., T]:
         """Create a sync method wrapper for an async method.
 
         Args:
@@ -204,9 +201,7 @@ class SyncAsyncBridge:
         return wrapper
 
 
-def ensure_async(
-    func: Callable[..., Any]
-) -> Callable[..., Awaitable[Any]]:
+def ensure_async(func: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
     """Ensure a function is async-compatible.
 
     If the function is already async, returns it unchanged.

@@ -66,6 +66,7 @@ from victor.agent.synthesis_checkpoint import (
 # Import native compute_signature for 10-20x faster signature generation
 try:
     from victor.processing.native import compute_signature as native_compute_signature
+
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
@@ -1335,16 +1336,16 @@ class ToolPipeline:
                 logger.warning(f"Deduplication tracker check failed: {e}")
 
         # Process through middleware chain (before execution)
-        middleware_blocked = False
         if self.middleware_chain is not None:
             try:
-                before_result = await self.middleware_chain.process_before(tool_name, normalized_args)
+                before_result = await self.middleware_chain.process_before(
+                    tool_name, normalized_args
+                )
                 if not before_result.proceed:
                     logger.info(
                         f"[Pipeline] Tool '{tool_name}' blocked by middleware: "
                         f"{before_result.error_message}"
                     )
-                    middleware_blocked = True
                     return ToolCallResult(
                         tool_name=tool_name,
                         arguments=normalized_args,

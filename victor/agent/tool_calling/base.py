@@ -20,6 +20,7 @@ LLM providers, abstracting away provider-specific formats and behaviors.
 """
 
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -28,6 +29,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 from victor.providers.base import ToolDefinition
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -482,9 +485,7 @@ class FallbackParsingMixin:
                     result.warnings.append(f"Skipped invalid tool name: {extracted.name}")
                     continue
 
-                tool_calls.append(
-                    ToolCall(name=extracted.name, arguments=extracted.arguments)
-                )
+                tool_calls.append(ToolCall(name=extracted.name, arguments=extracted.arguments))
 
             if not tool_calls:
                 return ToolCallParseResult(
@@ -539,9 +540,7 @@ class FallbackParsingMixin:
             return result
 
         # Try Python-style function call parsing (for open-weight models)
-        result = self.parse_python_call_from_content(
-            content, validate_name_fn, valid_tool_names
-        )
+        result = self.parse_python_call_from_content(content, validate_name_fn, valid_tool_names)
         if result.tool_calls:
             return result
 
