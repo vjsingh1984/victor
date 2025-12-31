@@ -108,6 +108,26 @@ class DataAnalysisRLConfig:
         """Check if a learner is active."""
         return learner in self.active_learners
 
+    def get_rl_config(self) -> Dict[str, Any]:
+        """Return RL configuration as dictionary (protocol compliance).
+
+        Implements RLConfigProviderProtocol.get_rl_config() to enable
+        integration with the vertical framework.
+
+        Returns:
+            Dict with RL configuration including:
+            - active_learners: List of learner type values
+            - task_type_mappings: Map task types to recommended tools
+            - quality_thresholds: Task-specific quality thresholds
+            - default_patience: Provider-specific patience settings
+        """
+        return {
+            "active_learners": [learner.value for learner in self.active_learners],
+            "task_type_mappings": self.task_type_mappings,
+            "quality_thresholds": self.quality_thresholds,
+            "default_patience": self.default_patience,
+        }
+
     def __repr__(self) -> str:
         return (
             f"DataAnalysisRLConfig(learners={len(self.active_learners)}, "

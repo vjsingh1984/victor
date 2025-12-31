@@ -226,6 +226,9 @@ class RLHookRegistry:
         self._exploitation_counts: Dict[str, int] = {}  # learner -> exploitation count
         self._epsilon_history: List[tuple] = []  # (timestamp, learner, epsilon)
 
+        # Track whether we've warned about missing coordinator (only warn once)
+        self._warned_no_coordinator = False
+
         # Initialize default subscriptions
         self._init_default_subscriptions()
 
@@ -243,6 +246,7 @@ class RLHookRegistry:
             coordinator: RL coordinator instance
         """
         self._coordinator = coordinator
+        self._warned_no_coordinator = False  # Reset warning flag
         logger.debug("RLHookRegistry connected to coordinator")
 
     def subscribe(self, event_type: RLEventType, learner_name: str) -> None:
@@ -306,7 +310,15 @@ class RLHookRegistry:
 
         # Dispatch to subscribed learners
         if self._coordinator is None:
-            logger.warning("RL: No coordinator set, event not dispatched")
+            # Only warn once about missing coordinator (expected during early startup)
+            if not self._warned_no_coordinator:
+                logger.debug("RL: No coordinator set, events will be dispatched once coordinator is connected")
+                self._warned_no_coordinator = True
+            return
+
+        # Check if coordinator is closed (prevents "Cannot operate on closed database" errors)
+        if hasattr(self._coordinator, "is_closed") and self._coordinator.is_closed:
+            logger.debug("RL: Coordinator is closed, skipping event dispatch")
             return
 
         learners = self._subscribers.get(event.type, set())
@@ -314,7 +326,11 @@ class RLHookRegistry:
             try:
                 self._dispatch_to_learner(learner_name, event)
             except Exception as e:
-                logger.warning(f"RL: Failed to dispatch to '{learner_name}': {e}")
+                # Don't log warnings for closed database errors (expected during shutdown)
+                if "closed database" in str(e).lower():
+                    logger.debug(f"RL: Skipping dispatch to '{learner_name}' - database closed")
+                else:
+                    logger.warning(f"RL: Failed to dispatch to '{learner_name}': {e}")
 
         # Dispatch to custom handlers
         handlers = self._custom_handlers.get(event.type, [])

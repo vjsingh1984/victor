@@ -492,6 +492,9 @@ class RLCoordinator:
         self._writer_queue: Optional[AsyncWriterQueue] = None
         self._writer_queue_enabled = False
 
+        # Lifecycle state tracking
+        self._is_closed = False
+
         # Ensure core tables exist
         self._ensure_core_tables()
 
@@ -1101,8 +1104,18 @@ class RLCoordinator:
         """
         return self._writer_queue_enabled and self._writer_queue is not None
 
+    @property
+    def is_closed(self) -> bool:
+        """Check if coordinator is closed.
+
+        Returns:
+            True if coordinator has been closed
+        """
+        return self._is_closed
+
     def close(self) -> None:
-        """Close database connection."""
+        """Close database connection and mark coordinator as closed."""
+        self._is_closed = True
         if self.db:
             self.db.close()
             logger.debug("RL: Database connection closed")
