@@ -2046,7 +2046,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Args:
             patterns: List of safety pattern instances
         """
-        self._safety_patterns = patterns
+        self._vertical_safety_patterns = patterns
 
     @property
     def messages(self) -> List[Message]:
