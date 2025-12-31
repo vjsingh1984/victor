@@ -92,6 +92,14 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset EventBus singleton (cancels pending async tasks to prevent leaks)
+        try:
+            from victor.observability.event_bus import EventBus
+
+            EventBus.reset_instance()
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 

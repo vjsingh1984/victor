@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -62,6 +63,7 @@ class EventCategory(str, Enum):
     AUDIT = "audit"  # Security and compliance
     METRIC = "metric"  # Performance metrics
     LIFECYCLE = "lifecycle"  # Session start/end
+    VERTICAL = "vertical"  # Vertical integration events
     CUSTOM = "custom"  # User-defined events
 
 
@@ -309,6 +311,13 @@ class EventBus:
         self._initialized = True
         self._lock = threading.Lock()
 
+        # Track pending async tasks to prevent leaks under stress
+        self._pending_tasks: set[asyncio.Task[None]] = set()
+
+        # Rate-limited warning for DROP_OLDEST/DROP_NEWEST (Fix: Workstream E)
+        self._last_drop_warning: float = 0
+        self._drop_warning_interval: float = 60.0  # seconds - max 1 warning per minute
+
     @classmethod
     def get_instance(cls) -> "EventBus":
         """Get the singleton EventBus instance.
@@ -326,11 +335,19 @@ class EventBus:
         """
         with cls._lock:
             if cls._instance is not None:
+                # Cancel all pending async tasks to prevent leaks
+                pending = getattr(cls._instance, "_pending_tasks", set())
+                for task in list(pending):
+                    if not task.done():
+                        task.cancel()
+                pending.clear()
+
                 cls._instance._subscriptions = {cat: [] for cat in EventCategory}
                 cls._instance._exporters = []
                 cls._instance._session_id = None
                 cls._instance._trace_context = {}
                 cls._instance._backpressure_metrics = BackpressureMetrics()
+                cls._instance._pending_tasks = set()
                 # Recreate queue with same maxsize
                 maxsize = getattr(cls._instance, "_queue_maxsize", 10000)
                 cls._instance._event_queue = asyncio.Queue(maxsize=maxsize)
@@ -459,8 +476,10 @@ class EventBus:
             if subscription.matches(event):
                 try:
                     if subscription.is_async:
-                        # Queue async handler
-                        asyncio.create_task(subscription.handler(event))  # type: ignore
+                        # Queue async handler with tracking to prevent leaks
+                        task = asyncio.create_task(subscription.handler(event))  # type: ignore
+                        self._pending_tasks.add(task)
+                        task.add_done_callback(self._pending_tasks.discard)
                     else:
                         subscription.handler(event)
                 except Exception as e:
@@ -533,6 +552,51 @@ class EventBus:
         """
         if exporter in self._exporters:
             self._exporters.remove(exporter)
+
+    async def shutdown(self, timeout: float = 5.0) -> int:
+        """Gracefully shutdown the event bus.
+
+        Cancels all pending async tasks and waits for them to complete.
+        Use this before application exit to prevent task leaks.
+
+        Args:
+            timeout: Maximum seconds to wait for tasks to complete.
+
+        Returns:
+            Number of tasks that were cancelled.
+        """
+        cancelled_count = 0
+        pending = list(self._pending_tasks)
+
+        if not pending:
+            return 0
+
+        # Cancel all pending tasks
+        for task in pending:
+            if not task.done():
+                task.cancel()
+                cancelled_count += 1
+
+        # Wait for tasks to complete (with timeout)
+        if pending:
+            try:
+                await asyncio.wait(pending, timeout=timeout)
+            except Exception as e:
+                logger.debug(f"Error waiting for tasks during shutdown: {e}")
+
+        self._pending_tasks.clear()
+        logger.debug(f"EventBus shutdown: cancelled {cancelled_count} pending tasks")
+        return cancelled_count
+
+    def get_pending_task_count(self) -> int:
+        """Get count of pending async tasks.
+
+        Useful for debugging and monitoring task leaks.
+
+        Returns:
+            Number of pending tasks.
+        """
+        return len(self._pending_tasks)
 
     def get_subscription_count(self, category: Optional[EventCategory] = None) -> int:
         """Get number of subscriptions.
@@ -655,15 +719,27 @@ class EventBus:
 
         if self._backpressure_strategy == BackpressureStrategy.DROP_NEWEST:
             self._backpressure_metrics.events_dropped += 1
-            logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
+            # Rate-limited warning for DROP_NEWEST (Workstream E fix)
+            now = time.time()
+            if now - self._last_drop_warning >= self._drop_warning_interval:
+                logger.warning("Event bus dropping events (queue full, DROP_NEWEST strategy)")
+                self._last_drop_warning = now
+            else:
+                logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
             return False
 
         elif self._backpressure_strategy == BackpressureStrategy.DROP_OLDEST:
             try:
                 # Remove oldest event
                 dropped = self._event_queue.get_nowait()
-                logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
                 self._backpressure_metrics.events_dropped += 1
+                # Rate-limited warning for DROP_OLDEST (Workstream E fix)
+                now = time.time()
+                if now - self._last_drop_warning >= self._drop_warning_interval:
+                    logger.warning("Event bus dropping events (queue full, DROP_OLDEST strategy)")
+                    self._last_drop_warning = now
+                else:
+                    logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
                 # Add new event
                 self._event_queue.put_nowait(event)
                 return True
@@ -721,14 +797,26 @@ class EventBus:
 
         if self._backpressure_strategy == BackpressureStrategy.DROP_NEWEST:
             self._backpressure_metrics.events_dropped += 1
-            logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
+            # Rate-limited warning for DROP_NEWEST (Workstream E fix)
+            now = time.time()
+            if now - self._last_drop_warning >= self._drop_warning_interval:
+                logger.warning("Event bus dropping events (queue full, DROP_NEWEST strategy)")
+                self._last_drop_warning = now
+            else:
+                logger.debug(f"Event dropped (DROP_NEWEST): {event.name}")
             return False
 
         elif self._backpressure_strategy == BackpressureStrategy.DROP_OLDEST:
             try:
                 dropped = self._event_queue.get_nowait()
-                logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
                 self._backpressure_metrics.events_dropped += 1
+                # Rate-limited warning for DROP_OLDEST (Workstream E fix)
+                now = time.time()
+                if now - self._last_drop_warning >= self._drop_warning_interval:
+                    logger.warning("Event bus dropping events (queue full, DROP_OLDEST strategy)")
+                    self._last_drop_warning = now
+                else:
+                    logger.debug(f"Event dropped (DROP_OLDEST): {dropped.name}")
                 self._event_queue.put_nowait(event)
                 return True
             except (asyncio.QueueEmpty, asyncio.QueueFull):
