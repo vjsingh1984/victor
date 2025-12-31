@@ -141,6 +141,13 @@ build = [
     "pyinstaller-hooks-contrib>=2024.0",
 ]
 
+# HTTP API server for IDE integrations (VS Code, JetBrains, etc.)
+# Usage: pip install victor[api]
+api = [
+    "fastapi>=0.109",
+    "uvicorn>=0.27",
+]
+
 # Google Gemini provider (using new google-genai SDK)
 # Usage: pip install victor[google]
 google = [
