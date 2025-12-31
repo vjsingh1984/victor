@@ -5301,7 +5301,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 if resolved_name != name:
                     tc["name"] = resolved_name
                     name = resolved_name
-                is_enabled = self.tools.is_tool_enabled(name)
+                # Use ToolAccessController (with tiered config) instead of registry directly
+                is_enabled = self.is_tool_enabled(name)
                 logger.debug(f"Tool '{name}' enabled={is_enabled}")
                 if is_enabled:
                     valid_tool_calls.append(tc)
@@ -5905,6 +5906,47 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             logger.debug(
                                 f"Recovery attempt {attempt}: got {len(response.content)} chars"
                             )
+
+                            # Try to extract tool calls from text (for models like Groq that
+                            # write tool call syntax in their response instead of using API)
+                            try:
+                                from victor.agent.tool_calling.text_extractor import (
+                                    extract_tool_calls_from_text,
+                                )
+
+                                # Get valid tool names from registry
+                                valid_tool_names = {
+                                    t.name for t in self.tools.list_tools(only_enabled=True)
+                                }
+                                extraction_result = extract_tool_calls_from_text(
+                                    response.content,
+                                    valid_tool_names=valid_tool_names,
+                                )
+                                if extraction_result.success and extraction_result.tool_calls:
+                                    logger.info(
+                                        f"Recovery: Extracted {len(extraction_result.tool_calls)} "
+                                        f"tool calls from text output"
+                                    )
+                                    # Convert ExtractedToolCall to dict format for main loop
+                                    tool_calls = [
+                                        {
+                                            "name": tc.name,
+                                            "arguments": tc.arguments,
+                                            "id": f"recovery_{idx}",
+                                        }
+                                        for idx, tc in enumerate(extraction_result.tool_calls)
+                                    ]
+                                    # Re-inject prompt and let main loop handle tool execution
+                                    self.add_message("user", prompt)
+                                    if extraction_result.remaining_content:
+                                        self.add_message(
+                                            "assistant", extraction_result.remaining_content
+                                        )
+                                    recovery_success = True
+                                    break
+                            except Exception as e:
+                                logger.debug(f"Text extraction failed during recovery: {e}")
+
                             sanitized = self._sanitize_response(response.content)
                             if sanitized and len(sanitized) > 20:
                                 self.add_message("assistant", sanitized)
@@ -6692,7 +6734,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 canonical_tool_name = tool_name
 
             # Skip unknown tools immediately (no retries, no budget cost)
-            if not self.tools.is_tool_enabled(canonical_tool_name):
+            # Use ToolAccessController (with tiered config) instead of registry directly
+            if not self.is_tool_enabled(canonical_tool_name):
                 # Log original and canonical names to aid debugging in tests
                 self.console.print(
                     f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
