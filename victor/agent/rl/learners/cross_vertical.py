@@ -373,6 +373,7 @@ class CrossVerticalLearner(BaseLearner):
                 value=0.5,
                 confidence=0.3,
                 reason=f"Sufficient local data ({local_count} samples) - use local learner",
+                sample_size=local_count,
                 is_baseline=True,
             )
 
@@ -396,10 +397,8 @@ class CrossVerticalLearner(BaseLearner):
                     f"Cross-vertical pattern from {', '.join(matching_pattern.source_verticals)}: "
                     f"{matching_pattern.recommendation}"
                 ),
+                sample_size=matching_pattern.sample_count,
                 is_baseline=False,
-                formation=None,
-                suggested_budget=None,
-                role_distribution=None,
             )
 
         # No matching pattern found
@@ -407,6 +406,7 @@ class CrossVerticalLearner(BaseLearner):
             value=0.5,
             confidence=0.2,
             reason=f"No cross-vertical pattern for task type '{task_type}'",
+            sample_size=0,
             is_baseline=True,
         )
 
