@@ -138,16 +138,67 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
         )
 
 
-class OpenAIToolCallingAdapter(BaseToolCallingAdapter):
-    """Adapter for OpenAI GPT models.
+class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Adapter for OpenAI GPT models and OpenAI-compatible providers.
 
     OpenAI uses function calling format with tool_calls containing
     function.name and function.arguments (as JSON string).
+
+    This adapter now includes FallbackParsingMixin for handling cases where
+    open-weight models on OpenAI-compatible providers (Cerebras, Groq, Together,
+    etc.) output tool calls as text instead of structured JSON.
+
+    Fallback parsing order:
+    1. Native tool_calls from provider response
+    2. JSON parsing from content
+    3. XML parsing from content
+    4. Python-style function call parsing from content
     """
+
+    # Providers that sometimes need stronger tool calling hints
+    _NEEDS_TOOL_HINTS = {"groqcloud", "fireworks", "together", "openrouter", "cerebras"}
 
     @property
     def provider_name(self) -> str:
         return "openai"
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for OpenAI and OpenAI-compatible providers.
+
+        For cloud OpenAI-compatible providers that sometimes ignore tool calls,
+        provides stronger hints to encourage proper tool usage.
+        """
+        capabilities = self.get_capabilities()
+
+        # Check if this is an OpenAI-compatible provider that needs hints
+        # We detect this by checking the model name for common open-weight patterns
+        model_lower = self.model.lower() if self.model else ""
+        needs_hints = any(
+            pattern in model_lower
+            for pattern in ["llama", "qwen", "deepseek", "mistral", "gemma", "phi"]
+        )
+
+        if needs_hints:
+            hints = [
+                "IMPORTANT - TOOL USAGE REQUIRED:",
+                "- You MUST use the provided tools to complete tasks.",
+                "- DO NOT speculate or guess about file contents - READ them with tools.",
+                "- When asked to read a file, call read() or read_file() immediately.",
+                "- When asked to run a command, call shell() or bash() immediately.",
+                "- Only provide your answer AFTER gathering information with tools.",
+                "",
+                "TOOL CALL FORMAT:",
+                "- Use the tool calling API to invoke tools.",
+                "- If you cannot use the API, write: tool_name(arg='value')",
+                "- Example: read(path='file.py') or shell(command='ls -la')",
+            ]
+            return "\n".join(hints)
+
+        # For standard OpenAI models, use parallel hints if supported
+        if capabilities.native_tool_calls and capabilities.parallel_tool_calls:
+            return "Call MULTIPLE tools in parallel when operations are independent."
+
+        return ""
 
     def get_capabilities(self) -> ToolCallingCapabilities:
         # Load from YAML config
@@ -161,8 +212,8 @@ class OpenAIToolCallingAdapter(BaseToolCallingAdapter):
                 streaming_tool_calls=True,
                 parallel_tool_calls=True,
                 tool_choice_param=True,
-                json_fallback_parsing=False,
-                xml_fallback_parsing=False,
+                json_fallback_parsing=True,  # Enable fallback for OpenAI-compat providers
+                xml_fallback_parsing=True,
                 thinking_mode=False,
                 requires_strict_prompting=False,
                 tool_call_format=ToolCallFormat.OPENAI,
@@ -191,41 +242,76 @@ class OpenAIToolCallingAdapter(BaseToolCallingAdapter):
         content: str,
         raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
-        """Parse OpenAI tool calls.
+        """Parse OpenAI tool calls with fallback parsing for OpenAI-compatible providers.
 
         OpenAI returns: {"id": "...", "name": "...", "arguments": "..."}
         where arguments is a JSON string that needs parsing.
+
+        For OpenAI-compatible providers using open-weight models, falls back to
+        content parsing when native tool calls are empty or invalid.
         """
-        if not raw_tool_calls:
-            return ToolCallParseResult(remaining_content=content)
+        native_warnings: List[str] = []
 
-        tool_calls = []
-        warnings = []
+        # Try native tool calls first
+        if raw_tool_calls:
+            tool_calls = []
 
-        for tc in raw_tool_calls:
-            name = tc.get("name", "")
-            if not self.is_valid_tool_name(name):
-                warnings.append(f"Skipped invalid tool name: {name}")
-                continue
+            for tc in raw_tool_calls:
+                name = tc.get("name", "")
+                if not self.is_valid_tool_name(name):
+                    native_warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
 
-            # Parse arguments (may be string or dict)
-            args = tc.get("arguments", {})
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    warnings.append(f"Failed to parse arguments for {name}")
-                    args = {}
+                # Parse arguments (may be string or dict)
+                args = tc.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        native_warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
 
-            tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
 
-        return ToolCallParseResult(
-            tool_calls=tool_calls,
-            remaining_content=content,
-            parse_method="native",
-            confidence=1.0,
-            warnings=warnings,
-        )
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=native_warnings,
+                )
+
+        # Fallback: Try parsing tool calls from content
+        # This handles open-weight models that output tool calls as text
+        if content:
+            # Get valid tool names for Python call extraction
+            valid_names = None
+            if hasattr(self, "_valid_tool_names"):
+                valid_names = self._valid_tool_names
+
+            result = self.parse_from_content(
+                content,
+                validate_name_fn=self.is_valid_tool_name,
+                valid_tool_names=valid_names,
+            )
+            if result.tool_calls:
+                # Combine warnings from native parsing attempt
+                all_warnings = native_warnings + result.warnings
+                logger.debug(
+                    f"OpenAI adapter: Extracted {len(result.tool_calls)} tool calls "
+                    f"from content using {result.parse_method}"
+                )
+                return ToolCallParseResult(
+                    tool_calls=result.tool_calls,
+                    remaining_content=result.remaining_content,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=all_warnings,
+                )
+
+        # Return with any native parsing warnings
+        return ToolCallParseResult(remaining_content=content, warnings=native_warnings)
 
 
 class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
