@@ -33,8 +33,8 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.framework.tools import ToolSet
 
-# Import canonical ToolCategory from tools.py (single source of truth)
-from victor.framework.tools import ToolCategory, _CATEGORY_TOOLS
+# Import canonical ToolCategory and registry from tools.py (single source of truth)
+from victor.framework.tools import ToolCategory, get_category_registry
 
 # Import capability helpers for protocol-based access
 from victor.framework.vertical_integration import _check_capability, _invoke_capability
@@ -506,9 +506,20 @@ class ToolConfigBuilder:
         )
     """
 
-    # Reference canonical category→tools mapping from tools.py (single source of truth)
-    # Note: This is a class-level alias, not a copy
-    CATEGORY_TOOLS: Dict[ToolCategory, Set[str]] = _CATEGORY_TOOLS
+    @staticmethod
+    def get_category_tools(category: ToolCategory) -> Set[str]:
+        """Get tools for a category using the registry.
+
+        This replaces static CATEGORY_TOOLS with dynamic registry lookup.
+        Supports custom categories registered by plugins/verticals.
+
+        Args:
+            category: Tool category to look up
+
+        Returns:
+            Set of tool names in the category
+        """
+        return get_category_registry().get_tools(category.value)
 
     def __init__(self) -> None:
         """Initialize builder."""
@@ -564,7 +575,7 @@ class ToolConfigBuilder:
             Self for chaining
         """
         self._categories.add(category)
-        category_tools = self.CATEGORY_TOOLS.get(category, set())
+        category_tools = self.get_category_tools(category)
         self._enabled.update(category_tools)
         return self
 
@@ -577,7 +588,7 @@ class ToolConfigBuilder:
         Returns:
             Self for chaining
         """
-        category_tools = self.CATEGORY_TOOLS.get(category, set())
+        category_tools = self.get_category_tools(category)
         self._disabled.update(category_tools)
         return self
 
