@@ -948,6 +948,7 @@ class OrchestratorFactory(ModeAwareMixin):
         on_tool_start: Callable,
         on_tool_complete: Callable,
         deduplication_tracker: Optional[Any],
+        middleware_chain: Optional[Any] = None,
     ) -> Any:
         """Create tool pipeline for coordinating tool execution flow.
 
@@ -960,6 +961,7 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_start: Callback invoked when tool execution starts
             on_tool_complete: Callback invoked when tool execution completes
             deduplication_tracker: Optional tracker for preventing duplicate calls
+            middleware_chain: Optional middleware chain for processing tool calls
 
         Returns:
             ToolPipeline instance coordinating tool execution
@@ -980,8 +982,9 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_start=on_tool_start,
             on_tool_complete=on_tool_complete,
             deduplication_tracker=deduplication_tracker,
+            middleware_chain=middleware_chain,
         )
-        logger.debug("ToolPipeline created")
+        logger.debug("ToolPipeline created%s", " with middleware chain" if middleware_chain else "")
         return pipeline
 
     def create_conversation_controller(
@@ -1396,7 +1399,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """
         from victor.agent.message_history import MessageHistory
 
-        max_history = getattr(self.settings, "max_conversation_history", 100)
+        max_history = getattr(self.settings, "max_conversation_history", 100000)
         history = MessageHistory(
             system_prompt=system_prompt,
             max_history_messages=max_history,

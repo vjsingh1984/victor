@@ -48,13 +48,13 @@ class MessageHistory:
     def __init__(
         self,
         system_prompt: str = "",
-        max_history_messages: int = 100,
+        max_history_messages: int = 100000,
     ):
         """Initialize conversation manager.
 
         Args:
             system_prompt: Initial system prompt for the conversation
-            max_history_messages: Maximum messages to retain in history
+            max_history_messages: Maximum messages to retain (default 100k for historical analysis)
         """
         self._system_prompt = system_prompt
         self._system_added = False

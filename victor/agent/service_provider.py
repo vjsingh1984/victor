@@ -621,10 +621,18 @@ class OrchestratorServiceProvider:
             ToolRegistrar instance
         """
         from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-        from victor.agent.protocols import ToolRegistryProtocol
+        from victor.agent.protocols import ToolRegistryProtocol, ToolDependencyGraphProtocol
 
         # Get ToolRegistry from container
         tool_registry = container.get(ToolRegistryProtocol)
+
+        # Get ToolDependencyGraph from container for tool planning
+        tool_graph = None
+        if getattr(self._settings, "enable_tool_graph", True):
+            try:
+                tool_graph = container.get(ToolDependencyGraphProtocol)
+            except Exception:
+                pass  # Tool graph is optional
 
         # Build config from settings
         config = ToolRegistrarConfig(
@@ -639,6 +647,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
             provider=None,  # Will be set later by orchestrator
             model=getattr(self._settings, "model", None),
+            tool_graph=tool_graph,  # Pass tool graph for tool planning
             config=config,
         )
 
@@ -790,7 +799,7 @@ class OrchestratorServiceProvider:
 
         return MessageHistory(
             system_prompt="",  # Will be set by orchestrator
-            max_history_messages=getattr(self._settings, "max_conversation_history", 100),
+            max_history_messages=getattr(self._settings, "max_conversation_history", 100000),
         )
 
     # =========================================================================
