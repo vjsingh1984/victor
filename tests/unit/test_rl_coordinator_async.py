@@ -50,7 +50,9 @@ def temp_storage_path() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def coordinator(temp_storage_path: Path, temp_db_path: Path) -> Generator[RLCoordinator, None, None]:
+def coordinator(
+    temp_storage_path: Path, temp_db_path: Path
+) -> Generator[RLCoordinator, None, None]:
     """Create a test RLCoordinator with temp database."""
     reset_database()
     get_database(temp_db_path)
