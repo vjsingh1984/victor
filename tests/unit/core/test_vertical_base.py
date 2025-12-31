@@ -175,7 +175,7 @@ class TestGetExtensionsLSPCompliance:
         extensions2 = AnotherVertical.get_extensions(use_cache=False)
 
         # Both must return VerticalExtensions (LSP)
-        assert type(extensions1) == type(
+        assert type(extensions1) is type(
             extensions2
         ), "LSP violation: different subclasses return different types"
         assert isinstance(extensions1, VerticalExtensions)
