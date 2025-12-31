@@ -14,13 +14,24 @@
 
 """
 A tool for executing Python code in a secure, stateful Docker container.
+
+Features:
+- Proper context manager support for automatic cleanup
+- Container labeling for cleanup identification
+- atexit handler for cleanup on Python exit
+- Container reuse within session
 """
 
+import atexit
 import io
+import logging
 import tarfile
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
+import weakref
+
+logger = logging.getLogger(__name__)
 
 # Optional docker import
 try:
@@ -37,6 +48,70 @@ except ImportError:
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+
+# Container label for identifying Victor sandbox containers
+SANDBOX_CONTAINER_LABEL = "victor.sandbox"
+SANDBOX_CONTAINER_VALUE = "code-executor"
+
+# Global registry of active sandbox instances for cleanup
+_active_sandboxes: weakref.WeakSet = weakref.WeakSet()
+_cleanup_registered = False
+
+
+def cleanup_all_sandboxes() -> int:
+    """Clean up all active sandbox containers.
+
+    Returns:
+        Number of containers cleaned up
+    """
+    cleaned = 0
+    for sandbox in list(_active_sandboxes):
+        try:
+            sandbox.stop()
+            cleaned += 1
+        except Exception as e:
+            logger.warning(f"Failed to cleanup sandbox: {e}")
+    return cleaned
+
+
+def cleanup_orphaned_containers() -> int:
+    """Clean up any orphaned Victor sandbox containers.
+
+    This finds and removes any containers labeled as Victor sandboxes
+    that may have been left behind from previous sessions.
+
+    Returns:
+        Number of containers cleaned up
+    """
+    if not DOCKER_AVAILABLE:
+        return 0
+
+    try:
+        client = docker.from_env()
+        containers = client.containers.list(
+            all=True,
+            filters={"label": f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"},
+        )
+        cleaned = 0
+        for container in containers:
+            try:
+                logger.info(f"Removing orphaned sandbox container: {container.short_id}")
+                container.remove(force=True)
+                cleaned += 1
+            except Exception as e:
+                logger.warning(f"Failed to remove container {container.short_id}: {e}")
+        return cleaned
+    except Exception as e:
+        logger.warning(f"Failed to cleanup orphaned containers: {e}")
+        return 0
+
+
+def _register_atexit_cleanup():
+    """Register atexit handler for cleanup (called once)."""
+    global _cleanup_registered
+    if not _cleanup_registered:
+        atexit.register(cleanup_all_sandboxes)
+        _cleanup_registered = True
 
 
 class CodeSandbox:
@@ -83,6 +158,15 @@ class CodeSandbox:
             # Docker not available, but not required - continue without it
             self.docker_client = None
 
+    def __enter__(self) -> "CodeSandbox":
+        """Context manager entry - start the container."""
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - stop and cleanup the container."""
+        self.stop()
+
     def start(self) -> None:
         """Starts the persistent Docker container.
 
@@ -96,6 +180,10 @@ class CodeSandbox:
         if self.container:
             return  # Already started
 
+        # Register for atexit cleanup
+        _register_atexit_cleanup()
+        _active_sandboxes.add(self)
+
         try:
             self.docker_client.images.pull(self.docker_image)
             self.container = self.docker_client.containers.run(
@@ -106,19 +194,20 @@ class CodeSandbox:
                 network_disabled=self.network_disabled,
                 mem_limit=self.memory_limit,
                 cpu_shares=self.cpu_shares,
+                labels={SANDBOX_CONTAINER_LABEL: SANDBOX_CONTAINER_VALUE},
             )
+            logger.debug(f"Started sandbox container: {self.container.short_id}")
         except Exception as e:
             # Log the error but don't crash Victor
             # Docker container execution will be unavailable
-            import logging
-
-            logger = logging.getLogger(__name__)
             logger.warning(
                 f"Docker container startup failed: {e}. "
                 "Code execution in containers will be unavailable."
             )
             self.container = None
             self.docker_available = False  # Mark Docker as unavailable
+            # Remove from active set since startup failed
+            _active_sandboxes.discard(self)
 
     def stop(self) -> None:
         """Stops and removes the Docker container."""
@@ -127,11 +216,16 @@ class CodeSandbox:
             return
 
         if self.container:
+            container_id = self.container.short_id
             try:
                 self.container.remove(force=True)
-            except Exception:
-                pass  # Container already gone or other error
+                logger.debug(f"Stopped sandbox container: {container_id}")
+            except Exception as e:
+                logger.debug(f"Container {container_id} cleanup: {e}")
             self.container = None
+
+        # Remove from active set (safe even if not present)
+        _active_sandboxes.discard(self)
 
     def execute(self, code: str, timeout: int = 60) -> dict:
         """Executes a block of Python code inside the running container."""
