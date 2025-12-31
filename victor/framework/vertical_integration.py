@@ -74,6 +74,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -89,6 +90,7 @@ from typing import (
 )
 
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -502,6 +504,97 @@ class IntegrationResult:
         """Add an informational message."""
         self.info.append(message)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization (SRP: data → dict).
+
+        Returns:
+            Dict representation suitable for JSON serialization
+        """
+        return {
+            "success": self.success,
+            "vertical_name": self.vertical_name,
+            "tools_applied": list(self.tools_applied),
+            "middleware_count": self.middleware_count,
+            "safety_patterns_count": self.safety_patterns_count,
+            "prompt_hints_count": self.prompt_hints_count,
+            "mode_configs_count": self.mode_configs_count,
+            "workflows_count": self.workflows_count,
+            "rl_learners_count": self.rl_learners_count,
+            "team_specs_count": self.team_specs_count,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "info": self.info,
+        }
+
+    def persist(self, base_path: Optional[Path] = None) -> Optional[Path]:
+        """Persist integration result to JSONL file for auditing (SRP: persistence).
+
+        Uses append-only JSONL format for efficiency - avoids file locking issues
+        and reduces filesystem overhead. Each line is a complete JSON record.
+
+        Args:
+            base_path: Base path for audit logs. Defaults to ~/.victor/logs/integration/
+
+        Returns:
+            Path to the JSONL file, or None if persistence failed
+        """
+        import json
+        from datetime import datetime, timezone
+
+        try:
+            # Use default path if not provided
+            if base_path is None:
+                base_path = Path.home() / ".victor" / "logs" / "integration"
+
+            # Ensure directory exists
+            base_path.mkdir(parents=True, exist_ok=True)
+
+            # Use append-only JSONL file (one per day for easy rotation)
+            date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+            filepath = base_path / f"integration_{date_str}.jsonl"
+
+            # Append JSON line (atomic on most filesystems)
+            record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "vertical_name": self.vertical_name,
+                "result": self.to_dict(),
+            }
+            with open(filepath, "a") as f:
+                f.write(json.dumps(record) + "\n")
+
+            logger.debug(f"IntegrationResult appended to: {filepath}")
+            return filepath
+
+        except Exception as e:
+            logger.warning(f"Failed to persist IntegrationResult: {e}")
+            return None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "IntegrationResult":
+        """Create IntegrationResult from dictionary (SRP: deserialization).
+
+        Args:
+            data: Dictionary representation (from to_dict)
+
+        Returns:
+            IntegrationResult instance
+        """
+        return cls(
+            success=data.get("success", True),
+            vertical_name=data.get("vertical_name"),
+            tools_applied=set(data.get("tools_applied", [])),
+            middleware_count=data.get("middleware_count", 0),
+            safety_patterns_count=data.get("safety_patterns_count", 0),
+            prompt_hints_count=data.get("prompt_hints_count", 0),
+            mode_configs_count=data.get("mode_configs_count", 0),
+            workflows_count=data.get("workflows_count", 0),
+            rl_learners_count=data.get("rl_learners_count", 0),
+            team_specs_count=data.get("team_specs_count", 0),
+            errors=data.get("errors", []),
+            warnings=data.get("warnings", []),
+            info=data.get("info", []),
+        )
+
 
 # =============================================================================
 # Integration Protocol
@@ -697,6 +790,35 @@ class VerticalIntegrationPipeline:
             f"middleware={result.middleware_count}, "
             f"safety_patterns={result.safety_patterns_count}"
         )
+
+        # Emit vertical_applied event for observability
+        try:
+            event_bus = EventBus.get_instance()
+            event_bus.publish(
+                VictorEvent(
+                    category=EventCategory.VERTICAL,
+                    name="vertical_applied",
+                    data={
+                        "vertical": result.vertical_name,
+                        "tools_count": len(result.tools_applied),
+                        "middleware_count": result.middleware_count,
+                        "safety_patterns_count": result.safety_patterns_count,
+                        "prompt_hints_count": result.prompt_hints_count,
+                        "workflows_count": result.workflows_count,
+                        "rl_learners_count": result.rl_learners_count,
+                        "team_specs_count": result.team_specs_count,
+                        "success": result.success,
+                        "error_count": len(result.errors),
+                        "warning_count": len(result.warnings),
+                    },
+                    source="VerticalIntegrationPipeline",
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit vertical_applied event: {e}")
+
+        # Note: result.persist() available for opt-in audit logging
+        # Not called automatically to avoid duplication with EventBus
 
         return result
 
