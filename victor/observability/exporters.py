@@ -179,6 +179,97 @@ class JsonLineExporter(BaseExporter):
         return self._event_count
 
 
+class LoggingExporter(BaseExporter):
+    """Exports events to Python's logging system.
+
+    This allows observability events to be written to log files alongside
+    regular log messages, using the existing logging infrastructure.
+
+    Events are logged at INFO level by default, with ERROR events at ERROR level.
+
+    Example:
+        from victor.observability import EventBus, LoggingExporter
+
+        bus = EventBus.get_instance()
+        bus.add_exporter(LoggingExporter("victor.events"))
+
+        # Events will now appear in logs:
+        # 2025-01-01 12:00:00 - victor.events - INFO - [TOOL] read: success
+    """
+
+    def __init__(
+        self,
+        logger_name: str = "victor.events",
+        *,
+        include_categories: Optional[Set[EventCategory]] = None,
+        exclude_categories: Optional[Set[EventCategory]] = None,
+        log_level: int = logging.INFO,
+        include_data: bool = True,
+    ) -> None:
+        """Initialize the logging exporter.
+
+        Args:
+            logger_name: Name of the logger to use.
+            include_categories: Categories to include (None = all).
+            exclude_categories: Categories to exclude.
+            log_level: Default log level for events.
+            include_data: Whether to include event data in log message.
+        """
+        self._logger = logging.getLogger(logger_name)
+        self.include_categories = include_categories
+        self.exclude_categories = exclude_categories or set()
+        self.log_level = log_level
+        self.include_data = include_data
+        self._event_count = 0
+
+    def export(self, event: VictorEvent) -> None:
+        """Export event to logging system.
+
+        Args:
+            event: Event to export.
+        """
+        # Filter by category
+        if self.include_categories and event.category not in self.include_categories:
+            return
+        if event.category in self.exclude_categories:
+            return
+
+        # Determine log level
+        level = self.log_level
+        if event.category == EventCategory.ERROR:
+            level = logging.ERROR
+        elif event.category == EventCategory.AUDIT:
+            level = logging.WARNING
+
+        # Format message
+        category_name = event.category.value.upper() if event.category else "UNKNOWN"
+        message = f"[{category_name}] {event.name}"
+
+        if self.include_data and event.data:
+            # Include key data fields (avoid very long output)
+            data_preview = {}
+            for k, v in event.data.items():
+                if isinstance(v, str) and len(v) > 100:
+                    data_preview[k] = v[:100] + "..."
+                elif isinstance(v, (list, set)) and len(v) > 5:
+                    data_preview[k] = f"[{len(v)} items]"
+                else:
+                    data_preview[k] = v
+            message += f": {data_preview}"
+
+        self._logger.log(level, message)
+        self._event_count += 1
+
+    def close(self) -> None:
+        """Close the exporter (no-op for logging)."""
+        pass
+
+    @property
+    def event_count(self) -> int:
+        """Get total number of events exported."""
+        return self._event_count
+
+
 class CallbackExporter(BaseExporter):
     """Exports events by calling a user-defined callback.
 

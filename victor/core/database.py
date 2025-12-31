@@ -732,38 +732,33 @@ class ProjectDatabaseManager:
         "conversation": "conversation.db",
         "entities": "entities.db",
         "mode_learning": "mode_learning.db",
-        "graph": "../graph/graph.db",  # Relative to .victor
+        "profile_learning": "profile_learning.db",
+        "changes": "changes/changes.db",
+        "graph": "graph/graph.db",
     }
 
     # Tables that should stay in project database (not global)
     PROJECT_TABLES = {
-        # Graph tables (new consolidated names)
+        # Graph tables
         "graph_node",
         "graph_edge",
         "graph_file_mtime",
-        # Legacy graph tables (for migration)
-        "nodes",
-        "edges",
-        "file_mtimes",
-        "symbols",
-        "references",
-        "definitions",
-        "imports",
-        "files",
-        # Conversation tables
-        "conversations",
-        "messages",
-        "conversation_metadata",
-        # Entity tables
-        "entities",
-        "entity_relations",
-        "entity_mentions",
-        # Mode learning (project-specific preferences)
-        "mode_preferences",
-        "mode_history",
-        # FTS tables
-        "nodes_fts",
         "graph_node_fts",
+        # Conversation tables
+        "messages",
+        "sessions",
+        "context_sizes",
+        "context_summaries",
+        # Mode learning tables
+        "rl_mode_q",
+        "rl_mode_task",
+        "rl_mode_history",
+        # Profile learning tables
+        "interaction_history",
+        "profile_metrics",
+        # Changes tables
+        "change_groups",
+        "file_changes",
     }
 
     def __init__(self, project_path: Optional[Path] = None):

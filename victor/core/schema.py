@@ -163,65 +163,21 @@ class Tables:
     def get_legacy_mapping(cls) -> Dict[str, str]:
         """Get mapping from legacy table names to new names.
 
+        This mapping is for reference only - data migration from legacy tables
+        is not supported. Delete old databases and reinitialize instead.
+
         Returns:
             Dict mapping old_name -> new_name
         """
         return {
-            # System
-            "_db_metadata": cls.SYS_METADATA,
-            "schema_version": cls.SYS_SCHEMA_VERSION,
-            # RL Core
-            "rl_outcomes": cls.RL_OUTCOME,
-            "rl_telemetry": cls.RL_METRIC,
-            # RL Q-Values (consolidated into rl_q_value)
-            "mode_transition_q_values": cls.RL_Q_VALUE,
-            "model_selector_q_values": cls.RL_Q_VALUE,
-            "tool_selector_q_values": cls.RL_Q_VALUE,
-            "cache_eviction_q_values": cls.RL_Q_VALUE,
-            "workflow_q_values": cls.RL_Q_VALUE,
-            # RL History (consolidated into rl_transition)
-            "mode_transition_history": cls.RL_TRANSITION,
-            "grounding_threshold_history": cls.RL_TRANSITION,
-            "quality_weight_history": cls.RL_TRANSITION,
-            "prompt_template_history": cls.RL_TRANSITION,
-            "cache_eviction_history": cls.RL_TRANSITION,
-            "curriculum_history": cls.RL_TRANSITION,
-            # RL Params (consolidated into rl_param)
-            "continuation_patience_stats": cls.RL_PARAM,
-            "continuation_prompts_stats": cls.RL_PARAM,
-            "semantic_threshold_stats": cls.RL_PARAM,
-            "grounding_threshold_params": cls.RL_PARAM,
-            "grounding_threshold_stats": cls.RL_PARAM,
-            "quality_weights": cls.RL_PARAM,
-            "model_selector_state": cls.RL_PARAM,
-            # RL Task Stats (consolidated into rl_task_stat)
-            "mode_transition_task_stats": cls.RL_TASK_STAT,
-            "model_selector_task_q_values": cls.RL_TASK_STAT,
-            "tool_selector_task_q_values": cls.RL_TASK_STAT,
-            "cache_eviction_tool_values": cls.RL_TASK_STAT,
-            "tool_selector_outcomes": cls.RL_TASK_STAT,
-            # RL Patterns
-            "cross_vertical_patterns": cls.RL_PATTERN,
-            "cross_vertical_applications": cls.RL_PATTERN_USE,
-            # Agent - Teams
-            "team_composition_stats": cls.AGENT_TEAM_CONFIG,
-            "team_execution_history": cls.AGENT_TEAM_RUN,
-            # Agent - Workflows
-            "workflow_executions": cls.AGENT_WORKFLOW_RUN,
-            # Agent - Prompts
-            "prompt_template_styles": cls.AGENT_PROMPT_STYLE,
-            "prompt_template_elements": cls.AGENT_PROMPT_ELEMENT,
-            # Agent - Curriculum
-            "curriculum_stages": cls.AGENT_CURRICULUM_STAGE,
-            "curriculum_metrics": cls.AGENT_CURRICULUM_METRIC,
-            "policy_checkpoints": cls.AGENT_POLICY_SNAPSHOT,
-            # UI
-            "sessions": cls.UI_SESSION,
-            "failed_signatures": cls.UI_FAILED_CALL,
-            # Graph (legacy names from sqlite_store.py)
+            # Graph (legacy -> new)
             "nodes": cls.GRAPH_NODE,
             "edges": cls.GRAPH_EDGE,
             "file_mtimes": cls.GRAPH_FILE_MTIME,
+            # Mode learning (legacy -> new)
+            "q_values": cls.RL_MODE_Q,
+            "task_stats": cls.RL_MODE_TASK,
+            "transition_history": cls.RL_MODE_HISTORY,
         }
 
 
@@ -633,6 +589,174 @@ class Schema:
             ON {Tables.GRAPH_FILE_MTIME}(mtime);
     """
 
+    # ===========================================
+    # CONVERSATION TABLES (project-level)
+    # ===========================================
+
+    CONV_MESSAGE = """
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT,
+            tool_calls TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    CONV_SESSION = """
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            provider TEXT,
+            model TEXT,
+            profile TEXT,
+            data TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT
+        )
+    """
+
+    CONV_CONTEXT_SIZE = """
+        CREATE TABLE IF NOT EXISTS context_sizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            token_count INTEGER,
+            message_count INTEGER,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    CONV_CONTEXT_SUMMARY = """
+        CREATE TABLE IF NOT EXISTS context_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            summary TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    CONV_INDEXES = """
+        CREATE INDEX IF NOT EXISTS idx_messages_session
+            ON messages(session_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_context_sizes_session
+            ON context_sizes(session_id);
+    """
+
+    # ===========================================
+    # MODE LEARNING TABLES (project-level)
+    # ===========================================
+
+    MODE_Q_VALUE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_Q} (
+            state_key TEXT NOT NULL,
+            action_key TEXT NOT NULL,
+            q_value REAL NOT NULL DEFAULT 0.0,
+            visit_count INTEGER NOT NULL DEFAULT 0,
+            last_updated TEXT NOT NULL,
+            PRIMARY KEY (state_key, action_key)
+        )
+    """
+
+    MODE_TASK_STAT = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_TASK} (
+            task_type TEXT PRIMARY KEY,
+            optimal_tool_budget INTEGER DEFAULT 10,
+            avg_quality_score REAL DEFAULT 0.5,
+            avg_completion_rate REAL DEFAULT 0.5,
+            sample_count INTEGER DEFAULT 0,
+            last_updated TEXT NOT NULL
+        )
+    """
+
+    MODE_TRANSITION_HISTORY = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_HISTORY} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_name TEXT NOT NULL,
+            from_mode TEXT NOT NULL,
+            to_mode TEXT NOT NULL,
+            trigger TEXT NOT NULL,
+            state_key TEXT NOT NULL,
+            action_key TEXT NOT NULL,
+            reward REAL,
+            timestamp TEXT NOT NULL
+        )
+    """
+
+    MODE_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_{Tables.RL_MODE_Q}_state
+            ON {Tables.RL_MODE_Q}(state_key);
+        CREATE INDEX IF NOT EXISTS idx_{Tables.RL_MODE_HISTORY}_profile
+            ON {Tables.RL_MODE_HISTORY}(profile_name, timestamp);
+    """
+
+    # ===========================================
+    # PROFILE LEARNING TABLES (project-level)
+    # ===========================================
+
+    PROFILE_INTERACTION = """
+        CREATE TABLE IF NOT EXISTS interaction_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interaction_type TEXT NOT NULL,
+            context TEXT,
+            response_style TEXT,
+            success INTEGER,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    PROFILE_METRIC = """
+        CREATE TABLE IF NOT EXISTS profile_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            metric_name TEXT NOT NULL,
+            metric_value REAL,
+            context TEXT,
+            sample_count INTEGER DEFAULT 1,
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(metric_name, context)
+        )
+    """
+
+    PROFILE_INDEXES = """
+        CREATE INDEX IF NOT EXISTS idx_interaction_type
+            ON interaction_history(interaction_type);
+    """
+
+    # ===========================================
+    # CHANGES TABLES (project-level)
+    # ===========================================
+
+    CHANGES_GROUP = """
+        CREATE TABLE IF NOT EXISTS change_groups (
+            id TEXT PRIMARY KEY,
+            description TEXT,
+            commit_hash TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            finalized_at TEXT
+        )
+    """
+
+    CHANGES_FILE = """
+        CREATE TABLE IF NOT EXISTS file_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            change_type TEXT NOT NULL,
+            old_content TEXT,
+            new_content TEXT,
+            diff TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (group_id) REFERENCES change_groups(id)
+        )
+    """
+
+    CHANGES_INDEXES = """
+        CREATE INDEX IF NOT EXISTS idx_file_changes_group
+            ON file_changes(group_id);
+        CREATE INDEX IF NOT EXISTS idx_file_changes_path
+            ON file_changes(file_path);
+    """
+
     @classmethod
     def get_all_schemas(cls) -> List[str]:
         """Get all schema definitions in creation order."""
@@ -679,9 +803,25 @@ class Schema:
     def get_project_schemas(cls) -> List[str]:
         """Get schema definitions for project-level tables (graph, etc.)."""
         return [
+            # Graph
             cls.GRAPH_NODE,
             cls.GRAPH_EDGE,
             cls.GRAPH_FILE_MTIME,
+            # Conversation
+            cls.CONV_MESSAGE,
+            cls.CONV_SESSION,
+            cls.CONV_CONTEXT_SIZE,
+            cls.CONV_CONTEXT_SUMMARY,
+            # Mode learning
+            cls.MODE_Q_VALUE,
+            cls.MODE_TASK_STAT,
+            cls.MODE_TRANSITION_HISTORY,
+            # Profile learning
+            cls.PROFILE_INTERACTION,
+            cls.PROFILE_METRIC,
+            # Changes
+            cls.CHANGES_GROUP,
+            cls.CHANGES_FILE,
         ]
 
     @classmethod
@@ -689,6 +829,10 @@ class Schema:
         """Get index definitions for project-level tables."""
         return [
             cls.GRAPH_INDEXES,
+            cls.CONV_INDEXES,
+            cls.MODE_INDEXES,
+            cls.PROFILE_INDEXES,
+            cls.CHANGES_INDEXES,
         ]
 
 

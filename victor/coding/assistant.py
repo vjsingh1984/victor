@@ -120,49 +120,42 @@ class CodingAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools optimized for software development.
 
+        Uses canonical tool names from victor.tools.tool_names.
+
         Returns:
             List of tool names including filesystem, git, shell, and code tools.
         """
+        from victor.tools.tool_names import ToolNames
+
         return [
             # Core filesystem
-            "read",
-            "write",
-            "edit",
-            "ls",
-            "overview",
+            ToolNames.READ,  # read_file -> read
+            ToolNames.WRITE,  # write_file -> write
+            ToolNames.EDIT,  # edit_files -> edit
+            ToolNames.LS,  # list_directory -> ls
+            ToolNames.OVERVIEW,  # get_project_overview -> overview
             # Search
-            "code_search",  # Semantic code search (primary name)
-            "grep",  # Keyword search
-            "plan_files",
-            # Git
-            "git",
-            "git_status",
-            "git_diff",
-            "git_log",
-            "git_commit",
-            "git_branch",
+            ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
+            ToolNames.GREP,  # code_search (keyword) -> grep
+            ToolNames.PLAN,  # plan_files -> plan
+            # Git (unified git tool handles all operations)
+            ToolNames.GIT,  # Git operations
             # Shell
-            "shell",
-            "bash",
+            ToolNames.SHELL,  # execute_bash -> shell
             # Code intelligence
-            "lsp",
-            "symbols",
-            "references",
-            "hover",
+            ToolNames.LSP,  # lsp operations
+            ToolNames.SYMBOL,  # find_symbol -> symbol
+            ToolNames.REFS,  # find_references -> refs
             # Refactoring
-            "refactor",
-            "rename_symbol",
-            "extract_function",
+            ToolNames.RENAME,  # refactor_rename_symbol -> rename
+            ToolNames.EXTRACT,  # refactor_extract_function -> extract
             # Testing
-            "test",
-            "run_tests",
-            "test_file",
+            ToolNames.TEST,  # run_tests -> test
             # Docker
-            "docker",
-            "docker_compose",
+            ToolNames.DOCKER,  # docker operations
             # Web (for documentation)
-            "web_search",
-            "web_fetch",
+            ToolNames.WEB_SEARCH,  # web_search
+            ToolNames.WEB_FETCH,  # web_fetch
         ]
 
     @classmethod
@@ -205,21 +198,25 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get coding-specific stage definitions.
 
+        Uses canonical tool names from victor.tools.tool_names.
+
         Returns:
             Stage definitions optimized for software development workflow.
         """
+        from victor.tools.tool_names import ToolNames
+
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the coding request",
-                tools={"read", "ls", "overview", "search"},
+                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW, ToolNames.GREP},
                 keywords=["what", "how", "explain", "where", "show me"],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning the implementation approach",
-                tools={"search", "plan_files", "overview", "read"},
+                tools={ToolNames.GREP, ToolNames.PLAN, ToolNames.OVERVIEW, ToolNames.READ},
                 keywords=["plan", "approach", "design", "architecture", "strategy"],
                 next_stages={"READING", "EXECUTION"},
             ),
@@ -227,12 +224,12 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
                 name="READING",
                 description="Reading code and gathering context",
                 tools={
-                    "read",
-                    "code_search",
-                    "semantic_code_search",
-                    "lsp",
-                    "symbols",
-                    "references",
+                    ToolNames.READ,
+                    ToolNames.CODE_SEARCH,
+                    ToolNames.GREP,
+                    ToolNames.LSP,
+                    ToolNames.SYMBOL,
+                    ToolNames.REFS,
                 },
                 keywords=["read", "show", "find", "look", "check", "search"],
                 next_stages={"ANALYSIS", "EXECUTION"},
@@ -240,7 +237,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Analyzing code structure and dependencies",
-                tools={"lsp", "symbols", "references", "hover", "overview"},
+                tools={ToolNames.LSP, ToolNames.SYMBOL, ToolNames.REFS, ToolNames.OVERVIEW},
                 keywords=["analyze", "review", "understand", "why", "how does"],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
@@ -248,12 +245,11 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
                 name="EXECUTION",
                 description="Implementing changes",
                 tools={
-                    "write",
-                    "edit",
-                    "shell",
-                    "git",
-                    "refactor",
-                    "rename_symbol",
+                    ToolNames.WRITE,
+                    ToolNames.EDIT,
+                    ToolNames.SHELL,
+                    ToolNames.GIT,
+                    ToolNames.RENAME,
                 },
                 keywords=[
                     "change",
@@ -272,14 +268,14 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Testing and validating changes",
-                tools={"shell", "test", "run_tests", "git_diff", "read"},
+                tools={ToolNames.SHELL, ToolNames.TEST, ToolNames.GIT, ToolNames.READ},
                 keywords=["test", "verify", "check", "validate", "run", "build"],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Committing and summarizing",
-                tools={"git_commit", "git_status", "git_diff"},
+                tools={ToolNames.GIT},
                 keywords=["done", "finish", "complete", "commit", "summarize"],
                 next_stages=set(),
             ),

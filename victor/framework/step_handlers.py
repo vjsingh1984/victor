@@ -96,9 +96,13 @@ if TYPE_CHECKING:
 # Import protocols for runtime isinstance checks
 from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
+    TaskTypeHint,
     TeamSpecProviderProtocol,
     WorkflowProviderProtocol,
 )
+
+# Import PromptContributorAdapter for hint normalization
+from victor.core.verticals.prompt_adapter import PromptContributorAdapter
 
 from victor.framework.protocols import CapabilityRegistryProtocol
 
@@ -198,6 +202,72 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
 
 
 # =============================================================================
+# Tiered Tool Config Helper (Workstream D: API Mismatch Fix)
+# =============================================================================
+
+
+def get_tiered_config(vertical: Any) -> Optional[Any]:
+    """Get tiered tool config with fallback chain.
+
+    Some verticals implement get_tiered_tool_config() while others
+    implement get_tiered_tools(). This helper provides a unified
+    interface with a fallback chain:
+
+    1. Try get_tiered_tool_config() first (preferred)
+    2. Fall back to get_tiered_tools() if config method missing or returns None
+    3. Return None if vertical has neither method
+
+    SOLID Compliance:
+    - Uses callable() check instead of just hasattr (ISP)
+    - Validates return type is TieredToolConfig-like (LSP)
+    - Provides single unified interface (DIP)
+
+    Args:
+        vertical: Vertical class to get config from
+
+    Returns:
+        TieredToolConfig or None if not available
+    """
+
+    def _is_tiered_config(obj: Any) -> bool:
+        """Check if object is a valid TieredToolConfig-like object."""
+        # Must have mandatory attribute (basic duck typing)
+        return obj is not None and hasattr(obj, "mandatory")
+
+    def _try_get_config(vertical: Any, method_name: str) -> Optional[Any]:
+        """Try to get config from a method, handling various cases."""
+        attr = getattr(vertical, method_name, None)
+        if attr is None:
+            return None
+
+        # Only proceed if it's callable (method/classmethod)
+        if not callable(attr):
+            return None
+
+        try:
+            config = attr()
+            if _is_tiered_config(config):
+                return config
+        except (TypeError, AttributeError):
+            # Method exists but is not properly callable or returns error
+            pass
+
+        return None
+
+    # Try get_tiered_tool_config() first (preferred method)
+    config = _try_get_config(vertical, "get_tiered_tool_config")
+    if config is not None:
+        return config
+
+    # Fallback to get_tiered_tools()
+    config = _try_get_config(vertical, "get_tiered_tools")
+    if config is not None:
+        return config
+
+    return None
+
+
+# =============================================================================
 # Step Handler Protocol
 # =============================================================================
 
@@ -253,12 +323,15 @@ class BaseStepHandler(ABC):
     """Abstract base class for step handlers.
 
     Provides common functionality for all step handlers including
-    error handling and logging.
+    error handling, logging, and per-step status tracking.
 
     Subclasses must implement:
     - name property
     - order property
     - _do_apply() method
+
+    Optionally override:
+    - _get_step_details() to provide additional status details
     """
 
     @property
@@ -281,7 +354,12 @@ class BaseStepHandler(ABC):
         result: "IntegrationResult",
         strict_mode: bool = False,
     ) -> None:
-        """Apply this step with error handling.
+        """Apply this step with error handling and status tracking.
+
+        Automatically records step execution status including:
+        - Success/error/warning status
+        - Execution duration in milliseconds
+        - Optional step-specific details
 
         Args:
             orchestrator: Orchestrator instance
@@ -290,14 +368,48 @@ class BaseStepHandler(ABC):
             result: Integration result
             strict_mode: If True, fail on any error
         """
+        import time
+
+        start_time = time.perf_counter()
+        status = "success"
+        details: Optional[Dict[str, Any]] = None
+
         try:
             self._do_apply(orchestrator, vertical, context, result)
+            # Get step-specific details after successful apply
+            details = self._get_step_details(result)
         except Exception as e:
             if strict_mode:
                 result.add_error(f"{self.name} failed: {e}")
+                status = "error"
             else:
                 result.add_warning(f"{self.name} error: {e}")
+                status = "warning"
+            details = {"error": str(e)}
             logger.debug(f"Step {self.name} failed: {e}", exc_info=True)
+
+        # Record step status with timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        result.record_step_status(
+            self.name,
+            status,
+            details=details,
+            duration_ms=round(duration_ms, 2),
+        )
+
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+        """Get step-specific details for status tracking.
+
+        Override in subclasses to provide meaningful details about
+        what was applied during this step.
+
+        Args:
+            result: Integration result with updated counts
+
+        Returns:
+            Dictionary with step-specific details, or None
+        """
+        return None
 
     @abstractmethod
     def _do_apply(
@@ -385,6 +497,12 @@ class ToolStepHandler(BaseStepHandler):
             logger.debug("Tool name canonicalization not available")
             return tools
 
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+        """Return tool-specific details."""
+        if result.tools_applied:
+            return {"tools_count": len(result.tools_applied)}
+        return {"tools_count": 0, "skipped": True}
+
 
 # =============================================================================
 # Prompt Step Handler
@@ -445,16 +563,22 @@ class PromptStepHandler(BaseStepHandler):
     ) -> None:
         """Apply prompt contributors to orchestrator.
 
+        Uses PromptContributorAdapter to normalize different hint formats
+        (dict, string, TaskTypeHint) into a consistent TaskTypeHint interface.
+
         Args:
             orchestrator: Orchestrator instance
             contributors: List of prompt contributors
             context: Vertical context
             result: Result to update
         """
-        # Merge task hints from all contributors
-        merged_hints: Dict[str, Any] = {}
+        # Merge and normalize task hints from all contributors using adapter
+        merged_hints: Dict[str, TaskTypeHint] = {}
         for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-            merged_hints.update(contributor.get_task_type_hints())
+            raw_hints = contributor.get_task_type_hints()
+            # Use PromptContributorAdapter to normalize hints to TaskTypeHint
+            normalized_hints = self._normalize_hints(raw_hints)
+            merged_hints.update(normalized_hints)
 
         context.apply_task_hints(merged_hints)
         result.prompt_hints_count = len(merged_hints)
@@ -485,6 +609,24 @@ class PromptStepHandler(BaseStepHandler):
                     prompt_builder = getattr(orchestrator, "prompt_builder", None)
                     if prompt_builder and hasattr(prompt_builder, "add_prompt_section"):
                         prompt_builder.add_prompt_section(section)
+
+    def _normalize_hints(self, hints: Dict[str, Any]) -> Dict[str, TaskTypeHint]:
+        """Normalize hints to TaskTypeHint using PromptContributorAdapter.
+
+        Supports multiple hint formats:
+        - TaskTypeHint instances (preserved as-is)
+        - Dict with hint/tool_budget/priority_tools keys
+        - String (just the hint text)
+
+        Args:
+            hints: Raw hints in various formats
+
+        Returns:
+            Dict mapping task types to normalized TaskTypeHint objects
+        """
+        # Use PromptContributorAdapter.from_dict for normalization
+        adapter = PromptContributorAdapter.from_dict(task_hints=hints)
+        return adapter.get_task_type_hints()
 
 
 # =============================================================================
@@ -958,6 +1100,17 @@ class FrameworkStepHandler(BaseStepHandler):
             logger.debug(f"Registered team_spec: {team_name}")
         logger.debug(f"Applied {team_count} team specifications from vertical")
 
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+        """Return framework integration details."""
+        details = {}
+        if result.workflows_count > 0:
+            details["workflows_count"] = result.workflows_count
+        if result.rl_learners_count > 0:
+            details["rl_learners_count"] = result.rl_learners_count
+        if result.team_specs_count > 0:
+            details["team_specs_count"] = result.team_specs_count
+        return details if details else None
+
     def apply_chains(
         self,
         orchestrator: Any,
@@ -1179,11 +1332,15 @@ class TieredConfigStepHandler(BaseStepHandler):
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
-        """Apply tiered tool config from vertical."""
-        # Check if vertical provides tiered tool config
-        tiered_config = None
-        if hasattr(vertical, "get_tiered_tool_config"):
-            tiered_config = vertical.get_tiered_tool_config()
+        """Apply tiered tool config from vertical.
+
+        Uses get_tiered_config() helper with fallback chain:
+        1. Try get_tiered_tool_config() first
+        2. Fall back to get_tiered_tools() if config missing or None
+        3. Return early if neither method provides config
+        """
+        # Use fallback chain helper (Workstream D fix)
+        tiered_config = get_tiered_config(vertical)
 
         if tiered_config is None:
             logger.debug(f"Vertical {vertical.name} does not provide tiered tool config")
@@ -1491,7 +1648,50 @@ class ExtensionsStepHandler(BaseStepHandler):
         ) -> None:
             self._apply_enrichment_strategy(orchestrator, strategy, context, result)
 
+        def handle_tool_selection(
+            orchestrator: Any,
+            strategy: Any,
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            self._apply_tool_selection_strategy(orchestrator, strategy, context, result)
+
+        def handle_service_provider(
+            orchestrator: Any,
+            provider: Any,
+            extensions: Any,
+            context: "VerticalContext",
+            result: "IntegrationResult",
+        ) -> None:
+            """Register vertical-specific services with the DI container."""
+            # Get container and settings from orchestrator
+            container = getattr(orchestrator, "_container", None)
+            settings = getattr(orchestrator, "settings", None)
+
+            if container is None:
+                result.add_warning(
+                    "Cannot register vertical services: orchestrator lacks container"
+                )
+                return
+
+            try:
+                provider.register_services(container, settings)
+                # Count registered services if method available
+                required = provider.get_required_services() if hasattr(provider, "get_required_services") else []
+                optional = provider.get_optional_services() if hasattr(provider, "get_optional_services") else []
+                total = len(required) + len(optional)
+                result.add_info(f"Registered {total} vertical services ({len(required)} required, {len(optional)} optional)")
+                logger.debug(f"Registered vertical services: {total} total")
+            except Exception as e:
+                result.add_warning(f"Failed to register vertical services: {e}")
+                logger.debug(f"Service registration error: {e}", exc_info=True)
+
         # Register default handlers with priorities
+        # Service provider first (priority=5) so services are available to other handlers
+        self._extension_registry.register(
+            ExtensionHandler("service_provider", handle_service_provider, priority=5)
+        )
         self._extension_registry.register(
             ExtensionHandler("middleware", handle_middleware, priority=10)
         )
@@ -1509,6 +1709,9 @@ class ExtensionsStepHandler(BaseStepHandler):
         )
         self._extension_registry.register(
             ExtensionHandler("enrichment_strategy", handle_enrichment, priority=60)
+        )
+        self._extension_registry.register(
+            ExtensionHandler("tool_selection_strategy", handle_tool_selection, priority=15)
         )
 
     def _do_apply(
@@ -1530,6 +1733,65 @@ class ExtensionsStepHandler(BaseStepHandler):
 
         # OCP: Apply all registered extension handlers
         self._extension_registry.apply_all(orchestrator, extensions, context, result)
+
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+        """Return extension application details."""
+        details = {}
+        if result.middleware_count > 0:
+            details["middleware_count"] = result.middleware_count
+        if result.safety_patterns_count > 0:
+            details["safety_patterns_count"] = result.safety_patterns_count
+        if result.prompt_hints_count > 0:
+            details["prompt_hints_count"] = result.prompt_hints_count
+        if result.mode_configs_count > 0:
+            details["mode_configs_count"] = result.mode_configs_count
+        return details if details else None
+
+    def _apply_tool_selection_strategy(
+        self,
+        orchestrator: Any,
+        strategy: Any,
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply tool selection strategy from vertical extensions.
+
+        Registers the vertical-specific tool selection strategy with the
+        tool selection system, enabling domain-aware tool prioritization.
+
+        Args:
+            orchestrator: Orchestrator instance
+            strategy: ToolSelectionStrategyProtocol implementation
+            context: Vertical context
+            result: Result to update
+        """
+        # Store in context for later retrieval
+        context.apply_tool_selection_strategy(strategy)
+
+        # Try to register with tool selector via capability
+        if _check_capability(orchestrator, "tool_selection_strategy"):
+            _invoke_capability(orchestrator, "tool_selection_strategy", strategy)
+            logger.debug("Applied tool selection strategy via capability")
+            return
+
+        # Fallback: try to set on tool selector directly
+        tool_selector = getattr(orchestrator, "tool_selector", None)
+        if tool_selector is not None:
+            if hasattr(tool_selector, "set_vertical_strategy"):
+                tool_selector.set_vertical_strategy(strategy)
+                logger.debug("Applied tool selection strategy to tool_selector")
+                return
+            elif hasattr(tool_selector, "register_strategy"):
+                vertical_name = context.vertical_name or "default"
+                tool_selector.register_strategy(vertical_name, strategy)
+                logger.debug(f"Registered tool selection strategy for vertical={vertical_name}")
+                return
+
+        # Log that strategy is stored in context only
+        logger.debug(
+            "Tool selection strategy stored in context only; "
+            "orchestrator lacks tool_selector with strategy support"
+        )
 
     def _apply_enrichment_strategy(
         self,
@@ -1690,4 +1952,6 @@ __all__ = [
     # Capability helpers
     "_check_capability",
     "_invoke_capability",
+    # Tiered config helper (Workstream D)
+    "get_tiered_config",
 ]

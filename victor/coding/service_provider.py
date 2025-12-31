@@ -106,7 +106,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
             auto_fix = getattr(settings, "code_correction_auto_fix", True)
             return CodeCorrectionMiddleware(enabled=enabled, auto_fix=auto_fix)
 
-        container.register(
+        container.register_or_replace(
             CodingMiddlewareProtocol,
             create_middleware,
             ServiceLifetime.SINGLETON,
@@ -125,7 +125,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
 
             return CodingSafetyExtension()
 
-        container.register(
+        container.register_or_replace(
             CodingSafetyProtocol,
             create_safety,
             ServiceLifetime.SINGLETON,
@@ -146,7 +146,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
             use_extended = getattr(settings, "use_extended_grounding", False)
             return CodingPromptContributor(use_extended_grounding=use_extended)
 
-        container.register(
+        container.register_or_replace(
             CodingPromptProtocol,
             create_prompts,
             ServiceLifetime.SINGLETON,
@@ -167,7 +167,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
             default_mode = getattr(settings, "default_mode", "default")
             return CodingModeConfigProvider(default_mode=default_mode)
 
-        container.register(
+        container.register_or_replace(
             ModeConfigProviderProtocol,
             create_mode_config,
             ServiceLifetime.SINGLETON,
@@ -189,7 +189,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
 
             return CodingToolDependencyProvider()
 
-        container.register(
+        container.register_or_replace(
             ToolDependencyProviderProtocol,
             create_tool_deps,
             ServiceLifetime.SINGLETON,
