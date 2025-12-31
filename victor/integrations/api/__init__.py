@@ -19,24 +19,50 @@ and external tool access.
 
 Components:
 - VictorAPIServer: Legacy aiohttp-based server
-- VictorFastAPIServer: Modern FastAPI-based server (recommended)
+- VictorFastAPIServer: Modern FastAPI-based server (recommended, requires fastapi)
 - APIMiddlewareStack: Authentication, rate limiting, and CORS middleware
 - EventBridge: Real-time event streaming to WebSocket clients
 """
 
-from victor.integrations.api.server import VictorAPIServer
-from victor.integrations.api.fastapi_server import VictorFastAPIServer
-from victor.integrations.api.middleware import (
-    APIMiddlewareStack,
-    RateLimitConfig,
-    AuthConfig,
-    TokenBucket,
-)
-from victor.integrations.api.event_bridge import (
-    EventBroadcaster,
-    BridgeEvent,
-    BridgeEventType,
-)
+from typing import TYPE_CHECKING
+
+# Lazy imports for optional dependencies
+if TYPE_CHECKING:
+    from victor.integrations.api.server import VictorAPIServer
+    from victor.integrations.api.fastapi_server import VictorFastAPIServer
+    from victor.integrations.api.middleware import (
+        APIMiddlewareStack,
+        RateLimitConfig,
+        AuthConfig,
+        TokenBucket,
+    )
+    from victor.integrations.api.event_bridge import (
+        EventBroadcaster,
+        BridgeEvent,
+        BridgeEventType,
+    )
+
+
+def __getattr__(name: str):
+    """Lazy import for optional dependencies."""
+    if name == "VictorAPIServer":
+        from victor.integrations.api.server import VictorAPIServer
+
+        return VictorAPIServer
+    elif name == "VictorFastAPIServer":
+        from victor.integrations.api.fastapi_server import VictorFastAPIServer
+
+        return VictorFastAPIServer
+    elif name in ("APIMiddlewareStack", "RateLimitConfig", "AuthConfig", "TokenBucket"):
+        from victor.integrations.api import middleware
+
+        return getattr(middleware, name)
+    elif name in ("EventBroadcaster", "BridgeEvent", "BridgeEventType"):
+        from victor.integrations.api import event_bridge
+
+        return getattr(event_bridge, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Servers
