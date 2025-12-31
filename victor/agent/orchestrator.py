@@ -2008,6 +2008,46 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return getattr(self, "_middleware_chain", None)
 
+    # =========================================================================
+    # Internal Storage Setters (DIP Compliance)
+    # These methods provide controlled access for adapter implementations,
+    # replacing direct private attribute writes. Only called by
+    # VerticalIntegrationAdapter - not for general use.
+    # =========================================================================
+
+    def _set_vertical_middleware_storage(self, middleware: List[Any]) -> None:
+        """Internal: Set vertical middleware storage.
+
+        DIP Compliance: Provides controlled setter instead of direct
+        private attribute access. Called by VerticalIntegrationAdapter.
+
+        Args:
+            middleware: List of middleware instances
+        """
+        self._vertical_middleware = middleware
+
+    def _set_middleware_chain_storage(self, chain: Any) -> None:
+        """Internal: Set middleware chain storage.
+
+        DIP Compliance: Provides controlled setter instead of direct
+        private attribute access. Called by VerticalIntegrationAdapter.
+
+        Args:
+            chain: MiddlewareChain instance
+        """
+        self._middleware_chain = chain
+
+    def _set_safety_patterns_storage(self, patterns: List[Any]) -> None:
+        """Internal: Set safety patterns storage.
+
+        DIP Compliance: Provides controlled setter instead of direct
+        private attribute access. Called by VerticalIntegrationAdapter.
+
+        Args:
+            patterns: List of safety pattern instances
+        """
+        self._safety_patterns = patterns
+
     @property
     def messages(self) -> List[Message]:
         """Get conversation messages (backward compatibility property).

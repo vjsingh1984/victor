@@ -174,10 +174,13 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_middleware"):
             vertical_context.apply_middleware(middleware)
 
-        # Store reference directly - we ARE the implementation, don't recurse via capability
-        # This is safe because we're setting the storage, not calling the capability
-        # Note: We set directly to maintain backward compatibility with tests
-        self._orchestrator._vertical_middleware = middleware
+        # Store reference via internal setter (DIP-compliant)
+        # Uses orchestrator's controlled storage setter instead of direct attribute access
+        if hasattr(self._orchestrator, "_set_vertical_middleware_storage"):
+            self._orchestrator._set_vertical_middleware_storage(middleware)
+        else:
+            # Fallback for backward compatibility
+            self._orchestrator._vertical_middleware = middleware
 
         # Get middleware chain via capability (DIP-compliant read)
         chain = self._get_capability_value("middleware_chain")
@@ -187,8 +190,10 @@ class VerticalIntegrationAdapter:
                 from victor.agent.middleware_chain import MiddlewareChain
 
                 chain = MiddlewareChain()
-                # Store directly on orchestrator (we're the implementation)
-                if hasattr(self._orchestrator, "_middleware_chain"):
+                # Store via internal setter (DIP-compliant)
+                if hasattr(self._orchestrator, "_set_middleware_chain_storage"):
+                    self._orchestrator._set_middleware_chain_storage(chain)
+                elif hasattr(self._orchestrator, "_middleware_chain"):
                     self._orchestrator._middleware_chain = chain
             except ImportError:
                 logger.warning("MiddlewareChain not available")
@@ -232,9 +237,13 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_safety_patterns"):
             vertical_context.apply_safety_patterns(patterns)
 
-        # Store reference directly - we ARE the implementation, don't recurse via capability
-        # Note: We set directly to maintain backward compatibility with tests
-        self._orchestrator._vertical_safety_patterns = patterns
+        # Store reference via internal setter (DIP-compliant)
+        # Uses orchestrator's controlled storage setter instead of direct attribute access
+        if hasattr(self._orchestrator, "_set_safety_patterns_storage"):
+            self._orchestrator._set_safety_patterns_storage(patterns)
+        else:
+            # Fallback for backward compatibility
+            self._orchestrator._vertical_safety_patterns = patterns
 
         # Get safety checker via capability or public method
         checker = None

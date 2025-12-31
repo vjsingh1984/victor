@@ -29,6 +29,40 @@ ToolRegistrar acts as a facade for multiple registration systems:
 - MCPRegistry: MCP server discovery
 - ToolDependencyGraph: Tool planning
 
+SRP Consideration (Future Refactoring)
+======================================
+This class currently bundles 5 responsibilities. For stricter SRP compliance,
+consider splitting into:
+
+1. ToolCatalogLoader: Dynamic tool discovery from victor/tools
+   - _discover_tools(), _load_tool_module(), _register_dynamic_tools()
+
+2. PluginLoader: Plugin system management
+   - _initialize_plugins(), _load_plugin_package(), _register_plugin_tools()
+
+3. MCPConnector: MCP server discovery and connection
+   - _setup_mcp_integration(), _connect_mcp_servers()
+
+4. ToolGraphBuilder: Tool dependency graph setup
+   - _build_tool_graph(), _register_graph_dependencies()
+
+5. ToolRegistrar (Facade): Thin facade coordinating the above
+   - initialize(), get_stats(), prewarm()
+
+Benefits of split:
+- Each class has single reason to change
+- Easier testing of individual components
+- Plugin/MCP can be disabled without loading their code
+- Clearer dependency injection boundaries
+
+Trade-offs:
+- More files to navigate
+- Increased coordination overhead
+- May be premature if responsibilities are stable
+
+Current status: Acceptable as facade pattern. Split if maintenance
+pain points emerge (e.g., frequent MCP changes breaking plugin code).
+
 Usage:
     from victor.agent.tool_registrar import ToolRegistrar
 

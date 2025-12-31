@@ -471,6 +471,15 @@ class VerticalBase(ABC):
     def get_tiered_tools(cls) -> Optional[Any]:
         """Get tiered tool configuration for intelligent selection.
 
+        DEPRECATED: Use get_tiered_tool_config() instead.
+
+        This method is maintained for backward compatibility. New verticals
+        should override get_tiered_tool_config() which has a default
+        implementation using TieredToolTemplate.
+
+        ISP/LSP Compliance: This method now delegates to get_tiered_tool_config()
+        to ensure consistent behavior regardless of which method is called.
+
         Override to provide vertical-specific tiered tool configuration
         for context-efficient tool selection. When implemented, this enables:
 
@@ -493,7 +502,8 @@ class VerticalBase(ABC):
         Returns:
             TieredToolConfig or None (falls back to get_tools())
         """
-        return None
+        # ISP/LSP: Delegate to canonical method for consistent behavior
+        return cls.get_tiered_tool_config()
 
     @classmethod
     def get_workflow_provider(cls) -> Optional[Any]:
