@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from victor.storage.graph.protocol import GraphStoreProtocol
 from victor.storage.graph.sqlite_store import SqliteGraphStore
@@ -23,31 +24,34 @@ except Exception:
     Neo4jGraphStore = None
 
 
-def create_graph_store(name: str, path: Path) -> GraphStoreProtocol:
+def create_graph_store(
+    name: str = "sqlite",
+    project_path: Optional[Path] = None,
+) -> GraphStoreProtocol:
     """Create a graph store by name.
 
     Args:
-        name: Backend name (currently supports "sqlite")
-        path: Path to the underlying storage (e.g., DB file)
+        name: Backend name (sqlite, memory, duckdb, lancedb, neo4j)
+        project_path: Path to project root. If None, uses current directory.
 
     Returns:
         GraphStoreProtocol implementation
     """
     backend = (name or "sqlite").lower()
     if backend == "sqlite":
-        return SqliteGraphStore(path)
+        return SqliteGraphStore(project_path=project_path)
     if backend == "memory":
         return MemoryGraphStore()
     if backend == "duckdb":
         if DuckDBGraphStore is None:
             raise ValueError("DuckDB graph backend requested but duckdb is not installed")
-        return DuckDBGraphStore(path)
+        return DuckDBGraphStore(project_path)
     if backend == "lancedb":
         if LanceDBGraphStore is None:
             raise ValueError("LanceDB graph backend requested but lancedb is not installed")
-        return LanceDBGraphStore(path)
+        return LanceDBGraphStore(project_path)
     if backend == "neo4j":
         if Neo4jGraphStore is None:
             raise ValueError("Neo4j graph backend requested but neo4j driver is not installed")
-        return Neo4jGraphStore(path)
+        return Neo4jGraphStore(project_path)
     raise ValueError(f"Unsupported graph store backend: {name}")

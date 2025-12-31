@@ -46,7 +46,7 @@ from victor.coding.codebase.graph.protocol import GraphEdge, GraphNode
 from victor.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
 from victor.coding.languages.registry import get_language_registry
 from victor.coding.codebase.graph.registry import create_graph_store
-from victor.coding.codebase.graph.sqlite_store import SqliteGraphStore
+from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.coding.codebase.symbol_resolver import SymbolResolver
 
 if TYPE_CHECKING:
@@ -736,15 +736,10 @@ class CodebaseIndex:
         # Callbacks for change notifications (e.g., SymbolStore)
         self._change_callbacks: List[Callable[[str], None]] = []
 
-        # Graph store (per-repo, embedded)
+        # Graph store (per-repo, embedded in project.db)
         if graph_store is None:
-            backend = graph_store_name or os.getenv("VICTOR_GRAPH_STORE", "sqlite")
-            if graph_path is None:
-                from victor.config.settings import get_project_paths
-
-                graph_path = get_project_paths(self.root).project_victor_dir / "graph" / "graph.db"
             self.graph_store: Optional["GraphStoreProtocol"] = create_graph_store(
-                backend, Path(graph_path)
+                project_path=self.root
             )
         else:
             self.graph_store = graph_store

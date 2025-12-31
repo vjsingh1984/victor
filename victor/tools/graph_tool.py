@@ -1328,11 +1328,8 @@ async def graph(
         graph(mode="module_pagerank", file="package", top_k=10)
     """
     try:
-        # Get graph store
-        graph_dir = Path(".victor/graph")
-        graph_dir.mkdir(parents=True, exist_ok=True)
-        graph_path = graph_dir / "graph.db"
-        store = create_graph_store("sqlite", graph_path)
+        # Get graph store (uses consolidated project.db by default)
+        store = create_graph_store("sqlite", project_path=Path.cwd())
 
         # Load into analyzer
         analyzer = await _load_graph(store)
