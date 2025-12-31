@@ -119,6 +119,36 @@ from victor.security.safety.infrastructure import (
     validate_kubernetes_manifest,
 )
 
+# Source credibility patterns (extracted from research/safety.py)
+from victor.security.safety.source_credibility import (
+    DOMAIN_TYPES,
+    SOURCE_CREDIBILITY_PATTERNS,
+    CredibilityLevel,
+    CredibilityMatch,
+    SourceCredibilityScanner,
+    get_credibility_level,
+    get_source_safety_reminders,
+    is_high_credibility,
+    is_low_credibility,
+    validate_source_credibility,
+)
+
+# Content warning patterns (extracted from research/safety.py)
+from victor.security.safety.content_patterns import (
+    ADVICE_RISK_PATTERNS,
+    CONTENT_WARNING_PATTERNS,
+    MISINFORMATION_RISK_PATTERNS,
+    ContentPatternScanner,
+    ContentWarningLevel,
+    ContentWarningMatch,
+    detect_advice_risk,
+    detect_misinformation_risk,
+    get_content_safety_reminders,
+    get_high_severity_warnings,
+    has_content_warnings,
+    scan_content_warnings,
+)
+
 __all__ = [
     # Types
     "SafetyPattern",
@@ -176,4 +206,28 @@ __all__ = [
     "scan_infrastructure_command",
     "validate_dockerfile",
     "validate_kubernetes_manifest",
+    # Source credibility patterns
+    "DOMAIN_TYPES",
+    "SOURCE_CREDIBILITY_PATTERNS",
+    "CredibilityLevel",
+    "CredibilityMatch",
+    "SourceCredibilityScanner",
+    "get_credibility_level",
+    "get_source_safety_reminders",
+    "is_high_credibility",
+    "is_low_credibility",
+    "validate_source_credibility",
+    # Content warning patterns
+    "ADVICE_RISK_PATTERNS",
+    "CONTENT_WARNING_PATTERNS",
+    "MISINFORMATION_RISK_PATTERNS",
+    "ContentPatternScanner",
+    "ContentWarningLevel",
+    "ContentWarningMatch",
+    "detect_advice_risk",
+    "detect_misinformation_risk",
+    "get_content_safety_reminders",
+    "get_high_severity_warnings",
+    "has_content_warnings",
+    "scan_content_warnings",
 ]
