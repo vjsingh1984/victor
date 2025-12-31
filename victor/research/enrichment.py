@@ -20,6 +20,9 @@ to inject relevant research context such as:
 - Source citations and references
 - Relevant snippets from previous research conversations
 
+This module delegates to the framework's enrichment utilities
+(victor.framework.enrichment) for domain-agnostic functionality.
+
 Example:
     from victor.research.enrichment import ResearchEnrichmentStrategy
 
@@ -33,7 +36,6 @@ Example:
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Awaitable
 
 from victor.agent.prompt_enrichment import (
@@ -43,14 +45,25 @@ from victor.agent.prompt_enrichment import (
     EnrichmentType,
 )
 
+# Import framework enrichment utilities (DRY principle)
+from victor.framework.enrichment import (
+    extract_search_terms as _framework_extract_search_terms,
+    format_web_results as _framework_format_web_results,
+    extract_tool_context as _framework_extract_tool_context,
+)
+
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
 
 
+# DEPRECATED: Use victor.framework.enrichment.extract_search_terms instead
+# Kept for backward compatibility
 def _extract_search_terms(prompt: str) -> List[str]:
     """Extract potential search terms from a prompt.
+
+    DEPRECATED: Use victor.framework.enrichment.extract_search_terms instead.
 
     Args:
         prompt: The prompt text to analyze
@@ -58,29 +71,7 @@ def _extract_search_terms(prompt: str) -> List[str]:
     Returns:
         List of search term candidates
     """
-    # Remove common question patterns for cleaner extraction
-    cleaned = re.sub(
-        r"^(what|how|why|when|where|who|which|can|could|would|should|is|are|do|does)\s+",
-        "",
-        prompt.lower(),
-    )
-
-    # Extract quoted phrases (from original prompt to preserve case)
-    quoted = re.findall(r'"([^"]+)"', prompt)
-
-    # Extract key noun phrases (simplified)
-    # Look for capitalized words and technical terms
-    terms = re.findall(r"\b[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\b", prompt)
-
-    # Also extract significant words from cleaned prompt
-    significant_words = [
-        w for w in cleaned.split() if len(w) > 4 and w not in {"about", "which", "would"}
-    ]
-    terms.extend(significant_words[:3])
-
-    # Combine and dedupe
-    all_terms = quoted + terms
-    return list(dict.fromkeys(all_terms))[:5]  # Max 5 terms
+    return _framework_extract_search_terms(prompt, max_terms=5)
 
 
 class ResearchEnrichmentStrategy:
@@ -178,6 +169,8 @@ class ResearchEnrichmentStrategy:
     ) -> Optional[ContextEnrichment]:
         """Enrich from web search results.
 
+        Delegates formatting to framework enrichment utilities.
+
         Args:
             terms: Search terms to query
             task_type: Type of research task
@@ -200,21 +193,13 @@ class ResearchEnrichmentStrategy:
         if not results:
             return None
 
-        # Format search results
-        content_parts = ["Relevant web search results:"]
-
-        for i, result in enumerate(results[: self._max_results], 1):
-            title = result.get("title", "Untitled")
-            snippet = result.get("snippet", "")
-            url = result.get("url", "")
-
-            content_parts.append(f"\n{i}. **{title}**")
-            if snippet:
-                content_parts.append(f"   {snippet[:200]}...")
-            if url:
-                content_parts.append(f"   Source: {url}")
-
-        content = "\n".join(content_parts)
+        # Use framework utility for formatting
+        content = _framework_format_web_results(
+            results,
+            max_results=self._max_results,
+            max_snippet_length=200,
+            include_urls=True,
+        )
 
         return ContextEnrichment(
             type=EnrichmentType.WEB_SEARCH,
@@ -230,8 +215,8 @@ class ResearchEnrichmentStrategy:
     ) -> Optional[ContextEnrichment]:
         """Enrich from previous tool call results.
 
-        Extracts relevant context from recent web search or
-        web fetch tool results in the conversation.
+        Delegates to framework enrichment utilities for extraction.
+        Research vertical filters for web search/fetch tools.
 
         Args:
             tool_history: List of recent tool calls
@@ -239,41 +224,24 @@ class ResearchEnrichmentStrategy:
         Returns:
             Enrichment with relevant prior results, or None
         """
-        relevant_results = []
+        # Use framework utility for extraction (research-specific tool filter)
+        content = _framework_extract_tool_context(
+            tool_history,
+            tool_names={"web_search", "web_fetch"},  # Research-specific
+            max_results=3,
+            max_content_length=300,
+            header="Prior research in this session:",
+        )
 
-        for call in tool_history[-10:]:  # Last 10 calls
-            tool_name = call.get("tool", "")
-
-            # Look for web search/fetch results
-            if tool_name in ("web_search", "web_fetch"):
-                result = call.get("result", {})
-                if isinstance(result, dict) and result.get("success"):
-                    content = result.get("content", "")
-                    if content and len(content) > 50:
-                        relevant_results.append(
-                            {
-                                "tool": tool_name,
-                                "content": content[:300],
-                            }
-                        )
-
-        if not relevant_results:
+        if not content:
             return None
-
-        content_parts = ["Prior research in this session:"]
-
-        for item in relevant_results[:3]:  # Max 3 prior results
-            content_parts.append(f"\n- From {item['tool']}:")
-            content_parts.append(f"  {item['content']}...")
-
-        content = "\n".join(content_parts)
 
         return ContextEnrichment(
             type=EnrichmentType.CONVERSATION,
             content=content,
             priority=EnrichmentPriority.NORMAL,
             source="tool_history",
-            metadata={"prior_results": len(relevant_results)},
+            metadata={"source": "framework_enrichment"},
         )
 
     def get_priority(self) -> int:
