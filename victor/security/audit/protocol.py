@@ -55,7 +55,9 @@ class AuditEventType(str, Enum):
     # Security events
     SECRET_DETECTED = "secret_detected"
     SECRET_ACCESS = "secret_access"  # API key / credential access attempts
-    SECURITY_EVENT = "security_event"  # General security events (HOME manipulation, path traversal, etc.)
+    SECURITY_EVENT = (
+        "security_event"  # General security events (HOME manipulation, path traversal, etc.)
+    )
     SECURITY_SCAN = "security_scan"
     ACCESS_DENIED = "access_denied"
 
