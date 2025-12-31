@@ -101,8 +101,7 @@ class TestQLearningStore:
     def temp_store(self):
         """Create a temporary Q-learning store."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test_qlearn.db"
-            yield QLearningStore(db_path=db_path)
+            yield QLearningStore(project_path=Path(tmpdir))
 
     def test_get_q_value_returns_zero_for_unknown(self, temp_store):
         """Unknown state-action pairs should return 0."""
@@ -256,8 +255,7 @@ class TestAdaptiveModeController:
     def temp_store(self):
         """Create a temporary Q-learning store."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test_qlearn.db"
-            yield QLearningStore(db_path=db_path)
+            yield QLearningStore(project_path=Path(tmpdir))
 
     @pytest.fixture
     def controller(self, temp_store):
@@ -473,8 +471,7 @@ class TestModeTransitions:
     @pytest.fixture
     def temp_store(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test_qlearn.db"
-            yield QLearningStore(db_path=db_path)
+            yield QLearningStore(project_path=Path(tmpdir))
 
     @pytest.fixture
     def controller(self, temp_store):
@@ -510,8 +507,7 @@ class TestRewardCalculation:
     @pytest.fixture
     def temp_store(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test_qlearn.db"
-            yield QLearningStore(db_path=db_path)
+            yield QLearningStore(project_path=Path(tmpdir))
 
     @pytest.fixture
     def controller(self, temp_store):

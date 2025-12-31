@@ -35,7 +35,7 @@ def tracker():
 
     reset_change_tracker()
     with tempfile.TemporaryDirectory() as tmpdir:
-        tracker = FileChangeHistory(storage_dir=Path(tmpdir), max_history=50)
+        tracker = FileChangeHistory(project_path=Path(tmpdir), max_history=50)
         yield tracker
 
 
