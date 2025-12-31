@@ -12,18 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Hybrid search combining semantic and keyword search using RRF algorithm.
+"""Framework-level search utilities.
 
-DEPRECATED: This module now re-exports from victor.framework.search.
-Please import directly from victor.framework.search instead:
+This module provides generic search algorithms and utilities that can be
+used across all verticals. These are domain-agnostic search implementations.
 
+Provides:
+- HybridSearchEngine: RRF-based fusion of semantic and keyword search
+- HybridSearchResult: Result dataclass for hybrid search
+
+Usage:
     from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine
 
-This re-export is maintained for backward compatibility only.
+    engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
+    results = engine.combine_results(semantic_results, keyword_results)
 """
 
-# Re-export from framework for backward compatibility
-from victor.framework.search import (
+from victor.framework.search.hybrid import (
     HybridSearchEngine,
     HybridSearchResult,
     create_hybrid_search_engine,
