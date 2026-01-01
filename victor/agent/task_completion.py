@@ -57,13 +57,18 @@ class TaskDeliverable:
 
 @dataclass
 class TaskCompletionState:
-    """Tracks the completion state of a task."""
+    """Tracks the completion state of a task.
+
+    Note: max_continuation_requests defaults to MEDIUM complexity budget.
+    Use configure_for_complexity() to set based on task complexity.
+    """
 
     expected_deliverables: List[DeliverableType] = field(default_factory=list)
     completed_deliverables: List[TaskDeliverable] = field(default_factory=list)
     completion_signals: Set[str] = field(default_factory=set)
     continuation_requests: int = 0
-    max_continuation_requests: int = 2
+    # Default to MEDIUM complexity budget (5) - was 2 which caused premature termination
+    max_continuation_requests: int = 5
 
     @property
     def is_complete(self) -> bool:
@@ -414,6 +419,28 @@ class TaskCompletionDetector:
         """Reset state for new task."""
         self._state = TaskCompletionState()
         logger.debug("Task completion detector reset")
+
+    def configure_for_complexity(self, complexity: str) -> None:
+        """Configure completion limits based on task complexity.
+
+        Args:
+            complexity: Complexity level (simple, medium, complex, generation, action, analysis)
+
+        Uses ComplexityBudget from victor.framework.task for consolidated limits.
+        """
+        try:
+            from victor.framework.task.complexity import ComplexityBudget
+            from victor.framework.task.protocols import TaskComplexity
+
+            complexity_enum = TaskComplexity(complexity.lower())
+            budget = ComplexityBudget.for_complexity(complexity_enum)
+            self._state.max_continuation_requests = budget.max_continuation_requests
+            logger.debug(
+                f"Configured completion for {complexity}: "
+                f"max_continuation_requests={budget.max_continuation_requests}"
+            )
+        except (ValueError, ImportError) as e:
+            logger.warning(f"Could not configure for complexity '{complexity}': {e}")
 
     def force_complete(self, reason: str) -> None:
         """Force task completion with a reason.

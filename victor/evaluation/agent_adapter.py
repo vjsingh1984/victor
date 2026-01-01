@@ -60,12 +60,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AdapterConfig:
-    """Configuration for the Victor agent adapter."""
+    """Configuration for the Victor agent adapter.
 
-    max_turns: int = 20  # Maximum conversation turns
-    tool_budget: int = 50  # Maximum tool calls
+    Defaults are based on ACTION complexity from ComplexityBudget,
+    which is appropriate for benchmark tasks that require multiple tool calls.
+    """
+
+    # Defaults from ComplexityBudget(ACTION) - single source of truth
+    # ACTION: tool_budget=50, max_turns=30, max_continuation_requests=15, timeout_seconds=600
+    max_turns: int = 30  # Maximum conversation turns (ACTION complexity)
+    tool_budget: int = 50  # Maximum tool calls (ACTION complexity)
     max_tool_calls: int = 50  # Alias for tool_budget (backwards compat)
-    total_timeout: int = 300  # Total task timeout in seconds
+    total_timeout: int = 600  # Total task timeout in seconds (ACTION complexity)
     min_turn_timeout: int = 180  # Minimum per-turn timeout (P2: Timeout Fix)
     track_file_edits: bool = True
     track_diffs: bool = True
@@ -300,6 +306,13 @@ class VictorAgentAdapter:
         task_description = task.issue_text or task.prompt
         self._completion_detector.analyze_intent(task_description)
 
+        # Determine task complexity with fallback chain:
+        # 1. Explicit override from task (highest priority)
+        # 2. Inference from task description
+        # 3. Conservative default (MEDIUM)
+        complexity_value = self._determine_complexity(task, task_description)
+        self._completion_detector.configure_for_complexity(complexity_value)
+
         # Use task's issue_text or prompt directly - let framework handle enrichment
         prompt = task_description
 
@@ -361,6 +374,59 @@ class VictorAgentAdapter:
             trace.token_usage = self.orchestrator.get_token_usage()
 
         return trace
+
+    def _determine_complexity(self, task: BenchmarkTask, task_description: str) -> str:
+        """Determine task complexity using fallback chain.
+
+        Priority order:
+        1. Explicit override from task.complexity_override (caller knows best)
+        2. Inference from task description using TaskComplexityService
+        3. Conservative default: "medium"
+
+        This design:
+        - Keeps override optional (minimal config)
+        - Allows max control when needed
+        - Framework doesn't fight what caller wants
+
+        Args:
+            task: The benchmark task (may have complexity_override)
+            task_description: Text to classify if no override
+
+        Returns:
+            Complexity level string: simple, medium, complex, generation, action, analysis
+        """
+        # Priority 1: Explicit override (caller knows best)
+        if task.complexity_override:
+            logger.info(
+                f"Using explicit complexity override: {task.complexity_override}"
+            )
+            return task.complexity_override
+
+        # Priority 2: Inference from task description
+        try:
+            from victor.framework.task.complexity import TaskComplexityService
+
+            service = TaskComplexityService()
+            classification = service.classify(task_description)
+
+            # Only use inference if confidence is reasonable
+            if classification.confidence >= 0.5:
+                logger.info(
+                    f"Task classified as {classification.complexity.value} "
+                    f"(budget: {classification.tool_budget}, confidence: {classification.confidence:.2f})"
+                )
+                return classification.complexity.value
+            else:
+                logger.info(
+                    f"Low confidence classification ({classification.confidence:.2f}), "
+                    f"using conservative default"
+                )
+        except Exception as e:
+            logger.warning(f"Complexity inference failed: {e}")
+
+        # Priority 3: Conservative default
+        logger.info("Using conservative default complexity: medium")
+        return "medium"
 
     def _inject_task_context(self, task: BenchmarkTask, workspace_dir: Path) -> None:
         """Inject task context into orchestrator's system prompt for enrichment.

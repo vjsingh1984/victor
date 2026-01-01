@@ -58,6 +58,8 @@ from .protocols import (
 
 # Complexity classification service
 from .complexity import (
+    ComplexityBudget,
+    COMPLEXITY_BUDGETS,
     DEFAULT_BUDGETS,
     PATTERNS,
     TASK_TYPE_TO_COMPLEXITY,
@@ -81,7 +83,10 @@ __all__ = [
     "TaskClassification",
     # Service
     "TaskComplexityService",
-    # Constants
+    # Consolidated budgets (single source of truth)
+    "ComplexityBudget",
+    "COMPLEXITY_BUDGETS",
+    # Legacy constants (prefer COMPLEXITY_BUDGETS)
     "DEFAULT_BUDGETS",
     "PATTERNS",
     "TASK_TYPE_TO_COMPLEXITY",

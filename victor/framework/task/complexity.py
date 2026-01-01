@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
@@ -49,7 +50,8 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\bgit\s+(status|log|branch)\b", 1.0, "git_status"),
         (r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b", 0.9, "status_query"),
         (r"\bpwd\b|\bcurrent\s+(directory|dir|folder)\b", 1.0, "pwd"),
-        (r"\bls\b(?!\s+\|)", 0.9, "ls_command"),
+        # ls command - exclude ls= (Python kwarg like linestyle) and ls| (pipe)
+        (r"(?:^|\s)ls\s+(?![\=\'])", 0.9, "ls_command"),
         (r"\bcount\s+(files?|lines?|words?)\b", 0.9, "count_query"),
     ],
     TaskComplexity.MEDIUM: [
@@ -64,11 +66,6 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\bhow\s+(does|do|is)\s+.+\s+(work|implemented)\b", 0.9, "how_works"),
     ],
     TaskComplexity.COMPLEX: [
-        (
-            r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|code)\b",
-            1.0,
-            "analyze_codebase",
-        ),
         (r"\brefactor\b", 0.9, "refactor"),
         (
             r"\b(implement|add|create)\s+(a\s+)?(new\s+)?(feature|system|module)\b",
@@ -83,6 +80,12 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         ),
         (r"\bconvert\s+.+\s+(to|into)\s+", 0.9, "convert_code"),
         (r"\bconsolidate\s+(the\s+)?(code|duplicate|files?)\b", 0.9, "consolidate"),
+        # Bug fix patterns - common in issue reports
+        (r"\b(failed|fails|failing)\s+to\s+\w+", 1.0, "bug_fix"),
+        (r"\b(unexpected|wrong|incorrect)\s+(behavior|result|output|error)\b", 0.95, "bug_behavior"),
+        (r"\braise[sd]?\s+\w*Error\b", 0.9, "raises_error"),
+        (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\b", 1.0, "fix_bug"),
+        (r"\b(bug|issue)\s*(report|#\d+)?\s*:", 0.9, "bug_report"),
     ],
     TaskComplexity.GENERATION: [
         (
@@ -99,8 +102,9 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b", 0.95, "show_code_example"),
         (r"\bshow\s+me\s+code\s+for\b", 0.95, "show_code_for"),
         (r"\bimplement\s+(the\s+)?function\s+to\s+pass\b", 0.95, "implement_function"),
-        (r"\bdef\s+\w+\s*\([^)]*\)\s*:", 0.95, "function_definition"),
-        (r'"""\s*\n.*?>>>', 0.95, "doctest_pattern"),
+        # Lower weight - often appears in issue reports as code examples
+        (r"\bdef\s+\w+\s*\([^)]*\)\s*:", 0.6, "function_definition"),
+        (r'"""\s*\n.*?>>>', 0.7, "doctest_pattern"),
     ],
     TaskComplexity.ACTION: [
         (r"\bgit\s+(add|commit|push|pull|merge|rebase|stash)\b", 1.0, "git_command"),
@@ -117,6 +121,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         ),
         (r"\barchitecture\s+(review|analysis|overview)\b", 1.0, "architecture_analysis"),
         (
+            r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|code)\b",
+            1.0,
+            "analyze_codebase",
+        ),
+        (
             r"\b(explain|describe)\s+(the\s+)?(entire|whole|full)\s+(codebase|project|system)\b",
             1.0,
             "explain_codebase",
@@ -125,15 +134,70 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     ],
 }
 
-# Default tool budgets per complexity level
-# Minimum of 10 for all types to prevent premature termination
+# Consolidated budget configuration per complexity level
+# All limits are derived from complexity - single source of truth
+@dataclass
+class ComplexityBudget:
+    """Consolidated budget configuration for a task complexity level.
+
+    All components (adapter, completion detector, orchestrator) should use
+    this instead of having their own hardcoded limits.
+    """
+    tool_budget: int           # Max tool calls
+    max_turns: int             # Max conversation turns
+    max_continuation_requests: int  # Max "need more info" before force stop
+    timeout_seconds: int       # Total task timeout
+
+    @classmethod
+    def for_complexity(cls, complexity: "TaskComplexity") -> "ComplexityBudget":
+        """Get budget config for a complexity level."""
+        return COMPLEXITY_BUDGETS.get(complexity, COMPLEXITY_BUDGETS[TaskComplexity.MEDIUM])
+
+
+# Single source of truth for all budget-related configs
+COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
+    TaskComplexity.SIMPLE: ComplexityBudget(
+        tool_budget=10,
+        max_turns=5,
+        max_continuation_requests=3,
+        timeout_seconds=60,
+    ),
+    TaskComplexity.MEDIUM: ComplexityBudget(
+        tool_budget=15,
+        max_turns=10,
+        max_continuation_requests=5,
+        timeout_seconds=120,
+    ),
+    TaskComplexity.COMPLEX: ComplexityBudget(
+        tool_budget=25,
+        max_turns=20,
+        max_continuation_requests=10,
+        timeout_seconds=300,
+    ),
+    TaskComplexity.GENERATION: ComplexityBudget(
+        tool_budget=10,
+        max_turns=5,
+        max_continuation_requests=3,
+        timeout_seconds=60,
+    ),
+    TaskComplexity.ACTION: ComplexityBudget(
+        tool_budget=50,
+        max_turns=30,
+        max_continuation_requests=15,
+        timeout_seconds=600,
+    ),
+    TaskComplexity.ANALYSIS: ComplexityBudget(
+        tool_budget=60,
+        max_turns=40,
+        max_continuation_requests=20,
+        timeout_seconds=900,
+    ),
+}
+
+# Legacy: Simple tool budgets for backward compatibility
 DEFAULT_BUDGETS: Dict[TaskComplexity, int] = {
-    TaskComplexity.SIMPLE: 10,      # Quick queries still need some room
-    TaskComplexity.MEDIUM: 15,      # Moderate exploration
-    TaskComplexity.COMPLEX: 25,     # Deep work
-    TaskComplexity.GENERATION: 10,  # Code generation may need reads
-    TaskComplexity.ACTION: 50,      # Multi-step actions
-    TaskComplexity.ANALYSIS: 60,    # Thorough exploration
+    complexity: budget.tool_budget
+    for complexity, budget in COMPLEXITY_BUDGETS.items()
 }
 
 # Mapping from task type strings to complexity levels
@@ -200,21 +264,33 @@ class TaskComplexityService:
         custom_classifiers: Optional[List[Callable[[str], Optional[TaskClassification]]]] = None,
         use_semantic: bool = True,
         semantic_threshold: float = 0.65,
+        use_rl: bool = True,
     ) -> None:
         """Initialize the complexity service.
+
+        Inference chain (opinionated defaults, all optional):
+        1. Custom classifiers (extensibility)
+        2. High-confidence regex patterns (fast, deterministic)
+        3. Semantic embeddings (meaning-based classification)
+        4. RL-adjusted patterns (learned from outcomes)
+        5. Score-based regex (aggregate pattern weights)
+        6. Conservative default (MEDIUM)
 
         Args:
             budgets: Custom budget overrides per complexity level
             custom_patterns: Additional regex patterns for classification
             custom_classifiers: Custom classifier functions to try first
-            use_semantic: Whether to use semantic classification
+            use_semantic: Whether to use semantic classification (embeddings)
             semantic_threshold: Confidence threshold for semantic classification
+            use_rl: Whether to use RL-based adjustments (learns from outcomes)
         """
         self.budgets = budgets or DEFAULT_BUDGETS.copy()
         self.custom_classifiers = custom_classifiers or []
         self.use_semantic = use_semantic
         self.semantic_threshold = semantic_threshold
+        self.use_rl = use_rl
         self._semantic_classifier = None
+        self._rl_learner = None
 
         # Compile regex patterns
         self._patterns: Dict[TaskComplexity, List[Tuple[re.Pattern, float, str]]] = {
@@ -251,6 +327,93 @@ class TaskComplexityService:
                 logger.warning("TaskTypeClassifier not available, using regex only")
                 self.use_semantic = False
         return self._semantic_classifier
+
+    def _get_rl_learner(self):
+        """Lazy-load the RL complexity learner.
+
+        Uses the RL coordinator's learner registry if available.
+        Learns from task outcomes to adjust complexity predictions.
+        """
+        if self._rl_learner is None and self.use_rl:
+            try:
+                from victor.agent.rl.coordinator import RLCoordinator
+
+                coordinator = RLCoordinator.get_instance()
+                # Check if complexity learner is registered
+                self._rl_learner = coordinator.get_learner("complexity")
+                if self._rl_learner is None:
+                    logger.debug("Complexity RL learner not registered, using inference only")
+                    self.use_rl = False
+            except (ImportError, Exception) as e:
+                logger.debug(f"RL integration not available: {e}")
+                self.use_rl = False
+        return self._rl_learner
+
+    def record_outcome(
+        self,
+        message: str,
+        predicted: TaskComplexity,
+        success: bool,
+        actual_tools_used: int,
+        actual_turns: int,
+    ) -> None:
+        """Record classification outcome for RL learning.
+
+        Call this after task completion to help the classifier learn.
+        The RL learner adjusts future predictions based on outcomes.
+
+        Args:
+            message: Original task message
+            predicted: Complexity that was predicted/used
+            success: Whether task completed successfully
+            actual_tools_used: How many tools were actually used
+            actual_turns: How many conversation turns occurred
+
+        Example:
+            # After task completion
+            service.record_outcome(
+                message="fix the authentication bug",
+                predicted=TaskComplexity.MEDIUM,
+                success=True,
+                actual_tools_used=8,
+                actual_turns=5,
+            )
+        """
+        learner = self._get_rl_learner()
+        if not learner:
+            return
+
+        try:
+            # Calculate reward based on outcome
+            # Positive: completed with reasonable resource usage
+            # Negative: timeout, too many tools, or failure
+            budget = COMPLEXITY_BUDGETS[predicted]
+            tool_ratio = actual_tools_used / budget.tool_budget
+            turn_ratio = actual_turns / budget.max_turns
+
+            if success and tool_ratio <= 1.0 and turn_ratio <= 1.0:
+                reward = 1.0 - (tool_ratio + turn_ratio) / 4  # Reward efficiency
+            elif success:
+                reward = 0.2  # Completed but over budget
+            else:
+                reward = -0.5  # Failed
+
+            learner.record(
+                state={"message_hash": hash(message[:100])},
+                action=predicted.value,
+                reward=reward,
+                context={
+                    "message_preview": message[:200],
+                    "actual_tools": actual_tools_used,
+                    "actual_turns": actual_turns,
+                },
+            )
+            logger.debug(
+                f"RL: Recorded complexity outcome: {predicted.value}, "
+                f"reward={reward:.2f}, success={success}"
+            )
+        except Exception as e:
+            logger.debug(f"RL outcome recording failed: {e}")
 
     def _classify_semantic(self, message: str) -> Optional[TaskClassification]:
         """Attempt semantic classification using embeddings."""

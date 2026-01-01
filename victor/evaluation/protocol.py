@@ -121,6 +121,11 @@ class BenchmarkTask:
     tags: list[str] = field(default_factory=list)
     timeout_seconds: int = 300
 
+    # Task complexity override - if set, framework uses this instead of inference
+    # Valid values: "simple", "medium", "complex", "generation", "action", "analysis"
+    # If None, framework infers complexity from task description
+    complexity_override: Optional[str] = None
+
 
 @dataclass
 class CodeQualityMetrics:
