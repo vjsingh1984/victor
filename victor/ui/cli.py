@@ -19,6 +19,7 @@ from rich.console import Console
 from typing import Optional
 
 from victor import __version__
+from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
 from victor.ui.commands.config import config_app
 from victor.ui.commands.embeddings import embeddings_app
@@ -42,6 +43,7 @@ app = typer.Typer(
 )
 
 # Register all the subcommands
+app.add_typer(benchmark_app)
 app.add_typer(chat_app)
 app.add_typer(config_app)
 app.add_typer(embeddings_app)

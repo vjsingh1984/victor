@@ -40,7 +40,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from victor.ui.commands.utils import configure_logging
+from victor.ui.commands.utils import setup_logging
 
 rag_app = typer.Typer(
     name="rag",
@@ -50,32 +50,41 @@ console = Console()
 
 
 def _configure_log_level(log_level: Optional[str]) -> None:
-    """Configure logging level for RAG commands."""
-    if log_level is None:
-        log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING")
+    """Configure logging for RAG commands using centralized config.
 
-    log_level = log_level.upper()
-    valid_levels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}
+    Uses the centralized logging config system with proper priority chain:
+    1. CLI argument (log_level)
+    2. Environment variable (VICTOR_LOG_LEVEL)
+    3. User config (~/.victor/config.yaml)
+    4. Command-specific override from package config
+    5. Package defaults (WARNING console, INFO file)
+    """
+    # Validate log level if provided
+    if log_level is not None:
+        log_level = log_level.upper()
+        valid_levels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}
 
-    if log_level not in valid_levels:
-        console.print(
-            f"[bold red]Error:[/] Invalid log level '{log_level}'. "
-            f"Valid options: {', '.join(sorted(valid_levels))}"
-        )
-        raise typer.Exit(1)
+        if log_level not in valid_levels:
+            console.print(
+                f"[bold red]Error:[/] Invalid log level '{log_level}'. "
+                f"Valid options: {', '.join(sorted(valid_levels))}"
+            )
+            raise typer.Exit(1)
 
-    if log_level == "WARN":
-        log_level = "WARNING"
+        if log_level == "WARN":
+            log_level = "WARNING"
 
-    configure_logging(log_level, stream=sys.stderr)
+    # Use centralized logging config
+    setup_logging(command="rag", cli_log_level=log_level, stream=sys.stderr)
 
-    # Also configure debug logger levels
-    try:
-        from victor.agent.debug_logger import configure_logging_levels
+    # Also configure debug logger levels if explicitly set
+    if log_level:
+        try:
+            from victor.agent.debug_logger import configure_logging_levels
 
-        configure_logging_levels(log_level)
-    except ImportError:
-        pass
+            configure_logging_levels(log_level)
+        except ImportError:
+            pass
 
 
 @rag_app.callback()

@@ -15,9 +15,43 @@
 """Shared pytest fixtures and configuration."""
 
 import multiprocessing
+import socket
 import sys
 
 import pytest
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama server is running at localhost:11434.
+
+    Use this in tests that require Ollama with:
+        @pytest.mark.skipif(not is_ollama_available(), reason="Ollama not available")
+
+    Returns:
+        True if Ollama is reachable, False otherwise.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(1)
+        result = sock.connect_ex(("localhost", 11434))
+        return result == 0
+    finally:
+        sock.close()
+
+
+def requires_ollama():
+    """Pytest marker to skip tests when Ollama is not available.
+
+    Usage:
+        @requires_ollama()
+        def test_something():
+            ...
+    """
+    return pytest.mark.skipif(
+        not is_ollama_available(), reason="Ollama server not available at localhost:11434"
+    )
+
+
 from unittest.mock import MagicMock, patch
 
 # On macOS, use 'spawn' start method to avoid semaphore leak warnings

@@ -22,6 +22,10 @@ Supported benchmarks:
 - SWE-bench: Real-world GitHub issues from Python repositories
 - HumanEval: Code generation from docstrings (OpenAI)
 - MBPP: Mostly Basic Python Problems (Google Research)
+
+Framework comparison:
+- Compare Victor against Aider, Claude Code, Cursor, and others
+- Uses published benchmark results for standardized comparison
 """
 
 from victor.evaluation.benchmarks.swe_bench import (
@@ -29,9 +33,33 @@ from victor.evaluation.benchmarks.swe_bench import (
     MBPPRunner,
     SWEBenchRunner,
 )
+from victor.evaluation.benchmarks.framework_comparison import (
+    ComparisonMetrics,
+    ComparisonReport,
+    Framework,
+    FrameworkCapabilities,
+    FrameworkResult,
+    FRAMEWORK_CAPABILITIES,
+    PUBLISHED_RESULTS,
+    compute_metrics_from_result,
+    create_comparison_report,
+    get_published_result,
+)
 
 __all__ = [
+    # Runners
     "HumanEvalRunner",
     "MBPPRunner",
     "SWEBenchRunner",
+    # Framework comparison
+    "ComparisonMetrics",
+    "ComparisonReport",
+    "Framework",
+    "FrameworkCapabilities",
+    "FrameworkResult",
+    "FRAMEWORK_CAPABILITIES",
+    "PUBLISHED_RESULTS",
+    "compute_metrics_from_result",
+    "create_comparison_report",
+    "get_published_result",
 ]

@@ -42,7 +42,8 @@ class TestCodingWorkflowProvider:
         provider = CodingWorkflowProvider()
         workflows = provider.get_workflows()
 
-        assert len(workflows) == 7
+        # Core workflows + YAML workflows (tdd, tdd_quick, bugfix)
+        assert len(workflows) >= 7
         assert "feature_implementation" in workflows
         assert "quick_feature" in workflows
         assert "bug_fix" in workflows
@@ -50,13 +51,16 @@ class TestCodingWorkflowProvider:
         assert "code_review" in workflows
         assert "quick_review" in workflows
         assert "pr_review" in workflows
+        # New YAML workflows
+        assert "tdd" in workflows
+        assert "bugfix" in workflows
 
     def test_get_workflow_names(self):
         """Test getting workflow names."""
         provider = CodingWorkflowProvider()
         names = provider.get_workflow_names()
 
-        assert len(names) == 7
+        assert len(names) >= 7
         assert "feature_implementation" in names
 
     def test_get_workflow_by_name(self):

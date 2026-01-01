@@ -20,7 +20,8 @@ This package provides workflow definitions for common data analysis tasks:
 - Statistical analysis
 - Machine Learning pipeline
 
-Supports both standard and streaming execution via StreamingWorkflowExecutor.
+Uses YAML-first architecture with Python escape hatches for complex conditions
+and transforms that cannot be expressed in YAML.
 
 Example:
     provider = DataAnalysisWorkflowProvider()
@@ -33,274 +34,39 @@ Example:
     async for chunk in provider.astream("eda_workflow", orchestrator, context):
         if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
             print(f"Completed: {chunk.node_name}")
+
+Available workflows (all YAML-defined):
+- eda_pipeline: Full EDA with parallel statistics and visualizations
+- eda_quick: Lightweight EDA for quick analysis
+- data_cleaning: Systematic cleaning with validation loop
+- data_cleaning_quick: Automated cleaning without human review
+- statistical_analysis: Hypothesis testing and statistical modeling
+- ml_pipeline: End-to-end ML pipeline with hyperparameter tuning
+- ml_quick: Quick baseline model training
 """
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
-from victor.workflows.definition import (
-    WorkflowBuilder,
-    WorkflowDefinition,
-    workflow,
-)
+from victor.workflows.definition import WorkflowDefinition
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-
-@workflow("eda_workflow", "Exploratory Data Analysis workflow")
-def eda_workflow() -> WorkflowDefinition:
-    """Create exploratory data analysis workflow.
-
-    Comprehensive EDA with profiling, visualization, and insights.
-    """
-    return (
-        WorkflowBuilder("eda_workflow")
-        .set_metadata("category", "data_analysis")
-        .set_metadata("complexity", "medium")
-        # Load and understand data
-        .add_agent(
-            "load",
-            role="researcher",
-            goal="Load data and understand structure, types, and shape",
-            tool_budget=15,
-            allowed_tools=["read_file", "ls", "shell"],
-            output_key="data_profile",
-        )
-        # Generate summary statistics
-        .add_agent(
-            "profile",
-            role="analyst",
-            goal="Generate summary statistics and data profiling",
-            tool_budget=20,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"data": "data_profile"},
-            output_key="statistics",
-        )
-        # Analyze distributions and correlations
-        .add_agent(
-            "analyze",
-            role="analyst",
-            goal="Analyze distributions, correlations, and patterns",
-            tool_budget=20,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"stats": "statistics"},
-            output_key="analysis",
-        )
-        # Create visualizations
-        .add_agent(
-            "visualize",
-            role="executor",
-            goal="Create visualizations for key findings",
-            tool_budget=20,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"analysis": "analysis"},
-            output_key="visualizations",
-        )
-        # Summarize insights
-        .add_agent(
-            "summarize",
-            role="writer",
-            goal="Summarize key insights and recommendations",
-            tool_budget=10,
-            allowed_tools=["write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("data_cleaning", "Data cleaning and preparation workflow")
-def data_cleaning_workflow() -> WorkflowDefinition:
-    """Create data cleaning workflow.
-
-    Systematic data cleaning with validation.
-    """
-    return (
-        WorkflowBuilder("data_cleaning")
-        .set_metadata("category", "data_analysis")
-        .set_metadata("complexity", "medium")
-        # Assess data quality
-        .add_agent(
-            "assess",
-            role="analyst",
-            goal="Assess data quality issues (missing, duplicates, outliers)",
-            tool_budget=15,
-            allowed_tools=["read_file", "shell"],
-            output_key="quality_report",
-        )
-        # Plan cleaning strategy
-        .add_agent(
-            "plan",
-            role="planner",
-            goal="Plan data cleaning strategy based on issues",
-            tool_budget=10,
-            allowed_tools=["read_file"],
-            input_mapping={"report": "quality_report"},
-            output_key="cleaning_plan",
-        )
-        # Execute cleaning
-        .add_agent(
-            "clean",
-            role="executor",
-            goal="Execute data cleaning transformations",
-            tool_budget=25,
-            allowed_tools=["shell", "write_file", "read_file"],
-            input_mapping={"plan": "cleaning_plan"},
-            output_key="cleaned_data",
-        )
-        # Validate results
-        .add_agent(
-            "validate",
-            role="reviewer",
-            goal="Validate cleaned data meets quality standards",
-            tool_budget=15,
-            allowed_tools=["shell", "read_file"],
-            input_mapping={"data": "cleaned_data"},
-            output_key="validation",
-        )
-        # Document changes
-        .add_agent(
-            "document",
-            role="writer",
-            goal="Document cleaning steps and data lineage",
-            tool_budget=10,
-            allowed_tools=["write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("statistical_analysis", "Statistical analysis workflow")
-def statistical_analysis_workflow() -> WorkflowDefinition:
-    """Create statistical analysis workflow.
-
-    Hypothesis testing and statistical modeling.
-    """
-    return (
-        WorkflowBuilder("statistical_analysis")
-        .set_metadata("category", "data_analysis")
-        .set_metadata("complexity", "high")
-        # Understand research questions
-        .add_agent(
-            "formulate",
-            role="researcher",
-            goal="Formulate hypotheses and identify statistical tests",
-            tool_budget=15,
-            allowed_tools=["read_file", "web_search"],
-            output_key="hypotheses",
-        )
-        # Prepare data for analysis
-        .add_agent(
-            "prepare",
-            role="executor",
-            goal="Prepare data for statistical analysis",
-            tool_budget=20,
-            allowed_tools=["shell", "read_file", "write_file"],
-            input_mapping={"hypotheses": "hypotheses"},
-            output_key="prepared_data",
-        )
-        # Run statistical tests
-        .add_agent(
-            "test",
-            role="analyst",
-            goal="Run statistical tests and calculate metrics",
-            tool_budget=25,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"data": "prepared_data"},
-            output_key="test_results",
-        )
-        # Interpret results
-        .add_agent(
-            "interpret",
-            role="analyst",
-            goal="Interpret results and draw conclusions",
-            tool_budget=15,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"results": "test_results"},
-            output_key="interpretation",
-        )
-        # Report findings
-        .add_agent(
-            "report",
-            role="writer",
-            goal="Create statistical report with visualizations",
-            tool_budget=15,
-            allowed_tools=["shell", "write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("ml_pipeline", "Machine Learning pipeline workflow")
-def ml_pipeline_workflow() -> WorkflowDefinition:
-    """Create ML pipeline workflow.
-
-    End-to-end machine learning pipeline.
-    """
-    return (
-        WorkflowBuilder("ml_pipeline")
-        .set_metadata("category", "data_analysis")
-        .set_metadata("complexity", "high")
-        # Problem understanding
-        .add_agent(
-            "understand",
-            role="researcher",
-            goal="Understand ML problem and success criteria",
-            tool_budget=10,
-            allowed_tools=["read_file", "web_search"],
-            output_key="problem_definition",
-        )
-        # Feature engineering
-        .add_agent(
-            "engineer",
-            role="executor",
-            goal="Engineer features from raw data",
-            tool_budget=25,
-            allowed_tools=["shell", "read_file", "write_file"],
-            input_mapping={"problem": "problem_definition"},
-            output_key="features",
-        )
-        # Model training
-        .add_agent(
-            "train",
-            role="executor",
-            goal="Train and tune ML models",
-            tool_budget=30,
-            allowed_tools=["shell", "write_file"],
-            input_mapping={"features": "features"},
-            output_key="models",
-        )
-        # Model evaluation
-        .add_agent(
-            "evaluate",
-            role="reviewer",
-            goal="Evaluate models and select best",
-            tool_budget=20,
-            allowed_tools=["shell", "read_file", "write_file"],
-            input_mapping={"models": "models"},
-            output_key="evaluation",
-        )
-        # Document pipeline
-        .add_agent(
-            "document_ml",
-            role="writer",
-            goal="Document ML pipeline and model performance",
-            tool_budget=10,
-            allowed_tools=["write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
+    from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 
 class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
     """Provides data analysis-specific workflows.
+
+    Uses YAML-first architecture with Python escape hatches for complex
+    conditions and transforms that cannot be expressed in YAML.
 
     Includes support for streaming execution via StreamingWorkflowExecutor
     for real-time progress updates during data analysis workflows.
@@ -318,15 +84,50 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
 
     def __init__(self) -> None:
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        self._config: Optional["YAMLWorkflowConfig"] = None
+
+    def _get_config(self) -> "YAMLWorkflowConfig":
+        """Get YAML workflow config with escape hatches registered.
+
+        Returns:
+            YAMLWorkflowConfig with DataAnalysis conditions and transforms
+        """
+        if self._config is None:
+            from victor.workflows.yaml_loader import YAMLWorkflowConfig
+            from victor.dataanalysis.escape_hatches import CONDITIONS, TRANSFORMS
+
+            self._config = YAMLWorkflowConfig(
+                base_dir=Path(__file__).parent,
+                condition_registry=CONDITIONS,
+                transform_registry=TRANSFORMS,
+            )
+        return self._config
 
     def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Lazy load all YAML workflows.
+
+        Uses escape hatches for complex conditions that can't be expressed in YAML.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
         if self._workflows is None:
-            self._workflows = {
-                "eda_workflow": eda_workflow(),
-                "data_cleaning": data_cleaning_workflow(),
-                "statistical_analysis": statistical_analysis_workflow(),
-                "ml_pipeline": ml_pipeline_workflow(),
-            }
+            try:
+                from victor.workflows.yaml_loader import load_workflows_from_directory
+
+                # Load from the workflows directory with escape hatches
+                workflows_dir = Path(__file__).parent
+                config = self._get_config()
+                self._workflows = load_workflows_from_directory(
+                    workflows_dir,
+                    pattern="*.yaml",
+                    config=config,
+                )
+                logger.debug(f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to load YAML workflows: {e}")
+                self._workflows = {}
+
         return self._workflows
 
     def get_workflows(self) -> Dict[str, WorkflowDefinition]:
@@ -445,29 +246,12 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
         return f"DataAnalysisWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
-from victor.dataanalysis.workflows.graph_workflows import (
-    EDAState,
-    CleaningState,
-    MLPipelineState,
-    create_eda_workflow,
-    create_cleaning_workflow,
-    create_ml_pipeline_workflow,
-    DataAnalysisGraphExecutor,
-)
+# Register DataAnalysis domain handlers when this module is loaded
+from victor.dataanalysis.handlers import register_handlers as _register_handlers
+
+_register_handlers()
 
 __all__ = [
-    # WorkflowBuilder-based workflows
+    # YAML-first workflow provider
     "DataAnalysisWorkflowProvider",
-    "eda_workflow",
-    "data_cleaning_workflow",
-    "statistical_analysis_workflow",
-    "ml_pipeline_workflow",
-    # StateGraph-based workflows
-    "EDAState",
-    "CleaningState",
-    "MLPipelineState",
-    "create_eda_workflow",
-    "create_cleaning_workflow",
-    "create_ml_pipeline_workflow",
-    "DataAnalysisGraphExecutor",
 ]

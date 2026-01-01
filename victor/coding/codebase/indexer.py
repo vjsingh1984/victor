@@ -829,12 +829,21 @@ class CodebaseIndex:
         """Check if a path should be ignored based on ignore patterns.
 
         Also excludes hidden directories (starting with '.') by convention.
+        Only checks path parts WITHIN the project root, not parent directories.
         """
-        path_str = str(path)
+        # Get path relative to root to avoid ignoring due to parent directories
+        # e.g., ~/.victor/swe_bench_cache/repo should not be ignored because of .victor
+        try:
+            rel_path = path.relative_to(self.root)
+            path_str = str(rel_path)
+        except ValueError:
+            # Path is not under root - check full path
+            path_str = str(path)
+            rel_path = path
 
         # Skip hidden directories (Unix convention: directories starting with '.')
         # This excludes .git/, .vscode-test/, .vscode-victor/, etc.
-        for part in path.parts:
+        for part in rel_path.parts:
             if part.startswith(".") and part not in (".", ".."):
                 return True
 

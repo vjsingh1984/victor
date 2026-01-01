@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="boxGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="boxGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="boxGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="boxGrad4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#db2777"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="600" fill="url(#bgGrad)"/>
+
+  <!-- Title -->
+  <text x="500" y="40" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">
+    Victor Evaluation Pipeline
+  </text>
+  <text x="500" y="65" text-anchor="middle" fill="#94a3b8" font-size="14">
+    Token Tracking &amp; Timeout Management Flow (v0.4.0)
+  </text>
+
+  <!-- Row 1: CLI & Harness -->
+  <g transform="translate(50, 100)">
+    <!-- CLI -->
+    <rect x="0" y="0" width="180" height="80" rx="8" fill="url(#boxGrad1)" filter="url(#shadow)"/>
+    <text x="90" y="35" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="600">CLI Command</text>
+    <text x="90" y="55" text-anchor="middle" fill="#c7d2fe" font-size="11">victor benchmark run</text>
+    <text x="90" y="70" text-anchor="middle" fill="#c7d2fe" font-size="10">swe-bench --profile X</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="230" y1="140" x2="290" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Harness -->
+  <g transform="translate(300, 100)">
+    <rect x="0" y="0" width="180" height="80" rx="8" fill="url(#boxGrad2)" filter="url(#shadow)"/>
+    <text x="90" y="35" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="600">EvaluationHarness</text>
+    <text x="90" y="55" text-anchor="middle" fill="#a7f3d0" font-size="11">harness.py</text>
+    <text x="90" y="70" text-anchor="middle" fill="#a7f3d0" font-size="10">Task orchestration</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <line x1="480" y1="140" x2="540" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Agent Adapter -->
+  <g transform="translate(550, 100)">
+    <rect x="0" y="0" width="180" height="80" rx="8" fill="url(#boxGrad3)" filter="url(#shadow)"/>
+    <text x="90" y="35" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="600">VictorAgentAdapter</text>
+    <text x="90" y="55" text-anchor="middle" fill="#fef3c7" font-size="11">agent_adapter.py</text>
+    <text x="90" y="70" text-anchor="middle" fill="#fef3c7" font-size="10">Connects to orchestrator</text>
+  </g>
+
+  <!-- Arrow 3 -->
+  <line x1="730" y1="140" x2="790" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Orchestrator -->
+  <g transform="translate(800, 100)">
+    <rect x="0" y="0" width="150" height="80" rx="8" fill="url(#boxGrad4)" filter="url(#shadow)"/>
+    <text x="75" y="35" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="600">Orchestrator</text>
+    <text x="75" y="55" text-anchor="middle" fill="#fbcfe8" font-size="11">orchestrator.py</text>
+    <text x="75" y="70" text-anchor="middle" fill="#fbcfe8" font-size="10">chat() method</text>
+  </g>
+
+  <!-- Row 2: Token Flow -->
+  <g transform="translate(50, 230)">
+    <rect x="0" y="0" width="900" height="120" rx="10" fill="rgba(99, 102, 241, 0.1)" stroke="#6366f1" stroke-width="1"/>
+    <text x="450" y="25" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="600">Token Tracking Pipeline</text>
+
+    <!-- Provider box -->
+    <g transform="translate(30, 40)">
+      <rect x="0" y="0" width="150" height="60" rx="6" fill="#1e293b" stroke="#4f46e5" stroke-width="1"/>
+      <text x="75" y="25" text-anchor="middle" fill="#a5b4fc" font-size="12" font-weight="600">Provider.chat()</text>
+      <text x="75" y="45" text-anchor="middle" fill="#64748b" font-size="10">Returns usage dict</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="180" y1="70" x2="220" y2="70" stroke="#6366f1" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <!-- Accumulator -->
+    <g transform="translate(230, 40)">
+      <rect x="0" y="0" width="180" height="60" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="90" y="25" text-anchor="middle" fill="#86efac" font-size="12" font-weight="600">_cumulative_token_usage</text>
+      <text x="90" y="45" text-anchor="middle" fill="#64748b" font-size="10">prompt + completion + total</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="410" y1="70" x2="450" y2="70" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <!-- get_token_usage -->
+    <g transform="translate(460, 40)">
+      <rect x="0" y="0" width="150" height="60" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+      <text x="75" y="25" text-anchor="middle" fill="#fcd34d" font-size="12" font-weight="600">get_token_usage()</text>
+      <text x="75" y="45" text-anchor="middle" fill="#64748b" font-size="10">Returns TokenUsage</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="610" y1="70" x2="650" y2="70" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+    <!-- TaskResult -->
+    <g transform="translate(660, 40)">
+      <rect x="0" y="0" width="200" height="60" rx="6" fill="#1e293b" stroke="#ec4899" stroke-width="1"/>
+      <text x="100" y="25" text-anchor="middle" fill="#f9a8d4" font-size="12" font-weight="600">TaskResult</text>
+      <text x="100" y="45" text-anchor="middle" fill="#64748b" font-size="10">tokens_input/output/used</text>
+    </g>
+  </g>
+
+  <!-- Row 3: Timeout Policy -->
+  <g transform="translate(50, 380)">
+    <rect x="0" y="0" width="440" height="120" rx="10" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" stroke-width="1"/>
+    <text x="220" y="25" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="600">Timeout Policy (SOLID OCP)</text>
+
+    <g transform="translate(20, 45)">
+      <rect x="0" y="0" width="120" height="55" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="60" y="22" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600">SafeTimeoutPolicy</text>
+      <text x="60" y="40" text-anchor="middle" fill="#64748b" font-size="10">min: 180s/turn</text>
+    </g>
+
+    <g transform="translate(160, 45)">
+      <rect x="0" y="0" width="120" height="55" rx="6" fill="#1e293b" stroke="#0891b2" stroke-width="1"/>
+      <text x="60" y="22" text-anchor="middle" fill="#67e8f9" font-size="11" font-weight="600">AdaptivePolicy</text>
+      <text x="60" y="40" text-anchor="middle" fill="#64748b" font-size="10">growth: 1.2x</text>
+    </g>
+
+    <g transform="translate(300, 45)">
+      <rect x="0" y="0" width="120" height="55" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+      <text x="60" y="22" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="600">NaivePolicy</text>
+      <text x="60" y="40" text-anchor="middle" fill="#64748b" font-size="10">total/turns</text>
+    </g>
+  </g>
+
+  <!-- Row 3: Results Output -->
+  <g transform="translate(510, 380)">
+    <rect x="0" y="0" width="440" height="120" rx="10" fill="rgba(236, 72, 153, 0.1)" stroke="#ec4899" stroke-width="1"/>
+    <text x="220" y="25" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="600">Results Output</text>
+
+    <g transform="translate(20, 40)" fill="#f9a8d4" font-size="11">
+      <text x="0" y="15" font-family="monospace">{</text>
+      <text x="15" y="30" font-family="monospace">"total_tokens": 169704,</text>
+      <text x="15" y="45" font-family="monospace">"tokens_input": 167482,</text>
+      <text x="15" y="60" font-family="monospace">"tokens_output": 2222,</text>
+      <text x="0" y="75" font-family="monospace">}</text>
+    </g>
+
+    <g transform="translate(230, 40)">
+      <rect x="0" y="0" width="180" height="70" rx="6" fill="#1e293b" stroke="#ec4899" stroke-width="1"/>
+      <text x="90" y="20" text-anchor="middle" fill="#f9a8d4" font-size="11" font-weight="600">Saved to:</text>
+      <text x="90" y="40" text-anchor="middle" fill="#64748b" font-size="9" font-family="monospace">~/.victor/evaluations/</text>
+      <text x="90" y="55" text-anchor="middle" fill="#64748b" font-size="9" font-family="monospace">eval_swe_bench_*.json</text>
+    </g>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(50, 530)">
+    <text x="0" y="0" fill="#ffffff" font-size="12" font-weight="600">Components:</text>
+    <rect x="100" y="-10" width="12" height="12" rx="2" fill="url(#boxGrad1)"/>
+    <text x="118" y="0" fill="#94a3b8" font-size="10">CLI</text>
+    <rect x="160" y="-10" width="12" height="12" rx="2" fill="url(#boxGrad2)"/>
+    <text x="178" y="0" fill="#94a3b8" font-size="10">Harness</text>
+    <rect x="230" y="-10" width="12" height="12" rx="2" fill="url(#boxGrad3)"/>
+    <text x="248" y="0" fill="#94a3b8" font-size="10">Adapter</text>
+    <rect x="305" y="-10" width="12" height="12" rx="2" fill="url(#boxGrad4)"/>
+    <text x="323" y="0" fill="#94a3b8" font-size="10">Orchestrator</text>
+  </g>
+
+  <!-- Version badge -->
+  <g transform="translate(850, 530)">
+    <rect x="0" y="-15" width="100" height="25" rx="12" fill="#6366f1"/>
+    <text x="50" y="3" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600">Victor v0.4.0</text>
+  </g>
+</svg>

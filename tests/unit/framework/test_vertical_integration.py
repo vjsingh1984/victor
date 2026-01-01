@@ -718,7 +718,8 @@ class TestRealVerticalIntegration:
 
         workflow_names = provider.get_workflow_names()
         assert len(workflow_names) > 0
-        assert "deploy_infrastructure" in workflow_names
+        # YAML migration renamed deploy_infrastructure to deploy
+        assert "deploy" in workflow_names or "deploy_infrastructure" in workflow_names
 
     def test_devops_vertical_has_rl_config(self):
         """Test that devops vertical provides RL config."""
@@ -778,7 +779,8 @@ class TestRealVerticalIntegration:
 
         workflow_names = provider.get_workflow_names()
         assert len(workflow_names) > 0
-        assert "eda_workflow" in workflow_names
+        # YAML migration renamed eda_workflow to eda_pipeline
+        assert "eda_pipeline" in workflow_names or "eda_workflow" in workflow_names
 
     def test_data_analysis_vertical_has_rl_config(self):
         """Test that data analysis vertical provides RL config."""
@@ -834,7 +836,8 @@ class TestWorkflowProviderProtocol:
 
         workflows = provider.get_workflows()
         assert isinstance(workflows, dict)
-        assert "deploy_infrastructure" in workflows
+        # YAML migration renamed deploy_infrastructure to deploy
+        assert "deploy" in workflows or "deploy_infrastructure" in workflows
 
     def test_research_workflow_provider_protocol(self):
         """Test that research workflow provider satisfies protocol."""
@@ -854,7 +857,8 @@ class TestWorkflowProviderProtocol:
 
         workflows = provider.get_workflows()
         assert isinstance(workflows, dict)
-        assert "eda_workflow" in workflows
+        # YAML migration renamed eda_workflow to eda_pipeline
+        assert "eda_pipeline" in workflows or "eda_workflow" in workflows
         assert "ml_pipeline" in workflows
 
 

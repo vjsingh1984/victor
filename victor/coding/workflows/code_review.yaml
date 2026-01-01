@@ -1,0 +1,460 @@
+# Code Review Workflow
+# ====================
+# Comprehensive code review with:
+# - Static analysis and linting
+# - Security scanning
+# - Best practices verification
+# - Performance review
+# - Documentation check
+
+workflows:
+  code_review:
+    description: "Comprehensive automated code review with feedback"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: coding
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Gather Changes
+      # =====================================================================
+      - id: gather_changes
+        type: compute
+        name: "Gather Code Changes"
+        tools: [shell]
+        inputs:
+          command: $ctx.diff_command
+          base_branch: $ctx.base_branch
+        output: changes
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_changes]
+
+      - id: check_changes
+        type: condition
+        name: "Check Changes Exist"
+        condition: "change_count > 0"
+        branches:
+          "true": parallel_analysis
+          "false": no_changes
+
+      - id: no_changes
+        type: transform
+        name: "No Changes to Review"
+        transform: |
+          status = "skipped"
+          reason = "No code changes found"
+
+      # =====================================================================
+      # Stage 2: Parallel Analysis
+      # =====================================================================
+      - id: parallel_analysis
+        type: parallel
+        name: "Run Parallel Checks"
+        parallel_nodes: [lint_check, type_check, security_scan, complexity_analysis]
+        join_strategy: all
+        next: [aggregate_results]
+
+      - id: lint_check
+        type: compute
+        name: "Run Linters"
+        tools: [shell]
+        inputs:
+          commands:
+            - $ctx.lint_command
+            - $ctx.format_check_command
+        output: lint_results
+        constraints:
+          llm_allowed: false
+          timeout: 180
+
+      - id: type_check
+        type: compute
+        name: "Run Type Checker"
+        tools: [shell]
+        inputs:
+          command: $ctx.type_check_command
+        output: type_results
+        constraints:
+          llm_allowed: false
+          timeout: 180
+
+      - id: security_scan
+        type: compute
+        name: "Security Analysis"
+        tools: [shell]
+        inputs:
+          commands:
+            - $ctx.security_scan_command
+        output: security_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+
+      - id: complexity_analysis
+        type: compute
+        name: "Complexity Analysis"
+        tools: [shell]
+        inputs:
+          command: $ctx.complexity_command
+        output: complexity_results
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      # =====================================================================
+      # Stage 3: Aggregate and AI Review
+      # =====================================================================
+      - id: aggregate_results
+        type: transform
+        name: "Aggregate Analysis Results"
+        transform: |
+          total_issues = lint_issues + type_issues + security_issues
+          has_blocking = security_critical > 0 or type_errors > 0
+        next: [ai_review]
+
+      - id: ai_review
+        type: agent
+        name: "AI Code Review"
+        role: reviewer
+        goal: |
+          Perform a detailed code review focusing on:
+
+          1. **Logic and Correctness**
+             - Are there any bugs or logic errors?
+             - Are edge cases handled?
+             - Are error conditions properly managed?
+
+          2. **Code Quality**
+             - Is the code readable and maintainable?
+             - Are functions/methods appropriately sized?
+             - Is there code duplication?
+
+          3. **Best Practices**
+             - Does it follow project conventions?
+             - Are design patterns used appropriately?
+             - Is there proper separation of concerns?
+
+          4. **Performance**
+             - Are there obvious performance issues?
+             - Any N+1 queries or expensive loops?
+             - Memory usage concerns?
+
+          5. **Testing**
+             - Are changes adequately tested?
+             - Are test cases meaningful?
+             - Is coverage sufficient?
+
+          Analysis Results:
+          - Lint Issues: {lint_issues}
+          - Type Issues: {type_issues}
+          - Security Issues: {security_issues}
+          - Complexity Score: {complexity_score}
+        tool_budget: 30
+        tools: [read, grep, code_search]
+        llm_config:
+          temperature: 0.4
+        output: review_findings
+        next: [categorize_findings]
+
+      - id: categorize_findings
+        type: agent
+        name: "Categorize Review Findings"
+        role: analyst
+        goal: |
+          Categorize review findings by severity:
+
+          **Critical** - Must fix before merge:
+          - Security vulnerabilities
+          - Data loss risks
+          - Breaking changes
+
+          **Major** - Should fix:
+          - Bugs and logic errors
+          - Missing error handling
+          - Performance issues
+
+          **Minor** - Nice to have:
+          - Code style improvements
+          - Documentation gaps
+          - Refactoring suggestions
+
+          **Nitpicks** - Optional:
+          - Naming suggestions
+          - Comment improvements
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          findings: review_findings
+        output: categorized_findings
+        next: [check_blocking]
+
+      # =====================================================================
+      # Stage 4: Decision Point
+      # =====================================================================
+      - id: check_blocking
+        type: condition
+        name: "Check for Blocking Issues"
+        condition: "has_critical_issues"
+        branches:
+          "true": request_changes
+          "false": check_major
+
+      - id: check_major
+        type: condition
+        name: "Check for Major Issues"
+        condition: "major_issue_count > 2"
+        branches:
+          "true": request_changes
+          "false": approve_with_comments
+
+      - id: request_changes
+        type: hitl
+        name: "Request Changes"
+        hitl_type: approval
+        prompt: |
+          ## Code Review: Changes Requested
+
+          **Summary:** {review_summary}
+
+          ### Critical Issues ({critical_count})
+          {critical_issues}
+
+          ### Major Issues ({major_count})
+          {major_issues}
+
+          ### Minor Issues ({minor_count})
+          {minor_issues}
+
+          ---
+          Please address the critical and major issues before re-review.
+        context_keys:
+          - review_summary
+          - critical_count
+          - critical_issues
+          - major_count
+          - major_issues
+          - minor_count
+          - minor_issues
+        timeout: 300
+        fallback: continue
+        next: [offer_auto_fix]
+
+      - id: offer_auto_fix
+        type: hitl
+        name: "Offer Auto-Fix"
+        hitl_type: input
+        prompt: |
+          Would you like me to automatically fix the issues I can address?
+
+          **Auto-fixable Issues:**
+          {auto_fixable_issues}
+        context_keys:
+          - auto_fixable_issues
+        choices:
+          - "Yes, fix automatically"
+          - "No, I'll fix manually"
+        timeout: 300
+        fallback: continue
+        next: [handle_auto_fix]
+
+      - id: handle_auto_fix
+        type: condition
+        name: "Handle Auto-Fix Choice"
+        condition: "auto_fix_choice"
+        branches:
+          "Yes, fix automatically": apply_fixes
+          "No, I'll fix manually": complete_with_changes
+
+      - id: apply_fixes
+        type: agent
+        name: "Apply Auto-Fixes"
+        role: executor
+        goal: |
+          Apply automatic fixes for:
+          {auto_fixable_issues}
+
+          Guidelines:
+          - Make minimal, targeted changes
+          - Preserve existing logic
+          - Add comments explaining changes
+        tool_budget: 30
+        tools: [read, edit, shell]
+        llm_config:
+          temperature: 0.1
+        output: applied_fixes
+        next: [verify_fixes]
+
+      - id: verify_fixes
+        type: compute
+        name: "Verify Fixes"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: fix_verification
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_fix_success]
+
+      - id: check_fix_success
+        type: condition
+        name: "Check Fix Success"
+        condition: "fixes_verified"
+        branches:
+          "true": re_review
+          "false": complete_with_changes
+
+      - id: re_review
+        type: agent
+        name: "Quick Re-Review"
+        role: reviewer
+        goal: "Verify the auto-fixes resolved the issues without introducing new ones."
+        tool_budget: 15
+        tools: [read, grep]
+        output: re_review_result
+        next: [approve_with_comments]
+
+      # =====================================================================
+      # Stage 5: Approval
+      # =====================================================================
+      - id: approve_with_comments
+        type: agent
+        name: "Generate Approval Summary"
+        role: writer
+        goal: |
+          Generate a review approval with:
+          - Summary of what was reviewed
+          - Positive aspects of the code
+          - Minor suggestions (optional)
+          - Approval statement
+        tool_budget: 10
+        llm_config:
+          temperature: 0.5
+        output: approval_summary
+        next: [human_approval]
+
+      - id: human_approval
+        type: hitl
+        name: "Final Approval"
+        hitl_type: approval
+        prompt: |
+          ## Code Review: Ready for Approval
+
+          **AI Review Summary:**
+          {approval_summary}
+
+          **Analysis Results:**
+          - Lint: {lint_status}
+          - Types: {type_status}
+          - Security: {security_status}
+          - Complexity: {complexity_score}
+
+          **Remaining Minor Issues:** {minor_count}
+
+          Do you approve this code for merge?
+        context_keys:
+          - approval_summary
+          - lint_status
+          - type_status
+          - security_status
+          - complexity_score
+          - minor_count
+        choices:
+          - "Approve"
+          - "Request more changes"
+          - "Discuss"
+        timeout: 900
+        fallback: continue
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval Decision"
+        condition: "approval_decision"
+        branches:
+          "Approve": complete_approved
+          "Request more changes": complete_with_changes
+          "Discuss": schedule_discussion
+
+      - id: schedule_discussion
+        type: transform
+        name: "Schedule Discussion"
+        transform: |
+          status = "pending_discussion"
+          action_required = "Schedule code review discussion"
+
+      - id: complete_approved
+        type: transform
+        name: "Review Approved"
+        transform: |
+          status = "approved"
+          approval_time = current_timestamp()
+
+      - id: complete_with_changes
+        type: transform
+        name: "Changes Requested"
+        transform: |
+          status = "changes_requested"
+
+
+  # =========================================================================
+  # Quick Review - Lightweight Check
+  # =========================================================================
+  quick_review:
+    description: "Quick code review for small changes"
+
+    metadata:
+      vertical: coding
+
+    nodes:
+      - id: gather
+        type: compute
+        name: "Gather Changes"
+        tools: [shell]
+        output: changes
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        next: [review]
+
+      - id: review
+        type: agent
+        name: "Quick Review"
+        role: reviewer
+        goal: |
+          Quick review focusing on:
+          - Obvious bugs or issues
+          - Security concerns
+          - Test coverage
+        tool_budget: 15
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.4
+          model_hint: claude-3-haiku
+        output: review
+        next: [verdict]
+
+      - id: verdict
+        type: condition
+        name: "Review Verdict"
+        condition: "has_issues"
+        branches:
+          "true": needs_attention
+          "false": approved
+
+      - id: needs_attention
+        type: transform
+        name: "Needs Attention"
+        transform: |
+          status = "needs_attention"
+
+      - id: approved
+        type: transform
+        name: "Approved"
+        transform: |
+          status = "approved"

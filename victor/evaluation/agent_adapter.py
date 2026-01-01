@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 else:
     # Deferred import at runtime - only when actually needed
     AgentOrchestrator = None  # Will be imported lazily in from_profile()
+from victor.agent.task_completion import TaskCompletionDetector
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
     FileEdit,
@@ -59,12 +60,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AdapterConfig:
-    """Configuration for the Victor agent adapter."""
+    """Configuration for the Victor agent adapter.
 
-    max_turns: int = 20  # Maximum conversation turns
-    tool_budget: int = 50  # Maximum tool calls
+    Defaults are based on ACTION complexity from ComplexityBudget,
+    which is appropriate for benchmark tasks that require multiple tool calls.
+    """
+
+    # Defaults from ComplexityBudget(ACTION) - single source of truth
+    # ACTION: tool_budget=50, max_turns=30, max_continuation_requests=15, timeout_seconds=600
+    max_turns: int = 30  # Maximum conversation turns (ACTION complexity)
+    tool_budget: int = 50  # Maximum tool calls (ACTION complexity)
     max_tool_calls: int = 50  # Alias for tool_budget (backwards compat)
-    timeout_per_turn: int = 120  # Seconds per turn
+    total_timeout: int = 600  # Total task timeout in seconds (ACTION complexity)
+    min_turn_timeout: int = 180  # Minimum per-turn timeout (P2: Timeout Fix)
     track_file_edits: bool = True
     track_diffs: bool = True
     working_dir: Optional[Path] = None
@@ -72,6 +80,18 @@ class AdapterConfig:
     # Correction metrics tracking
     track_corrections: bool = True  # Enable correction metrics collection
     keep_correction_attempts: bool = False  # Store individual correction records
+
+    @property
+    def timeout_per_turn(self) -> int:
+        """Calculate per-turn timeout with minimum enforcement (P2: Timeout Fix).
+
+        Uses SafeTimeoutPolicy to ensure at least min_turn_timeout seconds per turn,
+        even for slow models like DeepSeek.
+        """
+        from victor.evaluation.timeout_calculator import SafeTimeoutPolicy
+
+        policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)
+        return policy.calculate(self.total_timeout, self.max_turns)
 
 
 class VictorAgentAdapter:
@@ -109,17 +129,34 @@ class VictorAgentAdapter:
                 keep_attempts=self.config.keep_correction_attempts
             )
 
-        # Hook into tool execution
-        self._original_tool_start = orchestrator._on_tool_start_callback
-        self._original_tool_complete = orchestrator._on_tool_complete_callback
-        orchestrator._on_tool_start_callback = self._on_tool_start
-        orchestrator._on_tool_complete_callback = self._on_tool_complete
+        # Task completion detector (uses framework's detection, not gaming code)
+        self._completion_detector = TaskCompletionDetector()
+
+        # Hook into tool execution via ToolRegistry hooks
+        # The orchestrator's streaming handler uses self.tools.execute() directly,
+        # bypassing the ToolPipeline. We must hook into the ToolRegistry instead.
+        if hasattr(orchestrator, "tools") and orchestrator.tools:
+            orchestrator.tools.register_before_hook(
+                self._on_tool_start_hook, critical=False, name="AgentAdapter.tool_start"
+            )
+            orchestrator.tools.register_after_hook(
+                self._on_tool_complete_hook, critical=False, name="AgentAdapter.tool_complete"
+            )
+            logger.info("[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
+        else:
+            logger.warning("[AgentAdapter] Could not register hooks - ToolRegistry not found")
+
+    def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Hook called by ToolRegistry before tool execution."""
+        self._on_tool_start(tool_name, arguments)
+
+    def _on_tool_complete_hook(self, result: Any) -> None:
+        """Hook called by ToolRegistry after tool execution."""
+        self._on_tool_complete(result)
 
     def _on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Track tool call start."""
-        # Call original callback
-        if self._original_tool_start:
-            self._original_tool_start(tool_name, arguments)
+        logger.info(f"[AgentAdapter] Tool started: {tool_name}")
 
         # Record tool call
         self._tool_calls.append(
@@ -148,10 +185,6 @@ class VictorAgentAdapter:
 
     def _on_tool_complete(self, result: Any) -> None:
         """Track tool call completion."""
-        # Call original callback
-        if self._original_tool_complete:
-            self._original_tool_complete(result)
-
         # Update last tool call with result
         if self._tool_calls:
             last_call = self._tool_calls[-1]
@@ -161,6 +194,13 @@ class VictorAgentAdapter:
             elif hasattr(result, "tool_name"):
                 last_call.success = getattr(result, "success", True)
                 last_call.result = getattr(result, "result", None)
+
+            # Record tool result for completion detection (framework integration)
+            result_dict = {
+                "success": getattr(result, "success", True),
+                "path": last_call.arguments.get("path") or last_call.arguments.get("file_path"),
+            }
+            self._completion_detector.record_tool_result(last_call.name, result_dict)
 
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
@@ -219,6 +259,30 @@ class VictorAgentAdapter:
             )
         )
 
+    def get_partial_trace(self) -> Dict[str, Any]:
+        """Get partial trace data for timeout scenarios.
+
+        Returns a dict with current state that can be used to populate
+        TaskResult even when the task didn't complete normally.
+        """
+        token_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        if hasattr(self.orchestrator, "get_token_usage"):
+            usage = self.orchestrator.get_token_usage()
+            token_usage = {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            }
+
+        return {
+            "code": "",  # No code generated on timeout
+            "tokens_input": token_usage["input_tokens"],
+            "tokens_output": token_usage["output_tokens"],
+            "tokens_used": token_usage["total_tokens"],
+            "tool_calls": len(self._tool_calls),
+            "turns": self._turns,
+        }
+
     def reset(self) -> None:
         """Reset tracking state for new task."""
         self._tool_calls = []
@@ -228,11 +292,18 @@ class VictorAgentAdapter:
         self._file_snapshots = {}
         self.orchestrator.reset_conversation()
 
+        # Reset token usage for fresh tracking per task
+        if hasattr(self.orchestrator, "reset_token_usage"):
+            self.orchestrator.reset_token_usage()
+
         # Reset metrics collector for new task
         if self.config.track_corrections:
             self._metrics_collector = CorrectionMetricsCollector(
                 keep_attempts=self.config.keep_correction_attempts
             )
+
+        # Reset completion detector for new task
+        self._completion_detector.reset()
 
     async def execute_task(
         self,
@@ -240,6 +311,10 @@ class VictorAgentAdapter:
         workspace_dir: Path,
     ) -> AgenticExecutionTrace:
         """Execute an agentic task and return execution trace.
+
+        Uses the framework's PromptEnrichmentService and TaskCompletionDetector
+        rather than benchmark-specific gaming code. This tests Victor as users
+        would actually use it.
 
         Args:
             task: The benchmark task to execute
@@ -251,13 +326,34 @@ class VictorAgentAdapter:
         self.reset()
         self.config.working_dir = workspace_dir
 
+        # CRITICAL: Set workspace BEFORE any orchestrator operations
+        # This ensures tools like file read/write, grep, etc. operate on the benchmark
+        # repo rather than Victor's own codebase. Uses framework method for proper
+        # encapsulation of project context updates.
+        self.orchestrator.set_workspace(workspace_dir)
+
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
         )
 
-        # Build task prompt
-        prompt = self._build_task_prompt(task, workspace_dir)
+        # Inject task context into vertical context for framework enrichment
+        # This is the proper architecture: hints flow through the enrichment pipeline
+        self._inject_task_context(task, workspace_dir)
+
+        # Analyze intent for completion detection (framework feature)
+        task_description = task.issue_text or task.prompt
+        self._completion_detector.analyze_intent(task_description)
+
+        # Determine task complexity with fallback chain:
+        # 1. Explicit override from task (highest priority)
+        # 2. Inference from task description
+        # 3. Conservative default (MEDIUM)
+        complexity_value = self._determine_complexity(task, task_description)
+        self._completion_detector.configure_for_complexity(complexity_value)
+
+        # Use task's issue_text or prompt directly - let framework handle enrichment
+        prompt = task_description
 
         try:
             # Execute agent loop
@@ -266,14 +362,13 @@ class VictorAgentAdapter:
                 self._turns += 1
 
                 # Add user message
-                self._messages.append(
-                    {"role": "user", "content": prompt if self._turns == 1 else "Continue."}
-                )
+                current_message = prompt if self._turns == 1 else "Continue."
+                self._messages.append({"role": "user", "content": current_message})
 
                 # Get agent response
                 try:
                     response = await asyncio.wait_for(
-                        self.orchestrator.chat(prompt if self._turns == 1 else "Continue."),
+                        self.orchestrator.chat(current_message),
                         timeout=self.config.timeout_per_turn,
                     )
                 except asyncio.TimeoutError:
@@ -283,8 +378,9 @@ class VictorAgentAdapter:
                 assistant_content = response.content if response else ""
                 self._messages.append({"role": "assistant", "content": assistant_content})
 
-                # Check for completion signals
-                complete = self._is_task_complete(assistant_content)
+                # Use framework's completion detection (not gaming code)
+                self._completion_detector.analyze_response(assistant_content)
+                complete = self._completion_detector.should_stop()
 
                 # Check tool budget
                 if len(self._tool_calls) >= self.config.tool_budget:
@@ -304,6 +400,9 @@ class VictorAgentAdapter:
         trace.messages = self._messages.copy()
         trace.tool_calls = self._tool_calls.copy()
         trace.file_edits = self._file_edits.copy()
+        logger.info(
+            f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns"
+        )
 
         # Generate combined patch from file edits
         trace.generated_patch = self._generate_combined_patch()
@@ -312,57 +411,100 @@ class VictorAgentAdapter:
         if self._metrics_collector:
             trace.correction_metrics = self._metrics_collector.metrics.to_dict()
 
+        # Capture token usage from orchestrator (P1: Token Tracking Fix)
+        if hasattr(self.orchestrator, "get_token_usage"):
+            trace.token_usage = self.orchestrator.get_token_usage()
+
         return trace
 
-    def _build_task_prompt(self, task: BenchmarkTask, workspace_dir: Path) -> str:
-        """Build the initial prompt for the task."""
-        parts = []
+    def _determine_complexity(self, task: BenchmarkTask, task_description: str) -> str:
+        """Determine task complexity using fallback chain.
 
-        # Task description
-        parts.append(f"# Task: {task.task_id}")
-        parts.append("")
+        Priority order:
+        1. Explicit override from task.complexity_override (caller knows best)
+        2. Inference from task description using TaskComplexityService
+        3. Conservative default: "medium"
 
-        if task.prompt:
-            parts.append("## Problem Statement")
-            parts.append(task.prompt)
-            parts.append("")
+        This design:
+        - Keeps override optional (minimal config)
+        - Allows max control when needed
+        - Framework doesn't fight what caller wants
 
-        # Working directory
-        parts.append("## Working Directory")
-        parts.append(f"You are working in: {workspace_dir}")
-        parts.append("")
+        Args:
+            task: The benchmark task (may have complexity_override)
+            task_description: Text to classify if no override
 
-        # Context code if provided
+        Returns:
+            Complexity level string: simple, medium, complex, generation, action, analysis
+        """
+        # Priority 1: Explicit override (caller knows best)
+        if task.complexity_override:
+            logger.info(f"Using explicit complexity override: {task.complexity_override}")
+            return task.complexity_override
+
+        # Priority 2: Inference from task description
+        try:
+            from victor.framework.task.complexity import TaskComplexityService
+
+            service = TaskComplexityService()
+            classification = service.classify(task_description)
+
+            # Only use inference if confidence is reasonable
+            if classification.confidence >= 0.5:
+                logger.info(
+                    f"Task classified as {classification.complexity.value} "
+                    f"(budget: {classification.tool_budget}, confidence: {classification.confidence:.2f})"
+                )
+                return classification.complexity.value
+            else:
+                logger.info(
+                    f"Low confidence classification ({classification.confidence:.2f}), "
+                    f"using conservative default"
+                )
+        except Exception as e:
+            logger.warning(f"Complexity inference failed: {e}")
+
+        # Priority 3: Conservative default
+        logger.info("Using conservative default complexity: medium")
+        return "medium"
+
+    def _inject_task_context(self, task: BenchmarkTask, workspace_dir: Path) -> None:
+        """Inject task context into orchestrator's system prompt for enrichment.
+
+        This replaces the gaming approach of _build_task_prompt() with proper
+        framework integration. Context is appended to the system prompt using
+        the orchestrator's native append_to_system_prompt() method.
+
+        Args:
+            task: The benchmark task
+            workspace_dir: Working directory for the task
+        """
+        context_sections = []
+
+        # Add working directory context
+        context_sections.append(f"## Working Directory\nYou are working in: {workspace_dir}")
+
+        # Add repository context if available
+        if task.repo:
+            repo_name = task.repo.replace("https://github.com/", "").replace(".git", "")
+            context_sections.append(f"**Repository:** {repo_name}")
+
+        # Add hints through the system prompt (framework integration)
+        # These become part of the system context, benefiting all verticals
+        if task.hints:
+            hints_section = "## Hints\n" + "\n".join(f"- {hint}" for hint in task.hints)
+            context_sections.append(hints_section)
+
+        # Add context code if provided
         if task.context_code:
-            parts.append("## Context Code")
-            parts.append("```python")
-            parts.append(task.context_code)
-            parts.append("```")
-            parts.append("")
+            code_section = f"## Context Code\n```python\n{task.context_code}\n```"
+            context_sections.append(code_section)
 
-        # Instructions
-        parts.append("## Instructions")
-        parts.append("1. Analyze the problem and explore relevant files")
-        parts.append("2. Implement the required changes")
-        parts.append("3. Test your changes if applicable")
-        parts.append("4. Say 'TASK COMPLETE' when finished")
-        parts.append("")
-
-        return "\n".join(parts)
-
-    def _is_task_complete(self, response: str) -> bool:
-        """Check if agent signals task completion."""
-        completion_phrases = [
-            "task complete",
-            "task completed",
-            "task is complete",
-            "i have completed",
-            "the task has been completed",
-            "changes have been applied",
-            "implementation complete",
-        ]
-        response_lower = response.lower()
-        return any(phrase in response_lower for phrase in completion_phrases)
+        # Append all context to the orchestrator's system prompt
+        if context_sections:
+            combined_context = "\n\n".join(context_sections)
+            self.orchestrator.append_to_system_prompt(combined_context)
+            logger.debug(f"Injected task context: {len(context_sections)} sections")
 
     def _generate_combined_patch(self) -> str:
         """Generate combined unified diff from all file edits."""
@@ -418,13 +560,36 @@ class VictorAgentAdapter:
 
         # Create provider using ProviderRegistry (class methods)
         # Note: api_key and base_url may be extra fields from profiles.yaml (ProfileConfig allows extra="allow")
-        provider = ProviderRegistry.create(
-            provider_name,
-            settings=settings,
-            api_key=getattr(profile_config, "api_key", None),
-            base_url=base_url or getattr(profile_config, "base_url", None),
-            timeout=timeout,
-        )
+        # Only pass base_url if explicitly set, otherwise let provider use its default
+        provider_kwargs = {
+            "settings": settings,
+            "timeout": timeout,
+        }
+
+        # Get API key from profile, environment variable, or keyring
+        api_key = getattr(profile_config, "api_key", None)
+        # Resolve ${ENV_VAR} references
+        if api_key and api_key.startswith("${") and api_key.endswith("}"):
+            env_var = api_key[2:-1]
+            api_key = os.environ.get(env_var)
+
+        # If still no API key, try keyring
+        if not api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                api_key = get_api_key(provider_name)
+            except ImportError:
+                pass
+
+        if api_key:
+            provider_kwargs["api_key"] = api_key
+
+        effective_base_url = base_url or getattr(profile_config, "base_url", None)
+        if effective_base_url:
+            provider_kwargs["base_url"] = effective_base_url
+
+        provider = ProviderRegistry.create(provider_name, **provider_kwargs)
 
         # Create orchestrator - lazy import to break circular dependency
         # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator

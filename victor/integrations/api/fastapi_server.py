@@ -309,6 +309,9 @@ class VictorFastAPIServer:
         rate_limit_rpm: Optional[int] = None,
         api_keys: Optional[Dict[str, str]] = None,
         enable_cors: bool = True,
+        enable_hitl: bool = False,
+        hitl_auth_token: Optional[str] = None,
+        hitl_persistent: bool = True,
     ):
         """Initialize the FastAPI server.
 
@@ -319,6 +322,9 @@ class VictorFastAPIServer:
             rate_limit_rpm: Optional requests per minute limit (None = no limit)
             api_keys: Optional dict of {api_key: client_id} for authentication
             enable_cors: Enable CORS headers (default: True)
+            enable_hitl: Enable HITL (Human-in-the-Loop) endpoints (default: False)
+            hitl_auth_token: Optional auth token for HITL endpoints
+            hitl_persistent: Use SQLite for persistent HITL storage (default: True)
         """
         self.host = host
         self.port = port
@@ -326,10 +332,14 @@ class VictorFastAPIServer:
         self.rate_limit_rpm = rate_limit_rpm
         self.api_keys = api_keys or {}
         self.enable_cors = enable_cors
+        self.enable_hitl = enable_hitl
+        self.hitl_auth_token = hitl_auth_token
+        self.hitl_persistent = hitl_persistent
 
         self._orchestrator = None
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
+        self._hitl_store = None
 
         # Create FastAPI app with lifespan
         self.app = FastAPI(
@@ -360,6 +370,10 @@ class VictorFastAPIServer:
 
         # Setup routes
         self._setup_routes()
+
+        # Setup HITL routes if enabled
+        if self.enable_hitl:
+            self._setup_hitl_routes()
 
     @asynccontextmanager
     async def _lifespan(self, app: FastAPI) -> AsyncIterator[None]:
@@ -2837,6 +2851,59 @@ Respond with just the command to run."""
                 if websocket in self._ws_clients:
                     self._ws_clients.remove(websocket)
                 logger.info(f"WebSocket client disconnected. Total: {len(self._ws_clients)}")
+
+    # =========================================================================
+    # HITL (Human-in-the-Loop) Routes
+    # =========================================================================
+
+    def _setup_hitl_routes(self) -> None:
+        """Set up HITL (Human-in-the-Loop) endpoints for workflow approvals.
+
+        This enables the unified server to handle both VS Code/IDE requests
+        and workflow approval requests on the same port.
+
+        Endpoints added:
+            GET /hitl/requests - List pending approval requests
+            GET /hitl/requests/{id} - Get specific request
+            POST /hitl/respond/{id} - Submit approval/rejection
+            GET /hitl/ui - Web-based approval UI
+            GET /hitl/history - Approval history (SQLite only)
+        """
+        try:
+            from victor.workflows.hitl_api import (
+                HITLStore,
+                SQLiteHITLStore,
+                create_hitl_router,
+            )
+
+            # Create HITL store - SQLite for persistence, in-memory otherwise
+            if self.hitl_persistent:
+                self._hitl_store = SQLiteHITLStore()
+                logger.info(f"HITL using SQLite store: {self._hitl_store.db_path}")
+            else:
+                self._hitl_store = HITLStore()
+                logger.info("HITL using in-memory store")
+
+            # Create and include the HITL router
+            hitl_router = create_hitl_router(
+                store=self._hitl_store,
+                require_auth=bool(self.hitl_auth_token),
+                auth_token=self.hitl_auth_token,
+            )
+            self.app.include_router(hitl_router, prefix="/hitl")
+
+            logger.info("HITL endpoints enabled at /hitl/*")
+
+        except ImportError as e:
+            logger.warning(f"HITL endpoints not available: {e}")
+
+    def get_hitl_store(self) -> Optional[Any]:
+        """Get the HITL store for this server instance.
+
+        Returns:
+            HITLStore if HITL is enabled, None otherwise
+        """
+        return self._hitl_store
 
     # =========================================================================
     # Helper Methods

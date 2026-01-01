@@ -20,7 +20,8 @@ This package provides workflow definitions for common research tasks:
 - Literature review
 - Competitive analysis
 
-Supports both standard and streaming execution via StreamingWorkflowExecutor.
+Uses YAML-first architecture with Python escape hatches for complex conditions
+and transforms that cannot be expressed in YAML.
 
 Example:
     provider = ResearchWorkflowProvider()
@@ -33,254 +34,38 @@ Example:
     async for chunk in provider.astream("deep_research", orchestrator, context):
         if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
             print(f"Completed: {chunk.node_name}")
+
+Available workflows (all YAML-defined):
+- deep_research: Comprehensive research with source validation
+- quick_research: Fast research for simple queries
+- fact_check: Systematic fact verification
+- literature_review: Academic literature review
+- competitive_analysis: Market and competitive research
+- competitive_scan: Quick competitive overview
 """
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
-from victor.workflows.definition import (
-    WorkflowBuilder,
-    WorkflowDefinition,
-    workflow,
-)
+from victor.workflows.definition import WorkflowDefinition
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-
-@workflow("deep_research", "Multi-source research with verification")
-def deep_research_workflow() -> WorkflowDefinition:
-    """Create deep research workflow.
-
-    Performs comprehensive research with source verification.
-    """
-    return (
-        WorkflowBuilder("deep_research")
-        .set_metadata("category", "research")
-        .set_metadata("complexity", "high")
-        # Understand research question
-        .add_agent(
-            "understand",
-            role="researcher",
-            goal="Clarify research question and identify key search terms",
-            tool_budget=10,
-            allowed_tools=["read_file", "grep"],
-            output_key="research_plan",
-        )
-        # Search multiple sources
-        .add_agent(
-            "search",
-            role="researcher",
-            goal="Search for information from multiple sources",
-            tool_budget=25,
-            allowed_tools=["web_search", "web_fetch"],
-            input_mapping={"plan": "research_plan"},
-            output_key="raw_sources",
-        )
-        # Extract and analyze
-        .add_agent(
-            "analyze",
-            role="analyst",
-            goal="Extract key facts and analyze source quality",
-            tool_budget=20,
-            allowed_tools=["web_fetch", "read_file"],
-            input_mapping={"sources": "raw_sources"},
-            output_key="analysis",
-        )
-        # Verify claims
-        .add_agent(
-            "verify",
-            role="reviewer",
-            goal="Cross-reference and verify key claims",
-            tool_budget=15,
-            allowed_tools=["web_search", "web_fetch"],
-            input_mapping={"claims": "analysis"},
-            output_key="verification",
-        )
-        # Synthesize report
-        .add_agent(
-            "synthesize",
-            role="writer",
-            goal="Create comprehensive research report with citations",
-            tool_budget=15,
-            allowed_tools=["write_file", "edit_files"],
-            input_mapping={"findings": "verification"},
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("fact_check", "Fact verification workflow")
-def fact_check_workflow() -> WorkflowDefinition:
-    """Create fact-checking workflow.
-
-    Verifies claims against authoritative sources.
-    """
-    return (
-        WorkflowBuilder("fact_check")
-        .set_metadata("category", "research")
-        .set_metadata("complexity", "medium")
-        # Parse claims
-        .add_agent(
-            "parse",
-            role="analyst",
-            goal="Identify specific claims to verify",
-            tool_budget=10,
-            allowed_tools=["read_file"],
-            output_key="claims",
-        )
-        # Search for evidence
-        .add_agent(
-            "search_evidence",
-            role="researcher",
-            goal="Search for supporting or refuting evidence",
-            tool_budget=20,
-            allowed_tools=["web_search", "web_fetch"],
-            input_mapping={"claims": "claims"},
-            output_key="evidence",
-        )
-        # Evaluate evidence
-        .add_agent(
-            "evaluate",
-            role="reviewer",
-            goal="Evaluate evidence quality and reach conclusions",
-            tool_budget=15,
-            allowed_tools=["web_fetch"],
-            input_mapping={"evidence": "evidence"},
-            output_key="evaluation",
-        )
-        # Report findings
-        .add_agent(
-            "report",
-            role="writer",
-            goal="Create fact-check report with verdicts",
-            tool_budget=10,
-            allowed_tools=["write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("literature_review", "Academic literature review")
-def literature_review_workflow() -> WorkflowDefinition:
-    """Create literature review workflow.
-
-    Systematic review of academic and technical literature.
-    """
-    return (
-        WorkflowBuilder("literature_review")
-        .set_metadata("category", "research")
-        .set_metadata("complexity", "high")
-        # Define scope
-        .add_agent(
-            "scope",
-            role="planner",
-            goal="Define review scope and search strategy",
-            tool_budget=10,
-            allowed_tools=["read_file"],
-            output_key="scope",
-        )
-        # Search literature
-        .add_agent(
-            "search_lit",
-            role="researcher",
-            goal="Search academic databases and repositories",
-            tool_budget=30,
-            allowed_tools=["web_search", "web_fetch"],
-            input_mapping={"scope": "scope"},
-            output_key="papers",
-        )
-        # Screen and select
-        .add_agent(
-            "screen",
-            role="analyst",
-            goal="Screen papers for relevance and quality",
-            tool_budget=15,
-            allowed_tools=["web_fetch", "read_file"],
-            input_mapping={"papers": "papers"},
-            output_key="selected",
-        )
-        # Extract data
-        .add_agent(
-            "extract",
-            role="analyst",
-            goal="Extract key findings and methodologies",
-            tool_budget=20,
-            allowed_tools=["web_fetch", "read_file"],
-            input_mapping={"papers": "selected"},
-            output_key="extracted",
-        )
-        # Synthesize
-        .add_agent(
-            "synthesize_review",
-            role="writer",
-            goal="Synthesize findings into literature review",
-            tool_budget=15,
-            allowed_tools=["write_file", "edit_files"],
-            next_nodes=[],
-        )
-        .build()
-    )
-
-
-@workflow("competitive_analysis", "Market and competitive research")
-def competitive_analysis_workflow() -> WorkflowDefinition:
-    """Create competitive analysis workflow.
-
-    Research competitors, market trends, and positioning.
-    """
-    return (
-        WorkflowBuilder("competitive_analysis")
-        .set_metadata("category", "research")
-        .set_metadata("complexity", "medium")
-        # Identify competitors
-        .add_agent(
-            "identify",
-            role="researcher",
-            goal="Identify key competitors and market segments",
-            tool_budget=15,
-            allowed_tools=["web_search", "web_fetch"],
-            output_key="competitors",
-        )
-        # Research each competitor
-        .add_agent(
-            "research_competitors",
-            role="researcher",
-            goal="Research competitor products, features, and positioning",
-            tool_budget=25,
-            allowed_tools=["web_search", "web_fetch"],
-            input_mapping={"competitors": "competitors"},
-            output_key="competitor_data",
-        )
-        # Analyze market
-        .add_agent(
-            "analyze_market",
-            role="analyst",
-            goal="Analyze market trends and opportunities",
-            tool_budget=15,
-            allowed_tools=["web_search", "web_fetch"],
-            output_key="market_analysis",
-        )
-        # Create report
-        .add_agent(
-            "report_analysis",
-            role="writer",
-            goal="Create competitive analysis report",
-            tool_budget=10,
-            allowed_tools=["write_file"],
-            next_nodes=[],
-        )
-        .build()
-    )
+    from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 
 class ResearchWorkflowProvider(WorkflowProviderProtocol):
     """Provides research-specific workflows.
+
+    Uses YAML-first architecture with Python escape hatches for complex
+    conditions and transforms that cannot be expressed in YAML.
 
     Includes support for streaming execution via StreamingWorkflowExecutor
     for real-time progress updates during research workflows.
@@ -298,15 +83,50 @@ class ResearchWorkflowProvider(WorkflowProviderProtocol):
 
     def __init__(self) -> None:
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        self._config: Optional["YAMLWorkflowConfig"] = None
+
+    def _get_config(self) -> "YAMLWorkflowConfig":
+        """Get YAML workflow config with escape hatches registered.
+
+        Returns:
+            YAMLWorkflowConfig with Research conditions and transforms
+        """
+        if self._config is None:
+            from victor.workflows.yaml_loader import YAMLWorkflowConfig
+            from victor.research.escape_hatches import CONDITIONS, TRANSFORMS
+
+            self._config = YAMLWorkflowConfig(
+                base_dir=Path(__file__).parent,
+                condition_registry=CONDITIONS,
+                transform_registry=TRANSFORMS,
+            )
+        return self._config
 
     def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Lazy load all YAML workflows.
+
+        Uses escape hatches for complex conditions that can't be expressed in YAML.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
         if self._workflows is None:
-            self._workflows = {
-                "deep_research": deep_research_workflow(),
-                "fact_check": fact_check_workflow(),
-                "literature_review": literature_review_workflow(),
-                "competitive_analysis": competitive_analysis_workflow(),
-            }
+            try:
+                from victor.workflows.yaml_loader import load_workflows_from_directory
+
+                # Load from the workflows directory with escape hatches
+                workflows_dir = Path(__file__).parent
+                config = self._get_config()
+                self._workflows = load_workflows_from_directory(
+                    workflows_dir,
+                    pattern="*.yaml",
+                    config=config,
+                )
+                logger.debug(f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to load YAML workflows: {e}")
+                self._workflows = {}
+
         return self._workflows
 
     def get_workflows(self) -> Dict[str, WorkflowDefinition]:
@@ -421,29 +241,12 @@ class ResearchWorkflowProvider(WorkflowProviderProtocol):
         return f"ResearchWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
-from victor.research.workflows.graph_workflows import (
-    ResearchState,
-    FactCheckState,
-    LiteratureState,
-    create_deep_research_workflow,
-    create_fact_check_workflow,
-    create_literature_review_workflow,
-    ResearchGraphExecutor,
-)
+# Register Research domain handlers when this module is loaded
+from victor.research.handlers import register_handlers as _register_handlers
+
+_register_handlers()
 
 __all__ = [
-    # WorkflowBuilder-based workflows
+    # YAML-first workflow provider
     "ResearchWorkflowProvider",
-    "deep_research_workflow",
-    "fact_check_workflow",
-    "literature_review_workflow",
-    "competitive_analysis_workflow",
-    # StateGraph-based workflows
-    "ResearchState",
-    "FactCheckState",
-    "LiteratureState",
-    "create_deep_research_workflow",
-    "create_fact_check_workflow",
-    "create_literature_review_workflow",
-    "ResearchGraphExecutor",
 ]

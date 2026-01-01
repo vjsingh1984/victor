@@ -21,8 +21,20 @@ from victor.ui.commands.utils import (
     check_codebase_index,
     get_rl_profile_suggestion,
     setup_safety_confirmation,
-    configure_logging,
+    setup_logging,
     graceful_shutdown,
+)
+from victor.workflows import (
+    load_workflow_from_file,
+    YAMLWorkflowError,
+    StateGraphExecutor,
+    ExecutorConfig,
+)
+from victor.workflows.visualization import (
+    WorkflowVisualizer,
+    OutputFormat as VizFormat,
+    RenderBackend,
+    get_available_backends,
 )
 
 chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
@@ -142,6 +154,29 @@ def chat(
         help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}). "
         "By default, no vertical is applied (uses standard CodingAssistant behavior with framework features).",
     ),
+    workflow: Optional[str] = typer.Option(
+        None,
+        "--workflow",
+        "-w",
+        help="Path to YAML workflow file to execute. Runs workflow instead of chat mode.",
+    ),
+    validate_workflow: bool = typer.Option(
+        False,
+        "--validate",
+        help="Validate YAML workflow file without executing. Use with --workflow.",
+    ),
+    render_format: Optional[str] = typer.Option(
+        None,
+        "--render",
+        "-r",
+        help="Render workflow DAG (ascii, mermaid, d2, dot, plantuml, svg, png). Use with --workflow.",
+    ),
+    render_output: Optional[str] = typer.Option(
+        None,
+        "--render-output",
+        "-o",
+        help="Output file for rendered diagram. Required for svg/png formats.",
+    ),
     legacy_mode: bool = typer.Option(
         False,
         "--legacy",
@@ -174,32 +209,59 @@ def chat(
                 console.print("[bold red]Error:[/] Invalid mode. Choose from build, plan, explore.")
                 raise typer.Exit(1)
 
+        # Handle workflow mode (--workflow and --validate/--render)
+        if workflow or validate_workflow or render_format:
+            if (validate_workflow or render_format) and not workflow:
+                console.print(
+                    "[bold red]Error:[/] --validate/--render require --workflow to specify a file."
+                )
+                raise typer.Exit(1)
+
+            asyncio.run(
+                run_workflow_mode(
+                    workflow_path=workflow,  # type: ignore
+                    validate_only=validate_workflow,
+                    render_format=render_format,
+                    render_output=render_output,
+                    profile=profile,
+                    vertical=vertical,
+                    log_level=log_level,
+                )
+            )
+            return
+
         automation_mode = json_output or plain or code_only
 
-        if log_level is None:
-            log_level = os.getenv("VICTOR_LOG_LEVEL", "ERROR" if automation_mode else "WARNING")
+        # Use ERROR level for automation modes (cleaner output)
+        if log_level is None and automation_mode:
+            log_level = "ERROR"
 
-        log_level = log_level.upper()
-        valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
+        # Validate log level if explicitly provided
+        if log_level is not None:
+            log_level = log_level.upper()
+            valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
 
-        if log_level not in valid_levels:
-            console.print(
-                f"[bold red]Error:[/ ] Invalid log level '{log_level}'. Valid options: {', '.join(valid_levels)}"
-            )
-            raise typer.Exit(1)
+            if log_level not in valid_levels:
+                console.print(
+                    f"[bold red]Error:[/ ] Invalid log level '{log_level}'. Valid options: {', '.join(valid_levels)}"
+                )
+                raise typer.Exit(1)
 
-        if log_level == "WARN":
-            log_level = "WARNING"
+            if log_level == "WARN":
+                log_level = "WARNING"
 
-        # For troubleshooting, prefer plain text output when verbose logging is enabled
-        if log_level in {"DEBUG", "INFO"}:
-            renderer = "text"
+            # For troubleshooting, prefer plain text output when verbose logging is enabled
+            if log_level in {"DEBUG", "INFO"}:
+                renderer = "text"
 
-        configure_logging(log_level, stream=sys.stderr)
+        # Use centralized logging config
+        setup_logging(command="chat", cli_log_level=log_level, stream=sys.stderr)
 
         from victor.agent.debug_logger import configure_logging_levels
 
-        configure_logging_levels(log_level)
+        # Apply debug logger levels if explicitly specified
+        if log_level:
+            configure_logging_levels(log_level)
 
         formatter = create_formatter(
             json_mode=json_output,
@@ -303,10 +365,8 @@ def chat(
 
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
-    log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
-    if log_level == "WARN":
-        log_level = "WARNING"
-    configure_logging(log_level)
+    # Use centralized logging config (respects ~/.victor/config.yaml and env vars)
+    setup_logging(command="chat")
 
     settings = load_settings()
     setup_safety_confirmation()
@@ -690,3 +750,235 @@ async def _run_cli_repl(
             import traceback
 
             console.print(traceback.format_exc())
+
+
+async def run_workflow_mode(
+    workflow_path: str,
+    validate_only: bool = False,
+    render_format: Optional[str] = None,
+    render_output: Optional[str] = None,
+    profile: str = "default",
+    vertical: Optional[str] = None,
+    log_level: Optional[str] = None,
+) -> None:
+    """Run, validate, or render a YAML workflow file.
+
+    Args:
+        workflow_path: Path to the YAML workflow file
+        validate_only: If True, only validate without executing
+        render_format: Output format for rendering (ascii, mermaid, d2, dot, svg, png)
+        render_output: Output file for rendered diagram
+        profile: Profile to use for agent nodes
+        vertical: Optional vertical for context
+        log_level: Logging level
+    """
+    import json
+    from pathlib import Path
+    from rich.table import Table
+    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
+
+    # Setup logging
+    if log_level:
+        setup_logging(command="workflow", cli_log_level=log_level)
+    else:
+        setup_logging(command="workflow")
+
+    workflow_file = Path(workflow_path)
+    if not workflow_file.exists():
+        console.print(f"[bold red]Error:[/] Workflow file not found: {workflow_path}")
+        raise typer.Exit(1)
+
+    if workflow_file.suffix not in {".yaml", ".yml"}:
+        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]Workflow:[/] {workflow_file.name}")
+    console.print("[dim]" + "─" * 50 + "[/]")
+
+    try:
+        # Load and parse workflow(s)
+        loaded = load_workflow_from_file(str(workflow_file))
+
+        # Handle dict of workflows or single workflow
+        from victor.workflows.definition import WorkflowDefinition
+
+        workflows: dict[str, WorkflowDefinition] = {}
+        if isinstance(loaded, dict):
+            workflows = loaded
+        else:
+            workflows = {loaded.name: loaded}
+
+        if not workflows:
+            console.print("[bold red]Error:[/] No workflows found in file")
+            raise typer.Exit(1)
+
+        compiler = YAMLToStateGraphCompiler()
+        all_validated = True
+
+        for wf_name, workflow in workflows.items():
+            console.print(f"\n[bold cyan]Workflow:[/] {wf_name}")
+
+            # Display workflow info
+            table = Table(show_header=False, box=None)
+            table.add_column("Property", style="cyan")
+            table.add_column("Value")
+
+            table.add_row("Description", workflow.description or "(none)")
+            table.add_row("Nodes", str(len(workflow.nodes)))
+            table.add_row("Start Node", workflow.start_node)
+
+            # Count node types
+            node_types: dict[str, int] = {}
+            for node in workflow.nodes.values():
+                node_type = type(node).__name__
+                node_types[node_type] = node_types.get(node_type, 0) + 1
+
+            types_str = ", ".join(f"{t}: {c}" for t, c in sorted(node_types.items()))
+            table.add_row("Node Types", types_str)
+
+            console.print(table)
+
+            try:
+                # Validate using compiler
+                _compiled = compiler.compile(workflow)
+                console.print("[bold green]✓[/] Validation passed")
+            except Exception as e:
+                console.print(f"[bold red]✗[/] Validation failed: {e}")
+                all_validated = False
+
+        if not all_validated:
+            raise typer.Exit(1)
+
+        if validate_only and not render_format:
+            console.print("\n[bold green]Validation complete.[/]")
+            return
+
+        # Handle rendering
+        if render_format:
+            # For rendering, use first workflow if multiple exist
+            workflow = next(iter(workflows.values()))
+            viz = WorkflowVisualizer(workflow)
+
+            # Map format string to enum
+            format_map = {
+                "ascii": VizFormat.ASCII,
+                "mermaid": VizFormat.MERMAID,
+                "plantuml": VizFormat.PLANTUML,
+                "dot": VizFormat.DOT,
+                "d2": VizFormat.D2,
+                "svg": VizFormat.SVG,
+                "png": VizFormat.PNG,
+            }
+
+            fmt = format_map.get(render_format.lower())
+            if not fmt:
+                console.print(
+                    f"[bold red]Error:[/] Unknown format '{render_format}'. "
+                    f"Valid: {', '.join(format_map.keys())}"
+                )
+                raise typer.Exit(1)
+
+            # SVG/PNG require output path
+            if fmt in {VizFormat.SVG, VizFormat.PNG} and not render_output:
+                # Generate default output path
+                render_output = str(workflow_file.with_suffix(f".{render_format.lower()}"))
+                console.print(f"[dim]Output: {render_output}[/]")
+
+            console.print(f"\n[bold]Rendering as {render_format.upper()}...[/]")
+
+            try:
+                result = viz.render(fmt, render_output)
+
+                if render_output:
+                    console.print(f"[bold green]✓[/] Saved to {render_output}")
+                else:
+                    console.print("")
+                    # Use markup=False to avoid interpreting [] as Rich markup
+                    console.print(result, markup=False)
+
+            except Exception as e:
+                console.print(f"[bold red]✗[/] Rendering failed: {e}")
+
+                # Show available backends
+                backends = get_available_backends()
+                console.print("\n[dim]Available backends:[/]")
+                for name, avail in backends.items():
+                    status = "[green]✓[/]" if avail else "[red]✗[/]"
+                    console.print(f"  {status} {name}")
+
+                raise typer.Exit(1)
+
+            return
+
+        # For execution, use first workflow if multiple exist
+        workflow = next(iter(workflows.values()))
+
+        # Execute workflow
+        console.print(f"\n[bold]Executing workflow '{workflow.name}'...[/]\n")
+
+        settings = load_settings()
+
+        # Create orchestrator if agent nodes exist
+        orchestrator = None
+        from victor.workflows.definition import AgentNode
+
+        has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
+
+        if has_agent_nodes:
+            shim = FrameworkShim(
+                settings,
+                profile_name=profile,
+                vertical=get_vertical(vertical) if vertical else None,
+            )
+            orchestrator = await shim.create_orchestrator()
+
+        # Execute with StateGraphExecutor
+        executor = StateGraphExecutor(
+            orchestrator=orchestrator,
+            config=ExecutorConfig(
+                enable_checkpointing=False,  # Simple execution mode
+                max_iterations=50,
+            ),
+        )
+
+        result = await executor.execute(workflow, {})
+
+        # Display result
+        console.print("[dim]" + "─" * 50 + "[/]")
+
+        if result.success:
+            console.print("[bold green]✓[/] Workflow completed successfully")
+            console.print(f"  [dim]Duration: {result.duration_seconds:.2f}s[/]")
+            console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
+            console.print(f"  [dim]Iterations: {result.iterations}[/]")
+
+            if result.state:
+                console.print("\n[bold]Final State:[/]")
+                # Filter internal keys
+                display_state = {
+                    k: v
+                    for k, v in result.state.items()
+                    if not k.startswith("_") and k != "node_results"
+                }
+                if display_state:
+                    console.print(json.dumps(display_state, indent=2, default=str))
+        else:
+            console.print("[bold red]✗[/] Workflow failed")
+            if result.error:
+                console.print(f"  [red]{result.error}[/]")
+
+        # Cleanup orchestrator
+        if orchestrator:
+            await graceful_shutdown(orchestrator)
+
+    except YAMLWorkflowError as e:
+        console.print("[bold red]✗[/] Workflow validation failed")
+        console.print(f"  [red]{e}[/]")
+        raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] {e}")
+        import traceback
+
+        console.print(traceback.format_exc())
+        raise typer.Exit(1)

@@ -253,27 +253,148 @@ Victor's performance on coding benchmarks depends on the underlying LLM model:
 
 ---
 
-## 6. Identified Gaps & Recommendations
+## 6. Implemented Evaluation Infrastructure (v0.4.0)
 
-### 6.1 Critical Gaps (High Priority)
+Victor now includes a comprehensive evaluation harness with the following components:
 
-| Gap | Impact | Recommendation |
-|-----|--------|----------------|
-| No formal benchmark suite | Can't measure improvements | Build SWE-bench compatible harness |
-| No Pass@k sampling | Can't evaluate code gen quality | Add multi-sample generation |
-| No regression testing | Can't verify fixes don't break | Integrate "pass-to-pass" testing |
-| No baseline comparisons | Can't compare model performance | Add model benchmarking mode |
+### 6.1 Evaluation Harness Architecture
 
-### 6.2 Important Gaps (Medium Priority)
+```
+victor/evaluation/
+├── harness.py              # Core EvaluationHarness with task execution
+├── protocol.py             # BenchmarkTask, TaskResult, TokenUsage dataclasses
+├── agent_adapter.py        # VictorAgentAdapter connecting orchestrator to harness
+├── agentic_harness.py      # AgenticExecutionTrace for tool/file tracking
+├── timeout_calculator.py   # SafeTimeoutPolicy, AdaptiveTimeoutPolicy
+├── benchmarks/
+│   ├── swe_bench.py        # SWE-bench runner
+│   ├── humaneval.py        # HumanEval runner
+│   └── mbpp.py             # MBPP runner
+└── correction/
+    ├── self_corrector.py   # Iterative code correction
+    └── metrics.py          # CorrectionMetricsCollector
+```
+
+### 6.2 Key Features Implemented
+
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| **Token Tracking** | ✅ Implemented | `TokenUsage` dataclass, cumulative tracking in orchestrator |
+| **Turn Timeouts** | ✅ Implemented | `SafeTimeoutPolicy` with 180s minimum per turn |
+| **Tool Call Tracking** | ✅ Implemented | `ToolCall` dataclass, callback hooks |
+| **File Edit Tracking** | ✅ Implemented | `FileEdit` with before/after snapshots |
+| **Self-Correction** | ✅ Implemented | Iterative refinement with auto-fix |
+| **Partial Completion** | ✅ Implemented | `completion_score` 0.0-1.0 based on tests + quality |
+| **Code Quality Metrics** | ✅ Implemented | `CodeQualityMetrics` with complexity, maintainability |
+
+### 6.3 CLI Commands
+
+```bash
+# List available benchmarks
+victor benchmark list
+
+# Run SWE-bench with specific model
+victor benchmark run swe-bench --profile deepseek --max-tasks 10 --timeout 600
+
+# Run HumanEval
+victor benchmark run humaneval --model claude-3-sonnet
+
+# Compare frameworks
+victor benchmark compare --benchmark swe-bench
+
+# Show leaderboard
+victor benchmark leaderboard --benchmark swe-bench
+```
+
+### 6.6 Benchmark Results (v0.4.0)
+
+| Provider | Model | Task | Tokens | Duration | Status |
+|----------|-------|------|--------|----------|--------|
+| DeepSeek | deepseek-chat | astropy-11693 | 169,704 | 214.0s | ❌ Failed |
+| OpenAI | gpt-4.1 | astropy-11693 | 69,545 | 110.6s | ❌ Failed |
+| Ollama | qwen3-coder-tools:30b | astropy-11693 | N/A* | 600.0s | ⏱️ Timeout |
+
+**Notes:**
+- Token tracking verified working for cloud providers (DeepSeek, OpenAI)
+- *Ollama doesn't return token counts in API responses - requires separate estimation
+- Timeout policy (180s min per turn) prevents premature turn timeouts
+- Rate limiting observed with OpenAI (429 errors auto-retried)
+- SWE-bench astropy task is complex (WCS coordinate conversion bug)
+- Local Qwen3 model worked steadily but timed out at 600s task limit
+
+### 6.4 Token Tracking Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Token Tracking Pipeline                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────┐    ┌──────────────────┐    ┌───────────────────────┐ │
+│  │   Provider   │───>│  AgentOrchestrator │───>│  VictorAgentAdapter │ │
+│  │   .chat()    │    │  accumulate tokens │    │  get_token_usage()  │ │
+│  └──────────────┘    └──────────────────┘    └───────────────────────┘ │
+│         │                     │                         │               │
+│         ▼                     ▼                         ▼               │
+│  ┌──────────────┐    ┌──────────────────┐    ┌───────────────────────┐ │
+│  │ CompletionResponse │    │ _cumulative_token_usage │    │ AgenticExecutionTrace │ │
+│  │   .usage dict │    │ prompt/completion/total │    │ .token_usage      │ │
+│  └──────────────┘    └──────────────────┘    └───────────────────────┘ │
+│                                                          │               │
+│                                                          ▼               │
+│                              ┌───────────────────────────────────────┐  │
+│                              │         EvaluationHarness             │  │
+│                              │  TaskResult.tokens_input/output/used  │  │
+│                              └───────────────────────────────────────┘  │
+│                                                          │               │
+│                                                          ▼               │
+│                              ┌───────────────────────────────────────┐  │
+│                              │        Results JSON                   │  │
+│                              │  "total_tokens": 169704,              │  │
+│                              │  "tokens_input": 167482,              │  │
+│                              │  "tokens_output": 2222                │  │
+│                              └───────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.5 Timeout Policy Architecture (SOLID OCP)
+
+```python
+# Strategy pattern for timeout calculation
+class TimeoutPolicy(Protocol):
+    def calculate(self, total_timeout: int, max_turns: int) -> int: ...
+
+class SafeTimeoutPolicy:
+    """Ensures minimum 180s per turn, even for slow models."""
+    MIN_TURN_TIMEOUT = 180
+
+class AdaptiveTimeoutPolicy:
+    """Increases timeout for later turns (debugging, test fixing)."""
+    growth_factor: float = 1.2
+```
+
+---
+
+## 7. Remaining Gaps & Recommendations
+
+### 7.1 Addressed Gaps (Previously Critical)
+
+| Gap | Status | Resolution |
+|-----|--------|------------|
+| No formal benchmark suite | ✅ RESOLVED | SWE-bench, HumanEval, MBPP harnesses implemented |
+| No token efficiency | ✅ RESOLVED | Full token tracking from provider to results JSON |
+| No task completion scoring | ✅ RESOLVED | `completion_score` with weighted tests + quality |
+| Binary success/fail only | ✅ RESOLVED | Partial completion scoring implemented |
+
+### 7.2 Remaining Gaps (Medium Priority)
 
 | Gap | Impact | Recommendation |
 |-----|--------|----------------|
 | Limited multi-language | Python-centric | Extend to TypeScript, Rust, Go |
-| No code quality metrics | Can't measure generated code quality | Add linting scores, complexity |
-| No token efficiency | Can't optimize costs | Track tokens per task |
-| No task completion scoring | Binary success/fail only | Add partial completion scoring |
+| No Pass@k sampling | Can't evaluate code gen quality | Add multi-sample generation |
+| No regression testing | Can't verify fixes don't break | Integrate "pass-to-pass" testing |
+| No baseline comparisons | Can't compare model performance | Add model benchmarking mode |
 
-### 6.3 Nice-to-Have Gaps (Low Priority)
+### 7.3 Nice-to-Have Gaps (Low Priority)
 
 | Gap | Impact | Recommendation |
 |-----|--------|----------------|

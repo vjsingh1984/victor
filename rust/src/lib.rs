@@ -34,12 +34,14 @@
 //! - `pattern_match`: Aho-Corasick multi-pattern matching for tool/intent detection
 //! - `extractor`: High-performance tool call extraction from model output
 //! - `sanitizer`: High-performance response sanitization
+//! - `embeddings`: Quantized embeddings, matrix ops, KNN (v0.4.0)
 
 use pyo3::prelude::*;
 
 mod chunking;
 mod classifier;
 mod dedup;
+mod embeddings;
 mod extractor;
 mod hashing;
 mod json_repair;
@@ -162,6 +164,22 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sanitizer::detect_leakage_patterns, m)?)?;
     m.add_function(wrap_pyfunction!(sanitizer::strip_markup, m)?)?;
     m.add_function(wrap_pyfunction!(sanitizer::validate_tool_name, m)?)?;
+
+    // Embedding functions (v0.4.0 - quantization, matrix ops, KNN)
+    m.add_class::<embeddings::QuantizedEmbedding>()?;
+    m.add_function(wrap_pyfunction!(embeddings::quantize_embedding, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::batch_quantize_embeddings, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::dequantize_embedding, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::quantized_cosine_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        embeddings::batch_quantized_cosine_similarity,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(embeddings::matmul_vector, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::batch_matmul_vector, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::random_projection, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::pairwise_distances, m)?)?;
+    m.add_function(wrap_pyfunction!(embeddings::knn_graph, m)?)?;
 
     Ok(())
 }

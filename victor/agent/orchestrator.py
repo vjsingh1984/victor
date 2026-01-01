@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
+    from victor.evaluation.protocol import TokenUsage
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
@@ -700,6 +701,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize UsageAnalytics singleton for data-driven optimization (via factory)
         self._usage_analytics = self._factory.create_usage_analytics()
+
+        # Token usage tracking for evaluation/benchmarking
+        # Accumulates across all stream_chat calls for accurate reporting
+        self._cumulative_token_usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
 
         # Initialize ToolSequenceTracker for intelligent next-tool suggestions (via factory)
         self._sequence_tracker = self._factory.create_sequence_tracker()
@@ -1486,6 +1497,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug("Tiered config applied to ToolAccessController")
 
         logger.debug("Tiered tool config set")
+
+    def set_workspace(self, workspace_dir: Path) -> None:
+        """Set the workspace directory for task execution.
+
+        Updates the global project root and orchestrator's project context
+        to work in the specified directory. This is essential for benchmark
+        evaluations where each task operates in a different workspace.
+
+        Args:
+            workspace_dir: Path to the workspace directory
+        """
+        from victor.config.settings import set_project_root
+        from victor.context.project_context import ProjectContext
+
+        # Update global project root
+        set_project_root(workspace_dir)
+        logger.info(f"Project root set to: {workspace_dir}")
+
+        # Create new project context for this workspace
+        self.project_context = ProjectContext(root_path=str(workspace_dir))
+        self.project_context.load()
+
+        # Update system prompt if new context has content
+        if self.project_context.content:
+            base_prompt = self._build_system_prompt_with_adapter()
+            self._system_prompt = (
+                base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
 
     def _apply_vertical_tools(self, tools: Set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
@@ -2451,6 +2491,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._metrics_collector.get_tool_usage_stats(
             conversation_state_summary=self.conversation_state.get_state_summary()
         )
+
+    def get_token_usage(self) -> "TokenUsage":
+        """Get cumulative token usage for evaluation tracking.
+
+        Returns cumulative tokens used across all stream_chat calls.
+        Used by VictorAgentAdapter for benchmark token tracking.
+
+        Returns:
+            TokenUsage dataclass with input/output/total token counts
+        """
+        from victor.evaluation.protocol import TokenUsage
+
+        return TokenUsage(
+            input_tokens=self._cumulative_token_usage.get("prompt_tokens", 0),
+            output_tokens=self._cumulative_token_usage.get("completion_tokens", 0),
+            total_tokens=self._cumulative_token_usage.get("total_tokens", 0),
+        )
+
+    def reset_token_usage(self) -> None:
+        """Reset cumulative token usage tracking.
+
+        Call this at the start of a new evaluation task to get fresh counts.
+        """
+        for key in self._cumulative_token_usage:
+            self._cumulative_token_usage[key] = 0
 
     def get_conversation_stage(self) -> ConversationStage:
         """Get the current conversation stage.
@@ -4066,6 +4131,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 **provider_kwargs,
             )
 
+            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
+            if response.usage:
+                self._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
+                self._cumulative_token_usage["completion_tokens"] += response.usage.get(
+                    "completion_tokens", 0
+                )
+                self._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
+
             # Add assistant response to history if has content
             if response.content:
                 self.add_message("assistant", response.content)
@@ -5578,8 +5655,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
-        async for chunk in self._stream_chat_impl(user_message):
-            yield chunk
+        try:
+            async for chunk in self._stream_chat_impl(user_message):
+                yield chunk
+        finally:
+            # Update cumulative token usage after stream completes
+            # This enables accurate token tracking for evaluations/benchmarks
+            if hasattr(self, "_current_stream_context") and self._current_stream_context:
+                ctx = self._current_stream_context
+                if hasattr(ctx, "cumulative_usage"):
+                    for key in self._cumulative_token_usage:
+                        if key in ctx.cumulative_usage:
+                            self._cumulative_token_usage[key] += ctx.cumulative_usage[key]
+                    # Calculate total if not tracked by provider
+                    if self._cumulative_token_usage["total_tokens"] == 0:
+                        self._cumulative_token_usage["total_tokens"] = (
+                            self._cumulative_token_usage["prompt_tokens"]
+                            + self._cumulative_token_usage["completion_tokens"]
+                        )
 
     async def _stream_chat_impl(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Implementation for streaming chat.
