@@ -253,7 +253,9 @@ class ComparisonReport:
             "|------|-----------|-----------|-------------|-------------|-----------|",
         ]
 
-        for i, result in enumerate(sorted(self.results, key=lambda r: r.metrics.pass_rate, reverse=True)):
+        for i, result in enumerate(
+            sorted(self.results, key=lambda r: r.metrics.pass_rate, reverse=True)
+        ):
             lines.append(
                 f"| {i+1} | {result.framework.value} | "
                 f"{result.metrics.pass_rate:.1%} | "
@@ -262,25 +264,29 @@ class ComparisonReport:
                 f"${result.metrics.cost_per_task:.4f} |"
             )
 
-        lines.extend([
-            "",
-            "## Detailed Metrics",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Detailed Metrics",
+                "",
+            ]
+        )
 
         for result in self.results:
             m = result.metrics
-            lines.extend([
-                f"### {result.framework.value}",
-                "",
-                f"- **Model**: {result.model}",
-                f"- **Pass Rate**: {m.pass_rate:.1%}",
-                f"- **Code Quality**: {m.code_quality_score:.1f}/100",
-                f"- **Test Pass Rate**: {m.test_pass_rate:.1%}",
-                f"- **Error Rate**: {m.error_rate:.1%}",
-                f"- **Timeout Rate**: {m.timeout_rate:.1%}",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"### {result.framework.value}",
+                    "",
+                    f"- **Model**: {result.model}",
+                    f"- **Pass Rate**: {m.pass_rate:.1%}",
+                    f"- **Code Quality**: {m.code_quality_score:.1f}/100",
+                    f"- **Test Pass Rate**: {m.test_pass_rate:.1%}",
+                    f"- **Error Rate**: {m.error_rate:.1%}",
+                    f"- **Timeout Rate**: {m.timeout_rate:.1%}",
+                    "",
+                ]
+            )
 
         return "\n".join(lines)
 
@@ -324,9 +330,7 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
 
     # Quality - calculate from task results
     quality_scores = [
-        r.code_quality.get_overall_score()
-        for r in result.task_results
-        if r.code_quality
+        r.code_quality.get_overall_score() for r in result.task_results if r.code_quality
     ]
     if quality_scores:
         metrics.code_quality_score = sum(quality_scores) / len(quality_scores)
