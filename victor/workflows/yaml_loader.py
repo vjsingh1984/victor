@@ -22,6 +22,8 @@ Extended Schema Features:
 - $ref: External file references for node reuse
 - batch_config: Workflow-level batch execution settings
 - temporal_context: Point-in-time analysis for backtesting
+- $env.VAR_NAME: Environment variable interpolation
+- ${VAR:-default}: Shell-style env vars with defaults
 
 Example YAML format:
     workflows:
@@ -93,12 +95,74 @@ from __future__ import annotations
 
 import logging
 import operator
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, TYPE_CHECKING, Union
 
 import yaml
+
+
+# =============================================================================
+# Environment Variable Interpolation
+# =============================================================================
+
+# Pattern for $env.VAR_NAME syntax
+ENV_VAR_PATTERN = re.compile(r"\$env\.([A-Za-z_][A-Za-z0-9_]*)")
+# Pattern for ${VAR:-default} syntax
+SHELL_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def _interpolate_env_vars(value: Any) -> Any:
+    """Recursively interpolate environment variables in YAML values.
+
+    Supports two syntaxes:
+    - $env.VAR_NAME: Simple env var reference
+    - ${VAR_NAME:-default}: Shell-style with optional default
+
+    Args:
+        value: Any YAML value (str, dict, list, or primitive)
+
+    Returns:
+        Value with environment variables interpolated
+
+    Example:
+        input: "$env.DATABASE_URL"
+        output: "postgresql://localhost:5432/db"
+
+        input: "${API_KEY:-default_key}"
+        output: value of API_KEY or "default_key" if not set
+    """
+    if isinstance(value, str):
+        # Handle $env.VAR_NAME syntax
+        def replace_env(match: re.Match) -> str:
+            var_name = match.group(1)
+            return os.environ.get(var_name, f"$env.{var_name}")
+
+        result = ENV_VAR_PATTERN.sub(replace_env, value)
+
+        # Handle ${VAR:-default} syntax
+        def replace_shell(match: re.Match) -> str:
+            var_name = match.group(1)
+            default = match.group(2) if match.group(2) is not None else ""
+            return os.environ.get(var_name, default)
+
+        result = SHELL_VAR_PATTERN.sub(replace_shell, result)
+        return result
+
+    elif isinstance(value, dict):
+        return {k: _interpolate_env_vars(v) for k, v in value.items()}
+
+    elif isinstance(value, list):
+        return [_interpolate_env_vars(item) for item in value]
+
+    return value
+
+
+if TYPE_CHECKING:
+    from victor.workflows.batch_executor import BatchConfig
+    from victor.workflows.services.definition import ServiceConfig
 
 from victor.workflows.definition import (
     AgentNode,
@@ -487,9 +551,7 @@ class BatchConfigYAML:
             batch_size=self.batch_size,
             max_concurrent=self.max_concurrent,
             delay_seconds=self.delay_seconds,
-            retry_strategy=strategy_map.get(
-                self.retry_strategy, RetryStrategy.END_OF_BATCH
-            ),
+            retry_strategy=strategy_map.get(self.retry_strategy, RetryStrategy.END_OF_BATCH),
             max_retries=self.max_retries,
             retry_delay_seconds=self.retry_delay_seconds,
             timeout_per_item=self.timeout_per_item,
@@ -1113,6 +1175,9 @@ def load_workflow_from_yaml(
     if not isinstance(data, dict):
         raise YAMLWorkflowError("YAML must contain a dictionary")
 
+    # Interpolate environment variables
+    data = _interpolate_env_vars(data)
+
     # Check for workflows key
     workflows_data = data.get("workflows", data)
 
@@ -1275,6 +1340,162 @@ class YAMLWorkflowProvider:
         return list(self._workflows.keys())
 
 
+# =============================================================================
+# CLI Arguments Support
+# =============================================================================
+
+
+@dataclass
+class WorkflowArgument:
+    """Definition of a workflow input argument.
+
+    Used to define expected inputs for workflows, similar to argparse.
+
+    Attributes:
+        name: Argument name (used as context key)
+        type: Python type (str, int, float, bool, list)
+        required: Whether argument is required
+        default: Default value if not provided
+        help: Help text for documentation
+        choices: Valid choices (for enum-like args)
+        env_var: Environment variable fallback
+
+    Example YAML:
+        workflows:
+          deploy:
+            arguments:
+              - name: target
+                type: str
+                required: true
+                help: "Deployment target (staging, production)"
+                choices: [staging, production]
+              - name: version
+                type: str
+                default: latest
+                env_var: DEPLOY_VERSION
+              - name: dry_run
+                type: bool
+                default: false
+    """
+
+    name: str
+    type: str = "str"
+    required: bool = False
+    default: Any = None
+    help: str = ""
+    choices: Optional[List[Any]] = None
+    env_var: Optional[str] = None
+
+    def parse_value(self, value: Any) -> Any:
+        """Parse and validate a value for this argument."""
+        if value is None:
+            # Check env var fallback
+            if self.env_var:
+                value = os.environ.get(self.env_var)
+            if value is None:
+                return self.default
+
+        # Type conversion
+        type_map = {
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": lambda v: v.lower() in ("true", "1", "yes") if isinstance(v, str) else bool(v),
+            "list": lambda v: v.split(",") if isinstance(v, str) else list(v),
+        }
+        converter = type_map.get(self.type, str)
+        try:
+            converted = converter(value)
+        except (ValueError, TypeError) as e:
+            raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
+
+        # Validate choices
+        if self.choices and converted not in self.choices:
+            raise YAMLWorkflowError(
+                f"Invalid value for argument '{self.name}': " f"'{converted}' not in {self.choices}"
+            )
+
+        return converted
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowArgument":
+        return cls(
+            name=data["name"],
+            type=data.get("type", "str"),
+            required=data.get("required", False),
+            default=data.get("default"),
+            help=data.get("help", ""),
+            choices=data.get("choices"),
+            env_var=data.get("env_var"),
+        )
+
+
+def parse_workflow_args(
+    workflow_def: WorkflowDefinition,
+    cli_args: Optional[Dict[str, Any]] = None,
+    env_prefix: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Parse CLI-style arguments into workflow initial context.
+
+    Args:
+        workflow_def: Workflow definition with optional arguments metadata
+        cli_args: Provided arguments (from CLI, API, etc.)
+        env_prefix: Prefix for environment variable fallbacks
+
+    Returns:
+        Dict suitable for initial_context in workflow execution
+
+    Raises:
+        YAMLWorkflowError: If required arguments are missing
+
+    Example:
+        # YAML workflow with arguments defined
+        workflow = load_workflow_from_file("deploy.yaml")
+        context = parse_workflow_args(
+            workflow,
+            cli_args={"target": "staging", "version": "1.2.3"},
+        )
+        result = await executor.execute(workflow, initial_context=context)
+    """
+    cli_args = cli_args or {}
+    context: Dict[str, Any] = {}
+
+    # Get argument definitions from workflow metadata
+    args_defs = workflow_def.metadata.get("arguments", [])
+    if not args_defs:
+        # No argument schema, pass through cli_args directly
+        return dict(cli_args)
+
+    # Parse each defined argument
+    for arg_data in args_defs:
+        arg = WorkflowArgument.from_dict(arg_data) if isinstance(arg_data, dict) else arg_data
+
+        # Try to get value from cli_args
+        value = cli_args.get(arg.name)
+
+        # Try env var with optional prefix
+        if value is None and env_prefix:
+            env_key = f"{env_prefix}_{arg.name.upper()}"
+            value = os.environ.get(env_key)
+
+        # Parse and validate
+        parsed = arg.parse_value(value)
+
+        # Check required
+        if parsed is None and arg.required:
+            raise YAMLWorkflowError(f"Missing required argument: {arg.name}")
+
+        if parsed is not None:
+            context[arg.name] = parsed
+
+    # Include any extra args not in schema
+    for key, value in cli_args.items():
+        if key not in context:
+            context[key] = value
+
+    return context
+
+
 __all__ = [
     # Error types
     "YAMLWorkflowError",
@@ -1286,9 +1507,12 @@ __all__ = [
     "TemporalContextConfig",
     "BatchConfigYAML",
     "ServiceConfigYAML",
+    "WorkflowArgument",
     # Loading functions
     "load_workflow_from_dict",
     "load_workflow_from_yaml",
     "load_workflow_from_file",
     "load_workflows_from_directory",
+    # Argument parsing
+    "parse_workflow_args",
 ]
