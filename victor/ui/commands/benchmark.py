@@ -45,7 +45,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from victor.ui.commands.utils import configure_logging
+from victor.ui.commands.utils import setup_logging
 
 benchmark_app = typer.Typer(
     name="benchmark",
@@ -54,24 +54,21 @@ benchmark_app = typer.Typer(
 console = Console()
 
 
-def _configure_log_level(log_level: Optional[str]) -> None:
-    """Configure logging level for benchmark commands.
+def _configure_log_level(log_level: Optional[str], command: str = "benchmark") -> None:
+    """Configure logging for benchmark commands using centralized config.
 
-    Defaults:
-    - Console: WARNING (clean output)
-    - File: INFO (detailed logging for debugging)
+    Uses the centralized logging config system with proper priority chain:
+    1. CLI argument (log_level)
+    2. Environment variable (VICTOR_LOG_LEVEL)
+    3. User config (~/.victor/config.yaml)
+    4. Command-specific override from package config
+    5. Package defaults (WARNING console, INFO file)
 
-    If log_level is explicitly set (via CLI or env var), it overrides both.
+    Args:
+        log_level: CLI-provided log level (highest priority)
+        command: Command name for command-specific config lookup
     """
-    # Default console to WARNING for clean output
-    console_level = "WARNING"
-    # Default file to INFO for detailed logs
-    file_level = "INFO"
-
-    # Check if user explicitly set a level
-    if log_level is None:
-        log_level = os.getenv("VICTOR_LOG_LEVEL")
-
+    # Validate log level if provided
     if log_level is not None:
         log_level = log_level.upper()
         valid_levels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}
@@ -86,11 +83,8 @@ def _configure_log_level(log_level: Optional[str]) -> None:
         if log_level == "WARN":
             log_level = "WARNING"
 
-        # Override both levels when explicitly set
-        console_level = log_level
-        file_level = log_level
-
-    configure_logging(console_level, stream=sys.stderr, file_level=file_level)
+    # Use centralized logging config
+    setup_logging(command=command, cli_log_level=log_level, stream=sys.stderr)
 
 
 @benchmark_app.command("list")

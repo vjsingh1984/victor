@@ -21,7 +21,7 @@ from victor.ui.commands.utils import (
     check_codebase_index,
     get_rl_profile_suggestion,
     setup_safety_confirmation,
-    configure_logging,
+    setup_logging,
     graceful_shutdown,
 )
 
@@ -176,30 +176,36 @@ def chat(
 
         automation_mode = json_output or plain or code_only
 
-        if log_level is None:
-            log_level = os.getenv("VICTOR_LOG_LEVEL", "ERROR" if automation_mode else "WARNING")
+        # Use ERROR level for automation modes (cleaner output)
+        if log_level is None and automation_mode:
+            log_level = "ERROR"
 
-        log_level = log_level.upper()
-        valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
+        # Validate log level if explicitly provided
+        if log_level is not None:
+            log_level = log_level.upper()
+            valid_levels = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"]
 
-        if log_level not in valid_levels:
-            console.print(
-                f"[bold red]Error:[/ ] Invalid log level '{log_level}'. Valid options: {', '.join(valid_levels)}"
-            )
-            raise typer.Exit(1)
+            if log_level not in valid_levels:
+                console.print(
+                    f"[bold red]Error:[/ ] Invalid log level '{log_level}'. Valid options: {', '.join(valid_levels)}"
+                )
+                raise typer.Exit(1)
 
-        if log_level == "WARN":
-            log_level = "WARNING"
+            if log_level == "WARN":
+                log_level = "WARNING"
 
-        # For troubleshooting, prefer plain text output when verbose logging is enabled
-        if log_level in {"DEBUG", "INFO"}:
-            renderer = "text"
+            # For troubleshooting, prefer plain text output when verbose logging is enabled
+            if log_level in {"DEBUG", "INFO"}:
+                renderer = "text"
 
-        configure_logging(log_level, stream=sys.stderr)
+        # Use centralized logging config
+        setup_logging(command="chat", cli_log_level=log_level, stream=sys.stderr)
 
         from victor.agent.debug_logger import configure_logging_levels
 
-        configure_logging_levels(log_level)
+        # Apply debug logger levels if explicitly specified
+        if log_level:
+            configure_logging_levels(log_level)
 
         formatter = create_formatter(
             json_mode=json_output,
@@ -303,10 +309,8 @@ def chat(
 
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
-    log_level = os.getenv("VICTOR_LOG_LEVEL", "WARNING").upper()
-    if log_level == "WARN":
-        log_level = "WARNING"
-    configure_logging(log_level)
+    # Use centralized logging config (respects ~/.victor/config.yaml and env vars)
+    setup_logging(command="chat")
 
     settings = load_settings()
     setup_safety_confirmation()

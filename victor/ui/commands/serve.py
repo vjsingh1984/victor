@@ -6,6 +6,8 @@ from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 
+from victor.ui.commands.utils import setup_logging
+
 serve_app = typer.Typer(name="serve", help="Start the Victor API server for IDE integrations.")
 console = Console()
 
@@ -32,11 +34,11 @@ def serve(
         "-p",
         help="Port to listen on",
     ),
-    log_level: str = typer.Option(
-        "INFO",
+    log_level: Optional[str] = typer.Option(
+        None,
         "--log-level",
         "-l",
-        help="Set logging level (DEBUG, INFO, WARN, ERROR)",
+        help="Set logging level (defaults to INFO for serve or VICTOR_LOG_LEVEL env var)",
     ),
     profile: str = typer.Option(
         "default",
@@ -64,17 +66,15 @@ def serve(
         _serve(host, port, log_level, profile, backend)
 
 
-def _serve(host: str, port: int, log_level: str, profile: str, backend: ServerBackend):
-    # Configure logging
-    log_level = log_level.upper()
-    if log_level == "WARN":
-        log_level = "WARNING"
+def _serve(host: str, port: int, log_level: Optional[str], profile: str, backend: ServerBackend):
+    # Normalize log level if provided
+    if log_level is not None:
+        log_level = log_level.upper()
+        if log_level == "WARN":
+            log_level = "WARNING"
 
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,
-    )
+    # Use centralized logging config (serve has INFO default in logging_config.yaml)
+    setup_logging(command="serve", cli_log_level=log_level)
 
     # Backend-specific information
     backend_info = ""

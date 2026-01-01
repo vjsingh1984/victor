@@ -1,0 +1,45 @@
+# Victor Logging Configuration
+#
+# This is the package-level default. Users can override in ~/.victor/config.yaml
+# Environment variables take precedence over both:
+#   - VICTOR_LOG_LEVEL: Override console level (e.g., DEBUG, INFO, WARNING)
+#   - VICTOR_LOG_FILE_LEVEL: Override file level
+#   - VICTOR_LOG_FILE: Override log file path
+#   - VICTOR_LOG_DISABLED: Set to "true" to disable file logging
+#
+# CLI arguments have highest priority.
+
+logging:
+  # Default levels for all commands
+  default:
+    console_level: WARNING      # Console output: WARNING for clean output
+    file_level: INFO            # File output: INFO for debugging
+    file_enabled: true          # Enable file logging
+    file_path: ~/.victor/logs/victor.log
+    file_max_bytes: 10485760    # 10MB max per file
+    file_backup_count: 5        # Keep 5 rotated backups
+    console_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    file_format: "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s"
+    event_logging: true         # Enable EventBus -> logging integration
+
+  # Per-command overrides (inherit from default, only specify differences)
+  commands:
+    # chat: uses defaults (WARNING console, INFO file)
+    # benchmark: uses defaults
+    serve:
+      console_level: INFO       # Servers show more visibility
+    debug:
+      console_level: DEBUG
+      file_level: DEBUG
+    index:
+      console_level: INFO       # Show indexing progress
+    mcp:
+      console_level: INFO       # MCP server visibility
+
+  # Module-specific level overrides (reduce noise from chatty libraries)
+  modules:
+    httpx: WARNING              # HTTP request logs
+    urllib3: WARNING            # Connection pool logs
+    asyncio: WARNING            # Async event loop logs
+    aiofiles: WARNING           # Async file operations
+    watchfiles: WARNING         # File watcher logs
