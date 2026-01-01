@@ -131,6 +131,7 @@ def run_benchmark(
     """Run a benchmark evaluation."""
     _configure_log_level(log_level)
 
+    from victor.config.settings import Settings
     from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
     from victor.evaluation.benchmarks import (
         SWEBenchRunner,
@@ -156,10 +157,29 @@ def run_benchmark(
     bench_type, runner_factory = benchmark_map[benchmark_lower]
     runner = runner_factory() if callable(runner_factory) else runner_factory
 
+    # Load profile to get model if not specified
+    effective_model = model
+    effective_provider = None
+    if not effective_model:
+        settings = Settings()
+        try:
+            profiles = settings.load_profiles()
+            profile_config = profiles.get(profile)
+            if profile_config:
+                # ProfileConfig is a Pydantic model with .model attribute
+                effective_model = profile_config.model
+                effective_provider = profile_config.provider
+            else:
+                console.print(f"[yellow]Warning:[/] Profile '{profile}' not found, using default model")
+                effective_model = "claude-3-sonnet"
+        except Exception as e:
+            console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
+            effective_model = "claude-3-sonnet"
+
     # Build config
     config = EvaluationConfig(
         benchmark=bench_type,
-        model=model or "claude-3-sonnet",
+        model=effective_model,
         max_tasks=max_tasks,
         timeout_per_task=timeout,
         max_turns=max_turns,
@@ -174,6 +194,10 @@ def run_benchmark(
     console.print()
 
     async def run_async():
+        from victor.evaluation.harness import EvaluationHarness
+        from victor.evaluation.agent_adapter import VictorAgentAdapter
+        from victor.evaluation.protocol import BenchmarkTask
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -181,7 +205,11 @@ def run_benchmark(
         ) as progress:
             task = progress.add_task("Loading tasks...", total=None)
 
-            # Load tasks
+            # Create harness and register runner
+            harness = EvaluationHarness()
+            harness.register_runner(runner)
+
+            # Load tasks first to show count
             tasks = await runner.load_tasks(config)
             progress.update(task, description=f"Loaded {len(tasks)} tasks")
 
@@ -189,13 +217,49 @@ def run_benchmark(
                 console.print("[yellow]No tasks to run[/]")
                 return None
 
+            # Create agent adapter from profile
+            progress.update(task, description="Initializing agent...")
+            try:
+                adapter = VictorAgentAdapter.from_profile(
+                    profile=profile,
+                    model_override=model,  # Use explicit model if provided
+                    timeout=timeout,
+                )
+
+                # Create a simple callback that returns the generated code
+                async def agent_callback(benchmark_task: BenchmarkTask) -> str:
+                    """Run agent on task and return generated code."""
+                    import tempfile
+                    from pathlib import Path
+
+                    # Create temp workspace for the task
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        workspace = Path(tmpdir)
+                        trace = await adapter.execute_task(benchmark_task, workspace)
+                        # Return the generated patch/code from the trace
+                        # AgenticExecutionTrace has: generated_patch, generated_code, messages
+                        return trace.generated_patch or trace.generated_code or ""
+
+            except Exception as e:
+                console.print(f"[red]Error initializing agent:[/] {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+
+            # Progress callback
+            def on_progress(task_idx: int, total: int, result):
+                progress.update(
+                    task,
+                    description=f"Task {task_idx + 1}/{total}: {result.status.value}"
+                )
+
             # Run evaluation
             progress.update(task, description="Running evaluation...")
-
-            from victor.evaluation.evaluation_orchestrator import EvaluationOrchestrator
-
-            orchestrator = EvaluationOrchestrator(runner, config)
-            result = await orchestrator.run()
+            result = await harness.run_evaluation(
+                config=config,
+                agent_callback=agent_callback,
+                progress_callback=on_progress,
+            )
 
             return result
 

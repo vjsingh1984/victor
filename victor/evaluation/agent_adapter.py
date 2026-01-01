@@ -418,13 +418,20 @@ class VictorAgentAdapter:
 
         # Create provider using ProviderRegistry (class methods)
         # Note: api_key and base_url may be extra fields from profiles.yaml (ProfileConfig allows extra="allow")
-        provider = ProviderRegistry.create(
-            provider_name,
-            settings=settings,
-            api_key=getattr(profile_config, "api_key", None),
-            base_url=base_url or getattr(profile_config, "base_url", None),
-            timeout=timeout,
-        )
+        # Only pass base_url if explicitly set, otherwise let provider use its default
+        provider_kwargs = {
+            "settings": settings,
+            "timeout": timeout,
+        }
+        api_key = getattr(profile_config, "api_key", None)
+        if api_key:
+            provider_kwargs["api_key"] = api_key
+
+        effective_base_url = base_url or getattr(profile_config, "base_url", None)
+        if effective_base_url:
+            provider_kwargs["base_url"] = effective_base_url
+
+        provider = ProviderRegistry.create(provider_name, **provider_kwargs)
 
         # Create orchestrator - lazy import to break circular dependency
         # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
