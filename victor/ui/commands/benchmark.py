@@ -115,9 +115,7 @@ def list_benchmarks() -> None:
 
 @benchmark_app.command("setup")
 def setup_benchmark(
-    benchmark: str = typer.Argument(
-        ..., help="Benchmark to setup: swe-bench, swe-bench-lite"
-    ),
+    benchmark: str = typer.Argument(..., help="Benchmark to setup: swe-bench, swe-bench-lite"),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of repos to setup"
     ),
@@ -191,7 +189,9 @@ def setup_benchmark(
             setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
 
             for i, task in enumerate(unique_tasks):
-                repo_name = task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
+                repo_name = (
+                    task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
+                )
                 progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
 
                 try:
@@ -218,30 +218,20 @@ def setup_benchmark(
 
 @benchmark_app.command("run")
 def run_benchmark(
-    benchmark: str = typer.Argument(
-        ..., help="Benchmark to run: swe-bench, humaneval, mbpp"
-    ),
+    benchmark: str = typer.Argument(..., help="Benchmark to run: swe-bench, humaneval, mbpp"),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
-    profile: str = typer.Option(
-        "default", "--profile", "-p", help="Victor profile to use"
-    ),
+    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
     ),
-    timeout: int = typer.Option(
-        300, "--timeout", "-t", help="Timeout per task in seconds"
-    ),
-    max_turns: int = typer.Option(
-        10, "--max-turns", help="Maximum conversation turns per task"
-    ),
-    parallel: int = typer.Option(
-        1, "--parallel", help="Number of parallel tasks"
-    ),
+    timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout per task in seconds"),
+    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
@@ -288,7 +278,9 @@ def run_benchmark(
                 effective_model = profile_config.model
                 effective_provider = profile_config.provider
             else:
-                console.print(f"[yellow]Warning:[/] Profile '{profile}' not found, using default model")
+                console.print(
+                    f"[yellow]Warning:[/] Profile '{profile}' not found, using default model"
+                )
                 effective_model = "claude-3-sonnet"
         except Exception as e:
             console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
@@ -346,6 +338,7 @@ def run_benchmark(
 
                 # Create workspace manager for SWE-bench (uses caching)
                 from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+
                 workspace_manager = SWEBenchWorkspaceManager()
 
                 # Create a callback that returns code AND metrics for token tracking
@@ -378,14 +371,18 @@ def run_benchmark(
                         console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
                     else:
                         # Setup on-the-fly (slower, but works without explicit setup)
-                        console.print(f"  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]")
+                        console.print(
+                            f"  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
+                        )
                         await workspace_manager.setup_repo_with_indexes(benchmark_task)
                         work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
 
                     # Checkout the specific base commit for this task
                     if benchmark_task.base_commit and work_dir:
                         checkout_proc = await asyncio.create_subprocess_exec(
-                            "git", "checkout", benchmark_task.base_commit,
+                            "git",
+                            "checkout",
+                            benchmark_task.base_commit,
                             cwd=work_dir,
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
@@ -433,14 +430,14 @@ def run_benchmark(
             except Exception as e:
                 console.print(f"[red]Error initializing agent:[/] {e}")
                 import traceback
+
                 traceback.print_exc()
                 return None
 
             # Progress callback
             def on_progress(task_idx: int, total: int, result):
                 progress.update(
-                    task,
-                    description=f"Task {task_idx + 1}/{total}: {result.status.value}"
+                    task, description=f"Task {task_idx + 1}/{total}: {result.status.value}"
                 )
 
             # Run evaluation
@@ -579,9 +576,7 @@ def compare_frameworks(
             json.dumps(
                 {
                     "benchmark": benchmark,
-                    "results": {
-                        f.value: d for f, d in results.items()
-                    },
+                    "results": {f.value: d for f, d in results.items()},
                 },
                 indent=2,
             )
@@ -591,9 +586,7 @@ def compare_frameworks(
 
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
-    benchmark: str = typer.Option(
-        "swe-bench", "--benchmark", "-b", help="Benchmark to show"
-    ),
+    benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),
 ) -> None:
     """Show the leaderboard for a benchmark."""
     from victor.evaluation.benchmarks import PUBLISHED_RESULTS
@@ -619,9 +612,7 @@ def show_leaderboard(
         raise typer.Exit(0)
 
     results = PUBLISHED_RESULTS[bench_type]
-    sorted_results = sorted(
-        results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True
-    )
+    sorted_results = sorted(results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True)
 
     table = Table()
     table.add_column("Rank", style="bold")

@@ -294,6 +294,7 @@ def serve_hitl(
     storage_info = ""
     if persistent:
         from pathlib import Path
+
         effective_db = db_path or str(Path.home() / ".victor" / "hitl.db")
         storage_info = f"\n[bold]Storage:[/] [green]SQLite[/] ({effective_db})"
     else:
