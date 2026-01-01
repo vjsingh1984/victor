@@ -913,27 +913,36 @@ class CodebaseIndex:
         if self.graph_store and self._graph_edges:
             await self.graph_store.upsert_edges(self._graph_edges)
 
-        # Build embeddings for all indexed symbols
+        # Build embeddings for all indexed symbols (batched for performance)
         if self.use_embeddings and self.embedding_provider:
-            embedding_count = 0
+            # Collect all documents for batch embedding
+            documents = []
             for rel_path, file_meta in self.files.items():
                 for symbol in file_meta.symbols:
                     text_for_embedding = self._get_symbol_embedding_text(symbol)
                     if text_for_embedding:
-                        try:
-                            await self.embedding_provider.index_document(
-                                doc_id=f"{rel_path}:{symbol.name}",
-                                content=text_for_embedding,
-                                metadata={
-                                    "file_path": rel_path,
-                                    "symbol_name": symbol.name,
-                                    "symbol_type": symbol.type,
-                                    "line_number": symbol.line_number,
-                                },
-                            )
-                            embedding_count += 1
-                        except Exception as e:
-                            logger.debug(f"Failed to embed symbol {symbol.name}: {e}")
+                        documents.append({
+                            "id": f"{rel_path}:{symbol.name}",
+                            "content": text_for_embedding,
+                            "file_path": rel_path,
+                            "symbol_name": symbol.name,
+                            "symbol_type": symbol.type,
+                            "line_number": symbol.line_number,
+                        })
+
+            # Batch embed for performance (process in chunks of 500)
+            batch_size = 500
+            embedding_count = 0
+            for i in range(0, len(documents), batch_size):
+                batch = documents[i:i + batch_size]
+                try:
+                    await self.embedding_provider.index_documents(batch)
+                    embedding_count += len(batch)
+                    if i > 0 and i % 5000 == 0:
+                        logger.info(f"Embedded {embedding_count}/{len(documents)} symbols...")
+                except Exception as e:
+                    logger.warning(f"Failed to embed batch at {i}: {e}")
+
             logger.info(f"Created {embedding_count} embeddings for semantic search")
 
         self._is_indexed = True
