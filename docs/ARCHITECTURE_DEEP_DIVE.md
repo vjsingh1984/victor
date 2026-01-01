@@ -330,6 +330,43 @@ models:
 
 ---
 
+## Evaluation System (v0.4.0)
+
+Victor includes a comprehensive evaluation harness for benchmarking against industry standards.
+
+### Evaluation Components
+
+| Component | Module | Purpose |
+|-----------|--------|---------|
+| `EvaluationHarness` | `victor.evaluation.harness` | Task orchestration, result aggregation |
+| `VictorAgentAdapter` | `victor.evaluation.agent_adapter` | Connects orchestrator to harness |
+| `BenchmarkTask` | `victor.evaluation.protocol` | Task definition (prompt, tests, repo) |
+| `TaskResult` | `victor.evaluation.protocol` | Result with tokens, duration, quality |
+| `TokenUsage` | `victor.evaluation.protocol` | Input/output/total token tracking |
+| `SafeTimeoutPolicy` | `victor.evaluation.timeout_calculator` | Ensures 180s minimum per turn |
+
+### Token Tracking Flow
+
+```mermaid
+flowchart LR
+    P[Provider.chat] -->|usage dict| O[Orchestrator]
+    O -->|accumulate| CU[_cumulative_token_usage]
+    CU -->|get_token_usage| A[AgentAdapter]
+    A -->|token_usage| T[TaskResult]
+    T -->|save| J[Results JSON]
+```
+
+### Benchmark Commands
+
+```bash
+victor benchmark list              # Available benchmarks
+victor benchmark run swe-bench     # Run SWE-bench
+victor benchmark run humaneval     # Run HumanEval
+victor benchmark compare           # Framework comparison
+```
+
+---
+
 ## Notes
 
 > **Air-Gapped Mode**: Only local providers (Ollama, LMStudio, vLLM), no web tools, local embeddings.
@@ -337,6 +374,8 @@ models:
 > **Tool Selection**: Default hybrid strategy (70% semantic, 30% keyword). Configure via `tool_selection_strategy` setting.
 
 > **Context Compaction**: Triggers at 70% context window usage. Truncates tool results, summarizes history.
+
+> **Benchmark Timeouts**: SafeTimeoutPolicy ensures minimum 180s per turn for slow models (DeepSeek, Mixtral).
 
 ---
 
@@ -346,3 +385,4 @@ models:
 - [TOOL_SELECTION.md](./TOOL_SELECTION.md) - Tool selection strategies
 - [CORE_PATTERNS.md](./CORE_PATTERNS.md) - Design patterns
 - [VERTICALS.md](./VERTICALS.md) - Domain-specific assistants
+- [BENCHMARK_EVALUATION.md](./BENCHMARK_EVALUATION.md) - Benchmark evaluation details

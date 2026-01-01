@@ -77,6 +77,11 @@ docs/
 - [User Guide](USER_GUIDE.md) - Complete usage
 - [Configuration](guides/QUICKSTART.md#configuration)
 
+### Benchmarking & Evaluation
+- [Benchmark Evaluation](BENCHMARK_EVALUATION.md) - SWE-bench, HumanEval, MBPP
+- [Evaluation Flow Diagram](assets/evaluation-flow.svg) - Token tracking architecture
+- Running benchmarks: `victor benchmark run swe-bench --profile <profile>`
+
 ### Providers & Models
 - [Provider Setup](guides/PROVIDER_SETUP.md) - Configure 25+ providers
 - [Model Comparison](MODEL_COMPARISON.md) - Tested Ollama benchmarks
