@@ -22,6 +22,12 @@ This package provides workflow definitions for common data analysis tasks:
 
 Supports both standard and streaming execution via StreamingWorkflowExecutor.
 
+Supports hybrid loading:
+- Python workflows (inline @workflow definitions)
+- YAML workflows (external files in workflows/*.yaml)
+
+YAML workflows override Python workflows when names collide.
+
 Example:
     provider = DataAnalysisWorkflowProvider()
 
@@ -35,6 +41,8 @@ Example:
             print(f"Completed: {chunk.node_name}")
 """
 
+import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
@@ -43,6 +51,8 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     workflow,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -319,14 +329,59 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
     def __init__(self) -> None:
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
 
+    def _load_python_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Load Python-defined workflows.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
+        return {
+            "eda_workflow": eda_workflow(),
+            "data_cleaning": data_cleaning_workflow(),
+            "statistical_analysis": statistical_analysis_workflow(),
+            "ml_pipeline": ml_pipeline_workflow(),
+        }
+
+    def _load_yaml_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Load YAML-defined workflows from workflows/*.yaml.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
+        try:
+            from victor.workflows.yaml_loader import load_workflows_from_directory
+
+            # Load from the workflows directory (same as this file)
+            workflows_dir = Path(__file__).parent
+            yaml_workflows = load_workflows_from_directory(workflows_dir)
+            logger.debug(f"Loaded {len(yaml_workflows)} YAML workflows from {workflows_dir}")
+            return yaml_workflows
+        except Exception as e:
+            logger.warning(f"Failed to load YAML workflows: {e}")
+            return {}
+
     def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Lazy load all workflows with hybrid Python/YAML support.
+
+        YAML workflows override Python workflows when names collide.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
         if self._workflows is None:
-            self._workflows = {
-                "eda_workflow": eda_workflow(),
-                "data_cleaning": data_cleaning_workflow(),
-                "statistical_analysis": statistical_analysis_workflow(),
-                "ml_pipeline": ml_pipeline_workflow(),
-            }
+            # Start with Python workflows as base
+            python_workflows = self._load_python_workflows()
+
+            # Override with YAML workflows
+            yaml_workflows = self._load_yaml_workflows()
+
+            # Merge: YAML takes precedence
+            self._workflows = {**python_workflows, **yaml_workflows}
+
+            logger.debug(
+                f"Loaded {len(python_workflows)} Python + {len(yaml_workflows)} YAML workflows "
+                f"= {len(self._workflows)} total"
+            )
         return self._workflows
 
     def get_workflows(self) -> Dict[str, WorkflowDefinition]:
@@ -454,6 +509,10 @@ from victor.dataanalysis.workflows.graph_workflows import (
     create_ml_pipeline_workflow,
     DataAnalysisGraphExecutor,
 )
+
+# Register DataAnalysis domain handlers when this module is loaded
+from victor.dataanalysis.handlers import register_handlers as _register_handlers
+_register_handlers()
 
 __all__ = [
     # WorkflowBuilder-based workflows
