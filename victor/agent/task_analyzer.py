@@ -139,6 +139,11 @@ class TaskAnalyzer:
             self._complexity_classifier = ComplexityClassifier()
         return self._complexity_classifier
 
+    def _get_complexity_hint(self, complexity: "TaskComplexity") -> str:
+        """Get prompt hint for a complexity level via enricher."""
+        from victor.agent.complexity_classifier import get_prompt_hint
+        return get_prompt_hint(complexity)
+
     @property
     def action_authorizer(self) -> ActionAuthorizer:
         if not self._action_authorizer:
@@ -209,7 +214,7 @@ class TaskAnalyzer:
             requires_confirmation=action_result.intent == ActionIntent.AMBIGUOUS,
             matched_patterns=complexity_result.matched_patterns,
             analysis_details={
-                "complexity_hint": complexity_result.prompt_hint,
+                "complexity_hint": self._get_complexity_hint(complexity_result.complexity),
                 "action_signals": action_result.matched_signals,
                 "unified_source": unified_result.source,
                 "unified_matched_keywords": [m.keyword for m in unified_result.matched_keywords],
