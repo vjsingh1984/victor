@@ -15,9 +15,16 @@
 """Workflow definition and execution system.
 
 This package provides a LangGraph-like workflow DSL for defining
-reusable multi-agent workflows as Python code.
+reusable multi-agent workflows as Python code or YAML.
 
-Example:
+Features:
+- ComputeNode: LLM-free execution with constraints
+- AgentNode: LLM-powered execution for complex reasoning
+- Handlers: Extensible compute handlers for domain logic
+- Isolation: Per-vertical sandbox configuration
+- YAML Support: Declarative workflow definitions
+
+Example (Python):
     from victor.workflows import WorkflowBuilder, workflow, WorkflowRegistry
 
     @workflow("code_review", "Review code quality")
@@ -30,9 +37,19 @@ Example:
             .build()
         )
 
-    # Execute
-    executor = WorkflowExecutor(orchestrator)
-    result = await executor.execute("code_review", {"files": ["main.py"]})
+Example (YAML):
+    workflows:
+      eda_pipeline:
+        nodes:
+          - id: load
+            type: compute
+            tools: [read]
+            constraints:
+              llm_allowed: false
+          - id: analyze
+            type: agent
+            role: analyst
+            goal: "Analyze data patterns"
 """
 
 from victor.workflows.base import BaseWorkflow
@@ -118,6 +135,169 @@ from victor.workflows.graph import (
     GraphValidationError,
 )
 
+# New modules for extended workflow capabilities
+from victor.workflows.definition import (
+    ComputeNode,
+    TaskConstraints,
+    ConstraintsProtocol,
+    AirgappedConstraints,
+    ComputeOnlyConstraints,
+    FullAccessConstraints,
+)
+from victor.workflows.executor import (
+    ComputeHandler,
+    TemporalContext,
+    register_compute_handler,
+    get_compute_handler,
+    list_compute_handlers,
+)
+from victor.workflows.isolation import (
+    SandboxType,
+    ResourceLimits,
+    IsolationConfig,
+    IsolationMapper,
+)
+from victor.workflows.cost_router import (
+    CostTier,
+    ModelConfig,
+    RoutingDecision,
+    CostAwareRouter,
+    get_default_router,
+    route_for_cost,
+)
+from victor.workflows.sandbox_executor import (
+    ExecutionResult,
+    SandboxedExecutor,
+    get_sandboxed_executor,
+)
+from victor.workflows.handlers import (
+    ParallelToolsHandler,
+    SequentialToolsHandler,
+    RetryBackoffHandler,
+    DataTransformHandler,
+    ConditionalBranchHandler,
+    FRAMEWORK_HANDLERS,
+    register_framework_handlers,
+)
+from victor.workflows.batch_executor import (
+    RetryStrategy,
+    BatchConfig,
+    BatchItemResult,
+    BatchProgress,
+    BatchResult,
+    BatchWorkflowExecutor,
+)
+from victor.workflows.yaml_to_graph_compiler import (
+    WorkflowState,
+    GraphNodeResult as CompiledGraphNodeResult,
+    CompilerConfig,
+    YAMLToStateGraphCompiler,
+    NodeExecutorFactory,
+    ConditionEvaluator,
+    compile_yaml_workflow,
+    execute_yaml_workflow,
+)
+from victor.workflows.unified_executor import (
+    ExecutorConfig,
+    ExecutorResult,
+    StateGraphExecutor,
+    get_executor,
+    execute_workflow,
+)
+from victor.workflows.deployment import (
+    DeploymentTarget,
+    DockerConfig,
+    DockerComposeConfig,
+    KubernetesConfig,
+    ECSConfig,
+    CloudRunConfig,
+    AzureContainerConfig,
+    LambdaConfig,
+    RemoteConfig,
+    SandboxConfig,
+    DeploymentConfig,
+    DeploymentHandler,
+    get_deployment_handler,
+)
+from victor.workflows.service_lifecycle import (
+    ServiceConfig,
+    ServiceLifecycle,
+    ServiceManager,
+    PostgresService,
+    RedisService,
+    RabbitMQService,
+    KafkaService,
+    HTTPClientService,
+    S3Service,
+)
+from victor.workflows.runtime import (
+    HITLServerConfig,
+    RuntimeConfig,
+    RuntimeResult,
+    WorkflowRuntime,
+    run_workflow,
+)
+from victor.workflows.hitl import (
+    HITLNodeType,
+    HITLFallback,
+    HITLMode,
+    HITLCategory,
+    HITL_MODE_CATEGORIES,
+    HITLStatus,
+    HITLRequest,
+    HITLResponse,
+    HITLHandler,
+    HITLNode,
+    HITLExecutor,
+    DefaultHITLHandler,
+    DEPLOYMENT_HITL_COMPATIBILITY,
+    get_supported_hitl_modes,
+    validate_hitl_deployment_compatibility,
+)
+from victor.workflows.hitl_transports import (
+    # Base classes
+    BaseTransportConfig,
+    BaseTransport,
+    HITLTransportProtocol,
+    # Config classes
+    EmailConfig,
+    SMSConfig,
+    SlackConfig,
+    TeamsConfig,
+    GitHubConfig,
+    GitLabConfig,
+    JiraConfig,
+    PagerDutyConfig,
+    TerraformCloudConfig,
+    CustomHookConfig,
+    # Transport classes
+    EmailTransport,
+    SMSTransport,
+    SlackTransport,
+    GitHubPRTransport,
+    GitHubCheckTransport,
+    CustomHookTransport,
+    # Registry functions
+    register_transport,
+    get_transport,
+    list_available_transports,
+)
+from victor.workflows.hitl_api import (
+    StoredRequest,
+    HITLStore,
+    get_global_store,
+    SQLiteHITLStore,
+    get_sqlite_store,
+    APIHITLHandler,
+    create_hitl_router,
+    create_hitl_app,
+    run_hitl_server,
+)
+
+# Register framework handlers on module load
+# Domain-specific handlers are registered by each vertical when loaded
+register_framework_handlers()
+
 __all__ = [
     # Base
     "BaseWorkflow",
@@ -125,9 +305,16 @@ __all__ = [
     "NodeType",
     "WorkflowNode",
     "AgentNode",
+    "ComputeNode",
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    # Constraints
+    "TaskConstraints",
+    "ConstraintsProtocol",
+    "AirgappedConstraints",
+    "ComputeOnlyConstraints",
+    "FullAccessConstraints",
     # Definition
     "WorkflowDefinition",
     "WorkflowBuilder",
@@ -143,6 +330,43 @@ __all__ = [
     "WorkflowContext",
     "WorkflowResult",
     "WorkflowExecutor",
+    "TemporalContext",
+    # Compute Handlers
+    "ComputeHandler",
+    "register_compute_handler",
+    "get_compute_handler",
+    "list_compute_handlers",
+    # Framework handlers (domain handlers are provided by each vertical)
+    "ParallelToolsHandler",
+    "SequentialToolsHandler",
+    "RetryBackoffHandler",
+    "DataTransformHandler",
+    "ConditionalBranchHandler",
+    "FRAMEWORK_HANDLERS",
+    "register_framework_handlers",
+    # Isolation
+    "SandboxType",
+    "ResourceLimits",
+    "IsolationConfig",
+    "IsolationMapper",
+    # Cost Routing
+    "CostTier",
+    "ModelConfig",
+    "RoutingDecision",
+    "CostAwareRouter",
+    "get_default_router",
+    "route_for_cost",
+    # Sandbox Execution
+    "ExecutionResult",
+    "SandboxedExecutor",
+    "get_sandboxed_executor",
+    # Batch Execution
+    "RetryStrategy",
+    "BatchConfig",
+    "BatchItemResult",
+    "BatchProgress",
+    "BatchResult",
+    "BatchWorkflowExecutor",
     # Protocols (Graph API)
     "RetryPolicy",
     "IWorkflowNode",
@@ -191,4 +415,98 @@ __all__ = [
     "DuplicateNodeError",
     "InvalidEdgeError",
     "GraphValidationError",
+    # YAML to StateGraph Compiler
+    "WorkflowState",
+    "CompiledGraphNodeResult",
+    "CompilerConfig",
+    "YAMLToStateGraphCompiler",
+    "NodeExecutorFactory",
+    "ConditionEvaluator",
+    "compile_yaml_workflow",
+    "execute_yaml_workflow",
+    # StateGraph Executor
+    "ExecutorConfig",
+    "ExecutorResult",
+    "StateGraphExecutor",
+    "get_executor",
+    "execute_workflow",
+    # Deployment
+    "DeploymentTarget",
+    "DockerConfig",
+    "DockerComposeConfig",
+    "KubernetesConfig",
+    "ECSConfig",
+    "CloudRunConfig",
+    "AzureContainerConfig",
+    "LambdaConfig",
+    "RemoteConfig",
+    "SandboxConfig",
+    "DeploymentConfig",
+    "DeploymentHandler",
+    "get_deployment_handler",
+    # Services
+    "ServiceConfig",
+    "ServiceLifecycle",
+    "ServiceManager",
+    "PostgresService",
+    "RedisService",
+    "RabbitMQService",
+    "KafkaService",
+    "HTTPClientService",
+    "S3Service",
+    # Runtime (serverless-like)
+    "HITLServerConfig",
+    "RuntimeConfig",
+    "RuntimeResult",
+    "WorkflowRuntime",
+    "run_workflow",
+    # HITL (Human-in-the-Loop)
+    "HITLNodeType",
+    "HITLFallback",
+    "HITLMode",
+    "HITLCategory",
+    "HITL_MODE_CATEGORIES",
+    "HITLStatus",
+    "HITLRequest",
+    "HITLResponse",
+    "HITLHandler",
+    "HITLNode",
+    "HITLExecutor",
+    "DefaultHITLHandler",
+    "DEPLOYMENT_HITL_COMPATIBILITY",
+    "get_supported_hitl_modes",
+    "validate_hitl_deployment_compatibility",
+    # HITL API (remote deployments)
+    "StoredRequest",
+    "HITLStore",
+    "get_global_store",
+    "SQLiteHITLStore",
+    "get_sqlite_store",
+    "APIHITLHandler",
+    "create_hitl_router",
+    "create_hitl_app",
+    "run_hitl_server",
+    # HITL Transports (external integrations)
+    "BaseTransportConfig",
+    "BaseTransport",
+    "HITLTransportProtocol",
+    "EmailConfig",
+    "SMSConfig",
+    "SlackConfig",
+    "TeamsConfig",
+    "GitHubConfig",
+    "GitLabConfig",
+    "JiraConfig",
+    "PagerDutyConfig",
+    "TerraformCloudConfig",
+    "CustomHookConfig",
+    "EmailTransport",
+    "SMSTransport",
+    "SlackTransport",
+    "GitHubPRTransport",
+    "GitHubCheckTransport",
+    "CustomHookTransport",
+    "register_transport",
+    "get_transport",
+    "list_available_transports",
 ]
