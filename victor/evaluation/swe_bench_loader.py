@@ -653,10 +653,10 @@ class SWEBenchWorkspaceManager:
         victor_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Run indexer on the repo
+            # Run indexer on the repo with embeddings enabled for semantic search
             from victor.coding.codebase.indexer import CodebaseIndex
 
-            indexer = CodebaseIndex(cache_path)
+            indexer = CodebaseIndex(cache_path, use_embeddings=True)
             await indexer.index_codebase()
 
             # Mark as indexed
