@@ -139,8 +139,7 @@ class TestBenchmarkHelp:
 
 
 @pytest.mark.skipif(
-    not is_ollama_available(),
-    reason="Ollama not available - skipping benchmark execution tests"
+    not is_ollama_available(), reason="Ollama not available - skipping benchmark execution tests"
 )
 class TestBenchmarkExecution:
     """Integration tests for actually running benchmarks.
@@ -154,16 +153,20 @@ class TestBenchmarkExecution:
         # Use default profile which should use Ollama if available
         result = runner.invoke(
             benchmark_app,
-            ["run", "humaneval", "--max-tasks", "1", "--timeout", "60", "--profile", "default"]
+            ["run", "humaneval", "--max-tasks", "1", "--timeout", "60", "--profile", "default"],
         )
         # Should start running or fail gracefully if model unavailable
         # We don't assert success since the model might not be loaded
-        assert "HumanEval" in result.stdout or "humaneval" in result.stdout or result.exit_code in (0, 1)
+        assert (
+            "HumanEval" in result.stdout
+            or "humaneval" in result.stdout
+            or result.exit_code in (0, 1)
+        )
 
     def test_run_mbpp_with_ollama(self):
         """Test running MBPP with Ollama (limited tasks)."""
         result = runner.invoke(
             benchmark_app,
-            ["run", "mbpp", "--max-tasks", "1", "--timeout", "60", "--profile", "default"]
+            ["run", "mbpp", "--max-tasks", "1", "--timeout", "60", "--profile", "default"],
         )
         assert "MBPP" in result.stdout or "mbpp" in result.stdout or result.exit_code in (0, 1)

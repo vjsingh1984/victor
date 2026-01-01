@@ -507,11 +507,7 @@ class TestConvenienceFunctions:
 
     def test_compile_yaml_workflow(self):
         """Test compile_yaml_workflow function."""
-        workflow = (
-            WorkflowBuilder("test")
-            .add_transform("step", lambda ctx: ctx)
-            .build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
 
         compiled = compile_yaml_workflow(workflow)
         assert compiled is not None
@@ -520,9 +516,7 @@ class TestConvenienceFunctions:
     async def test_execute_yaml_workflow(self):
         """Test execute_yaml_workflow function."""
         workflow = (
-            WorkflowBuilder("test")
-            .add_transform("step", lambda ctx: {**ctx, "done": True})
-            .build()
+            WorkflowBuilder("test").add_transform("step", lambda ctx: {**ctx, "done": True}).build()
         )
 
         result = await execute_yaml_workflow(

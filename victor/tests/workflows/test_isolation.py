@@ -35,6 +35,7 @@ from unittest.mock import MagicMock, patch
 @dataclass
 class IsolationConfig:
     """Test isolation configuration."""
+
     sandbox_type: Literal["none", "process", "docker"] = "none"
     network_allowed: bool = True
     filesystem_readonly: bool = False
@@ -51,8 +52,9 @@ class TestIsolationMapper:
             expected_verticals = ["coding", "research", "devops", "dataanalysis", "rag"]
 
             for vertical in expected_verticals:
-                assert vertical in IsolationMapper.VERTICAL_DEFAULTS, \
-                    f"Missing default for vertical: {vertical}"
+                assert (
+                    vertical in IsolationMapper.VERTICAL_DEFAULTS
+                ), f"Missing default for vertical: {vertical}"
         except ImportError:
             pytest.skip("IsolationMapper not available")
 
@@ -205,7 +207,7 @@ class TestExecutorIsolationIntegration:
 
             # Mock orchestrator
             orchestrator = MagicMock()
-            executor = WorkflowExecutor(orchestrator)
+            WorkflowExecutor(orchestrator)
 
             # Check that devops vertical would use docker
             config = IsolationMapper.VERTICAL_DEFAULTS.get("devops")

@@ -195,12 +195,8 @@ class TestStreamingToolAdapter:
     async def test_execute_streaming_multiple_tools(self, mock_pipeline):
         """Test streaming multiple tool calls."""
         mock_results = [
-            MockToolCallResult(
-                tool_name="tool1", arguments={}, success=True, result="Result 1"
-            ),
-            MockToolCallResult(
-                tool_name="tool2", arguments={}, success=True, result="Result 2"
-            ),
+            MockToolCallResult(tool_name="tool1", arguments={}, success=True, result="Result 1"),
+            MockToolCallResult(tool_name="tool2", arguments={}, success=True, result="Result 2"),
         ]
 
         # Mock to return results one at a time (called twice)

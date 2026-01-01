@@ -292,9 +292,7 @@ class TestMLTrainingHandler:
             },
             output_key="model_result",
         )
-        context = MockWorkflowContext(
-            {"X": [[1, 2], [3, 4], [5, 6]], "y": [1, 2, 3]}
-        )
+        context = MockWorkflowContext({"X": [[1, 2], [3, 4], [5, 6]], "y": [1, 2, 3]})
 
         result = await handler(node, context, mock_registry)
 

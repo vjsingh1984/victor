@@ -48,8 +48,7 @@ def requires_ollama():
             ...
     """
     return pytest.mark.skipif(
-        not is_ollama_available(),
-        reason="Ollama server not available at localhost:11434"
+        not is_ollama_available(), reason="Ollama server not available at localhost:11434"
     )
 
 

@@ -220,7 +220,7 @@ workflows:
         wf = workflows["batch_test"]
 
         # batch_config may be stored in metadata or as separate attribute
-        if hasattr(wf, 'batch_config') and wf.batch_config is not None:
+        if hasattr(wf, "batch_config") and wf.batch_config is not None:
             assert wf.batch_config.batch_size == 10
             assert wf.batch_config.max_concurrent == 5
         else:
@@ -254,7 +254,7 @@ workflows:
         wf = workflows["temporal_test"]
 
         # temporal_context may be stored in metadata or as separate attribute
-        if hasattr(wf, 'temporal_context') and wf.temporal_context is not None:
+        if hasattr(wf, "temporal_context") and wf.temporal_context is not None:
             assert wf.temporal_context.lookback_periods == 8
         else:
             # Check if stored in metadata
@@ -384,7 +384,7 @@ workflows:
         node = wf.nodes["agent_node"]
         if node.llm_config is not None:
             # llm_config may be a dict or LLMConfig object
-            if hasattr(node.llm_config, 'temperature'):
+            if hasattr(node.llm_config, "temperature"):
                 assert node.llm_config.temperature == 0.3
             elif isinstance(node.llm_config, dict):
                 assert node.llm_config.get("temperature") == 0.3
@@ -419,7 +419,13 @@ workflows:
         # Workflow without nodes should be skipped
         workflows = load_workflow_from_yaml(yaml_content)
         # Empty workflow should not be included
-        assert "empty_workflow" not in workflows or len(workflows.get("empty_workflow", {}).nodes if "empty_workflow" in workflows else {}) == 0
+        assert (
+            "empty_workflow" not in workflows
+            or len(
+                workflows.get("empty_workflow", {}).nodes if "empty_workflow" in workflows else {}
+            )
+            == 0
+        )
 
     def test_invalid_node_type(self):
         """Test error for invalid node type."""
@@ -506,7 +512,8 @@ class TestDirectoryLoading:
         """Test loading all YAML files from a directory."""
         # Create test YAML file
         yaml_file = tmp_path / "test_workflow.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   dir_workflow:
     description: "Directory test"
@@ -516,7 +523,8 @@ workflows:
         role: tester
         goal: "Test loading"
         tool_budget: 5
-""")
+"""
+        )
         from victor.workflows.yaml_loader import load_workflows_from_directory
 
         workflows = load_workflows_from_directory(tmp_path)
@@ -527,7 +535,8 @@ workflows:
         """Test that non-YAML files are skipped."""
         # Create YAML and non-YAML files
         yaml_file = tmp_path / "valid.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   valid_workflow:
     description: "Valid"
@@ -537,7 +546,8 @@ workflows:
         role: test
         goal: "Test"
         tool_budget: 1
-""")
+"""
+        )
 
         txt_file = tmp_path / "readme.txt"
         txt_file.write_text("This is not a workflow file")

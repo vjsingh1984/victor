@@ -27,7 +27,13 @@ from victor.evaluation.benchmarks.framework_comparison import (
     create_comparison_report,
     get_published_result,
 )
-from victor.evaluation.protocol import BenchmarkType, EvaluationConfig, EvaluationResult, TaskResult, TaskStatus
+from victor.evaluation.protocol import (
+    BenchmarkType,
+    EvaluationConfig,
+    EvaluationResult,
+    TaskResult,
+    TaskStatus,
+)
 
 
 class TestFramework:
@@ -87,7 +93,12 @@ class TestFrameworkCapabilities:
 
     def test_all_frameworks_have_capabilities(self):
         """Test that all frameworks have defined capabilities."""
-        for framework in [Framework.VICTOR, Framework.AIDER, Framework.CLAUDE_CODE, Framework.CURSOR]:
+        for framework in [
+            Framework.VICTOR,
+            Framework.AIDER,
+            Framework.CLAUDE_CODE,
+            Framework.CURSOR,
+        ]:
             assert framework in FRAMEWORK_CAPABILITIES
 
 
@@ -175,9 +186,30 @@ class TestComputeMetrics:
             model="test-model",
         )
         task_results = [
-            TaskResult(task_id="1", status=TaskStatus.PASSED, tests_passed=5, tests_total=5, duration_seconds=1.0, tokens_used=100),
-            TaskResult(task_id="2", status=TaskStatus.PASSED, tests_passed=3, tests_total=3, duration_seconds=2.0, tokens_used=150),
-            TaskResult(task_id="3", status=TaskStatus.FAILED, tests_passed=1, tests_total=5, duration_seconds=1.5, tokens_used=120),
+            TaskResult(
+                task_id="1",
+                status=TaskStatus.PASSED,
+                tests_passed=5,
+                tests_total=5,
+                duration_seconds=1.0,
+                tokens_used=100,
+            ),
+            TaskResult(
+                task_id="2",
+                status=TaskStatus.PASSED,
+                tests_passed=3,
+                tests_total=3,
+                duration_seconds=2.0,
+                tokens_used=150,
+            ),
+            TaskResult(
+                task_id="3",
+                status=TaskStatus.FAILED,
+                tests_passed=1,
+                tests_total=5,
+                duration_seconds=1.5,
+                tokens_used=120,
+            ),
         ]
         result = EvaluationResult(config=config)
         result._task_results = task_results
@@ -271,6 +303,7 @@ class TestComparisonReport:
     def test_to_json(self):
         """Test exporting report as JSON."""
         import json
+
         report = ComparisonReport(
             benchmark=BenchmarkType.SWE_BENCH,
             results=[
@@ -311,6 +344,8 @@ class TestCreateComparisonReport:
             model="claude-3-sonnet",
         )
         victor_result = EvaluationResult(config=config)
-        report = create_comparison_report(BenchmarkType.SWE_BENCH, victor_result, include_published=False)
+        report = create_comparison_report(
+            BenchmarkType.SWE_BENCH, victor_result, include_published=False
+        )
         assert len(report.results) == 1
         assert report.results[0].framework == Framework.VICTOR

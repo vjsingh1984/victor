@@ -172,14 +172,10 @@ class TestStateGraphExecutor:
     @pytest.mark.asyncio
     async def test_execute_with_checkpointing(self):
         """Test execution with checkpointing enabled."""
-        executor = StateGraphExecutor(
-            config=ExecutorConfig(enable_checkpointing=True)
-        )
+        executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
 
         workflow = (
-            WorkflowBuilder("test")
-            .add_transform("step", lambda ctx: {**ctx, "done": True})
-            .build()
+            WorkflowBuilder("test").add_transform("step", lambda ctx: {**ctx, "done": True}).build()
         )
 
         result = await executor.execute(
@@ -204,11 +200,7 @@ class TestStateGraphExecutor:
         def failing_transform(ctx):
             raise ValueError("Intentional failure")
 
-        workflow = (
-            WorkflowBuilder("failing")
-            .add_transform("fail", failing_transform)
-            .build()
-        )
+        workflow = WorkflowBuilder("failing").add_transform("fail", failing_transform).build()
 
         result = await executor.execute(workflow, {})
 
