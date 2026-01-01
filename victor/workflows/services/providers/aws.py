@@ -394,9 +394,7 @@ class AWSServiceProvider(BaseServiceProvider):
                     f"redis://:{password}@{handle.host}:{endpoint['Port']}/0"
                 )
             else:
-                handle.connection_info["REDIS_URL"] = (
-                    f"redis://{handle.host}:{endpoint['Port']}/0"
-                )
+                handle.connection_info["REDIS_URL"] = f"redis://{handle.host}:{endpoint['Port']}/0"
             handle.connection_info["REDIS_HOST"] = handle.host
             handle.connection_info["REDIS_PORT"] = str(endpoint["Port"])
 
@@ -428,9 +426,7 @@ class AWSServiceProvider(BaseServiceProvider):
             ],
         }
 
-        await loop.run_in_executor(
-            None, lambda: elasticache.create_cache_cluster(**params)
-        )
+        await loop.run_in_executor(None, lambda: elasticache.create_cache_cluster(**params))
 
         # Wait for cluster to be available
         await self._wait_for_elasticache_available(elasticache, cluster_id)

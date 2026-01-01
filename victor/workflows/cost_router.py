@@ -320,7 +320,7 @@ class CostAwareRouter:
 
         reason = f"Selected {best.name} (tier={best.cost_tier.name})"
         if preferred_provider and best.provider == preferred_provider:
-            reason += f", preferred provider match"
+            reason += ", preferred provider match"
         if task_hint:
             reason += f", task={task_hint}"
 

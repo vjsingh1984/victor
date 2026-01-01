@@ -167,13 +167,9 @@ class SandboxedExecutor:
                     command, isolation, working_dir, env, input_data
                 )
         elif isolation.sandbox_type == "process":
-            result = await self._execute_process(
-                command, isolation, working_dir, env, input_data
-            )
+            result = await self._execute_process(command, isolation, working_dir, env, input_data)
         else:
-            result = await self._execute_inline(
-                command, isolation, working_dir, env, input_data
-            )
+            result = await self._execute_inline(command, isolation, working_dir, env, input_data)
 
         result.duration_seconds = time.time() - start_time
         return result
@@ -208,7 +204,9 @@ class SandboxedExecutor:
                 env={**os.environ, **(env or {})},
             )
 
-            timeout = isolation.resource_limits.timeout_seconds if isolation.resource_limits else 60.0
+            timeout = (
+                isolation.resource_limits.timeout_seconds if isolation.resource_limits else 60.0
+            )
 
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(input_data.encode() if input_data else None),
@@ -297,7 +295,11 @@ class SandboxedExecutor:
             return ExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace") if stdout else "",
-                error=stderr.decode("utf-8", errors="replace") if stderr and process.returncode != 0 else "",
+                error=(
+                    stderr.decode("utf-8", errors="replace")
+                    if stderr and process.returncode != 0
+                    else ""
+                ),
                 exit_code=process.returncode or 0,
                 sandbox_type="process",
             )
@@ -343,11 +345,16 @@ class SandboxedExecutor:
         docker_cmd = ["docker", "run", "--rm"]
 
         # Resource limits
-        docker_cmd.extend([
-            "--memory", f"{limits.max_memory_mb}m",
-            "--cpus", "1.0",
-            "--pids-limit", str(limits.max_processes),
-        ])
+        docker_cmd.extend(
+            [
+                "--memory",
+                f"{limits.max_memory_mb}m",
+                "--cpus",
+                "1.0",
+                "--pids-limit",
+                str(limits.max_processes),
+            ]
+        )
 
         # Network settings
         if not isolation.network_allowed:

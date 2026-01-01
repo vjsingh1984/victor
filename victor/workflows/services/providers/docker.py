@@ -84,9 +84,7 @@ class DockerServiceProvider(BaseServiceProvider):
             label_prefix: Label prefix for identifying managed containers
         """
         if not DOCKER_AVAILABLE:
-            raise ImportError(
-                "Docker SDK not available. Install with: pip install docker"
-            )
+            raise ImportError("Docker SDK not available. Install with: pip install docker")
 
         self._docker_host = docker_host
         self._network_name = network_name
@@ -212,9 +210,7 @@ class DockerServiceProvider(BaseServiceProvider):
                 await loop.run_in_executor(None, self.client.images.get, config.image)
             except ImageNotFound:
                 logger.info(f"Pulling image: {config.image}")
-                await loop.run_in_executor(
-                    None, self.client.images.pull, config.image
-                )
+                await loop.run_in_executor(None, self.client.images.pull, config.image)
 
             # Build container config
             container_config = self._build_container_config(config, handle)
@@ -242,13 +238,9 @@ class DockerServiceProvider(BaseServiceProvider):
             # Get container IP if on custom network
             networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
             if self._network_name in networks:
-                handle.metadata["container_ip"] = networks[self._network_name].get(
-                    "IPAddress"
-                )
+                handle.metadata["container_ip"] = networks[self._network_name].get("IPAddress")
 
-            logger.info(
-                f"Started container {handle.container_id[:12]} for '{config.name}'"
-            )
+            logger.info(f"Started container {handle.container_id[:12]} for '{config.name}'")
             return handle
 
         except (APIError, ContainerError, ImageNotFound) as e:
@@ -271,8 +263,7 @@ class DockerServiceProvider(BaseServiceProvider):
             )
 
             logger.debug(
-                f"Stopping container {handle.container_id[:12]} "
-                f"(grace={grace_period}s)"
+                f"Stopping container {handle.container_id[:12]} " f"(grace={grace_period}s)"
             )
 
             await loop.run_in_executor(

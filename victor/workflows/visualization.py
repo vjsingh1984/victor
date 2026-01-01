@@ -101,6 +101,7 @@ def _detect_best_backend() -> "RenderBackend":
     try:
         import matplotlib
         import networkx
+
         return RenderBackend.MATPLOTLIB
     except ImportError:
         pass
@@ -162,7 +163,7 @@ NODE_STYLES: Dict[str, NodeStyle] = {
         border="normal",
     ),
     "ConditionNode": NodeStyle(
-        shape="{{}}", # diamond
+        shape="{{}}",  # diamond
         color="#FFF3E0",  # light orange
         icon="?",
         border="normal",
@@ -254,7 +255,9 @@ class WorkflowVisualizer:
             description = None
 
             if isinstance(node, AgentNode):
-                description = node.goal[:50] + "..." if node.goal and len(node.goal) > 50 else node.goal
+                description = (
+                    node.goal[:50] + "..." if node.goal and len(node.goal) > 50 else node.goal
+                )
             elif hasattr(node, "description"):
                 desc = getattr(node, "description", None)
                 if desc:
@@ -360,7 +363,7 @@ class WorkflowVisualizer:
                 lines.append(f"{indent}+{'-' * box_width}+")
                 lines.append(f"{indent}| {label:<{box_width-2}} |")
                 if node.description:
-                    desc = node.description[:box_width-4]
+                    desc = node.description[: box_width - 4]
                     lines.append(f"{indent}| {desc:<{box_width-2}} |")
                 lines.append(f"{indent}+{'-' * box_width}+")
 
@@ -537,32 +540,32 @@ class WorkflowVisualizer:
         # Define styles
         lines.append("classes: {")
         lines.append("  agent: {")
-        lines.append("    style.fill: \"#E3F2FD\"")
-        lines.append("    style.stroke: \"#1976D2\"")
+        lines.append('    style.fill: "#E3F2FD"')
+        lines.append('    style.stroke: "#1976D2"')
         lines.append("    style.border-radius: 8")
         lines.append("  }")
         lines.append("  compute: {")
-        lines.append("    style.fill: \"#E8F5E9\"")
-        lines.append("    style.stroke: \"#388E3C\"")
+        lines.append('    style.fill: "#E8F5E9"')
+        lines.append('    style.stroke: "#388E3C"')
         lines.append("  }")
         lines.append("  condition: {")
-        lines.append("    style.fill: \"#FFF3E0\"")
-        lines.append("    style.stroke: \"#F57C00\"")
+        lines.append('    style.fill: "#FFF3E0"')
+        lines.append('    style.stroke: "#F57C00"')
         lines.append("    shape: diamond")
         lines.append("  }")
         lines.append("  parallel: {")
-        lines.append("    style.fill: \"#F3E5F5\"")
-        lines.append("    style.stroke: \"#7B1FA2\"")
+        lines.append('    style.fill: "#F3E5F5"')
+        lines.append('    style.stroke: "#7B1FA2"')
         lines.append("    style.double-border: true")
         lines.append("  }")
         lines.append("  hitl: {")
-        lines.append("    style.fill: \"#FFEBEE\"")
-        lines.append("    style.stroke: \"#D32F2F\"")
+        lines.append('    style.fill: "#FFEBEE"')
+        lines.append('    style.stroke: "#D32F2F"')
         lines.append("    shape: oval")
         lines.append("  }")
         lines.append("  transform: {")
-        lines.append("    style.fill: \"#ECEFF1\"")
-        lines.append("    style.stroke: \"#607D8B\"")
+        lines.append('    style.fill: "#ECEFF1"')
+        lines.append('    style.stroke: "#607D8B"')
         lines.append("  }")
         lines.append("}")
         lines.append("")
@@ -576,7 +579,7 @@ class WorkflowVisualizer:
             lines.append(f"{node.id}: {label} {{")
             lines.append(f"  class: {node_class}")
             if node.description:
-                lines.append(f"  tooltip: \"{node.description}\"")
+                lines.append(f'  tooltip: "{node.description}"')
             lines.append("}")
 
         lines.append("")
@@ -636,7 +639,7 @@ class WorkflowVisualizer:
 
             extra = ""
             if node.node_type == "AgentNode":
-                extra = ", style=\"rounded,filled\""
+                extra = ', style="rounded,filled"'
             elif node.node_type == "ParallelNode":
                 extra = ", peripheries=2, style=filled"
             else:
@@ -777,15 +780,14 @@ class WorkflowVisualizer:
             return svg_content
 
         except URLError as e:
-            raise RuntimeError(
-                f"Kroki API error: {e}. Check network or use local backend."
-            )
+            raise RuntimeError(f"Kroki API error: {e}. Check network or use local backend.")
 
     def _to_svg_matplotlib(self, output_path: Optional[str] = None) -> str:
         """Render SVG using matplotlib and networkx."""
         import io
 
         import matplotlib
+
         matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt
         import networkx as nx
@@ -1047,6 +1049,7 @@ def _has_matplotlib() -> bool:
     try:
         import matplotlib
         import networkx
+
         return True
     except ImportError:
         return False

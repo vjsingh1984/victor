@@ -211,9 +211,7 @@ class ServiceRegistry:
         # Get provider
         provider = self._providers.get(config.provider)
         if not provider:
-            raise ServiceError(
-                name, f"No provider registered for type: {config.provider}"
-            )
+            raise ServiceError(name, f"No provider registered for type: {config.provider}")
 
         entry.provider = provider
 
@@ -317,7 +315,7 @@ class ServiceRegistry:
             ServiceDependencyError: If circular dependency detected
         """
         # Build dependency graph
-        in_degree: Dict[str, int] = {name: 0 for name in self._services}
+        in_degree: Dict[str, int] = dict.fromkeys(self._services, 0)
         dependents: Dict[str, List[str]] = defaultdict(list)
 
         for name, entry in self._services.items():
@@ -339,9 +337,7 @@ class ServiceRegistry:
 
         while queue:
             # Pop in startup_order priority
-            queue.sort(
-                key=lambda n: self._services[n].config.lifecycle.startup_order
-            )
+            queue.sort(key=lambda n: self._services[n].config.lifecycle.startup_order)
             current = queue.pop(0)
             result.append(current)
 
@@ -353,9 +349,7 @@ class ServiceRegistry:
         if len(result) != len(self._services):
             # Circular dependency
             remaining = set(self._services.keys()) - set(result)
-            raise ServiceDependencyError(
-                list(remaining)[0], "Circular dependency detected"
-            )
+            raise ServiceDependencyError(list(remaining)[0], "Circular dependency detected")
 
         return result
 

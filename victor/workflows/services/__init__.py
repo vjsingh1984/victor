@@ -147,34 +147,40 @@ from victor.workflows.services.credentials import (
     get_credential_manager,
 )
 
+
 # Providers (lazy import to avoid heavy dependencies)
 def get_docker_provider(**kwargs):
     """Get Docker service provider."""
     from victor.workflows.services.providers.docker import DockerServiceProvider
+
     return DockerServiceProvider(**kwargs)
 
 
 def get_kubernetes_provider(**kwargs):
     """Get Kubernetes service provider."""
     from victor.workflows.services.providers.kubernetes import KubernetesServiceProvider
+
     return KubernetesServiceProvider(**kwargs)
 
 
 def get_local_provider(**kwargs):
     """Get local process provider."""
     from victor.workflows.services.providers.local import LocalProcessProvider
+
     return LocalProcessProvider(**kwargs)
 
 
 def get_external_provider(**kwargs):
     """Get external service provider."""
     from victor.workflows.services.providers.external import ExternalServiceProvider
+
     return ExternalServiceProvider(**kwargs)
 
 
 def get_aws_provider(**kwargs):
     """Get AWS service provider."""
     from victor.workflows.services.providers.aws import AWSServiceProvider
+
     return AWSServiceProvider(**kwargs)
 
 
@@ -189,30 +195,35 @@ def create_default_registry() -> ServiceRegistry:
     # Register providers (will fail gracefully if deps missing)
     try:
         from victor.workflows.services.providers.docker import DockerServiceProvider
+
         registry.register_provider("docker", DockerServiceProvider())
     except ImportError:
         pass
 
     try:
         from victor.workflows.services.providers.local import LocalProcessProvider
+
         registry.register_provider("local", LocalProcessProvider())
     except ImportError:
         pass
 
     try:
         from victor.workflows.services.providers.external import ExternalServiceProvider
+
         registry.register_provider("external", ExternalServiceProvider())
     except ImportError:
         pass
 
     try:
         from victor.workflows.services.providers.kubernetes import KubernetesServiceProvider
+
         registry.register_provider("kubernetes", KubernetesServiceProvider())
     except ImportError:
         pass
 
     try:
         from victor.workflows.services.providers.aws import AWSServiceProvider
+
         registry.register_provider("aws_rds", AWSServiceProvider())
         registry.register_provider("aws_elasticache", AWSServiceProvider())
         registry.register_provider("aws_msk", AWSServiceProvider())

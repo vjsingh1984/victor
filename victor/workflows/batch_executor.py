@@ -371,8 +371,7 @@ class BatchWorkflowExecutor(Generic[T]):
 
         # Initialize results
         item_results: List[BatchItemResult[T]] = [
-            BatchItemResult(input=inp, status=ItemStatus.PENDING)
-            for inp in inputs
+            BatchItemResult(input=inp, status=ItemStatus.PENDING) for inp in inputs
         ]
 
         retry_queue: List[int] = []  # Indices of items to retry
@@ -489,6 +488,7 @@ class BatchWorkflowExecutor(Generic[T]):
             on_progress: Progress callback
             retry_queue: Queue for items to retry later
         """
+
         async def execute_item(idx: int) -> None:
             async with semaphore:
                 if self._cancelled:
@@ -502,7 +502,11 @@ class BatchWorkflowExecutor(Generic[T]):
                     # Execute workflow with this input
                     result = await self.workflow_executor.execute(
                         workflow,
-                        initial_context=dict(item_result.input) if isinstance(item_result.input, dict) else {"input": item_result.input},
+                        initial_context=(
+                            dict(item_result.input)
+                            if isinstance(item_result.input, dict)
+                            else {"input": item_result.input}
+                        ),
                         timeout=config.timeout_per_item,
                     )
 
@@ -642,7 +646,7 @@ class BatchWorkflowExecutor(Generic[T]):
             if self._cancelled:
                 break
 
-            batch = retry_indices[i:i + batch_size]
+            batch = retry_indices[i : i + batch_size]
 
             # Apply backoff delay for exponential strategy
             if config.retry_strategy == RetryStrategy.EXPONENTIAL_BACKOFF:

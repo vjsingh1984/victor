@@ -76,23 +76,22 @@ SandboxType = Literal["none", "process", "docker"]
 ExecutionLocality = Literal["local", "remote"]
 
 LocalTarget = Literal[
-    "inline",           # Direct process execution (fastest)
-    "subprocess",       # OS subprocess with rlimit
-    "docker",           # Local Docker container
-    "kubernetes",       # Local K8s (minikube, kind)
+    "inline",  # Direct process execution (fastest)
+    "subprocess",  # OS subprocess with rlimit
+    "docker",  # Local Docker container
+    "kubernetes",  # Local K8s (minikube, kind)
 ]
 
 RemoteTarget = Literal[
-    "docker",           # Remote Docker daemon
-    "kubernetes",       # Generic remote K8s
-    "eks",              # AWS EKS
-    "aks",              # Azure AKS
-    "gke",              # Google GKE
-    "ecs",              # AWS ECS Fargate
-    "airflow",          # Airflow DAG trigger
-    "api",              # Generic REST API
+    "docker",  # Remote Docker daemon
+    "kubernetes",  # Generic remote K8s
+    "eks",  # AWS EKS
+    "aks",  # Azure AKS
+    "gke",  # Google GKE
+    "ecs",  # AWS ECS Fargate
+    "airflow",  # Airflow DAG trigger
+    "api",  # Generic REST API
 ]
-
 
 
 @dataclass
@@ -463,9 +462,7 @@ class IsolationConfig:
             "sandbox_type": self.sandbox_type,
             "network_allowed": self.network_allowed,
             "filesystem_readonly": self.filesystem_readonly,
-            "resource_limits": (
-                self.resource_limits.to_dict() if self.resource_limits else None
-            ),
+            "resource_limits": (self.resource_limits.to_dict() if self.resource_limits else None),
             "working_directory": self.working_directory,
             "environment": self.environment,
             "docker_image": self.docker_image,
@@ -475,9 +472,7 @@ class IsolationConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "IsolationConfig":
         resource_data = data.get("resource_limits")
-        resource_limits = (
-            ResourceLimits.from_dict(resource_data) if resource_data else None
-        )
+        resource_limits = ResourceLimits.from_dict(resource_data) if resource_data else None
 
         return cls(
             sandbox_type=data.get("sandbox_type", "none"),
@@ -592,7 +587,7 @@ class IsolationMapper:
             sandbox_type = "none"  # No external dependencies
             network_allowed = False
             filesystem_readonly = True
-            logger.debug(f"AirgappedConstraints: sandbox=none, network=off")
+            logger.debug("AirgappedConstraints: sandbox=none, network=off")
 
         # ComputeOnlyConstraints: Process isolation, no LLM
         elif isinstance(constraints, ComputeOnlyConstraints):
@@ -610,7 +605,7 @@ class IsolationMapper:
                 max_memory_mb=2048,
                 timeout_seconds=constraints.timeout,
             )
-            logger.debug(f"FullAccessConstraints: sandbox=docker, full access")
+            logger.debug("FullAccessConstraints: sandbox=docker, full access")
 
         # Standard constraints: Apply specific settings
         else:

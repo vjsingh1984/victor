@@ -457,7 +457,8 @@ class SQLiteHITLStore:
         """Initialize database schema."""
         conn = self._get_connection()
         try:
-            conn.execute(f"""
+            conn.execute(
+                f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
                     id TEXT PRIMARY KEY,
                     workflow_id TEXT,
@@ -476,15 +477,20 @@ class SQLiteHITLStore:
                     expires_at TEXT,
                     responded_at TEXT
                 )
-            """)
-            conn.execute(f"""
+            """
+            )
+            conn.execute(
+                f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_status
                 ON {self.table_name}(status)
-            """)
-            conn.execute(f"""
+            """
+            )
+            conn.execute(
+                f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_workflow
                 ON {self.table_name}(workflow_id)
-            """)
+            """
+            )
             conn.commit()
         finally:
             conn.close()
@@ -520,9 +526,11 @@ class SQLiteHITLStore:
                 value=resp_data.get("value"),
                 modifications=resp_data.get("modifications"),
                 reason=resp_data.get("reason"),
-                responded_at=datetime.fromisoformat(resp_data["responded_at"])
-                if resp_data.get("responded_at")
-                else _utc_now(),
+                responded_at=(
+                    datetime.fromisoformat(resp_data["responded_at"])
+                    if resp_data.get("responded_at")
+                    else _utc_now()
+                ),
             )
 
         return StoredRequest(
@@ -532,9 +540,7 @@ class SQLiteHITLStore:
             status=row["status"],
             response=response,
             created_at=datetime.fromisoformat(row["created_at"]),
-            expires_at=datetime.fromisoformat(row["expires_at"])
-            if row["expires_at"]
-            else None,
+            expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
         )
 
     async def store_request(
@@ -557,9 +563,7 @@ class SQLiteHITLStore:
 
         async with self._lock:
             now = _utc_now()
-            expires_at = datetime.fromtimestamp(
-                now.timestamp() + request.timeout, tz=timezone.utc
-            )
+            expires_at = datetime.fromtimestamp(now.timestamp() + request.timeout, tz=timezone.utc)
 
             conn = self._get_connection()
             try:
@@ -580,9 +584,11 @@ class SQLiteHITLStore:
                         request.prompt,
                         json.dumps(request.context),
                         json.dumps(request.choices) if request.choices else None,
-                        json.dumps(request.default_value)
-                        if request.default_value is not None
-                        else None,
+                        (
+                            json.dumps(request.default_value)
+                            if request.default_value is not None
+                            else None
+                        ),
                         request.timeout,
                         request.fallback.value,
                         "pending",
@@ -838,9 +844,7 @@ class SQLiteHITLStore:
             Number of requests cleaned up
         """
         # Keep records for 24 hours after completion
-        cutoff = datetime.fromtimestamp(
-            _utc_now().timestamp() - 86400, tz=timezone.utc
-        )
+        cutoff = datetime.fromtimestamp(_utc_now().timestamp() - 86400, tz=timezone.utc)
 
         conn = self._get_connection()
         try:
@@ -1070,9 +1074,7 @@ def create_hitl_router(
         from fastapi import APIRouter, Body, HTTPException, Header
         from fastapi.responses import HTMLResponse
     except ImportError:
-        raise ImportError(
-            "FastAPI is required for HITL API. Install with: pip install fastapi"
-        )
+        raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
 
     router = APIRouter(tags=["hitl"])
     hitl_store = store or get_global_store()
@@ -1100,9 +1102,7 @@ def create_hitl_router(
         return {"requests": [r.to_dict() for r in pending], "count": len(pending)}
 
     @router.get("/requests/{request_id}")
-    async def get_request(
-        request_id: str, authorization: Optional[str] = Header(None)
-    ):
+    async def get_request(request_id: str, authorization: Optional[str] = Header(None)):
         """Get a specific HITL request."""
         await verify_auth(authorization)
         stored = await hitl_store.get_request(request_id)
@@ -1126,9 +1126,7 @@ def create_hitl_router(
             reason=body.reason,
         )
         if not response:
-            raise HTTPException(
-                status_code=404, detail="Request not found or already processed"
-            )
+            raise HTTPException(status_code=404, detail="Request not found or already processed")
         return {"success": True, "response": response.to_dict()}
 
     @router.get("/ui", response_class=HTMLResponse)
@@ -1150,9 +1148,7 @@ def create_hitl_router(
         """Get approval history for audit purposes."""
         await verify_auth(authorization)
         if hasattr(hitl_store, "get_request_history"):
-            history = await hitl_store.get_request_history(
-                workflow_id=workflow_id, limit=limit
-            )
+            history = await hitl_store.get_request_history(workflow_id=workflow_id, limit=limit)
             return {"history": [r.to_dict() for r in history], "count": len(history)}
         return {"history": [], "count": 0, "note": "History requires SQLite store"}
 
@@ -2521,9 +2517,7 @@ def create_hitl_app(
         from fastapi import FastAPI
         from fastapi.middleware.cors import CORSMiddleware
     except ImportError:
-        raise ImportError(
-            "FastAPI is required for HITL API. Install with: pip install fastapi"
-        )
+        raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
 
     hitl_store = store or get_global_store()
 
@@ -2616,9 +2610,7 @@ async def run_hitl_server(
     try:
         import uvicorn
     except ImportError:
-        raise ImportError(
-            "uvicorn is required for HITL server. Install with: pip install uvicorn"
-        )
+        raise ImportError("uvicorn is required for HITL server. Install with: pip install uvicorn")
 
     if app is None:
         app = create_hitl_app()

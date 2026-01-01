@@ -58,6 +58,7 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -69,7 +70,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Protocol, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
@@ -560,8 +561,20 @@ class SmartCardCredentials:
         elif system == "Windows":
             # Windows uses DLLs
             candidates = [
-                str(Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "OpenSC Project" / "OpenSC" / "pkcs11" / "opensc-pkcs11.dll"),
-                str(Path(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")) / "OpenSC Project" / "OpenSC" / "pkcs11" / "opensc-pkcs11.dll"),
+                str(
+                    Path(os.environ.get("PROGRAMFILES", "C:\\Program Files"))
+                    / "OpenSC Project"
+                    / "OpenSC"
+                    / "pkcs11"
+                    / "opensc-pkcs11.dll"
+                ),
+                str(
+                    Path(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"))
+                    / "OpenSC Project"
+                    / "OpenSC"
+                    / "pkcs11"
+                    / "opensc-pkcs11.dll"
+                ),
             ]
         else:
             candidates = []
@@ -626,10 +639,14 @@ class SmartCardCredentials:
             cmd = [
                 "pkcs11-tool",
                 "--sign",
-                "--slot", str(self.slot),
-                "--pin", pin,
-                "--input-file", challenge_file,
-                "--mechanism", "SHA256-RSA-PKCS",
+                "--slot",
+                str(self.slot),
+                "--pin",
+                pin,
+                "--input-file",
+                challenge_file,
+                "--mechanism",
+                "SHA256-RSA-PKCS",
             ]
 
             if self.middleware:
@@ -877,9 +894,12 @@ class SSOAuthenticator:
 
         if self.config.use_pkce:
             import hashlib
-            code_challenge = base64.urlsafe_b64encode(
-                hashlib.sha256(code_verifier.encode()).digest()
-            ).decode().rstrip("=")
+
+            code_challenge = (
+                base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
+                .decode()
+                .rstrip("=")
+            )
             code_challenge_method = "S256"
         else:
             code_challenge = None
@@ -945,7 +965,7 @@ class SSOAuthenticator:
 
         try:
             # Open browser
-            logger.info(f"Opening browser for SSO login...")
+            logger.info("Opening browser for SSO login...")
             webbrowser.open(auth_url)
 
             # Wait for callback
@@ -1003,9 +1023,7 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.utcnow() + timedelta(
-                        seconds=result["expires_in"]
-                    )
+                    expires_at = datetime.utcnow() + timedelta(seconds=result["expires_in"])
 
                 return SSOTokens(
                     access_token=result["access_token"],
@@ -1043,9 +1061,7 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.utcnow() + timedelta(
-                        seconds=result["expires_in"]
-                    )
+                    expires_at = datetime.utcnow() + timedelta(seconds=result["expires_in"])
 
                 return SSOTokens(
                     access_token=result["access_token"],
@@ -1069,6 +1085,7 @@ class SSOAuthenticator:
             logout_url = f"{self.config.issuer_url}/oauth2/v1/logout"
 
         import urllib.parse
+
         full_url = f"{logout_url}?{urllib.parse.urlencode(params)}"
         webbrowser.open(full_url)
 
@@ -1345,9 +1362,7 @@ class SystemAuthenticator:
             # Try GSSAPI (Unix/macOS)
             import gssapi
 
-            server_name = gssapi.Name(
-                service, gssapi.NameType.hostbased_service
-            )
+            server_name = gssapi.Name(service, gssapi.NameType.hostbased_service)
 
             ctx = gssapi.SecurityContext(
                 name=server_name,
@@ -1401,9 +1416,9 @@ class SystemAuthenticator:
             import win32security
 
             if domain:
-                user = f"{domain}\\{username}"
+                pass
             else:
-                user = username
+                pass
 
             # LogonUser validates credentials
             handle = win32security.LogonUser(
@@ -1465,7 +1480,7 @@ class SystemAuthenticator:
                 import sspi
                 import sspicon
 
-                pkg_info = sspi.QuerySecurityPackageInfo("NTLM")
+                sspi.QuerySecurityPackageInfo("NTLM")
 
                 cred, _ = sspi.AcquireCredentialsHandle(
                     None, "NTLM", sspicon.SECPKG_CRED_OUTBOUND, None, None
@@ -1475,8 +1490,7 @@ class SystemAuthenticator:
                     cred,
                     None,
                     "localhost",
-                    sspicon.ISC_REQ_CONFIDENTIALITY
-                    | sspicon.ISC_REQ_REPLAY_DETECT,
+                    sspicon.ISC_REQ_CONFIDENTIALITY | sspicon.ISC_REQ_REPLAY_DETECT,
                     None,
                     sspicon.SECURITY_NATIVE_DREP,
                     None,
@@ -1606,16 +1620,14 @@ class SystemAuthenticator:
                 import win32api
 
                 username = win32api.GetUserName()
-                domain = win32api.GetDomainName()
+                win32api.GetDomainName()
 
                 groups = []
                 level = 0
                 resume = 0
 
                 while True:
-                    info, total, resume = win32net.NetUserGetLocalGroups(
-                        None, username, level
-                    )
+                    info, total, resume = win32net.NetUserGetLocalGroups(None, username, level)
                     groups.extend([g["name"] for g in info])
                     if not resume:
                         break
@@ -2001,9 +2013,7 @@ class KubernetesCredentials:
     @classmethod
     def from_default(cls) -> Optional["KubernetesCredentials"]:
         """Load from default kubeconfig."""
-        kubeconfig_path = os.environ.get(
-            "KUBECONFIG", os.path.expanduser("~/.kube/config")
-        )
+        kubeconfig_path = os.environ.get("KUBECONFIG", os.path.expanduser("~/.kube/config"))
 
         if os.path.exists(kubeconfig_path):
             return cls(
@@ -2037,10 +2047,14 @@ class DatabaseCredentials:
             return base
 
         elif self.driver == "mysql":
-            return f"mysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            return (
+                f"mysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            )
 
         elif self.driver == "mongodb":
-            return f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            return (
+                f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            )
 
         elif self.driver == "redis":
             if self.password:
@@ -2482,9 +2496,7 @@ class CredentialManager:
         self._storage_backend.set(f"docker/{creds.registry}", creds.to_dict())
 
     # Kubernetes
-    def get_kubernetes(
-        self, context: Optional[str] = None
-    ) -> Optional[KubernetesCredentials]:
+    def get_kubernetes(self, context: Optional[str] = None) -> Optional[KubernetesCredentials]:
         """Get Kubernetes credentials."""
         key = f"kubernetes/{context}" if context else "kubernetes/default"
         data = self._get_raw(key)

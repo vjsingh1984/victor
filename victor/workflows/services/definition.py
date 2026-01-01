@@ -620,8 +620,7 @@ class ServiceConfig:
             "image": self.image,
             "command": self.command,
             "ports": [
-                {"container_port": p.container_port, "host_port": p.host_port}
-                for p in self.ports
+                {"container_port": p.container_port, "host_port": p.host_port} for p in self.ports
             ],
             "environment": self.environment,
             "volumes": [
@@ -651,9 +650,7 @@ class ServiceConfig:
             volumes=data.get("volumes", []),
             working_dir=data.get("working_dir"),
             user=data.get("user"),
-            health_check=(
-                HealthCheckConfig.from_dict(health_data) if health_data else None
-            ),
+            health_check=(HealthCheckConfig.from_dict(health_data) if health_data else None),
             lifecycle=LifecycleConfig.from_dict(lifecycle_data),
             exports=data.get("exports", {}),
             labels=data.get("labels", {}),
@@ -958,9 +955,8 @@ class ServicePresets:
             image=f"redis:{version}",
             ports=[PortMapping(container_port=6379, host_port=port)],
             environment=env,
-            command=["redis-server", "--appendonly", "yes"] + (
-                ["--requirepass", password] if password else []
-            ),
+            command=["redis-server", "--appendonly", "yes"]
+            + (["--requirepass", password] if password else []),
             health_check=HealthCheckConfig.for_redis(6379),
             exports={
                 "REDIS_URL": url_template,
@@ -1021,7 +1017,7 @@ class ServicePresets:
             },
             health_check=HealthCheckConfig(
                 type=HealthCheckType.COMMAND,
-                command='mongosh --eval "db.adminCommand(\'ping\')"',
+                command="mongosh --eval \"db.adminCommand('ping')\"",
             ),
             exports={
                 "MONGODB_URL": f"mongodb://{user}:{password}@{{host}}:{{port}}/{database}",

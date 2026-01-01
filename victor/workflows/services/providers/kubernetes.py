@@ -105,9 +105,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
             label_prefix: Label prefix for managed resources
         """
         if not K8S_AVAILABLE:
-            raise ImportError(
-                "kubernetes not available. Install with: pip install kubernetes"
-            )
+            raise ImportError("kubernetes not available. Install with: pip install kubernetes")
 
         self._credentials = credentials
         self._kubeconfig_path = kubeconfig_path
@@ -123,9 +121,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
             if self._credentials.kubeconfig_content:
                 # Write to temp file
                 content = base64.b64decode(self._credentials.kubeconfig_content)
-                with tempfile.NamedTemporaryFile(
-                    mode="wb", suffix=".yaml", delete=False
-                ) as f:
+                with tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False) as f:
                     f.write(content)
                     kubeconfig_path = f.name
                 k8s_config.load_kube_config(
@@ -150,9 +146,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
                 self._api_client = client.ApiClient(configuration)
                 return
         elif self._kubeconfig_path:
-            k8s_config.load_kube_config(
-                config_file=self._kubeconfig_path, context=self._context
-            )
+            k8s_config.load_kube_config(config_file=self._kubeconfig_path, context=self._context)
         else:
             # Try in-cluster config, then default kubeconfig
             try:
@@ -216,9 +210,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
                 handle.host = endpoint["host"]
                 handle.ports = endpoint["ports"]
 
-            logger.info(
-                f"Started K8s deployment '{handle.service_id}' in namespace '{namespace}'"
-            )
+            logger.info(f"Started K8s deployment '{handle.service_id}' in namespace '{namespace}'")
             return handle
 
         except ApiException as e:
@@ -244,13 +236,8 @@ class KubernetesServiceProvider(BaseServiceProvider):
         container = client.V1Container(
             name=config.name,
             image=config.image,
-            ports=[
-                client.V1ContainerPort(container_port=pm.container_port)
-                for pm in config.ports
-            ],
-            env=[
-                client.V1EnvVar(name=k, value=v) for k, v in config.environment.items()
-            ],
+            ports=[client.V1ContainerPort(container_port=pm.container_port) for pm in config.ports],
+            env=[client.V1EnvVar(name=k, value=v) for k, v in config.environment.items()],
         )
 
         if config.command:
@@ -278,9 +265,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
                     failure_threshold=hc.retries,
                 )
                 if hc.type.value == "tcp":
-                    container.liveness_probe.tcp_socket = client.V1TCPSocketAction(
-                        port=hc.port
-                    )
+                    container.liveness_probe.tcp_socket = client.V1TCPSocketAction(port=hc.port)
                 else:
                     container.liveness_probe.http_get = client.V1HTTPGetAction(
                         path=hc.path, port=hc.port
@@ -310,9 +295,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
             ),
         )
 
-    def _build_service(
-        self, config: ServiceConfig, handle: ServiceHandle
-    ) -> client.V1Service:
+    def _build_service(self, config: ServiceConfig, handle: ServiceHandle) -> client.V1Service:
         """Build Kubernetes Service spec."""
         labels = {
             f"{self._label_prefix}/managed": "true",
@@ -378,18 +361,14 @@ class KubernetesServiceProvider(BaseServiceProvider):
                     )
                     return
 
-                logger.debug(
-                    f"Waiting for deployment '{deployment_name}': {ready}/{desired} ready"
-                )
+                logger.debug(f"Waiting for deployment '{deployment_name}': {ready}/{desired} ready")
 
             except ApiException as e:
                 logger.warning(f"Error checking deployment status: {e}")
 
             await asyncio.sleep(5)
 
-    async def _get_service_endpoint(
-        self, handle: ServiceHandle, namespace: str
-    ) -> Dict[str, Any]:
+    async def _get_service_endpoint(self, handle: ServiceHandle, namespace: str) -> Dict[str, Any]:
         """Get service endpoint (host and ports)."""
         loop = asyncio.get_event_loop()
         service_name = handle.service_id
@@ -493,9 +472,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
         except ApiException as e:
             return f"[Error getting logs: {e}]"
 
-    async def _run_command_in_service(
-        self, handle: ServiceHandle, command: str
-    ) -> Tuple[int, str]:
+    async def _run_command_in_service(self, handle: ServiceHandle, command: str) -> Tuple[int, str]:
         """Execute command in pod."""
         loop = asyncio.get_event_loop()
         namespace = handle.metadata.get("namespace", self._namespace)

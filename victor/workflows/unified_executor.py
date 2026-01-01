@@ -184,6 +184,7 @@ class StateGraphExecutor:
         """Get the default tool registry if available."""
         try:
             from victor.tools.registry import get_tool_registry
+
             return get_tool_registry()
         except Exception:
             return None
@@ -240,6 +241,7 @@ class StateGraphExecutor:
             # Override checkpointer if provided
             if checkpointer:
                 from victor.workflows.yaml_to_graph_compiler import CompilerConfig
+
                 compiler.config = CompilerConfig(
                     max_iterations=self.config.max_iterations,
                     timeout=self.config.timeout,
@@ -270,10 +272,7 @@ class StateGraphExecutor:
             result = await compiled.invoke(state, thread_id=thread_id)
 
             # Extract user state (exclude internal fields)
-            user_state = {
-                k: v for k, v in result.state.items()
-                if not k.startswith("_")
-            }
+            user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
 
             return ExecutorResult(
                 success=result.success,
@@ -333,10 +332,7 @@ class StateGraphExecutor:
         # Stream execution
         async for node_id, current_state in compiled.stream(state, thread_id=thread_id):
             # Filter internal fields for user
-            user_state = {
-                k: v for k, v in current_state.items()
-                if not k.startswith("_")
-            }
+            user_state = {k: v for k, v in current_state.items() if not k.startswith("_")}
             yield (node_id, user_state)
 
 

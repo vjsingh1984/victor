@@ -192,105 +192,190 @@ HITL_MODE_CATEGORIES: Dict[HITLMode, HITLCategory] = {
 DEPLOYMENT_HITL_COMPATIBILITY = {
     # Local targets - all modes work
     "inline": [
-        HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.CLI,
+        HITLMode.TUI,
+        HITLMode.INLINE,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "subprocess": [
-        HITLMode.CLI, HITLMode.INLINE, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.CLI,
+        HITLMode.INLINE,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "local": [
-        HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.CLI,
+        HITLMode.TUI,
+        HITLMode.INLINE,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Docker - no TTY by default, need API/webhook
     "docker": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "docker_compose": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Kubernetes - async/API-based
     "kubernetes": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.TEAMS, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "aks": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.TEAMS, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "eks": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "gke": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Serverless - must be async (can't hold connection)
     "aws_lambda": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "cloud_run": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "azure_functions": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Container services
     "ecs": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "fargate": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "azure_container": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Batch/Job services
     "aws_batch": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "azure_batch": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "cloud_batch": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Workflow orchestrators - typically have their own approval mechanisms
     "airflow": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "temporal": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "step_functions": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Data platforms
     "databricks": [
-        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     "spark": [HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],  # Batch-only typically
     "ray": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
     "dask": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
     # Task queues
     "celery": [
-        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
-        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.EMAIL,
+        HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
     ],
     # Serverless platforms
     "modal": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
@@ -580,18 +665,28 @@ class HITLExecutor:
     def _get_transport(self):
         """Get or create the transport adapter."""
         if self._transport is None and self.mode not in [
-            HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
-            HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+            HITLMode.CLI,
+            HITLMode.TUI,
+            HITLMode.INLINE,
+            HITLMode.AUTO_APPROVE,
+            HITLMode.AUTO_REJECT,
         ]:
             from victor.workflows.hitl_transports import get_transport
+
             self._transport = get_transport(self.mode, self.transport_config)
         return self._transport
 
     def _should_use_transport(self) -> bool:
         """Check if we should use transport vs handler."""
-        return self.mode not in [
-            HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
-        ] and self._get_transport() is not None
+        return (
+            self.mode
+            not in [
+                HITLMode.CLI,
+                HITLMode.TUI,
+                HITLMode.INLINE,
+            ]
+            and self._get_transport() is not None
+        )
 
     async def execute_hitl_node(
         self,

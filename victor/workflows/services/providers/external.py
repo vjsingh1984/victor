@@ -103,9 +103,7 @@ class ExternalServiceProvider(BaseServiceProvider):
         handle.state = ServiceState.STARTING
         handle.started_at = datetime.utcnow()
 
-        logger.info(
-            f"Connecting to external service '{config.name}' at {handle.host}"
-        )
+        logger.info(f"Connecting to external service '{config.name}' at {handle.host}")
 
         return handle
 
@@ -194,13 +192,9 @@ class ManagedRedisProvider(ExternalServiceProvider):
             password = config.environment.get("REDIS_PASSWORD", "")
 
             if password:
-                handle.connection_info["REDIS_URL"] = (
-                    f"redis://:{password}@{handle.host}:{port}/0"
-                )
+                handle.connection_info["REDIS_URL"] = f"redis://:{password}@{handle.host}:{port}/0"
             else:
-                handle.connection_info["REDIS_URL"] = (
-                    f"redis://{handle.host}:{port}/0"
-                )
+                handle.connection_info["REDIS_URL"] = f"redis://{handle.host}:{port}/0"
             handle.connection_info["REDIS_HOST"] = handle.host
             handle.connection_info["REDIS_PORT"] = str(port)
 

@@ -519,16 +519,12 @@ class NodeExecutorFactory:
                 # Apply join strategy
                 if node.join_strategy == "all":
                     # All must succeed
-                    all_success = all(
-                        r.get("success", False) for r in parallel_results.values()
-                    )
+                    all_success = all(r.get("success", False) for r in parallel_results.values())
                     if not all_success:
                         state["_error"] = "Not all parallel nodes succeeded"
                 elif node.join_strategy == "any":
                     # At least one must succeed
-                    any_success = any(
-                        r.get("success", False) for r in parallel_results.values()
-                    )
+                    any_success = any(r.get("success", False) for r in parallel_results.values())
                     if not any_success:
                         state["_error"] = "No parallel nodes succeeded"
                 # "merge" strategy just combines all results
@@ -843,9 +839,7 @@ class YAMLToStateGraphCompiler:
             interrupt_before=interrupt_before,
         )
 
-        logger.info(
-            f"Compiled workflow '{workflow.name}' with {len(nodes_added)} nodes"
-        )
+        logger.info(f"Compiled workflow '{workflow.name}' with {len(nodes_added)} nodes")
 
         return compiled
 
@@ -879,9 +873,7 @@ class YAMLToStateGraphCompiler:
             if child_id in workflow.nodes:
                 parallel_node_defs.append(workflow.nodes[child_id])
 
-        executors = [
-            self._executor_factory.create_executor(node) for node in parallel_node_defs
-        ]
+        executors = [self._executor_factory.create_executor(node) for node in parallel_node_defs]
 
         async def execute_parallel_group(state: WorkflowState) -> WorkflowState:
             """Execute all parallel nodes and aggregate results."""
@@ -917,10 +909,7 @@ class YAMLToStateGraphCompiler:
                 state["_node_results"] = {}
             state["_node_results"][parallel_node.id] = GraphNodeResult(
                 node_id=parallel_node.id,
-                success=all(
-                    r.get("success", False)
-                    for r in state["_parallel_results"].values()
-                ),
+                success=all(r.get("success", False) for r in state["_parallel_results"].values()),
                 output=state["_parallel_results"],
                 duration_seconds=time.time() - start_time,
             )

@@ -1184,9 +1184,7 @@ class WorkflowExecutor:
                 if constraints.allows_tool(tool_name):
                     allowed_tools.append(tool_name)
                 else:
-                    logger.warning(
-                        f"Tool '{tool_name}' blocked by constraints for node {node.id}"
-                    )
+                    logger.warning(f"Tool '{tool_name}' blocked by constraints for node {node.id}")
 
             if not allowed_tools and node.tools:
                 return NodeResult(

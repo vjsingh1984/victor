@@ -401,9 +401,7 @@ class ServiceManager:
         for config in configs:
             handler_class = self._lifecycle_handlers.get(config.service_type)
             if not handler_class:
-                logger.warning(
-                    f"No lifecycle handler for service type: {config.service_type}"
-                )
+                logger.warning(f"No lifecycle handler for service type: {config.service_type}")
                 continue
 
             handler = handler_class()

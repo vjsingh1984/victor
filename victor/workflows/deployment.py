@@ -858,11 +858,10 @@ class DockerDeploymentHandler(DeploymentHandler):
         if self._client is None:
             try:
                 import docker
+
                 self._client = docker.from_env()
             except ImportError:
-                raise RuntimeError(
-                    "docker package not installed. Install with: pip install docker"
-                )
+                raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
 
     async def prepare(
@@ -930,14 +929,16 @@ class DockerDeploymentHandler(DeploymentHandler):
 
         # Serialize state and execute via container exec
         import json
+
         state_json = json.dumps(state)
         node_id = node.id
 
         # Execute Python code in container to process the node
         exec_cmd = [
-            "python", "-c",
+            "python",
+            "-c",
             f"import json; state = json.loads('{state_json}'); "
-            f"print(json.dumps({{'node_id': '{node_id}', 'state': state}}))"
+            f"print(json.dumps({{'node_id': '{node_id}', 'state': state}}))",
         ]
 
         loop = asyncio.get_event_loop()
@@ -998,8 +999,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
                 self._core_v1 = client.CoreV1Api()
             except ImportError:
                 raise RuntimeError(
-                    "kubernetes package not installed. "
-                    "Install with: pip install kubernetes"
+                    "kubernetes package not installed. " "Install with: pip install kubernetes"
                 )
         return self._core_v1
 
@@ -1078,9 +1078,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
             loop = asyncio.get_event_loop()
             pod = await loop.run_in_executor(
                 None,
-                lambda: api.read_namespaced_pod(
-                    name=self.pod_name, namespace=self._namespace
-                ),
+                lambda: api.read_namespaced_pod(name=self.pod_name, namespace=self._namespace),
             )
 
             if pod.status.phase == "Running":
@@ -1182,9 +1180,7 @@ class ECSDeploymentHandler(DeploymentHandler):
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:
-                raise RuntimeError(
-                    "boto3 package not installed. Install with: pip install boto3"
-                )
+                raise RuntimeError("boto3 package not installed. Install with: pip install boto3")
         return self._ecs_client
 
     async def prepare(

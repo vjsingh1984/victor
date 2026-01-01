@@ -511,8 +511,7 @@ class EmailTransport(BaseTransport):
         context_html = ""
         if request.context:
             context_items = "".join(
-                f"<li><strong>{k}:</strong> {v}</li>"
-                for k, v in request.context.items()
+                f"<li><strong>{k}:</strong> {v}</li>" for k, v in request.context.items()
             )
             context_html = f"<ul>{context_items}</ul>"
 
@@ -611,62 +610,60 @@ class SlackTransport(BaseTransport):
     ) -> List[Dict]:
         """Build Slack Block Kit blocks."""
         blocks = [
-            {
-                "type": "header",
-                "text": {"type": "plain_text", "text": "🔔 Approval Required"}
-            },
+            {"type": "header", "text": {"type": "plain_text", "text": "🔔 Approval Required"}},
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Workflow:* `{workflow_id}`\n*Request:* {request.prompt}"
-                }
+                    "text": f"*Workflow:* `{workflow_id}`\n*Request:* {request.prompt}",
+                },
             },
         ]
 
         # Add context
         if request.context:
-            context_text = "\n".join(
-                f"• *{k}:* {v}" for k, v in request.context.items()
-            )
-            blocks.append({
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": context_text}
-            })
+            context_text = "\n".join(f"• *{k}:* {v}" for k, v in request.context.items())
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": context_text}})
 
         # Add action buttons
-        blocks.append({
-            "type": "actions",
-            "block_id": f"hitl_{request.request_id}",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "✓ Approve"},
-                    "style": "primary",
-                    "action_id": "approve",
-                    "value": request.request_id,
-                    "url": urls.get("approve_url"),
-                },
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "✗ Reject"},
-                    "style": "danger",
-                    "action_id": "reject",
-                    "value": request.request_id,
-                    "url": urls.get("reject_url"),
-                },
-            ]
-        })
+        blocks.append(
+            {
+                "type": "actions",
+                "block_id": f"hitl_{request.request_id}",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "✓ Approve"},
+                        "style": "primary",
+                        "action_id": "approve",
+                        "value": request.request_id,
+                        "url": urls.get("approve_url"),
+                    },
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "✗ Reject"},
+                        "style": "danger",
+                        "action_id": "reject",
+                        "value": request.request_id,
+                        "url": urls.get("reject_url"),
+                    },
+                ],
+            }
+        )
 
         # Add timeout notice
         req_id_short = request.request_id[:12]
-        blocks.append({
-            "type": "context",
-            "elements": [{
-                "type": "mrkdwn",
-                "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`"
-            }]
-        })
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
+                    }
+                ],
+            }
+        )
 
         return blocks
 
@@ -837,9 +834,7 @@ class GitHubPRTransport(BaseTransport):
         """Build PR comment body."""
         context_md = ""
         if request.context:
-            context_items = "\n".join(
-                f"- **{k}:** {v}" for k, v in request.context.items()
-            )
+            context_items = "\n".join(f"- **{k}:** {v}" for k, v in request.context.items())
             context_md = f"\n\n**Context:**\n{context_items}"
 
         return f"""
@@ -941,9 +936,7 @@ class GitHubCheckTransport(BaseTransport):
         """Build check run details markdown."""
         context_md = ""
         if request.context:
-            context_items = "\n".join(
-                f"| {k} | {v} |" for k, v in request.context.items()
-            )
+            context_items = "\n".join(f"| {k} | {v} |" for k, v in request.context.items())
             context_md = f"\n| Key | Value |\n|-----|-------|\n{context_items}\n"
 
         return f"""

@@ -394,7 +394,7 @@ class RetryBackoffHandler:
                 # Calculate backoff delay
                 if attempt < self.max_retries:
                     delay = min(
-                        self.base_delay * (self.exponential_base ** attempt),
+                        self.base_delay * (self.exponential_base**attempt),
                         self.max_delay,
                     )
                     logger.debug(
@@ -595,7 +595,7 @@ class DataTransformHandler:
         if isinstance(data, dict):
             return data
         if isinstance(data, list):
-            return {i: v for i, v in enumerate(data)}
+            return dict(enumerate(data))
         return {"value": data}
 
     def _filter_none(self, data: Any) -> Any:
