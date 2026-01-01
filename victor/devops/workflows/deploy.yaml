@@ -233,7 +233,7 @@ workflows:
           - "Rollback"
           - "Retry"
         timeout: 600
-        fallback: rollback
+        fallback: abort
         next: [handle_health_decision]
 
       - id: handle_health_decision
