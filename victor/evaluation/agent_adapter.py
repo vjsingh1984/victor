@@ -132,11 +132,19 @@ class VictorAgentAdapter:
         # Task completion detector (uses framework's detection, not gaming code)
         self._completion_detector = TaskCompletionDetector()
 
-        # Hook into tool execution
+        # Hook into tool execution - must update BOTH orchestrator AND ToolPipeline
+        # The ToolPipeline receives a copy of the callback at init time, so we need
+        # to update it directly for our hooks to receive tool call events
         self._original_tool_start = orchestrator._on_tool_start_callback
         self._original_tool_complete = orchestrator._on_tool_complete_callback
         orchestrator._on_tool_start_callback = self._on_tool_start
         orchestrator._on_tool_complete_callback = self._on_tool_complete
+
+        # CRITICAL: Also update ToolPipeline's callbacks directly
+        # Without this, tool calls are not tracked in evaluation traces
+        if hasattr(orchestrator, "_tool_pipeline") and orchestrator._tool_pipeline:
+            orchestrator._tool_pipeline.on_tool_start = self._on_tool_start
+            orchestrator._tool_pipeline.on_tool_complete = self._on_tool_complete
 
     def _on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Track tool call start."""
