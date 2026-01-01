@@ -226,6 +226,10 @@ def run_benchmark(
                     timeout=timeout,
                 )
 
+                # Create workspace manager for SWE-bench (uses caching)
+                from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+                workspace_manager = SWEBenchWorkspaceManager()
+
                 # Create a callback that returns code AND metrics for token tracking
                 async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                     """Run agent on task and return generated code with metrics.
@@ -238,23 +242,28 @@ def run_benchmark(
                     - tool_calls: Number of tool calls
                     - turns: Number of conversation turns
                     """
-                    import tempfile
-                    from pathlib import Path
+                    # Use SWEBenchWorkspaceManager for cached repo cloning
+                    # First clone goes to ~/.victor/swe_bench_cache/, subsequent runs reuse it
+                    workspace = await workspace_manager.setup_workspace(
+                        benchmark_task,
+                        use_cache=True,
+                    )
 
-                    # Create temp workspace for the task
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        workspace = Path(tmpdir)
-                        trace = await adapter.execute_task(benchmark_task, workspace)
+                    # Agent works in workspace/repo where the cloned code is
+                    repo_dir = workspace / "repo"
+                    work_dir = repo_dir if repo_dir.exists() else workspace
 
-                        # Return code with metrics for harness to populate TaskResult
-                        return {
-                            "code": trace.generated_patch or trace.generated_code or "",
-                            "tokens_input": trace.token_usage.input_tokens,
-                            "tokens_output": trace.token_usage.output_tokens,
-                            "tokens_used": trace.token_usage.total_tokens,
-                            "tool_calls": len(trace.tool_calls),
-                            "turns": trace.turns,
-                        }
+                    trace = await adapter.execute_task(benchmark_task, work_dir)
+
+                    # Return code with metrics for harness to populate TaskResult
+                    return {
+                        "code": trace.generated_patch or trace.generated_code or "",
+                        "tokens_input": trace.token_usage.input_tokens,
+                        "tokens_output": trace.token_usage.output_tokens,
+                        "tokens_used": trace.token_usage.total_tokens,
+                        "tool_calls": len(trace.tool_calls),
+                        "turns": trace.turns,
+                    }
 
             except Exception as e:
                 console.print(f"[red]Error initializing agent:[/] {e}")
