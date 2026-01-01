@@ -82,8 +82,9 @@ def get_hidden_imports() -> list[str]:
     return [
         # Victor modules
         "victor",
-        "victor.api",
-        "victor.api.server",
+        "victor.ui",
+        "victor.ui.cli",
+        "victor.ui.commands",
         "victor.agent",
         "victor.agent.orchestrator",
         "victor.agent.tool_executor",
@@ -110,6 +111,9 @@ def get_hidden_imports() -> list[str]:
         "victor.mcp.server",
         "victor.config",
         "victor.config.settings",
+        "victor.evaluation",
+        "victor.evaluation.benchmarks",
+        "victor.evaluation.protocol",
         # Dependencies
         "aiohttp",
         "aiohttp.web",
@@ -214,8 +218,8 @@ def build_binary(
     for exclude in excludes:
         cmd.extend(["--exclude-module", exclude])
 
-    # Entry point
-    cmd.append("victor/api/server.py")
+    # Entry point - use the CLI module
+    cmd.append("victor/ui/cli.py")
 
     print("Building Victor binary...")
     print(f"Command: {' '.join(cmd)}")
