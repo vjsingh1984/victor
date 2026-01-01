@@ -1,0 +1,479 @@
+# DevOps Deployment Workflow
+# ==========================
+# Infrastructure deployment with:
+# - Pre-deployment validation
+# - Multi-environment support
+# - Rollback capabilities
+# - Health checks and monitoring
+
+workflows:
+  deploy:
+    description: "Safe deployment with validation and rollback"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Pre-Deployment Validation
+      # =====================================================================
+      - id: validate_config
+        type: compute
+        name: "Validate Configuration"
+        tools: [shell, read]
+        inputs:
+          config_path: $ctx.config_file
+          environment: $ctx.target_env
+        output: config_validation
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          timeout: 60
+        next: [check_config]
+
+      - id: check_config
+        type: condition
+        name: "Check Config Validity"
+        condition: "config_valid"
+        branches:
+          "true": check_dependencies
+          "false": fix_config
+
+      - id: fix_config
+        type: agent
+        name: "Fix Configuration Issues"
+        role: executor
+        goal: |
+          Fix the configuration issues:
+          {config_errors}
+
+          Ensure all required values are set and valid.
+        tool_budget: 15
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.1
+        output: fixed_config
+        next: [validate_config]
+
+      - id: check_dependencies
+        type: compute
+        name: "Check Dependencies"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          checks:
+            - docker_running
+            - kubectl_configured
+            - secrets_available
+            - network_reachable
+        output: dependency_check
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [verify_dependencies]
+
+      - id: verify_dependencies
+        type: condition
+        name: "Verify Dependencies"
+        condition: "all_dependencies_met"
+        branches:
+          "true": backup_current
+          "false": resolve_dependencies
+
+      - id: resolve_dependencies
+        type: hitl
+        name: "Resolve Missing Dependencies"
+        hitl_type: input
+        prompt: |
+          ## Missing Dependencies
+
+          The following dependencies are not met:
+          {missing_dependencies}
+
+          Please resolve these issues and confirm when ready.
+        context_keys:
+          - missing_dependencies
+        timeout: 1800
+        fallback: abort
+        next: [check_dependencies]
+
+      # =====================================================================
+      # Stage 2: Backup and Preparation
+      # =====================================================================
+      - id: backup_current
+        type: compute
+        name: "Backup Current Deployment"
+        tools: [shell]
+        inputs:
+          backup_type: full
+          target: $ctx.target_env
+        output: backup_info
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 300
+        next: [approval_gate]
+
+      - id: approval_gate
+        type: hitl
+        name: "Deployment Approval"
+        hitl_type: approval
+        prompt: |
+          ## Ready for Deployment
+
+          **Environment:** {target_env}
+          **Version:** {deploy_version}
+          **Changes:** {change_summary}
+
+          **Backup Created:** {backup_info}
+
+          Approve deployment?
+        context_keys:
+          - target_env
+          - deploy_version
+          - change_summary
+          - backup_info
+        timeout: 900
+        fallback: abort
+        next: [deploy]
+
+      # =====================================================================
+      # Stage 3: Deployment
+      # =====================================================================
+      - id: deploy
+        type: compute
+        name: "Execute Deployment"
+        tools: [shell]
+        inputs:
+          strategy: $ctx.deploy_strategy
+          replicas: $ctx.replica_count
+          timeout: $ctx.deploy_timeout
+        output: deploy_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          write_allowed: true
+          timeout: 600
+        next: [check_deploy]
+
+      - id: check_deploy
+        type: condition
+        name: "Check Deployment Status"
+        condition: "deploy_succeeded"
+        branches:
+          "true": health_check
+          "false": rollback
+
+      # =====================================================================
+      # Stage 4: Health Verification
+      # =====================================================================
+      - id: health_check
+        type: compute
+        name: "Run Health Checks"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          endpoints: $ctx.health_endpoints
+          expected_status: 200
+          retries: 5
+          delay: 10
+        output: health_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [verify_health]
+
+      - id: verify_health
+        type: condition
+        name: "Verify Health Status"
+        condition: "all_healthy"
+        branches:
+          "true": smoke_tests
+          "false": investigate_health
+
+      - id: investigate_health
+        type: agent
+        name: "Investigate Health Issues"
+        role: analyst
+        goal: |
+          Investigate the health check failures:
+          {health_failures}
+
+          Determine:
+          1. Root cause of failures
+          2. Whether to proceed or rollback
+          3. Potential fixes
+        tool_budget: 20
+        tools: [shell, read]
+        llm_config:
+          temperature: 0.2
+        output: investigation
+        next: [health_decision]
+
+      - id: health_decision
+        type: hitl
+        name: "Health Issue Decision"
+        hitl_type: approval
+        prompt: |
+          ## Health Check Issues
+
+          **Investigation:**
+          {investigation}
+
+          Options:
+          1. Continue (issues are minor)
+          2. Rollback
+          3. Retry health checks
+        context_keys:
+          - investigation
+        choices:
+          - "Continue"
+          - "Rollback"
+          - "Retry"
+        timeout: 600
+        fallback: rollback
+        next: [handle_health_decision]
+
+      - id: handle_health_decision
+        type: condition
+        name: "Handle Health Decision"
+        condition: "health_decision"
+        branches:
+          "Continue": smoke_tests
+          "Rollback": rollback
+          "Retry": health_check
+
+      # =====================================================================
+      # Stage 5: Smoke Tests
+      # =====================================================================
+      - id: smoke_tests
+        type: compute
+        name: "Run Smoke Tests"
+        tools: [shell]
+        inputs:
+          test_suite: smoke
+          environment: $ctx.target_env
+        output: smoke_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [verify_smoke]
+
+      - id: verify_smoke
+        type: condition
+        name: "Verify Smoke Tests"
+        condition: "smoke_passed"
+        branches:
+          "true": complete
+          "false": rollback
+
+      # =====================================================================
+      # Stage 6: Rollback (if needed)
+      # =====================================================================
+      - id: rollback
+        type: compute
+        name: "Execute Rollback"
+        tools: [shell]
+        inputs:
+          backup_ref: $ctx.backup_info
+          strategy: immediate
+        output: rollback_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 300
+        next: [verify_rollback]
+
+      - id: verify_rollback
+        type: compute
+        name: "Verify Rollback"
+        tools: [shell]
+        inputs:
+          expected_version: $ctx.previous_version
+        output: rollback_verification
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [notify_rollback]
+
+      - id: notify_rollback
+        type: agent
+        name: "Generate Rollback Report"
+        role: writer
+        goal: |
+          Generate a rollback incident report:
+          - What was being deployed
+          - Why it failed
+          - Rollback status
+          - Next steps
+        tool_budget: 10
+        output: rollback_report
+        next: [failed]
+
+      - id: failed
+        type: transform
+        name: "Deployment Failed"
+        transform: |
+          status = "failed"
+          rollback_performed = true
+
+      # =====================================================================
+      # Stage 7: Completion
+      # =====================================================================
+      - id: complete
+        type: parallel
+        name: "Post-Deployment Tasks"
+        parallel_nodes: [update_monitoring, notify_success, update_docs]
+        join_strategy: all
+        next: [done]
+
+      - id: update_monitoring
+        type: compute
+        name: "Update Monitoring"
+        tools: [shell]
+        inputs:
+          dashboard: $ctx.monitoring_dashboard
+          new_version: $ctx.deploy_version
+        constraints:
+          llm_allowed: false
+          timeout: 60
+
+      - id: notify_success
+        type: compute
+        name: "Send Success Notification"
+        tools: [shell]
+        inputs:
+          channel: $ctx.notification_channel
+          message_type: deployment_success
+        constraints:
+          llm_allowed: false
+          timeout: 30
+
+      - id: update_docs
+        type: agent
+        name: "Update Deployment Docs"
+        role: writer
+        goal: "Update deployment documentation with new version info."
+        tool_budget: 10
+        tools: [write]
+
+      - id: done
+        type: transform
+        name: "Deployment Complete"
+        transform: |
+          status = "completed"
+          deployed_version = deploy_version
+
+
+  # =========================================================================
+  # CI/CD Pipeline
+  # =========================================================================
+  cicd:
+    description: "Continuous integration and deployment pipeline"
+
+    metadata:
+      vertical: devops
+
+    nodes:
+      - id: build
+        type: compute
+        name: "Build"
+        tools: [shell]
+        inputs:
+          command: $ctx.build_command
+        output: build_result
+        constraints:
+          llm_allowed: false
+          timeout: 600
+        next: [test]
+
+      - id: test
+        type: compute
+        name: "Run Tests"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: test_result
+        constraints:
+          llm_allowed: false
+          timeout: 900
+        next: [check_tests]
+
+      - id: check_tests
+        type: condition
+        name: "Check Test Results"
+        condition: "tests_passed"
+        branches:
+          "true": security_scan
+          "false": notify_failure
+
+      - id: security_scan
+        type: compute
+        name: "Security Scan"
+        tools: [shell]
+        inputs:
+          scan_type: full
+        output: security_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_security]
+
+      - id: check_security
+        type: condition
+        name: "Check Security"
+        condition: "no_critical_vulnerabilities"
+        branches:
+          "true": push_image
+          "false": notify_failure
+
+      - id: push_image
+        type: compute
+        name: "Push Container Image"
+        tools: [shell]
+        inputs:
+          registry: $ctx.container_registry
+          tag: $ctx.image_tag
+        output: push_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 300
+        next: [trigger_deploy]
+
+      - id: trigger_deploy
+        type: condition
+        name: "Auto-Deploy Check"
+        condition: "auto_deploy_enabled and target_env == 'staging'"
+        branches:
+          "true": auto_deploy
+          "false": complete
+
+      - id: auto_deploy
+        type: agent
+        name: "Trigger Deployment"
+        role: executor
+        goal: "Trigger deployment to staging environment."
+        tool_budget: 10
+        tools: [shell]
+        output: deploy_trigger
+        next: [complete]
+
+      - id: notify_failure
+        type: compute
+        name: "Notify Failure"
+        tools: [shell]
+        inputs:
+          channel: $ctx.notification_channel
+          type: failure
+        constraints:
+          llm_allowed: false
+          timeout: 30
+
+      - id: complete
+        type: transform
+        name: "Pipeline Complete"
+        transform: |
+          status = "completed"
