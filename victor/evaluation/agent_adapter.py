@@ -64,7 +64,8 @@ class AdapterConfig:
     max_turns: int = 20  # Maximum conversation turns
     tool_budget: int = 50  # Maximum tool calls
     max_tool_calls: int = 50  # Alias for tool_budget (backwards compat)
-    timeout_per_turn: int = 120  # Seconds per turn
+    total_timeout: int = 300  # Total task timeout in seconds
+    min_turn_timeout: int = 180  # Minimum per-turn timeout (P2: Timeout Fix)
     track_file_edits: bool = True
     track_diffs: bool = True
     working_dir: Optional[Path] = None
@@ -72,6 +73,18 @@ class AdapterConfig:
     # Correction metrics tracking
     track_corrections: bool = True  # Enable correction metrics collection
     keep_correction_attempts: bool = False  # Store individual correction records
+
+    @property
+    def timeout_per_turn(self) -> int:
+        """Calculate per-turn timeout with minimum enforcement (P2: Timeout Fix).
+
+        Uses SafeTimeoutPolicy to ensure at least min_turn_timeout seconds per turn,
+        even for slow models like DeepSeek.
+        """
+        from victor.evaluation.timeout_calculator import SafeTimeoutPolicy
+
+        policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)
+        return policy.calculate(self.total_timeout, self.max_turns)
 
 
 class VictorAgentAdapter:
@@ -228,6 +241,10 @@ class VictorAgentAdapter:
         self._file_snapshots = {}
         self.orchestrator.reset_conversation()
 
+        # Reset token usage for fresh tracking per task
+        if hasattr(self.orchestrator, "reset_token_usage"):
+            self.orchestrator.reset_token_usage()
+
         # Reset metrics collector for new task
         if self.config.track_corrections:
             self._metrics_collector = CorrectionMetricsCollector(
@@ -311,6 +328,10 @@ class VictorAgentAdapter:
         # Populate correction metrics if tracking is enabled
         if self._metrics_collector:
             trace.correction_metrics = self._metrics_collector.metrics.to_dict()
+
+        # Capture token usage from orchestrator (P1: Token Tracking Fix)
+        if hasattr(self.orchestrator, "get_token_usage"):
+            trace.token_usage = self.orchestrator.get_token_usage()
 
         return trace
 

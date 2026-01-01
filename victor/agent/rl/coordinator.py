@@ -231,8 +231,6 @@ class AsyncWriterQueue:
         count = 0
 
         try:
-            timestamp_now = dt.now().isoformat()
-
             for learner_name, outcome, vertical in batch:
                 outcome.vertical = vertical
 
@@ -247,13 +245,12 @@ class AsyncWriterQueue:
                 cursor.execute(
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
-                        learner_name, learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata, timestamp, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                        learner_id, provider, model, task_type, vertical,
+                        success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        learner_name,
-                        learner_name,
+                        learner_name,  # Maps to learner_id column
                         outcome.provider,
                         outcome.model,
                         outcome.task_type,
@@ -261,7 +258,6 @@ class AsyncWriterQueue:
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
-                        timestamp_now,
                     ),
                 )
                 count += 1
@@ -384,10 +380,6 @@ class BatchedOutcomeWriter:
         cursor = db.cursor()
 
         try:
-            from datetime import datetime as dt
-
-            timestamp_now = dt.now().isoformat()
-
             for learner_name, outcome, vertical in queue_copy:
                 outcome.vertical = vertical
 
@@ -401,13 +393,12 @@ class BatchedOutcomeWriter:
                 cursor.execute(
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
-                        learner_name, learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata, timestamp, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                        learner_id, provider, model, task_type, vertical,
+                        success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        learner_name,
-                        learner_name,
+                        learner_name,  # Maps to learner_id column
                         outcome.provider,
                         outcome.model,
                         outcome.task_type,
@@ -415,7 +406,6 @@ class BatchedOutcomeWriter:
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
-                        timestamp_now,
                     ),
                 )
 

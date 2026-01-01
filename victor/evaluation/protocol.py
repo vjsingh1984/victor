@@ -25,6 +25,34 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+@dataclass
+class TokenUsage:
+    """Token usage metrics for evaluation tracking.
+
+    A minimal interface for token data needed by evaluations (ISP compliance).
+    Supports addition for aggregation across turns.
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+        """Add two TokenUsage instances for aggregation."""
+        return TokenUsage(
+            input_tokens=self.input_tokens + other.input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+        )
+
+    def __iadd__(self, other: "TokenUsage") -> "TokenUsage":
+        """In-place addition for aggregation."""
+        self.input_tokens += other.input_tokens
+        self.output_tokens += other.output_tokens
+        self.total_tokens += other.total_tokens
+        return self
+
+
 class BenchmarkType(Enum):
     """Types of coding benchmarks."""
 
