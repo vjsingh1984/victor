@@ -55,25 +55,42 @@ console = Console()
 
 
 def _configure_log_level(log_level: Optional[str]) -> None:
-    """Configure logging level for benchmark commands."""
+    """Configure logging level for benchmark commands.
+
+    Defaults:
+    - Console: WARNING (clean output)
+    - File: INFO (detailed logging for debugging)
+
+    If log_level is explicitly set (via CLI or env var), it overrides both.
+    """
+    # Default console to WARNING for clean output
+    console_level = "WARNING"
+    # Default file to INFO for detailed logs
+    file_level = "INFO"
+
+    # Check if user explicitly set a level
     if log_level is None:
-        log_level = os.getenv("VICTOR_LOG_LEVEL", "INFO")
+        log_level = os.getenv("VICTOR_LOG_LEVEL")
 
-    log_level = log_level.upper()
-    valid_levels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}
+    if log_level is not None:
+        log_level = log_level.upper()
+        valid_levels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"}
 
-    if log_level not in valid_levels:
-        console.print(
-            f"[bold red]Error:[/] Invalid log level '{log_level}'. "
-            f"Valid options: {', '.join(sorted(valid_levels))}"
-        )
-        raise typer.Exit(1)
+        if log_level not in valid_levels:
+            console.print(
+                f"[bold red]Error:[/] Invalid log level '{log_level}'. "
+                f"Valid options: {', '.join(sorted(valid_levels))}"
+            )
+            raise typer.Exit(1)
 
-    if log_level == "WARN":
-        log_level = "WARNING"
+        if log_level == "WARN":
+            log_level = "WARNING"
 
-    # Pass file_level to ensure debug logs go to file when DEBUG is requested
-    configure_logging(log_level, stream=sys.stderr, file_level=log_level)
+        # Override both levels when explicitly set
+        console_level = log_level
+        file_level = log_level
+
+    configure_logging(console_level, stream=sys.stderr, file_level=file_level)
 
 
 @benchmark_app.command("list")
