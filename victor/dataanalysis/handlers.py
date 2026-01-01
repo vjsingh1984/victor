@@ -182,8 +182,8 @@ class MLTrainingHandler:
         start_time = time.time()
 
         model_type = node.input_mapping.get("model_type", "linear")
-        features_key = node.input_mapping.get("features")
-        target_key = node.input_mapping.get("target")
+        _features_key = node.input_mapping.get("features")  # noqa: F841
+        _target_key = node.input_mapping.get("target")  # noqa: F841
 
         try:
             train_cmd = f"python -m victor.ml.train --model {model_type}"
