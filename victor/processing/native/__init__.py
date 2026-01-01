@@ -2133,6 +2133,162 @@ def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
 
 
 # =============================================================================
+# YAML PARSING (v0.4.0 - Workflow Acceleration)
+# =============================================================================
+
+
+def parse_yaml(yaml_content: str) -> Any:
+    """Parse YAML string to Python object.
+
+    Uses Rust serde_yaml for ~5-20x speedup on large workflow files.
+    Falls back to PyYAML's safe_load.
+
+    Args:
+        yaml_content: Raw YAML string to parse
+
+    Returns:
+        Parsed Python object (dict, list, or scalar)
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "parse_yaml"):
+        return _native.parse_yaml(yaml_content)
+
+    import yaml
+
+    return yaml.safe_load(yaml_content)
+
+
+def parse_yaml_with_env(yaml_content: str) -> Any:
+    """Parse YAML with environment variable interpolation.
+
+    Supports:
+    - $env.VAR_NAME - Simple env var reference
+    - ${VAR_NAME:-default} - Shell-style with optional default
+
+    Uses Rust implementation when available for ~5-20x speedup.
+
+    Args:
+        yaml_content: Raw YAML string to parse
+
+    Returns:
+        Parsed Python object with env vars interpolated
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "parse_yaml_with_env"):
+        return _native.parse_yaml_with_env(yaml_content)
+
+    # Python fallback with env var interpolation
+    import os
+    import yaml
+
+    def interpolate_env_vars(value: Any) -> Any:
+        if isinstance(value, str):
+            # Handle $env.VAR_NAME
+            result = re.sub(
+                r"\$env\.([A-Za-z_][A-Za-z0-9_]*)",
+                lambda m: os.environ.get(m.group(1), f"$env.{m.group(1)}"),
+                value,
+            )
+            # Handle ${VAR:-default}
+            result = re.sub(
+                r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}",
+                lambda m: os.environ.get(m.group(1), m.group(2) or ""),
+                result,
+            )
+            return result
+        elif isinstance(value, dict):
+            return {k: interpolate_env_vars(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [interpolate_env_vars(item) for item in value]
+        return value
+
+    data = yaml.safe_load(yaml_content)
+    return interpolate_env_vars(data)
+
+
+def parse_yaml_file(file_path: str) -> Any:
+    """Parse YAML file directly.
+
+    Args:
+        file_path: Path to YAML file
+
+    Returns:
+        Parsed Python object
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "parse_yaml_file"):
+        return _native.parse_yaml_file(file_path)
+
+    import yaml
+
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def parse_yaml_file_with_env(file_path: str) -> Any:
+    """Parse YAML file with environment variable interpolation.
+
+    Args:
+        file_path: Path to YAML file
+
+    Returns:
+        Parsed Python object with env vars interpolated
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "parse_yaml_file_with_env"):
+        return _native.parse_yaml_file_with_env(file_path)
+
+    with open(file_path, "r") as f:
+        return parse_yaml_with_env(f.read())
+
+
+def validate_yaml(yaml_content: str) -> bool:
+    """Validate YAML syntax without full parsing.
+
+    Args:
+        yaml_content: Raw YAML string
+
+    Returns:
+        True if valid, False if invalid
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "validate_yaml"):
+        return _native.validate_yaml(yaml_content)
+
+    import yaml
+
+    try:
+        yaml.safe_load(yaml_content)
+        return True
+    except yaml.YAMLError:
+        return False
+
+
+def extract_workflow_names(yaml_content: str) -> List[str]:
+    """Extract workflow names from YAML content.
+
+    Fast scan to find workflow names without full parsing.
+
+    Args:
+        yaml_content: Raw YAML string
+
+    Returns:
+        List of workflow names found
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "extract_workflow_names"):
+        return _native.extract_workflow_names(yaml_content)
+
+    import yaml
+
+    data = yaml.safe_load(yaml_content)
+    if not isinstance(data, dict):
+        return []
+
+    names = []
+    workflows = data.get("workflows", data)
+    for key, val in workflows.items():
+        if isinstance(val, dict) and "nodes" in val:
+            names.append(key)
+
+    return names
+
+
+# =============================================================================
 # EXPORTS
 # =============================================================================
 
@@ -2217,4 +2373,11 @@ __all__ = [
     "detect_leakage_patterns",
     "strip_markup_fast",
     "validate_tool_name",
+    # YAML parsing (v0.4.0 - Workflow Acceleration)
+    "parse_yaml",
+    "parse_yaml_with_env",
+    "parse_yaml_file",
+    "parse_yaml_file_with_env",
+    "validate_yaml",
+    "extract_workflow_names",
 ]

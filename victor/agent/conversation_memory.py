@@ -2515,6 +2515,8 @@ class ConversationStore:
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """Compute cosine similarity between two vectors.
 
+        Uses Rust-accelerated implementation with NumPy fallback.
+
         Args:
             vec1: First embedding vector
             vec2: Second embedding vector
@@ -2523,15 +2525,9 @@ class ConversationStore:
             Cosine similarity score (0-1)
         """
         try:
-            import numpy as np
+            from victor.processing.native import cosine_similarity
 
-            v1 = np.array(vec1)
-            v2 = np.array(vec2)
-            dot = np.dot(v1, v2)
-            norm1 = np.linalg.norm(v1)
-            norm2 = np.linalg.norm(v2)
-            if norm1 > 0 and norm2 > 0:
-                return float(dot / (norm1 * norm2))
+            return cosine_similarity(vec1, vec2)
         except Exception:
             pass
         return 0.0

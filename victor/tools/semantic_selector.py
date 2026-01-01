@@ -1546,6 +1546,8 @@ class SemanticToolSelector:
     def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         """Calculate cosine similarity between two vectors.
 
+        Uses Rust-accelerated implementation with NumPy fallback.
+
         Args:
             a: First vector
             b: Second vector
@@ -1553,14 +1555,10 @@ class SemanticToolSelector:
         Returns:
             Similarity score (0-1)
         """
-        dot_product = np.dot(a, b)
-        norm_a = np.linalg.norm(a)
-        norm_b = np.linalg.norm(b)
+        from victor.processing.native import cosine_similarity
 
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-
-        return float(dot_product / (norm_a * norm_b))
+        # Convert numpy arrays to lists for Rust/fallback interface
+        return cosine_similarity(a.tolist(), b.tolist())
 
     @classmethod
     def _create_tool_text(cls, tool: Any) -> str:

@@ -516,15 +516,11 @@ class ConversationController:
 
             embeddings = self._embedding_service.embed_batch([t1, t2])
             if len(embeddings) == 2:
-                import numpy as np
+                from victor.processing.native import cosine_similarity
 
                 emb1, emb2 = embeddings[0], embeddings[1]
-                # Cosine similarity
-                dot = np.dot(emb1, emb2)
-                norm1 = np.linalg.norm(emb1)
-                norm2 = np.linalg.norm(emb2)
-                if norm1 > 0 and norm2 > 0:
-                    return float(dot / (norm1 * norm2))
+                # Use Rust-accelerated cosine similarity (with NumPy fallback)
+                return cosine_similarity(list(emb1), list(emb2))
         except Exception as e:
             logger.warning(f"Semantic similarity computation failed: {e}")
 

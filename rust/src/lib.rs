@@ -35,6 +35,7 @@
 //! - `extractor`: High-performance tool call extraction from model output
 //! - `sanitizer`: High-performance response sanitization
 //! - `embeddings`: Quantized embeddings, matrix ops, KNN (v0.4.0)
+//! - `yaml_loader`: Fast YAML parsing for workflow definitions (v0.4.0)
 
 use pyo3::prelude::*;
 
@@ -51,6 +52,7 @@ mod secrets;
 mod similarity;
 mod streaming_filter;
 mod thinking;
+mod yaml_loader;
 
 /// Victor Native Extensions Module
 ///
@@ -180,6 +182,14 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(embeddings::random_projection, m)?)?;
     m.add_function(wrap_pyfunction!(embeddings::pairwise_distances, m)?)?;
     m.add_function(wrap_pyfunction!(embeddings::knn_graph, m)?)?;
+
+    // YAML parsing functions (v0.4.0 - workflow acceleration)
+    m.add_function(wrap_pyfunction!(yaml_loader::parse_yaml, m)?)?;
+    m.add_function(wrap_pyfunction!(yaml_loader::parse_yaml_with_env, m)?)?;
+    m.add_function(wrap_pyfunction!(yaml_loader::parse_yaml_file, m)?)?;
+    m.add_function(wrap_pyfunction!(yaml_loader::parse_yaml_file_with_env, m)?)?;
+    m.add_function(wrap_pyfunction!(yaml_loader::validate_yaml, m)?)?;
+    m.add_function(wrap_pyfunction!(yaml_loader::extract_workflow_names, m)?)?;
 
     Ok(())
 }
