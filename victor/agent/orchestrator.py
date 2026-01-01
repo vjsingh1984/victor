@@ -4101,6 +4101,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 **provider_kwargs,
             )
 
+            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
+            if response.usage:
+                self._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
+                self._cumulative_token_usage["completion_tokens"] += response.usage.get(
+                    "completion_tokens", 0
+                )
+                self._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
+
             # Add assistant response to history if has content
             if response.content:
                 self.add_message("assistant", response.content)
