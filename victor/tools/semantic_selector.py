@@ -2000,10 +2000,10 @@ class SemanticToolSelector:
                 success=len(selected_tools) > 0,
                 quality_score=avg_score,
                 tool_name=",".join(tool_names[:5]),  # First 5 tools
-                context={
-                    "threshold": threshold,
+                threshold_value=threshold,
+                task_type=task_type,
+                metadata={
                     "tools_selected": len(selected_tools),
-                    "task_type": task_type,
                     "classification_aware": classification_aware,
                     "excluded_count": excluded_count,
                     "avg_similarity": avg_score,
