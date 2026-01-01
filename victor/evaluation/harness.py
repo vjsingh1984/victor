@@ -640,6 +640,18 @@ class EvaluationHarness:
                 task_result.error_message = "Agent timeout"
                 return task_result
 
+            # Handle dict return type for token tracking (P1 fix)
+            # Callbacks can return either:
+            # - str: Just the generated code (legacy)
+            # - dict: Code plus metrics {code, tokens_input, tokens_output, tokens_used, tool_calls, turns}
+            if isinstance(agent_output, dict):
+                task_result.tokens_input = agent_output.get("tokens_input", 0)
+                task_result.tokens_output = agent_output.get("tokens_output", 0)
+                task_result.tokens_used = agent_output.get("tokens_used", 0)
+                task_result.tool_calls = agent_output.get("tool_calls", 0)
+                task_result.turns = agent_output.get("turns", 0)
+                agent_output = agent_output.get("code", "")
+
             # Self-correction loop (if enabled)
             if config.enable_self_correction:
                 agent_output, task_result = await self._run_with_self_correction(

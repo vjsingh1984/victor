@@ -226,9 +226,18 @@ def run_benchmark(
                     timeout=timeout,
                 )
 
-                # Create a simple callback that returns the generated code
-                async def agent_callback(benchmark_task: BenchmarkTask) -> str:
-                    """Run agent on task and return generated code."""
+                # Create a callback that returns code AND metrics for token tracking
+                async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
+                    """Run agent on task and return generated code with metrics.
+
+                    Returns a dict with:
+                    - code: The generated patch or code
+                    - tokens_input: Input tokens used
+                    - tokens_output: Output tokens used
+                    - tokens_used: Total tokens used
+                    - tool_calls: Number of tool calls
+                    - turns: Number of conversation turns
+                    """
                     import tempfile
                     from pathlib import Path
 
@@ -236,9 +245,16 @@ def run_benchmark(
                     with tempfile.TemporaryDirectory() as tmpdir:
                         workspace = Path(tmpdir)
                         trace = await adapter.execute_task(benchmark_task, workspace)
-                        # Return the generated patch/code from the trace
-                        # AgenticExecutionTrace has: generated_patch, generated_code, messages
-                        return trace.generated_patch or trace.generated_code or ""
+
+                        # Return code with metrics for harness to populate TaskResult
+                        return {
+                            "code": trace.generated_patch or trace.generated_code or "",
+                            "tokens_input": trace.token_usage.input_tokens,
+                            "tokens_output": trace.token_usage.output_tokens,
+                            "tokens_used": trace.token_usage.total_tokens,
+                            "tool_calls": len(trace.tool_calls),
+                            "turns": trace.turns,
+                        }
 
             except Exception as e:
                 console.print(f"[red]Error initializing agent:[/] {e}")
