@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 
-from typing import Any, Callable, Dict, List, Optional, Protocol, Union
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from victor.workflows.definition import NodeType, WorkflowNode
 
@@ -77,6 +77,263 @@ class HITLFallback(str, Enum):
     CONTINUE = "continue"  # Continue with default value
     SKIP = "skip"  # Skip this node entirely
     RETRY = "retry"  # Retry the request
+
+
+class HITLMode(str, Enum):
+    """HITL interaction mode - determines transport mechanism."""
+
+    # Local/Interactive modes (require terminal/TTY)
+    CLI = "cli"  # Interactive CLI prompt (Rich/input)
+    TUI = "tui"  # TUI interface (Textual)
+
+    # Remote/Async modes (serverless-compatible)
+    API = "api"  # REST API callback (pause workflow, resume via API)
+    WEBHOOK = "webhook"  # POST to webhook, poll for response
+    POLLING = "polling"  # Poll endpoint for response
+
+    # Enterprise messaging integrations
+    EMAIL = "email"  # Send approval email with links
+    SMS = "sms"  # SMS/text message via Twilio/SNS
+    SLACK = "slack"  # Slack interactive message
+    TEAMS = "teams"  # Microsoft Teams approval card
+    DISCORD = "discord"  # Discord bot interaction
+
+    # DevOps/SCM integrations (for PR/MR approvals)
+    GITHUB_PR = "github_pr"  # GitHub PR review/approval
+    GITHUB_CHECK = "github_check"  # GitHub Check Run (CI gates)
+    GITHUB_DEPLOYMENT = "github_deployment"  # GitHub Deployment protection
+    GITLAB_MR = "gitlab_mr"  # GitLab Merge Request approval
+    GITLAB_PIPELINE = "gitlab_pipeline"  # GitLab pipeline gate
+    BITBUCKET_PR = "bitbucket_pr"  # Bitbucket PR approval
+    AZURE_DEVOPS_PR = "azure_devops_pr"  # Azure DevOps PR approval
+
+    # Issue/Project management integrations
+    JIRA = "jira"  # Jira issue transition approval
+    LINEAR = "linear"  # Linear issue approval
+    ASANA = "asana"  # Asana task approval
+    SERVICENOW = "servicenow"  # ServiceNow change request
+
+    # Incident/On-call integrations
+    PAGERDUTY = "pagerduty"  # PagerDuty incident approval
+    OPSGENIE = "opsgenie"  # OpsGenie alert approval
+    VICTOROPS = "victorops"  # VictorOps/Splunk On-Call
+
+    # Infrastructure/GitOps integrations
+    ARGOCD = "argocd"  # ArgoCD sync wave gate
+    FLUX = "flux"  # FluxCD gate
+    TERRAFORM_CLOUD = "terraform_cloud"  # Terraform Cloud run approval
+    SPACELIFT = "spacelift"  # Spacelift stack approval
+
+    # Auto modes (for testing/CI)
+    AUTO_APPROVE = "auto_approve"  # Auto-approve without human
+    AUTO_REJECT = "auto_reject"  # Auto-reject without human
+
+    # Inline callback (programmatic)
+    INLINE = "inline"  # Call a Python function directly
+
+    # Custom hook (user-defined transport)
+    CUSTOM_HOOK = "custom_hook"  # User-provided hook function
+
+
+class HITLCategory(str, Enum):
+    """Category of HITL mode for grouping and documentation."""
+
+    LOCAL = "local"  # Requires terminal/TTY
+    ASYNC_API = "async_api"  # REST/webhook based
+    MESSAGING = "messaging"  # Chat/email based
+    SCM = "scm"  # Source control management
+    PROJECT = "project"  # Issue/project tracking
+    INCIDENT = "incident"  # Incident management
+    INFRASTRUCTURE = "infrastructure"  # GitOps/IaC
+    AUTO = "auto"  # Automated (no human)
+    CUSTOM = "custom"  # User-defined
+
+
+# Map modes to categories
+HITL_MODE_CATEGORIES: Dict[HITLMode, HITLCategory] = {
+    HITLMode.CLI: HITLCategory.LOCAL,
+    HITLMode.TUI: HITLCategory.LOCAL,
+    HITLMode.API: HITLCategory.ASYNC_API,
+    HITLMode.WEBHOOK: HITLCategory.ASYNC_API,
+    HITLMode.POLLING: HITLCategory.ASYNC_API,
+    HITLMode.EMAIL: HITLCategory.MESSAGING,
+    HITLMode.SMS: HITLCategory.MESSAGING,
+    HITLMode.SLACK: HITLCategory.MESSAGING,
+    HITLMode.TEAMS: HITLCategory.MESSAGING,
+    HITLMode.DISCORD: HITLCategory.MESSAGING,
+    HITLMode.GITHUB_PR: HITLCategory.SCM,
+    HITLMode.GITHUB_CHECK: HITLCategory.SCM,
+    HITLMode.GITHUB_DEPLOYMENT: HITLCategory.SCM,
+    HITLMode.GITLAB_MR: HITLCategory.SCM,
+    HITLMode.GITLAB_PIPELINE: HITLCategory.SCM,
+    HITLMode.BITBUCKET_PR: HITLCategory.SCM,
+    HITLMode.AZURE_DEVOPS_PR: HITLCategory.SCM,
+    HITLMode.JIRA: HITLCategory.PROJECT,
+    HITLMode.LINEAR: HITLCategory.PROJECT,
+    HITLMode.ASANA: HITLCategory.PROJECT,
+    HITLMode.SERVICENOW: HITLCategory.PROJECT,
+    HITLMode.PAGERDUTY: HITLCategory.INCIDENT,
+    HITLMode.OPSGENIE: HITLCategory.INCIDENT,
+    HITLMode.VICTOROPS: HITLCategory.INCIDENT,
+    HITLMode.ARGOCD: HITLCategory.INFRASTRUCTURE,
+    HITLMode.FLUX: HITLCategory.INFRASTRUCTURE,
+    HITLMode.TERRAFORM_CLOUD: HITLCategory.INFRASTRUCTURE,
+    HITLMode.SPACELIFT: HITLCategory.INFRASTRUCTURE,
+    HITLMode.AUTO_APPROVE: HITLCategory.AUTO,
+    HITLMode.AUTO_REJECT: HITLCategory.AUTO,
+    HITLMode.INLINE: HITLCategory.CUSTOM,
+    HITLMode.CUSTOM_HOOK: HITLCategory.CUSTOM,
+}
+
+
+# Mapping of deployment targets to supported HITL modes
+# This enables validation that workflows with HITL nodes are compatible
+# with their deployment target
+DEPLOYMENT_HITL_COMPATIBILITY = {
+    # Local targets - all modes work
+    "inline": [
+        HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "subprocess": [
+        HITLMode.CLI, HITLMode.INLINE, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "local": [
+        HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Docker - no TTY by default, need API/webhook
+    "docker": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "docker_compose": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Kubernetes - async/API-based
+    "kubernetes": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.TEAMS, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "aks": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.TEAMS, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "eks": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "gke": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Serverless - must be async (can't hold connection)
+    "aws_lambda": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "cloud_run": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "azure_functions": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Container services
+    "ecs": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "fargate": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "azure_container": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Batch/Job services
+    "aws_batch": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "azure_batch": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.TEAMS,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "cloud_batch": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Workflow orchestrators - typically have their own approval mechanisms
+    "airflow": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "temporal": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "step_functions": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Data platforms
+    "databricks": [
+        HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    "spark": [HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],  # Batch-only typically
+    "ray": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    "dask": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    # Task queues
+    "celery": [
+        HITLMode.API, HITLMode.WEBHOOK, HITLMode.EMAIL, HITLMode.SLACK,
+        HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+    ],
+    # Serverless platforms
+    "modal": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+}
+
+
+def get_supported_hitl_modes(deployment_target: str) -> list:
+    """Get supported HITL modes for a deployment target.
+
+    Args:
+        deployment_target: The deployment target name
+
+    Returns:
+        List of supported HITLMode values
+    """
+    return DEPLOYMENT_HITL_COMPATIBILITY.get(
+        deployment_target,
+        [HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],  # Default fallback
+    )
+
+
+def validate_hitl_deployment_compatibility(
+    hitl_mode: HITLMode,
+    deployment_target: str,
+) -> tuple[bool, str]:
+    """Validate that HITL mode is compatible with deployment target.
+
+    Args:
+        hitl_mode: The HITL interaction mode
+        deployment_target: The deployment target
+
+    Returns:
+        Tuple of (is_compatible, error_message)
+    """
+    supported = get_supported_hitl_modes(deployment_target)
+
+    if hitl_mode in supported:
+        return True, ""
+
+    return False, (
+        f"HITL mode '{hitl_mode.value}' not supported for target '{deployment_target}'. "
+        f"Supported: {[m.value for m in supported]}"
+    )
 
 
 class HITLStatus(str, Enum):
@@ -290,29 +547,69 @@ class HITLExecutor:
     """Executes HITL nodes during workflow execution.
 
     Handles the async communication between workflow executor and
-    human interface (CLI, TUI, API).
+    human interface (CLI, TUI, API, or external integrations via transports).
+
+    Supports two modes:
+    1. Handler mode: Direct handler (CLI, TUI, inline) for local/interactive use
+    2. Transport mode: Uses transport adapters for remote integrations
+       (Slack, Email, GitHub PR, etc.)
     """
 
-    def __init__(self, handler: HITLHandler):
-        """Initialize with a UI handler.
+    def __init__(
+        self,
+        handler: Optional[HITLHandler] = None,
+        mode: Optional[HITLMode] = None,
+        transport_config: Optional[Any] = None,
+    ):
+        """Initialize executor with handler or transport.
 
         Args:
-            handler: Handler for human interactions
+            handler: Handler for human interactions (for local modes)
+            mode: HITL mode (determines transport if no handler)
+            transport_config: Configuration for transport (if using remote mode)
         """
         self.handler = handler
+        self.mode = mode or HITLMode.CLI
+        self.transport_config = transport_config
+        self._transport = None
+
         self._pending_requests: Dict[str, asyncio.Event] = {}
         self._responses: Dict[str, HITLResponse] = {}
+        self._external_refs: Dict[str, str] = {}  # request_id -> external_ref
+
+    def _get_transport(self):
+        """Get or create the transport adapter."""
+        if self._transport is None and self.mode not in [
+            HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
+            HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT,
+        ]:
+            from victor.workflows.hitl_transports import get_transport
+            self._transport = get_transport(self.mode, self.transport_config)
+        return self._transport
+
+    def _should_use_transport(self) -> bool:
+        """Check if we should use transport vs handler."""
+        return self.mode not in [
+            HITLMode.CLI, HITLMode.TUI, HITLMode.INLINE,
+        ] and self._get_transport() is not None
 
     async def execute_hitl_node(
         self,
         node: HITLNode,
         context: Dict[str, Any],
+        workflow_id: Optional[str] = None,
     ) -> HITLResponse:
         """Execute a HITL node, waiting for human response.
+
+        Automatically chooses between:
+        - Handler mode: Direct CLI/TUI interaction
+        - Transport mode: Send via external system (Slack, Email, GitHub, etc.)
+        - Auto mode: Automatic approve/reject for testing
 
         Args:
             node: The HITL node to execute
             context: Current workflow context
+            workflow_id: Optional workflow identifier for transport context
 
         Returns:
             HITLResponse with result
@@ -321,15 +618,41 @@ class HITLExecutor:
             asyncio.TimeoutError: If timeout and fallback is ABORT
         """
         request = node.create_request(context)
+        workflow_id = workflow_id or context.get("_workflow_id", "workflow")
 
         logger.info(f"HITL request {request.request_id}: {node.hitl_type.value} - {node.prompt}")
 
-        try:
-            # Request human input with timeout
-            response = await asyncio.wait_for(
-                self.handler.request_human_input(request),
-                timeout=node.timeout,
+        # Handle auto modes first
+        if self.mode == HITLMode.AUTO_APPROVE:
+            logger.info(f"Auto-approving {request.request_id}")
+            return HITLResponse(
+                request_id=request.request_id,
+                status=HITLStatus.APPROVED,
+                approved=True,
+                value=node.default_value,
+                reason="Auto-approved (testing mode)",
             )
+        elif self.mode == HITLMode.AUTO_REJECT:
+            logger.info(f"Auto-rejecting {request.request_id}")
+            return HITLResponse(
+                request_id=request.request_id,
+                status=HITLStatus.REJECTED,
+                approved=False,
+                reason="Auto-rejected (testing mode)",
+            )
+
+        try:
+            if self._should_use_transport():
+                # Transport mode: send to external system and poll
+                response = await self._execute_via_transport(request, node, workflow_id)
+            elif self.handler:
+                # Handler mode: direct interaction
+                response = await asyncio.wait_for(
+                    self.handler.request_human_input(request),
+                    timeout=node.timeout,
+                )
+            else:
+                raise ValueError("No handler or transport configured for HITL")
 
             # Validate response
             if not node.validate_response(response):
@@ -346,6 +669,45 @@ class HITLExecutor:
         except asyncio.TimeoutError:
             logger.warning(f"HITL request {request.request_id} timed out after {node.timeout}s")
             return self._handle_timeout(request, node)
+
+    async def _execute_via_transport(
+        self,
+        request: HITLRequest,
+        node: HITLNode,
+        workflow_id: str,
+    ) -> HITLResponse:
+        """Execute HITL via transport adapter.
+
+        Sends notification to external system and polls for response.
+
+        Args:
+            request: The HITL request
+            node: The HITL node
+            workflow_id: Workflow identifier
+
+        Returns:
+            HITLResponse from external system
+        """
+        transport = self._get_transport()
+
+        # Send to external system
+        external_ref = await transport.send(request, workflow_id)
+        self._external_refs[request.request_id] = external_ref
+
+        logger.info(f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}")
+
+        # Wait for response with polling
+        response = await transport.wait_for_response(
+            request.request_id,
+            external_ref,
+            timeout=node.timeout,
+        )
+
+        if response:
+            return response
+
+        # No response within timeout
+        raise asyncio.TimeoutError(f"No response within {node.timeout}s")
 
     def _handle_timeout(
         self,
@@ -569,14 +931,24 @@ HITLCallback = Callable[[HITLRequest], HITLResponse]
 
 
 __all__ = [
+    # Node types and enums
     "HITLNodeType",
     "HITLFallback",
+    "HITLMode",
     "HITLStatus",
+    # Request/Response
     "HITLRequest",
     "HITLResponse",
+    # Protocols
     "HITLHandler",
+    # Node and executor
     "HITLNode",
     "HITLExecutor",
+    # Handlers
     "DefaultHITLHandler",
     "HITLCallback",
+    # Deployment compatibility
+    "DEPLOYMENT_HITL_COMPATIBILITY",
+    "get_supported_hitl_modes",
+    "validate_hitl_deployment_compatibility",
 ]
