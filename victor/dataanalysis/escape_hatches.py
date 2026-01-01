@@ -227,11 +227,13 @@ def aggregate_model_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     for model_key in models:
         if model_key in ctx:
-            results.append({
-                "name": model_key,
-                "metrics": ctx[model_key].get("metrics", {}),
-                "status": ctx[model_key].get("status", "unknown"),
-            })
+            results.append(
+                {
+                    "name": model_key,
+                    "metrics": ctx[model_key].get("metrics", {}),
+                    "status": ctx[model_key].get("status", "unknown"),
+                }
+            )
 
     best_model = max(results, key=lambda x: x["metrics"].get("accuracy", 0)) if results else None
 

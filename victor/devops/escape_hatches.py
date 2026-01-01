@@ -281,11 +281,13 @@ def merge_deployment_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
     notification_result = ctx.get("notification_result", {})
     docs_result = ctx.get("docs_result", {})
 
-    all_success = all([
-        monitoring_result.get("success", False),
-        notification_result.get("success", False),
-        docs_result.get("success", True),  # Docs update is optional
-    ])
+    all_success = all(
+        [
+            monitoring_result.get("success", False),
+            notification_result.get("success", False),
+            docs_result.get("success", True),  # Docs update is optional
+        ]
+    )
 
     return {
         "all_tasks_complete": True,

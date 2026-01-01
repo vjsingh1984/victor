@@ -305,11 +305,13 @@ def format_implementation_plan(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     steps = []
     for i, file in enumerate(files_to_modify, 1):
-        steps.append({
-            "step": i,
-            "file": file,
-            "action": "modify",
-        })
+        steps.append(
+            {
+                "step": i,
+                "file": file,
+                "action": "modify",
+            }
+        )
 
     return {
         "task": task,

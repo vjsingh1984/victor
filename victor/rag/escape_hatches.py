@@ -99,7 +99,6 @@ def document_quality(ctx: Dict[str, Any]) -> str:
         return "skip"
 
     # Check for quality indicators
-    has_structure = metadata.get("has_headings", False)
     extraction_confidence = metadata.get("confidence", 0.5)
 
     if text_length > 500 and extraction_confidence >= 0.8:
@@ -306,10 +305,7 @@ def merge_retrieved_chunks(ctx: Dict[str, Any]) -> Dict[str, Any]:
                         all_chunks.append(chunk)
 
     # Sort by relevance score
-    all_chunks.sort(
-        key=lambda x: x.get("relevance_score", x.get("score", 0)),
-        reverse=True
-    )
+    all_chunks.sort(key=lambda x: x.get("relevance_score", x.get("score", 0)), reverse=True)
 
     return {
         "chunks": all_chunks,
@@ -350,11 +346,13 @@ def format_context_window(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 break
 
             context_parts.append(f"[{i+1}] {text}")
-            citations.append({
-                "index": i + 1,
-                "source": source,
-                "relevance": chunk.get("relevance_score", 0),
-            })
+            citations.append(
+                {
+                    "index": i + 1,
+                    "source": source,
+                    "relevance": chunk.get("relevance_score", 0),
+                }
+            )
             current_tokens += chunk_tokens
 
     return {
