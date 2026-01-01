@@ -554,14 +554,6 @@ class TestEscapeHatches:
         assert analysis_confidence(ctx) == "medium"
 
 
-try:
-    import pandas
-
-    HAS_PANDAS = True
-except ImportError:
-    HAS_PANDAS = False
-
-
 class TestPyCaretHandler:
     """Tests for PyCaretHandler."""
 
@@ -576,7 +568,6 @@ class TestPyCaretHandler:
         return MagicMock()
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not HAS_PANDAS, reason="pandas required for data validation tests")
     async def test_no_data_input(self, handler, mock_registry):
         """Test handling of missing data input."""
         node = MockComputeNode(
@@ -593,7 +584,6 @@ class TestPyCaretHandler:
         assert "No 'data' input" in result.error
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not HAS_PANDAS, reason="pandas required for data validation tests")
     async def test_unsupported_data_type(self, handler, mock_registry):
         """Test handling of unsupported data type."""
         node = MockComputeNode(
@@ -665,7 +655,6 @@ class TestPyCaretHandler:
         assert result.status.value == "failed"
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not HAS_PANDAS, reason="pandas required for data validation tests")
     async def test_context_output_key(self, handler, mock_registry):
         """Test output key is set from node."""
         node = MockComputeNode(
