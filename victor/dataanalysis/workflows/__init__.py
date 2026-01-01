@@ -248,17 +248,6 @@ class DataAnalysisWorkflowProvider(WorkflowProviderProtocol):
         return f"DataAnalysisWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
-# StateGraph-based workflows (for backwards compatibility)
-from victor.dataanalysis.workflows.graph_workflows import (
-    EDAState,
-    CleaningState,
-    MLPipelineState,
-    create_eda_workflow,
-    create_cleaning_workflow,
-    create_ml_pipeline_workflow,
-    DataAnalysisGraphExecutor,
-)
-
 # Register DataAnalysis domain handlers when this module is loaded
 from victor.dataanalysis.handlers import register_handlers as _register_handlers
 
@@ -267,12 +256,4 @@ _register_handlers()
 __all__ = [
     # YAML-first workflow provider
     "DataAnalysisWorkflowProvider",
-    # StateGraph-based workflows (backwards compatibility)
-    "EDAState",
-    "CleaningState",
-    "MLPipelineState",
-    "create_eda_workflow",
-    "create_cleaning_workflow",
-    "create_ml_pipeline_workflow",
-    "DataAnalysisGraphExecutor",
 ]

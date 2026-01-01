@@ -222,19 +222,6 @@ class DevOpsWorkflowProvider(WorkflowProviderProtocol):
         return f"DevOpsWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
-# StateGraph-based workflows (for backwards compatibility)
-from victor.devops.workflows.graph_workflows import (
-    DeploymentState,
-    ContainerState,
-    CICDState,
-    SecurityAuditState,
-    create_deployment_workflow,
-    create_container_workflow,
-    create_cicd_workflow,
-    create_security_audit_workflow,
-    DevOpsGraphExecutor,
-)
-
 # Register DevOps domain handlers when this module is loaded
 from victor.devops.handlers import register_handlers as _register_handlers
 
@@ -243,14 +230,4 @@ _register_handlers()
 __all__ = [
     # YAML-first workflow provider
     "DevOpsWorkflowProvider",
-    # StateGraph-based workflows (backwards compatibility)
-    "DeploymentState",
-    "ContainerState",
-    "CICDState",
-    "SecurityAuditState",
-    "create_deployment_workflow",
-    "create_container_workflow",
-    "create_cicd_workflow",
-    "create_security_audit_workflow",
-    "DevOpsGraphExecutor",
 ]

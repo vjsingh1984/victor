@@ -243,17 +243,6 @@ class ResearchWorkflowProvider(WorkflowProviderProtocol):
         return f"ResearchWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
-# StateGraph-based workflows (for backwards compatibility)
-from victor.research.workflows.graph_workflows import (
-    ResearchState,
-    FactCheckState,
-    LiteratureState,
-    create_deep_research_workflow,
-    create_fact_check_workflow,
-    create_literature_review_workflow,
-    ResearchGraphExecutor,
-)
-
 # Register Research domain handlers when this module is loaded
 from victor.research.handlers import register_handlers as _register_handlers
 
@@ -262,12 +251,4 @@ _register_handlers()
 __all__ = [
     # YAML-first workflow provider
     "ResearchWorkflowProvider",
-    # StateGraph-based workflows (backwards compatibility)
-    "ResearchState",
-    "FactCheckState",
-    "LiteratureState",
-    "create_deep_research_workflow",
-    "create_fact_check_workflow",
-    "create_literature_review_workflow",
-    "ResearchGraphExecutor",
 ]
