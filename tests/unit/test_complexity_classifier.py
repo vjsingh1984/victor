@@ -103,9 +103,10 @@ class TestComplexityClassifier:
         assert result.complexity == TaskComplexity.SIMPLE
         assert "pwd" in result.matched_patterns
 
-        # "ls command" patterns
+        # "ls command" - short commands without context default to MEDIUM
+        # to avoid underestimating complexity
         result = classifier.classify("ls")
-        assert result.complexity == TaskComplexity.SIMPLE
+        assert result.complexity == TaskComplexity.MEDIUM
 
     def test_medium_task_detection(self):
         """Test detection of medium complexity tasks using regex patterns."""

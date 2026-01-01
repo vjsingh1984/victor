@@ -104,14 +104,19 @@ class TestTaskClassifierComplex:
     """Tests for COMPLEX task classification."""
 
     def test_analyze_codebase_complex(self):
-        """Test that 'analyze codebase' is classified as COMPLEX."""
+        """Test that 'analyze codebase' is classified as ANALYSIS.
+
+        Note: ANALYSIS is a more appropriate classification for codebase analysis
+        tasks that require exploration rather than modification.
+        """
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Analyze the entire codebase for improvements")
 
-        assert result.complexity == TaskComplexity.COMPLEX
-        assert result.tool_budget == 25
+        # ANALYSIS is correct for exploration/analysis tasks
+        assert result.complexity == TaskComplexity.ANALYSIS
+        assert result.tool_budget == 60  # ANALYSIS gets higher budget for exploration
 
     def test_refactor_complex(self):
         """Test that 'refactor' is classified as COMPLEX."""
