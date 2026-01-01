@@ -30,6 +30,7 @@ from victor.agent.complexity_classifier import (
     ComplexityClassifier,
     classify_task,
     get_task_prompt_hint,
+    get_prompt_hint,
     should_force_answer,
     DEFAULT_BUDGETS,
     PROMPT_HINTS,
@@ -48,34 +49,36 @@ class TestTaskComplexity:
 
 
 class TestTaskClassification:
-    """Tests for TaskClassification dataclass."""
+    """Tests for TaskClassification dataclass.
+
+    Note: prompt_hint was removed from TaskClassification for SRP compliance.
+    Hints are now provided by ComplexityHintEnricher in the enrichment module.
+    """
 
     def test_classification_creation(self):
         """Test creating a TaskClassification."""
         classification = TaskClassification(
             complexity=TaskComplexity.SIMPLE,
-            tool_budget=2,
-            prompt_hint="Simple task hint",
+            tool_budget=10,
             confidence=0.9,
             matched_patterns=["list_files"],
         )
         assert classification.complexity == TaskComplexity.SIMPLE
-        assert classification.tool_budget == 2
+        assert classification.tool_budget == 10
         assert classification.confidence == 0.9
 
     def test_should_force_completion_after(self):
         """Test the should_force_completion_after method."""
         classification = TaskClassification(
             complexity=TaskComplexity.SIMPLE,
-            tool_budget=2,
-            prompt_hint="",
+            tool_budget=10,
             confidence=0.9,
             matched_patterns=[],
         )
 
-        assert classification.should_force_completion_after(1) is False
-        assert classification.should_force_completion_after(2) is True
-        assert classification.should_force_completion_after(3) is True
+        assert classification.should_force_completion_after(9) is False
+        assert classification.should_force_completion_after(10) is True
+        assert classification.should_force_completion_after(11) is True
 
 
 class TestComplexityClassifier:
@@ -222,11 +225,11 @@ class TestComplexityClassifier:
         """Test the get_budget method."""
         classifier = ComplexityClassifier()
 
-        # Updated budget values
-        assert classifier.get_budget(TaskComplexity.SIMPLE) == 2
-        assert classifier.get_budget(TaskComplexity.MEDIUM) == 4
-        assert classifier.get_budget(TaskComplexity.COMPLEX) == 15
-        assert classifier.get_budget(TaskComplexity.GENERATION) == 0
+        # Updated budget values - minimum 10 for all types
+        assert classifier.get_budget(TaskComplexity.SIMPLE) == 10
+        assert classifier.get_budget(TaskComplexity.MEDIUM) == 15
+        assert classifier.get_budget(TaskComplexity.COMPLEX) == 25
+        assert classifier.get_budget(TaskComplexity.GENERATION) == 10
         assert classifier.get_budget(TaskComplexity.ACTION) == 50
         assert classifier.get_budget(TaskComplexity.ANALYSIS) == 60
 
@@ -237,23 +240,30 @@ class TestComplexityClassifier:
         classifier.update_budget(TaskComplexity.SIMPLE, 10)
         assert classifier.get_budget(TaskComplexity.SIMPLE) == 10
 
-    def test_prompt_hint_assignment(self):
-        """Test that correct prompt hints are assigned."""
+    def test_prompt_hint_via_enricher(self):
+        """Test that correct prompt hints are available via enricher.
+
+        Note: prompt_hint was removed from TaskClassification for SRP.
+        Hints are now retrieved separately via get_prompt_hint().
+        """
         classifier = ComplexityClassifier(use_semantic=False)
 
         result = classifier.classify("list files")
-        # Updated prompt hint format
-        assert "[SIMPLE]" in result.prompt_hint
+        hint = get_prompt_hint(result.complexity)
+        assert "[SIMPLE]" in hint
 
         result = classifier.classify("explain the code")
-        assert "[MEDIUM]" in result.prompt_hint
+        hint = get_prompt_hint(result.complexity)
+        assert "[MEDIUM]" in hint
 
         result = classifier.classify("analyze the codebase")
+        hint = get_prompt_hint(result.complexity)
         # May be COMPLEX or ANALYSIS
-        assert "[COMPLEX]" in result.prompt_hint or "[ANALYSIS]" in result.prompt_hint
+        assert "[COMPLEX]" in hint or "[ANALYSIS]" in hint
 
         result = classifier.classify("write a function")
-        assert "[GENERATE]" in result.prompt_hint
+        hint = get_prompt_hint(result.complexity)
+        assert "[GENERATE]" in hint
 
     def test_confidence_scoring(self):
         """Test confidence scores are reasonable."""
@@ -294,7 +304,6 @@ class TestComplexityClassifier:
                 return TaskClassification(
                     complexity=TaskComplexity.COMPLEX,
                     tool_budget=100,
-                    prompt_hint="Magic task",
                     confidence=1.0,
                     matched_patterns=["magic_word"],
                 )
@@ -391,8 +400,9 @@ class TestDefaultBudgets:
         """Test budget values are reasonable."""
         assert DEFAULT_BUDGETS[TaskComplexity.SIMPLE] < DEFAULT_BUDGETS[TaskComplexity.MEDIUM]
         assert DEFAULT_BUDGETS[TaskComplexity.MEDIUM] < DEFAULT_BUDGETS[TaskComplexity.COMPLEX]
-        # Generation has no exploration (0 tools)
-        assert DEFAULT_BUDGETS[TaskComplexity.GENERATION] == 0
+        # All budgets have minimum of 10 to prevent premature termination
+        for complexity in TaskComplexity:
+            assert DEFAULT_BUDGETS[complexity] >= 10
         # ACTION and ANALYSIS have higher budgets
         assert DEFAULT_BUDGETS[TaskComplexity.ACTION] == 50
         assert DEFAULT_BUDGETS[TaskComplexity.ANALYSIS] == 60

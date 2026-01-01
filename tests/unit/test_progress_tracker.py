@@ -573,8 +573,8 @@ class TestTaskClassifierIntegration:
         tracker, hint = create_tracker_from_classification(classification)
 
         assert classification.complexity == TaskComplexity.SIMPLE
-        assert tracker.config.tool_budget == 2
-        assert tracker.config.max_total_iterations == 3
+        assert tracker.config.tool_budget == 10  # Updated minimum budget
+        assert tracker.config.max_total_iterations == 11  # budget + 1
         assert "SIMPLE" in hint
 
     def test_create_tracker_from_complex_classification(self):
@@ -588,7 +588,7 @@ class TestTaskClassifierIntegration:
         tracker, hint = create_tracker_from_classification(classification)
 
         assert classification.complexity == TaskComplexity.COMPLEX
-        assert tracker.config.tool_budget == 15
+        assert tracker.config.tool_budget == 25  # Updated budget
         assert tracker.task_type == TaskType.ANALYSIS
         assert "COMPLEX" in hint
 
@@ -603,9 +603,9 @@ class TestTaskClassifierIntegration:
         tracker, hint = create_tracker_from_classification(classification)
 
         assert classification.complexity == TaskComplexity.GENERATION
-        # GENERATION tasks have 0 tool budget - no exploration needed for code generation
-        assert tracker.config.tool_budget == 0
-        assert tracker.config.max_total_iterations == 2
+        # GENERATION tasks have minimum budget of 10 (may need file reads)
+        assert tracker.config.tool_budget == 10
+        assert tracker.config.max_total_iterations == 11  # budget + 1
         assert tracker.task_type == TaskType.ACTION
         assert "GENERATE" in hint
 
@@ -617,7 +617,7 @@ class TestTaskClassifierIntegration:
         tracker, hint, classification = classify_and_create_tracker("git status")
 
         assert classification.complexity == TaskComplexity.SIMPLE
-        assert tracker.remaining_budget == 2
+        assert tracker.remaining_budget == 10  # Updated minimum budget
         assert "SIMPLE" in hint
 
     def test_tracker_enforces_task_budget(self):
@@ -626,13 +626,13 @@ class TestTaskClassifierIntegration:
 
         tracker, _, _ = classify_and_create_tracker("git log")
 
-        # Should have budget of 2 for simple task
-        assert tracker.remaining_budget == 2
+        # Should have budget of 10 for simple task (minimum)
+        assert tracker.remaining_budget == 10
 
-        tracker.record_tool_call("list_directory", {"path": "."})
-        assert tracker.remaining_budget == 1
+        # Use up the budget
+        for i in range(10):
+            tracker.record_tool_call("list_directory", {"path": f"path_{i}"})
 
-        tracker.record_tool_call("list_directory", {"path": "src/"})
         assert tracker.remaining_budget == 0
 
         # Should now trigger stop
