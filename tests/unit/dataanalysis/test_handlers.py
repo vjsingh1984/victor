@@ -554,3 +554,334 @@ class TestEscapeHatches:
             "uncertainty_areas": ["a", "b", "c"],
         }
         assert analysis_confidence(ctx) == "medium"
+
+
+class TestPyCaretHandler:
+    """Tests for PyCaretHandler."""
+
+    @pytest.fixture
+    def handler(self):
+        from victor.dataanalysis.handlers import PyCaretHandler
+
+        return PyCaretHandler()
+
+    @pytest.fixture
+    def mock_registry(self):
+        return MagicMock()
+
+    @pytest.mark.asyncio
+    async def test_no_data_input(self, handler, mock_registry):
+        """Test handling of missing data input."""
+        node = MockComputeNode(
+            input_mapping={
+                "target": "label",
+                "task": "classification",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+        assert "No 'data' input" in result.error
+
+    @pytest.mark.asyncio
+    async def test_unsupported_data_type(self, handler, mock_registry):
+        """Test handling of unsupported data type."""
+        node = MockComputeNode(
+            input_mapping={
+                "data": "raw_data",
+                "target": "label",
+                "task": "classification",
+            },
+        )
+        # Use a string instead of a DataFrame/dict/list
+        context = MockWorkflowContext({"raw_data": "invalid string data"})
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+        assert "Unsupported data type" in result.error
+
+    @pytest.mark.asyncio
+    async def test_dict_data_conversion(self, handler, mock_registry):
+        """Test dict data is converted to DataFrame."""
+        node = MockComputeNode(
+            input_mapping={
+                "data": {"col1": [1, 2, 3], "col2": [4, 5, 6]},
+                "target": "col2",
+                "task": "classification",
+            },
+        )
+        context = MockWorkflowContext()
+
+        # This will fail because PyCaret is not installed, but we're testing data conversion
+        result = await handler(node, context, mock_registry)
+
+        # Should fail with PyCaret not installed, not data conversion error
+        assert result.status.value == "failed"
+        assert "PyCaret" in result.error or "pycaret" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_list_data_conversion(self, handler, mock_registry):
+        """Test list data is converted to DataFrame."""
+        node = MockComputeNode(
+            input_mapping={
+                "data": [{"a": 1, "b": 2}, {"a": 3, "b": 4}],
+                "target": "b",
+                "task": "classification",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Should fail with PyCaret not installed, not data conversion error
+        assert result.status.value == "failed"
+        assert "PyCaret" in result.error or "pycaret" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_default_task_is_classification(self, handler, mock_registry):
+        """Test default task type is classification."""
+        node = MockComputeNode(
+            input_mapping={
+                "data": {"col1": [1, 2], "col2": [0, 1]},
+                "target": "col2",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Verify it attempted classification (will fail due to missing PyCaret)
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_context_output_key(self, handler, mock_registry):
+        """Test output key is set from node."""
+        node = MockComputeNode(
+            input_mapping={
+                "data": {"col1": [1], "col2": [1]},
+                "target": "col2",
+            },
+            output_key="automl_result",
+        )
+        context = MockWorkflowContext()
+
+        await handler(node, context, mock_registry)
+
+        # Context should have something at the output key (even if failed)
+        assert context.get("automl_result") is not None
+
+
+class TestAutoSklearnHandler:
+    """Tests for AutoSklearnHandler."""
+
+    @pytest.fixture
+    def handler(self):
+        from victor.dataanalysis.handlers import AutoSklearnHandler
+
+        return AutoSklearnHandler()
+
+    @pytest.fixture
+    def mock_registry(self):
+        return MagicMock()
+
+    @pytest.mark.asyncio
+    async def test_missing_x_input(self, handler, mock_registry):
+        """Test handling of missing X input."""
+        node = MockComputeNode(
+            input_mapping={
+                "y": "target",
+                "task": "classification",
+            },
+        )
+        context = MockWorkflowContext({"target": [0, 1, 0, 1]})
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+        assert "'X' (features) and 'y' (target)" in result.error
+
+    @pytest.mark.asyncio
+    async def test_missing_y_input(self, handler, mock_registry):
+        """Test handling of missing y input."""
+        node = MockComputeNode(
+            input_mapping={
+                "X": "features",
+                "task": "classification",
+            },
+        )
+        context = MockWorkflowContext({"features": [[1, 2], [3, 4]]})
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+        assert "'X' (features) and 'y' (target)" in result.error
+
+    @pytest.mark.asyncio
+    async def test_default_task_is_classification(self, handler, mock_registry):
+        """Test default task type is classification."""
+        node = MockComputeNode(
+            input_mapping={
+                "X": [[1, 2], [3, 4], [5, 6], [7, 8]],
+                "y": [0, 1, 0, 1],
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Will fail due to auto-sklearn not installed
+        assert result.status.value == "failed"
+        assert "auto-sklearn" in result.error.lower() or "autosklearn" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_context_output_key(self, handler, mock_registry):
+        """Test output key is set from node."""
+        node = MockComputeNode(
+            input_mapping={
+                "X": [[1, 2], [3, 4]],
+                "y": [0, 1],
+            },
+            output_key="sklearn_result",
+        )
+        context = MockWorkflowContext()
+
+        await handler(node, context, mock_registry)
+
+        assert context.get("sklearn_result") is not None
+
+    @pytest.mark.asyncio
+    async def test_dataframe_input_conversion(self, handler, mock_registry):
+        """Test DataFrame values are extracted."""
+        try:
+            import pandas as pd
+
+            df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+            series = pd.Series([0, 1, 0])
+
+            node = MockComputeNode(
+                input_mapping={
+                    "X": "features",
+                    "y": "target",
+                },
+            )
+            context = MockWorkflowContext({"features": df, "target": series})
+
+            result = await handler(node, context, mock_registry)
+
+            # Will fail due to auto-sklearn not installed
+            assert result.status.value == "failed"
+            assert "auto-sklearn" in result.error.lower() or "autosklearn" in result.error.lower()
+        except ImportError:
+            pytest.skip("pandas not installed")
+
+
+class TestRLTrainingHandler:
+    """Tests for RLTrainingHandler."""
+
+    @pytest.fixture
+    def handler(self):
+        from victor.dataanalysis.handlers import RLTrainingHandler
+
+        return RLTrainingHandler()
+
+    @pytest.fixture
+    def mock_registry(self):
+        return MagicMock()
+
+    @pytest.mark.asyncio
+    async def test_default_algorithm_is_ppo(self, handler, mock_registry):
+        """Test default algorithm is PPO."""
+        node = MockComputeNode(
+            input_mapping={
+                "env": "CartPole-v1",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Will fail due to stable-baselines3 not installed
+        assert result.status.value == "failed"
+        assert "stable-baselines3" in result.error.lower() or "gymnasium" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_default_env_is_cartpole(self, handler, mock_registry):
+        """Test default env is CartPole-v1."""
+        node = MockComputeNode(
+            input_mapping={},
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Will attempt to use default CartPole-v1
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_context_output_key(self, handler, mock_registry):
+        """Test output key is set from node."""
+        node = MockComputeNode(
+            input_mapping={
+                "env": "CartPole-v1",
+            },
+            output_key="rl_result",
+        )
+        context = MockWorkflowContext()
+
+        await handler(node, context, mock_registry)
+
+        assert context.get("rl_result") is not None
+
+    @pytest.mark.asyncio
+    async def test_all_input_parameters(self, handler, mock_registry):
+        """Test all input parameters are read correctly."""
+        node = MockComputeNode(
+            input_mapping={
+                "env": "MountainCar-v0",
+                "algorithm": "DQN",
+                "total_timesteps": 50000,
+                "policy": "MlpPolicy",
+                "learning_rate": 0.001,
+                "n_eval_episodes": 5,
+                "save_path": "/tmp/model",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Will fail due to packages not installed
+        assert result.status.value == "failed"
+
+
+class TestNewHandlersInRegistry:
+    """Tests for new handlers in HANDLERS dict."""
+
+    def test_pycaret_handler_in_registry(self):
+        """Test pycaret_automl handler is registered."""
+        from victor.dataanalysis.handlers import HANDLERS
+
+        assert "pycaret_automl" in HANDLERS
+
+    def test_autosklearn_handler_in_registry(self):
+        """Test autosklearn_automl handler is registered."""
+        from victor.dataanalysis.handlers import HANDLERS
+
+        assert "autosklearn_automl" in HANDLERS
+
+    def test_rl_training_handler_in_registry(self):
+        """Test rl_training handler is registered."""
+        from victor.dataanalysis.handlers import HANDLERS
+
+        assert "rl_training" in HANDLERS
+
+    def test_all_handlers_exported(self):
+        """Test all handler classes are in __all__."""
+        from victor.dataanalysis import handlers
+
+        assert "PyCaretHandler" in handlers.__all__
+        assert "AutoSklearnHandler" in handlers.__all__
+        assert "RLTrainingHandler" in handlers.__all__

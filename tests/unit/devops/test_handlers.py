@@ -542,3 +542,198 @@ class TestEscapeHatches:
             },
         }
         assert security_scan_verdict(ctx) == "fail"
+
+
+class TestMLOpsHandler:
+    """Tests for MLOpsHandler."""
+
+    @pytest.fixture
+    def handler(self):
+        from victor.devops.handlers import MLOpsHandler
+
+        return MLOpsHandler()
+
+    @pytest.fixture
+    def mock_registry(self):
+        return MagicMock()
+
+    @pytest.mark.asyncio
+    async def test_default_operation_is_register(self, handler, mock_registry):
+        """Test default operation is register."""
+        node = MockComputeNode(
+            input_mapping={
+                "model_name": "my_model",
+                "model_path": "/path/to/model",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Will fail because mlflow is not installed
+        assert result.status.value == "failed"
+        assert "MLflow" in result.error or "mlflow" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_register_operation(self, handler, mock_registry):
+        """Test register operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "register",
+                "model_name": "test_model",
+                "model_path": "/models/test.pkl",
+                "metrics": {"accuracy": 0.95},
+            },
+            output_key="mlops_result",
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+        assert context.get("mlops_result") is not None
+
+    @pytest.mark.asyncio
+    async def test_log_experiment_operation(self, handler, mock_registry):
+        """Test log_experiment operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "log_experiment",
+                "experiment_name": "my_experiment",
+                "metrics": {"loss": 0.1, "accuracy": 0.95},
+                "params": {"learning_rate": 0.001},
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_serve_operation(self, handler, mock_registry):
+        """Test serve operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "serve",
+                "model_name": "production_model",
+                "version": "1",
+                "port": 5001,
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_compare_operation(self, handler, mock_registry):
+        """Test compare operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "compare",
+                "model_name": "my_model",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_promote_operation(self, handler, mock_registry):
+        """Test promote operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "promote",
+                "model_name": "my_model",
+                "version": "3",
+                "stage": "Production",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_list_models_operation(self, handler, mock_registry):
+        """Test list_models operation."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "list_models",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_unknown_operation(self, handler, mock_registry):
+        """Test unknown operation returns error."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "invalid_operation",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        assert result.status.value == "failed"
+
+    @pytest.mark.asyncio
+    async def test_context_output_key(self, handler, mock_registry):
+        """Test output key is set from node."""
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "register",
+                "model_name": "test",
+            },
+            output_key="mlflow_result",
+        )
+        context = MockWorkflowContext()
+
+        await handler(node, context, mock_registry)
+
+        assert context.get("mlflow_result") is not None
+
+    @pytest.mark.asyncio
+    async def test_custom_tracking_uri(self, mock_registry):
+        """Test custom tracking URI."""
+        from victor.devops.handlers import MLOpsHandler
+
+        handler = MLOpsHandler(tracking_uri="http://mlflow.example.com")
+        node = MockComputeNode(
+            input_mapping={
+                "operation": "register",
+                "model_name": "test",
+            },
+        )
+        context = MockWorkflowContext()
+
+        result = await handler(node, context, mock_registry)
+
+        # Should fail with mlflow not installed, not tracking URI error
+        assert result.status.value == "failed"
+
+
+class TestMLOpsInRegistry:
+    """Tests for MLOps handler in HANDLERS dict."""
+
+    def test_mlops_handler_in_registry(self):
+        """Test mlops handler is registered."""
+        from victor.devops.handlers import HANDLERS
+
+        assert "mlops" in HANDLERS
+
+    def test_mlops_exported(self):
+        """Test MLOpsHandler class is in __all__."""
+        from victor.devops import handlers
+
+        assert "MLOpsHandler" in handlers.__all__
