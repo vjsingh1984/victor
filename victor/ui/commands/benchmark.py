@@ -387,14 +387,24 @@ def run_benchmark(
                     try:
                         trace = await adapter.execute_task(benchmark_task, work_dir)
                     except asyncio.CancelledError:
-                        # On timeout/cancellation, flush partial data to logs
+                        # On timeout/cancellation, store partial data for harness
                         partial = adapter.get_partial_trace()
                         logger.info(
                             f"Task cancelled - partial trace: "
                             f"tool_calls={partial['tool_calls']}, turns={partial['turns']}, "
                             f"tokens={partial['tokens_used']}"
                         )
-                        # Re-raise to let wait_for handle it, but data is logged
+                        # Store partial data in a container the harness can access
+                        # We use a mutable dict attached to the function object
+                        agent_callback._partial_data = {
+                            "code": partial.get("code", ""),
+                            "tokens_input": partial.get("tokens_input", 0),
+                            "tokens_output": partial.get("tokens_output", 0),
+                            "tokens_used": partial.get("tokens_used", 0),
+                            "tool_calls": partial.get("tool_calls", 0),
+                            "turns": partial.get("turns", 0),
+                        }
+                        # Re-raise so wait_for properly times out
                         raise
                     finally:
                         os.chdir(original_cwd)

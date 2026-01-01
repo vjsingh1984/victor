@@ -987,6 +987,39 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ToolPipeline created%s", " with middleware chain" if middleware_chain else "")
         return pipeline
 
+    def create_streaming_tool_adapter(
+        self,
+        tool_pipeline: Any,
+        on_chunk: Optional[Callable] = None,
+    ) -> Any:
+        """Create StreamingToolAdapter for unified streaming tool execution.
+
+        The StreamingToolAdapter wraps ToolPipeline to provide streaming output
+        while preserving ALL ToolPipeline features (caching, middleware, callbacks,
+        budget, deduplication, etc.).
+
+        This solves the dual execution path problem where:
+        - Batch path: Used ToolPipeline with full feature support
+        - Streaming path: Previously bypassed ToolPipeline using self.tools.execute()
+
+        Now BOTH paths route through: StreamingToolAdapter -> ToolPipeline
+
+        Args:
+            tool_pipeline: ToolPipeline instance to wrap
+            on_chunk: Optional callback for each StreamingToolChunk
+
+        Returns:
+            StreamingToolAdapter instance
+        """
+        from victor.agent.streaming_tool_adapter import create_streaming_tool_adapter
+
+        adapter = create_streaming_tool_adapter(
+            tool_pipeline=tool_pipeline,
+            on_chunk=on_chunk,
+        )
+        logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
+        return adapter
+
     def create_conversation_controller(
         self,
         provider: "BaseProvider",

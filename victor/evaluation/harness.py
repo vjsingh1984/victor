@@ -667,9 +667,21 @@ class EvaluationHarness:
             except asyncio.TimeoutError:
                 task_result.status = TaskStatus.TIMEOUT
                 task_result.error_message = "Agent timeout"
-                # Note: partial data may be returned from callback's CancelledError handler
-                # The callback should return a dict with partial metrics if available
-                logger.info("Task timed out - partial metrics may be available from callback")
+                # Check if callback stored partial data before cancellation
+                partial_data = getattr(agent_callback, "_partial_data", None)
+                if partial_data:
+                    task_result.tokens_input = partial_data.get("tokens_input", 0)
+                    task_result.tokens_output = partial_data.get("tokens_output", 0)
+                    task_result.tokens_used = partial_data.get("tokens_used", 0)
+                    task_result.tool_calls = partial_data.get("tool_calls", 0)
+                    task_result.turns = partial_data.get("turns", 0)
+                    task_result.generated_code = partial_data.get("code", "")
+                    logger.info(
+                        f"Task timed out - partial metrics recovered: "
+                        f"tool_calls={task_result.tool_calls}, turns={task_result.turns}"
+                    )
+                else:
+                    logger.info("Task timed out - no partial metrics available")
                 return task_result
 
             # Handle dict return type for token tracking (P1 fix)
