@@ -32,6 +32,15 @@ from victor.agent.conversation_state import ConversationStage
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
 
+# Rust-accelerated pattern matching (with Python fallback)
+_RUST_PATTERN_MATCHING = False
+try:
+    from victor.processing.native import find_all_patterns
+
+    _RUST_PATTERN_MATCHING = True
+except ImportError:
+    pass
+
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
@@ -230,10 +239,17 @@ def detect_categories_from_message(message: str) -> Set[str]:
 
     # Always check fallback keywords to ensure coverage
     # (registry may not have all category keywords defined)
-    message_lower = message.lower()
+    # Use Rust Aho-Corasick when available for O(text_len) matching
     for category, keywords in _FALLBACK_CATEGORY_KEYWORDS.items():
-        if any(kw in message_lower for kw in keywords):
-            detected.add(category)
+        keywords_list = list(keywords)
+        if _RUST_PATTERN_MATCHING:
+            matches = find_all_patterns(message, keywords_list, case_insensitive=True)
+            if matches:
+                detected.add(category)
+        else:
+            message_lower = message.lower()
+            if any(kw in message_lower for kw in keywords):
+                detected.add(category)
 
     if detected:
         logger.debug(f"Detected categories (merged): {detected}")
