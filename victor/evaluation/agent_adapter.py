@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 else:
     # Deferred import at runtime - only when actually needed
     AgentOrchestrator = None  # Will be imported lazily in from_profile()
+from victor.agent.task_completion import TaskCompletionDetector
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
     FileEdit,
@@ -122,6 +123,9 @@ class VictorAgentAdapter:
                 keep_attempts=self.config.keep_correction_attempts
             )
 
+        # Task completion detector (uses framework's detection, not gaming code)
+        self._completion_detector = TaskCompletionDetector()
+
         # Hook into tool execution
         self._original_tool_start = orchestrator._on_tool_start_callback
         self._original_tool_complete = orchestrator._on_tool_complete_callback
@@ -174,6 +178,14 @@ class VictorAgentAdapter:
             elif hasattr(result, "tool_name"):
                 last_call.success = getattr(result, "success", True)
                 last_call.result = getattr(result, "result", None)
+
+            # Record tool result for completion detection (framework integration)
+            result_dict = {
+                "success": getattr(result, "success", True),
+                "path": last_call.arguments.get("path")
+                or last_call.arguments.get("file_path"),
+            }
+            self._completion_detector.record_tool_result(last_call.name, result_dict)
 
         # Track file edit after completion
         if self.config.track_file_edits and self._tool_calls:
@@ -251,12 +263,19 @@ class VictorAgentAdapter:
                 keep_attempts=self.config.keep_correction_attempts
             )
 
+        # Reset completion detector for new task
+        self._completion_detector.reset()
+
     async def execute_task(
         self,
         task: BenchmarkTask,
         workspace_dir: Path,
     ) -> AgenticExecutionTrace:
         """Execute an agentic task and return execution trace.
+
+        Uses the framework's PromptEnrichmentService and TaskCompletionDetector
+        rather than benchmark-specific gaming code. This tests Victor as users
+        would actually use it.
 
         Args:
             task: The benchmark task to execute
@@ -273,8 +292,16 @@ class VictorAgentAdapter:
             start_time=time.time(),
         )
 
-        # Build task prompt
-        prompt = self._build_task_prompt(task, workspace_dir)
+        # Inject task context into vertical context for framework enrichment
+        # This is the proper architecture: hints flow through the enrichment pipeline
+        self._inject_task_context(task, workspace_dir)
+
+        # Analyze intent for completion detection (framework feature)
+        task_description = task.issue_text or task.prompt
+        self._completion_detector.analyze_intent(task_description)
+
+        # Use task's issue_text or prompt directly - let framework handle enrichment
+        prompt = task_description
 
         try:
             # Execute agent loop
@@ -283,14 +310,13 @@ class VictorAgentAdapter:
                 self._turns += 1
 
                 # Add user message
-                self._messages.append(
-                    {"role": "user", "content": prompt if self._turns == 1 else "Continue."}
-                )
+                current_message = prompt if self._turns == 1 else "Continue."
+                self._messages.append({"role": "user", "content": current_message})
 
                 # Get agent response
                 try:
                     response = await asyncio.wait_for(
-                        self.orchestrator.chat(prompt if self._turns == 1 else "Continue."),
+                        self.orchestrator.chat(current_message),
                         timeout=self.config.timeout_per_turn,
                     )
                 except asyncio.TimeoutError:
@@ -300,8 +326,9 @@ class VictorAgentAdapter:
                 assistant_content = response.content if response else ""
                 self._messages.append({"role": "assistant", "content": assistant_content})
 
-                # Check for completion signals
-                complete = self._is_task_complete(assistant_content)
+                # Use framework's completion detection (not gaming code)
+                self._completion_detector.analyze_response(assistant_content)
+                complete = self._completion_detector.should_stop()
 
                 # Check tool budget
                 if len(self._tool_calls) >= self.config.tool_budget:
@@ -335,55 +362,45 @@ class VictorAgentAdapter:
 
         return trace
 
-    def _build_task_prompt(self, task: BenchmarkTask, workspace_dir: Path) -> str:
-        """Build the initial prompt for the task."""
-        parts = []
+    def _inject_task_context(self, task: BenchmarkTask, workspace_dir: Path) -> None:
+        """Inject task context into orchestrator's system prompt for enrichment.
 
-        # Task description
-        parts.append(f"# Task: {task.task_id}")
-        parts.append("")
+        This replaces the gaming approach of _build_task_prompt() with proper
+        framework integration. Context is appended to the system prompt using
+        the orchestrator's native append_to_system_prompt() method.
 
-        if task.prompt:
-            parts.append("## Problem Statement")
-            parts.append(task.prompt)
-            parts.append("")
+        Args:
+            task: The benchmark task
+            workspace_dir: Working directory for the task
+        """
+        context_sections = []
 
-        # Working directory
-        parts.append("## Working Directory")
-        parts.append(f"You are working in: {workspace_dir}")
-        parts.append("")
+        # Add working directory context
+        context_sections.append(
+            f"## Working Directory\nYou are working in: {workspace_dir}"
+        )
 
-        # Context code if provided
+        # Add repository context if available
+        if task.repo:
+            repo_name = task.repo.replace("https://github.com/", "").replace(".git", "")
+            context_sections.append(f"**Repository:** {repo_name}")
+
+        # Add hints through the system prompt (framework integration)
+        # These become part of the system context, benefiting all verticals
+        if task.hints:
+            hints_section = "## Hints\n" + "\n".join(f"- {hint}" for hint in task.hints)
+            context_sections.append(hints_section)
+
+        # Add context code if provided
         if task.context_code:
-            parts.append("## Context Code")
-            parts.append("```python")
-            parts.append(task.context_code)
-            parts.append("```")
-            parts.append("")
+            code_section = f"## Context Code\n```python\n{task.context_code}\n```"
+            context_sections.append(code_section)
 
-        # Instructions
-        parts.append("## Instructions")
-        parts.append("1. Analyze the problem and explore relevant files")
-        parts.append("2. Implement the required changes")
-        parts.append("3. Test your changes if applicable")
-        parts.append("4. Say 'TASK COMPLETE' when finished")
-        parts.append("")
-
-        return "\n".join(parts)
-
-    def _is_task_complete(self, response: str) -> bool:
-        """Check if agent signals task completion."""
-        completion_phrases = [
-            "task complete",
-            "task completed",
-            "task is complete",
-            "i have completed",
-            "the task has been completed",
-            "changes have been applied",
-            "implementation complete",
-        ]
-        response_lower = response.lower()
-        return any(phrase in response_lower for phrase in completion_phrases)
+        # Append all context to the orchestrator's system prompt
+        if context_sections:
+            combined_context = "\n\n".join(context_sections)
+            self.orchestrator.append_to_system_prompt(combined_context)
+            logger.debug(f"Injected task context: {len(context_sections)} sections")
 
     def _generate_combined_patch(self) -> str:
         """Generate combined unified diff from all file edits."""
