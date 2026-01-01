@@ -378,13 +378,9 @@ class MLOpsHandler:
             client = MlflowClient()
 
             if operation == "register":
-                return self._register_model(
-                    mlflow, client, model_name, model_path, metrics, params
-                )
+                return self._register_model(mlflow, client, model_name, model_path, metrics, params)
             elif operation == "log_experiment":
-                return self._log_experiment(
-                    mlflow, experiment_name, metrics, params
-                )
+                return self._log_experiment(mlflow, experiment_name, metrics, params)
             elif operation == "serve":
                 return self._serve_model(model_name, version, port)
             elif operation == "compare":
@@ -484,13 +480,15 @@ class MLOpsHandler:
 
             for v in versions:
                 run = client.get_run(v.run_id)
-                comparison.append({
-                    "version": v.version,
-                    "stage": v.current_stage,
-                    "run_id": v.run_id,
-                    "metrics": run.data.metrics,
-                    "status": v.status,
-                })
+                comparison.append(
+                    {
+                        "version": v.version,
+                        "stage": v.current_stage,
+                        "run_id": v.run_id,
+                        "metrics": run.data.metrics,
+                        "status": v.status,
+                    }
+                )
 
             # Find best version by first metric
             best_version = None
@@ -511,9 +509,7 @@ class MLOpsHandler:
                 "error": f"Model comparison failed: {e}",
             }
 
-    def _promote_model(
-        self, client, model_name: str, version: str, stage: str
-    ) -> Dict[str, Any]:
+    def _promote_model(self, client, model_name: str, version: str, stage: str) -> Dict[str, Any]:
         """Promote a model version to a stage."""
         client.transition_model_version_stage(
             name=model_name,
@@ -540,8 +536,7 @@ class MLOpsHandler:
                 {
                     "name": m.name,
                     "latest_versions": [
-                        {"version": v.version, "stage": v.current_stage}
-                        for v in m.latest_versions
+                        {"version": v.version, "stage": v.current_stage} for v in m.latest_versions
                     ],
                 }
                 for m in models

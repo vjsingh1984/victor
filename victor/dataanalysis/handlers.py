@@ -164,7 +164,7 @@ class StatsComputeHandler:
             elif operation == "std":
                 mean = sum(numeric) / len(numeric)
                 variance = sum((x - mean) ** 2 for x in numeric) / len(numeric)
-                return variance ** 0.5
+                return variance**0.5
             elif operation == "describe":
                 mean = sum(numeric) / len(numeric)
                 return {
@@ -487,8 +487,13 @@ class PyCaretHandler:
                 "task": task,
                 "best_model": str(type(final_model).__name__),
                 "best_model_object": final_model,
-                "leaderboard": leaderboard.to_dict() if hasattr(leaderboard, "to_dict") else str(leaderboard),
-                "top_n_models": [str(type(m).__name__) for m in (best_models if isinstance(best_models, list) else [best_models])],
+                "leaderboard": (
+                    leaderboard.to_dict() if hasattr(leaderboard, "to_dict") else str(leaderboard)
+                ),
+                "top_n_models": [
+                    str(type(m).__name__)
+                    for m in (best_models if isinstance(best_models, list) else [best_models])
+                ],
                 "sort_metric": sort_metric,
             }
 
@@ -712,9 +717,13 @@ class AutoSklearnHandler:
                 "task": task,
                 "cv_score": float(score),
                 "metric": metric or default_metric,
-                "leaderboard": leaderboard.to_dict() if hasattr(leaderboard, "to_dict") else str(leaderboard),
+                "leaderboard": (
+                    leaderboard.to_dict() if hasattr(leaderboard, "to_dict") else str(leaderboard)
+                ),
                 "statistics": stats,
-                "n_models_evaluated": len(automl.cv_results_) if hasattr(automl, "cv_results_") else None,
+                "n_models_evaluated": (
+                    len(automl.cv_results_) if hasattr(automl, "cv_results_") else None
+                ),
                 "automl_object": automl,
             }
 
@@ -886,9 +895,7 @@ class RLTrainingHandler:
             train_time = time.time() - train_start
 
             # Evaluate
-            mean_reward, std_reward = evaluate_policy(
-                model, env, n_eval_episodes=n_eval_episodes
-            )
+            mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=n_eval_episodes)
 
             # Save if path provided
             if save_path:

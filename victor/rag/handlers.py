@@ -196,27 +196,31 @@ class ChunkProcessorHandler:
                 chunks.append({"text": text[pos:end], "start": pos, "end": end})
                 pos += chunk_size - overlap
         elif strategy == "sentence":
-            sentences = re.split(r'(?<=[.!?])\s+', text)
+            sentences = re.split(r"(?<=[.!?])\s+", text)
             current_chunk = ""
             start = 0
             for sentence in sentences:
                 if len(current_chunk) + len(sentence) > chunk_size:
                     if current_chunk:
-                        chunks.append({
-                            "text": current_chunk.strip(),
-                            "start": start,
-                            "end": start + len(current_chunk),
-                        })
+                        chunks.append(
+                            {
+                                "text": current_chunk.strip(),
+                                "start": start,
+                                "end": start + len(current_chunk),
+                            }
+                        )
                     current_chunk = sentence
                     start = start + len(current_chunk)
                 else:
                     current_chunk += " " + sentence
             if current_chunk:
-                chunks.append({
-                    "text": current_chunk.strip(),
-                    "start": start,
-                    "end": start + len(current_chunk),
-                })
+                chunks.append(
+                    {
+                        "text": current_chunk.strip(),
+                        "start": start,
+                        "end": start + len(current_chunk),
+                    }
+                )
         elif strategy == "paragraph":
             paragraphs = text.split("\n\n")
             pos = 0

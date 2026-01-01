@@ -313,6 +313,7 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
 
 # Register Coding domain handlers when this module is loaded
 from victor.coding.handlers import register_handlers as _register_handlers
+
 _register_handlers()
 
 __all__ = [
