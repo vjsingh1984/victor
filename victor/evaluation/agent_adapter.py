@@ -444,7 +444,23 @@ class VictorAgentAdapter:
             "settings": settings,
             "timeout": timeout,
         }
+
+        # Get API key from profile, environment variable, or keyring
         api_key = getattr(profile_config, "api_key", None)
+        # Resolve ${ENV_VAR} references
+        if api_key and api_key.startswith("${") and api_key.endswith("}"):
+            env_var = api_key[2:-1]
+            api_key = os.environ.get(env_var)
+
+        # If still no API key, try keyring
+        if not api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                api_key = get_api_key(provider_name)
+            except ImportError:
+                pass
+
         if api_key:
             provider_kwargs["api_key"] = api_key
 

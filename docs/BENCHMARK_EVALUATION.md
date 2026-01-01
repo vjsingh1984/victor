@@ -306,6 +306,22 @@ victor benchmark compare --benchmark swe-bench
 victor benchmark leaderboard --benchmark swe-bench
 ```
 
+### 6.6 Benchmark Results (v0.4.0)
+
+| Provider | Model | Task | Tokens | Duration | Status |
+|----------|-------|------|--------|----------|--------|
+| DeepSeek | deepseek-chat | astropy-11693 | 169,704 | 214.0s | ❌ Failed |
+| OpenAI | gpt-4.1 | astropy-11693 | 69,545 | 110.6s | ❌ Failed |
+| Ollama | qwen3-coder-tools:30b | astropy-11693 | N/A* | 600.0s | ⏱️ Timeout |
+
+**Notes:**
+- Token tracking verified working for cloud providers (DeepSeek, OpenAI)
+- *Ollama doesn't return token counts in API responses - requires separate estimation
+- Timeout policy (180s min per turn) prevents premature turn timeouts
+- Rate limiting observed with OpenAI (429 errors auto-retried)
+- SWE-bench astropy task is complex (WCS coordinate conversion bug)
+- Local Qwen3 model worked steadily but timed out at 600s task limit
+
 ### 6.4 Token Tracking Flow
 
 ```
