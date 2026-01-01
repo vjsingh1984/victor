@@ -377,6 +377,7 @@ class ConversationStateMachine:
             Detected stage or None
         """
         if not self.state.last_tools:
+            logger.debug("_detect_stage_from_tools: No recent tools, returning None")
             return None
 
         # Score stages based on tool overlap (uses registry + static fallback)
@@ -389,8 +390,35 @@ class ConversationStateMachine:
                 scores[stage] = overlap
 
         if scores:
-            return max(scores, key=scores.get)  # type: ignore
+            max_score = max(scores.values())
+            tied_stages = [s for s, v in scores.items() if v == max_score]
 
+            # Tie-breaking logic to prevent oscillation:
+            # 1. Prefer current stage if it's in the tied group (stability)
+            # 2. Otherwise, prefer the most advanced stage (forward progress)
+            if len(tied_stages) == 1:
+                detected = tied_stages[0]
+            elif self.state.stage in tied_stages:
+                # Current stage is tied - stay to avoid oscillation
+                detected = self.state.stage
+                logger.debug(
+                    f"_detect_stage_from_tools: Tie resolved by staying at current stage"
+                )
+            else:
+                # Pick the most advanced (highest in workflow order)
+                detected = max(tied_stages, key=lambda s: STAGE_ORDER[s])
+                logger.debug(
+                    f"_detect_stage_from_tools: Tie resolved by picking most advanced stage"
+                )
+
+            scores_str = ", ".join(f"{k.name}={v}" for k, v in scores.items())
+            logger.debug(
+                f"_detect_stage_from_tools: last_tools={self.state.last_tools}, "
+                f"scores=[{scores_str}], detected={detected.name}"
+            )
+            return detected
+
+        logger.debug(f"_detect_stage_from_tools: No stage overlap for tools={self.state.last_tools}")
         return None
 
     def _maybe_transition(self) -> None:
@@ -401,9 +429,19 @@ class ConversationStateMachine:
             stage_tools = self._get_tools_for_stage(detected)
             recent_overlap = len(set(self.state.last_tools) & stage_tools)
 
+            logger.debug(
+                f"_maybe_transition: current={self.state.stage.name}, detected={detected.name}, "
+                f"recent_overlap={recent_overlap}, min_threshold={self.MIN_TOOLS_FOR_TRANSITION}, "
+                f"stage_tools_count={len(stage_tools)}"
+            )
+
             # Use class constant for minimum tools threshold
             if recent_overlap >= self.MIN_TOOLS_FOR_TRANSITION:
                 self._transition_to(detected, confidence=0.6 + (recent_overlap * 0.1))
+            else:
+                logger.debug(
+                    f"_maybe_transition: Transition blocked - overlap {recent_overlap} < threshold {self.MIN_TOOLS_FOR_TRANSITION}"
+                )
 
     def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:
         """Transition to a new stage.
@@ -432,6 +470,10 @@ class ConversationStateMachine:
             STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]
             and confidence < self.BACKWARD_TRANSITION_THRESHOLD
         ):
+            logger.debug(
+                f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
+                f"confidence={confidence:.2f} < threshold={self.BACKWARD_TRANSITION_THRESHOLD}"
+            )
             return
 
         if new_stage != old_stage:

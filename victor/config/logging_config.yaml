@@ -25,7 +25,8 @@ logging:
   # Per-command overrides (inherit from default, only specify differences)
   commands:
     # chat: uses defaults (WARNING console, INFO file)
-    # benchmark: uses defaults
+    benchmark:
+      file_level: DEBUG         # Detailed logs for debugging stage transitions
     serve:
       console_level: INFO       # Servers show more visibility
     debug:
