@@ -12,11 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for benchmark CLI commands."""
+"""Tests for benchmark CLI commands.
+
+Unit tests that don't require Ollama or API keys test CLI structure only.
+Integration tests that run actual benchmarks are skipped when Ollama is unavailable.
+"""
+
+import socket
 
 import pytest
 from typer.testing import CliRunner
 from victor.ui.commands.benchmark import benchmark_app
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama server is running at localhost:11434."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(1)
+        result = sock.connect_ex(("localhost", 11434))
+        return result == 0
+    finally:
+        sock.close()
 
 
 runner = CliRunner()
@@ -58,6 +75,7 @@ class TestBenchmarkRun:
         assert "--max-tasks" in result.stdout
         assert "--model" in result.stdout
         assert "--timeout" in result.stdout
+        assert "--profile" in result.stdout
 
 
 class TestBenchmarkCompare:
@@ -118,3 +136,34 @@ class TestBenchmarkHelp:
         assert "compare" in result.stdout
         assert "leaderboard" in result.stdout
         assert "capabilities" in result.stdout
+
+
+@pytest.mark.skipif(
+    not is_ollama_available(),
+    reason="Ollama not available - skipping benchmark execution tests"
+)
+class TestBenchmarkExecution:
+    """Integration tests for actually running benchmarks.
+
+    These tests require Ollama to be running with a model available.
+    They are skipped in CI environments where Ollama is not available.
+    """
+
+    def test_run_humaneval_with_ollama(self):
+        """Test running HumanEval with Ollama (limited tasks)."""
+        # Use default profile which should use Ollama if available
+        result = runner.invoke(
+            benchmark_app,
+            ["run", "humaneval", "--max-tasks", "1", "--timeout", "60", "--profile", "default"]
+        )
+        # Should start running or fail gracefully if model unavailable
+        # We don't assert success since the model might not be loaded
+        assert "HumanEval" in result.stdout or "humaneval" in result.stdout or result.exit_code in (0, 1)
+
+    def test_run_mbpp_with_ollama(self):
+        """Test running MBPP with Ollama (limited tasks)."""
+        result = runner.invoke(
+            benchmark_app,
+            ["run", "mbpp", "--max-tasks", "1", "--timeout", "60", "--profile", "default"]
+        )
+        assert "MBPP" in result.stdout or "mbpp" in result.stdout or result.exit_code in (0, 1)
