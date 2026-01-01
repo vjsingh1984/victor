@@ -1,0 +1,433 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Sandboxed execution for workflow compute nodes.
+
+Provides Docker and subprocess isolation for compute node execution
+based on IsolationConfig settings. Integrates with the existing
+sandbox infrastructure in victor.integrations.mcp.sandbox.
+
+Execution Modes:
+- none: Direct inline execution (fastest)
+- process: Subprocess with resource limits (rlimit)
+- docker: Full container isolation (safest)
+
+Example:
+    from victor.workflows.sandbox_executor import SandboxedExecutor
+    from victor.workflows.isolation import IsolationMapper, IsolationConfig
+
+    executor = SandboxedExecutor()
+
+    # Execute with isolation
+    result = await executor.execute(
+        command=["python", "compute_stats.py"],
+        isolation=IsolationConfig(sandbox_type="process"),
+        context={"data_path": "/tmp/data.csv"},
+    )
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from victor.workflows.isolation import IsolationConfig, ResourceLimits
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ExecutionResult:
+    """Result of sandboxed execution.
+
+    Attributes:
+        success: Whether execution succeeded
+        output: Standard output from command
+        error: Error message if failed
+        exit_code: Process exit code
+        duration_seconds: Execution duration
+        sandbox_type: Type of sandbox used
+    """
+
+    success: bool
+    output: str = ""
+    error: str = ""
+    exit_code: int = 0
+    duration_seconds: float = 0.0
+    sandbox_type: str = "none"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "success": self.success,
+            "output": self.output,
+            "error": self.error,
+            "exit_code": self.exit_code,
+            "duration_seconds": self.duration_seconds,
+            "sandbox_type": self.sandbox_type,
+        }
+
+
+class SandboxedExecutor:
+    """Execute commands with configurable isolation.
+
+    Supports three isolation levels:
+    - none: Direct execution (no isolation)
+    - process: Subprocess with rlimit resource controls
+    - docker: Full container isolation
+
+    Example:
+        executor = SandboxedExecutor()
+
+        result = await executor.execute(
+            command=["python", "script.py"],
+            isolation=IsolationConfig(sandbox_type="docker"),
+        )
+    """
+
+    def __init__(
+        self,
+        default_docker_image: str = "python:3.11-slim",
+        docker_available: Optional[bool] = None,
+    ):
+        """Initialize executor.
+
+        Args:
+            default_docker_image: Default Docker image for container execution
+            docker_available: Override Docker availability check
+        """
+        self._default_image = default_docker_image
+        self._docker_available = docker_available
+        if docker_available is None:
+            self._docker_available = self._check_docker()
+
+    def _check_docker(self) -> bool:
+        """Check if Docker is available."""
+        try:
+            result = subprocess.run(
+                ["docker", "version", "--format", "{{.Server.Version}}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    async def execute(
+        self,
+        command: List[str],
+        isolation: IsolationConfig,
+        working_dir: Optional[str] = None,
+        env: Optional[Dict[str, str]] = None,
+        input_data: Optional[str] = None,
+    ) -> ExecutionResult:
+        """Execute command with specified isolation.
+
+        Args:
+            command: Command and arguments to execute
+            isolation: Isolation configuration
+            working_dir: Working directory for execution
+            env: Environment variables
+            input_data: Data to pipe to stdin
+
+        Returns:
+            ExecutionResult with output and status
+        """
+        import time
+
+        start_time = time.time()
+
+        if isolation.sandbox_type == "docker":
+            if self._docker_available:
+                result = await self._execute_docker(
+                    command, isolation, working_dir, env, input_data
+                )
+            else:
+                logger.warning("Docker not available, falling back to process isolation")
+                result = await self._execute_process(
+                    command, isolation, working_dir, env, input_data
+                )
+        elif isolation.sandbox_type == "process":
+            result = await self._execute_process(
+                command, isolation, working_dir, env, input_data
+            )
+        else:
+            result = await self._execute_inline(
+                command, isolation, working_dir, env, input_data
+            )
+
+        result.duration_seconds = time.time() - start_time
+        return result
+
+    async def _execute_inline(
+        self,
+        command: List[str],
+        isolation: IsolationConfig,
+        working_dir: Optional[str],
+        env: Optional[Dict[str, str]],
+        input_data: Optional[str],
+    ) -> ExecutionResult:
+        """Execute command inline without isolation.
+
+        Args:
+            command: Command to execute
+            isolation: Isolation config (for timeout)
+            working_dir: Working directory
+            env: Environment variables
+            input_data: Stdin data
+
+        Returns:
+            ExecutionResult
+        """
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdin=asyncio.subprocess.PIPE if input_data else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=working_dir,
+                env={**os.environ, **(env or {})},
+            )
+
+            timeout = isolation.resource_limits.timeout_seconds if isolation.resource_limits else 60.0
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input_data.encode() if input_data else None),
+                timeout=timeout,
+            )
+
+            return ExecutionResult(
+                success=process.returncode == 0,
+                output=stdout.decode("utf-8", errors="replace"),
+                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                exit_code=process.returncode or 0,
+                sandbox_type="none",
+            )
+
+        except asyncio.TimeoutError:
+            return ExecutionResult(
+                success=False,
+                error=f"Command timed out after {timeout}s",
+                sandbox_type="none",
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                sandbox_type="none",
+            )
+
+    async def _execute_process(
+        self,
+        command: List[str],
+        isolation: IsolationConfig,
+        working_dir: Optional[str],
+        env: Optional[Dict[str, str]],
+        input_data: Optional[str],
+    ) -> ExecutionResult:
+        """Execute command in sandboxed subprocess with rlimit.
+
+        Args:
+            command: Command to execute
+            isolation: Isolation config with resource limits
+            working_dir: Working directory
+            env: Environment variables
+            input_data: Stdin data
+
+        Returns:
+            ExecutionResult
+        """
+        from victor.integrations.mcp.sandbox import SandboxConfig, SandboxedProcess
+
+        # Convert isolation config to sandbox config
+        limits = isolation.resource_limits or ResourceLimits()
+        sandbox_config = SandboxConfig(
+            max_memory_mb=limits.max_memory_mb,
+            max_cpu_seconds=limits.max_cpu_seconds,
+            max_file_descriptors=limits.max_file_descriptors,
+            max_processes=limits.max_processes,
+            timeout_seconds=limits.timeout_seconds,
+            allow_network=isolation.network_allowed,
+        )
+
+        sandbox = SandboxedProcess(sandbox_config)
+
+        try:
+            # Prepare environment
+            exec_env = env or {}
+            if not isolation.network_allowed:
+                exec_env["VICTOR_NETWORK_DISABLED"] = "1"
+
+            process = await sandbox.start(
+                command=command,
+                cwd=working_dir or isolation.working_directory,
+                env=exec_env,
+            )
+
+            # Communicate with process
+            stdout, stderr = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: process.communicate(input_data.encode() if input_data else None),
+                ),
+                timeout=limits.timeout_seconds,
+            )
+
+            await sandbox.terminate(process)
+
+            return ExecutionResult(
+                success=process.returncode == 0,
+                output=stdout.decode("utf-8", errors="replace") if stdout else "",
+                error=stderr.decode("utf-8", errors="replace") if stderr and process.returncode != 0 else "",
+                exit_code=process.returncode or 0,
+                sandbox_type="process",
+            )
+
+        except asyncio.TimeoutError:
+            return ExecutionResult(
+                success=False,
+                error=f"Command timed out after {limits.timeout_seconds}s",
+                sandbox_type="process",
+            )
+        except Exception as e:
+            logger.error(f"Process sandbox execution failed: {e}")
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                sandbox_type="process",
+            )
+
+    async def _execute_docker(
+        self,
+        command: List[str],
+        isolation: IsolationConfig,
+        working_dir: Optional[str],
+        env: Optional[Dict[str, str]],
+        input_data: Optional[str],
+    ) -> ExecutionResult:
+        """Execute command in Docker container.
+
+        Args:
+            command: Command to execute
+            isolation: Isolation config with Docker settings
+            working_dir: Working directory to mount
+            env: Environment variables
+            input_data: Stdin data
+
+        Returns:
+            ExecutionResult
+        """
+        limits = isolation.resource_limits or ResourceLimits()
+        image = isolation.docker_image or self._default_image
+
+        # Build docker run command
+        docker_cmd = ["docker", "run", "--rm"]
+
+        # Resource limits
+        docker_cmd.extend([
+            "--memory", f"{limits.max_memory_mb}m",
+            "--cpus", "1.0",
+            "--pids-limit", str(limits.max_processes),
+        ])
+
+        # Network settings
+        if not isolation.network_allowed:
+            docker_cmd.extend(["--network", "none"])
+
+        # Filesystem settings
+        if isolation.filesystem_readonly:
+            docker_cmd.append("--read-only")
+
+        # Mount working directory
+        if working_dir:
+            mount_mode = "ro" if isolation.filesystem_readonly else "rw"
+            docker_cmd.extend(["-v", f"{working_dir}:/workspace:{mount_mode}"])
+            docker_cmd.extend(["-w", "/workspace"])
+
+        # Mount additional volumes
+        for host_path, container_path in isolation.docker_volumes.items():
+            docker_cmd.extend(["-v", f"{host_path}:{container_path}"])
+
+        # Environment variables
+        for key, value in (env or {}).items():
+            docker_cmd.extend(["-e", f"{key}={value}"])
+
+        for key, value in isolation.environment.items():
+            docker_cmd.extend(["-e", f"{key}={value}"])
+
+        # Add image and command
+        docker_cmd.append(image)
+        docker_cmd.extend(command)
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *docker_cmd,
+                stdin=asyncio.subprocess.PIPE if input_data else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input_data.encode() if input_data else None),
+                timeout=limits.timeout_seconds + 30,  # Extra time for container startup
+            )
+
+            return ExecutionResult(
+                success=process.returncode == 0,
+                output=stdout.decode("utf-8", errors="replace"),
+                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                exit_code=process.returncode or 0,
+                sandbox_type="docker",
+            )
+
+        except asyncio.TimeoutError:
+            return ExecutionResult(
+                success=False,
+                error=f"Docker execution timed out after {limits.timeout_seconds}s",
+                sandbox_type="docker",
+            )
+        except Exception as e:
+            logger.error(f"Docker execution failed: {e}")
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                sandbox_type="docker",
+            )
+
+
+# Global executor instance
+_default_executor: Optional[SandboxedExecutor] = None
+
+
+def get_sandboxed_executor() -> SandboxedExecutor:
+    """Get or create the default sandboxed executor."""
+    global _default_executor
+    if _default_executor is None:
+        _default_executor = SandboxedExecutor()
+    return _default_executor
+
+
+__all__ = [
+    "ExecutionResult",
+    "SandboxedExecutor",
+    "get_sandboxed_executor",
+]

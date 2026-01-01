@@ -26,24 +26,109 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
 
 from victor.workflows.definition import (
     AgentNode,
+    ComputeNode,
     ConditionNode,
     ParallelNode,
     TransformNode,
     WorkflowDefinition,
     WorkflowNode,
 )
+from victor.workflows.isolation import IsolationMapper
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents import SubAgentOrchestrator
     from victor.agent.rl.checkpoint_store import CheckpointStore
+    from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
+    from victor.workflows.services import ServiceRegistry, ServiceConfig
 
 logger = logging.getLogger(__name__)
+
+
+class ComputeHandler(Protocol):
+    """Protocol for custom compute node handlers.
+
+    Handlers enable domain-specific execution logic for ComputeNodes.
+    Register handlers with register_compute_handler() to extend
+    workflow execution capabilities.
+
+    Example:
+        async def rl_decision_handler(
+            node: ComputeNode,
+            context: WorkflowContext,
+            tool_registry: ToolRegistry,
+        ) -> NodeResult:
+            # Load RL policy and make decision
+            policy = load_policy(context.get("policy_path"))
+            features = {k: context.get(k) for k in node.input_mapping.values()}
+            decision = policy.predict(features)
+            context.set(node.output_key, decision)
+            return NodeResult(node.id, NodeStatus.COMPLETED, output=decision)
+
+        register_compute_handler("rl_decision", rl_decision_handler)
+    """
+
+    async def __call__(
+        self,
+        node: "ComputeNode",
+        context: "WorkflowContext",
+        tool_registry: "ToolRegistry",
+    ) -> "NodeResult":
+        """Execute custom handler logic.
+
+        Args:
+            node: The ComputeNode being executed
+            context: Workflow execution context
+            tool_registry: Tool registry for tool execution
+
+        Returns:
+            NodeResult with execution outcome
+        """
+        ...
+
+
+# Global registry for compute handlers
+_compute_handlers: Dict[str, ComputeHandler] = {}
+
+
+def register_compute_handler(name: str, handler: ComputeHandler) -> None:
+    """Register a custom compute handler.
+
+    Handlers enable domain-specific execution logic for ComputeNodes.
+    When a ComputeNode has a `handler` field matching the registered name,
+    the handler will be invoked instead of the default tool execution.
+
+    Args:
+        name: Handler name (referenced in YAML as handler: name)
+        handler: Async callable implementing ComputeHandler protocol
+
+    Example:
+        register_compute_handler("rl_decision", my_rl_handler)
+
+        # In YAML:
+        - id: weights
+          type: compute
+          handler: rl_decision
+          inputs:
+            features: $ctx.valuation_features
+    """
+    _compute_handlers[name] = handler
+    logger.debug(f"Registered compute handler: {name}")
+
+
+def get_compute_handler(name: str) -> Optional[ComputeHandler]:
+    """Get a registered compute handler by name."""
+    return _compute_handlers.get(name)
+
+
+def list_compute_handlers() -> List[str]:
+    """List all registered compute handler names."""
+    return list(_compute_handlers.keys())
 
 
 class NodeStatus(Enum):
@@ -94,6 +179,114 @@ class NodeResult:
 
 
 @dataclass
+class TemporalContext:
+    """Point-in-time context for backtesting and historical analysis.
+
+    Provides temporal awareness to workflow execution, allowing tools
+    to access data as of a specific date for backtesting scenarios.
+
+    Attributes:
+        as_of_date: The reference date for point-in-time analysis (YYYY-MM-DD)
+        lookback_periods: Number of periods to look back from as_of_date
+        period_type: Type of period (days, weeks, months, quarters, years)
+        include_end_date: Whether to include the as_of_date in range
+
+    Example YAML:
+        - id: fetch_historical
+          type: compute
+          tools: [sec_filing]
+          temporal_context:
+            as_of_date: $ctx.analysis_date
+            lookback_periods: 8
+            period_type: quarters
+
+    Example usage in tools:
+        def my_tool(symbol: str, _exec_ctx: dict) -> ToolResult:
+            temporal = _exec_ctx.get("temporal_context")
+            if temporal:
+                data = fetch_data(symbol, as_of=temporal.as_of_date)
+            else:
+                data = fetch_data(symbol)  # Current data
+    """
+
+    as_of_date: Optional[str] = None  # ISO format: YYYY-MM-DD
+    lookback_periods: int = 0
+    period_type: str = "quarters"  # days, weeks, months, quarters, years
+    include_end_date: bool = True
+
+    def get_date_range(self) -> tuple:
+        """Calculate start and end dates based on lookback.
+
+        Returns:
+            Tuple of (start_date, end_date) as strings
+        """
+        from datetime import datetime, timedelta
+
+        if not self.as_of_date:
+            end_date = datetime.now()
+        else:
+            end_date = datetime.fromisoformat(self.as_of_date)
+
+        # Calculate start date based on lookback
+        if self.period_type == "days":
+            delta = timedelta(days=self.lookback_periods)
+        elif self.period_type == "weeks":
+            delta = timedelta(weeks=self.lookback_periods)
+        elif self.period_type == "months":
+            delta = timedelta(days=self.lookback_periods * 30)
+        elif self.period_type == "quarters":
+            delta = timedelta(days=self.lookback_periods * 91)
+        elif self.period_type == "years":
+            delta = timedelta(days=self.lookback_periods * 365)
+        else:
+            delta = timedelta(days=0)
+
+        start_date = end_date - delta
+
+        return (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+
+    def is_valid_for_date(self, data_date: str) -> bool:
+        """Check if a data date is valid for this temporal context.
+
+        Args:
+            data_date: Date to check (YYYY-MM-DD)
+
+        Returns:
+            True if data_date is on or before as_of_date
+        """
+        if not self.as_of_date:
+            return True  # No constraint
+
+        from datetime import datetime
+
+        data_dt = datetime.fromisoformat(data_date)
+        as_of_dt = datetime.fromisoformat(self.as_of_date)
+
+        if self.include_end_date:
+            return data_dt <= as_of_dt
+        return data_dt < as_of_dt
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "as_of_date": self.as_of_date,
+            "lookback_periods": self.lookback_periods,
+            "period_type": self.period_type,
+            "include_end_date": self.include_end_date,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContext":
+        """Create from dictionary."""
+        return cls(
+            as_of_date=data.get("as_of_date"),
+            lookback_periods=data.get("lookback_periods", 0),
+            period_type=data.get("period_type", "quarters"),
+            include_end_date=data.get("include_end_date", True),
+        )
+
+
+@dataclass
 class WorkflowContext:
     """Execution context for a workflow.
 
@@ -104,11 +297,13 @@ class WorkflowContext:
         data: Shared context data
         node_results: Results from executed nodes
         metadata: Execution metadata
+        temporal: Optional temporal context for point-in-time analysis
     """
 
     data: Dict[str, Any] = field(default_factory=dict)
     node_results: Dict[str, NodeResult] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    temporal: Optional[TemporalContext] = None
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a context value."""
@@ -233,6 +428,8 @@ class WorkflowExecutor:
         checkpointer: Optional["CheckpointStore"] = None,
         cache: Optional["WorkflowCache"] = None,
         cache_config: Optional["WorkflowCacheConfig"] = None,
+        tool_registry: Optional["ToolRegistry"] = None,
+        service_registry: Optional["ServiceRegistry"] = None,
     ):
         """Initialize executor.
 
@@ -243,6 +440,8 @@ class WorkflowExecutor:
             checkpointer: Optional CheckpointStore for persistence
             cache: Optional WorkflowCache for node result caching
             cache_config: Optional config to create a cache (alternative to cache param)
+            tool_registry: Optional ToolRegistry for ComputeNode execution
+            service_registry: Optional ServiceRegistry for infrastructure services
         """
         self.orchestrator = orchestrator
         self.max_parallel = max_parallel
@@ -250,6 +449,9 @@ class WorkflowExecutor:
         self._checkpointer = checkpointer
         self._sub_agents: Optional["SubAgentOrchestrator"] = None
         self._active_executions: Dict[str, asyncio.Task] = {}
+        self._tool_registry = tool_registry
+        self._service_registry = service_registry
+        self._services_started = False
 
         # Initialize cache if config provided
         if cache is not None:
@@ -271,9 +473,111 @@ class WorkflowExecutor:
         return self._sub_agents
 
     @property
+    def tool_registry(self) -> "ToolRegistry":
+        """Get or create ToolRegistry for ComputeNode execution."""
+        if self._tool_registry is None:
+            from victor.tools.registry import ToolRegistry
+
+            self._tool_registry = ToolRegistry()
+        return self._tool_registry
+
+    @property
     def cache(self) -> Optional["WorkflowCache"]:
         """Get the workflow cache (if enabled)."""
         return self._cache
+
+    @property
+    def service_registry(self) -> "ServiceRegistry":
+        """Get or create ServiceRegistry for infrastructure services."""
+        if self._service_registry is None:
+            from victor.workflows.services import create_default_registry
+
+            self._service_registry = create_default_registry()
+        return self._service_registry
+
+    async def _start_services(
+        self,
+        workflow: WorkflowDefinition,
+        context: WorkflowContext,
+    ) -> None:
+        """Start infrastructure services defined in workflow metadata.
+
+        Services are started in dependency order before workflow execution.
+        Service exports (like DATABASE_URL) are added to workflow context.
+
+        Args:
+            workflow: Workflow definition with services in metadata
+            context: Execution context to populate with service exports
+        """
+        services_config = workflow.metadata.get("services", [])
+        if not services_config:
+            return
+
+        from victor.workflows.services import ServiceConfig
+        from victor.workflows.yaml_loader import ServiceConfigYAML
+
+        logger.info(f"Starting {len(services_config)} infrastructure services...")
+
+        # Convert YAML configs to ServiceConfig objects
+        configs = []
+        for svc_data in services_config:
+            yaml_config = ServiceConfigYAML(
+                name=svc_data["name"],
+                provider=svc_data.get("provider", "docker"),
+                preset=svc_data.get("preset"),
+                image=svc_data.get("image"),
+                command=svc_data.get("command"),
+                ports=svc_data.get("ports", []),
+                environment=svc_data.get("environment", {}),
+                volumes=svc_data.get("volumes", []),
+                health_check=svc_data.get("health_check"),
+                depends_on=svc_data.get("depends_on", []),
+                lifecycle=svc_data.get("lifecycle"),
+                exports=svc_data.get("exports", {}),
+            )
+            configs.append(yaml_config.to_service_config())
+
+        # Start all services (handles dependency ordering)
+        try:
+            await self.service_registry.start_all(configs, timeout=300.0)
+            self._services_started = True
+
+            # Export service connection info to context
+            all_exports = self.service_registry.get_all_exports()
+            for svc_name, exports in all_exports.items():
+                for key, value in exports.items():
+                    context.set(f"service_{svc_name}_{key}", value)
+                    # Also set short form for common keys
+                    if key in ("DATABASE_URL", "REDIS_URL", "KAFKA_URL"):
+                        context.set(key, value)
+
+            logger.info(f"All {len(configs)} services started successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to start services: {e}")
+            raise
+
+    async def _stop_services(self) -> None:
+        """Stop all running infrastructure services.
+
+        Services are stopped in reverse dependency order.
+        Called automatically after workflow execution.
+        """
+        if not self._services_started:
+            return
+
+        try:
+            logger.info("Stopping infrastructure services...")
+            await self.service_registry.stop_all(grace_period=30.0)
+            self._services_started = False
+            logger.info("All services stopped")
+        except Exception as e:
+            logger.error(f"Error stopping services: {e}")
+            # Force cleanup even if graceful stop failed
+            try:
+                await self.service_registry.cleanup_all()
+            except Exception:
+                pass
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
@@ -292,17 +596,32 @@ class WorkflowExecutor:
         *,
         timeout: Optional[float] = None,
         thread_id: Optional[str] = None,
+        temporal_context: Optional[TemporalContext] = None,
     ) -> WorkflowResult:
-        """Execute a workflow with optional checkpointing.
+        """Execute a workflow with optional checkpointing and temporal context.
 
         Args:
             workflow: Workflow definition to execute
             initial_context: Initial context data
             timeout: Overall timeout (None = no limit)
             thread_id: Thread ID for checkpointing (enables resume)
+            temporal_context: Optional point-in-time context for backtesting
 
         Returns:
             WorkflowResult with execution outcome
+
+        Example with temporal context:
+            # Backtest as of a specific date
+            temporal = TemporalContext(
+                as_of_date="2023-06-30",
+                lookback_periods=8,
+                period_type="quarters",
+            )
+            result = await executor.execute(
+                workflow,
+                initial_context={"symbol": "AAPL"},
+                temporal_context=temporal,
+            )
         """
         execution_id = uuid.uuid4().hex[:8]
         thread_id = thread_id or execution_id
@@ -322,6 +641,10 @@ class WorkflowExecutor:
                 initial_context = checkpoint.state.get("context", {})
                 resume_from_node = checkpoint.state.get("next_node")
 
+        # Build temporal context from workflow metadata if not provided
+        if temporal_context is None and "temporal_context" in workflow.metadata:
+            temporal_context = TemporalContext.from_dict(workflow.metadata["temporal_context"])
+
         context = WorkflowContext(
             data=initial_context.copy() if initial_context else {},
             metadata={
@@ -329,11 +652,15 @@ class WorkflowExecutor:
                 "workflow_name": workflow.name,
                 "thread_id": thread_id,
             },
+            temporal=temporal_context,
         )
 
         start_time = time.time()
 
         try:
+            # Start infrastructure services before workflow execution
+            await self._start_services(workflow, context)
+
             if timeout:
                 await asyncio.wait_for(
                     self._execute_workflow(workflow, context, thread_id, resume_from_node),
@@ -387,6 +714,10 @@ class WorkflowExecutor:
                 total_duration=time.time() - start_time,
                 error=str(e),
             )
+
+        finally:
+            # Always stop services after workflow execution
+            await self._stop_services()
 
     async def _execute_workflow(
         self,
@@ -525,6 +856,9 @@ class WorkflowExecutor:
         try:
             if isinstance(node, AgentNode):
                 result = await self._execute_agent_node(node, context, start_time)
+
+            elif isinstance(node, ComputeNode):
+                result = await self._execute_compute_node(node, context, start_time)
 
             elif isinstance(node, ConditionNode):
                 result = await self._execute_condition_node(node, context, start_time)
@@ -791,6 +1125,239 @@ class WorkflowExecutor:
                 duration_seconds=time.time() - start_time,
             )
 
+    async def _execute_compute_node(
+        self,
+        node: ComputeNode,
+        context: WorkflowContext,
+        start_time: float,
+    ) -> NodeResult:
+        """Execute a compute node with constraints enforcement and isolation.
+
+        Supports:
+        - Custom handlers for domain-specific logic
+        - LLM-free tool execution
+        - Constraint enforcement (cost tier, tool limits, etc.)
+        - Isolation mapping (none, process, docker)
+
+        Args:
+            node: Compute node with tools, handler, and constraints
+            context: Execution context
+            start_time: Node start time
+
+        Returns:
+            NodeResult with execution outputs
+        """
+        try:
+            # Determine isolation configuration from constraints
+            vertical = context.metadata.get("vertical")
+            isolation = IsolationMapper.from_constraints(
+                constraints=node.constraints,
+                vertical=vertical,
+            )
+            logger.debug(
+                f"Node {node.id}: isolation={isolation.sandbox_type}, "
+                f"network={isolation.network_allowed}, vertical={vertical}"
+            )
+
+            # Check for custom handler first
+            if node.handler:
+                handler = get_compute_handler(node.handler)
+                if handler:
+                    logger.debug(f"Using custom handler '{node.handler}' for node {node.id}")
+                    return await handler(node, context, self.tool_registry)
+                else:
+                    logger.warning(
+                        f"Handler '{node.handler}' not found for node {node.id}, "
+                        f"falling back to default execution"
+                    )
+
+            # Default tool execution with constraint enforcement
+            tool_params = self._build_compute_params(node, context)
+            outputs = {}
+            tool_calls_used = 0
+            constraints = node.constraints
+
+            # Filter tools based on constraints
+            allowed_tools = []
+            for tool_name in node.tools:
+                # Check against constraint allowlists/blocklists
+                if constraints.allows_tool(tool_name):
+                    allowed_tools.append(tool_name)
+                else:
+                    logger.warning(
+                        f"Tool '{tool_name}' blocked by constraints for node {node.id}"
+                    )
+
+            if not allowed_tools and node.tools:
+                return NodeResult(
+                    node_id=node.id,
+                    status=NodeStatus.FAILED,
+                    error="All tools blocked by constraints",
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Build execution context with isolation info
+            exec_ctx = {
+                "workflow_context": context.data,
+                "constraints": constraints.to_dict(),
+                "isolation": isolation.to_dict(),
+                "temporal_context": context.metadata.get("temporal_context"),
+            }
+
+            if node.parallel and len(allowed_tools) > 1:
+                # Execute tools in parallel
+                async def execute_tool(tool_name: str, exec_context: dict) -> tuple:
+                    try:
+                        result = await asyncio.wait_for(
+                            self.tool_registry.execute(
+                                tool_name,
+                                _exec_ctx=exec_context,
+                                **tool_params,
+                            ),
+                            timeout=constraints.timeout,
+                        )
+                        return tool_name, result
+                    except asyncio.TimeoutError:
+                        from victor.tools.base import ToolResult
+
+                        return tool_name, ToolResult(
+                            success=False,
+                            output=None,
+                            error=f"Tool '{tool_name}' timed out after {constraints.timeout}s",
+                        )
+                    except Exception as e:
+                        from victor.tools.base import ToolResult
+
+                        return tool_name, ToolResult(
+                            success=False,
+                            output=None,
+                            error=str(e),
+                        )
+
+                tasks = [execute_tool(tool_name, exec_ctx) for tool_name in allowed_tools]
+                results = await asyncio.gather(*tasks)
+
+                for tool_name, result in results:
+                    tool_calls_used += 1
+                    if tool_calls_used > constraints.max_tool_calls:
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.FAILED,
+                            error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
+                            output=outputs,
+                            duration_seconds=time.time() - start_time,
+                            tool_calls_used=tool_calls_used,
+                        )
+
+                    if result.success:
+                        outputs[tool_name] = result.output
+                    elif node.fail_fast:
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.FAILED,
+                            error=f"Tool '{tool_name}' failed: {result.error}",
+                            output=outputs,
+                            duration_seconds=time.time() - start_time,
+                            tool_calls_used=tool_calls_used,
+                        )
+            else:
+                # Execute tools sequentially
+                for tool_name in allowed_tools:
+                    if tool_calls_used >= constraints.max_tool_calls:
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.FAILED,
+                            error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
+                            output=outputs,
+                            duration_seconds=time.time() - start_time,
+                            tool_calls_used=tool_calls_used,
+                        )
+
+                    try:
+                        result = await asyncio.wait_for(
+                            self.tool_registry.execute(
+                                tool_name,
+                                _exec_ctx=exec_ctx,
+                                **tool_params,
+                            ),
+                            timeout=constraints.timeout,
+                        )
+                        tool_calls_used += 1
+
+                        if result.success:
+                            outputs[tool_name] = result.output
+                            # Update params with output for chaining
+                            tool_params.update({tool_name: result.output})
+                        elif node.fail_fast:
+                            return NodeResult(
+                                node_id=node.id,
+                                status=NodeStatus.FAILED,
+                                error=f"Tool '{tool_name}' failed: {result.error}",
+                                output=outputs,
+                                duration_seconds=time.time() - start_time,
+                                tool_calls_used=tool_calls_used,
+                            )
+
+                    except asyncio.TimeoutError:
+                        if node.fail_fast:
+                            return NodeResult(
+                                node_id=node.id,
+                                status=NodeStatus.FAILED,
+                                error=f"Tool '{tool_name}' timed out after {constraints.timeout}s",
+                                output=outputs,
+                                duration_seconds=time.time() - start_time,
+                                tool_calls_used=tool_calls_used,
+                            )
+
+            # Store outputs in context
+            output_key = node.output_key or node.id
+            context.set(output_key, outputs)
+
+            return NodeResult(
+                node_id=node.id,
+                status=NodeStatus.COMPLETED,
+                output=outputs,
+                duration_seconds=time.time() - start_time,
+                tool_calls_used=tool_calls_used,
+            )
+
+        except Exception as e:
+            logger.error(f"ComputeNode '{node.id}' failed: {e}", exc_info=True)
+            return NodeResult(
+                node_id=node.id,
+                status=NodeStatus.FAILED,
+                error=f"Compute failed: {e}",
+                duration_seconds=time.time() - start_time,
+            )
+
+    def _build_compute_params(
+        self,
+        node: ComputeNode,
+        context: WorkflowContext,
+    ) -> Dict[str, Any]:
+        """Build tool parameters from context using input mapping.
+
+        Args:
+            node: Compute node with input mapping
+            context: Execution context
+
+        Returns:
+            Dictionary of parameters for tool execution
+        """
+        params = {}
+        for param_name, context_key in node.input_mapping.items():
+            if isinstance(context_key, str):
+                # Could be a context reference or literal value
+                value = context.get(context_key)
+                if value is not None:
+                    params[param_name] = value
+                else:
+                    # Treat as literal value if not found in context
+                    params[param_name] = context_key
+            else:
+                params[param_name] = context_key
+        return params
+
     async def execute_by_name(
         self,
         workflow_name: str,
@@ -958,9 +1525,17 @@ class WorkflowExecutor:
 
 
 __all__ = [
+    # Core types
     "NodeStatus",
     "NodeResult",
     "WorkflowContext",
     "WorkflowResult",
     "WorkflowExecutor",
+    # Temporal context for backtesting
+    "TemporalContext",
+    # Handler extensibility
+    "ComputeHandler",
+    "register_compute_handler",
+    "get_compute_handler",
+    "list_compute_handlers",
 ]
