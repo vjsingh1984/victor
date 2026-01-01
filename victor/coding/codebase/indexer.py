@@ -913,6 +913,29 @@ class CodebaseIndex:
         if self.graph_store and self._graph_edges:
             await self.graph_store.upsert_edges(self._graph_edges)
 
+        # Build embeddings for all indexed symbols
+        if self.use_embeddings and self.embedding_provider:
+            embedding_count = 0
+            for rel_path, file_meta in self.files.items():
+                for symbol in file_meta.symbols:
+                    text_for_embedding = self._get_symbol_embedding_text(symbol)
+                    if text_for_embedding:
+                        try:
+                            await self.embedding_provider.index_document(
+                                doc_id=f"{rel_path}:{symbol.name}",
+                                content=text_for_embedding,
+                                metadata={
+                                    "file_path": rel_path,
+                                    "symbol_name": symbol.name,
+                                    "symbol_type": symbol.type,
+                                    "line_number": symbol.line_number,
+                                },
+                            )
+                            embedding_count += 1
+                        except Exception as e:
+                            logger.debug(f"Failed to embed symbol {symbol.name}: {e}")
+            logger.info(f"Created {embedding_count} embeddings for semantic search")
+
         self._is_indexed = True
         self._is_stale = False
         self._last_indexed = time.time()
@@ -1079,9 +1102,9 @@ class CodebaseIndex:
                 text_for_embedding = self._get_symbol_embedding_text(symbol)
                 if text_for_embedding:
                     try:
-                        await self.embedding_provider.add_document(
+                        await self.embedding_provider.index_document(
                             doc_id=f"{rel_path}:{symbol.name}",
-                            text=text_for_embedding,
+                            content=text_for_embedding,
                             metadata={
                                 "file_path": rel_path,
                                 "symbol_name": symbol.name,
