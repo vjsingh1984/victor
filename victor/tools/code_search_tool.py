@@ -452,7 +452,8 @@ async def code_search(
         )
 
         # Get semantic search configuration from settings
-        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.5)
+        # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
+        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.25)
         expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
         enable_hybrid = getattr(settings, "enable_hybrid_search", False)
 
