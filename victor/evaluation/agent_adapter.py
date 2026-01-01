@@ -156,16 +156,19 @@ class VictorAgentAdapter:
 
     def _on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Track tool call start."""
+        start_time = time.time()
         logger.info(f"[AgentAdapter] Tool started: {tool_name}")
 
-        # Record tool call
+        # Record tool call with start time for duration tracking
         self._tool_calls.append(
             ToolCall(
                 name=tool_name,
                 arguments=arguments,
-                timestamp=time.time(),
+                timestamp=start_time,
             )
         )
+        # Store start time for duration calculation
+        self._current_tool_start = start_time
 
         # Snapshot file before edit
         if self.config.track_file_edits and tool_name in (
@@ -185,8 +188,20 @@ class VictorAgentAdapter:
 
     def _on_tool_complete(self, result: Any) -> None:
         """Track tool call completion."""
+        # Calculate duration
+        end_time = time.time()
+        duration_ms = 0
+        if hasattr(self, "_current_tool_start"):
+            duration_ms = int((end_time - self._current_tool_start) * 1000)
+
         # Update last tool call with result
         if self._tool_calls:
+            tool_name = self._tool_calls[-1].name
+            success = getattr(result, "success", True) if hasattr(result, "success") else True
+            logger.info(
+                f"[AgentAdapter] Tool completed: {tool_name} "
+                f"(duration={duration_ms}ms, success={success})"
+            )
             last_call = self._tool_calls[-1]
             if hasattr(result, "success"):
                 last_call.success = result.success
