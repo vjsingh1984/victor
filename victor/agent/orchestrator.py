@@ -1497,6 +1497,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         logger.debug("Tiered tool config set")
 
+    def set_workspace(self, workspace_dir: Path) -> None:
+        """Set the workspace directory for task execution.
+
+        Updates the global project root and orchestrator's project context
+        to work in the specified directory. This is essential for benchmark
+        evaluations where each task operates in a different workspace.
+
+        Args:
+            workspace_dir: Path to the workspace directory
+        """
+        from victor.config.settings import set_project_root
+        from victor.context.project_context import ProjectContext
+
+        # Update global project root
+        set_project_root(workspace_dir)
+        logger.info(f"Project root set to: {workspace_dir}")
+
+        # Create new project context for this workspace
+        self.project_context = ProjectContext(root_path=str(workspace_dir))
+        self.project_context.load()
+
+        # Update system prompt if new context has content
+        if self.project_context.content:
+            base_prompt = self._build_system_prompt_with_adapter()
+            self._system_prompt = (
+                base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
+
     def _apply_vertical_tools(self, tools: Set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
 

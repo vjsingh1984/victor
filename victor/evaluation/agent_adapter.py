@@ -293,6 +293,12 @@ class VictorAgentAdapter:
         self.reset()
         self.config.working_dir = workspace_dir
 
+        # CRITICAL: Set workspace BEFORE any orchestrator operations
+        # This ensures tools like file read/write, grep, etc. operate on the benchmark
+        # repo rather than Victor's own codebase. Uses framework method for proper
+        # encapsulation of project context updates.
+        self.orchestrator.set_workspace(workspace_dir)
+
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
