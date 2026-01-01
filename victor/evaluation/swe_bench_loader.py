@@ -661,6 +661,7 @@ class SWEBenchWorkspaceManager:
 
             # Mark as indexed
             from datetime import datetime, timezone
+
             index_marker.write_text(datetime.now(timezone.utc).isoformat())
 
             logger.info(f"Indexed {task.repo} successfully")

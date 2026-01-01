@@ -82,7 +82,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\bconsolidate\s+(the\s+)?(code|duplicate|files?)\b", 0.9, "consolidate"),
         # Bug fix patterns - common in issue reports
         (r"\b(failed|fails|failing)\s+to\s+\w+", 1.0, "bug_fix"),
-        (r"\b(unexpected|wrong|incorrect)\s+(behavior|result|output|error)\b", 0.95, "bug_behavior"),
+        (
+            r"\b(unexpected|wrong|incorrect)\s+(behavior|result|output|error)\b",
+            0.95,
+            "bug_behavior",
+        ),
         (r"\braise[sd]?\s+\w*Error\b", 0.9, "raises_error"),
         (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\b", 1.0, "fix_bug"),
         (r"\b(bug|issue)\s*(report|#\d+)?\s*:", 0.9, "bug_report"),
@@ -134,6 +138,7 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     ],
 }
 
+
 # Consolidated budget configuration per complexity level
 # All limits are derived from complexity - single source of truth
 @dataclass
@@ -143,10 +148,11 @@ class ComplexityBudget:
     All components (adapter, completion detector, orchestrator) should use
     this instead of having their own hardcoded limits.
     """
-    tool_budget: int           # Max tool calls
-    max_turns: int             # Max conversation turns
+
+    tool_budget: int  # Max tool calls
+    max_turns: int  # Max conversation turns
     max_continuation_requests: int  # Max "need more info" before force stop
-    timeout_seconds: int       # Total task timeout
+    timeout_seconds: int  # Total task timeout
 
     @classmethod
     def for_complexity(cls, complexity: "TaskComplexity") -> "ComplexityBudget":
@@ -196,8 +202,7 @@ COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
 
 # Legacy: Simple tool budgets for backward compatibility
 DEFAULT_BUDGETS: Dict[TaskComplexity, int] = {
-    complexity: budget.tool_budget
-    for complexity, budget in COMPLEXITY_BUDGETS.items()
+    complexity: budget.tool_budget for complexity, budget in COMPLEXITY_BUDGETS.items()
 }
 
 # Mapping from task type strings to complexity levels
@@ -423,9 +428,7 @@ class TaskComplexityService:
 
         try:
             result = classifier.classify_sync(message)
-            complexity = TASK_TYPE_TO_COMPLEXITY.get(
-                result.task_type.value, TaskComplexity.MEDIUM
-            )
+            complexity = TASK_TYPE_TO_COMPLEXITY.get(result.task_type.value, TaskComplexity.MEDIUM)
             if result.confidence >= self.semantic_threshold:
                 return TaskClassification(
                     complexity=complexity,

@@ -142,6 +142,7 @@ class TaskAnalyzer:
     def _get_complexity_hint(self, complexity: "TaskComplexity") -> str:
         """Get prompt hint for a complexity level via enricher."""
         from victor.agent.complexity_classifier import get_prompt_hint
+
         return get_prompt_hint(complexity)
 
     @property

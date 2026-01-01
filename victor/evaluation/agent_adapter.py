@@ -137,18 +137,14 @@ class VictorAgentAdapter:
         # bypassing the ToolPipeline. We must hook into the ToolRegistry instead.
         if hasattr(orchestrator, "tools") and orchestrator.tools:
             orchestrator.tools.register_before_hook(
-                self._on_tool_start_hook,
-                critical=False,
-                name="AgentAdapter.tool_start"
+                self._on_tool_start_hook, critical=False, name="AgentAdapter.tool_start"
             )
             orchestrator.tools.register_after_hook(
-                self._on_tool_complete_hook,
-                critical=False,
-                name="AgentAdapter.tool_complete"
+                self._on_tool_complete_hook, critical=False, name="AgentAdapter.tool_complete"
             )
-            logger.info(f"[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
+            logger.info("[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
         else:
-            logger.warning(f"[AgentAdapter] Could not register hooks - ToolRegistry not found")
+            logger.warning("[AgentAdapter] Could not register hooks - ToolRegistry not found")
 
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution."""
@@ -202,8 +198,7 @@ class VictorAgentAdapter:
             # Record tool result for completion detection (framework integration)
             result_dict = {
                 "success": getattr(result, "success", True),
-                "path": last_call.arguments.get("path")
-                or last_call.arguments.get("file_path"),
+                "path": last_call.arguments.get("path") or last_call.arguments.get("file_path"),
             }
             self._completion_detector.record_tool_result(last_call.name, result_dict)
 
@@ -405,7 +400,9 @@ class VictorAgentAdapter:
         trace.messages = self._messages.copy()
         trace.tool_calls = self._tool_calls.copy()
         trace.file_edits = self._file_edits.copy()
-        logger.info(f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns")
+        logger.info(
+            f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns"
+        )
 
         # Generate combined patch from file edits
         trace.generated_patch = self._generate_combined_patch()
@@ -442,9 +439,7 @@ class VictorAgentAdapter:
         """
         # Priority 1: Explicit override (caller knows best)
         if task.complexity_override:
-            logger.info(
-                f"Using explicit complexity override: {task.complexity_override}"
-            )
+            logger.info(f"Using explicit complexity override: {task.complexity_override}")
             return task.complexity_override
 
         # Priority 2: Inference from task description
@@ -487,9 +482,7 @@ class VictorAgentAdapter:
         context_sections = []
 
         # Add working directory context
-        context_sections.append(
-            f"## Working Directory\nYou are working in: {workspace_dir}"
-        )
+        context_sections.append(f"## Working Directory\nYou are working in: {workspace_dir}")
 
         # Add repository context if available
         if task.repo:

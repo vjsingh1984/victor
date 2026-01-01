@@ -245,7 +245,9 @@ class StreamingToolAdapter:
             execution_time_ms = (time.monotonic() - start_time) * 1000
 
             # Check if it was a cache hit
-            if tool_result.cached or (tool_result.skipped and "cache" in (tool_result.skip_reason or "").lower()):
+            if tool_result.cached or (
+                tool_result.skipped and "cache" in (tool_result.skip_reason or "").lower()
+            ):
                 cache_chunk = StreamingToolChunk(
                     tool_name=tool_name,
                     tool_call_id=tool_call_id,
