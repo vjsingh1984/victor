@@ -31,11 +31,14 @@ Usage:
 
 import asyncio
 import json
+import logging
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import typer
 from rich.console import Console
@@ -69,7 +72,8 @@ def _configure_log_level(log_level: Optional[str]) -> None:
     if log_level == "WARN":
         log_level = "WARNING"
 
-    configure_logging(log_level, stream=sys.stderr)
+    # Pass file_level to ensure debug logs go to file when DEBUG is requested
+    configure_logging(log_level, stream=sys.stderr, file_level=log_level)
 
 
 @benchmark_app.command("list")
@@ -379,9 +383,19 @@ def run_benchmark(
 
                     # Change to target repo directory so agent uses its indexes
                     original_cwd = os.getcwd()
+                    os.chdir(work_dir)
                     try:
-                        os.chdir(work_dir)
                         trace = await adapter.execute_task(benchmark_task, work_dir)
+                    except asyncio.CancelledError:
+                        # On timeout/cancellation, flush partial data to logs
+                        partial = adapter.get_partial_trace()
+                        logger.info(
+                            f"Task cancelled - partial trace: "
+                            f"tool_calls={partial['tool_calls']}, turns={partial['turns']}, "
+                            f"tokens={partial['tokens_used']}"
+                        )
+                        # Re-raise to let wait_for handle it, but data is logged
+                        raise
                     finally:
                         os.chdir(original_cwd)
 

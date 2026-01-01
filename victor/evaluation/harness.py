@@ -667,6 +667,9 @@ class EvaluationHarness:
             except asyncio.TimeoutError:
                 task_result.status = TaskStatus.TIMEOUT
                 task_result.error_message = "Agent timeout"
+                # Note: partial data may be returned from callback's CancelledError handler
+                # The callback should return a dict with partial metrics if available
+                logger.info("Task timed out - partial metrics may be available from callback")
                 return task_result
 
             # Handle dict return type for token tracking (P1 fix)

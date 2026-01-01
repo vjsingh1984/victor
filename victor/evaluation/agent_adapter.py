@@ -132,25 +132,35 @@ class VictorAgentAdapter:
         # Task completion detector (uses framework's detection, not gaming code)
         self._completion_detector = TaskCompletionDetector()
 
-        # Hook into tool execution - must update BOTH orchestrator AND ToolPipeline
-        # The ToolPipeline receives a copy of the callback at init time, so we need
-        # to update it directly for our hooks to receive tool call events
-        self._original_tool_start = orchestrator._on_tool_start_callback
-        self._original_tool_complete = orchestrator._on_tool_complete_callback
-        orchestrator._on_tool_start_callback = self._on_tool_start
-        orchestrator._on_tool_complete_callback = self._on_tool_complete
+        # Hook into tool execution via ToolRegistry hooks
+        # The orchestrator's streaming handler uses self.tools.execute() directly,
+        # bypassing the ToolPipeline. We must hook into the ToolRegistry instead.
+        if hasattr(orchestrator, "tools") and orchestrator.tools:
+            orchestrator.tools.register_before_hook(
+                self._on_tool_start_hook,
+                critical=False,
+                name="AgentAdapter.tool_start"
+            )
+            orchestrator.tools.register_after_hook(
+                self._on_tool_complete_hook,
+                critical=False,
+                name="AgentAdapter.tool_complete"
+            )
+            logger.info(f"[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
+        else:
+            logger.warning(f"[AgentAdapter] Could not register hooks - ToolRegistry not found")
 
-        # CRITICAL: Also update ToolPipeline's callbacks directly
-        # Without this, tool calls are not tracked in evaluation traces
-        if hasattr(orchestrator, "_tool_pipeline") and orchestrator._tool_pipeline:
-            orchestrator._tool_pipeline.on_tool_start = self._on_tool_start
-            orchestrator._tool_pipeline.on_tool_complete = self._on_tool_complete
+    def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Hook called by ToolRegistry before tool execution."""
+        self._on_tool_start(tool_name, arguments)
+
+    def _on_tool_complete_hook(self, result: Any) -> None:
+        """Hook called by ToolRegistry after tool execution."""
+        self._on_tool_complete(result)
 
     def _on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Track tool call start."""
-        # Call original callback
-        if self._original_tool_start:
-            self._original_tool_start(tool_name, arguments)
+        logger.info(f"[AgentAdapter] Tool started: {tool_name}")
 
         # Record tool call
         self._tool_calls.append(
@@ -179,10 +189,6 @@ class VictorAgentAdapter:
 
     def _on_tool_complete(self, result: Any) -> None:
         """Track tool call completion."""
-        # Call original callback
-        if self._original_tool_complete:
-            self._original_tool_complete(result)
-
         # Update last tool call with result
         if self._tool_calls:
             last_call = self._tool_calls[-1]
@@ -257,6 +263,30 @@ class VictorAgentAdapter:
                 diff=diff,
             )
         )
+
+    def get_partial_trace(self) -> Dict[str, Any]:
+        """Get partial trace data for timeout scenarios.
+
+        Returns a dict with current state that can be used to populate
+        TaskResult even when the task didn't complete normally.
+        """
+        token_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        if hasattr(self.orchestrator, "get_token_usage"):
+            usage = self.orchestrator.get_token_usage()
+            token_usage = {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            }
+
+        return {
+            "code": "",  # No code generated on timeout
+            "tokens_input": token_usage["input_tokens"],
+            "tokens_output": token_usage["output_tokens"],
+            "tokens_used": token_usage["total_tokens"],
+            "tool_calls": len(self._tool_calls),
+            "turns": self._turns,
+        }
 
     def reset(self) -> None:
         """Reset tracking state for new task."""
@@ -375,6 +405,7 @@ class VictorAgentAdapter:
         trace.messages = self._messages.copy()
         trace.tool_calls = self._tool_calls.copy()
         trace.file_edits = self._file_edits.copy()
+        logger.info(f"[AgentAdapter] Trace populated: {len(self._tool_calls)} tool calls, {self._turns} turns")
 
         # Generate combined patch from file edits
         trace.generated_patch = self._generate_combined_patch()
