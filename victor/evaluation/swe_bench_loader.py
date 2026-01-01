@@ -654,10 +654,10 @@ class SWEBenchWorkspaceManager:
 
         try:
             # Run indexer on the repo
-            from victor.coding.codebase.indexer import CodebaseIndexer
+            from victor.coding.codebase.indexer import CodebaseIndex
 
-            indexer = CodebaseIndexer(cache_path)
-            await indexer.index_async()
+            indexer = CodebaseIndex(cache_path)
+            await indexer.index_codebase()
 
             # Mark as indexed
             from datetime import datetime, timezone

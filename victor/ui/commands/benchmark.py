@@ -143,9 +143,10 @@ def setup_benchmark(
         else:
             runner = SWEBenchRunner()
 
-        # Load tasks
+        # Load tasks (model is required but not used for setup)
         config = EvaluationConfig(
             benchmark=BenchmarkType.SWE_BENCH,
+            model="setup-only",  # Not used for cloning/indexing
             max_tasks=max_tasks,
         )
 
