@@ -610,6 +610,88 @@ class SWEBenchWorkspaceManager:
         """Copy repository from cache."""
         shutil.copytree(cached_repo, target_dir)
 
+    async def setup_repo_with_indexes(
+        self,
+        task: BenchmarkTask,
+        force_reindex: bool = False,
+    ) -> Path:
+        """Clone repo and build indexes (graph, embeddings, project.db).
+
+        This is Phase 1 of the two-phase benchmark approach:
+        - Clone repo to cache (if not already)
+        - Build code indexes in repo's .victor/ directory
+        - Return path to indexed repo
+
+        Args:
+            task: The benchmark task
+            force_reindex: Force rebuild of indexes even if they exist
+
+        Returns:
+            Path to the cached repo with indexes
+        """
+        if not task.repo:
+            raise ValueError(f"Task {task.task_id} has no repository URL")
+
+        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        cache_path = self.cache_dir / repo_hash
+
+        # Clone if not cached
+        if not cache_path.exists():
+            logger.info(f"Cloning {task.repo} to cache...")
+            await self._clone_repo(task, cache_path)
+
+        # Check if already indexed
+        victor_dir = cache_path / ".victor"
+        index_marker = victor_dir / "indexed_at"
+
+        if not force_reindex and index_marker.exists():
+            logger.info(f"Repo already indexed: {cache_path}")
+            return cache_path
+
+        # Build indexes
+        logger.info(f"Building indexes for {task.repo}...")
+        victor_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Run indexer on the repo
+            from victor.coding.codebase.indexer import CodebaseIndexer
+
+            indexer = CodebaseIndexer(cache_path)
+            await indexer.index_async()
+
+            # Mark as indexed
+            from datetime import datetime, timezone
+            index_marker.write_text(datetime.now(timezone.utc).isoformat())
+
+            logger.info(f"Indexed {task.repo} successfully")
+        except Exception as e:
+            logger.warning(f"Indexing failed (will work without): {e}")
+
+        return cache_path
+
+    def is_repo_indexed(self, task: BenchmarkTask) -> bool:
+        """Check if repo has been indexed."""
+        if not task.repo:
+            return False
+
+        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        cache_path = self.cache_dir / repo_hash
+        index_marker = cache_path / ".victor" / "indexed_at"
+
+        return index_marker.exists()
+
+    def get_cached_repo_path(self, task: BenchmarkTask) -> Optional[Path]:
+        """Get path to cached repo (for execution phase)."""
+        if not task.repo:
+            return None
+
+        repo_hash = hashlib.md5(task.repo.encode()).hexdigest()[:16]
+        cache_path = self.cache_dir / repo_hash
+
+        if cache_path.exists():
+            return cache_path
+        return None
+
     async def cleanup_workspace(self, workspace_dir: Path) -> None:
         """Clean up a task workspace."""
         try:

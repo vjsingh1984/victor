@@ -98,6 +98,108 @@ def list_benchmarks() -> None:
     console.print("\n[dim]Run with: victor benchmark run <benchmark-name>[/]")
 
 
+@benchmark_app.command("setup")
+def setup_benchmark(
+    benchmark: str = typer.Argument(
+        ..., help="Benchmark to setup: swe-bench, swe-bench-lite"
+    ),
+    max_tasks: Optional[int] = typer.Option(
+        None, "--max-tasks", "-n", help="Maximum number of repos to setup"
+    ),
+    force_reindex: bool = typer.Option(
+        False, "--force", "-f", help="Force re-index even if already done"
+    ),
+    log_level: Optional[str] = typer.Option(
+        None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
+    ),
+) -> None:
+    """Setup benchmark repos (clone + index). Run before 'run' for faster execution.
+
+    This downloads and indexes the repositories needed for the benchmark.
+    Indexes are cached in ~/.victor/swe_bench_cache/ and reused across runs.
+
+    Example:
+        victor benchmark setup swe-bench --max-tasks 5
+        victor benchmark run swe-bench --max-tasks 5
+    """
+    _configure_log_level(log_level)
+
+    from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
+    from victor.evaluation.benchmarks import SWEBenchRunner
+
+    # Only SWE-bench needs setup (repo cloning)
+    benchmark_lower = benchmark.lower().replace("_", "-")
+    if benchmark_lower not in ("swe-bench", "swe-bench-lite"):
+        console.print(f"[yellow]Setup not needed for {benchmark}[/]")
+        console.print("Only SWE-bench benchmarks require repo setup.")
+        return
+
+    async def run_setup():
+        from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+
+        # Create runner to load tasks
+        if benchmark_lower == "swe-bench-lite":
+            runner = SWEBenchRunner(split="lite")
+        else:
+            runner = SWEBenchRunner()
+
+        # Load tasks
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH,
+            max_tasks=max_tasks,
+        )
+
+        console.print(f"[bold]Setting up {benchmark} benchmark...[/]")
+        tasks = await runner.load_tasks(config)
+        console.print(f"Found {len(tasks)} tasks to setup")
+
+        # Setup workspace manager
+        workspace_manager = SWEBenchWorkspaceManager()
+
+        # Group tasks by repo (to avoid duplicate clones)
+        repos_seen = set()
+        unique_tasks = []
+        for task in tasks:
+            if task.repo and task.repo not in repos_seen:
+                repos_seen.add(task.repo)
+                unique_tasks.append(task)
+
+        console.print(f"Unique repositories: {len(unique_tasks)}")
+
+        # Setup each unique repo
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
+
+            for i, task in enumerate(unique_tasks):
+                repo_name = task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
+                progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
+
+                try:
+                    # Check if already indexed
+                    if not force_reindex and workspace_manager.is_repo_indexed(task):
+                        console.print(f"  [green]✓[/] {repo_name} (cached)")
+                    else:
+                        await workspace_manager.setup_repo_with_indexes(
+                            task,
+                            force_reindex=force_reindex,
+                        )
+                        console.print(f"  [green]✓[/] {repo_name} (indexed)")
+                except Exception as e:
+                    console.print(f"  [red]✗[/] {repo_name}: {e}")
+
+                progress.advance(setup_task)
+
+        console.print("\n[bold green]Setup complete![/]")
+        console.print(f"Cached repos: {workspace_manager.cache_dir}")
+        console.print(f"\nNow run: victor benchmark run {benchmark}")
+
+    asyncio.run(run_setup())
+
+
 @benchmark_app.command("run")
 def run_benchmark(
     benchmark: str = typer.Argument(
@@ -234,6 +336,14 @@ def run_benchmark(
                 async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                     """Run agent on task and return generated code with metrics.
 
+                    Two-phase approach:
+                    1. Setup phase (optional, run 'victor benchmark setup' first):
+                       - Clones repo to ~/.victor/swe_bench_cache/<hash>/
+                       - Builds indexes in repo's .victor/ directory
+                    2. Execution phase (this callback):
+                       - Uses cached repo with pre-built indexes
+                       - Agent works in target repo, not victor's codebase
+
                     Returns a dict with:
                     - code: The generated patch or code
                     - tokens_input: Input tokens used
@@ -242,18 +352,37 @@ def run_benchmark(
                     - tool_calls: Number of tool calls
                     - turns: Number of conversation turns
                     """
-                    # Use SWEBenchWorkspaceManager for cached repo cloning
-                    # First clone goes to ~/.victor/swe_bench_cache/, subsequent runs reuse it
-                    workspace = await workspace_manager.setup_workspace(
-                        benchmark_task,
-                        use_cache=True,
-                    )
+                    import os
 
-                    # Agent works in workspace/repo where the cloned code is
-                    repo_dir = workspace / "repo"
-                    work_dir = repo_dir if repo_dir.exists() else workspace
+                    # Check if repo is already setup (Phase 1 completed)
+                    cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
+                    if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
+                        # Use cached+indexed repo directly
+                        work_dir = cached_repo
+                        console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
+                    else:
+                        # Setup on-the-fly (slower, but works without explicit setup)
+                        console.print(f"  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]")
+                        await workspace_manager.setup_repo_with_indexes(benchmark_task)
+                        work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
 
-                    trace = await adapter.execute_task(benchmark_task, work_dir)
+                    # Checkout the specific base commit for this task
+                    if benchmark_task.base_commit and work_dir:
+                        checkout_proc = await asyncio.create_subprocess_exec(
+                            "git", "checkout", benchmark_task.base_commit,
+                            cwd=work_dir,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        await checkout_proc.communicate()
+
+                    # Change to target repo directory so agent uses its indexes
+                    original_cwd = os.getcwd()
+                    try:
+                        os.chdir(work_dir)
+                        trace = await adapter.execute_task(benchmark_task, work_dir)
+                    finally:
+                        os.chdir(original_cwd)
 
                     # Return code with metrics for harness to populate TaskResult
                     return {
