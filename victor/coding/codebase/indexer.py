@@ -724,11 +724,33 @@ class CodebaseIndex:
         "*.hocon",
     ]
 
+    # Unified ID generation for graph-embedding correlation
+    @staticmethod
+    def make_symbol_id(file_path: str, symbol_name: str) -> str:
+        """Generate unified symbol ID for graph and embedding correlation.
+
+        Format: symbol:{file_path}:{symbol_name}
+
+        This ID is used as:
+        - node_id in graph_node (SQLite)
+        - doc_id in embeddings (LanceDB)
+
+        Enables bidirectional lookup:
+        - Semantic search → node_id → graph traversal
+        - Graph query → node_id → embedding lookup
+        """
+        return f"symbol:{file_path}:{symbol_name}"
+
+    @staticmethod
+    def make_file_id(file_path: str) -> str:
+        """Generate unified file ID for graph nodes."""
+        return f"file:{file_path}"
+
     def __init__(
         self,
         root_path: str,
         ignore_patterns: Optional[List[str]] = None,
-        use_embeddings: bool = False,
+        use_embeddings: bool = True,
         embedding_config: Optional[Dict[str, Any]] = None,
         enable_watcher: bool = True,
         graph_store: Optional["GraphStoreProtocol"] = None,
@@ -737,10 +759,16 @@ class CodebaseIndex:
     ):
         """Initialize codebase indexer.
 
+        Graph and embeddings are always coupled - they share unified IDs for
+        correlation. When you query semantic search, you can use the returned
+        unified_id to traverse the graph. When you traverse the graph, you can
+        lookup semantic similarity for nodes.
+
         Args:
             root_path: Root directory of the codebase
             ignore_patterns: Patterns to ignore (e.g., ["venv/", "node_modules/"])
-            use_embeddings: Whether to use semantic search with embeddings
+            use_embeddings: Enable semantic search with embeddings (default: True).
+                Graph and embeddings are coupled via unified IDs.
             embedding_config: Configuration for embedding provider (optional)
             enable_watcher: Whether to enable file watching for auto-staleness detection
             graph_store: Optional graph store for symbol relationships. If None,
@@ -916,18 +944,23 @@ class CodebaseIndex:
         # Build embeddings for all indexed symbols (batched for performance)
         if self.use_embeddings and self.embedding_provider:
             # Collect all documents for batch embedding
+            # Uses unified IDs for graph-embedding correlation
             documents = []
             for rel_path, file_meta in self.files.items():
                 for symbol in file_meta.symbols:
                     text_for_embedding = self._get_symbol_embedding_text(symbol)
                     if text_for_embedding:
+                        # Use unified ID for correlation with graph nodes
+                        unified_id = self.make_symbol_id(rel_path, symbol.name)
                         documents.append({
-                            "id": f"{rel_path}:{symbol.name}",
+                            "id": unified_id,
                             "content": text_for_embedding,
-                            "file_path": rel_path,
-                            "symbol_name": symbol.name,
-                            "symbol_type": symbol.type,
-                            "line_number": symbol.line_number,
+                            "metadata": {
+                                "file_path": rel_path,
+                                "symbol_name": symbol.name,
+                                "symbol_type": symbol.type,
+                                "line_number": symbol.line_number,
+                            },
                         })
 
             # Batch embed for performance (process in chunks of 500)
@@ -1111,8 +1144,10 @@ class CodebaseIndex:
                 text_for_embedding = self._get_symbol_embedding_text(symbol)
                 if text_for_embedding:
                     try:
+                        # Use unified ID for graph-embedding correlation
+                        unified_id = self.make_symbol_id(rel_path, symbol.name)
                         await self.embedding_provider.index_document(
-                            doc_id=f"{rel_path}:{symbol.name}",
+                            doc_id=unified_id,
                             content=text_for_embedding,
                             metadata={
                                 "file_path": rel_path,
@@ -1721,9 +1756,10 @@ class CodebaseIndex:
         symbol_names = {s.name for s in metadata.symbols}
 
         # Always create a file node so config/docs files without symbols still appear in the graph.
+        # Uses unified ID format for graph-embedding correlation.
         file_node_id: Optional[str] = None
         if self.graph_store:
-            file_node_id = f"file:{metadata.path}"
+            file_node_id = self.make_file_id(metadata.path)
             self._graph_nodes.append(
                 GraphNode(
                     node_id=file_node_id,
@@ -1737,22 +1773,22 @@ class CodebaseIndex:
             )
 
         for symbol in metadata.symbols:
-            # Symbol registry
-            self.symbols[f"{metadata.path}:{symbol.name}"] = symbol
+            # Symbol registry - use unified ID format
+            unified_id = self.make_symbol_id(metadata.path, symbol.name)
+            self.symbols[unified_id] = symbol
             if metadata.path not in self.symbol_index:
                 self.symbol_index[metadata.path] = []
             self.symbol_index[metadata.path].append(symbol.name)
 
             if self.graph_store:
-                symbol_id = f"symbol:{metadata.path}:{symbol.name}"
                 # Determine parent_id for nested symbols (methods in classes)
                 parent_id = None
                 if symbol.parent_symbol:
-                    parent_id = f"symbol:{metadata.path}:{symbol.parent_symbol}"
+                    parent_id = self.make_symbol_id(metadata.path, symbol.parent_symbol)
 
                 self._graph_nodes.append(
                     GraphNode(
-                        node_id=symbol_id,
+                        node_id=unified_id,
                         type=symbol.type,
                         name=symbol.name,
                         file=metadata.path,
@@ -1762,28 +1798,29 @@ class CodebaseIndex:
                         signature=symbol.signature,
                         docstring=symbol.docstring,
                         parent_id=parent_id,
+                        embedding_ref=unified_id,  # Link to vector store entry
                         metadata={},
                     )
                 )
                 self._graph_edges.append(
                     GraphEdge(
-                        src=file_node_id or f"file:{metadata.path}",
-                        dst=symbol_id,
+                        src=file_node_id or self.make_file_id(metadata.path),
+                        dst=unified_id,
                         type="CONTAINS",
                         metadata={"path": metadata.path},
                     )
                 )
 
         # Add simple intra-file CALLS edges when both endpoints are known symbols
+        # Uses unified IDs for graph-embedding correlation
         if self.graph_store and metadata.call_edges:
             for caller, callee in metadata.call_edges:
+                caller_id = self.make_symbol_id(metadata.path, caller)
                 if caller not in symbol_names or callee not in symbol_names:
                     # Track for potential cross-file resolution
-                    caller_id = f"symbol:{metadata.path}:{caller}"
                     self._pending_call_edges.append((caller_id, callee, metadata.path))
                     continue
-                caller_id = f"symbol:{metadata.path}:{caller}"
-                callee_id = f"symbol:{metadata.path}:{callee}"
+                callee_id = self.make_symbol_id(metadata.path, callee)
                 self._graph_edges.append(
                     GraphEdge(
                         src=caller_id,
@@ -1793,15 +1830,15 @@ class CodebaseIndex:
                     )
                 )
 
-        # Inheritance edges (child -> base)
+        # Inheritance edges (child -> base) - uses unified IDs
         if self.graph_store and metadata.inherit_edges:
             for child, base in metadata.inherit_edges:
-                child_id = f"symbol:{metadata.path}:{child}"
+                child_id = self.make_symbol_id(metadata.path, child)
                 if child not in symbol_names:
                     continue
                 # if base is in current file, link directly, else resolve later
                 if base in symbol_names:
-                    base_id = f"symbol:{metadata.path}:{base}"
+                    base_id = self.make_symbol_id(metadata.path, base)
                     self._graph_edges.append(
                         GraphEdge(
                             src=child_id,
@@ -1813,14 +1850,14 @@ class CodebaseIndex:
                 else:
                     self._pending_inherit_edges.append((child_id, base, metadata.path))
 
-        # Implements edges (child -> interface/abstract)
+        # Implements edges (child -> interface/abstract) - uses unified IDs
         if self.graph_store and metadata.implements_edges:
             for child, base in metadata.implements_edges:
-                child_id = f"symbol:{metadata.path}:{child}"
+                child_id = self.make_symbol_id(metadata.path, child)
                 if child not in symbol_names:
                     continue
                 if base in symbol_names:
-                    base_id = f"symbol:{metadata.path}:{base}"
+                    base_id = self.make_symbol_id(metadata.path, base)
                     self._graph_edges.append(
                         GraphEdge(
                             src=child_id,
@@ -1832,14 +1869,14 @@ class CodebaseIndex:
                 else:
                     self._pending_implements_edges.append((child_id, base, metadata.path))
 
-        # Composition edges (owner -> member type)
+        # Composition edges (owner -> member type) - uses unified IDs
         if self.graph_store and metadata.compose_edges:
             for owner, member in metadata.compose_edges:
-                owner_id = f"symbol:{metadata.path}:{owner}"
+                owner_id = self.make_symbol_id(metadata.path, owner)
                 if owner not in symbol_names:
                     continue
                 if member in symbol_names:
-                    member_id = f"symbol:{metadata.path}:{member}"
+                    member_id = self.make_symbol_id(metadata.path, member)
                     self._graph_edges.append(
                         GraphEdge(
                             src=owner_id,
@@ -1856,7 +1893,7 @@ class CodebaseIndex:
         if self.graph_store and metadata.imports:
             for imp in metadata.imports:
                 is_stdlib = _is_stdlib_module(imp)
-                module_node_id = f"module:{imp}"
+                module_node_id = f"module:{imp}"  # module:pkg format for external modules
                 self._graph_nodes.append(
                     GraphNode(
                         node_id=module_node_id,
@@ -1868,7 +1905,7 @@ class CodebaseIndex:
                 )
                 self._graph_edges.append(
                     GraphEdge(
-                        src=f"file:{metadata.path}",
+                        src=self.make_file_id(metadata.path),
                         dst=module_node_id,
                         type="IMPORTS",
                         metadata={"path": metadata.path, "is_stdlib": is_stdlib},
@@ -1880,10 +1917,8 @@ class CodebaseIndex:
         if not self._pending_call_edges:
             return
 
-        # Build resolver index from graph nodes
-        node_ids = []
-        for sym_key in self.symbols.keys():
-            node_ids.append(f"symbol:{sym_key}")
+        # Build resolver index from graph nodes - self.symbols keys are already unified IDs
+        node_ids = list(self.symbols.keys())
         self._symbol_resolver.ingest(node_ids)
 
         # Cross-file CALLS resolution
