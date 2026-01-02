@@ -85,6 +85,26 @@ When you receive tool output in <TOOL_OUTPUT> tags:
 VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 """.strip()
 
+# Prescriptive guidance for handling large/truncated files
+LARGE_FILE_PAGINATION_GUIDANCE = """
+LARGE FILE HANDLING (MANDATORY):
+When you see "LARGE FILE" or "TRUNCATED" in tool output, you received PARTIAL content only.
+The file contains more data at different offsets. To find what you need:
+
+1. **File shows structure summary only**: Use search parameter to find specific content:
+   read(path='file.py', search='function_name')
+   read(path='file.py', search='class ClassName')
+
+2. **File was truncated mid-content**: Use offset to continue reading:
+   read(path='file.py', offset=X, limit=300)  # Where X = last line shown
+
+3. **Searching for a specific line number**: If function is at line 3000:
+   read(path='file.py', offset=2980, limit=100)  # Read lines 2981-3080
+
+DO NOT re-read the full file without parameters - you will get the same truncated view.
+DO NOT assume content is missing - use offset/search to access additional sections.
+""".strip()
+
 # Task-type-specific prompt hints
 # These are appended to system prompts when task type is detected
 # Concise format for cloud providers - local models use extended hints from complexity_classifier
@@ -757,14 +777,16 @@ class SystemPromptBuilder:
         - Anti-repetition rules
         - Strict grounding requirements
         - Efficient tool usage patterns
+        - Pagination for large files
         """
         return (
             "Expert coding assistant with tool access.\n\n"
             "CRITICAL RULES (MUST FOLLOW):\n"
-            "• NEVER read the same file twice - cache file contents mentally\n"
+            "• NEVER read the same file twice with identical arguments\n"
             "• NEVER call the same tool with identical arguments\n"
             "• If you've read a file, use that content for all future references\n"
             "• Only call tools when you need NEW information\n\n"
+            f"{LARGE_FILE_PAGINATION_GUIDANCE}\n\n"
             "GROUNDING (MANDATORY):\n"
             "• ALL code snippets must be directly from tool output\n"
             "• Do NOT generate or imagine file contents\n"
@@ -774,6 +796,7 @@ class SystemPromptBuilder:
             "TOOL EFFICIENCY:\n"
             "• list_directory first to understand structure\n"
             "• read_file ONCE per file, remember contents\n"
+            "• For large files, use search/offset parameters (see above)\n"
             "• Use semantic_code_search for specific symbols\n"
             "• Stop tool calls when you have enough info (usually 3-5 calls)\n\n"
             "TASK EXECUTION:\n"

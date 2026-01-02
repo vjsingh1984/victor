@@ -56,28 +56,45 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CH
 from rich.console import Console
 
 if TYPE_CHECKING:
+    # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
     from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
     from victor.evaluation.protocol import TokenUsage
+    # Factory-created components (type hints only)
+    from victor.agent.response_sanitizer import ResponseSanitizer
+    from victor.agent.search_router import SearchRouter
+    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.agent.metrics_collector import MetricsCollector
+    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.context_compactor import ContextCompactor
+    from victor.agent.usage_analytics import UsageAnalytics
+    from victor.agent.tool_sequence_tracker import ToolSequenceTracker
+    from victor.agent.recovery import RecoveryHandler
+    from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
+    from victor.agent.tool_output_formatter import ToolOutputFormatter
+    from victor.agent.tool_pipeline import ToolPipeline
+    from victor.agent.streaming_controller import StreamingController
+    from victor.agent.task_analyzer import TaskAnalyzer
+    from victor.agent.tool_registrar import ToolRegistrar
+    from victor.agent.provider_manager import ProviderManager
+    from victor.agent.tool_selection import ToolSelector
+    from victor.agent.tool_executor import ToolExecutor
+    from victor.agent.safety import SafetyChecker
+    from victor.agent.auto_commit import AutoCommitter
 
+# Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation_memory import (
-    ConversationStore,
-    MessageRole,
-)
+from victor.agent.conversation_memory import ConversationStore, MessageRole
 
-# DI container bootstrap - ensures services are available
+# DI container bootstrap
 from victor.core.bootstrap import ensure_bootstrapped, get_service_optional
-from victor.core.container import (
-    MetricsServiceProtocol,
-    LoggerServiceProtocol,
-)
+from victor.core.container import MetricsServiceProtocol, LoggerServiceProtocol
 
-# Service protocols for DI resolution (Phase 10)
+# Service protocols for DI resolution
 from victor.agent.protocols import (
     ResponseSanitizerProtocol,
     ComplexityClassifierProtocol,
@@ -94,47 +111,30 @@ from victor.agent.protocols import (
     ContextCompactorProtocol,
 )
 
-# Mode-aware mixin for consistent mode controller access
+# Mixins (used at class definition time)
 from victor.protocols.mode_aware import ModeAwareMixin
-
-# Capability registry mixin for explicit capability discovery (replaces hasattr)
 from victor.agent.capability_registry import CapabilityRegistryMixin
 
-# Config loaders for externalized configuration
+# Config and enums (used at runtime)
 from victor.config.config_loaders import get_provider_limits
-from victor.agent.conversation_embedding_store import (
-    ConversationEmbeddingStore,
-)
+from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
-from victor.agent.action_authorizer import (
-    ActionAuthorizer,
-    ActionIntent,
-    INTENT_BLOCKED_TOOLS,
-)
-from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
-from victor.agent.response_sanitizer import ResponseSanitizer
-from victor.agent.search_router import SearchRouter, SearchRoute, SearchType
-from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
+from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
+from victor.agent.prompt_builder import get_task_type_hint
+from victor.agent.search_router import SearchRoute, SearchType
+from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.metrics_collector import (
-    MetricsCollector,
-    MetricsCollectorConfig,
-)
-from victor.agent.unified_task_tracker import (
-    UnifiedTaskTracker,
-    TaskType,
-)
+from victor.agent.metrics_collector import MetricsCollectorConfig
+from victor.agent.unified_task_tracker import UnifiedTaskTracker, TaskType
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
-# New decomposed components (facades for orchestrator responsibilities)
+# Decomposed components - configs, strategies, functions
 from victor.agent.conversation_controller import (
-    ConversationController,
     ConversationConfig,
     ContextMetrics,
     CompactionStrategy,
 )
 from victor.agent.context_compactor import (
-    ContextCompactor,
     TruncationStrategy,
     create_context_compactor,
     calculate_parallel_read_budget,
@@ -142,82 +142,36 @@ from victor.agent.context_compactor import (
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
-from victor.agent.usage_analytics import (
-    UsageAnalytics,
-    AnalyticsConfig,
-)
-from victor.agent.tool_sequence_tracker import (
-    ToolSequenceTracker,
-    create_sequence_tracker,
-)
-from victor.agent.recovery import (
-    RecoveryHandler,
-    RecoveryOutcome,
-    FailureType,
-    RecoveryAction,
-)
+from victor.agent.usage_analytics import AnalyticsConfig
+from victor.agent.tool_sequence_tracker import create_sequence_tracker
+# Recovery - enums and functions used at runtime
+from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.protocols import RecoveryHandlerProtocol
-from victor.agent.orchestrator_recovery import (
-    OrchestratorRecoveryIntegration,
-    create_recovery_integration,
-    RecoveryAction as OrchestratorRecoveryAction,
-)
-from victor.agent.tool_output_formatter import (
-    ToolOutputFormatter,
-    ToolOutputFormatterConfig,
-    FormattingContext,
-    create_tool_output_formatter,
-)
+from victor.agent.orchestrator_recovery import create_recovery_integration, RecoveryAction as OrchestratorRecoveryAction
+from victor.agent.tool_output_formatter import ToolOutputFormatterConfig, FormattingContext, create_tool_output_formatter
 
-# CodeCorrectionMiddleware imported lazily to avoid circular import
-# (code_correction_middleware -> evaluation.correction -> evaluation.__init__ -> agent_adapter -> orchestrator)
-from victor.agent.tool_pipeline import (
-    ToolPipeline,
-    ToolPipelineConfig,
-    ToolCallResult,
-)
-from victor.agent.streaming_controller import (
-    StreamingController,
-    StreamingControllerConfig,
-    StreamingSession,
-)
-from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
-from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
+# Pipeline - configs and results used at runtime
+from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
+from victor.agent.streaming_controller import StreamingControllerConfig, StreamingSession
+from victor.agent.task_analyzer import get_task_analyzer
+from victor.agent.tool_registrar import ToolRegistrarConfig
+from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
-# Observability integration (EventBus, hooks, exporters)
+# Observability
 from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 from victor.observability.integration import ObservabilityIntegration
-
-# Intelligent pipeline integration (lazy initialization to avoid circular imports)
-# These enable RL-based mode learning, quality scoring, and prompt optimization
 from victor.agent.orchestrator_integration import IntegrationConfig
 
-from victor.agent.tool_selection import (
-    get_critical_tools,
-    ToolSelector,
-)
-from victor.agent.tool_calling import (
-    ToolCallParseResult,
-)
-from victor.agent.tool_executor import ToolExecutor, ValidationMode
-from victor.agent.safety import SafetyChecker
-from victor.agent.orchestrator_utils import (
-    calculate_max_context_chars,
-    infer_git_operation,
-    get_tool_status_message,
-)
+# Tool execution - functions and enums
+from victor.agent.tool_selection import get_critical_tools
+from victor.agent.tool_calling import ToolCallParseResult
+from victor.agent.tool_executor import ValidationMode
+from victor.agent.orchestrator_utils import calculate_max_context_chars, infer_git_operation, get_tool_status_message
 from victor.agent.orchestrator_factory import OrchestratorFactory
-from victor.agent.auto_commit import AutoCommitter
-from victor.agent.parallel_executor import (
-    create_parallel_executor,
-)
-from victor.agent.response_completer import (
-    ToolFailureContext,
-    create_response_completer,
-)
+from victor.agent.parallel_executor import create_parallel_executor
+from victor.agent.response_completer import ToolFailureContext, create_response_completer
 from victor.observability.analytics.logger import UsageLogger
 from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 from victor.storage.cache.tool_cache import ToolCache
@@ -1069,7 +1023,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # =====================================================================
 
     @property
-    def conversation_controller(self) -> ConversationController:
+    def conversation_controller(self) -> "ConversationController":
         """Get the conversation controller component.
 
         Returns:
@@ -1078,7 +1032,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._conversation_controller
 
     @property
-    def tool_pipeline(self) -> ToolPipeline:
+    def tool_pipeline(self) -> "ToolPipeline":
         """Get the tool pipeline component.
 
         Returns:
@@ -1087,7 +1041,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._tool_pipeline
 
     @property
-    def streaming_controller(self) -> StreamingController:
+    def streaming_controller(self) -> "StreamingController":
         """Get the streaming controller component.
 
         Returns:
@@ -1105,7 +1059,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._streaming_handler
 
     @property
-    def task_analyzer(self) -> TaskAnalyzer:
+    def task_analyzer(self) -> "TaskAnalyzer":
         """Get the task analyzer component.
 
         Returns:
@@ -1135,7 +1089,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._observability = value
 
     @property
-    def provider_manager(self) -> ProviderManager:
+    def provider_manager(self) -> "ProviderManager":
         """Get the provider manager component.
 
         Returns:
@@ -1144,7 +1098,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._provider_manager
 
     @property
-    def context_compactor(self) -> ContextCompactor:
+    def context_compactor(self) -> "ContextCompactor":
         """Get the context compactor component.
 
         Returns:
@@ -1153,7 +1107,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._context_compactor
 
     @property
-    def tool_output_formatter(self) -> ToolOutputFormatter:
+    def tool_output_formatter(self) -> "ToolOutputFormatter":
         """Get the tool output formatter for LLM-context-aware formatting.
 
         Returns:
@@ -1162,7 +1116,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._tool_output_formatter
 
     @property
-    def usage_analytics(self) -> UsageAnalytics:
+    def usage_analytics(self) -> "UsageAnalytics":
         """Get the usage analytics singleton.
 
         Returns:
@@ -1171,7 +1125,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._usage_analytics
 
     @property
-    def sequence_tracker(self) -> ToolSequenceTracker:
+    def sequence_tracker(self) -> "ToolSequenceTracker":
         """Get the tool sequence tracker for intelligent next-tool suggestions.
 
         Returns:
@@ -1180,7 +1134,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._sequence_tracker
 
     @property
-    def recovery_handler(self) -> Optional[RecoveryHandler]:
+    def recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Get the recovery handler for model failure recovery.
 
         Returns:
@@ -1189,7 +1143,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._recovery_handler
 
     @property
-    def recovery_integration(self) -> OrchestratorRecoveryIntegration:
+    def recovery_integration(self) -> "OrchestratorRecoveryIntegration":
         """Get the recovery integration submodule.
 
         Returns:
@@ -1979,7 +1933,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"Continuation event emission failed: {e}")
 
     @property
-    def safety_checker(self) -> SafetyChecker:
+    def safety_checker(self) -> "SafetyChecker":
         """Get the safety checker for dangerous operation detection.
 
         UI layers can use this to set confirmation callbacks:
@@ -1991,7 +1945,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._safety_checker
 
     @property
-    def auto_committer(self) -> Optional[AutoCommitter]:
+    def auto_committer(self) -> Optional["AutoCommitter"]:
         """Get the auto-committer for AI-assisted code change commits.
 
         Usage:

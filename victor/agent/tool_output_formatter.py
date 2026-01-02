@@ -189,6 +189,16 @@ class ToolOutputFormatter:
         original_len = len(output_str)
         truncated = False
 
+        # IMPORTANT: For file reads, check size BEFORE truncation
+        # Very large files should use file structure mode, not head+tail truncation
+        # This prevents losing critical content in the middle of large files
+        if tool_name in ("read_file", "read"):
+            if original_len > self.config.file_structure_threshold:
+                # Skip truncation - use file structure mode instead
+                return self._format_large_file_structure(
+                    args, output, output_str, original_len
+                )
+
         # Use smart truncation if truncator available
         if self._truncator:
             try:
@@ -211,7 +221,7 @@ class ToolOutputFormatter:
             output_str = output_str[: self.config.max_output_chars]
 
         # Tool-specific formatting
-        if tool_name == "read_file":
+        if tool_name in ("read_file", "read"):
             return self._format_read_file(args, output, output_str, original_len, truncated)
 
         if tool_name == "list_directory":
@@ -268,6 +278,58 @@ To see specific sections, use read_file with offset/limit parameters or code_sea
 
 IMPORTANT: The content above between the ═══ markers is the EXACT content of the file.
 You MUST use this actual content in your analysis. Do NOT fabricate or imagine different content."""
+
+    def _format_large_file_structure(
+        self,
+        args: Dict[str, Any],
+        output: Any,
+        output_str: str,
+        original_len: int,
+    ) -> str:
+        """Format very large files with structure summary and pagination guidance.
+
+        Called BEFORE truncation to provide useful structure overview instead of
+        head+tail truncation which loses critical middle content.
+        """
+        file_path = args.get("path", "unknown")
+        file_content = str(output) if output is not None else output_str
+        lines = file_content.split("\n")
+        num_lines = len(lines)
+
+        # Extract file structure (classes, functions)
+        structure_summary = self.extract_file_structure(file_content, file_path)
+
+        # Calculate pagination suggestions
+        chunk_size = 300  # Recommended lines per chunk
+        num_chunks = (num_lines + chunk_size - 1) // chunk_size
+
+        return f"""<TOOL_OUTPUT tool="read" path="{file_path}">
+═══ LARGE FILE: {original_len:,} chars / {num_lines:,} lines ═══
+
+{structure_summary}
+
+═══ HOW TO READ THIS FILE ═══
+
+This file has {num_lines:,} lines. To read specific sections:
+
+1. **Search for specific content** (FASTEST):
+   read(path='{file_path}', search='function_name')
+   read(path='{file_path}', search='class ClassName')
+
+2. **Read by line range** (for context around found content):
+   read(path='{file_path}', offset=0, limit={chunk_size})      # Lines 1-{chunk_size}
+   read(path='{file_path}', offset={chunk_size}, limit={chunk_size})    # Lines {chunk_size+1}-{chunk_size*2}
+   ... up to offset={num_lines - chunk_size}
+
+3. **Total chunks needed**: {num_chunks} chunks of {chunk_size} lines each
+
+═══ END OF FILE STRUCTURE ═══
+</TOOL_OUTPUT>
+
+ACTION REQUIRED: This file is too large to display fully.
+- Use 'search' parameter to find specific functions/classes
+- Use 'offset' and 'limit' parameters to read specific line ranges
+- DO NOT re-read the full file without parameters - you will get this same structure view"""
 
     def _format_list_directory(self, args: Dict[str, Any], output_str: str) -> str:
         """Format list_directory tool output."""

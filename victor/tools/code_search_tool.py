@@ -612,7 +612,7 @@ async def code_search(
             "success": True,
             "results": truncated_results,
             "count": len(truncated_results),
-            "hint": "Use read_file with line_start/line_end to see full content of specific results.",
+            "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
             "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
             "metadata": {
                 "rebuilt": rebuilt,
