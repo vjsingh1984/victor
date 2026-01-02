@@ -216,6 +216,21 @@ class TaskCompletionDetector:
             # Active completion signaling (instructed in system prompt)
             "task complete:",
             "task complete.",
+            # Additional patterns for broader LLM coverage
+            "has been modified",
+            "has been updated",
+            "has been changed",
+            "modification is complete",
+            "update is complete",
+            "changes have been made",
+            "file updated",
+            "code updated",
+            "implementation complete",
+            "the changes are",
+            "i've updated",
+            "i have updated",
+            "i've modified",
+            "i have modified",
         }
     )
 
@@ -232,6 +247,16 @@ class TaskCompletionDetector:
             "please provide more details",
             "if there's anything else",
             "any other",
+            # Additional patterns for broader LLM coverage
+            "shall i proceed",
+            "do you want me to",
+            "should i continue",
+            "need me to",
+            "want me to add",
+            "want me to make",
+            "anything else you'd like",
+            "any changes you'd like",
+            "any modifications",
         }
     )
 
