@@ -444,7 +444,7 @@ class TestSpeedupValidation:
         )
 
         # Accept any speedup > 1x as valid (Rust should never be slower)
-        assert speedup >= 1.0, f"Rust should not be slower than Python"
+        assert speedup >= 1.0, "Rust should not be slower than Python"
 
     def test_stdlib_speedup(self):
         """Validate stdlib detection performance.
@@ -491,7 +491,7 @@ class TestSpeedupValidation:
 
         # For simple hash lookups, Python frozenset is already optimal
         # Accept up to 2x slower due to FFI overhead for small operations
-        assert speedup >= 0.5, f"Rust should not be more than 2x slower"
+        assert speedup >= 0.5, "Rust should not be more than 2x slower"
 
     def test_similarity_speedup(self):
         """Validate batch similarity performance.
@@ -539,7 +539,7 @@ class TestSpeedupValidation:
         # For small batches, FFI overhead dominates - Rust is ~10x slower
         # This is expected; embeddings service correctly uses NumPy directly
         # This test documents the FFI overhead for future reference
-        print(f"  (Note: NumPy+BLAS is optimal for similarity; Rust FFI overhead is expected)")
+        print("  (Note: NumPy+BLAS is optimal for similarity; Rust FFI overhead is expected)")
 
     def test_normalize_block_speedup(self):
         """Validate text normalization achieves speedup.
@@ -583,7 +583,7 @@ class TestSpeedupValidation:
         )
 
         # Rust regex should be faster than Python re module
-        assert speedup >= 0.8, f"Rust should not be more than 20% slower"
+        assert speedup >= 0.8, "Rust should not be more than 20% slower"
 
     def test_content_hasher_speedup(self):
         """Validate ContentHasher benefits from native normalization.

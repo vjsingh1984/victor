@@ -91,7 +91,11 @@ class TestReadFileSearch:
 
             result = await read(f.name)
 
-            assert result == content
+            # read() now returns formatted output with headers and line numbers
+            assert "line 1" in result
+            assert "line 2" in result
+            assert "line 3" in result
+            assert "[File:" in result  # Header present
 
             Path(f.name).unlink()
 
