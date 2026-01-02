@@ -3548,85 +3548,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         registered_count = self.tool_registrar._register_dynamic_tools()
         logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
 
-        # MCP integration (handled separately via registrar config)
+        # MCP integration - delegate to ToolRegistrar
         if getattr(self.settings, "use_mcp_tools", False):
-            self._setup_mcp_integration()
-
-    def _setup_mcp_integration(self) -> None:
-        """Set up MCP integration using registry or legacy client.
-
-        Uses MCPRegistry for auto-discovery if available, falls back to
-        legacy single-client approach for backwards compatibility.
-        """
-        mcp_command = getattr(self.settings, "mcp_command", None)
-
-        # Try MCPRegistry with auto-discovery first
-        try:
-            from victor.integrations.mcp.registry import MCPRegistry
-
-            # Auto-discover MCP servers from standard locations
-            self.mcp_registry = MCPRegistry.discover_servers()
-
-            # Also register command from settings if specified
-            if mcp_command:
-                from victor.integrations.mcp.registry import MCPServerConfig
-
-                cmd_parts = mcp_command.split()
-                self.mcp_registry.register_server(
-                    MCPServerConfig(
-                        name="settings_mcp",
-                        command=cmd_parts,
-                        description="MCP server from settings",
-                        auto_connect=True,
-                    )
-                )
-
-            # Start registry and connect to servers in background
-            if self.mcp_registry.list_servers():
-                logger.info(
-                    f"MCP Registry initialized with {len(self.mcp_registry.list_servers())} server(s)"
-                )
-                self._create_background_task(self._start_mcp_registry(), name="mcp_registry_start")
-            else:
-                logger.debug("No MCP servers configured")
-
-        except ImportError:
-            logger.debug("MCPRegistry not available, using legacy client")
-            self._setup_legacy_mcp(mcp_command)
-
-        # Register MCP tool definitions
-        for mcp_tool in get_mcp_tool_definitions():
-            self.tools.register_dict(mcp_tool)
-
-    def _setup_legacy_mcp(self, mcp_command: Optional[str]) -> None:
-        """Set up legacy single MCP client (backwards compatibility)."""
-        if mcp_command:
-            try:
-                from victor.integrations.mcp.client import MCPClient
-
-                mcp_client = MCPClient()
-                cmd_parts = mcp_command.split()
-                self._create_background_task(
-                    mcp_client.connect(cmd_parts), name="mcp_legacy_connect"
-                )
-                # MCP client setup is now handled via context injection
-            except Exception as exc:
-                logger.warning(f"Failed to start MCP client: {exc}")
-
-    async def _start_mcp_registry(self) -> None:
-        """Start MCP registry and connect to discovered servers."""
-        try:
-            await self.mcp_registry.start()
-            results = await self.mcp_registry.connect_all()
-            connected = sum(1 for v in results.values() if v)
-            if connected > 0:
-                logger.info(f"Connected to {connected} MCP server(s)")
-                # Update available tools from MCP
-                mcp_tools = self.mcp_registry.get_all_tools()
-                if mcp_tools:
-                    logger.info(f"Discovered {len(mcp_tools)} MCP tools")
-        except Exception as e:
-            logger.warning(f"Failed to start MCP registry: {e}")
+            mcp_tools_count = self.tool_registrar._setup_mcp_integration()
+            # Copy mcp_registry reference for backwards compatibility
+            self.mcp_registry = getattr(self.tool_registrar, "mcp_registry", None)
+            if mcp_tools_count > 0:
+                logger.debug(f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar")
 
     def _register_default_tool_dependencies(self) -> None:
         """Register minimal tool input/output specs for planning with cost tiers."""

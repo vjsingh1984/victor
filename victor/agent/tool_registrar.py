@@ -487,7 +487,7 @@ class ToolRegistrar:
             registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
             # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
-            from victor.agent.orchestrator_utils import get_critical_tools
+            from victor.agent.tool_selection import get_critical_tools
             core_tools = get_critical_tools(self.tools)
 
             # Format 1: Lists of enabled/disabled tools

@@ -165,31 +165,29 @@ class TestEmbeddingPreload:
         # Should not create a new task
 
 
+@pytest.mark.skip(
+    reason="MCP methods moved to ToolRegistrar in Jan 2026 refactoring (TD-002). "
+    "Test MCP integration via ToolRegistrar tests instead."
+)
 class TestMCPIntegration:
-    """Tests for MCP integration setup."""
+    """Tests for MCP integration setup.
+
+    DEPRECATED: MCP methods (_setup_mcp_integration, _setup_legacy_mcp, _start_mcp_registry)
+    have been consolidated into ToolRegistrar. The orchestrator now delegates to
+    tool_registrar._setup_mcp_integration().
+    """
 
     def test_setup_mcp_integration_no_mcp_registry(self, orchestrator):
-        """Test _setup_mcp_integration handles missing MCPRegistry (covers lines 660-662)."""
-        with patch.dict("sys.modules", {"victor.integrations.mcp.registry": None}):
-            with patch.object(orchestrator, "_setup_legacy_mcp"):
-                # This would raise ImportError, calling _setup_legacy_mcp
-                try:
-                    orchestrator._setup_mcp_integration()
-                except Exception:
-                    pass
+        """Test _setup_mcp_integration handles missing MCPRegistry."""
+        pass
 
     def test_setup_legacy_mcp_no_command(self, orchestrator):
-        """Test _setup_legacy_mcp with no command does nothing (covers line 670)."""
-        orchestrator._setup_legacy_mcp(None)  # Should not raise
+        """Test _setup_legacy_mcp with no command does nothing."""
+        pass
 
-    @pytest.mark.skip(
-        reason="configure_mcp_client removed in Dec 2025 refactoring; _setup_legacy_mcp now uses MCPClient directly"
-    )
     def test_setup_legacy_mcp_with_command_failure(self, orchestrator):
-        """Test _setup_legacy_mcp handles connection failure (covers lines 678-679)."""
-        with patch("victor.integrations.mcp.client.MCPClient") as mock_client:
-            mock_client.return_value.connect.side_effect = Exception("Connection failed")
-            orchestrator._setup_legacy_mcp("mcp command")  # Should not raise
+        """Test _setup_legacy_mcp handles connection failure."""
+        pass
 
 
 class TestToolDependencies:
