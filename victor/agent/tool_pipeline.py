@@ -1303,8 +1303,10 @@ class ToolPipeline:
                         except Exception as e:
                             logger.warning(f"on_tool_complete callback failed: {e}")
                     return sem_cached_result
-            except Exception as e:
-                logger.debug(f"Semantic cache lookup failed: {e}")
+            except (TimeoutError, asyncio.TimeoutError):
+                logger.debug("Semantic cache timeout, skipping")
+            except (OSError, ValueError) as e:
+                logger.warning(f"Semantic cache error (may indicate corruption): {e}")
 
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
