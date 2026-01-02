@@ -199,7 +199,13 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.registry import ProviderRegistry
-from victor.core.errors import ProviderRateLimitError
+from victor.core.errors import (
+    ProviderAuthError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ToolNotFoundError,
+    ToolValidationError,
+)
 from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
@@ -676,8 +682,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._rl_coordinator is not None:
             try:
                 pruning_learner = self._rl_coordinator.get_learner("context_pruning")
-            except Exception as e:
-                logger.debug(f"Could not get context_pruning learner: {e}")
+            except KeyError:
+                logger.debug("context_pruning learner not registered in RL coordinator")
+            except AttributeError:
+                logger.debug("RL coordinator interface mismatch (missing get_learner)")
 
         # ContextCompactor: Proactive context management and tool result truncation (via factory)
         self._context_compactor = self._factory.create_context_compactor(
@@ -2544,8 +2552,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     },
                 )
                 self._rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
-            except Exception as e:
-                logger.debug(f"Failed to record tool outcome to RL: {e}")
+            except ImportError:
+                logger.debug("RLOutcome not available, skipping RL recording")
+            except KeyError as e:
+                logger.debug(f"RL learner not registered: {e}")
+            except ValueError as e:
+                logger.warning(f"Invalid outcome data for RL recording: {e}")
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -2953,8 +2965,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 extensions = self._container.get_optional(VerticalExtensions)
                 if extensions and extensions.prompt_contributors:
                     prompt_contributors = extensions.prompt_contributors
-            except Exception:
-                pass
+            except ImportError:
+                logger.debug("VerticalExtensions module not available")
+            except AttributeError as e:
+                logger.warning(f"VerticalExtensions missing expected attributes: {e}")
 
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
@@ -3055,8 +3069,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 extensions = self._container.get_optional(VerticalExtensions)
                 if extensions and extensions.prompt_contributors:
                     prompt_contributors = extensions.prompt_contributors
-            except Exception:
-                pass
+            except ImportError:
+                logger.debug("VerticalExtensions module not available")
+            except AttributeError as e:
+                logger.warning(f"VerticalExtensions missing expected attributes: {e}")
 
             # Reinitialize prompt builder
             self.prompt_builder = SystemPromptBuilder(
@@ -4423,8 +4439,23 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     if sanitized:
                         self.add_message("assistant", sanitized)
                         chunk = StreamChunk(content=sanitized)
+            except (ProviderRateLimitError, ProviderTimeoutError) as e:
+                logger.error(f"Rate limit/timeout during final response: {e}")
+                chunk = StreamChunk(
+                    content="Rate limited or timeout. Please retry in a moment.\n"
+                )
+            except ProviderAuthError as e:
+                logger.error(f"Auth error during final response: {e}")
+                chunk = StreamChunk(
+                    content="Authentication error. Check API credentials.\n"
+                )
+            except (ConnectionError, TimeoutError) as e:
+                logger.error(f"Network error during final response: {e}")
+                chunk = StreamChunk(
+                    content="Network error. Check connection.\n"
+                )
             except Exception as e:
-                logger.warning(f"Final response generation failed: {e}")
+                logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
                     content="Unable to generate final summary due to iteration limit.\n"
                 )
@@ -6898,12 +6929,32 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         )
                         return result, False, error_msg
 
-            except Exception as e:
+            except (ToolNotFoundError, ToolValidationError, PermissionError) as e:
+                # Non-retryable errors - fail immediately
+                logger.error(f"Tool '{tool_name}' permanent failure: {e}")
+                return None, False, str(e)
+            except (TimeoutError, ConnectionError, asyncio.TimeoutError) as e:
+                # Retryable transient errors
                 last_error = str(e)
                 if attempt < max_attempts - 1:
                     delay = min(base_delay * (2**attempt), max_delay)
                     logger.warning(
-                        f"Tool '{tool_name}' raised exception (attempt {attempt + 1}/{max_attempts}): {e}. "
+                        f"Tool '{tool_name}' transient error (attempt {attempt + 1}/{max_attempts}): {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(
+                        f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}"
+                    )
+                    return None, False, last_error
+            except Exception as e:
+                # Unknown errors - log and retry with caution
+                last_error = str(e)
+                if attempt < max_attempts - 1:
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    logger.warning(
+                        f"Tool '{tool_name}' unexpected error (attempt {attempt + 1}/{max_attempts}): {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
