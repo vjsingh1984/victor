@@ -3461,9 +3461,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
-        Encapsulates the complex decision logic for handling responses without tool
-        calls, including intent classification, continuation prompting, and summary
-        requests.
+        DEPRECATED: This method delegates to ContinuationStrategy.determine_continuation_action().
+        Kept for backward compatibility with existing tests.
 
         Args:
             intent_result: Result from intent classifier (has .intent, .confidence)
@@ -3477,314 +3476,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             mentioned_tools: Tools mentioned but not executed (hallucinated tool calls)
 
         Returns:
-            Dictionary with:
-            - action: str - One of: "continue_asking_input", "return_to_user",
-                          "prompt_tool_call", "request_summary",
-                          "request_completion", "finish", "force_tool_execution"
-            - message: Optional[str] - System message to inject (if any)
-            - reason: str - Human-readable reason for the action
-            - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
+            Dictionary with action, message, reason, and updates.
         """
-        updates: Dict[str, Any] = {}
-
-        # CRITICAL FIX: If summary was already requested in a previous iteration,
-        # we should finish now - don't ask for another summary or loop again.
-        # This prevents duplicate output where the same content is yielded multiple times.
-        if getattr(self, "_max_prompts_summary_requested", False):
-            logger.info("Summary was already requested - finishing to prevent duplicate output")
-            return {
-                "action": "finish",
-                "message": None,
-                "reason": "Summary already requested - final response received",
-                "updates": updates,
-            }
-
-        # Extract intent type
-        intends_to_continue = intent_result.intent == IntentType.CONTINUATION
-        is_completion = intent_result.intent == IntentType.COMPLETION
-        is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
-        is_stuck_loop = intent_result.intent == IntentType.STUCK_LOOP
-
-        # CRITICAL FIX: Handle stuck loop immediately - model is planning but not executing
-        if is_stuck_loop:
-            logger.warning(
-                "Detected STUCK_LOOP intent - model is planning but not executing. "
-                "Forcing summary."
-            )
-            return {
-                "action": "request_summary",
-                "message": (
-                    "You appear to be stuck in a planning loop - you keep describing what "
-                    "you will do but are not making actual tool calls.\n\n"
-                    "Please either:\n"
-                    "1. Make an ACTUAL tool call NOW (not just describe it), OR\n"
-                    "2. Provide your response based on what you already know.\n\n"
-                    "Do not describe what you will do - just do it or provide your answer."
-                ),
-                "reason": "STUCK_LOOP detected - forcing summary",
-                "updates": {"continuation_prompts": 99},  # Prevent further prompting
-            }
-
-        # Configuration - use configurable thresholds from settings
-        max_asking_input_prompts = 3
-        requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
-        # Get continuation prompt limits from settings with provider/model-specific overrides
-        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 6)
-        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 5)
-        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 3)
-
-        # Check for provider/model-specific overrides (RL-learned or manually configured)
-        provider_model_key = f"{self.provider.name}:{self.model}"
-
-        # First, try RL-learned recommendations if coordinator is enabled
-        if self._rl_coordinator:
-            for task_type_name, default_val in [
-                ("analysis", max_cont_analysis),
-                ("action", max_cont_action),
-                ("default", max_cont_default),
-            ]:
-                recommendation = self._rl_coordinator.get_recommendation(
-                    "continuation_prompts", self.provider.name, self.model, task_type_name
-                )
-                if recommendation and recommendation.value is not None:
-                    learned_val = recommendation.value
-                    if task_type_name == "analysis":
-                        max_cont_analysis = learned_val
-                    elif task_type_name == "action":
-                        max_cont_action = learned_val
-                    else:
-                        max_cont_default = learned_val
-                    logger.debug(
-                        f"RL: Using learned continuation prompt for {provider_model_key}:{task_type_name}: "
-                        f"{default_val} → {learned_val} (confidence={recommendation.confidence:.2f})"
-                    )
-
-        # Then, apply manual overrides (take precedence over RL)
-        overrides = getattr(self.settings, "continuation_prompt_overrides", {})
-        if provider_model_key in overrides:
-            override = overrides[provider_model_key]
-            max_cont_analysis = override.get("analysis", max_cont_analysis)
-            max_cont_action = override.get("action", max_cont_action)
-            max_cont_default = override.get("default", max_cont_default)
-            logger.debug(
-                f"Using manual continuation prompt overrides for {provider_model_key}: "
-                f"analysis={max_cont_analysis}, action={max_cont_action}, default={max_cont_default}"
-            )
-
-        max_continuation_prompts = (
-            max_cont_analysis
-            if is_analysis_task
-            else (max_cont_action if is_action_task else max_cont_default)
+        # Delegate to ContinuationStrategy (extracted in Phase 2E)
+        strategy = ContinuationStrategy()
+        return strategy.determine_continuation_action(
+            intent_result=intent_result,
+            is_analysis_task=is_analysis_task,
+            is_action_task=is_action_task,
+            content_length=content_length,
+            full_content=full_content,
+            continuation_prompts=continuation_prompts,
+            asking_input_prompts=asking_input_prompts,
+            one_shot_mode=one_shot_mode,
+            mentioned_tools=mentioned_tools,
+            # Context from orchestrator
+            max_prompts_summary_requested=getattr(self, "_max_prompts_summary_requested", False),
+            settings=self.settings,
+            rl_coordinator=self._rl_coordinator,
+            provider_name=self.provider.name,
+            model=self.model,
+            tool_budget=self.tool_budget,
+            unified_tracker_config=self.unified_tracker.config,
+            task_completion_signals=None,  # Legacy caller doesn't use this
         )
-
-        # Track for RL learning (what max was actually used this session)
-        self._max_continuation_prompts_used = max_continuation_prompts
-
-        # Budget/iteration thresholds
-        budget_threshold = (
-            self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
-        )
-        max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
-        iteration_threshold = (
-            max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
-        )
-
-        # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
-        # If model says "let me call search()" but didn't actually call it, force action
-        if mentioned_tools and len(mentioned_tools) > 0:
-            # Track consecutive hallucinated tool mentions
-            if not hasattr(self, "_hallucinated_tool_count"):
-                self._hallucinated_tool_count = 0
-            self._hallucinated_tool_count += 1
-
-            # After 2 consecutive hallucinations, force a more aggressive response
-            if self._hallucinated_tool_count >= 2:
-                self._hallucinated_tool_count = 0  # Reset counter
-                updates["continuation_prompts"] = continuation_prompts + 2  # Double increment
-                return {
-                    "action": "force_tool_execution",
-                    "message": (
-                        f"CRITICAL: You mentioned using {', '.join(mentioned_tools)} but did NOT "
-                        "actually execute any tool call. Your response contained TEXT describing "
-                        "what you would do, but no actual tool invocation.\n\n"
-                        "You MUST respond with an ACTUAL tool call in the proper format. "
-                        "Do NOT describe what you will do - just DO it.\n\n"
-                        "Example correct format:\n"
-                        '{"name": "read", "arguments": {"path": "some/file.py"}}\n\n'
-                        "If you cannot call tools, provide your final answer NOW."
-                    ),
-                    "reason": f"Forcing tool execution after {self._hallucinated_tool_count + 2} hallucinated tool mentions",
-                    "updates": updates,
-                    "mentioned_tools": mentioned_tools,  # Pass tools for handler delegation
-                }
-            else:
-                updates["continuation_prompts"] = continuation_prompts + 1
-                return {
-                    "action": "prompt_tool_call",
-                    "message": (
-                        f"You mentioned {', '.join(mentioned_tools)} but did not call any tool. "
-                        "Please ACTUALLY call the tool now, or provide your analysis.\n\n"
-                        "DO NOT just describe what you will do - make the actual tool call."
-                    ),
-                    "reason": f"Tool mentioned but not executed: {mentioned_tools}",
-                    "updates": updates,
-                }
-
-        # Reset hallucinated tool count on successful non-hallucination
-        if hasattr(self, "_hallucinated_tool_count"):
-            self._hallucinated_tool_count = 0
-
-        # Handle model asking for user input
-        if is_asking_input:
-            if one_shot_mode and asking_input_prompts < max_asking_input_prompts:
-                updates["asking_input_prompts"] = asking_input_prompts + 1
-                return {
-                    "action": "continue_asking_input",
-                    "message": (
-                        "Yes, please continue with the implementation. "
-                        "Proceed with the most sensible approach based on what you've learned."
-                    ),
-                    "reason": f"Model asking input (one-shot) - auto-continuing ({asking_input_prompts + 1}/{max_asking_input_prompts})",
-                    "updates": updates,
-                }
-            elif not one_shot_mode:
-                return {
-                    "action": "return_to_user",
-                    "message": None,
-                    "reason": "Model asking input (interactive) - returning to user",
-                    "updates": updates,
-                }
-
-        # Check for structured content that indicates completion
-        has_substantial_structured_content = content_length > 500 and any(
-            marker in (full_content or "")
-            for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
-        )
-        content_looks_incomplete = content_length < 800 and not has_substantial_structured_content
-
-        # Determine if we should prompt for continuation
-        should_prompt_continuation = intends_to_continue or (
-            intent_result.intent == IntentType.NEUTRAL
-            and content_looks_incomplete
-            and not is_completion
-        )
-
-        # CRITICAL FIX: Detect stuck continuation loop pattern
-        # If model keeps saying "let me read" but never calls tools, after patience threshold
-        # stop prompting and force a summary instead. Use provider-specific patience.
-        # Track tool calls at start of continuation prompting to detect when model is stuck
-        # even if it made tool calls earlier in the session.
-        if not hasattr(self, "_tool_calls_at_continuation_start"):
-            self._tool_calls_at_continuation_start = self.tool_calls_used
-        if continuation_prompts == 0:
-            # Reset tracking on first prompt of a new sequence
-            self._tool_calls_at_continuation_start = self.tool_calls_used
-
-        tool_calls_during_continuation = (
-            self.tool_calls_used - self._tool_calls_at_continuation_start
-        )
-
-        # Use provider-specific patience for continuation loops (e.g., DeepSeek needs more patience)
-        patience_threshold = self.tool_calling_caps.continuation_patience
-
-        if (
-            intends_to_continue
-            and continuation_prompts >= patience_threshold
-            and tool_calls_during_continuation == 0
-            and not getattr(self, "_max_prompts_summary_requested", False)
-        ):
-            # Model is in a continuation loop without making any progress
-            logger.warning(
-                f"Detected stuck continuation loop: {continuation_prompts} prompts, "
-                f"0 tool calls since continuation started (total: {self.tool_calls_used}), "
-                f"intent={intent_result.intent.name}"
-            )
-            updates["continuation_prompts"] = 99  # Prevent further prompting
-            self._stuck_loop_detected = True  # Track for RL learning
-            return {
-                "action": "request_summary",
-                "message": (
-                    "You have been saying you will examine files but have not made any tool calls. "
-                    "Please provide your response NOW based on what you know, or explain "
-                    "specifically what is preventing you from making tool calls."
-                ),
-                "reason": "Stuck continuation loop - no tool calls after multiple prompts",
-                "updates": updates,
-                "set_max_prompts_summary_requested": True,
-            }
-
-        # Prompt model to make tool call if appropriate
-        if (
-            requires_continuation_support
-            and should_prompt_continuation
-            and self.tool_calls_used < budget_threshold
-            and self.unified_tracker.iterations < iteration_threshold
-            and continuation_prompts < max_continuation_prompts
-        ):
-            updates["continuation_prompts"] = continuation_prompts + 1
-            return {
-                "action": "prompt_tool_call",
-                "message": (
-                    "You said you would examine more files but did not call any tool. "
-                    "Either:\n"
-                    "1. Call ls(path='...') to explore a directory, OR\n"
-                    "2. Call read(path='...') to read a specific file, OR\n"
-                    "3. Provide your analysis NOW if you have enough information.\n\n"
-                    "Make a tool call or provide your final response."
-                ),
-                "reason": f"Prompting for tool call ({continuation_prompts + 1}/{max_continuation_prompts})",
-                "updates": updates,
-            }
-
-        # Request summary if max continuation prompts reached
-        if (
-            requires_continuation_support
-            and continuation_prompts >= max_continuation_prompts
-            and self.tool_calls_used > 0
-            and not getattr(self, "_max_prompts_summary_requested", False)
-        ):
-            updates["continuation_prompts"] = 99  # Prevent further prompting
-            return {
-                "action": "request_summary",
-                "message": (
-                    "Please complete the task NOW based on what you have done so far. "
-                    "Provide a summary of your progress and any remaining steps."
-                ),
-                "reason": f"Max continuation prompts ({max_continuation_prompts}) reached",
-                "updates": updates,
-                "set_max_prompts_summary_requested": True,
-            }
-
-        # Request completion for incomplete output
-        if (
-            requires_continuation_support
-            and self.tool_calls_used > 0
-            and content_looks_incomplete
-            and not is_completion
-            and not getattr(self, "_final_summary_requested", False)
-        ):
-            return {
-                "action": "request_completion",
-                "message": (
-                    "You have examined several files. Please provide a complete summary "
-                    "of your analysis including:\n"
-                    "1. **Strengths** - What the codebase does well\n"
-                    "2. **Weaknesses** - Areas that need improvement\n"
-                    "3. **Recommendations** - Specific suggestions for improvement\n\n"
-                    "Provide your analysis NOW."
-                ),
-                "reason": "Incomplete output - requesting final summary",
-                "updates": updates,
-                "set_final_summary_requested": True,
-            }
-
-        # No more tool calls needed - finish
-        return {
-            "action": "finish",
-            "message": None,
-            "reason": "No more tool calls requested",
-            "updates": updates,
-        }
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
