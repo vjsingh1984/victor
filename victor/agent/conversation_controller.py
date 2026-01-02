@@ -23,6 +23,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
     CONTEXT_LIMITS,
@@ -130,6 +131,7 @@ class ConversationController:
         embedding_service: Optional["EmbeddingService"] = None,
         conversation_store: Optional["ConversationStore"] = None,
         session_id: Optional[str] = None,
+        prompt_normalizer: Optional[PromptNormalizer] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -142,6 +144,8 @@ class ConversationController:
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
+        # PromptNormalizer for input deduplication (DIP compliance)
+        self._normalizer = prompt_normalizer or get_prompt_normalizer()
 
     @property
     def messages(self) -> List[Message]:
@@ -190,10 +194,34 @@ class ConversationController:
         self._system_added = True
 
     def add_user_message(self, content: str) -> Message:
+        """Add a user message with optional normalization.
+
+        Uses PromptNormalizer to:
+        1. Normalize action verbs (view→read, check→read)
+        2. Detect and log duplicate messages
+        3. Collapse repeated continuation requests
+
+        Args:
+            content: User message content
+
+        Returns:
+            The added Message
+        """
         self.ensure_system_message()
-        message = self._history.add_user_message(content)
+
+        # Normalize input using PromptNormalizer
+        result = self._normalizer.normalize(content)
+        normalized_content = result.normalized
+
+        # Log normalizations if any were made
+        if result.changes:
+            logger.debug(f"Normalized prompt: {result.changes}")
+        if result.is_duplicate:
+            logger.debug("Detected duplicate message (will still add for conversational flow)")
+
+        message = self._history.add_user_message(normalized_content)
         if self.config.enable_stage_tracking:
-            self._state_machine.record_message(content, is_user=True)
+            self._state_machine.record_message(normalized_content, is_user=True)
         if (
             self.config.enable_context_monitoring
             and (metrics := self.get_context_metrics()).is_overflow_risk

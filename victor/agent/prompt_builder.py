@@ -28,6 +28,7 @@ from victor.agent.provider_tool_guidance import (
     get_tool_guidance_strategy,
     ToolGuidanceStrategy,
 )
+from victor.agent.prompt_normalizer import get_prompt_normalizer
 
 if TYPE_CHECKING:
     from victor.framework.enrichment import (
@@ -71,6 +72,33 @@ OUTPUT STYLE: CONCISE
 - Maximum 3 sentences for simple queries.
 """.strip()
 
+# Active completion signaling - deterministic detection
+# This guidance is always included to ensure predictable task completion detection
+# Uses underscore-prefixed signals to distinguish from natural language
+COMPLETION_GUIDANCE = """
+TASK COMPLETION (MANDATORY):
+When you complete a task, you MUST signal completion using these EXACT markers:
+
+1. For FILE OPERATIONS (create/edit/write):
+   Say: "_DONE_ Created/Modified <filename>"
+
+2. For BUG FIXES / ISSUE RESOLUTION:
+   Say: "_TASK_DONE_ <what was fixed>"
+
+3. For ANALYSIS / QUESTIONS / RESEARCH:
+   End with: "_SUMMARY_ <key findings>"
+
+4. For FAILED / BLOCKED TASKS:
+   Say: "_BLOCKED_ <reason>" or "_CANNOT_COMPLETE_ <reason>"
+
+IMPORTANT:
+- These signals are REQUIRED for the system to detect task completion
+- Use the EXACT markers with underscores (e.g., _DONE_, _TASK_DONE_, _SUMMARY_)
+- After signaling completion, STOP - do NOT ask follow-up questions
+- Do NOT say "would you like me to continue?" after completing the task
+- Do NOT re-read files you have already read
+""".strip()
+
 # Extended grounding rules for local models that need more explicit guidance
 GROUNDING_RULES_EXTENDED = """
 CRITICAL - TOOL OUTPUT GROUNDING:
@@ -108,15 +136,59 @@ DO NOT assume content is missing - use offset/search to access additional sectio
 # Task-type-specific prompt hints
 # These are appended to system prompts when task type is detected
 # Concise format for cloud providers - local models use extended hints from complexity_classifier
+# Each hint includes a completion signal instruction for deterministic task completion detection
+# Uses underscore-prefixed markers (e.g., _DONE_) to distinguish from natural language
 TASK_TYPE_HINTS = {
-    "code_generation": """[GENERATE] Write code directly. No exploration needed. Complete implementation.""",
-    "create_simple": """[CREATE] Write file immediately. Skip codebase exploration. One tool call max.""",
-    "create": """[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns.""",
-    "edit": """[EDIT] Read target file first, then modify. Focused changes only.""",
-    "search": """[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.""",
-    "action": """[ACTION] Execute git/test/build operations. Multiple tool calls allowed. Continue until complete.""",
-    "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.""",
-    "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.""",
+    "code_generation": """[GENERATE] Write code directly. No exploration needed. Complete implementation.
+Signal completion with: _DONE_ Created <filename>""",
+    "create_simple": """[CREATE] Write file immediately. Skip codebase exploration. One tool call max.
+Signal completion with: _DONE_ Created <filename>""",
+    "create": """[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns.
+Signal completion with: _DONE_ Created <filename>""",
+    "edit": """[EDIT] Read target file first, then modify. Focused changes only.
+Signal completion with: _DONE_ Modified <filename>""",
+    "search": """[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.
+Signal completion with: _SUMMARY_ Found <N> results in <locations>""",
+    "action": """[ACTION] Execute git/test/build operations. Multiple tool calls allowed. Continue until complete.
+Signal completion with: _DONE_ <action performed>""",
+    # SWE-bench / GitHub issue resolution - guides agent through bug-fixing workflow
+    "bug_fix": """[BUG FIX] Resolve a GitHub issue or bug report. CRITICAL WORKFLOW:
+
+PHASE 1 - UNDERSTAND (max 5 file reads):
+1. Read the file(s) mentioned in the error traceback/issue
+2. Read related imports and dependencies (1-2 files max)
+3. Identify the root cause from the code
+
+PHASE 2 - FIX (MANDATORY after Phase 1):
+4. Use edit_file or write_file to make the fix
+5. The fix should be minimal and surgical - only change what's necessary
+6. If the issue suggests a fix (e.g., "add quiet=True"), implement exactly that
+
+PHASE 3 - VERIFY (optional):
+7. If tests exist, run them to verify the fix
+
+CRITICAL RULES:
+- DO NOT read more than 5-7 files before making an edit
+- After reading the traceback/error location, you have enough context to edit
+- Prefer SMALL, FOCUSED changes over large refactors
+- If unsure, make the minimal fix that addresses the reported issue
+- Say "Fix applied" when done editing
+
+ANTI-PATTERNS TO AVOID:
+- Reading the entire codebase before editing
+- Exploring tangential files not in the error trace
+- Waiting for "perfect understanding" before acting
+- Re-reading files you've already read
+
+COMPLETION SIGNALING:
+When you have made the fix, say: "_TASK_DONE_ <brief summary of what was fixed>"
+This signals you are done. Example: '_TASK_DONE_ Added quiet=True parameter to world_to_pixel_values()'""",
+    "issue_resolution": """[ISSUE] Same as bug_fix - resolve GitHub issue with focused edits after minimal exploration.
+Signal completion with: _TASK_DONE_ <what was fixed>""",
+    "analysis_deep": """[ANALYSIS] Thorough codebase exploration. Read all relevant modules. Comprehensive output.
+Signal completion with: _SUMMARY_ <key findings and recommendations>""",
+    "analyze": """[ANALYZE] Examine code carefully. Read related files. Structured findings.
+Signal completion with: _SUMMARY_ <analysis findings>""",
     "design": """[ARCHITECTURE] For architecture/component questions:
 USE STRUCTURED GRAPH FIRST:
 - Call architecture_summary to get module pagerank/centrality with edge_counts + 2–3 callsites (runtime-only). Avoid ad-hoc graph/find hops unless data is missing.
@@ -143,158 +215,184 @@ Output requirements:
 - Use discovered component names (not generic descriptions like "storage module")
 - Include file:line references (e.g., "src/engines/impl.rs:42")
 - Verify improvements reference ACTUAL code patterns (grep first)
-Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
-    "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.""",
+Use 15-20 tool calls minimum. Prioritize by architectural importance.
+Signal completion with: _SUMMARY_ <architecture overview and recommendations>""",
+    "general": """[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.
+Signal completion with: _SUMMARY_ <answer to question>""",
     # DevOps vertical task types (aligned with TaskType enum)
     "infrastructure": """[INFRASTRUCTURE] Deploy infrastructure (Kubernetes, Terraform, Docker, cloud):
 1. Use Infrastructure as Code (Terraform, CloudFormation, Pulumi)
 2. Implement multi-stage Docker builds for smaller images
 3. Define resource limits and requests for Kubernetes
 4. Use ConfigMaps/Secrets for configuration management
-5. Tag all resources for cost tracking and organization""",
+5. Tag all resources for cost tracking and organization
+Signal completion with: _DONE_ Created <infrastructure files>""",
     "ci_cd": """[CI/CD] Configure continuous integration/deployment:
 1. Define clear stages: lint, test, build, deploy
 2. Cache dependencies for faster builds
 3. Use matrix builds for cross-platform testing
 4. Implement proper secret management (GitHub Secrets, Vault)
-5. Add manual approval for production deployments""",
+5. Add manual approval for production deployments
+Signal completion with: _DONE_ Created <pipeline config>""",
     # Data Analysis vertical task types (aligned with TaskType enum)
     "data_analysis": """[DATA ANALYSIS] Comprehensive data exploration and analysis:
 1. Load data and check shape/types with df.info(), df.describe()
 2. Calculate summary statistics (mean, median, std, quartiles)
 3. Identify missing values and their patterns (df.isnull().sum())
 4. Check for duplicates and data quality issues
-5. Analyze correlations and distributions before modeling""",
+5. Analyze correlations and distributions before modeling
+Signal completion with: _SUMMARY_ <data analysis findings>""",
     "visualization": """[VISUALIZATION] Create informative charts and dashboards:
 1. Choose appropriate chart type for the data (bar, line, scatter, heatmap)
 2. Use clear labels, titles, and legends
 3. Add context (units, time periods, annotations)
 4. Consider colorblind-friendly palettes (viridis, cividis)
-5. Save as high-resolution images (plt.savefig('fig.png', dpi=300))""",
+5. Save as high-resolution images (plt.savefig('fig.png', dpi=300))
+Signal completion with: _DONE_ Created <visualization files>""",
     # Research vertical task types (aligned with TaskType enum)
     "fact_check": """[FACT-CHECK] Verify claims with multiple independent sources:
 1. Search for original sources and official documentation
 2. Cross-reference with authoritative databases
 3. Check recency and relevance of sources
-4. Note any conflicting information found""",
+4. Note any conflicting information found
+Signal completion with: _SUMMARY_ <verification results>""",
     "literature_review": """[LITERATURE] Systematic review of existing knowledge:
 1. Define scope and search criteria
 2. Search academic and authoritative sources
 3. Extract key findings and methodologies
 4. Synthesize patterns and gaps
-5. Provide structured bibliography""",
+5. Provide structured bibliography
+Signal completion with: _SUMMARY_ <literature review findings>""",
     "competitive_analysis": """[ANALYSIS] Compare products, services, or approaches:
 1. Identify key comparison criteria
 2. Gather data from official sources
 3. Create objective comparison matrix
 4. Note strengths, weaknesses, limitations
-5. Avoid promotional language""",
+5. Avoid promotional language
+Signal completion with: _SUMMARY_ <competitive analysis results>""",
     "trend_research": """[TRENDS] Identify patterns and emerging developments:
 1. Search recent news and publications
 2. Look for quantitative data and statistics
 3. Identify key players and innovations
 4. Note methodology limitations
-5. Distinguish facts from speculation""",
+5. Distinguish facts from speculation
+Signal completion with: _SUMMARY_ <trend analysis findings>""",
     "technical_research": """[TECHNICAL] Deep dive into technical topics:
 1. Start with official documentation
 2. Search code repositories and examples
 3. Look for benchmarks and comparisons
 4. Note version-specific information
-5. Verify with multiple technical sources""",
+5. Verify with multiple technical sources
+Signal completion with: _SUMMARY_ <technical research findings>""",
     # Coding vertical granular task types (aligned with TaskType enum)
     "refactor": """[REFACTOR] Restructure existing code without changing behavior:
 1. Analyze current code structure and identify issues
 2. Plan incremental changes to minimize risk
 3. Apply refactoring patterns (extract method, rename, move)
 4. Verify behavior unchanged with existing tests
-5. Document architectural decisions""",
+5. Document architectural decisions
+Signal completion with: _DONE_ Refactored <component/file>""",
     "debug": """[DEBUG] Find and fix bugs systematically:
 1. Reproduce the issue consistently
 2. Read error messages and stack traces carefully
 3. Trace execution flow to find root cause
 4. Isolate the problem with minimal test case
-5. Fix root cause, not just symptoms""",
+5. Fix root cause, not just symptoms
+Signal completion with: _TASK_DONE_ Fixed <bug description>""",
     "test": """[TEST] Write comprehensive tests for code:
 1. Identify critical paths and edge cases
 2. Write unit tests for individual functions
 3. Add integration tests for component interactions
 4. Mock external dependencies appropriately
-5. Aim for meaningful coverage, not just metrics""",
+5. Aim for meaningful coverage, not just metrics
+Signal completion with: _DONE_ Created tests for <component>""",
     # DevOps vertical granular task types (aligned with TaskType enum)
     "dockerfile": """[DOCKERFILE] Create optimized Docker images:
 1. Use official base images with specific version tags
 2. Implement multi-stage builds for smaller images
 3. Order layers for optimal cache utilization
 4. Add health checks and proper signal handling
-5. Run as non-root user for security""",
+5. Run as non-root user for security
+Signal completion with: _DONE_ Created Dockerfile""",
     "docker_compose": """[COMPOSE] Configure multi-container applications:
 1. Define all services with explicit dependencies
 2. Use named volumes for persistent data
 3. Configure proper network isolation
 4. Add health checks for service readiness
-5. Use environment files for secrets""",
+5. Use environment files for secrets
+Signal completion with: _DONE_ Created docker-compose.yml""",
     "kubernetes": """[K8S] Create Kubernetes configurations:
 1. Use Deployments for stateless, StatefulSets for stateful apps
 2. Define resource requests and limits appropriately
 3. Add liveness and readiness probes
 4. Use ConfigMaps for config, Secrets for sensitive data
-5. Implement NetworkPolicies for security""",
+5. Implement NetworkPolicies for security
+Signal completion with: _DONE_ Created K8s manifests""",
     "terraform": """[TERRAFORM] Write Infrastructure as Code:
 1. Organize code into reusable modules
 2. Use remote state with locking (S3+DynamoDB, etc.)
 3. Implement proper variable typing and validation
 4. Tag all resources for cost tracking
-5. Use data sources instead of hardcoded IDs""",
+5. Use data sources instead of hardcoded IDs
+Signal completion with: _DONE_ Created Terraform config""",
     "monitoring": """[MONITORING] Set up observability infrastructure:
 1. Define key metrics and SLIs/SLOs
 2. Configure alerting with appropriate thresholds
 3. Set up distributed tracing for microservices
 4. Implement structured logging with context
-5. Create dashboards for visibility""",
+5. Create dashboards for visibility
+Signal completion with: _DONE_ Created monitoring config""",
     # Data Analysis vertical granular task types (aligned with TaskType enum)
     "data_profiling": """[PROFILE] Comprehensive data profiling:
 1. Load data and check shape/types (df.info(), df.dtypes)
 2. Calculate summary statistics (mean, median, std, quartiles)
 3. Identify missing values and their patterns
 4. Check for duplicates and uniqueness constraints
-5. Analyze value distributions and outliers""",
+5. Analyze value distributions and outliers
+Signal completion with: _SUMMARY_ <data profile findings>""",
     "statistical_analysis": """[STATISTICS] Perform rigorous statistical analysis:
 1. State null and alternative hypotheses clearly
 2. Check assumptions (normality, variance homogeneity)
 3. Choose appropriate test (t-test, ANOVA, chi-square)
 4. Calculate test statistic and p-value
-5. Interpret results with effect size and confidence intervals""",
+5. Interpret results with effect size and confidence intervals
+Signal completion with: _SUMMARY_ <statistical analysis results>""",
     "correlation_analysis": """[CORRELATION] Analyze variable relationships:
 1. Calculate correlation matrix for numeric variables
 2. Use appropriate method (Pearson for linear, Spearman for monotonic)
 3. Visualize with heatmap or scatter matrix
 4. Identify strong correlations (|r| > 0.7)
-5. Note potential confounders and causation vs correlation""",
+5. Note potential confounders and causation vs correlation
+Signal completion with: _SUMMARY_ <correlation findings>""",
     "regression": """[REGRESSION] Build predictive regression models:
 1. Define target and feature variables clearly
 2. Split data into train/test sets (or use cross-validation)
 3. Check for multicollinearity (VIF analysis)
 4. Fit model and assess coefficients significance
-5. Evaluate with R², RMSE, residual plots""",
+5. Evaluate with R², RMSE, residual plots
+Signal completion with: _SUMMARY_ <regression model results>""",
     "clustering": """[CLUSTERING] Segment data into meaningful groups:
 1. Scale features appropriately (StandardScaler, MinMaxScaler)
 2. Determine optimal cluster count (elbow method, silhouette score)
 3. Apply appropriate algorithm (K-means, hierarchical, DBSCAN)
 4. Visualize clusters (PCA/t-SNE for high dimensions)
-5. Profile cluster characteristics and interpret business meaning""",
+5. Profile cluster characteristics and interpret business meaning
+Signal completion with: _SUMMARY_ <clustering results>""",
     "time_series": """[TIMESERIES] Analyze temporal data patterns:
 1. Check datetime format and ensure proper frequency
 2. Plot time series and identify patterns (trend, seasonality, cycles)
 3. Decompose into trend, seasonal, and residual components
 4. Check stationarity (ADF test) and apply differencing if needed
-5. Apply appropriate forecasting method (ARIMA, Prophet, etc.)""",
+5. Apply appropriate forecasting method (ARIMA, Prophet, etc.)
+Signal completion with: _SUMMARY_ <time series analysis results>""",
     # Research vertical granular task types (aligned with TaskType enum)
     "general_query": """[QUERY] Answer general research questions:
 1. Clarify the scope and specific aspects of the question
 2. Search for authoritative sources and documentation
 3. Synthesize information from multiple perspectives
 4. Provide clear, structured explanation
-5. Note limitations and areas of uncertainty""",
+5. Note limitations and areas of uncertainty
+Signal completion with: _SUMMARY_ <answer to query>""",
 }
 
 
@@ -464,10 +562,13 @@ class SystemPromptBuilder:
         return merged
 
     def get_vertical_grounding_rules(self) -> str:
-        """Get grounding rules from vertical contributors.
+        """Get grounding rules from vertical contributors with deduplication.
+
+        Uses PromptNormalizer.deduplicate_sections() to remove duplicate
+        grounding rules that may come from multiple contributors.
 
         Returns:
-            Merged grounding rules from all contributors
+            Merged and deduplicated grounding rules from all contributors
         """
         if not self.prompt_contributors:
             return ""
@@ -479,13 +580,21 @@ class SystemPromptBuilder:
             if grounding:
                 rules.append(grounding)
 
+        # Deduplicate sections using PromptNormalizer
+        if rules:
+            normalizer = get_prompt_normalizer()
+            rules = normalizer.deduplicate_sections(rules)
+
         return "\n\n".join(rules) if rules else ""
 
     def get_vertical_system_prompt_sections(self) -> str:
-        """Get system prompt sections from vertical contributors.
+        """Get system prompt sections from vertical contributors with deduplication.
+
+        Uses PromptNormalizer.deduplicate_sections() to remove duplicate
+        system prompt sections that may come from multiple contributors.
 
         Returns:
-            Merged system prompt sections from all contributors
+            Merged and deduplicated system prompt sections from all contributors
         """
         if not self.prompt_contributors:
             return ""
@@ -496,6 +605,11 @@ class SystemPromptBuilder:
             section = contributor.get_system_prompt_section()
             if section:
                 sections.append(section)
+
+        # Deduplicate sections using PromptNormalizer
+        if sections:
+            normalizer = get_prompt_normalizer()
+            sections = normalizer.deduplicate_sections(sections)
 
         return "\n\n".join(sections) if sections else ""
 
@@ -633,6 +747,12 @@ class SystemPromptBuilder:
         provider-specific prompt construction. Includes provider-specific
         tool guidance (GAP-5) when available.
 
+        The prompt is built in this order:
+        1. Concise mode guidance (if enabled)
+        2. Base prompt (provider-specific)
+        3. Completion guidance (always included for deterministic task completion)
+        4. Provider-specific tool guidance (GAP-5)
+
         Returns:
             System prompt string tailored to the provider/model
         """
@@ -647,6 +767,9 @@ class SystemPromptBuilder:
         if self.concise_mode:
             base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
+
+        # Append completion guidance (always included for deterministic task completion)
+        base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
 
         # Append provider-specific tool guidance if available (GAP-5)
         tool_guidance = self.get_provider_tool_guidance()
