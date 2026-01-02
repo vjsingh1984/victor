@@ -1482,3 +1482,197 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                     "4. Do NOT output [TOOL_REQUEST] or similar markers.",
                 ]
             )
+
+
+class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Dedicated adapter for DeepSeek models.
+
+    DeepSeek provides OpenAI-compatible API with model-specific behaviors:
+    - deepseek-chat: Non-thinking mode with native function calling
+    - deepseek-reasoner: Thinking mode with Chain of Thought (NO function calling)
+
+    This adapter handles:
+    - Model-specific capability detection
+    - Reasoning content extraction for deepseek-reasoner
+    - Appropriate system prompts for each model type
+    - Fallback parsing for edge cases
+
+    References:
+    - https://api-docs.deepseek.com/guides/function_calling
+    - https://api-docs.deepseek.com/guides/reasoning_model
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "deepseek"
+
+    def _is_reasoner_model(self) -> bool:
+        """Check if current model is deepseek-reasoner (thinking mode)."""
+        return "reasoner" in self.model_lower or "r1" in self.model_lower
+
+    def _has_native_support(self) -> bool:
+        """Check if current model supports native tool calling.
+
+        deepseek-reasoner does NOT support function calling.
+        deepseek-chat and other variants do.
+        """
+        return not self._is_reasoner_model()
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for DeepSeek models."""
+        has_native = self._has_native_support()
+        is_reasoner = self._is_reasoner_model()
+
+        # Load from YAML config with model pattern matching
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("deepseek", self.model, ToolCallFormat.OPENAI)
+
+        # Override based on model type - reasoner has no tool support
+        if is_reasoner:
+            return ToolCallingCapabilities(
+                native_tool_calls=False,
+                streaming_tool_calls=False,
+                parallel_tool_calls=False,
+                tool_choice_param=False,
+                json_fallback_parsing=False,  # No tool parsing for reasoner
+                xml_fallback_parsing=False,
+                thinking_mode=True,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.OPENAI,
+                argument_format="json",
+                recommended_max_tools=0,  # No tools for reasoner
+                recommended_tool_budget=0,
+            )
+
+        # deepseek-chat: Full native tool calling support
+        if not caps.native_tool_calls:
+            return ToolCallingCapabilities(
+                native_tool_calls=True,
+                streaming_tool_calls=True,
+                parallel_tool_calls=True,
+                tool_choice_param=True,
+                json_fallback_parsing=True,
+                xml_fallback_parsing=False,
+                thinking_mode=False,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.OPENAI,
+                argument_format="json",
+                recommended_max_tools=50,
+                recommended_tool_budget=20,
+            )
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI function format (DeepSeek is OpenAI-compatible)."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse DeepSeek tool calls.
+
+        DeepSeek returns tool calls in OpenAI format:
+        {"id": "...", "function": {"name": "...", "arguments": "..."}}
+        where arguments is a JSON string.
+
+        For deepseek-reasoner, no tool calls are expected.
+        """
+        warnings: List[str] = []
+
+        # Reasoner model: no tool parsing
+        if self._is_reasoner_model():
+            return ToolCallParseResult(remaining_content=content)
+
+        # Try native tool calls first
+        if raw_tool_calls:
+            tool_calls = []
+
+            for tc in raw_tool_calls:
+                # Handle OpenAI format with nested function
+                if "function" in tc:
+                    func = tc["function"]
+                    name = func.get("name", "")
+                    args = func.get("arguments", "{}")
+                else:
+                    # Direct format
+                    name = tc.get("name", "")
+                    args = tc.get("arguments", {})
+
+                if not self.is_valid_tool_name(name):
+                    warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
+
+                # Parse arguments (may be string or dict)
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
+
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings,
+                )
+
+        # Fallback: Try parsing from content (using mixin)
+        if content:
+            result = self.parse_from_content(content, self.is_valid_tool_name)
+            if result.tool_calls:
+                all_warnings = warnings + result.warnings
+                return ToolCallParseResult(
+                    tool_calls=result.tool_calls,
+                    remaining_content=result.remaining_content,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=all_warnings,
+                )
+
+        return ToolCallParseResult(remaining_content=content, warnings=warnings)
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for DeepSeek models."""
+        if self._is_reasoner_model():
+            # Reasoner mode: No tools, emphasize reasoning
+            return "\n".join(
+                [
+                    "DEEPSEEK REASONER MODE:",
+                    "- You are in reasoning/thinking mode.",
+                    "- Focus on step-by-step logical analysis.",
+                    "- Tools are NOT available in this mode.",
+                    "- Provide thorough explanations with your reasoning.",
+                ]
+            )
+
+        # deepseek-chat: Normal tool calling
+        return "\n".join(
+            [
+                "TOOL USAGE:",
+                "- Use the available tools to gather information when needed.",
+                "- Call MULTIPLE tools in parallel when operations are independent.",
+                "- After gathering sufficient information (2-4 tool calls), provide your answer.",
+                "- Do NOT repeat identical tool calls.",
+                "",
+                "RESPONSE FORMAT:",
+                "- Provide your final answer in clear, readable text.",
+                "- Be concise and directly answer the question.",
+            ]
+        )
