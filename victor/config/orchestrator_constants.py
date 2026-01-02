@@ -250,14 +250,14 @@ class StageToolLimits:
     - These limits are applied AFTER semantic/keyword selection
     """
 
-    initial_max: int = 12  # Early exploration - focus on read tools
-    planning_max: int = 12  # Planning stage
-    reading_max: int = 12  # Reading/analysis
-    analysis_max: int = 14  # Analysis may need more tools
-    executing_max: int = 20  # Execution needs write/edit/shell/git/test
-    verification_max: int = 15  # Verification stage
-    completion_max: int = 10  # Completion - minimal tools
-    build_mode_max: int = 20  # BUILD mode override (allows more tools)
+    initial_max: int = 10  # Early exploration - focus on read tools
+    planning_max: int = 10  # Planning stage
+    reading_max: int = 10  # Reading/analysis
+    analysis_max: int = 12  # Analysis may need more tools
+    executing_max: int = 15  # Execution needs write/edit/shell/git/test
+    verification_max: int = 12  # Verification stage
+    completion_max: int = 8  # Completion - minimal tools
+    build_mode_max: int = 15  # BUILD mode override
 
 
 STAGE_TOOL_LIMITS = StageToolLimits()

@@ -66,13 +66,13 @@ class AdapterConfig:
     which is appropriate for benchmark tasks that require multiple tool calls.
     """
 
-    # Defaults from ComplexityBudget(ACTION) - single source of truth
-    # ACTION: tool_budget=50, max_turns=30, max_continuation_requests=15, timeout_seconds=600
-    max_turns: int = 30  # Maximum conversation turns (ACTION complexity)
+    # Defaults optimized for SWE-bench with slow models (DeepSeek, Qwen, Mixtral)
+    # ACTION: tool_budget=50, max_turns=20, timeout_seconds=1200
+    max_turns: int = 20  # Maximum conversation turns (fewer, longer turns)
     tool_budget: int = 50  # Maximum tool calls (ACTION complexity)
     max_tool_calls: int = 50  # Alias for tool_budget (backwards compat)
-    total_timeout: int = 600  # Total task timeout in seconds (ACTION complexity)
-    min_turn_timeout: int = 180  # Minimum per-turn timeout (P2: Timeout Fix)
+    total_timeout: int = 1200  # Total task timeout: 20 minutes for slow models
+    min_turn_timeout: int = 240  # 4 minutes per turn (slow model inference)
     track_file_edits: bool = True
     track_diffs: bool = True
     working_dir: Optional[Path] = None

@@ -167,7 +167,8 @@ class SWEBenchInstance:
             difficulty=repo_difficulty,
             category=self._get_category(),
             tags=self._get_tags(),
-            timeout_seconds=600,  # SWE-bench tasks need more time
+            timeout_seconds=900,  # SWE-bench tasks need more time (15 min)
+            complexity_override="action",  # SWE-bench = multi-step issue resolution
         )
 
     def _estimate_difficulty(self) -> str:

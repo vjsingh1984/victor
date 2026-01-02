@@ -223,8 +223,9 @@ class ConversationStateMachine:
     """
 
     # Minimum seconds between stage transitions (prevents thrashing)
-    # Increased from 3.0 to 5.0 to reduce stage thrashing observed in Ollama models
-    TRANSITION_COOLDOWN_SECONDS: float = 5.0
+    # Reduced from 5.0 to 2.0 to allow faster progression for SWE-bench tasks
+    # while still preventing thrashing
+    TRANSITION_COOLDOWN_SECONDS: float = 2.0
 
     # Minimum tools required to trigger stage transition
     MIN_TOOLS_FOR_TRANSITION: int = 3
