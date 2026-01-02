@@ -97,22 +97,22 @@ class ToolOutputFormatterConfig:
     """Configuration for tool output formatting.
 
     Attributes:
-        max_output_chars: Maximum characters before truncation (default 15000)
-        file_structure_threshold: Threshold for showing structure instead of content (default 50000)
+        max_output_chars: Maximum characters before truncation (default 8000)
+        file_structure_threshold: Threshold for showing structure instead of content (default 30000)
         min_savings_threshold: Minimum token savings to use optimized format (default 0.15 = 15%)
-        max_classes_shown: Maximum classes to show in structure summary (default 20)
-        max_functions_shown: Maximum functions to show in structure summary (default 30)
-        sample_lines_start: Number of lines to show from file start (default 30)
-        sample_lines_end: Number of lines to show from file end (default 20)
+        max_classes_shown: Maximum classes to show in structure summary (default 15)
+        max_functions_shown: Maximum functions to show in structure summary (default 20)
+        sample_lines_start: Number of lines to show from file start (default 20)
+        sample_lines_end: Number of lines to show from file end (default 15)
     """
 
-    max_output_chars: int = 15000
-    file_structure_threshold: int = 50000
+    max_output_chars: int = 8000  # Reduced from 15000 (~47% reduction)
+    file_structure_threshold: int = 30000  # Reduced from 50000 - show structure earlier
     min_savings_threshold: float = 0.15
-    max_classes_shown: int = 20
-    max_functions_shown: int = 30
-    sample_lines_start: int = 30
-    sample_lines_end: int = 20
+    max_classes_shown: int = 15  # Reduced from 20
+    max_functions_shown: int = 20  # Reduced from 30
+    sample_lines_start: int = 20  # Reduced from 30
+    sample_lines_end: int = 15  # Reduced from 20
 
 
 class TruncatorProtocol(Protocol):

@@ -62,16 +62,16 @@ class ContextLimits:
         chars_per_token_estimate: Approximate characters per token for estimation
 
     **Design Notes:**
-    - overflow_threshold (0.8) provides headroom before hitting model limits
-    - proactive_compaction_threshold (0.90) triggers compaction before overflow
-    - compaction_target (0.5) reduces to 50% to allow for conversation growth
+    - overflow_threshold (0.75) provides headroom before hitting model limits
+    - proactive_compaction_threshold (0.70) triggers compaction early for token efficiency
+    - compaction_target (0.45) reduces to 45% to allow for conversation growth
     """
 
-    overflow_threshold: float = 0.8
-    warning_threshold: float = 0.7
-    proactive_compaction_threshold: float = 0.90
-    critical_threshold: float = 0.95
-    compaction_target: float = 0.5
+    overflow_threshold: float = 0.75  # Reduced from 0.8
+    warning_threshold: float = 0.65  # Reduced from 0.7
+    proactive_compaction_threshold: float = 0.70  # Reduced from 0.90 - trigger earlier
+    critical_threshold: float = 0.90  # Reduced from 0.95
+    compaction_target: float = 0.45  # Reduced from 0.5 - compact more aggressively
     max_context_chars: int = 200000
     chars_per_token_estimate: int = 4
 
@@ -152,21 +152,21 @@ class CompactionConfig:
         chars_per_token: Approximate characters per token for calculations
 
     **Design Notes:**
-    - min_messages_after_compact (8) preserves enough context for coherent conversation
-    - tool_result_retention_weight (1.5) prioritizes tool results over discussion
+    - min_messages_after_compact (6) preserves enough context for coherent conversation
+    - tool_result_retention_weight (1.2) moderate priority for tool results
     - recent_message_weight (2.0) heavily weights recent messages
-    - tool_result_max_chars (8192) allows ~10-12 parallel reads within 32K usable tokens
+    - tool_result_max_chars (5120) allows ~12-15 parallel reads within 32K usable tokens
     - output_reserve_pct (0.5) reserves half the context for model output
-    - parallel_read_target_files (10) optimizes for common read patterns
+    - parallel_read_target_files (12) optimizes for common read patterns
     """
 
-    min_messages_after_compact: int = 8
-    tool_result_retention_weight: float = 1.5
+    min_messages_after_compact: int = 6  # Reduced from 8
+    tool_result_retention_weight: float = 1.2  # Reduced from 1.5
     recent_message_weight: float = 2.0
-    tool_result_max_chars: int = 8192
-    tool_result_max_lines: int = 230  # 8192 / 35 chars per line ≈ 234 lines
+    tool_result_max_chars: int = 5120  # Reduced from 8192 (~37% reduction)
+    tool_result_max_lines: int = 150  # Reduced from 230 (~35% reduction)
     output_reserve_pct: float = 0.5
-    parallel_read_target_files: int = 10
+    parallel_read_target_files: int = 12  # Increased from 10
     chars_per_token: float = 3.0
 
 
