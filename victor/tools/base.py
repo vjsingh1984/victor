@@ -374,6 +374,92 @@ class BaseTool(ABC):
             },
         }
 
+    def to_schema(self, level: "SchemaLevel" = None) -> Dict[str, Any]:
+        """Generate JSON schema at specified verbosity level.
+
+        Args:
+            level: Schema verbosity level (FULL, COMPACT, or STUB). Defaults to FULL.
+
+        Returns:
+            JSON Schema with appropriate detail level.
+
+        Example:
+            # FULL: Complete schema (~100-150 tokens)
+            tool.to_schema(SchemaLevel.FULL)
+
+            # COMPACT: All params, shorter descriptions (~60-80 tokens, ~20% reduction)
+            tool.to_schema(SchemaLevel.COMPACT)
+
+            # STUB: Minimal schema, required params only (~25-40 tokens)
+            tool.to_schema(SchemaLevel.STUB)
+        """
+        from victor.tools.enums import SchemaLevel
+
+        if level is None:
+            level = SchemaLevel.FULL
+
+        if level == SchemaLevel.FULL:
+            return self.to_json_schema()
+
+        # Get limits from schema level
+        max_desc = level.max_description_chars
+        max_param_desc = level.max_param_description_chars
+        include_optional = level.include_optional_params
+
+        # Build parameters based on level
+        params = {}
+        required_list = self.parameters.get("required", [])
+
+        for name, schema in self.parameters.get("properties", {}).items():
+            # STUB: only required params; COMPACT: all params
+            if not include_optional and name not in required_list:
+                continue
+
+            # Truncate description
+            desc = schema.get("description", "")
+            if len(desc) > max_param_desc:
+                desc = desc[: max_param_desc - 3] + "..."
+
+            params[name] = {
+                "type": schema.get("type", "string"),
+                "description": desc,
+            }
+
+            # Preserve enum if present
+            if "enum" in schema:
+                params[name]["enum"] = schema["enum"]
+
+        # Truncate tool description
+        desc = self.description
+        # For COMPACT/STUB: use first 1-2 sentences
+        first_sentence_end = desc.find(".")
+        if first_sentence_end > 0 and first_sentence_end < max_desc:
+            # Try to get second sentence for COMPACT
+            if level == SchemaLevel.COMPACT:
+                second_end = desc.find(".", first_sentence_end + 1)
+                if second_end > 0 and second_end < max_desc:
+                    desc = desc[: second_end + 1]
+                else:
+                    desc = desc[: first_sentence_end + 1]
+            else:
+                desc = desc[: first_sentence_end + 1]
+
+        if len(desc) > max_desc:
+            desc = desc[: max_desc - 3] + "..."
+
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": desc,
+                "parameters": {
+                    "type": "object",
+                    "properties": params,
+                    "required": [r for r in required_list if r in params],
+                },
+            },
+        }
+
     def validate_parameters(self, **kwargs: Any) -> bool:
         """Validate provided parameters against schema.
 
