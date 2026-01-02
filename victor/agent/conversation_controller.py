@@ -549,8 +549,10 @@ class ConversationController:
                 emb1, emb2 = embeddings[0], embeddings[1]
                 # Use Rust-accelerated cosine similarity (with NumPy fallback)
                 return cosine_similarity(list(emb1), list(emb2))
-        except Exception as e:
-            logger.warning(f"Semantic similarity computation failed: {e}")
+        except ImportError:
+            logger.debug("cosine_similarity not available, returning 0.0")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Semantic similarity computation failed (bad embeddings): {e}")
 
         return 0.0
 
@@ -727,8 +729,10 @@ class ConversationController:
                 context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
                 relevant_context.append(context)
 
-        except Exception as e:
-            logger.warning(f"Failed to retrieve relevant history: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to retrieve relevant history (I/O error): {e}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to retrieve relevant history (data error): {e}")
 
         return relevant_context[:limit]
 
@@ -748,8 +752,10 @@ class ConversationController:
                 summary,
                 message_ids,
             )
-        except Exception as e:
-            logger.warning(f"Failed to persist compaction summary: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to persist compaction summary (I/O error): {e}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to persist compaction summary (data error): {e}")
 
     def on_context_overflow(self, callback: Callable[[ContextMetrics], None]) -> None:
         """Register callback for context overflow events.
@@ -764,8 +770,11 @@ class ConversationController:
         for callback in self._context_callbacks:
             try:
                 callback(metrics)
+            except (TypeError, ValueError, AttributeError) as e:
+                logger.warning(f"Context callback failed (invalid callback): {e}")
             except Exception as e:
-                logger.warning(f"Context callback failed: {e}")
+                # Log with traceback for unexpected callback failures
+                logger.exception(f"Context callback failed unexpectedly: {e}")
 
     def get_last_user_message(self) -> Optional[str]:
         """Get the content of the last user message.

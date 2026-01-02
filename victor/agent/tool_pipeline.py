@@ -637,8 +637,10 @@ class ToolPipeline:
                 if self.signature_store.is_known_failure(tool_name, args):
                     logger.debug(f"Tool call is known failure (persistent): {tool_name}")
                     return True
-            except Exception as e:
-                logger.warning(f"Signature store check failed: {e}")
+            except (OSError, IOError) as e:
+                logger.warning(f"Signature store check failed (I/O error): {e}")
+            except (KeyError, ValueError) as e:
+                logger.debug(f"Signature store check failed (data error): {e}")
 
         # Fall back to in-memory check (session-only)
         signature = self._get_call_signature(tool_name, args)
@@ -663,8 +665,10 @@ class ToolPipeline:
             try:
                 self.signature_store.record_failure(tool_name, args, error_message)
                 logger.debug(f"Recorded failure to persistent store: {tool_name}")
-            except Exception as e:
-                logger.warning(f"Failed to record to signature store: {e}")
+            except (OSError, IOError) as e:
+                logger.warning(f"Failed to record to signature store (I/O error): {e}")
+            except (ValueError, TypeError) as e:
+                logger.debug(f"Failed to record to signature store (data error): {e}")
 
         # Also record in-memory for current session
         signature = self._get_call_signature(tool_name, args)
@@ -688,8 +692,10 @@ class ToolPipeline:
                 if self.signature_store.clear_signature(tool_name, args):
                     cleared = True
                     logger.debug(f"Cleared failure from persistent store: {tool_name}")
-            except Exception as e:
-                logger.warning(f"Failed to clear from signature store: {e}")
+            except (OSError, IOError) as e:
+                logger.warning(f"Failed to clear from signature store (I/O error): {e}")
+            except (KeyError, ValueError) as e:
+                logger.debug(f"Failed to clear from signature store (data error): {e}")
 
         # Clear from in-memory
         signature = self._get_call_signature(tool_name, args)
@@ -1360,8 +1366,10 @@ class ToolPipeline:
                         f"Code validation errors for tool '{tool_name}': "
                         f"{code_validation_errors}"
                     )
-            except Exception as e:
-                logger.warning(f"Code correction middleware failed: {e}")
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning(f"Code correction middleware failed (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Code correction middleware not configured: {e}")
 
         # Check for repeated failures
         if self.config.enable_failed_signature_tracking:
@@ -1392,8 +1400,10 @@ class ToolPipeline:
                         skip_reason="Redundant call (semantic overlap with recent operations)",
                         normalization_applied=normalization_applied,
                     )
-            except Exception as e:
-                logger.warning(f"Deduplication tracker check failed: {e}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Deduplication tracker check failed (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Deduplication tracker not properly initialized: {e}")
 
         # Process through middleware chain (before execution)
         if self.middleware_chain is not None:
@@ -1417,8 +1427,10 @@ class ToolPipeline:
                 # Apply any argument modifications from middleware
                 if before_result.modified_arguments:
                     normalized_args = before_result.modified_arguments
-            except Exception as e:
-                logger.warning(f"Middleware chain process_before failed: {e}")
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning(f"Middleware chain process_before failed (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Middleware chain not properly configured: {e}")
 
         # Notify start
         if self.on_tool_start:
@@ -1471,8 +1483,10 @@ class ToolPipeline:
                         code_corrected=call_result.code_corrected,
                         code_validation_errors=call_result.code_validation_errors,
                     )
-            except Exception as e:
-                logger.warning(f"Middleware chain process_after failed: {e}")
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning(f"Middleware chain process_after failed (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Middleware chain not properly configured: {e}")
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization
@@ -1501,8 +1515,10 @@ class ToolPipeline:
                         call_result.result,
                         file_path=file_path,
                     )
-                except Exception as e:
-                    logger.debug(f"Semantic cache store failed: {e}")
+                except (OSError, IOError) as e:
+                    logger.debug(f"Semantic cache store failed (I/O error): {e}")
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Semantic cache store failed (data error): {e}")
 
         # Invalidate caches when files are modified (write/edit tools)
         if call_result.success and tool_name.lower() in ("write", "edit"):
@@ -1519,8 +1535,10 @@ class ToolPipeline:
         if call_result.success and self.deduplication_tracker is not None:
             try:
                 self.deduplication_tracker.add_call(tool_name, normalized_args)
-            except Exception as e:
-                logger.warning(f"Failed to record call in deduplication tracker: {e}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to record call in deduplication tracker (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Deduplication tracker not properly initialized: {e}")
 
         # Update analytics
         if self.config.enable_analytics:
