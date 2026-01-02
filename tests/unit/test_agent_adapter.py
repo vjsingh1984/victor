@@ -36,11 +36,14 @@ class TestAdapterConfig:
     """Tests for AdapterConfig dataclass."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+        """Test default configuration values.
+
+        Defaults optimized for SWE-bench with slow models (DeepSeek, Qwen, Mixtral).
+        """
         config = AdapterConfig()
-        assert config.max_turns == 30
-        assert config.tool_budget == 50
-        assert config.min_turn_timeout == 180
+        assert config.max_turns == 20  # Fewer, longer turns for slow models
+        assert config.tool_budget == 50  # ACTION complexity budget
+        assert config.min_turn_timeout == 240  # 4 min per turn for slow inference
         assert config.track_file_edits is True
         assert config.track_diffs is True
         assert config.working_dir is None

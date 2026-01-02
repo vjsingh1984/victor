@@ -83,7 +83,8 @@ class TestTaskCompletionDetector:
         detector.analyze_response("The file has been created successfully.")
 
         state = detector.get_state()
-        assert "has been created" in state.completion_signals
+        # Signals now have priority prefix (passive: for phrase detection)
+        assert any("has been created" in signal for signal in state.completion_signals)
 
     def test_continuation_loop_detection(self, detector):
         """Test detection of continuation request patterns."""
