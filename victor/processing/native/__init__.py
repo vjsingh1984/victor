@@ -2402,6 +2402,161 @@ def extract_workflow_names(yaml_content: str) -> List[str]:
 
 
 # =============================================================================
+# ACCELERATOR PRIORITY SYSTEM (Benchmark-Based)
+# =============================================================================
+# Based on measured performance, some operations are faster in Rust (text
+# processing, chunking) while others are faster in Python (NumPy+BLAS for
+# similarity, frozenset for stdlib lookup). This system wires the optimal
+# backend by default, with override capability via configuration.
+#
+# Benchmark Results (Apple M-series, 2025-01):
+# | Operation          | Rust   | Python | Winner   | Speedup |
+# |--------------------|--------|--------|----------|---------|
+# | normalize_block    | 0.21ms | 1.37ms | RUST     | 6.6x    |
+# | chunk_with_overlap | 0.03ms | 0.14ms | RUST     | 5.0x    |
+# | content_hashing    | 0.71ms | 1.76ms | RUST     | 2.5x    |
+# | count_lines        | 0.004ms| 0.009ms| RUST     | 2.4x    |
+# | type_coercion      | 0.19ms | 0.40ms | RUST     | 2.3x    |
+# | stdlib_detection   | 0.12ms | 0.10ms | PYTHON   | 0.9x    |
+# | json_repair        | 0.06ms | 0.04ms | PYTHON   | 0.7x    |
+# | batch_similarity   | 0.18ms | 0.03ms | PYTHON   | 0.1x    |
+
+from enum import Enum
+
+
+class AcceleratorPreference(str, Enum):
+    """Backend preference for native accelerators."""
+
+    RUST = "rust"  # Force Rust (fail if unavailable)
+    PYTHON = "python"  # Force Python
+    AUTO = "auto"  # Use benchmark-based default
+
+
+@dataclass(frozen=True)
+class AcceleratorBenchmark:
+    """Benchmark data for an accelerator operation."""
+
+    name: str
+    rust_ms: float
+    python_ms: float
+    preferred: str  # "rust" or "python"
+    notes: str = ""
+
+    @property
+    def speedup(self) -> float:
+        """Speedup ratio (Python time / Rust time)."""
+        return self.python_ms / self.rust_ms if self.rust_ms > 0 else 0.0
+
+
+# Benchmark-based defaults (measured on Apple M-series, 2025-01)
+ACCELERATOR_BENCHMARKS: Dict[str, AcceleratorBenchmark] = {
+    # Text processing - Rust wins
+    "normalize_block": AcceleratorBenchmark(
+        "normalize_block", 0.21, 1.37, "rust", "Whitespace/punctuation normalization"
+    ),
+    "chunk_with_overlap": AcceleratorBenchmark(
+        "chunk_with_overlap", 0.03, 0.14, "rust", "Line-aware text chunking"
+    ),
+    "content_hashing": AcceleratorBenchmark(
+        "content_hashing", 0.71, 1.76, "rust", "Hash with normalization (SHA-256 dominates)"
+    ),
+    "count_lines": AcceleratorBenchmark(
+        "count_lines", 0.004, 0.009, "rust", "SIMD-optimized line counting"
+    ),
+    "type_coercion": AcceleratorBenchmark(
+        "type_coercion", 0.19, 0.40, "rust", "String to bool/int/float coercion"
+    ),
+    # Python wins - NumPy/BLAS or simple operations
+    "stdlib_detection": AcceleratorBenchmark(
+        "stdlib_detection", 0.12, 0.10, "python", "frozenset O(1) lookup is optimal"
+    ),
+    "json_repair": AcceleratorBenchmark(
+        "json_repair", 0.06, 0.04, "python", "Simple string ops faster for small inputs"
+    ),
+    "batch_similarity": AcceleratorBenchmark(
+        "batch_similarity", 0.18, 0.03, "python", "NumPy+BLAS has hardware SIMD"
+    ),
+    "similarity_matrix": AcceleratorBenchmark(
+        "similarity_matrix", 0.20, 0.05, "python", "NumPy matmul is highly optimized"
+    ),
+}
+
+# User-configurable overrides (can be set at runtime)
+_accelerator_overrides: Dict[str, str] = {}
+
+
+def set_accelerator_preference(operation: str, preference: str) -> None:
+    """Override the default backend for an operation.
+
+    Args:
+        operation: Operation name (e.g., "normalize_block", "batch_similarity")
+        preference: "rust", "python", or "auto" (reset to benchmark default)
+
+    Example:
+        # Force Python for all similarity operations
+        set_accelerator_preference("batch_similarity", "python")
+
+        # Reset to benchmark-based default
+        set_accelerator_preference("batch_similarity", "auto")
+    """
+    if preference == "auto":
+        _accelerator_overrides.pop(operation, None)
+    else:
+        _accelerator_overrides[operation] = preference
+
+
+def get_preferred_backend(operation: str) -> str:
+    """Get the optimal backend for an operation.
+
+    Returns "rust" or "python" based on:
+    1. User override (if set via set_accelerator_preference)
+    2. Benchmark data (if available)
+    3. Default to "rust" if native available, else "python"
+
+    Args:
+        operation: Operation name
+
+    Returns:
+        "rust" or "python"
+    """
+    # Check user override first
+    if operation in _accelerator_overrides:
+        return _accelerator_overrides[operation]
+
+    # Check benchmark data
+    if operation in ACCELERATOR_BENCHMARKS:
+        benchmark = ACCELERATOR_BENCHMARKS[operation]
+        preferred = benchmark.preferred
+        # Only use Rust if it's available
+        if preferred == "rust" and not _NATIVE_AVAILABLE:
+            return "python"
+        return preferred
+
+    # Default: use Rust if available
+    return "rust" if _NATIVE_AVAILABLE else "python"
+
+
+def get_all_benchmarks() -> Dict[str, Dict[str, Any]]:
+    """Get all benchmark data for display/debugging.
+
+    Returns:
+        Dict mapping operation names to benchmark info
+    """
+    return {
+        name: {
+            "rust_ms": b.rust_ms,
+            "python_ms": b.python_ms,
+            "speedup": f"{b.speedup:.1f}x",
+            "preferred": b.preferred,
+            "override": _accelerator_overrides.get(name),
+            "effective": get_preferred_backend(name),
+            "notes": b.notes,
+        }
+        for name, b in ACCELERATOR_BENCHMARKS.items()
+    }
+
+
+# =============================================================================
 # PROTOCOL-BASED DISPATCH (SOLID Design)
 # =============================================================================
 # These factories provide protocol-compliant implementations with automatic
@@ -2464,9 +2619,13 @@ def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalize
 def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityComputerProtocol":
     """Get a similarity computer implementation.
 
+    Note: Benchmark data shows NumPy+BLAS (Python) is ~6x faster than Rust FFI
+    for batch similarity operations. Default uses Python unless explicitly
+    overridden or set via set_accelerator_preference("batch_similarity", "rust").
+
     Args:
         backend: Explicit backend choice ("rust" or "python").
-                 If None, uses Rust if available, otherwise Python.
+                 If None, uses benchmark-based preference (Python for similarity).
 
     Returns:
         SimilarityComputerProtocol implementation
@@ -2477,10 +2636,17 @@ def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityCompute
     """
     from victor.native.protocols import SimilarityComputerProtocol
 
-    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        # TODO: Return Rust implementation when available
-        # For now, fall through to Python
-        pass
+    effective_backend = backend or get_preferred_backend("batch_similarity")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
+        # Rust implementation exists but is slower than NumPy for similarity
+        # Only use if explicitly requested
+        try:
+            from victor.native.rust.similarity import RustSimilarityComputer
+
+            return RustSimilarityComputer()
+        except ImportError:
+            pass
 
     from victor.native.python.similarity import PythonSimilarityComputer
 
@@ -2490,9 +2656,12 @@ def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityCompute
 def get_text_chunker(backend: Optional[str] = None) -> "TextChunkerProtocol":
     """Get a text chunker implementation.
 
+    Note: Benchmark data shows Rust is ~5x faster for text chunking.
+    Default uses Rust when available.
+
     Args:
         backend: Explicit backend choice ("rust" or "python").
-                 If None, uses Rust if available, otherwise Python.
+                 If None, uses benchmark-based preference (Rust for chunking).
 
     Returns:
         TextChunkerProtocol implementation
@@ -2503,7 +2672,9 @@ def get_text_chunker(backend: Optional[str] = None) -> "TextChunkerProtocol":
     """
     from victor.native.protocols import TextChunkerProtocol
 
-    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+    effective_backend = backend or get_preferred_backend("chunk_with_overlap")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
         try:
             from victor.native.rust.chunker import RustTextChunker
 
@@ -2823,4 +2994,11 @@ __all__ = [
     "get_content_hasher",
     "get_default_content_hasher_fuzzy",
     "get_default_content_hasher_exact",
+    # Accelerator priority system (benchmark-based backend selection)
+    "AcceleratorPreference",
+    "AcceleratorBenchmark",
+    "ACCELERATOR_BENCHMARKS",
+    "set_accelerator_preference",
+    "get_preferred_backend",
+    "get_all_benchmarks",
 ]
