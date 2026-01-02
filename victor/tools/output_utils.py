@@ -266,8 +266,8 @@ def truncate_output(
 
 def truncate_by_lines(
     content: str,
-    max_lines: int = 1500,
-    max_bytes: int = 51200,  # 50KB
+    max_lines: int = 750,
+    max_bytes: int = 25600,  # 25KB
     start_line: int = 0,
 ) -> Tuple[str, "TruncationInfo"]:
     """Truncate content by line count and/or byte size.
