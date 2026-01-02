@@ -2621,6 +2621,79 @@ def get_default_ast_indexer() -> "AstIndexerProtocol":
     return _ast_indexer_instance
 
 
+def get_content_hasher(
+    normalize_whitespace: bool = True,
+    case_insensitive: bool = False,
+    hash_length: int = 16,
+    remove_punctuation: bool = False,
+) -> "ContentHasherProtocol":
+    """Get a content hasher implementation with configured normalization.
+
+    The ContentHasher automatically uses Rust native normalize_block()
+    when available for 10-50x faster normalization.
+
+    Args:
+        normalize_whitespace: Collapse multiple whitespace to single space
+        case_insensitive: Convert to lowercase before hashing
+        hash_length: Number of hex chars to return (1-64)
+        remove_punctuation: Remove trailing punctuation
+
+    Returns:
+        ContentHasherProtocol implementation
+
+    Example:
+        hasher = get_content_hasher(normalize_whitespace=True, case_insensitive=True)
+        hash1 = hasher.hash("Hello  World")
+        hash2 = hasher.hash("hello world")
+        assert hash1 == hash2  # Same due to normalization
+    """
+    from victor.core.utils.content_hasher import ContentHasher
+
+    return ContentHasher(
+        normalize_whitespace=normalize_whitespace,
+        case_insensitive=case_insensitive,
+        hash_length=hash_length,
+        remove_punctuation=remove_punctuation,
+    )
+
+
+# Content hasher preset singletons
+_content_hasher_fuzzy: Optional["ContentHasherProtocol"] = None
+_content_hasher_exact: Optional["ContentHasherProtocol"] = None
+
+
+def get_default_content_hasher_fuzzy() -> "ContentHasherProtocol":
+    """Get the default fuzzy content hasher singleton.
+
+    Preconfigured for text deduplication with whitespace normalization,
+    case insensitivity, and punctuation removal.
+
+    Uses lazy initialization and returns a cached instance.
+    """
+    global _content_hasher_fuzzy
+    if _content_hasher_fuzzy is None:
+        from victor.core.utils.content_hasher import HasherPresets
+
+        _content_hasher_fuzzy = HasherPresets.text_fuzzy()
+    return _content_hasher_fuzzy
+
+
+def get_default_content_hasher_exact() -> "ContentHasherProtocol":
+    """Get the default exact content hasher singleton.
+
+    Preconfigured for exact matching (no normalization).
+    Suitable for tool call deduplication and API signature matching.
+
+    Uses lazy initialization and returns a cached instance.
+    """
+    global _content_hasher_exact
+    if _content_hasher_exact is None:
+        from victor.core.utils.content_hasher import HasherPresets
+
+        _content_hasher_exact = HasherPresets.exact_match()
+    return _content_hasher_exact
+
+
 def reset_protocol_singletons() -> None:
     """Reset all protocol singletons.
 
@@ -2628,12 +2701,14 @@ def reset_protocol_singletons() -> None:
     """
     global _symbol_extractor_instance, _argument_normalizer_instance
     global _similarity_computer_instance, _text_chunker_instance
-    global _ast_indexer_instance
+    global _ast_indexer_instance, _content_hasher_fuzzy, _content_hasher_exact
     _symbol_extractor_instance = None
     _argument_normalizer_instance = None
     _similarity_computer_instance = None
     _text_chunker_instance = None
     _ast_indexer_instance = None
+    _content_hasher_fuzzy = None
+    _content_hasher_exact = None
 
 
 # =============================================================================
@@ -2744,4 +2819,8 @@ __all__ = [
     "get_default_text_chunker",
     "get_default_ast_indexer",
     "reset_protocol_singletons",
+    # Content hashing (cross-vertical, uses native normalize_block)
+    "get_content_hasher",
+    "get_default_content_hasher_fuzzy",
+    "get_default_content_hasher_exact",
 ]

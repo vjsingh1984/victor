@@ -505,3 +505,74 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
             Tuple of (stdlib_imports, non_stdlib_imports)
         """
         ...
+
+
+@runtime_checkable
+class ContentHasherProtocol(NativeAcceleratorProtocol, Protocol):
+    """Protocol for content hashing with configurable normalization.
+
+    Provides cross-vertical content hashing for:
+    - Text deduplication (OutputDeduplicator)
+    - Tool call deduplication (ToolDeduplicationTracker)
+    - Cache key generation
+    - Change detection
+
+    This protocol abstracts over Python and Rust implementations,
+    using native acceleration when available.
+    """
+
+    def hash(self, content: str) -> str:
+        """Generate hash for content with configured normalization.
+
+        Args:
+            content: Content to hash
+
+        Returns:
+            Hexadecimal hash string
+        """
+        ...
+
+    def hash_dict(self, data: Dict[str, Any]) -> str:
+        """Hash dictionary with sorted keys for deterministic output.
+
+        Args:
+            data: Dictionary to hash (must be JSON-serializable)
+
+        Returns:
+            Hexadecimal hash string
+        """
+        ...
+
+    def hash_list(self, items: List[Any]) -> str:
+        """Hash list with sorted items for deterministic output.
+
+        Args:
+            items: List to hash
+
+        Returns:
+            Hexadecimal hash string
+        """
+        ...
+
+    def hash_block(self, block: str, min_length: int = 0) -> Optional[str]:
+        """Hash content block with optional minimum length check.
+
+        Args:
+            block: Content block to hash
+            min_length: Minimum length required (0 = no minimum)
+
+        Returns:
+            Hash string if block meets minimum length, None otherwise
+        """
+        ...
+
+    def normalize(self, content: str) -> str:
+        """Normalize content without hashing (for inspection/debugging).
+
+        Args:
+            content: Content to normalize
+
+        Returns:
+            Normalized content string
+        """
+        ...
