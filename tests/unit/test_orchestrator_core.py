@@ -2985,7 +2985,8 @@ class TestIntelligentPipelineIntegration:
     async def test_prepare_intelligent_request_error(self, orchestrator):
         """Test _prepare_intelligent_request handles errors."""
         mock_integration = MagicMock()
-        mock_integration.prepare_request = AsyncMock(side_effect=Exception("Pipeline error"))
+        # Use ValueError since we now catch specific exception types
+        mock_integration.prepare_request = AsyncMock(side_effect=ValueError("Pipeline error"))
         with patch.object(
             type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
         ):
@@ -3048,7 +3049,8 @@ class TestIntelligentPipelineIntegration:
     async def test_validate_intelligent_response_error(self, orchestrator):
         """Test _validate_intelligent_response handles errors."""
         mock_integration = MagicMock()
-        mock_integration.validate_response = AsyncMock(side_effect=Exception("Validation error"))
+        # Use ValueError since we now catch specific exception types
+        mock_integration.validate_response = AsyncMock(side_effect=ValueError("Validation error"))
         with patch.object(
             type(orchestrator), "intelligent_integration", property(lambda self: mock_integration)
         ):

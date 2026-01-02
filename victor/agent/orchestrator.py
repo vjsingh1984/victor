@@ -522,8 +522,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self.memory_manager and getattr(settings, "conversation_embeddings_enabled", True):
             try:
                 self._init_conversation_embedding_store()
-            except Exception as embed_err:
-                logger.warning(f"Failed to initialize ConversationEmbeddingStore: {embed_err}")
+            except ImportError as embed_err:
+                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
+            except (OSError, IOError) as embed_err:
+                logger.warning(f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}")
+            except (ValueError, TypeError) as embed_err:
+                logger.warning(f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}")
 
         # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
         self.conversation_state = self._factory.create_conversation_state_machine()
@@ -970,9 +974,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except ImportError:
             # RL module not available - skip silently
             pass
-        except Exception as e:
-            # Don't let RL errors affect main flow
-            logger.warning(f"Failed to send RL reward signal: {e}")
+        except (KeyError, AttributeError) as e:
+            # RL coordinator not properly initialized
+            logger.debug(f"RL reward signal skipped (not configured): {e}")
+        except (ValueError, TypeError) as e:
+            # Invalid reward data
+            logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
@@ -1320,8 +1327,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.info(
                     f"IntelligentPipeline initialized for {self.provider_name}:{self.model}"
                 )
-            except Exception as e:
-                logger.warning(f"Failed to initialize IntelligentPipeline: {e}")
+            except ImportError as e:
+                logger.debug(f"IntelligentPipeline dependencies not available: {e}")
+                self._intelligent_pipeline_enabled = False
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
                 self._intelligent_pipeline_enabled = False
 
         return self._intelligent_integration
@@ -1347,8 +1357,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 self._subagent_orchestrator = SubAgentOrchestrator(parent=self)
                 logger.info("SubAgentOrchestrator initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize SubAgentOrchestrator: {e}")
+            except ImportError as e:
+                logger.debug(f"SubAgentOrchestrator module not available: {e}")
+                self._subagent_orchestration_enabled = False
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
                 self._subagent_orchestration_enabled = False
 
         return self._subagent_orchestrator
@@ -1568,8 +1581,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             logger.info(f"Manual checkpoint saved: {checkpoint_id[:20]}...")
             return checkpoint_id
-        except Exception as e:
-            logger.warning(f"Failed to save checkpoint: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to save checkpoint (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to save checkpoint (serialization error): {e}")
             return None
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
@@ -1590,8 +1606,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._apply_checkpoint_state(state)
             logger.info(f"Restored checkpoint: {checkpoint_id[:20]}...")
             return True
-        except Exception as e:
-            logger.warning(f"Failed to restore checkpoint: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to restore checkpoint (I/O error): {e}")
+            return False
+        except (KeyError, ValueError) as e:
+            logger.warning(f"Failed to restore checkpoint (invalid data): {e}")
             return False
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
@@ -1613,8 +1632,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 session_id=self._memory_session_id or "default",
                 state=state,
             )
-        except Exception as e:
-            logger.debug(f"Auto-checkpoint failed: {e}")
+        except (OSError, IOError) as e:
+            logger.debug(f"Auto-checkpoint failed (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Auto-checkpoint failed (serialization error): {e}")
             return None
 
     def _get_checkpoint_state(self) -> dict:
@@ -1711,8 +1733,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "should_continue": context.should_continue,
                 "system_prompt_addition": context.system_prompt if context.system_prompt else None,
             }
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline prepare_request failed: {e}")
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"IntelligentPipeline prepare_request failed (data error): {e}")
             return None
 
     async def _validate_intelligent_response(
@@ -1775,8 +1800,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Actionable feedback for grounding correction on retry
                 "grounding_feedback": getattr(result, "grounding_feedback", ""),
             }
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline validate_response failed: {e}")
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"IntelligentPipeline validate_response skipped (not configured): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"IntelligentPipeline validate_response failed (data error): {e}")
             return None
 
     def _record_intelligent_outcome(
