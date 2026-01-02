@@ -8,7 +8,7 @@
 | Aspect | Value |
 |--------|-------|
 | Purpose | Enterprise AI coding assistant with 25+ LLM providers |
-| Core Tools | 45 enterprise-grade tools |
+| Core Tools | 55 enterprise-grade tools |
 | Architecture | Layered protocol-first design |
 | Key Pattern | Facade (orchestrator delegates to specialized components) |
 

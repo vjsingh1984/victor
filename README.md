@@ -140,7 +140,7 @@ flowchart TB
     subgraph Core
         Orch[Orchestrator]
         Prov[25+ Providers]
-        Tools[45 Tools]
+        Tools[55 Tools]
         Vert[5 Verticals]
     end
 
@@ -193,7 +193,7 @@ flowchart TB
 |----------|-------------|
 | [User Guide](docs/USER_GUIDE.md) | Complete usage |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing |
-| [Tool Catalog](docs/TOOL_CATALOG.md) | All 45 tools |
+| [Tool Catalog](docs/TOOL_CATALOG.md) | All 55 tools |
 | [Provider Setup](docs/guides/PROVIDER_SETUP.md) | Provider config |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Workflow DSL](docs/guides/WORKFLOW_DSL.md) | StateGraph guide |
@@ -205,7 +205,7 @@ flowchart TB
 | Component | Status |
 |-----------|:------:|
 | Agent Orchestrator | Stable |
-| 45 Tools | Stable |
+| 55 Tools | Stable |
 | 25+ Providers | Stable |
 | 5 Verticals | Stable |
 | Semantic Search | Stable |
