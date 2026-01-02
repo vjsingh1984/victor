@@ -565,6 +565,7 @@ class Settings(BaseSettings):
     # UI
     theme: str = "monokai"
     show_token_count: bool = True
+    show_cost_metrics: bool = False  # Show cost in metrics display (e.g., "$0.015")
     stream_responses: bool = True
     use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
 

@@ -250,6 +250,7 @@ class ChunkGenerator:
         self,
         stream_ctx: "StreamingChatContext",
         elapsed_time: float,
+        cost_str: Optional[str] = None,
     ) -> str:
         """Format performance metrics for normal completion.
 
@@ -259,17 +260,21 @@ class ChunkGenerator:
         Args:
             stream_ctx: The streaming context
             elapsed_time: Elapsed time in seconds
+            cost_str: Optional cost string to append (e.g., "$0.0123")
 
         Returns:
             Formatted metrics line string
         """
-        return self.streaming_handler.format_completion_metrics(stream_ctx, elapsed_time)
+        return self.streaming_handler.format_completion_metrics(
+            stream_ctx, elapsed_time, cost_str
+        )
 
     def format_budget_exhausted_metrics(
         self,
         stream_ctx: "StreamingChatContext",
         elapsed_time: float,
         time_to_first_token: Optional[float] = None,
+        cost_str: Optional[str] = None,
     ) -> str:
         """Format performance metrics for budget exhausted completion.
 
@@ -279,10 +284,11 @@ class ChunkGenerator:
             stream_ctx: The streaming context
             elapsed_time: Elapsed time in seconds
             time_to_first_token: Optional time to first token
+            cost_str: Optional cost string to append (e.g., "$0.0123")
 
         Returns:
             Formatted metrics line string
         """
         return self.streaming_handler.format_budget_exhausted_metrics(
-            stream_ctx, elapsed_time, time_to_first_token
+            stream_ctx, elapsed_time, time_to_first_token, cost_str
         )
