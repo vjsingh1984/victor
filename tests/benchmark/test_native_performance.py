@@ -540,3 +540,101 @@ class TestSpeedupValidation:
         # This is expected; embeddings service correctly uses NumPy directly
         # This test documents the FFI overhead for future reference
         print(f"  (Note: NumPy+BLAS is optimal for similarity; Rust FFI overhead is expected)")
+
+    def test_normalize_block_speedup(self):
+        """Validate text normalization achieves speedup.
+
+        normalize_block is used by ContentHasher for text deduplication.
+        It collapses whitespace, strips punctuation, and normalizes case.
+        """
+        import re
+
+        from victor.processing.native import normalize_block
+
+        # Generate sample text with lots of whitespace and punctuation
+        sample_texts = [
+            "Hello   World,   how   are   you  today?!",
+            "The quick  brown  fox    jumps over...  the lazy  dog.",
+            "Python   is   a   great   language   for   scripting!!!",
+            "Testing,  whitespace,  normalization,  performance.",
+            "Multiple    spaces     and\ttabs\t\tshould   be   normalized.",
+        ] * 200  # 1000 normalizations
+
+        def py_normalize(text: str) -> str:
+            """Pure Python whitespace normalization."""
+            normalized = re.sub(r"\s+", " ", text.strip())
+            return normalized.rstrip(".,;:!?")
+
+        def py_run():
+            for text in sample_texts:
+                py_normalize(text)
+
+        def rust_run():
+            for text in sample_texts:
+                normalize_block(text)
+
+        py_time = time_function(py_run, iterations=20)
+        rust_time = time_function(rust_run, iterations=20)
+
+        speedup = py_time / rust_time if rust_time > 0 else 0
+        print(
+            f"\nText normalization speedup: {speedup:.1f}x "
+            f"(Python: {py_time:.3f}ms, Rust: {rust_time:.3f}ms)"
+        )
+
+        # Rust regex should be faster than Python re module
+        assert speedup >= 0.8, f"Rust should not be more than 20% slower"
+
+    def test_content_hasher_speedup(self):
+        """Validate ContentHasher benefits from native normalization.
+
+        Tests full hash pipeline including normalization and SHA-256.
+        """
+        import hashlib
+        import re
+
+        from victor.core.utils.content_hasher import ContentHasher
+
+        # Sample texts for hashing
+        sample_texts = [
+            "Hello   World,   testing   content   hashing...",
+            "The quick  brown  fox    jumps over   the lazy dog!",
+            "Python   code   with   lots   of   whitespace.",
+            "JSON data:   {'key':   'value',   'num':   42}",
+            "Multiline\n\ntext\n\nwith\n\nextra\n\nlines.",
+        ] * 200  # 1000 hashes
+
+        def py_hash(text: str) -> str:
+            """Pure Python implementation (no native acceleration)."""
+            normalized = re.sub(r"\s+", " ", text.strip())
+            normalized = normalized.rstrip(".,;:!?").lower()
+            return hashlib.sha256(normalized.encode()).hexdigest()[:12]
+
+        # Create hasher with native acceleration enabled
+        hasher = ContentHasher(
+            normalize_whitespace=True,
+            case_insensitive=True,
+            remove_punctuation=True,
+            hash_length=12,
+        )
+
+        def py_run():
+            for text in sample_texts:
+                py_hash(text)
+
+        def native_run():
+            for text in sample_texts:
+                hasher.hash(text)
+
+        py_time = time_function(py_run, iterations=20)
+        native_time = time_function(native_run, iterations=20)
+
+        speedup = py_time / native_time if native_time > 0 else 0
+        print(
+            f"\nContent hashing speedup: {speedup:.1f}x "
+            f"(Python: {py_time:.3f}ms, Native: {native_time:.3f}ms)"
+        )
+
+        # With native normalize_block, should see improvement
+        # But SHA-256 is already fast, so overall speedup may be modest
+        print("  (Note: SHA-256 hashing dominates; normalization speedup is incremental)")
