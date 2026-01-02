@@ -641,6 +641,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             middleware_chain=self._middleware_chain,
         )
 
+        # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
+        if hasattr(self, "_pending_semantic_cache") and self._pending_semantic_cache is not None:
+            self._tool_pipeline.set_semantic_cache(self._pending_semantic_cache)
+            logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
+            self._pending_semantic_cache = None  # Clear reference
+
         # StreamingController: Manages streaming sessions and metrics (via factory)
         self._streaming_controller = self._factory.create_streaming_controller(
             streaming_metrics_collector=self.streaming_metrics_collector,
@@ -2226,10 +2232,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     max_entries=500,
                     cleanup_interval=60.0,
                 )
-                # Wire semantic cache to tool pipeline
-                if self._tool_pipeline is not None:
-                    self._tool_pipeline.set_semantic_cache(semantic_cache)
-                    logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
+                # Store semantic cache for later wiring to tool pipeline
+                # (tool pipeline is created after this method runs)
+                self._pending_semantic_cache = semantic_cache
+                logger.debug("[AgentOrchestrator] Semantic tool cache created, pending wire to pipeline")
             except Exception as e:
                 logger.warning(f"Failed to initialize semantic tool cache: {e}")
 
