@@ -321,8 +321,9 @@ class StreamingController:
             if not session.metrics:
                 return
 
-            # Estimate tokens from content length
-            estimated_tokens = session.metrics.total_content_length // 4
+            # Use actual token count from API when available, fall back to estimate
+            # StreamMetrics.effective_total_tokens handles this logic
+            total_tokens = session.metrics.effective_total_tokens
 
             analytics_metrics = AnalyticsMetrics(
                 request_id=session.session_id,
@@ -330,12 +331,18 @@ class StreamingController:
                 first_token_time=session.metrics.first_token_time,
                 last_token_time=session.end_time,
                 total_chunks=session.metrics.total_chunks,
-                total_tokens=estimated_tokens,
+                total_tokens=total_tokens,
                 model=session.model,
                 provider=session.provider,
             )
             if self.metrics_collector:
                 self.metrics_collector.record_metrics(analytics_metrics)
+
+            # Log whether we used actual or estimated tokens
+            if session.metrics.has_actual_usage:
+                logger.debug(f"Recorded actual token usage: {total_tokens}")
+            else:
+                logger.debug(f"Recorded estimated token usage: {total_tokens} (no API data)")
         except Exception as e:
             logger.debug(f"Failed to record to metrics collector: {e}")
 

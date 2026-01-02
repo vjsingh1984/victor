@@ -27,7 +27,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class StreamMetrics:
-    """Metrics collected during streaming."""
+    """Metrics collected during streaming.
+
+    Token tracking follows SOLID principles:
+    - Uses actual token counts from provider API when available
+    - Falls back to estimation (content_length / 4) only when API doesn't provide counts
+    - has_actual_usage flag indicates whether counts are actual or estimated
+
+    Cost tracking:
+    - Optional cost calculation based on provider pricing config
+    - Supports cache token costs (Anthropic)
+    - cost_calculated flag indicates whether costs are available
+    """
 
     start_time: float = 0.0
     first_token_time: Optional[float] = None
@@ -35,6 +46,76 @@ class StreamMetrics:
     total_chunks: int = 0
     total_content_length: int = 0
     tool_calls_count: int = 0
+
+    # Actual token usage from provider API (preferred)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    has_actual_usage: bool = False  # True when counts came from API, False when estimated
+
+    # Cache tokens (Anthropic-specific)
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+
+    # Cost tracking (USD)
+    input_cost: float = 0.0
+    output_cost: float = 0.0
+    cache_cost: float = 0.0
+    total_cost: float = 0.0
+    cost_calculated: bool = False
+
+    def record_usage(self, usage: Optional[Dict[str, Any]]) -> None:
+        """Record token usage from provider API response.
+
+        Args:
+            usage: Usage dict from provider (prompt_tokens, completion_tokens, total_tokens,
+                   cache_read_input_tokens, cache_creation_input_tokens)
+        """
+        if usage:
+            self.prompt_tokens += usage.get("prompt_tokens", 0)
+            self.completion_tokens += usage.get("completion_tokens", 0)
+            self.total_tokens += usage.get("total_tokens", 0)
+
+            # Cache tokens (Anthropic-style naming)
+            self.cache_read_tokens += usage.get("cache_read_input_tokens", 0)
+            self.cache_write_tokens += usage.get("cache_creation_input_tokens", 0)
+
+            # Mark as actual usage if we got non-zero values
+            if self.prompt_tokens > 0 or self.completion_tokens > 0:
+                self.has_actual_usage = True
+
+    def calculate_cost(self, capabilities: Any) -> None:
+        """Calculate cost using provider capabilities.
+
+        Args:
+            capabilities: ProviderMetricsCapabilities with pricing info
+        """
+        if not capabilities or not capabilities.cost_enabled:
+            return
+
+        costs = capabilities.calculate_cost(
+            self.prompt_tokens,
+            self.completion_tokens,
+            self.cache_read_tokens,
+            self.cache_write_tokens,
+        )
+        self.input_cost = costs["input_cost"]
+        self.output_cost = costs["output_cost"]
+        self.cache_cost = costs["cache_cost"]
+        self.total_cost = costs["total_cost"]
+        self.cost_calculated = True
+
+    @property
+    def effective_total_tokens(self) -> int:
+        """Get total tokens - actual from API or estimated from content length.
+
+        Returns actual token count when provider supplied it,
+        otherwise falls back to estimation.
+        """
+        if self.has_actual_usage and self.total_tokens > 0:
+            return self.total_tokens
+        # Fallback: estimate from content length (~4 chars per token)
+        return self.total_content_length // 4
 
     @property
     def time_to_first_token(self) -> Optional[float]:
@@ -52,13 +133,21 @@ class StreamMetrics:
 
     @property
     def tokens_per_second(self) -> float:
-        """Estimated tokens per second (rough, based on content length)."""
+        """Tokens per second (uses actual count when available)."""
         duration = self.total_duration
         if duration > 0:
-            # Rough estimate: ~4 chars per token
-            estimated_tokens = self.total_content_length / 4
-            return estimated_tokens / duration
+            return self.effective_total_tokens / duration
         return 0.0
+
+    def format_cost(self) -> str:
+        """Format cost for display.
+
+        Returns:
+            Cost string like "$0.0123" or "cost n/a"
+        """
+        if self.cost_calculated:
+            return f"${self.total_cost:.4f}"
+        return "cost n/a"
 
 
 @dataclass
