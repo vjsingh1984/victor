@@ -26,9 +26,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
+import yaml
+
 from victor.agent.conversation_state import ConversationStage
+from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
 
@@ -729,6 +733,191 @@ class ToolSelector(ModeAwareMixin):
             )
         except Exception as e:
             logger.warning(f"Failed to populate metadata registry: {e}")
+
+    def _load_vertical_config(self) -> Dict[str, Any]:
+        """Load vertical tool configurations from YAML.
+
+        Returns:
+            Dict with vertical configurations, or empty dict if not found
+        """
+        if not hasattr(self, "_vertical_config_cache"):
+            self._vertical_config_cache: Optional[Dict[str, Any]] = None
+
+        if self._vertical_config_cache is not None:
+            return self._vertical_config_cache
+
+        config_path = Path(__file__).parent.parent / "config" / "vertical_tools.yaml"
+        try:
+            if config_path.exists():
+                self._vertical_config_cache = yaml.safe_load(config_path.read_text())
+                logger.debug(f"Loaded vertical tools config from {config_path}")
+            else:
+                self._vertical_config_cache = {}
+                logger.debug("No vertical_tools.yaml found, using defaults")
+        except Exception as e:
+            logger.warning(f"Failed to load vertical_tools.yaml: {e}")
+            self._vertical_config_cache = {}
+
+        return self._vertical_config_cache
+
+    def _get_vertical_core_tools(self, vertical: Optional[str] = None) -> Set[str]:
+        """Get core tools for a specific vertical.
+
+        Args:
+            vertical: Vertical name (coding, devops, research, dataanalysis, rag)
+
+        Returns:
+            Set of tool names that are core for this vertical
+        """
+        config = self._load_vertical_config()
+        if not config:
+            return self._get_core_tools_cached()
+
+        # Get vertical-specific config or use default
+        vert_config = config.get("verticals", {}).get(vertical or "", {})
+        if not vert_config:
+            vert_config = config.get("default", {})
+
+        core = set(vert_config.get("core_tools", []))
+        core.update(vert_config.get("vertical_tools", []))
+        return core
+
+    def get_tools_with_levels(
+        self,
+        user_message: str,
+        vertical: Optional[str] = None,
+    ) -> Dict[str, SchemaLevel]:
+        """Return tools with their schema levels for token-efficient broadcasting.
+
+        This method implements tiered schema selection:
+        - Core tools get FULL schema (complete description, all params)
+        - Vertical-specific tools get COMPACT schema (shorter descriptions, ~20% reduction)
+        - Semantic pool tools get STUB schema (minimal description, required params)
+
+        Args:
+            user_message: The user's message for semantic matching
+            vertical: Optional vertical name (coding, devops, research, etc.)
+
+        Returns:
+            Dict mapping tool_name -> SchemaLevel
+        """
+        config = self._load_vertical_config()
+
+        # Get vertical-specific config or default
+        vert_config = config.get("verticals", {}).get(vertical or "", {})
+        if not vert_config:
+            vert_config = config.get("default", {})
+
+        # Core tools always get FULL schema
+        core_tools = set(vert_config.get("core_tools", []))
+        if not core_tools:
+            # Fallback to dynamic discovery
+            core_tools = self._get_core_tools_cached()
+
+        # Vertical-specific tools get COMPACT schema (~20% token reduction)
+        vertical_core = set(vert_config.get("vertical_tools", []))
+
+        # Semantic pool gets STUB schema
+        semantic_pool = set(vert_config.get("semantic_pool", []))
+        max_semantic = vert_config.get("max_semantic_pool", 5)
+
+        # Build levels dict
+        levels: Dict[str, SchemaLevel] = {}
+
+        # FULL for core tools only
+        for tool in core_tools:
+            levels[tool] = SchemaLevel.FULL
+
+        # COMPACT for vertical tools (~20% reduction from FULL)
+        for tool in vertical_core:
+            if tool not in levels:  # Don't override core tools
+                levels[tool] = SchemaLevel.COMPACT
+
+        # STUB for semantic pool (limited by max_semantic_pool)
+        # Filter semantic pool by keyword/semantic matching
+        message_lower = user_message.lower()
+        matched_semantic = []
+
+        for tool_name in semantic_pool:
+            if tool_name in levels:
+                continue  # Skip if already in core/vertical
+
+            # Simple keyword matching for semantic pool
+            tool = None
+            for t in self.tools.list_tools():
+                if t.name == tool_name:
+                    tool = t
+                    break
+
+            if tool:
+                # Check keywords from metadata
+                should_include = False
+                if hasattr(tool, "metadata") and tool.metadata:
+                    keywords = getattr(tool.metadata, "keywords", []) or []
+                    if any(kw.lower() in message_lower for kw in keywords):
+                        should_include = True
+
+                # Check tool description keywords
+                if not should_include:
+                    desc_words = tool.description.lower().split()[:10]
+                    if any(word in message_lower for word in desc_words if len(word) > 4):
+                        should_include = True
+
+                if should_include:
+                    matched_semantic.append(tool_name)
+
+        # Limit semantic pool
+        for tool_name in matched_semantic[:max_semantic]:
+            levels[tool_name] = SchemaLevel.STUB
+
+        logger.debug(
+            f"Tool schema levels for vertical={vertical}: "
+            f"FULL={len([t for t, l in levels.items() if l == SchemaLevel.FULL])}, "
+            f"COMPACT={len([t for t, l in levels.items() if l == SchemaLevel.COMPACT])}, "
+            f"STUB={len([t for t, l in levels.items() if l == SchemaLevel.STUB])}"
+        )
+
+        return levels
+
+    def get_tools_for_broadcast(
+        self,
+        user_message: str,
+        vertical: Optional[str] = None,
+    ) -> List[Tuple["ToolDefinition", SchemaLevel]]:
+        """Get tools with their schema levels for LLM broadcasting.
+
+        This is the main entry point for token-efficient tool broadcasting.
+        Returns tools paired with their schema levels so adapters can
+        generate appropriately sized schemas.
+
+        Args:
+            user_message: The user's message
+            vertical: Optional vertical name
+
+        Returns:
+            List of (ToolDefinition, SchemaLevel) tuples
+        """
+        from victor.providers.base import ToolDefinition
+
+        levels = self.get_tools_with_levels(user_message, vertical)
+
+        result: List[Tuple[ToolDefinition, SchemaLevel]] = []
+        all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
+
+        for tool_name, level in levels.items():
+            if tool_name in all_tools_map:
+                tool = all_tools_map[tool_name]
+                tool_def = ToolDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters,
+                )
+                result.append((tool_def, level))
+
+        # Sort: FULL schema tools first, then STUB
+        result.sort(key=lambda x: (0 if x[1] == SchemaLevel.FULL else 1, x[0].name))
+
+        return result
 
     def _get_core_tools_cached(self) -> Set[str]:
         """Get core tools with caching for performance.
