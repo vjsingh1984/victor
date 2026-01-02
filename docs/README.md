@@ -8,7 +8,7 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 |----------|-------------|
 | [Installation](guides/INSTALLATION.md) | Complete installation guide |
 | [Quick Start](guides/QUICKSTART.md) | First steps with Victor |
-| [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 25+ LLM providers |
+| [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 21 LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
 | [Tool Catalog](TOOL_CATALOG.md) | All 55 available tools |
 | [Verticals](VERTICALS.md) | 4 domain-specific assistant templates |
@@ -33,7 +33,7 @@ docs/
 ├── guides/                    # How-to guides
 │   ├── INSTALLATION.md        # Installation methods
 │   ├── QUICKSTART.md          # Step-by-step quickstart
-│   ├── PROVIDER_SETUP.md      # 25+ provider configurations
+│   ├── PROVIDER_SETUP.md      # 21 provider configurations
 │   ├── MCP_GUIDE.md           # MCP server setup
 │   ├── PLUGIN_GUIDE.md        # Writing plugins
 │   ├── OLLAMA_TOOL_SUPPORT.md # Ollama tool calling
@@ -83,7 +83,7 @@ docs/
 - Running benchmarks: `victor benchmark run swe-bench --profile <profile>`
 
 ### Providers & Models
-- [Provider Setup](guides/PROVIDER_SETUP.md) - Configure 25+ providers
+- [Provider Setup](guides/PROVIDER_SETUP.md) - Configure 21 providers
 - [Model Comparison](MODEL_COMPARISON.md) - Tested Ollama benchmarks
 - [Provider Reference](reference/PROVIDERS.md) - API reference
 - [Tool Calling](reference/TOOL_CALLING.md) - How tool calling works

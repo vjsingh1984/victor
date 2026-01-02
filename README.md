@@ -9,7 +9,7 @@
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-11100%2B%20passing-brightgreen.svg)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-15500%2B%20passing-brightgreen.svg)](#project-status)
 
 [Quick Start](#quick-start) | [Features](#features) | [Providers](#provider-comparison) | [Documentation](#documentation)
 
@@ -60,7 +60,7 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 | Challenge | Traditional Tools | Victor |
 |-----------|------------------|--------|
-| Vendor Lock-in | Single provider | 25+ providers |
+| Vendor Lock-in | Single provider | 21 providers |
 | Data Privacy | Cloud-only | Air-gapped mode |
 | Domain Expertise | Generic | 5 specialized verticals |
 | Tool Access | Limited | 45 cost-aware tools |

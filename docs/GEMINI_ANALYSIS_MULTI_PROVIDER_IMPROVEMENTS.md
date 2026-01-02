@@ -80,7 +80,7 @@ This document analyzes the performance of Google's Gemini 2.5 Flash model (free 
 - **Analysis:** code review, refactoring suggestions, dependency analysis
 
 #### 2.2 Strong Provider Abstraction
-- Unified interface for 25+ providers
+- Unified interface for 21 providers
 - Tool calling adapters handle provider-specific quirks
 - Fallback parsing for models without native tool support
 

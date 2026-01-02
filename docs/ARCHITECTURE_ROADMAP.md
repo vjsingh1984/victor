@@ -195,8 +195,8 @@ from victor.verticals.base import StageDefinition
 |------------|----------|--------|
 | 150+ Protocols | victor/protocols/, framework/, agent/ | ✅ |
 | 26x Config Caching | verticals/base.py:_config_cache | ✅ |
-| Provider Agnostic | 25+ providers via BaseProvider | ✅ |
-| Tool Ecosystem | 45 tools with cost-aware selection | ✅ |
+| Provider Agnostic | 21 providers via BaseProvider | ✅ |
+| Tool Ecosystem | 55 tools with cost-aware selection | ✅ |
 | Multi-Agent Teams | 4 formations in victor/agent/teams/ | ✅ |
 | DAG Workflows | YAML-based DSL with HITL nodes | ✅ |
 | Adaptive Learning | 13 RL learners for tool selection | ✅ |

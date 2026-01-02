@@ -150,7 +150,7 @@ The main README includes:
 
 ### Highlights
 
-- 25+ LLM providers (Claude, GPT, Gemini, Grok, Ollama, LMStudio, more)
+- 21 LLM providers (Claude, GPT, Gemini, Grok, Ollama, LMStudio, more)
 - 55 enterprise tools (git, refactoring, security scanning, batch ops)
 - 100% air-gapped mode for sensitive environments
 - Semantic codebase search with local embeddings

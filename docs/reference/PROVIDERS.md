@@ -4,9 +4,9 @@
 
 Victor supports all major LLM providers through a unified interface. This guide covers setup and usage for each provider.
 
-## Supported Providers (25+)
+## Supported Providers (21)
 
-Victor supports 25+ LLM providers organized by category. For detailed setup instructions, see [Provider Setup Guide](../guides/PROVIDER_SETUP.md).
+Victor supports 21 LLM providers organized by category. For detailed setup instructions, see [Provider Setup Guide](../guides/PROVIDER_SETUP.md).
 
 ### Local Providers (Free, Private)
 
