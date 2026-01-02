@@ -210,9 +210,11 @@ def helper_function():
             args={"path": "/path/to/file.py"},
             output=large_content,
         )
-        assert "FILE IS VERY LARGE" in result
+        # Check for large file indicator (new format uses "LARGE FILE:")
+        assert "LARGE FILE:" in result or "FILE IS VERY LARGE" in result
         assert "FILE STRUCTURE" in result
-        assert "To see specific sections" in result
+        # Check for pagination hint (new format uses "HOW TO READ THIS FILE")
+        assert "HOW TO READ THIS FILE" in result or "To see specific sections" in result
 
     def test_format_list_directory(self):
         """Test formatting list_directory tool output."""

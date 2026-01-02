@@ -695,11 +695,26 @@ class BaseToolCallingAdapter(ABC):
         "semantic_code_search": {"query": "", "path": "."},
     }
 
+    # Tool-specific valid arguments that should NOT be filtered even if they appear
+    # in HALLUCINATED_ARGUMENTS. Some tools legitimately support pagination params.
+    # Key: tool_name (canonical or legacy), Value: set of valid argument names
+    TOOL_VALID_ARGUMENTS: Dict[str, set] = {
+        # read/read_file support offset/limit for pagination of large files
+        "read": {"offset", "limit", "line_start", "line_end"},
+        "read_file": {"offset", "limit", "line_start", "line_end"},
+        # grep/search support context lines
+        "grep": {"context", "before", "after", "context_lines"},
+        "search": {"context", "before", "after", "context_lines"},
+        "code_search": {"max_results", "limit"},
+        "semantic_code_search": {"max_results", "limit", "top_k"},
+    }
+
     # Common hallucinated arguments that models generate but tools don't accept.
     # These are filtered out silently to prevent tool execution failures.
     # Models like gpt-oss:20b and smaller models frequently hallucinate these.
+    # NOTE: Check TOOL_VALID_ARGUMENTS first - some tools legitimately use these.
     HALLUCINATED_ARGUMENTS: set = {
-        # Common pagination/limit params that tools don't support
+        # Common pagination/limit params (but some tools DO support these - see above)
         "max_results",
         "limit",
         "offset",
@@ -779,11 +794,14 @@ class BaseToolCallingAdapter(ABC):
         if aliased_keys:
             logger.debug(f"Applied argument aliases for {tool_name}: {aliased_keys}")
 
-        # Step 2: Filter out hallucinated arguments
+        # Step 2: Filter out hallucinated arguments (but respect tool-specific valid args)
+        # Some tools legitimately support arguments that are commonly hallucinated for others
+        tool_valid_args = self.TOOL_VALID_ARGUMENTS.get(tool_name, set())
         filtered = {}
         filtered_out = []
         for key, value in aliased.items():
-            if key in self.HALLUCINATED_ARGUMENTS:
+            # Keep argument if: not hallucinated OR explicitly valid for this tool
+            if key in self.HALLUCINATED_ARGUMENTS and key not in tool_valid_args:
                 filtered_out.append(key)
             else:
                 filtered[key] = value

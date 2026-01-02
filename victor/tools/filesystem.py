@@ -1123,7 +1123,7 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: Cloud models 1000 lines/32KB, local models 250 lines/8KB. Always ends on complete lines.",
+        "TRUNCATION: Cloud models 1500 lines/50KB, local models 250 lines/8KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
@@ -1145,7 +1145,8 @@ async def read(
     """Read text/code file. Binary files rejected.
 
     TRUNCATION LIMITS:
-    - Maximum 1000 lines OR 32KB (whichever is reached first)
+    - Cloud models: Maximum 1500 lines OR 50KB (whichever is reached first)
+    - Local models: Maximum 250 lines OR 8KB
     - Always truncates at complete line boundaries (never mid-line)
     - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
 
@@ -1157,7 +1158,7 @@ async def read(
     Args:
         path: File path
         offset: Start line (0=beginning). Use for pagination of large files.
-        limit: Max lines to read (0=auto, applies 512 line / 20KB limit).
+        limit: Max lines to read (0=auto, applies configured limits).
                Set explicit limit to override auto-truncation.
         search: Grep pattern - efficient for finding specific content
         ctx: Context lines around matches
@@ -1471,7 +1472,7 @@ async def read(
     from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
 
     # Determine truncation limits based on model context
-    # Cloud models (Anthropic, OpenAI, etc.): 1000 lines / 32KB
+    # Cloud models (Anthropic, OpenAI, etc.): 1500 lines / 50KB
     # Local models (Ollama, LMStudio, vLLM): 250 lines / 8KB (conservative for smaller context)
     def _get_truncation_limits() -> tuple:
         """Get appropriate truncation limits based on current provider."""
@@ -1498,18 +1499,18 @@ async def read(
                         # ~10% of context for read output is reasonable
                         max_tokens = context_window // 10
                         # Estimate ~4 chars per token, ~40 chars per line
-                        max_lines = min(1000, max(100, max_tokens // 10))
-                        max_bytes = min(32768, max(4096, max_tokens * 4))
+                        max_lines = min(1500, max(100, max_tokens // 10))
+                        max_bytes = min(51200, max(4096, max_tokens * 4))
                         return max_lines, max_bytes
                 except Exception:
                     pass
                 return 250, 8192  # Fallback for local models
 
             # Cloud models get full limits
-            return 1000, 32768
+            return 1500, 51200  # 1500 lines, 50KB
         except Exception:
             # Default to cloud limits if settings unavailable
-            return 1000, 32768
+            return 1500, 51200
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
 
