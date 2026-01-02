@@ -30,6 +30,9 @@ from victor.agent.tool_calling.base import (
 from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
 from victor.agent.tool_calling.adapters import (
     AnthropicToolCallingAdapter,
+    AzureOpenAIToolCallingAdapter,
+    BedrockToolCallingAdapter,
+    DeepSeekToolCallingAdapter,
     OpenAIToolCallingAdapter,
     OllamaToolCallingAdapter,
     OpenAICompatToolCallingAdapter,
@@ -52,6 +55,9 @@ __all__ = [
     "ToolCallParseResult",
     "ToolCallingAdapterRegistry",
     "AnthropicToolCallingAdapter",
+    "AzureOpenAIToolCallingAdapter",
+    "BedrockToolCallingAdapter",
+    "DeepSeekToolCallingAdapter",
     "OpenAIToolCallingAdapter",
     "OllamaToolCallingAdapter",
     "OpenAICompatToolCallingAdapter",

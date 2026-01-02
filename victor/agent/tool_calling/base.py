@@ -89,12 +89,14 @@ class ToolCallFormat(Enum):
     OPENAI = "openai"  # OpenAI function calling format
     ANTHROPIC = "anthropic"  # Anthropic tool use format
     GOOGLE = "google"  # Google Gemini function_declarations format
+    BEDROCK = "bedrock"  # AWS Bedrock Converse API format (toolSpec/toolUse)
     OLLAMA_NATIVE = "ollama_native"  # Ollama's native tool_calls
     OLLAMA_JSON = "ollama_json"  # JSON in content (fallback)
     LMSTUDIO_NATIVE = "lmstudio_native"  # LMStudio native (hammer badge models)
     LMSTUDIO_DEFAULT = "lmstudio_default"  # LMStudio [TOOL_REQUEST] format
     VLLM = "vllm"  # vLLM with tool parser
     XML = "xml"  # XML-style tool calls in content
+    NONE = "none"  # No tool support (e.g., o1 reasoning models)
     UNKNOWN = "unknown"
 
 
