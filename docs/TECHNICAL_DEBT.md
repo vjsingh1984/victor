@@ -199,22 +199,23 @@ class ToolCallingProvider(Protocol):
 
 | ID | Description | Resolved | PR |
 |----|-------------|----------|-----|
-| - | - | - | - |
+| TD-001 | LSP Violation in LMStudio Provider | 2026-01-02 | 2ce4e4d |
+| TD-004 | Generic Exception Catches (partial: 6 critical fixes) | 2026-01-02 | ee6cd5e, f82f1be |
 
 ---
 
 ## Metrics Dashboard
 
 ```
-Total Debt Items: 10
-├── P0 (Critical): 1
-├── P1 (High): 3
+Total Debt Items: 9
+├── P0 (Critical): 0
+├── P1 (High): 3 (TD-004 partially resolved)
 ├── P2 (Medium): 3
 └── P3 (Low): 3
 
-Code Quality Score: 6.5/10
-├── SOLID Compliance: 7/10
-├── Error Handling: 5/10
+Code Quality Score: 7.0/10
+├── SOLID Compliance: 8/10 (LSP violation fixed)
+├── Error Handling: 6/10 (critical catches fixed)
 ├── Test Coverage: 7/10
 └── Documentation Accuracy: 8/10 (after fixes)
 ```
