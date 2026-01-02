@@ -1242,6 +1242,13 @@ class CodebaseIndex:
 
         # Build embeddings for all indexed symbols (batched for performance)
         if self.use_embeddings and self.embedding_provider:
+            # Clear existing embeddings first (handles schema changes like adding end_line)
+            try:
+                await self.embedding_provider.clear_index()
+                logger.debug("Cleared embedding index for full rebuild")
+            except Exception as e:
+                logger.warning(f"Failed to clear embedding index: {e}")
+
             # Collect all documents for batch embedding
             # Uses unified IDs for graph-embedding correlation
             documents = []
