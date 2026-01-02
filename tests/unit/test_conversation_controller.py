@@ -441,11 +441,13 @@ class TestSmartCompaction:
         assert controller._embedding_service == mock_service
 
     def test_config_compaction_defaults(self):
-        """Test compaction configuration defaults."""
+        """Test compaction configuration defaults match orchestrator_constants."""
+        from victor.config.orchestrator_constants import COMPACTION_CONFIG
+
         config = ConversationConfig()
 
         assert config.compaction_strategy == CompactionStrategy.TIERED
-        assert config.min_messages_to_keep == 6
-        assert config.tool_result_retention_weight == 1.5
-        assert config.recent_message_weight == 2.0
+        assert config.min_messages_to_keep == COMPACTION_CONFIG.min_messages_after_compact
+        assert config.tool_result_retention_weight == COMPACTION_CONFIG.tool_result_retention_weight
+        assert config.recent_message_weight == COMPACTION_CONFIG.recent_message_weight
         assert config.semantic_relevance_threshold == 0.3

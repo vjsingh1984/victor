@@ -1073,7 +1073,7 @@ class ToolSelector(ModeAwareMixin):
             ConversationStage.PLANNING: STAGE_TOOL_LIMITS.planning_max,
             ConversationStage.READING: STAGE_TOOL_LIMITS.reading_max,
             ConversationStage.ANALYSIS: STAGE_TOOL_LIMITS.analysis_max,
-            ConversationStage.EXECUTING: STAGE_TOOL_LIMITS.executing_max,
+            ConversationStage.EXECUTION: STAGE_TOOL_LIMITS.executing_max,
             ConversationStage.VERIFICATION: STAGE_TOOL_LIMITS.verification_max,
             ConversationStage.COMPLETION: STAGE_TOOL_LIMITS.completion_max,
         }
