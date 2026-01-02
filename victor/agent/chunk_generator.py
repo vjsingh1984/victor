@@ -265,9 +265,7 @@ class ChunkGenerator:
         Returns:
             Formatted metrics line string
         """
-        return self.streaming_handler.format_completion_metrics(
-            stream_ctx, elapsed_time, cost_str
-        )
+        return self.streaming_handler.format_completion_metrics(stream_ctx, elapsed_time, cost_str)
 
     def format_budget_exhausted_metrics(
         self,

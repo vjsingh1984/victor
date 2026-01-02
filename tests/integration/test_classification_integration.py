@@ -37,9 +37,8 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(
-        not is_ollama_available(), reason="Ollama server not available"
-    )
+    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
+
 
 from victor.classification import (
     PatternMatcher,
@@ -198,8 +197,9 @@ class TestPromptNormalizerIntegration:
 
         for original, expected_verb in prompts:
             result = normalizer.normalize(original)
-            assert expected_verb in result.normalized.lower(), \
-                f"'{original}' should normalize to contain '{expected_verb}'"
+            assert (
+                expected_verb in result.normalized.lower()
+            ), f"'{original}' should normalize to contain '{expected_verb}'"
 
     @requires_ollama()
     def test_continuation_collapsing(self):

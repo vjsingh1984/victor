@@ -134,31 +134,25 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
     TaskType.SEARCH: TaskComplexity.SIMPLE,
     TaskType.DESIGN: TaskComplexity.SIMPLE,
     TaskType.GENERAL: TaskComplexity.SIMPLE,
-
     # Medium tasks
     TaskType.ANALYZE: TaskComplexity.MEDIUM,
     TaskType.EDIT: TaskComplexity.MEDIUM,
-
     # Complex tasks
     TaskType.CREATE: TaskComplexity.COMPLEX,
     TaskType.REFACTOR: TaskComplexity.COMPLEX,
     TaskType.DEBUG: TaskComplexity.COMPLEX,
-
     # Generation tasks
     TaskType.CREATE_SIMPLE: TaskComplexity.GENERATION,
     TaskType.CODE_GENERATION: TaskComplexity.GENERATION,
-
     # Action tasks (multi-step)
     TaskType.ACTION: TaskComplexity.ACTION,
     TaskType.BUG_FIX: TaskComplexity.ACTION,
     TaskType.ISSUE_RESOLUTION: TaskComplexity.ACTION,
     TaskType.TEST: TaskComplexity.ACTION,
-
     # Analysis tasks
     TaskType.ANALYSIS_DEEP: TaskComplexity.ANALYSIS,
     TaskType.DATA_ANALYSIS: TaskComplexity.ANALYSIS,
     TaskType.STATISTICAL_ANALYSIS: TaskComplexity.ANALYSIS,
-
     # DevOps tasks
     TaskType.INFRASTRUCTURE: TaskComplexity.COMPLEX,
     TaskType.CI_CD: TaskComplexity.COMPLEX,
@@ -167,7 +161,6 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
     TaskType.DOCKERFILE: TaskComplexity.MEDIUM,
     TaskType.DOCKER_COMPOSE: TaskComplexity.MEDIUM,
     TaskType.MONITORING: TaskComplexity.COMPLEX,
-
     # Visualization
     TaskType.VISUALIZATION: TaskComplexity.MEDIUM,
     TaskType.DATA_PROFILING: TaskComplexity.MEDIUM,
@@ -175,7 +168,6 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
     TaskType.REGRESSION: TaskComplexity.COMPLEX,
     TaskType.CLUSTERING: TaskComplexity.COMPLEX,
     TaskType.TIME_SERIES: TaskComplexity.COMPLEX,
-
     # Research tasks
     TaskType.FACT_CHECK: TaskComplexity.MEDIUM,
     TaskType.LITERATURE_REVIEW: TaskComplexity.ANALYSIS,
@@ -183,7 +175,6 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
     TaskType.TREND_RESEARCH: TaskComplexity.ANALYSIS,
     TaskType.TECHNICAL_RESEARCH: TaskComplexity.ANALYSIS,
     TaskType.GENERAL_QUERY: TaskComplexity.MEDIUM,
-
     # Implementation tasks
     TaskType.IMPLEMENT: TaskComplexity.COMPLEX,
     TaskType.SECURITY: TaskComplexity.ACTION,
@@ -286,7 +277,6 @@ def _register_patterns():
             override=True,
             priority=95,
         ),
-
         # =================================================================
         # Analysis / Understanding (read-only operations)
         # =================================================================
@@ -370,7 +360,6 @@ def _register_patterns():
             override=False,
             priority=85,
         ),
-
         # =================================================================
         # Search / Find operations
         # =================================================================
@@ -424,7 +413,6 @@ def _register_patterns():
             override=True,
             priority=85,
         ),
-
         # =================================================================
         # Edit / Modify operations
         # =================================================================
@@ -468,7 +456,6 @@ def _register_patterns():
             override=False,
             priority=80,
         ),
-
         # =================================================================
         # Create / Generate operations
         # =================================================================
@@ -512,7 +499,6 @@ def _register_patterns():
             override=False,
             priority=75,
         ),
-
         # =================================================================
         # Action / Execution operations
         # =================================================================
@@ -586,7 +572,6 @@ def _register_patterns():
             override=True,
             priority=85,
         ),
-
         # =================================================================
         # Design / Planning (no tools needed)
         # =================================================================
@@ -620,7 +605,6 @@ def _register_patterns():
             override=True,
             priority=90,
         ),
-
         # =================================================================
         # DevOps: Infrastructure
         # =================================================================
@@ -674,7 +658,6 @@ def _register_patterns():
             override=True,
             priority=85,
         ),
-
         # =================================================================
         # DevOps: CI/CD
         # =================================================================
@@ -698,7 +681,6 @@ def _register_patterns():
             override=False,
             priority=80,
         ),
-
         # =================================================================
         # Data Analysis
         # =================================================================
@@ -732,7 +714,6 @@ def _register_patterns():
             override=True,
             priority=85,
         ),
-
         # =================================================================
         # Research
         # =================================================================
@@ -776,7 +757,6 @@ def _register_patterns():
             override=True,
             priority=85,
         ),
-
         # =================================================================
         # Additional SWE-bench style patterns
         # =================================================================
@@ -820,7 +800,6 @@ def _register_patterns():
             override=False,
             priority=90,
         ),
-
         # =================================================================
         # Security / Vulnerability patterns
         # =================================================================
@@ -844,7 +823,6 @@ def _register_patterns():
             override=True,
             priority=95,
         ),
-
         # =================================================================
         # Implementation / Feature patterns
         # =================================================================
@@ -878,7 +856,6 @@ def _register_patterns():
             override=False,
             priority=75,
         ),
-
         # =================================================================
         # Architecture / Migration patterns
         # =================================================================
@@ -912,7 +889,6 @@ def _register_patterns():
             override=False,
             priority=80,
         ),
-
         # =================================================================
         # Performance / Investigation patterns
         # =================================================================
@@ -966,7 +942,6 @@ def _register_patterns():
             override=False,
             priority=75,
         ),
-
         # =================================================================
         # Check / Analyze patterns (ambiguous)
         # =================================================================
@@ -1000,7 +975,6 @@ def _register_patterns():
             override=False,
             priority=85,
         ),
-
         # =================================================================
         # Simple operations
         # =================================================================

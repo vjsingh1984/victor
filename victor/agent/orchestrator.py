@@ -2244,7 +2244,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Store semantic cache for later wiring to tool pipeline
                 # (tool pipeline is created after this method runs)
                 self._pending_semantic_cache = semantic_cache
-                logger.debug("[AgentOrchestrator] Semantic tool cache created, pending wire to pipeline")
+                logger.debug(
+                    "[AgentOrchestrator] Semantic tool cache created, pending wire to pipeline"
+                )
             except Exception as e:
                 logger.warning(f"Failed to initialize semantic tool cache: {e}")
 

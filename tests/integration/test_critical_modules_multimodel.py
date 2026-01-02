@@ -51,18 +51,18 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(
-        not is_ollama_available(), reason="Ollama server not available"
-    )
+    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
 
 
 # =============================================================================
 # MODEL FAMILY CONFIGURATION
 # =============================================================================
 
+
 @dataclass
 class ModelFamily:
     """Configuration for a model family."""
+
     name: str
     models: List[str]
     description: str
@@ -73,28 +73,22 @@ MODEL_FAMILIES = {
     "qwen": ModelFamily(
         name="qwen",
         models=["qwen2.5-coder:7b", "qwen3-coder:30b"],
-        description="Alibaba Qwen coder models"
+        description="Alibaba Qwen coder models",
     ),
     "deepseek": ModelFamily(
         name="deepseek",
         models=["deepseek-coder-v2:16b", "deepseek-r1:14b"],
-        description="DeepSeek coder and reasoning models"
+        description="DeepSeek coder and reasoning models",
     ),
     "gpt_oss": ModelFamily(
-        name="gpt_oss",
-        models=["gpt-oss:20b"],
-        description="GPT-OSS open source GPT-like models"
+        name="gpt_oss", models=["gpt-oss:20b"], description="GPT-OSS open source GPT-like models"
     ),
     "devstral": ModelFamily(
         name="devstral",
         models=["devstral:latest"],
-        description="Mistral-based DevStral coding model"
+        description="Mistral-based DevStral coding model",
     ),
-    "llama": ModelFamily(
-        name="llama",
-        models=["llama3.1:8b"],
-        description="Meta Llama models"
-    ),
+    "llama": ModelFamily(name="llama", models=["llama3.1:8b"], description="Meta Llama models"),
 }
 
 # Define model pairs for cross-family testing
@@ -115,6 +109,7 @@ FAST_MODEL_PAIRS: List[Tuple[str, str, str, str]] = [
 async def get_available_models() -> List[str]:
     """Query Ollama for available models."""
     import httpx
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get("http://localhost:11434/api/tags", timeout=5.0)
@@ -124,13 +119,12 @@ async def get_available_models() -> List[str]:
         return []
 
 
-async def filter_available_pairs(pairs: List[Tuple[str, str, str, str]]) -> List[Tuple[str, str, str, str]]:
+async def filter_available_pairs(
+    pairs: List[Tuple[str, str, str, str]],
+) -> List[Tuple[str, str, str, str]]:
     """Filter model pairs to only include available models."""
     available = await get_available_models()
-    return [
-        (m1, f1, m2, f2) for m1, f1, m2, f2 in pairs
-        if m1 in available and m2 in available
-    ]
+    return [(m1, f1, m2, f2) for m1, f1, m2, f2 in pairs if m1 in available and m2 in available]
 
 
 @pytest.fixture
@@ -138,7 +132,8 @@ def temp_workspace():
     """Create a temporary workspace directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         workspace = Path(tmpdir)
-        (workspace / "main.py").write_text('''
+        (workspace / "main.py").write_text(
+            '''
 def hello():
     """Say hello."""
     return "Hello, World!"
@@ -146,17 +141,21 @@ def hello():
 def add(a, b):
     """Add two numbers."""
     return a + b
-''')
-        (workspace / "buggy.py").write_text('''
+'''
+        )
+        (workspace / "buggy.py").write_text(
+            """
 def divide(a, b):
     return a / b  # BUG: No zero check!
-''')
+"""
+        )
         yield workspace
 
 
 # =============================================================================
 # MULTI-MODEL TEST HELPERS
 # =============================================================================
+
 
 class MultiModelTestBase:
     """Base class for multi-model tests."""
@@ -180,11 +179,7 @@ class MultiModelTestBase:
 
     @staticmethod
     async def run_cross_family(
-        model1: str,
-        family1: str,
-        model2: str,
-        family2: str,
-        test_func
+        model1: str, family1: str, model2: str, family2: str, test_func
     ) -> Dict[str, Any]:
         """Run a test across two model families and compare results."""
         results = {}
@@ -213,6 +208,7 @@ class MultiModelTestBase:
 # CLASSIFICATION TESTS - MULTI MODEL
 # =============================================================================
 
+
 class TestClassificationMultiModel:
     """Classification tests run against multiple model families."""
 
@@ -236,8 +232,9 @@ class TestClassificationMultiModel:
         for prompt in prompts:
             result = matcher.match(prompt)
             assert result is not None, f"Failed to classify: {prompt[:50]}..."
-            assert result.task_type == TaskType.BUG_FIX, \
-                f"Wrong type for '{prompt[:30]}...': {result.task_type}"
+            assert (
+                result.task_type == TaskType.BUG_FIX
+            ), f"Wrong type for '{prompt[:30]}...': {result.task_type}"
             results[prompt[:30]] = result.task_type
 
         # All should be BUG_FIX
@@ -261,13 +258,15 @@ class TestClassificationMultiModel:
         for prompt, expected in test_cases:
             result = matcher.match(prompt)
             assert result is not None
-            assert result.complexity == expected, \
-                f"Wrong complexity for '{prompt}': {result.complexity} != {expected}"
+            assert (
+                result.complexity == expected
+            ), f"Wrong complexity for '{prompt}': {result.complexity} != {expected}"
 
 
 # =============================================================================
 # CHAT COMPLETION TESTS - MULTI MODEL
 # =============================================================================
+
 
 class TestChatCompletionMultiModel:
     """Chat completion tests run against multiple model families."""
@@ -291,7 +290,9 @@ class TestChatCompletionMultiModel:
             provider = OllamaProvider(base_url="http://localhost:11434", model=model)
             try:
                 response = await provider.chat(
-                    messages=[Message(role="user", content="What is 2+2? Reply with just the number.")],
+                    messages=[
+                        Message(role="user", content="What is 2+2? Reply with just the number.")
+                    ],
                     model=model,
                     max_tokens=10,
                 )
@@ -368,10 +369,12 @@ class TestChatCompletionMultiModel:
                 provider = OllamaProvider(base_url="http://localhost:11434", model=model)
                 try:
                     response = await provider.chat(
-                        messages=[Message(
-                            role="user",
-                            content="Write a Python function called 'add' that adds two numbers. Just the function, no explanation."
-                        )],
+                        messages=[
+                            Message(
+                                role="user",
+                                content="Write a Python function called 'add' that adds two numbers. Just the function, no explanation.",
+                            )
+                        ],
                         model=model,
                         max_tokens=100,
                     )
@@ -391,6 +394,7 @@ class TestChatCompletionMultiModel:
 # =============================================================================
 # STREAMING TESTS - MULTI MODEL
 # =============================================================================
+
 
 class TestStreamingMultiModel:
     """Streaming tests run against multiple model families."""
@@ -428,8 +432,9 @@ class TestStreamingMultiModel:
         for model, content in results.items():
             assert len(content) > 0, f"{model} produced empty response"
             # Should mention at least one number
-            assert any(n in content for n in ["1", "2", "3", "one", "two", "three"]), \
-                f"{model} didn't count: {content}"
+            assert any(
+                n in content for n in ["1", "2", "3", "one", "two", "three"]
+            ), f"{model} didn't count: {content}"
 
     @requires_ollama()
     @pytest.mark.asyncio
@@ -468,6 +473,7 @@ class TestStreamingMultiModel:
 # TASK COMPLETION TESTS - MULTI MODEL
 # =============================================================================
 
+
 class TestTaskCompletionMultiModel:
     """Task completion detection tests (model-agnostic)."""
 
@@ -492,8 +498,9 @@ class TestTaskCompletionMultiModel:
             detector.analyze_response(response)
 
             state = detector.get_state()
-            assert len(state.completion_signals) > 0, \
-                f"No completion signal detected for: {response}"
+            assert (
+                len(state.completion_signals) > 0
+            ), f"No completion signal detected for: {response}"
 
     @requires_ollama()
     @pytest.mark.asyncio
@@ -514,13 +521,13 @@ class TestTaskCompletionMultiModel:
             detector.analyze_response(response)
 
             state = detector.get_state()
-            assert state.continuation_requests >= 1, \
-                f"No continuation detected for: {response}"
+            assert state.continuation_requests >= 1, f"No continuation detected for: {response}"
 
 
 # =============================================================================
 # MULTI-TURN CONVERSATION TESTS - MULTI MODEL
 # =============================================================================
+
 
 class TestMultiTurnMultiModel:
     """Multi-turn conversation tests across model families."""
@@ -605,8 +612,9 @@ class TestMultiTurnMultiModel:
 
             r2 = await provider.chat(messages=messages, model=model, max_tokens=100)
             # Allow for variations like "BANANA" or "banana" or "The secret word is BANANA"
-            assert r2.content and ("banana" in r2.content.lower()), \
-                f"Context not retained: {r2.content}"
+            assert r2.content and (
+                "banana" in r2.content.lower()
+            ), f"Context not retained: {r2.content}"
         finally:
             await provider.close()
 
@@ -614,6 +622,7 @@ class TestMultiTurnMultiModel:
 # =============================================================================
 # TOOL CALLING TESTS - MULTI MODEL
 # =============================================================================
+
 
 class TestToolCallingMultiModel:
     """Tool calling tests across model families."""
@@ -657,6 +666,7 @@ class TestToolCallingMultiModel:
 # NORMALIZATION TESTS - MULTI MODEL AGNOSTIC
 # =============================================================================
 
+
 class TestNormalizationMultiModel:
     """Normalization tests (model-agnostic, but verified across inputs)."""
 
@@ -678,8 +688,9 @@ class TestNormalizationMultiModel:
 
         for original, expected_verb in test_cases:
             result = normalizer.normalize(original)
-            assert expected_verb in result.normalized.lower(), \
-                f"'{original}' should normalize to contain '{expected_verb}', got: {result.normalized}"
+            assert (
+                expected_verb in result.normalized.lower()
+            ), f"'{original}' should normalize to contain '{expected_verb}', got: {result.normalized}"
 
     @requires_ollama()
     @pytest.mark.asyncio
@@ -706,6 +717,7 @@ class TestNormalizationMultiModel:
 # =============================================================================
 # PERFORMANCE COMPARISON TESTS
 # =============================================================================
+
 
 class TestPerformanceMultiModel:
     """Performance comparison across model families."""
@@ -752,6 +764,7 @@ class TestPerformanceMultiModel:
 # =============================================================================
 # ERROR HANDLING - MULTI MODEL
 # =============================================================================
+
 
 class TestErrorHandlingMultiModel:
     """Error handling tests across models."""

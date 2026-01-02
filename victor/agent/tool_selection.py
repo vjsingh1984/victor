@@ -1591,7 +1591,9 @@ class ToolSelector(ModeAwareMixin):
 
         # Blend with keyword-selected tools (limited to prevent token explosion)
         # Pass _record=False to avoid double-counting in metrics
-        keyword_tools = self.select_keywords(user_message, planned_tools=planned_tools, _record=False)
+        keyword_tools = self.select_keywords(
+            user_message, planned_tools=planned_tools, _record=False
+        )
         if keyword_tools:
             existing = {t.name for t in tools}
             new_keyword_tools = [t for t in keyword_tools if t.name not in existing]
@@ -1646,9 +1648,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Cap to fallback_max_tools to avoid broadcasting too many tools
         if len(tools) > self.fallback_max_tools:
-            logger.debug(
-                f"Capping tools from {len(tools)} to {self.fallback_max_tools}"
-            )
+            logger.debug(f"Capping tools from {len(tools)} to {self.fallback_max_tools}")
             tools = tools[: self.fallback_max_tools]
 
         # Record selection AFTER final cap to reflect actual tool count

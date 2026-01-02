@@ -138,7 +138,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b", 0.9, "build_deploy"),
         (r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b", 1.0, "web_search_action"),
         # SWE-bench / GitHub issue format (multi-step issue resolution)
-        (r"###\s*(Description|Expected\s+behavior|Actual\s+behavior|Steps)", 1.0, "github_issue_format"),
+        (
+            r"###\s*(Description|Expected\s+behavior|Actual\s+behavior|Steps)",
+            1.0,
+            "github_issue_format",
+        ),
         (r"\bSteps\s+to\s+Reproduce\b", 1.0, "steps_to_reproduce"),
         (r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b", 0.95, "issue_request"),
     ],

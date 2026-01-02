@@ -244,9 +244,7 @@ class TestSimilarityDetection:
     def test_dissimilar_messages_not_flagged(self, normalizer):
         """Dissimilar messages should not be flagged."""
         normalizer.normalize("fix the authentication bug")
-        result = normalizer.is_similar_to_recent(
-            "add new feature to dashboard", threshold=0.8
-        )
+        result = normalizer.is_similar_to_recent("add new feature to dashboard", threshold=0.8)
         assert result is False
 
     def test_empty_history(self, normalizer):

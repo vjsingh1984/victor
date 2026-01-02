@@ -52,9 +52,7 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(
-        not is_ollama_available(), reason="Ollama server not available"
-    )
+    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
 
 
 # Default model for tests
@@ -66,7 +64,8 @@ def temp_workspace():
     """Create a temporary workspace directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         workspace = Path(tmpdir)
-        (workspace / "main.py").write_text('''
+        (workspace / "main.py").write_text(
+            '''
 def hello():
     """Say hello."""
     return "Hello, World!"
@@ -77,8 +76,10 @@ def add(a, b):
 
 if __name__ == "__main__":
     print(hello())
-''')
-        (workspace / "test_main.py").write_text('''
+'''
+        )
+        (workspace / "test_main.py").write_text(
+            """
 import pytest
 from main import hello, add
 
@@ -87,17 +88,21 @@ def test_hello():
 
 def test_add():
     assert add(2, 3) == 5
-''')
-        (workspace / "buggy.py").write_text('''
+"""
+        )
+        (workspace / "buggy.py").write_text(
+            """
 def divide(a, b):
     return a / b  # BUG: No zero check!
-''')
+"""
+        )
         yield workspace
 
 
 # =============================================================================
 # TASK COMPLETION E2E TESTS
 # =============================================================================
+
 
 class TestTaskCompletionE2E:
     """End-to-end tests for task completion detection."""
@@ -128,10 +133,9 @@ class TestTaskCompletionE2E:
         detector = TaskCompletionDetector()
         detector.analyze_intent("Add a docstring to the hello function")
 
-        detector.record_tool_result("write", {
-            "success": True,
-            "path": str(temp_workspace / "main.py")
-        })
+        detector.record_tool_result(
+            "write", {"success": True, "path": str(temp_workspace / "main.py")}
+        )
 
         detector.analyze_response("DONE: Added docstring to hello function")
         assert detector.should_stop() is True
@@ -148,8 +152,7 @@ class TestTaskCompletionE2E:
 
         state = detector.get_state()
         has_active = state.active_signal_detected or any(
-            "active:" in s or "TASK COMPLETE" in s.upper()
-            for s in state.completion_signals
+            "active:" in s or "TASK COMPLETE" in s.upper() for s in state.completion_signals
         )
         assert has_active or len(state.completion_signals) > 0
 
@@ -175,6 +178,7 @@ class TestTaskCompletionE2E:
 # =============================================================================
 # CLASSIFICATION PIPELINE TESTS
 # =============================================================================
+
 
 class TestClassificationPipelineE2E:
     """End-to-end tests for the classification pipeline."""
@@ -268,13 +272,15 @@ Expected: Memory released after each call.
         for prompt, expected_complexity in test_cases:
             result = matcher.match(prompt)
             assert result is not None, f"No match for: {prompt}"
-            assert result.complexity == expected_complexity, \
-                f"Wrong complexity for '{prompt}': {result.complexity} != {expected_complexity}"
+            assert (
+                result.complexity == expected_complexity
+            ), f"Wrong complexity for '{prompt}': {result.complexity} != {expected_complexity}"
 
 
 # =============================================================================
 # BUDGET MANAGEMENT TESTS
 # =============================================================================
+
 
 class TestBudgetManagement:
     """Tests for budget management functionality."""
@@ -317,6 +323,7 @@ class TestBudgetManagement:
 # CONTEXT COMPACTION TESTS
 # =============================================================================
 
+
 class TestContextCompaction:
     """Tests for context compaction functionality."""
 
@@ -357,6 +364,7 @@ class TestContextCompaction:
 # =============================================================================
 # CONVERSATION FLOW TESTS
 # =============================================================================
+
 
 class TestConversationFlow:
     """Tests for conversation flow handling."""
@@ -409,6 +417,7 @@ class TestConversationFlow:
 # =============================================================================
 # STREAMING TESTS
 # =============================================================================
+
 
 class TestStreamingIntegration:
     """Tests for streaming response handling."""
@@ -480,6 +489,7 @@ class TestStreamingIntegration:
 # =============================================================================
 # PROVIDER TESTS
 # =============================================================================
+
 
 class TestOllamaProvider:
     """Tests for Ollama provider functionality."""
@@ -582,6 +592,7 @@ class TestOllamaProvider:
 # COMPLEX WORKFLOW TESTS
 # =============================================================================
 
+
 class TestComplexWorkflows:
     """Tests for complex multi-step workflows."""
 
@@ -610,10 +621,9 @@ Actual: Raises ZeroDivisionError
         detector = TaskCompletionDetector()
         detector.analyze_intent(prompt)
 
-        detector.record_tool_result("write", {
-            "success": True,
-            "path": str(temp_workspace / "buggy.py")
-        })
+        detector.record_tool_result(
+            "write", {"success": True, "path": str(temp_workspace / "buggy.py")}
+        )
         detector.analyze_response("TASK COMPLETE: Added zero check")
 
         assert detector.should_stop() is True
@@ -639,11 +649,15 @@ Provide detailed analysis.
         # May match ANALYZE, ANALYSIS_DEEP, or similar analysis types
         assert result is not None
         # Accept any analysis-related task type
-        assert result.task_type in [
-            TaskType.ANALYZE,
-            TaskType.ANALYSIS_DEEP,
-            TaskType.DEBUG,  # Review can be classified as debug
-        ] or "ANAL" in result.task_type.value.upper()
+        assert (
+            result.task_type
+            in [
+                TaskType.ANALYZE,
+                TaskType.ANALYSIS_DEEP,
+                TaskType.DEBUG,  # Review can be classified as debug
+            ]
+            or "ANAL" in result.task_type.value.upper()
+        )
 
     @requires_ollama()
     @pytest.mark.asyncio
@@ -669,6 +683,7 @@ Refactor the main.py file to:
 # ERROR HANDLING TESTS
 # =============================================================================
 
+
 class TestErrorHandling:
     """Tests for error handling scenarios."""
 
@@ -684,9 +699,7 @@ class TestErrorHandling:
         )
 
         with pytest.raises(Exception):
-            await provider.chat(
-                messages=[{"role": "user", "content": "test"}]
-            )
+            await provider.chat(messages=[{"role": "user", "content": "test"}])
 
     @requires_ollama()
     @pytest.mark.asyncio
@@ -706,6 +719,7 @@ class TestErrorHandling:
 # =============================================================================
 # PERFORMANCE TESTS
 # =============================================================================
+
 
 class TestPerformance:
     """Tests for performance-critical paths."""
