@@ -1590,7 +1590,8 @@ class ToolSelector(ModeAwareMixin):
         )
 
         # Blend with keyword-selected tools (limited to prevent token explosion)
-        keyword_tools = self.select_keywords(user_message, planned_tools=planned_tools)
+        # Pass _record=False to avoid double-counting in metrics
+        keyword_tools = self.select_keywords(user_message, planned_tools=planned_tools, _record=False)
         if keyword_tools:
             existing = {t.name for t in tools}
             new_keyword_tools = [t for t in keyword_tools if t.name not in existing]
@@ -1634,19 +1635,27 @@ class ToolSelector(ModeAwareMixin):
         )
 
         # Smart fallback if 0 tools
+        is_fallback = False
         if not tools:
             logger.warning(
                 "Semantic selection returned 0 tools. "
                 "Using smart fallback: core tools + keyword matching."
             )
             tools = self._get_fallback_tools(user_message)
-            self._record_selection("fallback", len(tools))
-        else:
-            self._record_selection("semantic", len(tools))
+            is_fallback = True
 
         # Cap to fallback_max_tools to avoid broadcasting too many tools
         if len(tools) > self.fallback_max_tools:
+            logger.debug(
+                f"Capping tools from {len(tools)} to {self.fallback_max_tools}"
+            )
             tools = tools[: self.fallback_max_tools]
+
+        # Record selection AFTER final cap to reflect actual tool count
+        if is_fallback:
+            self._record_selection("fallback", len(tools))
+        else:
+            self._record_selection("semantic", len(tools))
 
         # Apply vertical-specific tool selection strategy (DIP/OCP)
         # This allows verticals to prioritize/reorder tools based on domain knowledge
@@ -1658,6 +1667,7 @@ class ToolSelector(ModeAwareMixin):
         self,
         user_message: str,
         planned_tools: Optional[List["ToolDefinition"]] = None,
+        _record: bool = True,
     ) -> List["ToolDefinition"]:
         """Select tools using keyword-based category matching.
 
@@ -1667,6 +1677,7 @@ class ToolSelector(ModeAwareMixin):
         Args:
             user_message: The user's input message
             planned_tools: Optional pre-planned tools to include
+            _record: Whether to record selection stats (False when called from select_semantic)
 
         Returns:
             List of relevant ToolDefinition objects
@@ -1706,7 +1717,8 @@ class ToolSelector(ModeAwareMixin):
                 f"Selected {len(selected_tools)} tools from vertical filter: "
                 f"{', '.join(tool_names)}"
             )
-            self._record_selection("vertical", len(selected_tools))
+            if _record:
+                self._record_selection("vertical", len(selected_tools))
             return selected_tools
 
         # Fallback: Build selected tool names using core tools + registry keyword matches
@@ -1760,7 +1772,8 @@ class ToolSelector(ModeAwareMixin):
         else:
             logger.debug(f"Tool selection unchanged: {len(selected_tools)} tools")
 
-        self._record_selection("keyword", len(selected_tools))
+        if _record:
+            self._record_selection("keyword", len(selected_tools))
         return selected_tools
 
     def prioritize_by_stage(
