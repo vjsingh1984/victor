@@ -401,12 +401,12 @@ class ConversationStateMachine:
             elif self.state.stage in tied_stages:
                 # Current stage is tied - stay to avoid oscillation
                 detected = self.state.stage
-                logger.debug(f"_detect_stage_from_tools: Tie resolved by staying at current stage")
+                logger.debug("_detect_stage_from_tools: Tie resolved by staying at current stage")
             else:
                 # Pick the most advanced (highest in workflow order)
                 detected = max(tied_stages, key=lambda s: STAGE_ORDER[s])
                 logger.debug(
-                    f"_detect_stage_from_tools: Tie resolved by picking most advanced stage"
+                    "_detect_stage_from_tools: Tie resolved by picking most advanced stage"
                 )
 
             scores_str = ", ".join(f"{k.name}={v}" for k, v in scores.items())

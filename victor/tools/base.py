@@ -29,6 +29,7 @@ from victor.tools.enums import (
     DangerLevel,
     ExecutionCategory,
     Priority,
+    SchemaLevel,
 )
 
 # Import metadata classes from separate module

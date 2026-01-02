@@ -872,9 +872,9 @@ class ToolSelector(ModeAwareMixin):
 
         logger.debug(
             f"Tool schema levels for vertical={vertical}: "
-            f"FULL={len([t for t, l in levels.items() if l == SchemaLevel.FULL])}, "
-            f"COMPACT={len([t for t, l in levels.items() if l == SchemaLevel.COMPACT])}, "
-            f"STUB={len([t for t, l in levels.items() if l == SchemaLevel.STUB])}"
+            f"FULL={len([t for t, lvl in levels.items() if lvl == SchemaLevel.FULL])}, "
+            f"COMPACT={len([t for t, lvl in levels.items() if lvl == SchemaLevel.COMPACT])}, "
+            f"STUB={len([t for t, lvl in levels.items() if lvl == SchemaLevel.STUB])}"
         )
 
         return levels

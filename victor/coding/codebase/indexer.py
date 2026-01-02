@@ -1326,7 +1326,6 @@ class CodebaseIndex:
         tasks = [(str(file_path), root_str, language) for file_path, language in files_to_index]
 
         # Process files in parallel using ProcessPoolExecutor
-        loop = asyncio.get_event_loop()
         with ProcessPoolExecutor(max_workers=self._parallel_workers) as executor:
             # Submit all tasks
             futures = {executor.submit(_process_file_parallel, *task): task for task in tasks}

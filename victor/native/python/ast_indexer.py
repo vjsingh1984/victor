@@ -192,7 +192,6 @@ STDLIB_MODULES = frozenset(
         "smtpd",
         "smtplib",
         "sndhdr",
-        "socket",
         "socketserver",
         "spwd",
         "stat",
