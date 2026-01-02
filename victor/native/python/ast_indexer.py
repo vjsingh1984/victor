@@ -192,7 +192,6 @@ STDLIB_MODULES = frozenset(
         "smtpd",
         "smtplib",
         "sndhdr",
-        "socket",
         "socketserver",
         "spwd",
         "stat",
@@ -315,9 +314,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
             identifiers = set(_IDENTIFIER_PATTERN.findall(source))
             return list(identifiers)
 
-    def extract_identifiers_with_positions(
-        self, source: str
-    ) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Args:
@@ -336,9 +333,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
 
             return results
 
-    def filter_stdlib_imports(
-        self, imports: List[str]
-    ) -> Tuple[List[str], List[str]]:
+    def filter_stdlib_imports(self, imports: List[str]) -> Tuple[List[str], List[str]]:
         """Partition imports into stdlib and non-stdlib.
 
         Args:

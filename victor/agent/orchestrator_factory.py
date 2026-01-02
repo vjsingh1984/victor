@@ -949,6 +949,7 @@ class OrchestratorFactory(ModeAwareMixin):
         on_tool_complete: Callable,
         deduplication_tracker: Optional[Any],
         middleware_chain: Optional[Any] = None,
+        semantic_cache: Optional[Any] = None,
     ) -> Any:
         """Create tool pipeline for coordinating tool execution flow.
 
@@ -962,6 +963,7 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_complete: Callback invoked when tool execution completes
             deduplication_tracker: Optional tracker for preventing duplicate calls
             middleware_chain: Optional middleware chain for processing tool calls
+            semantic_cache: Optional FAISS-based semantic cache for tool results
 
         Returns:
             ToolPipeline instance coordinating tool execution
@@ -976,6 +978,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 enable_caching=tool_cache is not None,
                 enable_analytics=True,
                 enable_failed_signature_tracking=True,
+                enable_semantic_caching=semantic_cache is not None,
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,
@@ -983,8 +986,13 @@ class OrchestratorFactory(ModeAwareMixin):
             on_tool_complete=on_tool_complete,
             deduplication_tracker=deduplication_tracker,
             middleware_chain=middleware_chain,
+            semantic_cache=semantic_cache,
         )
-        logger.debug("ToolPipeline created%s", " with middleware chain" if middleware_chain else "")
+        logger.debug(
+            "ToolPipeline created%s%s",
+            " with middleware chain" if middleware_chain else "",
+            " with semantic cache" if semantic_cache else "",
+        )
         return pipeline
 
     def create_streaming_tool_adapter(
@@ -1176,16 +1184,22 @@ class OrchestratorFactory(ModeAwareMixin):
             logger.warning(f"RL: Failed to initialize RL coordinator: {e}")
             return None
 
-    def create_context_compactor(self, conversation_controller: Any) -> Any:
+    def create_context_compactor(
+        self,
+        conversation_controller: Any,
+        pruning_learner: Optional[Any] = None,
+    ) -> Any:
         """Create context compactor for proactive context management.
 
         This component provides:
         - Proactive compaction before context overflow (triggers at 70% utilization)
         - Smart tool result truncation with content-aware strategies
         - Token estimation with content-type-specific factors
+        - RL-based adaptive pruning (when learner is provided)
 
         Args:
             conversation_controller: ConversationController instance for context tracking
+            pruning_learner: Optional RL learner for adaptive pruning decisions
 
         Returns:
             ContextCompactor instance configured with settings
@@ -1209,6 +1223,11 @@ class OrchestratorFactory(ModeAwareMixin):
             truncation_strategy_str, TruncationStrategy.SMART
         )
 
+        # Determine provider type for RL state
+        provider_name = getattr(self.settings, "provider", "").lower()
+        local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
+        provider_type = "local" if any(p in provider_name for p in local_providers) else "cloud"
+
         # Create compactor with all settings
         compactor = create_context_compactor(
             controller=conversation_controller,
@@ -1222,9 +1241,15 @@ class OrchestratorFactory(ModeAwareMixin):
             preserve_code_blocks=True,
             enable_proactive=getattr(self.settings, "context_proactive_compaction", True),
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
+            pruning_learner=pruning_learner,
+            provider_type=provider_type,
         )
 
-        logger.debug(f"ContextCompactor created with truncation_strategy={truncation_strategy}")
+        rl_status = "with RL learner" if pruning_learner else "without RL learner"
+        logger.debug(
+            f"ContextCompactor created {rl_status}, "
+            f"truncation_strategy={truncation_strategy}, provider_type={provider_type}"
+        )
         return compactor
 
     def create_argument_normalizer(self, provider: "BaseProvider") -> Any:

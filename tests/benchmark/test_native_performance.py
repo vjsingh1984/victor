@@ -248,9 +248,7 @@ class TestSimilarityPerformance:
 
         def run():
             query_norm = query / (np.linalg.norm(query) + 1e-9)
-            corpus_norms = corpus / (
-                np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9
-            )
+            corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
             np.dot(corpus_norms, query_norm)
 
         ms_per_call = time_function(run, iterations=100)
@@ -465,9 +463,7 @@ class TestSpeedupValidation:
             "collections.abc",
         ] * 200
 
-        stdlib_set = frozenset(
-            {"os", "sys", "collections", "typing", "asyncio", "json"}
-        )
+        stdlib_set = frozenset({"os", "sys", "collections", "typing", "asyncio", "json"})
 
         def py_is_stdlib(name: str) -> bool:
             return name.split(".")[0] in stdlib_set
@@ -518,9 +514,7 @@ class TestSpeedupValidation:
 
         def py_run():
             query_norm = query_np / (np.linalg.norm(query_np) + 1e-9)
-            corpus_norms = corpus_np / (
-                np.linalg.norm(corpus_np, axis=1, keepdims=True) + 1e-9
-            )
+            corpus_norms = corpus_np / (np.linalg.norm(corpus_np, axis=1, keepdims=True) + 1e-9)
             np.dot(corpus_norms, query_norm)
 
         def rust_run():

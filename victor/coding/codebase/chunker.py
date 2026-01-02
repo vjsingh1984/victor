@@ -48,6 +48,7 @@ Configuration:
 
 import ast
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -830,7 +831,10 @@ REGEX_SYMBOL_PATTERNS: Dict[str, List[tuple[str, str]]] = {
     ],
     # Fortran - scientific computing
     "fortran": [
-        ("program", r"^\s*PROGRAM\s+(\w+)", ),
+        (
+            "program",
+            r"^\s*PROGRAM\s+(\w+)",
+        ),
         ("subroutine", r"^\s*SUBROUTINE\s+(\w+)"),
         ("function", r"^\s*(?:INTEGER|REAL|DOUBLE|COMPLEX|LOGICAL|CHARACTER)?\s*FUNCTION\s+(\w+)"),
         ("module", r"^\s*MODULE\s+(\w+)"),
@@ -1118,6 +1122,7 @@ class TierAwareChunker:
         """
         if self._text_chunker is None:
             from victor.processing.native import get_default_text_chunker
+
             self._text_chunker = get_default_text_chunker()
         return self._text_chunker
 
@@ -1209,13 +1214,10 @@ class TierAwareChunker:
         # Try each fallback in order
         for fallback in fallbacks:
             try:
-                chunks = self._apply_fallback(
-                    fallback, file_path, relative_path, language, content
-                )
+                chunks = self._apply_fallback(fallback, file_path, relative_path, language, content)
                 if chunks:
                     logger.debug(
-                        f"Chunked {relative_path} with {fallback.value}: "
-                        f"{len(chunks)} chunks"
+                        f"Chunked {relative_path} with {fallback.value}: " f"{len(chunks)} chunks"
                     )
                     return chunks
             except Exception as e:
@@ -1225,9 +1227,7 @@ class TierAwareChunker:
         # Ultimate fallback - should never reach here but just in case
         return self._chunk_with_overlap(file_path, relative_path, language, content)
 
-    def _get_fallback_chain(
-        self, language: str, file_path: Path
-    ) -> List[ChunkingFallback]:
+    def _get_fallback_chain(self, language: str, file_path: Path) -> List[ChunkingFallback]:
         """Determine the fallback chain for a language.
 
         Args:
@@ -1276,9 +1276,20 @@ class TierAwareChunker:
         """Check if a file is a config file based on name patterns."""
         name = file_path.name.lower()
         config_patterns = [
-            "config", "settings", "properties", ".conf", ".cfg",
-            ".ini", ".env", "dockerfile", "makefile", "gemfile",
-            "rakefile", "procfile", "vagrantfile", ".rc",
+            "config",
+            "settings",
+            "properties",
+            ".conf",
+            ".cfg",
+            ".ini",
+            ".env",
+            "dockerfile",
+            "makefile",
+            "gemfile",
+            "rakefile",
+            "procfile",
+            "vagrantfile",
+            ".rc",
         ]
         return any(pattern in name for pattern in config_patterns)
 
@@ -1295,24 +1306,16 @@ class TierAwareChunker:
             return self._py_chunker.chunk_file(file_path, relative_path, content)
 
         elif fallback == ChunkingFallback.TREE_SITTER:
-            return self._chunk_with_tree_sitter(
-                file_path, relative_path, language, content
-            )
+            return self._chunk_with_tree_sitter(file_path, relative_path, language, content)
 
         elif fallback == ChunkingFallback.REGEX_SYMBOLS:
-            return self._chunk_with_regex(
-                file_path, relative_path, language, content
-            )
+            return self._chunk_with_regex(file_path, relative_path, language, content)
 
         elif fallback == ChunkingFallback.CONFIG_AWARE:
-            return self._chunk_config_file(
-                file_path, relative_path, language, content
-            )
+            return self._chunk_config_file(file_path, relative_path, language, content)
 
         elif fallback == ChunkingFallback.SLIDING_WINDOW:
-            return self._chunk_with_overlap(
-                file_path, relative_path, language, content
-            )
+            return self._chunk_with_overlap(file_path, relative_path, language, content)
 
         return []
 
@@ -1338,19 +1341,23 @@ class TierAwareChunker:
         # File summary
         if self._config.include_file_summary:
             symbol_names = [s.name for s in symbols[:10]]
-            summary = f"File: {relative_path}\nLanguage: {language}\nContains: {', '.join(symbol_names)}"
+            summary = (
+                f"File: {relative_path}\nLanguage: {language}\nContains: {', '.join(symbol_names)}"
+            )
             if len(symbols) > 10:
                 summary += f"\n  ... and {len(symbols) - 10} more"
 
-            chunks.append(CodeChunk(
-                id=f"{relative_path}:__file__",
-                content=summary,
-                chunk_type=ChunkType.FILE_SUMMARY,
-                file_path=relative_path,
-                line_start=1,
-                line_end=len(lines),
-                metadata={"symbol_count": len(symbols), "language": language},
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=f"{relative_path}:__file__",
+                    content=summary,
+                    chunk_type=ChunkType.FILE_SUMMARY,
+                    file_path=relative_path,
+                    line_start=1,
+                    line_end=len(lines),
+                    metadata={"symbol_count": len(symbols), "language": language},
+                )
+            )
 
         # Symbol chunks
         for sym in symbols:
@@ -1360,9 +1367,11 @@ class TierAwareChunker:
             if start < 0 or start >= len(lines):
                 continue
 
-            symbol_content = "\n".join(lines[start:end + 1])
+            symbol_content = "\n".join(lines[start : end + 1])
             if len(symbol_content) > self._config.max_chunk_chars:
-                symbol_content = symbol_content[:self._config.max_chunk_chars] + "\n# ... truncated"
+                symbol_content = (
+                    symbol_content[: self._config.max_chunk_chars] + "\n# ... truncated"
+                )
 
             chunk_type = (
                 ChunkType.CLASS_SUMMARY
@@ -1372,23 +1381,23 @@ class TierAwareChunker:
 
             parent = sym.parent_symbol
             chunk_id = (
-                f"{relative_path}:{parent}.{sym.name}"
-                if parent
-                else f"{relative_path}:{sym.name}"
+                f"{relative_path}:{parent}.{sym.name}" if parent else f"{relative_path}:{sym.name}"
             )
 
-            chunks.append(CodeChunk(
-                id=chunk_id,
-                content=f"{sym.type.title()}: {sym.name}\n{symbol_content}",
-                chunk_type=chunk_type,
-                file_path=relative_path,
-                symbol_name=sym.name,
-                symbol_type=sym.type,
-                line_start=sym.line_number,
-                line_end=sym.end_line or sym.line_number,
-                parent_id=f"{relative_path}:{parent}" if parent else None,
-                metadata={"language": language, "line_count": end - start + 1},
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=chunk_id,
+                    content=f"{sym.type.title()}: {sym.name}\n{symbol_content}",
+                    chunk_type=chunk_type,
+                    file_path=relative_path,
+                    symbol_name=sym.name,
+                    symbol_type=sym.type,
+                    line_start=sym.line_number,
+                    line_end=sym.end_line or sym.line_number,
+                    parent_id=f"{relative_path}:{parent}" if parent else None,
+                    metadata={"language": language, "line_count": end - start + 1},
+                )
+            )
 
         return chunks
 
@@ -1414,11 +1423,13 @@ class TierAwareChunker:
                 match = re.search(pattern, line, re.IGNORECASE)
                 if match:
                     name = match.group(1) if match.groups() else sym_type
-                    symbols.append({
-                        "name": name,
-                        "type": sym_type,
-                        "line": line_num,
-                    })
+                    symbols.append(
+                        {
+                            "name": name,
+                            "type": sym_type,
+                            "line": line_num,
+                        }
+                    )
 
         if not symbols:
             return []  # Let next fallback handle
@@ -1426,17 +1437,21 @@ class TierAwareChunker:
         # File summary
         if self._config.include_file_summary:
             symbol_names = [s["name"] for s in symbols[:10]]
-            summary = f"File: {relative_path}\nLanguage: {language}\nSymbols: {', '.join(symbol_names)}"
+            summary = (
+                f"File: {relative_path}\nLanguage: {language}\nSymbols: {', '.join(symbol_names)}"
+            )
 
-            chunks.append(CodeChunk(
-                id=f"{relative_path}:__file__",
-                content=summary,
-                chunk_type=ChunkType.FILE_SUMMARY,
-                file_path=relative_path,
-                line_start=1,
-                line_end=len(lines),
-                metadata={"symbol_count": len(symbols), "language": language},
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=f"{relative_path}:__file__",
+                    content=summary,
+                    chunk_type=ChunkType.FILE_SUMMARY,
+                    file_path=relative_path,
+                    line_start=1,
+                    line_end=len(lines),
+                    metadata={"symbol_count": len(symbols), "language": language},
+                )
+            )
 
         # Create chunks around each symbol
         for i, sym in enumerate(symbols):
@@ -1447,23 +1462,25 @@ class TierAwareChunker:
             else:
                 end_line = min(start_line + 50, len(lines))
 
-            symbol_lines = lines[start_line - 1:end_line]
+            symbol_lines = lines[start_line - 1 : end_line]
             symbol_content = "\n".join(symbol_lines)
 
             if len(symbol_content) > self._config.max_chunk_chars:
-                symbol_content = symbol_content[:self._config.max_chunk_chars] + "\n... truncated"
+                symbol_content = symbol_content[: self._config.max_chunk_chars] + "\n... truncated"
 
-            chunks.append(CodeChunk(
-                id=f"{relative_path}:{sym['name']}",
-                content=f"{sym['type'].title()}: {sym['name']}\n{symbol_content}",
-                chunk_type=ChunkType.METHOD_HEADER,
-                file_path=relative_path,
-                symbol_name=sym["name"],
-                symbol_type=sym["type"],
-                line_start=start_line,
-                line_end=end_line,
-                metadata={"language": language, "extraction": "regex"},
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=f"{relative_path}:{sym['name']}",
+                    content=f"{sym['type'].title()}: {sym['name']}\n{symbol_content}",
+                    chunk_type=ChunkType.METHOD_HEADER,
+                    file_path=relative_path,
+                    symbol_name=sym["name"],
+                    symbol_type=sym["type"],
+                    line_start=start_line,
+                    line_end=end_line,
+                    metadata={"language": language, "extraction": "regex"},
+                )
+            )
 
         return chunks
 
@@ -1479,15 +1496,17 @@ class TierAwareChunker:
         lines = content.split("\n")
 
         # File summary
-        chunks.append(CodeChunk(
-            id=f"{relative_path}:__file__",
-            content=f"Config File: {relative_path}\nFormat: {language}\nLines: {len(lines)}",
-            chunk_type=ChunkType.FILE_SUMMARY,
-            file_path=relative_path,
-            line_start=1,
-            line_end=len(lines),
-            metadata={"language": language, "config_type": language},
-        ))
+        chunks.append(
+            CodeChunk(
+                id=f"{relative_path}:__file__",
+                content=f"Config File: {relative_path}\nFormat: {language}\nLines: {len(lines)}",
+                chunk_type=ChunkType.FILE_SUMMARY,
+                file_path=relative_path,
+                line_start=1,
+                line_end=len(lines),
+                metadata={"language": language, "config_type": language},
+            )
+        )
 
         # For YAML/JSON/TOML - try to identify top-level sections
         if language in ("yaml", "json", "toml", "hocon"):
@@ -1496,19 +1515,23 @@ class TierAwareChunker:
             for section in sections:
                 section_content = section.get("content", "")
                 if len(section_content) > self._config.max_chunk_chars:
-                    section_content = section_content[:self._config.max_chunk_chars] + "\n# ... truncated"
+                    section_content = (
+                        section_content[: self._config.max_chunk_chars] + "\n# ... truncated"
+                    )
 
-                chunks.append(CodeChunk(
-                    id=f"{relative_path}:{section['name']}",
-                    content=f"Section: {section['name']}\n{section_content}",
-                    chunk_type=ChunkType.CLASS_SUMMARY,
-                    file_path=relative_path,
-                    symbol_name=section["name"],
-                    symbol_type="config_section",
-                    line_start=section.get("start_line", 1),
-                    line_end=section.get("end_line", len(lines)),
-                    metadata={"language": language},
-                ))
+                chunks.append(
+                    CodeChunk(
+                        id=f"{relative_path}:{section['name']}",
+                        content=f"Section: {section['name']}\n{section_content}",
+                        chunk_type=ChunkType.CLASS_SUMMARY,
+                        file_path=relative_path,
+                        symbol_name=section["name"],
+                        symbol_type="config_section",
+                        line_start=section.get("start_line", 1),
+                        line_end=section.get("end_line", len(lines)),
+                        metadata={"language": language},
+                    )
+                )
 
             if chunks:
                 return chunks
@@ -1516,9 +1539,7 @@ class TierAwareChunker:
         # Fallback: chunk by sections/blocks
         return self._chunk_with_overlap(file_path, relative_path, language, content)
 
-    def _extract_config_sections(
-        self, content: str, language: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_config_sections(self, content: str, language: str) -> List[Dict[str, Any]]:
         """Extract top-level sections from config files."""
         sections = []
         lines = content.split("\n")
@@ -1534,12 +1555,14 @@ class TierAwareChunker:
                 if line and not line[0].isspace() and ":" in line:
                     # Save previous section
                     if current_section:
-                        sections.append({
-                            "name": current_section,
-                            "content": "\n".join(section_lines),
-                            "start_line": section_start,
-                            "end_line": i,
-                        })
+                        sections.append(
+                            {
+                                "name": current_section,
+                                "content": "\n".join(section_lines),
+                                "start_line": section_start,
+                                "end_line": i,
+                            }
+                        )
 
                     current_section = line.split(":")[0].strip()
                     section_start = i + 1
@@ -1549,12 +1572,14 @@ class TierAwareChunker:
 
             # Save last section
             if current_section:
-                sections.append({
-                    "name": current_section,
-                    "content": "\n".join(section_lines),
-                    "start_line": section_start,
-                    "end_line": len(lines),
-                })
+                sections.append(
+                    {
+                        "name": current_section,
+                        "content": "\n".join(section_lines),
+                        "start_line": section_start,
+                        "end_line": len(lines),
+                    }
+                )
 
         elif language == "toml":
             # TOML sections [section]
@@ -1566,12 +1591,14 @@ class TierAwareChunker:
                 match = re.match(r"^\s*\[([^\]]+)\]", line)
                 if match:
                     if section_lines:
-                        sections.append({
-                            "name": current_section,
-                            "content": "\n".join(section_lines),
-                            "start_line": section_start,
-                            "end_line": i,
-                        })
+                        sections.append(
+                            {
+                                "name": current_section,
+                                "content": "\n".join(section_lines),
+                                "start_line": section_start,
+                                "end_line": i,
+                            }
+                        )
                     current_section = match.group(1)
                     section_start = i + 1
                     section_lines = [line]
@@ -1579,12 +1606,14 @@ class TierAwareChunker:
                     section_lines.append(line)
 
             if section_lines:
-                sections.append({
-                    "name": current_section,
-                    "content": "\n".join(section_lines),
-                    "start_line": section_start,
-                    "end_line": len(lines),
-                })
+                sections.append(
+                    {
+                        "name": current_section,
+                        "content": "\n".join(section_lines),
+                        "start_line": section_start,
+                        "end_line": len(lines),
+                    }
+                )
 
         return sections
 
@@ -1607,15 +1636,17 @@ class TierAwareChunker:
         lines = content.split("\n")
 
         # File summary (always created)
-        chunks.append(CodeChunk(
-            id=f"{relative_path}:__file__",
-            content=f"File: {relative_path}\nLanguage: {language}\nLines: {len(lines)}",
-            chunk_type=ChunkType.FILE_SUMMARY,
-            file_path=relative_path,
-            line_start=1,
-            line_end=len(lines),
-            metadata={"language": language, "chunking": "sliding_window"},
-        ))
+        chunks.append(
+            CodeChunk(
+                id=f"{relative_path}:__file__",
+                content=f"File: {relative_path}\nLanguage: {language}\nLines: {len(lines)}",
+                chunk_type=ChunkType.FILE_SUMMARY,
+                file_path=relative_path,
+                line_start=1,
+                line_end=len(lines),
+                metadata={"language": language, "chunking": "sliding_window"},
+            )
+        )
 
         # Skip empty content
         if not content.strip():

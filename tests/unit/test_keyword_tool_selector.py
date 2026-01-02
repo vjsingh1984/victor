@@ -58,11 +58,11 @@ class TestKeywordToolSelector:
     def tool_registry(self):
         """Create a tool registry with mock tools."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file", "Read a file from the filesystem"))
-        registry.register(MockTool("write_file", "Write content to a file"))
-        registry.register(MockTool("code_search", "Search code in the codebase"))
-        registry.register(MockTool("git_status", "Check git status"))
-        registry.register(MockTool("shell", "Run a shell command"))
+        registry.register_tool(MockTool("read_file", "Read a file from the filesystem"))
+        registry.register_tool(MockTool("write_file", "Write content to a file"))
+        registry.register_tool(MockTool("code_search", "Search code in the codebase"))
+        registry.register_tool(MockTool("git_status", "Check git status"))
+        registry.register_tool(MockTool("shell", "Run a shell command"))
         return registry
 
     @pytest.fixture
@@ -162,7 +162,7 @@ class TestKeywordToolSelector:
 
         # Add more tools to exceed the 10 limit
         for i in range(15):
-            tool_registry.register(MockTool(f"extra_tool_{i}", f"Extra tool {i}"))
+            tool_registry.register_tool(MockTool(f"extra_tool_{i}", f"Extra tool {i}"))
 
         # Return all extra tools as keyword matches
         mock_get_tools.return_value = {f"extra_tool_{i}" for i in range(15)}
@@ -210,9 +210,9 @@ class TestKeywordToolSelectorStageFiltering:
     def tool_registry(self):
         """Create a tool registry with mock tools."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file", "Read a file"))
-        registry.register(MockTool("write_file", "Write a file"))
-        registry.register(MockTool("code_search", "Search code"))
+        registry.register_tool(MockTool("read_file", "Read a file"))
+        registry.register_tool(MockTool("write_file", "Write a file"))
+        registry.register_tool(MockTool("code_search", "Search code"))
         return registry
 
     @pytest.fixture
@@ -322,7 +322,7 @@ class TestKeywordToolSelectorCaching:
     def tool_registry(self):
         """Create a tool registry with mock tools."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file", "Read a file"))
+        registry.register_tool(MockTool("read_file", "Read a file"))
         return registry
 
     def test_core_tools_cached(self, tool_registry):
@@ -369,7 +369,7 @@ class TestKeywordToolSelectorReadonlyCheck:
     def tool_registry(self):
         """Create a tool registry with mock tools."""
         registry = ToolRegistry()
-        registry.register(MockTool("read_file", "Read a file"))
+        registry.register_tool(MockTool("read_file", "Read a file"))
         return registry
 
     @pytest.fixture

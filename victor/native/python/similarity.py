@@ -72,9 +72,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
                 return self._cosine_numpy(a, b)
             return self._cosine_pure(a, b)
 
-    def batch_cosine(
-        self, query: List[float], corpus: List[List[float]]
-    ) -> List[float]:
+    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
         """Compute cosine similarity of query against corpus.
 
         Args:
@@ -169,9 +167,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
 
         return float(dot / (norm_a * norm_b))
 
-    def _batch_cosine_numpy(
-        self, query: List[float], corpus: List[List[float]]
-    ) -> List[float]:
+    def _batch_cosine_numpy(self, query: List[float], corpus: List[List[float]]) -> List[float]:
         """NumPy batch cosine similarity."""
         query_arr = np.array(query, dtype=np.float32)
         corpus_arr = np.array(corpus, dtype=np.float32)

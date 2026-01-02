@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
     from victor.evaluation.protocol import TokenUsage
+
     # Factory-created components (type hints only)
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.search_router import SearchRouter
@@ -120,7 +121,7 @@ from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
 from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
-from victor.agent.prompt_builder import get_task_type_hint
+from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType
 from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
@@ -144,13 +145,21 @@ from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
+
 # Recovery - enums and functions used at runtime
 from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.protocols import RecoveryHandlerProtocol
-from victor.agent.orchestrator_recovery import create_recovery_integration, RecoveryAction as OrchestratorRecoveryAction
-from victor.agent.tool_output_formatter import ToolOutputFormatterConfig, FormattingContext, create_tool_output_formatter
+from victor.agent.orchestrator_recovery import (
+    create_recovery_integration,
+    RecoveryAction as OrchestratorRecoveryAction,
+)
+from victor.agent.tool_output_formatter import (
+    ToolOutputFormatterConfig,
+    FormattingContext,
+    create_tool_output_formatter,
+)
 
 # Pipeline - configs and results used at runtime
 from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
@@ -168,7 +177,11 @@ from victor.agent.orchestrator_integration import IntegrationConfig
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.tool_calling import ToolCallParseResult
 from victor.agent.tool_executor import ValidationMode
-from victor.agent.orchestrator_utils import calculate_max_context_chars, infer_git_operation, get_tool_status_message
+from victor.agent.orchestrator_utils import (
+    calculate_max_context_chars,
+    infer_git_operation,
+    get_tool_status_message,
+)
 from victor.agent.orchestrator_factory import OrchestratorFactory
 from victor.agent.parallel_executor import create_parallel_executor
 from victor.agent.response_completer import ToolFailureContext, create_response_completer
@@ -643,9 +656,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # RLCoordinator: Framework-level RL with unified SQLite storage (via factory)
         self._rl_coordinator = self._factory.create_rl_coordinator()
 
+        # Get context pruning learner from RL coordinator (if available)
+        pruning_learner = None
+        if self._rl_coordinator is not None:
+            try:
+                pruning_learner = self._rl_coordinator.get_learner("context_pruning")
+            except Exception as e:
+                logger.debug(f"Could not get context_pruning learner: {e}")
+
         # ContextCompactor: Proactive context management and tool result truncation (via factory)
         self._context_compactor = self._factory.create_context_compactor(
-            conversation_controller=self._conversation_controller
+            conversation_controller=self._conversation_controller,
+            pruning_learner=pruning_learner,
         )
 
         # ToolOutputFormatter: LLM-context-aware formatting of tool results
@@ -2193,6 +2215,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "[AgentOrchestrator] ConversationEmbeddingStore configured. "
                 "Message embeddings will sync to LanceDB."
             )
+
+            # Set up semantic tool result cache using the embedding service
+            # This enables FAISS-based semantic caching with mtime invalidation
+            try:
+                from victor.agent.tool_result_cache import ToolResultCache
+
+                semantic_cache = ToolResultCache(
+                    embedding_service=embedding_service,
+                    max_entries=500,
+                    cleanup_interval=60.0,
+                )
+                # Wire semantic cache to tool pipeline
+                if self._tool_pipeline is not None:
+                    self._tool_pipeline.set_semantic_cache(semantic_cache)
+                    logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize semantic tool cache: {e}")
+
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
             self._conversation_embedding_store = None

@@ -83,15 +83,16 @@ class TestToolOutputFormatterConfig:
     """Tests for ToolOutputFormatterConfig dataclass."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+        """Test default configuration values (optimized for token efficiency)."""
         config = ToolOutputFormatterConfig()
-        assert config.max_output_chars == 15000
-        assert config.file_structure_threshold == 50000
+        # These values were reduced for token efficiency
+        assert config.max_output_chars == 8000  # Reduced from 15000
+        assert config.file_structure_threshold == 30000  # Reduced from 50000
         assert config.min_savings_threshold == 0.15
-        assert config.max_classes_shown == 20
-        assert config.max_functions_shown == 30
-        assert config.sample_lines_start == 30
-        assert config.sample_lines_end == 20
+        assert config.max_classes_shown == 15  # Reduced from 20
+        assert config.max_functions_shown == 20  # Reduced from 30
+        assert config.sample_lines_start == 20  # Reduced from 30
+        assert config.sample_lines_end == 15  # Reduced from 20
 
     def test_custom_values(self):
         """Test custom configuration values."""
@@ -130,10 +131,10 @@ class TestToolOutputFormatter:
     """Tests for ToolOutputFormatter class."""
 
     def test_init_default_config(self):
-        """Test initialization with default config."""
+        """Test initialization with default config (optimized for token efficiency)."""
         formatter = ToolOutputFormatter()
         assert formatter.config is not None
-        assert formatter.config.max_output_chars == 15000
+        assert formatter.config.max_output_chars == 8000  # Reduced from 15000
         assert formatter._truncator is None
 
     def test_init_custom_config(self):
@@ -210,9 +211,11 @@ def helper_function():
             args={"path": "/path/to/file.py"},
             output=large_content,
         )
-        assert "FILE IS VERY LARGE" in result
+        # Check for large file indicator (new format uses "LARGE FILE:")
+        assert "LARGE FILE:" in result or "FILE IS VERY LARGE" in result
         assert "FILE STRUCTURE" in result
-        assert "To see specific sections" in result
+        # Check for pagination hint (new format uses "HOW TO READ THIS FILE")
+        assert "HOW TO READ THIS FILE" in result or "To see specific sections" in result
 
     def test_format_list_directory(self):
         """Test formatting list_directory tool output."""
@@ -601,10 +604,10 @@ class TestFactoryFunctions:
     """Tests for factory functions."""
 
     def test_create_tool_output_formatter_default(self):
-        """Test factory function with defaults."""
+        """Test factory function with defaults (optimized for token efficiency)."""
         formatter = create_tool_output_formatter()
         assert isinstance(formatter, ToolOutputFormatter)
-        assert formatter.config.max_output_chars == 15000
+        assert formatter.config.max_output_chars == 8000  # Reduced from 15000
 
     def test_create_tool_output_formatter_with_config(self):
         """Test factory function with config."""

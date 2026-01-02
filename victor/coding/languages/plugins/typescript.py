@@ -94,8 +94,12 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             symbols=[
                 QueryPattern("class", "(class_declaration name: (identifier) @name) @def"),
                 QueryPattern("function", "(function_declaration name: (identifier) @name) @def"),
-                QueryPattern("function", "(method_signature name: (property_identifier) @name) @def"),
-                QueryPattern("function", "(method_definition name: (property_identifier) @name) @def"),
+                QueryPattern(
+                    "function", "(method_signature name: (property_identifier) @name) @def"
+                ),
+                QueryPattern(
+                    "function", "(method_definition name: (property_identifier) @name) @def"
+                ),
                 QueryPattern(
                     "function",
                     "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function))) @def",

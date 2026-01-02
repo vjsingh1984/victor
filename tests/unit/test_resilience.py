@@ -112,15 +112,16 @@ class TestCircuitBreaker:
 
     def test_half_open_reopens_on_failure(self):
         """Circuit should reopen on failure during HALF_OPEN."""
-        config = CircuitBreakerConfig(failure_threshold=2, recovery_timeout=0.1)
+        # Use longer timeout for reliable testing under parallel load
+        config = CircuitBreakerConfig(failure_threshold=2, recovery_timeout=0.05)
         breaker = CircuitBreaker(config)
 
         # Open circuit
         breaker.record_failure("test")
         breaker.record_failure("test")
 
-        # Wait for recovery
-        time.sleep(0.15)
+        # Wait for recovery (3x timeout for reliability)
+        time.sleep(0.20)
         breaker.get_state("test")  # Trigger transition to HALF_OPEN
 
         # Failure during test

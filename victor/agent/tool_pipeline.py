@@ -78,6 +78,7 @@ if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
     from victor.agent.middleware_chain import MiddlewareChain
+    from victor.agent.tool_result_cache import ToolResultCache
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,10 @@ class ToolPipelineConfig:
     enable_output_aggregation: bool = True
     enable_synthesis_checkpoints: bool = True
     synthesis_checkpoint_complexity: str = "medium"  # simple, medium, complex
+
+    # Semantic result caching with FAISS (mtime-based invalidation)
+    # Enables intelligent caching based on semantic similarity, reducing redundant tool calls
+    enable_semantic_caching: bool = True
 
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
@@ -372,6 +377,7 @@ class ToolPipeline:
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional["MiddlewareChain"] = None,
+        semantic_cache: Optional["ToolResultCache"] = None,
     ):
         """Initialize tool pipeline.
 
@@ -387,6 +393,7 @@ class ToolPipeline:
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
             middleware_chain: Optional middleware chain for processing tool calls
+            semantic_cache: Optional FAISS-based semantic cache for tool results
         """
         self.tools = tool_registry
         self.executor = tool_executor
@@ -397,6 +404,7 @@ class ToolPipeline:
         self.signature_store = signature_store
         self.deduplication_tracker = deduplication_tracker
         self.middleware_chain = middleware_chain
+        self.semantic_cache = semantic_cache
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -496,6 +504,21 @@ class ToolPipeline:
         # Reset output aggregator
         if self._output_aggregator:
             self._output_aggregator.reset()
+        # Clear semantic cache
+        if self.semantic_cache is not None:
+            self.semantic_cache.clear()
+
+    def set_semantic_cache(self, cache: "ToolResultCache") -> None:
+        """Set the semantic cache after initialization.
+
+        Useful when embedding service isn't available at construction time.
+
+        Args:
+            cache: ToolResultCache instance to use for semantic caching
+        """
+        self.semantic_cache = cache
+        self.config.enable_semantic_caching = cache is not None
+        logger.debug("Semantic cache set on tool pipeline")
 
     def is_valid_tool_name(self, name: str) -> bool:
         """Check if tool name is valid format.
@@ -779,13 +802,13 @@ class ToolPipeline:
 
         return len(to_remove)
 
-    def get_cache_stats(self) -> Dict[str, int]:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
 
         Returns:
-            Dict with cache_hits, cache_misses, cache_size, batch_dedup_count
+            Dict with idempotent cache stats and semantic cache stats
         """
-        return {
+        stats = {
             "cache_hits": self._cache_hits,
             "cache_misses": self._cache_misses,
             "cache_size": len(self._idempotent_cache),
@@ -796,6 +819,10 @@ class ToolPipeline:
             ),
             "batch_dedup_count": self._batch_dedup_count,
         }
+        # Include semantic cache stats if available
+        if self.semantic_cache is not None:
+            stats["semantic_cache"] = self.semantic_cache.get_stats()
+        return stats
 
     def _is_duplicate_read(self, file_path: str, max_age_seconds: float = 300.0) -> bool:
         """Check if file was recently read (within TTL window).
@@ -1248,6 +1275,37 @@ class ToolPipeline:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
 
+        # Check semantic cache (FAISS-based with mtime invalidation)
+        # This catches similar-but-not-identical queries that would return same results
+        if self.config.enable_semantic_caching and self.semantic_cache is not None:
+            try:
+                semantic_result = await self.semantic_cache.get(tool_name, normalized_args)
+                if semantic_result is not None:
+                    logger.info(f"[Pipeline] Semantic cache hit for {tool_name}")
+                    self._executed_tools.append(tool_name)
+                    # Build result from cached data
+                    sem_cached_result = ToolCallResult(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        success=True,
+                        result=semantic_result,
+                        cached=True,
+                        normalization_applied=normalization_applied,
+                    )
+                    if self.on_tool_start:
+                        try:
+                            self.on_tool_start(tool_name, normalized_args)
+                        except Exception as e:
+                            logger.warning(f"on_tool_start callback failed: {e}")
+                    if self.on_tool_complete:
+                        try:
+                            self.on_tool_complete(sem_cached_result)
+                        except Exception as e:
+                            logger.warning(f"on_tool_complete callback failed: {e}")
+                    return sem_cached_result
+            except Exception as e:
+                logger.debug(f"Semantic cache lookup failed: {e}")
+
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
         if tool_name.lower() in ("read", "read_file"):
@@ -1429,6 +1487,31 @@ class ToolPipeline:
         # Cache successful results for idempotent tools
         if call_result.success:
             self.cache_result(tool_name, normalized_args, call_result)
+
+            # Store in semantic cache (FAISS-based with mtime tracking)
+            if self.config.enable_semantic_caching and self.semantic_cache is not None:
+                try:
+                    # Get file path for mtime tracking
+                    file_path = normalized_args.get("path") or normalized_args.get("file_path")
+                    await self.semantic_cache.put(
+                        tool_name,
+                        normalized_args,
+                        call_result.result,
+                        file_path=file_path,
+                    )
+                except Exception as e:
+                    logger.debug(f"Semantic cache store failed: {e}")
+
+        # Invalidate caches when files are modified (write/edit tools)
+        if call_result.success and tool_name.lower() in ("write", "edit"):
+            file_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if file_path:
+                # Invalidate idempotent cache
+                self.invalidate_file_cache(file_path)
+                # Invalidate semantic cache
+                if self.semantic_cache is not None:
+                    self.semantic_cache.invalidate(file_path)
+                logger.debug(f"Invalidated caches for modified file: {file_path}")
 
         # Record successful tool call in deduplication tracker
         if call_result.success and self.deduplication_tracker is not None:

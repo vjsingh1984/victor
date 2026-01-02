@@ -2199,40 +2199,135 @@ def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
 # =============================================================================
 
 # Python stdlib modules for fallback lookup
-_PYTHON_STDLIB_MODULES = frozenset({
-    # Core builtins and language
-    "abc", "asyncio", "builtins", "collections", "contextlib", "copy",
-    "dataclasses", "enum", "functools", "gc", "inspect", "io", "itertools",
-    "operator", "sys", "types", "typing", "typing_extensions", "weakref",
-    # File/OS operations
-    "os", "pathlib", "shutil", "stat", "tempfile", "glob", "fnmatch",
-    # Data formats
-    "json", "csv", "xml", "html", "pickle", "base64", "codecs", "struct",
-    # Text processing
-    "re", "string", "textwrap", "unicodedata", "difflib",
-    # Date/Time
-    "datetime", "time", "calendar", "zoneinfo",
-    # Math/Numbers
-    "math", "decimal", "fractions", "random", "statistics", "cmath",
-    # Networking
-    "socket", "ssl", "http", "urllib", "email", "ftplib", "smtplib",
-    # Concurrent
-    "threading", "multiprocessing", "concurrent", "queue", "subprocess",
-    "signal", "selectors",
-    # Testing/Debug
-    "unittest", "doctest", "pdb", "traceback", "logging", "warnings",
-    # Crypto/Hashing
-    "hashlib", "hmac", "secrets",
-    # Archive/Compression
-    "zipfile", "tarfile", "gzip", "bz2", "lzma", "zlib",
-    # Other common stdlib
-    "argparse", "configparser", "getopt", "pprint", "shelve", "sqlite3",
-    "atexit", "sched", "heapq", "bisect", "array", "cProfile", "profile",
-    "timeit", "trace", "ast", "dis", "code", "codeop", "compileall",
-    "py_compile", "importlib", "pkgutil", "modulefinder", "runpy",
-    "venv", "site", "sysconfig", "platform", "ctypes", "mmap",
-    "uuid", "ipaddress", "locale", "gettext",
-})
+_PYTHON_STDLIB_MODULES = frozenset(
+    {
+        # Core builtins and language
+        "abc",
+        "asyncio",
+        "builtins",
+        "collections",
+        "contextlib",
+        "copy",
+        "dataclasses",
+        "enum",
+        "functools",
+        "gc",
+        "inspect",
+        "io",
+        "itertools",
+        "operator",
+        "sys",
+        "types",
+        "typing",
+        "typing_extensions",
+        "weakref",
+        # File/OS operations
+        "os",
+        "pathlib",
+        "shutil",
+        "stat",
+        "tempfile",
+        "glob",
+        "fnmatch",
+        # Data formats
+        "json",
+        "csv",
+        "xml",
+        "html",
+        "pickle",
+        "base64",
+        "codecs",
+        "struct",
+        # Text processing
+        "re",
+        "string",
+        "textwrap",
+        "unicodedata",
+        "difflib",
+        # Date/Time
+        "datetime",
+        "time",
+        "calendar",
+        "zoneinfo",
+        # Math/Numbers
+        "math",
+        "decimal",
+        "fractions",
+        "random",
+        "statistics",
+        "cmath",
+        # Networking
+        "socket",
+        "ssl",
+        "http",
+        "urllib",
+        "email",
+        "ftplib",
+        "smtplib",
+        # Concurrent
+        "threading",
+        "multiprocessing",
+        "concurrent",
+        "queue",
+        "subprocess",
+        "signal",
+        "selectors",
+        # Testing/Debug
+        "unittest",
+        "doctest",
+        "pdb",
+        "traceback",
+        "logging",
+        "warnings",
+        # Crypto/Hashing
+        "hashlib",
+        "hmac",
+        "secrets",
+        # Archive/Compression
+        "zipfile",
+        "tarfile",
+        "gzip",
+        "bz2",
+        "lzma",
+        "zlib",
+        # Other common stdlib
+        "argparse",
+        "configparser",
+        "getopt",
+        "pprint",
+        "shelve",
+        "sqlite3",
+        "atexit",
+        "sched",
+        "heapq",
+        "bisect",
+        "array",
+        "cProfile",
+        "profile",
+        "timeit",
+        "trace",
+        "ast",
+        "dis",
+        "code",
+        "codeop",
+        "compileall",
+        "py_compile",
+        "importlib",
+        "pkgutil",
+        "modulefinder",
+        "runpy",
+        "venv",
+        "site",
+        "sysconfig",
+        "platform",
+        "ctypes",
+        "mmap",
+        "uuid",
+        "ipaddress",
+        "locale",
+        "gettext",
+    }
+)
 
 
 def is_stdlib_module(module_name: str) -> bool:

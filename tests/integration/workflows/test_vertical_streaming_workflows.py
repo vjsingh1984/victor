@@ -162,8 +162,8 @@ class TestDevOpsWorkflowProviderStreaming:
         """Test provider has expected workflows available."""
         workflows = devops_provider.get_workflow_names()
         assert len(workflows) > 0
-        # Should have common devops workflows
-        assert "deploy_infrastructure" in workflows or "cicd_pipeline" in workflows
+        # Should have common devops workflows (deploy, cicd, container_*)
+        assert "deploy" in workflows or "cicd" in workflows
 
     def test_get_workflow_returns_valid_definition(self, devops_provider):
         """Test get_workflow returns valid workflow definitions."""

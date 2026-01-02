@@ -60,13 +60,16 @@ class TestCompactorConfig:
     """Tests for CompactorConfig."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+        """Test default configuration values match orchestrator_constants."""
+        from victor.config.orchestrator_constants import CONTEXT_LIMITS, COMPACTION_CONFIG
+
         config = CompactorConfig()
 
-        assert config.proactive_threshold == 0.90
-        assert config.min_messages_after_compact == 8
-        assert config.tool_result_max_chars == 8192
-        assert config.tool_result_max_lines == 230
+        # These now come from centralized orchestrator_constants
+        assert config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
+        assert config.min_messages_after_compact == COMPACTION_CONFIG.min_messages_after_compact
+        assert config.tool_result_max_chars == COMPACTION_CONFIG.tool_result_max_chars
+        assert config.tool_result_max_lines == COMPACTION_CONFIG.tool_result_max_lines
         assert config.truncation_strategy == TruncationStrategy.SMART
         assert config.preserve_code_blocks is True
         assert config.enable_proactive is True
@@ -119,10 +122,12 @@ class TestContextCompactorInit:
 
     def test_default_initialization(self, mock_controller):
         """Test default initialization."""
+        from victor.config.orchestrator_constants import CONTEXT_LIMITS
+
         compactor = ContextCompactor(mock_controller)
 
         assert compactor.controller is mock_controller
-        assert compactor.config.proactive_threshold == 0.90
+        assert compactor.config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
         assert compactor._compaction_count == 0
 
     def test_custom_config(self, mock_controller):

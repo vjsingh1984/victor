@@ -1123,7 +1123,7 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: Cloud models 1000 lines/32KB, local models 250 lines/8KB. Always ends on complete lines.",
+        "TRUNCATION: Cloud models 750 lines/25KB, local models 150 lines/6KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
@@ -1145,7 +1145,8 @@ async def read(
     """Read text/code file. Binary files rejected.
 
     TRUNCATION LIMITS:
-    - Maximum 1000 lines OR 32KB (whichever is reached first)
+    - Cloud models: Maximum 750 lines OR 25KB (whichever is reached first)
+    - Local models: Maximum 150 lines OR 6KB
     - Always truncates at complete line boundaries (never mid-line)
     - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
 
@@ -1157,7 +1158,7 @@ async def read(
     Args:
         path: File path
         offset: Start line (0=beginning). Use for pagination of large files.
-        limit: Max lines to read (0=auto, applies 512 line / 20KB limit).
+        limit: Max lines to read (0=auto, applies configured limits).
                Set explicit limit to override auto-truncation.
         search: Grep pattern - efficient for finding specific content
         ctx: Context lines around matches
@@ -1471,17 +1472,18 @@ async def read(
     from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
 
     # Determine truncation limits based on model context
-    # Cloud models (Anthropic, OpenAI, etc.): 1000 lines / 32KB
-    # Local models (Ollama, LMStudio, vLLM): 250 lines / 8KB (conservative for smaller context)
+    # Cloud models (Anthropic, OpenAI, etc.): 750 lines / 25KB (balanced for context efficiency)
+    # Local models (Ollama, LMStudio, vLLM): 150 lines / 6KB (conservative for smaller context)
     def _get_truncation_limits() -> tuple:
         """Get appropriate truncation limits based on current provider."""
         try:
             from victor.config.settings import get_settings
+
             settings = get_settings()
 
             # Check for airgapped mode or local providers
             if settings.airgapped_mode:
-                return 250, 8192  # 250 lines, 8KB for local models
+                return 150, 6144  # 150 lines, 6KB for local models
 
             # Check provider name for local indicators
             provider = getattr(settings, "provider", "").lower()
@@ -1490,6 +1492,7 @@ async def read(
                 # Try to get model context size from capabilities
                 try:
                     from victor.providers.model_capabilities import get_model_capabilities
+
                     model = getattr(settings, "model", "")
                     caps = get_model_capabilities(model)
                     context_window = caps.get("context_window", 0)
@@ -1498,18 +1501,18 @@ async def read(
                         # ~10% of context for read output is reasonable
                         max_tokens = context_window // 10
                         # Estimate ~4 chars per token, ~40 chars per line
-                        max_lines = min(1000, max(100, max_tokens // 10))
-                        max_bytes = min(32768, max(4096, max_tokens * 4))
+                        max_lines = min(300, max(50, max_tokens // 10))
+                        max_bytes = min(12288, max(2048, max_tokens * 4))
                         return max_lines, max_bytes
                 except Exception:
                     pass
-                return 250, 8192  # Fallback for local models
+                return 150, 6144  # Fallback for local models
 
-            # Cloud models get full limits
-            return 1000, 32768
+            # Cloud models get balanced limits
+            return 750, 25600  # 750 lines, 25KB
         except Exception:
             # Default to cloud limits if settings unavailable
-            return 1000, 32768
+            return 750, 25600
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
 

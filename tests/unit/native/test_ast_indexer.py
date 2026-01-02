@@ -80,7 +80,9 @@ class TestStdlibModuleDetection:
             "pytest",
         ]
         for module in third_party:
-            assert ast_indexer.is_stdlib_module(module) is True, f"{module} should be in allowed set"
+            assert (
+                ast_indexer.is_stdlib_module(module) is True
+            ), f"{module} should be in allowed set"
 
     def test_project_modules_not_stdlib(self, ast_indexer):
         """Test that project-specific modules are NOT detected as stdlib."""

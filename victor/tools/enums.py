@@ -258,3 +258,69 @@ class DangerLevel(Enum):
             DangerLevel.CRITICAL: "🚨 DANGER: This operation may cause irreversible changes!",
         }
         return messages[self]
+
+
+class SchemaLevel(str, Enum):
+    """Schema verbosity level for LLM broadcasting.
+
+    Controls how much detail is included in tool schemas sent to LLMs.
+    Using tiered schemas reduces token usage while maintaining functionality.
+
+    Schema Levels:
+        FULL: Complete description + all parameter details
+              Use for: Core tools, high-priority tools
+              Token cost: ~100-150 tokens per tool
+        COMPACT: Shortened description + all params with brief descriptions
+              Use for: Vertical-specific tools
+              Token cost: ~60-80 tokens per tool (~20% reduction from FULL)
+        STUB: Name + one-line description + required params only
+              Use for: Semantic pool tools, low-priority tools
+              Token cost: ~25-40 tokens per tool
+
+    Example:
+        # FULL schema for core tool
+        {"name": "read", "description": "Read text/code file. TRUNCATION: ...",
+         "parameters": {"path": {...}, "offset": {...}, "limit": {...}}}
+
+        # COMPACT schema for vertical tool
+        {"name": "git", "description": "Git version control operations.",
+         "parameters": {"operation": {...}, "args": {...}}}
+
+        # STUB schema for semantic pool
+        {"name": "jira", "description": "Create/query Jira issues.",
+         "parameters": {"action": {...}}}
+    """
+
+    FULL = "full"
+    COMPACT = "compact"
+    STUB = "stub"
+
+    @property
+    def is_verbose(self) -> bool:
+        """Check if this level includes full details."""
+        return self == SchemaLevel.FULL
+
+    @property
+    def max_description_chars(self) -> int:
+        """Maximum description length for this level."""
+        if self == SchemaLevel.FULL:
+            return 500
+        elif self == SchemaLevel.COMPACT:
+            return 150
+        else:
+            return 80
+
+    @property
+    def max_param_description_chars(self) -> int:
+        """Maximum parameter description length for this level."""
+        if self == SchemaLevel.FULL:
+            return 100
+        elif self == SchemaLevel.COMPACT:
+            return 50
+        else:
+            return 25
+
+    @property
+    def include_optional_params(self) -> bool:
+        """Whether to include optional parameters."""
+        return self in {SchemaLevel.FULL, SchemaLevel.COMPACT}
