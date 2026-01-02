@@ -2979,50 +2979,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_adapter = self._provider_manager.tool_adapter
             self.tool_calling_caps = self._provider_manager.capabilities
 
-            # Apply model-specific exploration settings to unified tracker
-            self.unified_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Get prompt contributors from vertical extensions
-            prompt_contributors = []
-            try:
-                from victor.core.verticals.protocols import VerticalExtensions
-
-                extensions = self._container.get_optional(VerticalExtensions)
-                if extensions and extensions.prompt_contributors:
-                    prompt_contributors = extensions.prompt_contributors
-            except ImportError:
-                logger.debug("VerticalExtensions module not available")
-            except AttributeError as e:
-                logger.warning(f"VerticalExtensions missing expected attributes: {e}")
-
-            # Reinitialize prompt builder
-            self.prompt_builder = SystemPromptBuilder(
-                provider_name=self.provider_name,
-                model=new_model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self.tool_calling_caps,
-                prompt_contributors=prompt_contributors,
-            )
-
-            # Rebuild system prompt with new adapter hints
-            base_system_prompt = self._build_system_prompt_with_adapter()
-            if self.project_context.content:
-                self._system_prompt = (
-                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-                )
-            else:
-                self._system_prompt = base_system_prompt
-
-            # Update tool budget based on new adapter's recommendation unless user override is sticky
-            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-            if sticky_budget:
-                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
-            else:
-                default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-                self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
+            self._apply_post_switch_hooks(respect_sticky_budget=True)
 
             # Log the switch
             logger.info(
@@ -3083,46 +3041,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_adapter = self._provider_manager.tool_adapter
             self.tool_calling_caps = self._provider_manager.capabilities
 
-            # Apply model-specific exploration settings to unified tracker
-            self.unified_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Get prompt contributors from vertical extensions
-            prompt_contributors = []
-            try:
-                from victor.core.verticals.protocols import VerticalExtensions
-
-                extensions = self._container.get_optional(VerticalExtensions)
-                if extensions and extensions.prompt_contributors:
-                    prompt_contributors = extensions.prompt_contributors
-            except ImportError:
-                logger.debug("VerticalExtensions module not available")
-            except AttributeError as e:
-                logger.warning(f"VerticalExtensions missing expected attributes: {e}")
-
-            # Reinitialize prompt builder
-            self.prompt_builder = SystemPromptBuilder(
-                provider_name=self.provider_name,
-                model=model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self.tool_calling_caps,
-                prompt_contributors=prompt_contributors,
-            )
-
-            # Rebuild system prompt
-            base_system_prompt = self._build_system_prompt_with_adapter()
-            if self.project_context.content:
-                self._system_prompt = (
-                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-                )
-            else:
-                self._system_prompt = base_system_prompt
-
-            # Update tool budget
-            default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
+            self._apply_post_switch_hooks()
 
             logger.info(
                 f"Switched model: {old_model} -> {model} "
@@ -3169,6 +3089,71 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         return info
+
+    def _apply_post_switch_hooks(self, respect_sticky_budget: bool = False) -> None:
+        """Apply post-switch hooks after provider/model switch.
+
+        Consolidates common post-switch logic used by both switch_provider()
+        and switch_model() methods:
+        - Apply model-specific exploration settings to unified tracker
+        - Reinitialize prompt builder with new capabilities
+        - Rebuild system prompt
+        - Update tool budget
+
+        Args:
+            respect_sticky_budget: If True, don't reset tool budget when user
+                override is sticky (used by switch_provider).
+
+        Note:
+            This method assumes self.model, self.provider_name, self.tool_adapter,
+            and self.tool_calling_caps are already updated before calling.
+        """
+        # Apply model-specific exploration settings to unified tracker
+        self.unified_tracker.set_model_exploration_settings(
+            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+            continuation_patience=self.tool_calling_caps.continuation_patience,
+        )
+
+        # Get prompt contributors from vertical extensions
+        prompt_contributors = []
+        try:
+            from victor.core.verticals.protocols import VerticalExtensions
+
+            extensions = self._container.get_optional(VerticalExtensions)
+            if extensions and extensions.prompt_contributors:
+                prompt_contributors = extensions.prompt_contributors
+        except ImportError:
+            logger.debug("VerticalExtensions module not available")
+        except AttributeError as e:
+            logger.warning(f"VerticalExtensions missing expected attributes: {e}")
+
+        # Reinitialize prompt builder
+        self.prompt_builder = SystemPromptBuilder(
+            provider_name=self.provider_name,
+            model=self.model,
+            tool_adapter=self.tool_adapter,
+            capabilities=self.tool_calling_caps,
+            prompt_contributors=prompt_contributors,
+        )
+
+        # Rebuild system prompt with new adapter hints
+        base_system_prompt = self._build_system_prompt_with_adapter()
+        if self.project_context.content:
+            self._system_prompt = (
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+        else:
+            self._system_prompt = base_system_prompt
+
+        # Update tool budget based on new adapter's recommendation
+        if respect_sticky_budget:
+            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+            if sticky_budget:
+                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
+                return
+
+        default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+        self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
