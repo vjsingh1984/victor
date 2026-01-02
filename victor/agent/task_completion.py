@@ -69,6 +69,8 @@ class TaskCompletionState:
     continuation_requests: int = 0
     # Default to MEDIUM complexity budget (5) - was 2 which caused premature termination
     max_continuation_requests: int = 5
+    # Active signal detection flag - set when explicit completion signal detected
+    active_signal_detected: bool = False
 
     @property
     def is_complete(self) -> bool:
@@ -128,6 +130,11 @@ class ITaskCompletionDetector(Protocol):
 class TaskCompletionDetector:
     """Detects when a task's objectives have been achieved.
 
+    This detector uses a priority-based approach:
+    1. ACTIVE SIGNALS (Priority 1): Explicit completion phrases instructed in system prompt
+    2. TOOL EVIDENCE (Priority 2): File modifications recorded from tool results
+    3. PASSIVE PHRASES (Priority 3): Fallback phrase detection for models that ignore instructions
+
     This detector analyzes:
     1. User intent to determine expected deliverables
     2. Tool results to track completed deliverables
@@ -143,7 +150,24 @@ class TaskCompletionDetector:
             print(detector.get_completion_summary())
     """
 
-    # Phrases indicating task completion
+    # Priority 1: Active signals - deterministic, instructed in system prompt
+    # These are checked first and if detected, immediately signal completion
+    # Using underscore-prefixed signals to avoid confusion with natural language
+    ACTIVE_SIGNALS: frozenset = frozenset(
+        {
+            "_task_done_",
+            "_done_",
+            "_summary_",
+            "_blocked_",
+            "_cannot_complete_",
+            # Also accept natural language variants for models that don't follow exactly
+            "task complete:",
+            "done:",
+            "summary:",
+        }
+    )
+
+    # Priority 3: Passive phrases indicating task completion (fallback)
     COMPLETION_PHRASES: frozenset = frozenset(
         {
             # File operations
@@ -173,6 +197,25 @@ class TaskCompletionDetector:
             "to summarize",
             "that covers",
             "this completes",
+            # Bug fix / SWE-bench completion phrases
+            "fix applied",
+            "fix has been applied",
+            "bug fixed",
+            "bug has been fixed",
+            "issue resolved",
+            "issue has been resolved",
+            "the fix is",
+            "i've fixed",
+            "i have fixed",
+            "successfully fixed",
+            "has been fixed",
+            "patch applied",
+            "change applied",
+            "modification complete",
+            "edit complete",
+            # Active completion signaling (instructed in system prompt)
+            "task complete:",
+            "task complete.",
         }
     )
 
@@ -197,10 +240,13 @@ class TaskCompletionDetector:
         {
             "write",
             "edit",
+            "edit_file",
             "create_file",
             "write_file",
             "save_file",
             "create",
+            "file_edit",
+            "modify_file",
         }
     )
 
@@ -313,18 +359,31 @@ class TaskCompletionDetector:
             logger.debug("Recorded code execution deliverable")
 
     def analyze_response(self, response_text: str) -> None:
-        """Detect completion signals in response text.
+        """Detect completion signals in response text with priority ordering.
+
+        Priority:
+        1. ACTIVE SIGNALS: Explicit completion signals instructed in system prompt
+        2. PASSIVE PHRASES: Fallback detection for models ignoring instructions
 
         Args:
             response_text: The agent's response text
         """
         response_lower = response_text.lower()
 
-        # Check for completion phrases
+        # Priority 1: Check active signals first (deterministic, instructed)
+        for signal in self.ACTIVE_SIGNALS:
+            if signal in response_lower:
+                self._state.completion_signals.add(f"active:{signal}")
+                self._state.active_signal_detected = True
+                logger.info(f"Active completion signal detected: {signal}")
+                # Active signal is definitive - skip passive detection
+                return
+
+        # Priority 3: Passive phrase detection (fallback)
         for phrase in self.COMPLETION_PHRASES:
             if phrase in response_lower:
-                self._state.completion_signals.add(phrase)
-                logger.debug(f"Detected completion signal: {phrase}")
+                self._state.completion_signals.add(f"passive:{phrase}")
+                logger.debug(f"Passive completion signal: {phrase}")
 
         # Check for continuation loop patterns
         for phrase in self.CONTINUATION_PHRASES:
@@ -366,10 +425,34 @@ class TaskCompletionDetector:
     def should_stop(self) -> bool:
         """Check if task objectives are met and agent should stop.
 
+        Uses priority-based completion detection:
+        1. ACTIVE SIGNAL: Explicit completion signal detected (deterministic)
+        2. FILE MODS + SIGNAL: File edits + any completion signal
+        3. FILE MODS + CONTINUATION: File edits + continuation requests
+        4. STANDARD: All expected deliverables met
+
         Returns:
             True if agent should stop, False otherwise
         """
+        # Priority 1: Active signal detected (deterministic, highest confidence)
+        if self._state.active_signal_detected:
+            logger.info("Stopping: Active completion signal detected")
+            return True
+
         is_complete = self._state.is_complete
+
+        # Priority 2: File modifications + signal (existing SWE-bench logic)
+        # For bug_fix tasks: if we've made file edits, that's a strong completion signal
+        # This handles SWE-bench style tasks where the agent edits but doesn't say "done"
+        if not is_complete and self._has_file_modifications():
+            # If we have file edits + any completion signal, we're done
+            if self._state.completion_signals:
+                is_complete = True
+                logger.info("Bug fix completion: file edits + completion signal detected")
+            # If we have file edits + 2+ continuation requests, likely done
+            elif self._state.continuation_requests >= 2:
+                is_complete = True
+                logger.info("Bug fix completion: file edits + continuation requests detected")
 
         if is_complete:
             logger.info(
@@ -379,6 +462,15 @@ class TaskCompletionDetector:
             )
 
         return is_complete
+
+    def _has_file_modifications(self) -> bool:
+        """Check if any file modification deliverables have been recorded.
+
+        Returns:
+            True if file edits/creations detected
+        """
+        file_types = {DeliverableType.FILE_CREATED, DeliverableType.FILE_MODIFIED}
+        return any(d.type in file_types for d in self._state.completed_deliverables)
 
     def get_completion_summary(self) -> str:
         """Generate summary of completed deliverables.

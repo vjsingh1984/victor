@@ -233,6 +233,10 @@ class ConversationStateMachine:
     # Confidence threshold for backward stage transitions
     BACKWARD_TRANSITION_THRESHOLD: float = 0.85
 
+    # Maximum reads without edit before forcing READING → EXECUTION transition
+    # Prevents infinite exploration in SWE-bench style bug fix tasks
+    MAX_READS_WITHOUT_EDIT: int = 7
+
     def __init__(
         self,
         hooks: Optional["StateHookManager"] = None,
@@ -424,6 +428,16 @@ class ConversationStateMachine:
 
     def _maybe_transition(self) -> None:
         """Check if we should transition to a new stage."""
+        # Force READING → EXECUTION if we've read too many files without editing
+        # This prevents infinite exploration in SWE-bench style bug fix tasks
+        if self._should_force_execution_transition():
+            logger.info(
+                f"Forcing READING→EXECUTION: {len(self.state.observed_files)} files read, "
+                f"{len(self.state.modified_files)} files modified"
+            )
+            self._transition_to(ConversationStage.EXECUTION, confidence=0.8)
+            return
+
         detected = self._detect_stage_from_tools()
         if detected and detected != self.state.stage:
             # Only transition if we have strong evidence
@@ -443,6 +457,37 @@ class ConversationStateMachine:
                 logger.debug(
                     f"_maybe_transition: Transition blocked - overlap {recent_overlap} < threshold {self.MIN_TOOLS_FOR_TRANSITION}"
                 )
+
+    def _should_force_execution_transition(self) -> bool:
+        """Check if we should force transition from READING to EXECUTION.
+
+        Conditions:
+        1. Current stage is READING (or ANALYSIS)
+        2. We've observed many files (> MAX_READS_WITHOUT_EDIT)
+        3. We haven't modified any files yet
+
+        This prevents the agent from getting stuck in endless exploration
+        for SWE-bench style bug fix tasks.
+
+        Returns:
+            True if we should force transition to EXECUTION
+        """
+        # Only force from READING or ANALYSIS stages
+        if self.state.stage not in {ConversationStage.READING, ConversationStage.ANALYSIS}:
+            return False
+
+        # Only force if we've read many files but haven't edited any
+        files_read = len(self.state.observed_files)
+        files_modified = len(self.state.modified_files)
+
+        if files_read >= self.MAX_READS_WITHOUT_EDIT and files_modified == 0:
+            logger.debug(
+                f"_should_force_execution: files_read={files_read} >= {self.MAX_READS_WITHOUT_EDIT}, "
+                f"files_modified={files_modified}"
+            )
+            return True
+
+        return False
 
     def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:
         """Transition to a new stage.

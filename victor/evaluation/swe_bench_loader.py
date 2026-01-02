@@ -168,7 +168,8 @@ class SWEBenchInstance:
             category=self._get_category(),
             tags=self._get_tags(),
             timeout_seconds=900,  # SWE-bench tasks need more time (15 min)
-            complexity_override="action",  # SWE-bench = multi-step issue resolution
+            # complexity_override removed - classifier now detects GitHub issue format
+            # and automatically promotes to ACTION complexity (budget=50, timeout=600s)
         )
 
     def _estimate_difficulty(self) -> str:
