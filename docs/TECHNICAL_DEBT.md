@@ -38,20 +38,24 @@ def supports_tools(self) -> bool:
 
 ## P1 - High Priority
 
-### TD-002: God Class - AgentOrchestrator
+### TD-002: God Class - AgentOrchestrator ⏳ IN PROGRESS
 
 **File**: `victor/agent/orchestrator.py`
-**Metrics**: 7,948 lines, 197 methods
+**Metrics**: ~7,600 lines, 197 methods (was 7,948 lines)
 **Issue**: Single Responsibility Principle violation - handles 8+ distinct responsibilities
 
-**Responsibilities to Extract**:
+**Progress** (2026-01-02):
+- ✅ `_determine_continuation_action` - 337 lines removed (was dead code, delegates to ContinuationStrategy)
+- Already extracted: ConversationController, ToolPipeline, StreamingController, ContinuationStrategy
+
+**Remaining Responsibilities to Extract**:
 1. `ConversationManager` - Conversation state, history, memory
 2. `ToolExecutionController` - Tool selection, execution, result handling
 3. `ProviderCoordinator` - Provider selection, failover, rate limiting
 4. `StreamingManager` - Stream handling, chunk processing
 5. `SessionStateManager` - State machine, session lifecycle
 
-**Effort**: High (2-3 sprints)
+**Effort**: High (2-3 sprints remaining)
 **Risk**: High - central component, needs careful refactoring
 
 ### TD-003: Factory Bloat - OrchestratorFactory
@@ -203,6 +207,7 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-008 | BaseProvider ISP Protocol classes | 2026-01-02 | 9d2854f |
 | TD-009 | Tool Calling Adapter Tests (31 new) | 2026-01-02 | 9d2854f |
 | TD-010 | Embedding Cache Project Isolation | 2026-01-02 | pending |
+| TD-002 | God Class - ContinuationDecisionEngine extraction (313 lines) | 2026-01-02 | c93e63f |
 
 ---
 
