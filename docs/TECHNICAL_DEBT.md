@@ -124,27 +124,24 @@ except Exception as e:
 
 **Effort**: Low per adapter, High total (1 day each)
 
-### TD-006: Stubbed Features
+### TD-006: Stubbed Features ✅ RESOLVED
 
 **Issue**: Features claimed in documentation but not implemented
+**Resolution**: Marked as "Experimental (Not Yet Implemented)" in `docs/guides/GRAPH_BACKENDS.md`
 
 | Feature | Location | Status |
 |---------|----------|--------|
-| Parallel workflow execution | `victor/workflows/executor.py:400+` | TODO stub |
-| LanceDB graph backend | `victor/coding/codebase/graph/lancedb_store.py:42` | TODO stub |
-| Neo4j graph backend | `victor/coding/codebase/graph/neo4j_store.py:19` | TODO stub |
+| LanceDB graph backend | `victor/coding/codebase/graph/lancedb_store.py` | Documented as experimental |
+| Neo4j graph backend | `victor/coding/codebase/graph/neo4j_store.py` | Documented as experimental |
 
-**Options**:
-1. Implement the features
-2. Remove from documentation until implemented
-3. Mark as "experimental" in docs
+Note: "Parallel workflow execution" was incorrectly flagged - the executor supports parallel node execution via `parallel` node type in YAML workflows.
 
-### TD-007: Tool Catalog Incomplete
+### TD-007: Tool Catalog Incomplete ✅ RESOLVED
 
 **Issue**: `TOOL_CATALOG.md` documents 45 tools, but registry has 55
-**Impact**: Users don't discover all available tools
+**Resolution**: Regenerated tool catalog with all 55 tools
 
-**Fix**: Run `python scripts/generate_tool_catalog.py` and verify output
+**Fix Applied**: `python scripts/generate_tool_catalog.py`
 
 ---
 
@@ -201,23 +198,26 @@ class ToolCallingProvider(Protocol):
 |----|-------------|----------|-----|
 | TD-001 | LSP Violation in LMStudio Provider | 2026-01-02 | 2ce4e4d |
 | TD-004 | Generic Exception Catches (partial: 6 critical fixes) | 2026-01-02 | ee6cd5e, f82f1be |
+| TD-005 | Missing Tool Calling Adapters (DeepSeek) | 2026-01-02 | a32d031 |
+| TD-006 | Stubbed Features (documented as experimental) | 2026-01-02 | - |
+| TD-007 | Tool Catalog Incomplete | 2026-01-02 | 59fa014 |
 
 ---
 
 ## Metrics Dashboard
 
 ```
-Total Debt Items: 9
+Total Debt Items: 7
 ├── P0 (Critical): 0
 ├── P1 (High): 3 (TD-004 partially resolved)
-├── P2 (Medium): 3
+├── P2 (Medium): 1 (TD-005 partially resolved)
 └── P3 (Low): 3
 
-Code Quality Score: 7.0/10
+Code Quality Score: 7.5/10
 ├── SOLID Compliance: 8/10 (LSP violation fixed)
 ├── Error Handling: 6/10 (critical catches fixed)
 ├── Test Coverage: 7/10
-└── Documentation Accuracy: 8/10 (after fixes)
+└── Documentation Accuracy: 9/10 (catalog + stubs documented)
 ```
 
 ---
