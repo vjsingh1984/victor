@@ -22,6 +22,11 @@ Design Principles:
 - Prompt hints are handled by enrichment/strategies/complexity_hints.py
 - Framework-level service usable by all verticals
 
+SOLID Compliance (Phase 2 Refactoring):
+- Uses TASK_TYPE_TO_COMPLEXITY from victor.classification (Single Source of Truth)
+- Optionally uses PatternMatcher for fast pattern-based classification
+- Reduces pattern duplication with classification module
+
 Usage:
     from victor.framework.task import TaskComplexityService, TaskComplexity
 
@@ -35,9 +40,16 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
+
+# Import TASK_TYPE_TO_COMPLEXITY from classification module (Single Source of Truth)
+from victor.classification import (
+    TASK_TYPE_TO_COMPLEXITY as CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY,
+    TaskType,
+    get_pattern_matcher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +102,15 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\braise[sd]?\s+\w*Error\b", 0.9, "raises_error"),
         (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\b", 1.0, "fix_bug"),
         (r"\b(bug|issue)\s*(report|#\d+)?\s*:", 0.9, "bug_report"),
+        # SWE-bench narrative patterns (GitHub issue style)
+        (r"\bthe\s+issue\s+is\s+(that\s+)?", 1.0, "swe_issue_narrative"),
+        (r"\bwhen\s+\w+.+\s+(fails?|breaks?|raises?|throws?)\b", 0.95, "swe_when_fails"),
+        (r"\b(test|tests?)\s+(fails?|failing|broken)\b", 1.0, "swe_test_fails"),
+        (r"\bTraceback\b|\bAttributeError\b|\bTypeError\b|\bValueError\b", 1.0, "swe_traceback"),
+        (r"\bexpected\s+.+\s+but\s+(got|received|returns?)\b", 0.95, "swe_expected_but"),
+        (r"\bdoes\s+not\s+(work|function|import|load|return)\b", 0.95, "swe_does_not"),
+        (r"\b(import|importing)\s+.+\s+(fails?|error)\b", 0.95, "swe_import_fails"),
+        (r"\bmodule\s+.+\s+(not\s+found|missing|unavailable)\b", 0.95, "swe_module_missing"),
     ],
     TaskComplexity.GENERATION: [
         (
@@ -116,6 +137,10 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\bpytest\b|\bnpm\s+test\b|\bcargo\s+test\b", 1.0, "test_command"),
         (r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b", 0.9, "build_deploy"),
         (r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b", 1.0, "web_search_action"),
+        # SWE-bench / GitHub issue format (multi-step issue resolution)
+        (r"###\s*(Description|Expected\s+behavior|Actual\s+behavior|Steps)", 1.0, "github_issue_format"),
+        (r"\bSteps\s+to\s+Reproduce\b", 1.0, "steps_to_reproduce"),
+        (r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b", 0.95, "issue_request"),
     ],
     TaskComplexity.ANALYSIS: [
         (
@@ -205,7 +230,9 @@ DEFAULT_BUDGETS: Dict[TaskComplexity, int] = {
     complexity: budget.tool_budget for complexity, budget in COMPLEXITY_BUDGETS.items()
 }
 
-# Mapping from task type strings to complexity levels
+# LEGACY: String-based mapping for backwards compatibility
+# Prefer using CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from victor.classification
+# which uses TaskType enum keys directly (Single Source of Truth)
 TASK_TYPE_TO_COMPLEXITY: Dict[str, TaskComplexity] = {
     # Core task types
     "edit": TaskComplexity.MEDIUM,
@@ -217,6 +244,9 @@ TASK_TYPE_TO_COMPLEXITY: Dict[str, TaskComplexity] = {
     "general": TaskComplexity.MEDIUM,
     "action": TaskComplexity.ACTION,
     "analysis_deep": TaskComplexity.COMPLEX,
+    # Bug fix / issue resolution (SWE-bench style)
+    "bug_fix": TaskComplexity.ACTION,
+    "issue_resolution": TaskComplexity.ACTION,
     # Research vertical task types
     "literature_review": TaskComplexity.COMPLEX,
     "trend_research": TaskComplexity.COMPLEX,
@@ -318,6 +348,30 @@ class TaskComplexityService:
                 )
             except re.error as e:
                 logger.warning(f"Invalid pattern '{pattern_str}': {e}")
+
+    def _classify_fast(self, message: str) -> Optional[TaskClassification]:
+        """Fast classification using PatternMatcher from classification module.
+
+        Uses the unified pattern registry for quick pattern-based classification.
+        Falls back to None if no high-confidence match is found.
+        """
+        try:
+            matcher = get_pattern_matcher()
+            pattern = matcher.match(message)
+            if pattern and pattern.confidence >= 0.9:
+                # Map TaskType to TaskComplexity using classification module's mapping
+                complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
+                    pattern.task_type, TaskComplexity.MEDIUM
+                )
+                return TaskClassification(
+                    complexity=complexity,
+                    tool_budget=self.budgets[complexity],
+                    confidence=pattern.confidence,
+                    matched_patterns=[f"fast:{pattern.name}"],
+                )
+        except Exception as e:
+            logger.debug(f"Fast classification failed: {e}")
+        return None
 
     def _get_semantic_classifier(self):
         """Lazy-load the semantic classifier."""
@@ -428,7 +482,11 @@ class TaskComplexityService:
 
         try:
             result = classifier.classify_sync(message)
-            complexity = TASK_TYPE_TO_COMPLEXITY.get(result.task_type.value, TaskComplexity.MEDIUM)
+            # Use CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from classification module
+            # This uses TaskType enum keys directly (Single Source of Truth)
+            complexity = CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY.get(
+                result.task_type, TaskComplexity.MEDIUM
+            )
             if result.confidence >= self.semantic_threshold:
                 return TaskClassification(
                     complexity=complexity,

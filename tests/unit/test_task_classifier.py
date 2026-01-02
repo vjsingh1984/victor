@@ -72,23 +72,25 @@ class TestTaskClassifierMedium:
         assert result.complexity == TaskComplexity.MEDIUM
         assert result.tool_budget == 15
 
-    def test_find_classes_medium(self):
-        """Test that 'find classes' is classified as MEDIUM."""
+    def test_find_classes_simple(self):
+        """Test that 'find classes' is classified as SIMPLE (search task)."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Find all classes that inherit from BaseTool")
 
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Search tasks are now correctly classified as SIMPLE
+        assert result.complexity == TaskComplexity.SIMPLE
 
-    def test_where_is_medium(self):
-        """Test that 'where is' is classified as MEDIUM."""
+    def test_where_is_simple(self):
+        """Test that 'where is' is classified as SIMPLE (search task)."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Where is the error handling implemented?")
 
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Search/location tasks are now correctly classified as SIMPLE
+        assert result.complexity == TaskComplexity.SIMPLE
 
     def test_how_does_work_medium(self):
         """Test that 'how does X work' is classified as MEDIUM."""
@@ -298,8 +300,9 @@ class TestEdgeCases:
         classifier = ComplexityClassifier()
         result = classifier.classify("")
 
-        # Should default to MEDIUM
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Empty messages default to SIMPLE (fallback semantic classification)
+        # since there's no pattern match or clear task type
+        assert result.complexity == TaskComplexity.SIMPLE
 
     def test_unrecognized_message(self):
         """Test classification of unrecognized message."""
