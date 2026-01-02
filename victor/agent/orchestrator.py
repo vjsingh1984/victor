@@ -480,6 +480,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
             ),
         )
+
+        # Session cost tracking (for LLM API cost monitoring)
+        from victor.agent.session_cost_tracker import SessionCostTracker
+
+        self._session_cost_tracker = SessionCostTracker(
+            provider=self.provider.name,
+            model=self.model,
+        )
+
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
         # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
@@ -2247,9 +2256,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Record the time of first token received."""
         self._metrics_collector.record_first_token()
 
-    def _finalize_stream_metrics(self) -> Optional[StreamMetrics]:
-        """Finalize stream metrics at end of streaming session."""
-        return self._metrics_collector.finalize_stream_metrics()
+    def _finalize_stream_metrics(
+        self, usage_data: Optional[Dict[str, int]] = None
+    ) -> Optional[StreamMetrics]:
+        """Finalize stream metrics at end of streaming session.
+
+        Args:
+            usage_data: Optional cumulative token usage from provider API.
+                       When provided, enables accurate token counts.
+        """
+        metrics = self._metrics_collector.finalize_stream_metrics(usage_data)
+
+        # Record to session cost tracker for cumulative tracking
+        if metrics and hasattr(self, "_session_cost_tracker"):
+            self._session_cost_tracker.record_request(
+                prompt_tokens=metrics.prompt_tokens,
+                completion_tokens=metrics.completion_tokens,
+                cache_read_tokens=metrics.cache_read_tokens,
+                cache_write_tokens=metrics.cache_write_tokens,
+                duration_seconds=metrics.total_duration,
+                tool_calls=metrics.tool_calls_count,
+            )
+
+        return metrics
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
@@ -2277,6 +2306,44 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             List of recent metrics dictionaries
         """
         return self._metrics_collector.get_streaming_metrics_history(limit)
+
+    def get_session_cost_summary(self) -> Dict[str, Any]:
+        """Get session cost summary.
+
+        Returns:
+            Dictionary with session cost statistics
+        """
+        if hasattr(self, "_session_cost_tracker"):
+            return self._session_cost_tracker.get_summary()
+        return {}
+
+    def get_session_cost_formatted(self) -> str:
+        """Get formatted session cost string.
+
+        Returns:
+            Cost string like "$0.0123" or "cost n/a"
+        """
+        if hasattr(self, "_session_cost_tracker"):
+            return self._session_cost_tracker.format_inline_cost()
+        return "cost n/a"
+
+    def export_session_costs(self, path: str, format: str = "json") -> None:
+        """Export session costs to file.
+
+        Args:
+            path: Output file path
+            format: Export format ("json" or "csv")
+        """
+        from pathlib import Path
+
+        if not hasattr(self, "_session_cost_tracker"):
+            return
+
+        output_path = Path(path)
+        if format == "csv":
+            self._session_cost_tracker.export_csv(output_path)
+        else:
+            self._session_cost_tracker.export_json(output_path)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -6469,10 +6536,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                                             sanitized
                                         )
 
-                                # Display metrics and exit
-                                elapsed_time = time.time() - stream_ctx.start_time
+                                # Finalize and display metrics, then exit
+                                final_metrics = self._finalize_stream_metrics(
+                                    stream_ctx.cumulative_usage
+                                )
+                                elapsed_time = (
+                                    final_metrics.total_duration
+                                    if final_metrics
+                                    else time.time() - stream_ctx.start_time
+                                )
+                                # Include cost if show_cost_metrics is enabled
+                                cost_str = None
+                                if self.settings.show_cost_metrics and final_metrics:
+                                    cost_str = final_metrics.format_cost()
                                 metrics_line = self._chunk_generator.format_completion_metrics(
-                                    stream_ctx, elapsed_time
+                                    stream_ctx, elapsed_time, cost_str
                                 )
                                 yield self._chunk_generator.generate_metrics_chunk(metrics_line)
                                 yield self._chunk_generator.generate_final_marker_chunk()
@@ -6528,10 +6606,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
 
-                        # Display performance metrics using handler delegation
-                        elapsed_time = time.time() - stream_ctx.start_time
+                        # Finalize and display performance metrics using handler delegation
+                        # Pass cumulative_usage for accurate token counts from provider API
+                        final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
+                        elapsed_time = (
+                            final_metrics.total_duration
+                            if final_metrics
+                            else time.time() - stream_ctx.start_time
+                        )
+                        # Include cost if show_cost_metrics is enabled
+                        cost_str = None
+                        if self.settings.show_cost_metrics and final_metrics:
+                            cost_str = final_metrics.format_cost()
                         metrics_line = self._chunk_generator.format_completion_metrics(
-                            stream_ctx, elapsed_time
+                            stream_ctx, elapsed_time, cost_str
                         )
                         yield self._chunk_generator.generate_metrics_chunk(metrics_line)
                         # Record outcome for Q-learning (normal completion = success)
@@ -6590,15 +6678,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         yield self._chunk_generator.generate_budget_error_chunk()
 
                     # Finalize and display performance metrics using handler delegation
-                    final_metrics = self._finalize_stream_metrics()
+                    # Pass cumulative_usage for accurate token counts from provider API
+                    final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
                     elapsed_time = (
                         final_metrics.total_duration
                         if final_metrics
                         else time.time() - stream_ctx.start_time
                     )
                     ttft = final_metrics.time_to_first_token if final_metrics else None
+                    # Include cost if show_cost_metrics is enabled
+                    cost_str = None
+                    if self.settings.show_cost_metrics and final_metrics:
+                        cost_str = final_metrics.format_cost()
                     metrics_line = self._chunk_generator.format_budget_exhausted_metrics(
-                        stream_ctx, elapsed_time, ttft
+                        stream_ctx, elapsed_time, ttft, cost_str
                     )
                     # Record outcome for Q-learning (budget reached = partial success)
                     self._record_intelligent_outcome(
