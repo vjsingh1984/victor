@@ -15,9 +15,18 @@
 """Tests for YAMLToStateGraphCompiler."""
 
 import asyncio
+import logging
 import pytest
 from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
+
+
+@pytest.fixture(autouse=True)
+def suppress_compiler_logging(caplog):
+    """Suppress expected warnings during edge-case tests."""
+    # Set workflow compiler logging to ERROR to reduce noise
+    # from intentional edge-case testing (no orchestrator, unknown branch, etc.)
+    logging.getLogger("victor.workflows.yaml_to_graph_compiler").setLevel(logging.CRITICAL)
 
 from victor.workflows.definition import (
     AgentNode,
