@@ -87,6 +87,13 @@ class TaskType(Enum):
     TECHNICAL_RESEARCH = "technical_research"
     GENERAL_QUERY = "general_query"
 
+    # Implementation task types
+    IMPLEMENT = "implement"
+    SECURITY = "security"
+    ARCHITECTURE = "architecture"
+    PLAN = "plan"
+    EXPLAIN = "explain"
+
 
 @dataclass(frozen=True)
 class ClassificationPattern:
@@ -176,6 +183,13 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
     TaskType.TREND_RESEARCH: TaskComplexity.ANALYSIS,
     TaskType.TECHNICAL_RESEARCH: TaskComplexity.ANALYSIS,
     TaskType.GENERAL_QUERY: TaskComplexity.MEDIUM,
+
+    # Implementation tasks
+    TaskType.IMPLEMENT: TaskComplexity.COMPLEX,
+    TaskType.SECURITY: TaskComplexity.ACTION,
+    TaskType.ARCHITECTURE: TaskComplexity.COMPLEX,
+    TaskType.PLAN: TaskComplexity.MEDIUM,
+    TaskType.EXPLAIN: TaskComplexity.SIMPLE,
 }
 
 
@@ -760,6 +774,230 @@ def _register_patterns():
             complexity=TaskComplexity.ANALYSIS,
             confidence=1.0,
             override=True,
+            priority=85,
+        ),
+
+        # =================================================================
+        # Additional SWE-bench style patterns
+        # =================================================================
+        ClassificationPattern(
+            name="memory_leak",
+            regex=r"\b(memory\s+leak|OOM|out\s+of\s+memory|memory\s+usage\s+grows)\b",
+            semantic_intent="memory leak OOM out of memory grows",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=1.0,
+            override=True,
+            priority=95,
+        ),
+        ClassificationPattern(
+            name="bug_prefix",
+            regex=r"(?m)^BUG:\s+",  # Multiline mode for ^ to match line start
+            semantic_intent="BUG bug fix issue",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=1.0,
+            override=True,
+            priority=100,
+        ),
+        ClassificationPattern(
+            name="null_pointer",
+            regex=r"\b(null\s*pointer|NullPointerException|None\s+type|NoneType|AttributeError:\s+.*None)\b",
+            semantic_intent="null pointer exception none type error",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=1.0,
+            override=True,
+            priority=95,
+        ),
+        ClassificationPattern(
+            name="encoding_unicode_error",
+            regex=r"\b(UnicodeDecodeError|UnicodeEncodeError|encoding\s+bug|encode|decode)\b",
+            semantic_intent="unicode encoding decode error",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=0.95,
+            override=False,
+            priority=90,
+        ),
+
+        # =================================================================
+        # Security / Vulnerability patterns
+        # =================================================================
+        ClassificationPattern(
+            name="security_vulnerability",
+            regex=r"\b(security\s+vulnerability|CVE-|critical\s+security|vulnerability\s+found)\b",
+            semantic_intent="security vulnerability CVE critical",
+            task_type=TaskType.SECURITY,
+            complexity=TaskComplexity.ACTION,
+            confidence=1.0,
+            override=True,
+            priority=100,
+        ),
+        ClassificationPattern(
+            name="fix_vulnerability",
+            regex=r"\b(fix|patch|resolve)\s+(the\s+)?(vulnerability|security\s+issue|injection)\b",
+            semantic_intent="fix patch vulnerability security",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=1.0,
+            override=True,
+            priority=95,
+        ),
+
+        # =================================================================
+        # Implementation / Feature patterns
+        # =================================================================
+        ClassificationPattern(
+            name="add_endpoint",
+            regex=r"\b(add|create|implement)\s+(a\s+)?(new\s+)?(API|REST|endpoint|route)\b",
+            semantic_intent="add create API REST endpoint route",
+            task_type=TaskType.IMPLEMENT,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.95,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="add_validation",
+            regex=r"\b(add|implement|create)\s+(input\s+)?validation\b",
+            semantic_intent="add implement input validation",
+            task_type=TaskType.IMPLEMENT,
+            complexity=TaskComplexity.MEDIUM,
+            confidence=0.9,
+            override=False,
+            priority=75,
+        ),
+        ClassificationPattern(
+            name="extend_implementation",
+            regex=r"\b(extend|enhance|expand)\s+(the\s+)?(current|existing)?\s*(implementation|fix|code)\b",
+            semantic_intent="extend enhance expand implementation",
+            task_type=TaskType.EDIT,
+            complexity=TaskComplexity.MEDIUM,
+            confidence=0.9,
+            override=False,
+            priority=75,
+        ),
+
+        # =================================================================
+        # Architecture / Migration patterns
+        # =================================================================
+        ClassificationPattern(
+            name="migrate_architecture",
+            regex=r"\b(migrate|migration)\s+(from|to)\s+\w+\b",
+            semantic_intent="migrate migration architecture",
+            task_type=TaskType.ARCHITECTURE,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.95,
+            override=False,
+            priority=85,
+        ),
+        ClassificationPattern(
+            name="microservices_pattern",
+            regex=r"\b(microservice|monolith|service\s+boundaries)\b",
+            semantic_intent="microservices monolith architecture",
+            task_type=TaskType.ARCHITECTURE,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.9,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="create_migration_plan",
+            regex=r"\b(create|make)\s+(a\s+)?(migration|rollout|phased)\s+plan\b",
+            semantic_intent="create migration rollout plan",
+            task_type=TaskType.PLAN,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.95,
+            override=False,
+            priority=80,
+        ),
+
+        # =================================================================
+        # Performance / Investigation patterns
+        # =================================================================
+        ClassificationPattern(
+            name="performance_investigation",
+            regex=r"\b(performance|profil|bottleneck|slow|degrad|latency)\b.*\b(investigat|analyz|identif|review)\b",
+            semantic_intent="performance profile bottleneck investigate",
+            task_type=TaskType.DEBUG,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.9,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="investigate_issue",
+            regex=r"\b(investigate|investigation)\s+(the\s+)?(issue|problem|error|root\s+cause)\b",
+            semantic_intent="investigate issue problem root cause",
+            task_type=TaskType.DEBUG,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.9,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="investigation_needed",
+            regex=r"\b(investigation\s+needed|needs?\s+investigation)\b",
+            semantic_intent="investigation needed required",
+            task_type=TaskType.DEBUG,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.9,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="performance_degraded",
+            regex=r"\b(response\s+times?\s+degraded|performance\s+degraded|slow\s+after)\b",
+            semantic_intent="performance degraded slow response",
+            task_type=TaskType.DEBUG,
+            complexity=TaskComplexity.COMPLEX,
+            confidence=0.9,
+            override=False,
+            priority=80,
+        ),
+        ClassificationPattern(
+            name="clarification_question",
+            regex=r"\b(i'm\s+confused|can\s+you\s+(show|explain)|how\s+does.*work|what\s+happens)\b",
+            semantic_intent="confused clarification explain show",
+            task_type=TaskType.ANALYZE,
+            complexity=TaskComplexity.MEDIUM,
+            confidence=0.8,
+            override=False,
+            priority=75,
+        ),
+
+        # =================================================================
+        # Check / Analyze patterns (ambiguous)
+        # =================================================================
+        ClassificationPattern(
+            name="check_config",
+            regex=r"\b(check|verify|look\s+at)\s+(the\s+)?(config|settings|configuration)\b",
+            semantic_intent="check verify config settings",
+            task_type=TaskType.ANALYZE,
+            complexity=TaskComplexity.SIMPLE,
+            confidence=0.8,
+            override=False,
+            priority=70,
+        ),
+        ClassificationPattern(
+            name="fix_any_issues",
+            regex=r"\b(fix|address|correct)\s+(any|all)?\s*(issues?|problems?)\s+(you\s+)?find\b",
+            semantic_intent="fix any issues problems find",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=0.9,
+            override=False,
+            priority=85,
+        ),
+        ClassificationPattern(
+            name="look_at_and_fix",
+            regex=r"\b(look\s+at|examine)\s+.*?\s+and\s+(fix|address|correct)\b",
+            semantic_intent="look at examine fix address",
+            task_type=TaskType.BUG_FIX,
+            complexity=TaskComplexity.ACTION,
+            confidence=0.9,
+            override=False,
             priority=85,
         ),
 
