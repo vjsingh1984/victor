@@ -34,17 +34,10 @@ import numpy as np
 # Import TRACE level from debug_logger (initializes the level on import)
 from victor.agent.debug_logger import TRACE
 
-# Import native extensions with fallback
-try:
-    from victor.processing.native import (
-        cosine_similarity as native_cosine_similarity,
-        batch_cosine_similarity as native_batch_cosine_similarity,
-        is_native_available,
-    )
-
-    _NATIVE_AVAILABLE = is_native_available()
-except ImportError:
-    _NATIVE_AVAILABLE = False
+# Note: Similarity operations use NumPy+BLAS directly (not Rust).
+# Benchmarks show NumPy is 10x faster due to BLAS optimization and
+# avoiding Python→list→Rust→list→Python FFI overhead.
+# See tests/benchmark/test_native_performance.py for details.
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -441,7 +434,9 @@ class EmbeddingService:
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         """Calculate cosine similarity between two vectors.
 
-        Uses native Rust/SIMD implementation when available for ~2-5x speedup.
+        Uses NumPy which is already SIMD-optimized via BLAS/LAPACK.
+        Benchmarks show NumPy is 10x faster than Rust for this operation
+        due to FFI overhead from numpy→list→rust→list→numpy conversion.
 
         Args:
             a: First vector
@@ -450,10 +445,7 @@ class EmbeddingService:
         Returns:
             Similarity score (0-1 for normalized vectors, -1 to 1 in general)
         """
-        if _NATIVE_AVAILABLE:
-            return native_cosine_similarity(a.tolist(), b.tolist())
-
-        # NumPy fallback
+        # NumPy with BLAS is faster than Rust for vectorized operations
         dot_product = np.dot(a, b)
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)
@@ -470,7 +462,9 @@ class EmbeddingService:
     ) -> np.ndarray:
         """Calculate cosine similarity between query and all corpus vectors.
 
-        Uses native Rust/SIMD implementation when available for ~2-5x speedup.
+        Uses NumPy which is already SIMD-optimized via BLAS/LAPACK.
+        Benchmarks show NumPy is 10x faster than Rust for batch operations
+        due to FFI overhead from numpy→list→rust→list→numpy conversion.
 
         Args:
             query: Query vector (shape: [dimension])
@@ -482,14 +476,7 @@ class EmbeddingService:
         if corpus.size == 0:
             return np.array([])
 
-        if _NATIVE_AVAILABLE:
-            # Convert numpy arrays to lists for native function
-            query_list = query.tolist()
-            corpus_list = corpus.tolist()
-            similarities = native_batch_cosine_similarity(query_list, corpus_list)
-            return np.asarray(similarities, dtype=np.float32)
-
-        # NumPy fallback
+        # NumPy with BLAS is faster than Rust for vectorized operations
         query_norm = query / (np.linalg.norm(query) + 1e-9)
         corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
 

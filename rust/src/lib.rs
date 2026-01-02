@@ -36,9 +36,13 @@
 //! - `sanitizer`: High-performance response sanitization
 //! - `embeddings`: Quantized embeddings, matrix ops, KNN (v0.4.0)
 //! - `yaml_loader`: Fast YAML parsing for workflow definitions (v0.4.0)
+//! - `ast_indexer`: Fast stdlib detection and identifier extraction (v0.4.0)
+//! - `arg_normalizer`: Fast JSON repair and type coercion (v0.4.0)
 
 use pyo3::prelude::*;
 
+mod arg_normalizer;
+mod ast_indexer;
 mod chunking;
 mod classifier;
 mod dedup;
@@ -131,6 +135,13 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(chunking::detect_doc_type, m)?)?;
     m.add_function(wrap_pyfunction!(chunking::count_tokens_approx, m)?)?;
 
+    // Line-aware chunking functions (Protocol-compliant)
+    m.add_class::<chunking::ChunkInfoRust>()?;
+    m.add_function(wrap_pyfunction!(chunking::count_lines, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::find_line_boundaries, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::line_at_offset, m)?)?;
+    m.add_function(wrap_pyfunction!(chunking::chunk_with_overlap, m)?)?;
+
     // Secret detection functions (HIGH impact, MEDIUM complexity)
     m.add_class::<secrets::SecretMatch>()?;
     m.add_function(wrap_pyfunction!(secrets::scan_secrets, m)?)?;
@@ -190,6 +201,31 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(yaml_loader::parse_yaml_file_with_env, m)?)?;
     m.add_function(wrap_pyfunction!(yaml_loader::validate_yaml, m)?)?;
     m.add_function(wrap_pyfunction!(yaml_loader::extract_workflow_names, m)?)?;
+
+    // AST indexer functions (v0.4.0 - codebase indexing acceleration)
+    m.add_function(wrap_pyfunction!(ast_indexer::is_stdlib_module, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_indexer::batch_is_stdlib_modules, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_indexer::filter_stdlib_imports, m)?)?;
+    m.add_function(wrap_pyfunction!(ast_indexer::extract_identifiers, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        ast_indexer::extract_identifiers_with_positions,
+        m
+    )?)?;
+
+    // Argument normalizer functions (v0.4.0 - tool call acceleration)
+    m.add_function(wrap_pyfunction!(arg_normalizer::coerce_string_type, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        arg_normalizer::batch_coerce_string_types,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(arg_normalizer::normalize_json_string, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        arg_normalizer::batch_normalize_json_strings,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(arg_normalizer::repair_quotes, m)?)?;
+    m.add_function(wrap_pyfunction!(arg_normalizer::is_valid_json, m)?)?;
+    m.add_function(wrap_pyfunction!(arg_normalizer::get_json_type, m)?)?;
 
     Ok(())
 }

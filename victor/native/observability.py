@@ -1,0 +1,493 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Observability hooks for native accelerations.
+
+Provides metrics collection, tracing, and instrumentation for all
+native (Rust) and fallback (Python) operations.
+
+Features:
+- Histogram-based latency tracking with percentiles
+- Counter-based usage tracking (Rust vs Python calls)
+- EventBus integration for async event publishing
+- OpenTelemetry span creation for distributed tracing
+- Instrumented wrapper for automatic metrics collection
+
+Usage:
+    from victor.native.observability import instrumented_call, NativeMetrics
+
+    # Automatic instrumentation
+    result = instrumented_call(
+        operation="symbol_extraction",
+        native_fn=rust_extract,
+        fallback_fn=python_extract,
+        source_code,
+        lang="python",
+    )
+
+    # Manual metrics access
+    metrics = NativeMetrics.get_instance()
+    print(f"Rust calls: {metrics.rust_calls.value}")
+    print(f"Avg latency: {metrics.extraction_latency.mean():.2f}ms")
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Generator, Optional, TypeVar
+
+logger = logging.getLogger(__name__)
+
+# Type variable for generic instrumented calls
+T = TypeVar("T")
+
+
+@dataclass
+class OperationStats:
+    """Statistics for a single operation type.
+
+    Thread-safe accumulator for operation metrics.
+    """
+
+    calls: int = 0
+    duration_ms_total: float = 0.0
+    errors: int = 0
+    rust_calls: int = 0
+    python_calls: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def record(self, duration_ms: float, used_rust: bool, error: bool = False) -> None:
+        """Record an operation execution."""
+        with self._lock:
+            self.calls += 1
+            self.duration_ms_total += duration_ms
+            if error:
+                self.errors += 1
+            if used_rust:
+                self.rust_calls += 1
+            else:
+                self.python_calls += 1
+
+    @property
+    def duration_ms_avg(self) -> float:
+        """Average duration in milliseconds."""
+        return self.duration_ms_total / self.calls if self.calls > 0 else 0.0
+
+    @property
+    def rust_ratio(self) -> float:
+        """Ratio of Rust calls to total calls."""
+        return self.rust_calls / self.calls if self.calls > 0 else 0.0
+
+    def to_dict(self) -> Dict[str, float]:
+        """Convert to dictionary for metrics export."""
+        return {
+            "calls_total": float(self.calls),
+            "duration_ms_total": self.duration_ms_total,
+            "duration_ms_avg": self.duration_ms_avg,
+            "errors_total": float(self.errors),
+            "rust_calls": float(self.rust_calls),
+            "python_calls": float(self.python_calls),
+            "rust_ratio": self.rust_ratio,
+        }
+
+
+class NativeMetrics:
+    """Singleton metrics collector for native accelerations.
+
+    Integrates with Victor's observability infrastructure:
+    - MetricsRegistry for histogram/counter metrics
+    - EventBus for async event publishing
+    - OpenTelemetry for distributed tracing
+
+    Example:
+        metrics = NativeMetrics.get_instance()
+        metrics.record_call("symbol_extraction", 5.2, used_rust=True)
+        print(metrics.get_stats())
+    """
+
+    _instance: Optional[NativeMetrics] = None
+    _lock = threading.Lock()
+
+    def __init__(self) -> None:
+        """Initialize metrics (use get_instance() instead)."""
+        self._stats: Dict[str, OperationStats] = {}
+        self._stats_lock = threading.Lock()
+
+        # Lazy-loaded observability integrations
+        self._registry = None
+        self._bus = None
+        self._tracer = None
+
+        # Pre-defined operations
+        self._operations = [
+            "symbol_extraction",
+            "arg_normalization",
+            "similarity_compute",
+            "text_chunking",
+            "stdlib_check",
+            "reference_extraction",
+            "json_repair",
+            "type_coercion",
+        ]
+
+        # Initialize stats for known operations
+        for op in self._operations:
+            self._stats[op] = OperationStats()
+
+    @classmethod
+    def get_instance(cls) -> NativeMetrics:
+        """Get singleton instance."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset singleton (for testing)."""
+        with cls._lock:
+            cls._instance = None
+
+    def _get_registry(self):
+        """Lazy-load MetricsRegistry."""
+        if self._registry is None:
+            try:
+                from victor.observability.metrics import MetricsRegistry
+
+                self._registry = MetricsRegistry.get_instance()
+            except ImportError:
+                logger.debug("MetricsRegistry not available")
+        return self._registry
+
+    def _get_bus(self):
+        """Lazy-load EventBus."""
+        if self._bus is None:
+            try:
+                from victor.observability.event_bus import EventBus
+
+                self._bus = EventBus.get_instance()
+            except ImportError:
+                logger.debug("EventBus not available")
+        return self._bus
+
+    def _get_tracer(self):
+        """Lazy-load OpenTelemetry tracer."""
+        if self._tracer is None:
+            try:
+                from victor.observability.telemetry import get_tracer
+
+                self._tracer = get_tracer("victor.native")
+            except ImportError:
+                logger.debug("OpenTelemetry not available")
+        return self._tracer
+
+    def record_call(
+        self,
+        operation: str,
+        duration_ms: float,
+        used_rust: bool,
+        error: bool = False,
+        tags: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """Record a native operation call.
+
+        Args:
+            operation: Operation name (e.g., "symbol_extraction")
+            duration_ms: Duration in milliseconds
+            used_rust: Whether Rust implementation was used
+            error: Whether the call resulted in an error
+            tags: Optional additional tags for metrics
+        """
+        # Update internal stats
+        with self._stats_lock:
+            if operation not in self._stats:
+                self._stats[operation] = OperationStats()
+            self._stats[operation].record(duration_ms, used_rust, error)
+
+        # Emit to MetricsRegistry if available
+        registry = self._get_registry()
+        if registry is not None:
+            try:
+                # Get or create histogram
+                histogram = registry.histogram(
+                    f"native_{operation}_duration_ms",
+                    f"Duration of native {operation} operation",
+                    buckets=(0.1, 0.5, 1, 5, 10, 50, 100, 500),
+                )
+                histogram.observe(duration_ms)
+
+                # Increment counter
+                counter = registry.counter(
+                    f"native_{operation}_calls_total",
+                    f"Total calls to native {operation}",
+                )
+                counter.inc()
+            except Exception as e:
+                logger.debug(f"Failed to record to MetricsRegistry: {e}")
+
+        # Emit to EventBus if available
+        bus = self._get_bus()
+        if bus is not None:
+            try:
+                bus.emit_metric(
+                    metric_name=f"native_{operation}_duration_ms",
+                    value=duration_ms,
+                    unit="ms",
+                    tags={
+                        "backend": "rust" if used_rust else "python",
+                        "error": str(error).lower(),
+                        **(tags or {}),
+                    },
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit to EventBus: {e}")
+
+    def get_stats(self, operation: Optional[str] = None) -> Dict[str, Any]:
+        """Get statistics for operations.
+
+        Args:
+            operation: Specific operation, or None for all
+
+        Returns:
+            Dictionary of statistics
+        """
+        with self._stats_lock:
+            if operation:
+                stats = self._stats.get(operation)
+                return stats.to_dict() if stats else {}
+            return {op: stats.to_dict() for op, stats in self._stats.items()}
+
+    def get_summary(self) -> Dict[str, float]:
+        """Get summary statistics across all operations."""
+        with self._stats_lock:
+            total_calls = sum(s.calls for s in self._stats.values())
+            total_duration = sum(s.duration_ms_total for s in self._stats.values())
+            total_rust = sum(s.rust_calls for s in self._stats.values())
+            total_errors = sum(s.errors for s in self._stats.values())
+
+            return {
+                "total_calls": float(total_calls),
+                "total_duration_ms": total_duration,
+                "avg_duration_ms": total_duration / total_calls if total_calls else 0,
+                "rust_ratio": total_rust / total_calls if total_calls else 0,
+                "error_rate": total_errors / total_calls if total_calls else 0,
+            }
+
+
+@contextmanager
+def traced_native_call(
+    operation: str, attributes: Optional[Dict[str, Any]] = None
+) -> Generator[Any, None, None]:
+    """Create an OpenTelemetry span for a native operation.
+
+    Args:
+        operation: Operation name
+        attributes: Optional span attributes
+
+    Yields:
+        The span object (or None if OTEL not available)
+
+    Example:
+        with traced_native_call("symbol_extraction", {"file": "foo.py"}) as span:
+            result = extract_symbols(source)
+            if span:
+                span.set_attribute("symbols_found", len(result))
+    """
+    metrics = NativeMetrics.get_instance()
+    tracer = metrics._get_tracer()
+
+    if tracer is not None:
+        try:
+            with tracer.start_as_current_span(f"native.{operation}") as span:
+                # Set base attributes
+                try:
+                    from victor.processing.native import is_native_available
+
+                    span.set_attribute(
+                        "native.backend", "rust" if is_native_available() else "python"
+                    )
+                except ImportError:
+                    span.set_attribute("native.backend", "unknown")
+
+                # Set custom attributes
+                if attributes:
+                    for k, v in attributes.items():
+                        span.set_attribute(k, v)
+
+                yield span
+        except Exception as e:
+            logger.debug(f"Tracing error: {e}")
+            yield None
+    else:
+        yield None
+
+
+def instrumented_call(
+    operation: str,
+    native_fn: Optional[Callable[..., T]],
+    fallback_fn: Callable[..., T],
+    *args: Any,
+    native_available: Optional[bool] = None,
+    **kwargs: Any,
+) -> T:
+    """Execute a function with automatic metrics collection.
+
+    Chooses between native (Rust) and fallback (Python) implementations
+    and records timing and usage metrics.
+
+    Args:
+        operation: Operation name for metrics
+        native_fn: Rust implementation (or None if not available)
+        fallback_fn: Python fallback implementation
+        *args: Positional arguments to pass
+        native_available: Override native availability check
+        **kwargs: Keyword arguments to pass
+
+    Returns:
+        Result from the chosen implementation
+
+    Raises:
+        Exception: Any exception from the underlying function
+
+    Example:
+        result = instrumented_call(
+            "json_repair",
+            native_fn=victor_native.repair_json if is_native_available() else None,
+            fallback_fn=python_repair_json,
+            malformed_json,
+        )
+    """
+    metrics = NativeMetrics.get_instance()
+
+    # Determine which implementation to use
+    if native_available is None:
+        try:
+            from victor.processing.native import is_native_available
+
+            native_available = is_native_available()
+        except ImportError:
+            native_available = False
+
+    use_native = native_available and native_fn is not None
+
+    start = time.perf_counter()
+    error = False
+
+    try:
+        if use_native:
+            result = native_fn(*args, **kwargs)
+        else:
+            result = fallback_fn(*args, **kwargs)
+        return result
+    except Exception:
+        error = True
+        raise
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+        metrics.record_call(operation, duration_ms, used_rust=use_native, error=error)
+
+
+class InstrumentedAccelerator:
+    """Base class for instrumented accelerator implementations.
+
+    Provides automatic metrics collection for all operations.
+    Subclass and implement the protocol methods.
+
+    Example:
+        class MyAccelerator(InstrumentedAccelerator):
+            def __init__(self):
+                super().__init__(backend="python")
+
+            def do_work(self, data):
+                with self._timed_call("do_work"):
+                    return self._process(data)
+    """
+
+    def __init__(self, backend: str = "python"):
+        """Initialize with backend identifier.
+
+        Args:
+            backend: "rust" or "python"
+        """
+        self._backend = backend
+        self._metrics = NativeMetrics.get_instance()
+        self._call_count = 0
+        self._total_duration_ms = 0.0
+        self._lock = threading.Lock()
+
+    def is_available(self) -> bool:
+        """Check if this accelerator is available."""
+        return True
+
+    def get_version(self) -> Optional[str]:
+        """Get version string."""
+        return None
+
+    def get_backend(self) -> str:
+        """Get backend identifier."""
+        return self._backend
+
+    def get_metrics(self) -> Dict[str, float]:
+        """Get performance metrics for this accelerator."""
+        with self._lock:
+            return {
+                "calls_total": float(self._call_count),
+                "duration_ms_total": self._total_duration_ms,
+                "duration_ms_avg": (
+                    self._total_duration_ms / self._call_count
+                    if self._call_count > 0
+                    else 0.0
+                ),
+            }
+
+    @contextmanager
+    def _timed_call(
+        self, operation: str, **tags: str
+    ) -> Generator[None, None, None]:
+        """Context manager for timing an operation.
+
+        Args:
+            operation: Operation name for metrics
+            **tags: Additional metric tags
+
+        Example:
+            with self._timed_call("extract_functions", lang="python"):
+                result = self._do_extraction(source)
+        """
+        start = time.perf_counter()
+        error = False
+        try:
+            yield
+        except Exception:
+            error = True
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - start) * 1000
+
+            with self._lock:
+                self._call_count += 1
+                self._total_duration_ms += duration_ms
+
+            self._metrics.record_call(
+                operation,
+                duration_ms,
+                used_rust=(self._backend == "rust"),
+                error=error,
+                tags=tags if tags else None,
+            )

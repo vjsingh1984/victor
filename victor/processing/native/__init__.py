@@ -2133,6 +2133,119 @@ def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
 
 
 # =============================================================================
+# TYPE COERCION (v0.4.0 - Argument Normalizer Hot Path)
+# =============================================================================
+
+
+def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
+    """Coerce a string to its appropriate type.
+
+    Fast detection and coercion of string values to bool/int/float/null.
+    Uses Rust implementation when available for ~3-5x speedup.
+
+    Args:
+        value: String value to coerce
+
+    Returns:
+        Tuple of (type_name, coerced_str, error_or_none)
+        - type_name: "null", "bool", "int", "float", or "string"
+        - coerced_str: The value as a string in canonical form
+        - error_or_none: Error message if coercion failed, else None
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "coerce_string_type"):
+        return _native.coerce_string_type(value)
+
+    # Pure Python fallback
+    # Check for null
+    if value.lower() in ("none", "null", "nil"):
+        return ("null", "null", None)
+
+    # Check for bool
+    if value.lower() in ("true", "yes", "on", "1"):
+        return ("bool", "true", None)
+    if value.lower() in ("false", "no", "off", "0"):
+        return ("bool", "false", None)
+
+    # Check for int
+    try:
+        int_val = int(value)
+        return ("int", str(int_val), None)
+    except ValueError:
+        pass
+
+    # Check for float
+    try:
+        float_val = float(value)
+        return ("float", str(float_val), None)
+    except ValueError:
+        pass
+
+    # Default to string
+    return ("string", value, None)
+
+
+# =============================================================================
+# STDLIB DETECTION (v0.4.0 - Indexer Hot Path)
+# =============================================================================
+
+# Python stdlib modules for fallback lookup
+_PYTHON_STDLIB_MODULES = frozenset({
+    # Core builtins and language
+    "abc", "asyncio", "builtins", "collections", "contextlib", "copy",
+    "dataclasses", "enum", "functools", "gc", "inspect", "io", "itertools",
+    "operator", "sys", "types", "typing", "typing_extensions", "weakref",
+    # File/OS operations
+    "os", "pathlib", "shutil", "stat", "tempfile", "glob", "fnmatch",
+    # Data formats
+    "json", "csv", "xml", "html", "pickle", "base64", "codecs", "struct",
+    # Text processing
+    "re", "string", "textwrap", "unicodedata", "difflib",
+    # Date/Time
+    "datetime", "time", "calendar", "zoneinfo",
+    # Math/Numbers
+    "math", "decimal", "fractions", "random", "statistics", "cmath",
+    # Networking
+    "socket", "ssl", "http", "urllib", "email", "ftplib", "smtplib",
+    # Concurrent
+    "threading", "multiprocessing", "concurrent", "queue", "subprocess",
+    "signal", "selectors",
+    # Testing/Debug
+    "unittest", "doctest", "pdb", "traceback", "logging", "warnings",
+    # Crypto/Hashing
+    "hashlib", "hmac", "secrets",
+    # Archive/Compression
+    "zipfile", "tarfile", "gzip", "bz2", "lzma", "zlib",
+    # Other common stdlib
+    "argparse", "configparser", "getopt", "pprint", "shelve", "sqlite3",
+    "atexit", "sched", "heapq", "bisect", "array", "cProfile", "profile",
+    "timeit", "trace", "ast", "dis", "code", "codeop", "compileall",
+    "py_compile", "importlib", "pkgutil", "modulefinder", "runpy",
+    "venv", "site", "sysconfig", "platform", "ctypes", "mmap",
+    "uuid", "ipaddress", "locale", "gettext",
+})
+
+
+def is_stdlib_module(module_name: str) -> bool:
+    """Check if a module is part of Python's standard library.
+
+    Uses Rust implementation with perfect hash when available for O(1) lookup.
+    Falls back to Python frozenset lookup.
+
+    Args:
+        module_name: Full module name (e.g., "os.path", "collections.abc")
+
+    Returns:
+        True if the module is a stdlib module
+    """
+    if _NATIVE_AVAILABLE and hasattr(_native, "is_stdlib_module"):
+        return _native.is_stdlib_module(module_name)
+
+    # Pure Python fallback - check top-level module
+    top_level = module_name.split(".")[0]
+    return top_level in _PYTHON_STDLIB_MODULES
+
+
+# =============================================================================
 # YAML PARSING (v0.4.0 - Workflow Acceleration)
 # =============================================================================
 
@@ -2289,6 +2402,237 @@ def extract_workflow_names(yaml_content: str) -> List[str]:
 
 
 # =============================================================================
+# PROTOCOL-BASED DISPATCH (SOLID Design)
+# =============================================================================
+# These factories provide protocol-compliant implementations with automatic
+# fallback from Rust to Python. See victor/native/protocols.py for the
+# protocol definitions and victor/native/python/ for Python fallbacks.
+
+
+def get_symbol_extractor(backend: Optional[str] = None) -> "SymbolExtractorProtocol":
+    """Get a symbol extractor implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        SymbolExtractorProtocol implementation
+
+    Example:
+        extractor = get_symbol_extractor()
+        symbols = extractor.extract_functions(source, "python")
+    """
+    from victor.native.protocols import SymbolExtractorProtocol
+
+    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+        # TODO: Return Rust implementation when available
+        # For now, fall through to Python
+        pass
+
+    from victor.native.python.symbol_extractor import PythonSymbolExtractor
+
+    return PythonSymbolExtractor()
+
+
+def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalizerProtocol":
+    """Get an argument normalizer implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        ArgumentNormalizerProtocol implementation
+
+    Example:
+        normalizer = get_argument_normalizer()
+        result, success = normalizer.normalize_json(json_str)
+    """
+    from victor.native.protocols import ArgumentNormalizerProtocol
+
+    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+        # TODO: Return Rust implementation when available
+        # For now, fall through to Python
+        pass
+
+    from victor.native.python.arg_normalizer import PythonArgumentNormalizer
+
+    return PythonArgumentNormalizer()
+
+
+def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityComputerProtocol":
+    """Get a similarity computer implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        SimilarityComputerProtocol implementation
+
+    Example:
+        computer = get_similarity_computer()
+        sim = computer.cosine(vec_a, vec_b)
+    """
+    from victor.native.protocols import SimilarityComputerProtocol
+
+    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+        # TODO: Return Rust implementation when available
+        # For now, fall through to Python
+        pass
+
+    from victor.native.python.similarity import PythonSimilarityComputer
+
+    return PythonSimilarityComputer()
+
+
+def get_text_chunker(backend: Optional[str] = None) -> "TextChunkerProtocol":
+    """Get a text chunker implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        TextChunkerProtocol implementation
+
+    Example:
+        chunker = get_text_chunker()
+        chunks = chunker.chunk_with_overlap(text, chunk_size=100, overlap=20)
+    """
+    from victor.native.protocols import TextChunkerProtocol
+
+    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+        # TODO: Return Rust implementation when available
+        # For now, fall through to Python
+        pass
+
+    from victor.native.python.chunker import PythonTextChunker
+
+    return PythonTextChunker()
+
+
+def get_ast_indexer(backend: Optional[str] = None) -> "AstIndexerProtocol":
+    """Get an AST indexer implementation.
+
+    The AST indexer accelerates hot paths in codebase indexing:
+    - is_stdlib_module(): O(1) stdlib lookup with perfect hash
+    - extract_identifiers(): SIMD-optimized regex extraction
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        AstIndexerProtocol implementation
+
+    Example:
+        indexer = get_ast_indexer()
+        is_stdlib = indexer.is_stdlib_module("os.path")
+        identifiers = indexer.extract_identifiers(source_code)
+    """
+    from victor.native.protocols import AstIndexerProtocol
+
+    if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
+        try:
+            from victor.native.rust.ast_indexer import RustAstIndexer
+
+            return RustAstIndexer()
+        except ImportError:
+            # Fall through to Python if Rust wrapper not available
+            pass
+
+    from victor.native.python.ast_indexer import PythonAstIndexer
+
+    return PythonAstIndexer()
+
+
+# Convenience singletons for common use cases
+_symbol_extractor_instance: Optional["SymbolExtractorProtocol"] = None
+_argument_normalizer_instance: Optional["ArgumentNormalizerProtocol"] = None
+_similarity_computer_instance: Optional["SimilarityComputerProtocol"] = None
+_text_chunker_instance: Optional["TextChunkerProtocol"] = None
+_ast_indexer_instance: Optional["AstIndexerProtocol"] = None
+
+
+def get_default_symbol_extractor() -> "SymbolExtractorProtocol":
+    """Get the default symbol extractor singleton.
+
+    Uses lazy initialization and returns a cached instance for
+    efficient repeated access.
+    """
+    global _symbol_extractor_instance
+    if _symbol_extractor_instance is None:
+        _symbol_extractor_instance = get_symbol_extractor()
+    return _symbol_extractor_instance
+
+
+def get_default_argument_normalizer() -> "ArgumentNormalizerProtocol":
+    """Get the default argument normalizer singleton.
+
+    Uses lazy initialization and returns a cached instance for
+    efficient repeated access.
+    """
+    global _argument_normalizer_instance
+    if _argument_normalizer_instance is None:
+        _argument_normalizer_instance = get_argument_normalizer()
+    return _argument_normalizer_instance
+
+
+def get_default_similarity_computer() -> "SimilarityComputerProtocol":
+    """Get the default similarity computer singleton.
+
+    Uses lazy initialization and returns a cached instance for
+    efficient repeated access.
+    """
+    global _similarity_computer_instance
+    if _similarity_computer_instance is None:
+        _similarity_computer_instance = get_similarity_computer()
+    return _similarity_computer_instance
+
+
+def get_default_text_chunker() -> "TextChunkerProtocol":
+    """Get the default text chunker singleton.
+
+    Uses lazy initialization and returns a cached instance for
+    efficient repeated access.
+    """
+    global _text_chunker_instance
+    if _text_chunker_instance is None:
+        _text_chunker_instance = get_text_chunker()
+    return _text_chunker_instance
+
+
+def get_default_ast_indexer() -> "AstIndexerProtocol":
+    """Get the default AST indexer singleton.
+
+    Uses lazy initialization and returns a cached instance for
+    efficient repeated access. This is the recommended way to access
+    the AST indexer for hot path operations during codebase indexing.
+    """
+    global _ast_indexer_instance
+    if _ast_indexer_instance is None:
+        _ast_indexer_instance = get_ast_indexer()
+    return _ast_indexer_instance
+
+
+def reset_protocol_singletons() -> None:
+    """Reset all protocol singletons.
+
+    Useful for testing to ensure clean state between tests.
+    """
+    global _symbol_extractor_instance, _argument_normalizer_instance
+    global _similarity_computer_instance, _text_chunker_instance
+    global _ast_indexer_instance
+    _symbol_extractor_instance = None
+    _argument_normalizer_instance = None
+    _similarity_computer_instance = None
+    _text_chunker_instance = None
+    _ast_indexer_instance = None
+
+
+# =============================================================================
 # EXPORTS
 # =============================================================================
 
@@ -2373,6 +2717,10 @@ __all__ = [
     "detect_leakage_patterns",
     "strip_markup_fast",
     "validate_tool_name",
+    # Type coercion (v0.4.0 - Argument Normalizer Hot Path)
+    "coerce_string_type",
+    # Stdlib detection (v0.4.0 - Indexer Hot Path)
+    "is_stdlib_module",
     # YAML parsing (v0.4.0 - Workflow Acceleration)
     "parse_yaml",
     "parse_yaml_with_env",
@@ -2380,4 +2728,16 @@ __all__ = [
     "parse_yaml_file_with_env",
     "validate_yaml",
     "extract_workflow_names",
+    # Protocol-based dispatch (SOLID Design)
+    "get_symbol_extractor",
+    "get_argument_normalizer",
+    "get_similarity_computer",
+    "get_text_chunker",
+    "get_ast_indexer",
+    "get_default_symbol_extractor",
+    "get_default_argument_normalizer",
+    "get_default_similarity_computer",
+    "get_default_text_chunker",
+    "get_default_ast_indexer",
+    "reset_protocol_singletons",
 ]
