@@ -42,9 +42,19 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from victor.native.protocols import (
+        ArgumentNormalizerProtocol,
+        AstIndexerProtocol,
+        ContentHasherProtocol,
+        SimilarityComputerProtocol,
+        SymbolExtractorProtocol,
+        TextChunkerProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 
