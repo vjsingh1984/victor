@@ -85,24 +85,28 @@ class TypeScriptPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
-        """Create tree-sitter queries for TypeScript symbol/call extraction."""
+        """Create tree-sitter queries for TypeScript symbol/call extraction.
+
+        The @def capture is used for end_line (function body boundaries).
+        The @name capture is used for the symbol name.
+        """
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_declaration name: (identifier) @name)"),
-                QueryPattern("function", "(function_declaration name: (identifier) @name)"),
-                QueryPattern("function", "(method_signature name: (property_identifier) @name)"),
-                QueryPattern("function", "(method_definition name: (property_identifier) @name)"),
+                QueryPattern("class", "(class_declaration name: (identifier) @name) @def"),
+                QueryPattern("function", "(function_declaration name: (identifier) @name) @def"),
+                QueryPattern("function", "(method_signature name: (property_identifier) @name) @def"),
+                QueryPattern("function", "(method_definition name: (property_identifier) @name) @def"),
                 QueryPattern(
                     "function",
-                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function)))",
+                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (arrow_function))) @def",
                 ),
                 QueryPattern(
                     "function",
-                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression)))",
+                    "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression))) @def",
                 ),
                 QueryPattern(
                     "function",
-                    "(assignment_expression left: (identifier) @name right: (arrow_function))",
+                    "(assignment_expression left: (identifier) @name right: (arrow_function)) @def",
                 ),
             ],
             calls="""

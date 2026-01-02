@@ -2504,9 +2504,13 @@ def get_text_chunker(backend: Optional[str] = None) -> "TextChunkerProtocol":
     from victor.native.protocols import TextChunkerProtocol
 
     if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        # TODO: Return Rust implementation when available
-        # For now, fall through to Python
-        pass
+        try:
+            from victor.native.rust.chunker import RustTextChunker
+
+            return RustTextChunker()
+        except ImportError:
+            # Fall through to Python if Rust wrapper not available
+            pass
 
     from victor.native.python.chunker import PythonTextChunker
 

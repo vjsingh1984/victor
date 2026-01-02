@@ -51,7 +51,10 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.native.protocols import ChunkInfo, TextChunkerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -137,38 +140,52 @@ class ChunkingStrategy(Enum):
 
 @dataclass
 class ChunkConfig:
-    """Configuration for chunking behavior."""
+    """Configuration for chunking behavior.
+
+    Token estimation uses 3.5 chars/token (conservative vs 4x industry norm)
+    to prevent truncation with dense code (short identifiers, operators).
+    """
 
     strategy: ChunkingStrategy = ChunkingStrategy.BODY_AWARE
-    max_chunk_tokens: int = 512  # ~2048 chars (embedding model limit)
-    overlap_tokens: int = 64  # ~256 chars overlap between chunks
+    max_chunk_tokens: int = 512  # Embedding model token limit
+    overlap_tokens: int = 64  # Overlap between chunks for context
     large_symbol_threshold: int = 30  # Lines above which to chunk bodies
     include_file_summary: bool = True  # Add file-level embedding
     include_class_summary: bool = True  # Add class-level embeddings
-    chars_per_token: int = 4  # Approximate chars per token
+    chars_per_token: float = 3.5  # Conservative (3.5x vs 4x norm) to prevent truncation
 
     @property
     def max_chunk_chars(self) -> int:
-        return self.max_chunk_tokens * self.chars_per_token
+        """Max characters per chunk (512 tokens * 3.5 = 1792 chars)."""
+        return int(self.max_chunk_tokens * self.chars_per_token)
 
     @property
     def overlap_chars(self) -> int:
-        return self.overlap_tokens * self.chars_per_token
+        """Overlap characters (64 tokens * 3.5 = 224 chars)."""
+        return int(self.overlap_tokens * self.chars_per_token)
 
 
 @dataclass
 class CodeChunk:
     """A chunk of code ready for embedding.
 
+    ID Format (hierarchical for disambiguation):
+        - File summary: `module/path:__file__`
+        - Class: `module/path:ClassName`
+        - Method: `module/path:ClassName.method_name`
+        - Body chunk: `module/path:ClassName.method_name:chunk_idx`
+        - Line range: `module/path:symbol:L10-L50`
+        - Window: `module/path:window:chunk_idx`
+
     Attributes:
-        id: Unique identifier (file:symbol:chunk_idx or file:symbol)
-        content: Text content for embedding
+        id: Unique hierarchical identifier (docid/symbolid:chunkid)
+        content: Text content for embedding (max ~1792 chars @ 3.5x)
         chunk_type: Type of chunk (FILE_SUMMARY, METHOD_HEADER, etc.)
         file_path: Source file path (relative)
         symbol_name: Symbol name if applicable
         symbol_type: function, class, method, etc.
-        line_start: Starting line number
-        line_end: Ending line number
+        line_start: Starting line number (1-indexed)
+        line_end: Ending line number (1-indexed)
         parent_id: Parent chunk ID for hierarchy
         metadata: Additional metadata for filtering
     """
@@ -788,3 +805,845 @@ def chunk_codebase(
 
     logger.info(f"Chunked {len(all_chunks)} chunks from {root_path}")
     return all_chunks
+
+
+# =============================================================================
+# Tier-Aware Chunking (Phase 4 of Tiered Language Support)
+# =============================================================================
+
+# DEPRECATED: Regex patterns are NO LONGER USED in the fallback chain.
+#
+# Rationale: If tree-sitter can't parse code, sliding window (Rust/Python) is
+# more robust than fragile regex patterns. Regex adds complexity without benefit:
+# - Parseable code → tree-sitter handles it (grammar-aware)
+# - Unparseable code → sliding window is guaranteed to work
+#
+# These patterns are retained for reference/documentation only.
+# TODO: Consider removing in future cleanup.
+REGEX_SYMBOL_PATTERNS: Dict[str, List[tuple[str, str]]] = {
+    # COBOL - legacy mainframe language
+    "cobol": [
+        ("division", r"^\s*(IDENTIFICATION|ENVIRONMENT|DATA|PROCEDURE)\s+DIVISION"),
+        ("section", r"^\s*(\w+)\s+SECTION\."),
+        ("paragraph", r"^\s*(\w[\w-]+)\.(?:\s|$)"),
+        ("procedure", r"^\s*PERFORM\s+(\w[\w-]+)"),
+    ],
+    # Fortran - scientific computing
+    "fortran": [
+        ("program", r"^\s*PROGRAM\s+(\w+)", ),
+        ("subroutine", r"^\s*SUBROUTINE\s+(\w+)"),
+        ("function", r"^\s*(?:INTEGER|REAL|DOUBLE|COMPLEX|LOGICAL|CHARACTER)?\s*FUNCTION\s+(\w+)"),
+        ("module", r"^\s*MODULE\s+(\w+)"),
+    ],
+    # Pascal/Delphi
+    "pascal": [
+        ("program", r"^\s*program\s+(\w+)"),
+        ("procedure", r"^\s*procedure\s+(\w+)"),
+        ("function", r"^\s*function\s+(\w+)"),
+        ("class", r"^\s*(\w+)\s*=\s*class"),
+    ],
+    # Ada
+    "ada": [
+        ("package", r"^\s*package\s+(\w+)"),
+        ("procedure", r"^\s*procedure\s+(\w+)"),
+        ("function", r"^\s*function\s+(\w+)"),
+    ],
+    # Prolog
+    "prolog": [
+        ("predicate", r"^(\w+)\s*\("),
+        ("rule", r"^(\w+)\s*:-"),
+    ],
+    # Lisp/Scheme/Clojure fallback
+    "lisp": [
+        ("function", r"\(defun\s+(\w+)"),
+        ("macro", r"\(defmacro\s+(\w+)"),
+        ("variable", r"\(defvar\s+(\w+)"),
+    ],
+    # Smalltalk
+    "smalltalk": [
+        ("class", r"^(\w+)\s+subclass:"),
+        ("method", r"^(\w+)\s*\["),
+    ],
+    # APL/J/K - array languages
+    "apl": [
+        ("function", r"^\s*(\w+)\s*←\s*\{"),
+    ],
+    # Assembly (generic)
+    "assembly": [
+        ("label", r"^(\w+):"),
+        ("procedure", r"^\s*(\w+)\s+PROC"),
+        ("macro", r"^\s*(\w+)\s+MACRO"),
+    ],
+    # Tcl
+    "tcl": [
+        ("procedure", r"^\s*proc\s+(\w+)"),
+        ("namespace", r"^\s*namespace\s+eval\s+(\w+)"),
+    ],
+    # Awk
+    "awk": [
+        ("function", r"^\s*function\s+(\w+)"),
+        ("rule", r"^(/[^/]+/|BEGIN|END)\s*\{"),
+    ],
+    # Groovy (for Gradle, Jenkins)
+    "groovy": [
+        ("class", r"^\s*class\s+(\w+)"),
+        ("method", r"^\s*(?:def|void|String|int|boolean)\s+(\w+)\s*\("),
+        ("closure", r"^\s*(\w+)\s*=\s*\{"),
+    ],
+    # Makefile
+    "makefile": [
+        ("target", r"^([a-zA-Z_][\w.-]*)\s*:(?!=)"),
+        ("variable", r"^([A-Z_][A-Z0-9_]*)\s*[:?]?="),
+    ],
+    # CMake
+    "cmake": [
+        ("function", r"^\s*function\s*\(\s*(\w+)"),
+        ("macro", r"^\s*macro\s*\(\s*(\w+)"),
+        ("target", r"^\s*add_(?:executable|library)\s*\(\s*(\w+)"),
+    ],
+    # Dockerfile
+    "dockerfile": [
+        ("stage", r"^FROM\s+\S+\s+(?:AS|as)\s+(\w+)"),
+        ("instruction", r"^(FROM|RUN|COPY|ADD|CMD|ENTRYPOINT|ENV|EXPOSE|WORKDIR)\s+"),
+    ],
+    # Ansible YAML
+    "ansible": [
+        ("task", r"^\s*-\s*name:\s*(.+)$"),
+        ("role", r"^\s*-\s*role:\s*(\w+)"),
+        ("block", r"^\s*block:\s*$"),
+    ],
+    # Terraform/HCL
+    "terraform": [
+        ("resource", r'^resource\s+"([^"]+)"\s+"([^"]+)"'),
+        ("module", r'^module\s+"([^"]+)"'),
+        ("variable", r'^variable\s+"([^"]+)"'),
+        ("output", r'^output\s+"([^"]+)"'),
+        ("data", r'^data\s+"([^"]+)"\s+"([^"]+)"'),
+    ],
+    # Puppet
+    "puppet": [
+        ("class", r"^\s*class\s+(\w+(?:::\w+)*)"),
+        ("define", r"^\s*define\s+(\w+(?:::\w+)*)"),
+        ("node", r"^\s*node\s+['\"]?([^'\"]+)['\"]?"),
+    ],
+    # Chef Ruby DSL
+    "chef": [
+        ("recipe", r"^\s*recipe\s+['\"]([^'\"]+)['\"]"),
+        ("resource", r"^\s*(\w+)\s+['\"]([^'\"]+)['\"]"),
+    ],
+    # Gradle Kotlin DSL
+    "gradle": [
+        ("task", r"^\s*(?:tasks\.register|task)\s*(?:<[^>]+>)?\s*\(\s*[\"'](\w+)[\"']"),
+        ("dependency", r"^\s*(?:implementation|api|compile)\s*\("),
+        ("plugin", r"^\s*id\s*\(\s*[\"']([^\"']+)[\"']\s*\)"),
+    ],
+    # Properties files (Java, etc.)
+    "properties": [
+        ("property", r"^([a-zA-Z_][\w.-]*)\s*="),
+    ],
+    # INI files
+    "ini": [
+        ("section", r"^\s*\[([^\]]+)\]"),
+        ("property", r"^([a-zA-Z_][\w.-]*)\s*="),
+    ],
+    # HOCON (Typesafe Config)
+    "hocon": [
+        ("block", r"^\s*([a-zA-Z_][\w.-]*)\s*\{"),
+        ("property", r"^\s*([a-zA-Z_][\w.-]*)\s*[:=]"),
+    ],
+    # NGINX config
+    "nginx": [
+        ("block", r"^\s*(http|server|location|upstream|events)\s*\{?"),
+        ("directive", r"^\s*(server_name|listen|root|proxy_pass)\s+"),
+    ],
+    # Apache config
+    "apache": [
+        ("section", r"^\s*<(VirtualHost|Directory|Location|Files)[^>]*>"),
+        ("directive", r"^\s*(ServerName|DocumentRoot|RewriteRule)\s+"),
+    ],
+    # Vim script
+    "vim": [
+        ("function", r"^\s*function!?\s+(\w+)"),
+        ("command", r"^\s*command!?\s+(\w+)"),
+        ("autocmd", r"^\s*autocmd\s+(\w+)"),
+    ],
+    # Emacs Lisp
+    "elisp": [
+        ("function", r"\(defun\s+([\w-]+)"),
+        ("variable", r"\(defvar\s+([\w-]+)"),
+        ("macro", r"\(defmacro\s+([\w-]+)"),
+    ],
+    # PowerShell
+    "powershell": [
+        ("function", r"^\s*function\s+([\w-]+)"),
+        ("class", r"^\s*class\s+(\w+)"),
+        ("workflow", r"^\s*workflow\s+([\w-]+)"),
+    ],
+    # Batch/CMD
+    "batch": [
+        ("label", r"^:(\w+)"),
+        ("function", r"^:(\w+)\s*$"),
+    ],
+    # Fish shell
+    "fish": [
+        ("function", r"^\s*function\s+(\w+)"),
+    ],
+    # Protocol Buffers
+    "protobuf": [
+        ("message", r"^\s*message\s+(\w+)"),
+        ("service", r"^\s*service\s+(\w+)"),
+        ("enum", r"^\s*enum\s+(\w+)"),
+    ],
+    # Thrift
+    "thrift": [
+        ("service", r"^\s*service\s+(\w+)"),
+        ("struct", r"^\s*struct\s+(\w+)"),
+        ("enum", r"^\s*enum\s+(\w+)"),
+    ],
+    # GraphQL
+    "graphql": [
+        ("type", r"^\s*type\s+(\w+)"),
+        ("query", r"^\s*(?:query|mutation|subscription)\s+(\w+)"),
+        ("interface", r"^\s*interface\s+(\w+)"),
+    ],
+    # OpenAPI/Swagger YAML
+    "openapi": [
+        ("path", r"^\s*(/[\w/{}-]+):"),
+        ("schema", r"^\s*(\w+):\s*$"),
+        ("operation", r"^\s*(get|post|put|delete|patch):\s*$"),
+    ],
+}
+
+# Config file patterns for structured chunking
+CONFIG_FILE_PATTERNS: Dict[str, Dict[str, Any]] = {
+    "yaml": {
+        "block_start": r"^(\w[\w-]*):\s*$",
+        "key_value": r"^(\w[\w-]*):\s+\S",
+        "list_item": r"^\s*-\s+",
+    },
+    "json": {
+        "object_key": r'"(\w+)"\s*:',
+    },
+    "toml": {
+        "section": r"^\s*\[([^\]]+)\]",
+        "key": r"^(\w+)\s*=",
+    },
+    "xml": {
+        "element": r"<(\w+)[^>]*>",
+        "attribute": r'(\w+)="[^"]*"',
+    },
+}
+
+
+class ChunkingFallback(Enum):
+    """Fallback strategies for chunking."""
+
+    PYTHON_AST = "python_ast"  # Full Python AST parsing
+    TREE_SITTER = "tree_sitter"  # Tree-sitter grammar
+    REGEX_SYMBOLS = "regex_symbols"  # DEPRECATED: Not used in fallback chain
+    CONFIG_AWARE = "config_aware"  # Config file structure awareness
+    SLIDING_WINDOW = "sliding_window"  # Rust/Python overlapping chunks
+
+
+class TierAwareChunker:
+    """Comprehensive tier-aware chunker with simple, robust fallback chain.
+
+    Provides chunking for ALL languages and file types with a cascading
+    fallback strategy:
+
+    1. **Python AST** (Tier 1 Python): Full AST parsing with semantic analysis
+    2. **Tree-sitter** (Tier 1/2/3): Grammar-based symbol extraction
+    3. **Config-Aware** (Config files): Structure-aware chunking for
+       YAML, JSON, TOML, Properties, HOCON, INI, XML
+    4. **Sliding Window** (Universal fallback): Rust/Python overlapping
+       chunks for any file type not covered above
+
+    Design Rationale:
+        - Regex patterns are intentionally NOT used because:
+          1. If code is parseable → tree-sitter handles it (grammar-aware)
+          2. If code is unparseable → sliding window is more robust than
+             fragile regex patterns
+        - Sliding window uses Rust native implementation when available
+          for 3-5x speedup
+        - Simple chain: fewer failure modes, easier to debug
+
+    This ensures NO language or file type is left without proper chunking.
+
+    Example:
+        chunker = TierAwareChunker(tree_sitter=TreeSitterExtractor())
+
+        # Python - uses AST
+        chunks = chunker.chunk_file(Path("main.py"), "main.py")
+
+        # Go - uses tree-sitter
+        chunks = chunker.chunk_file(Path("main.go"), "main.go")
+
+        # YAML config - uses config-aware chunking
+        chunks = chunker.chunk_file(Path("config.yaml"), "config.yaml")
+
+        # Unknown/unparseable - uses sliding window (Rust/Python)
+        chunks = chunker.chunk_file(Path("data.xyz"), "data.xyz")
+    """
+
+    def __init__(
+        self,
+        tree_sitter: Optional[Any] = None,
+        python_chunker: Optional[CodeChunker] = None,
+        config: Optional[ChunkConfig] = None,
+        text_chunker: Optional["TextChunkerProtocol"] = None,
+    ):
+        """Initialize tier-aware chunker.
+
+        Args:
+            tree_sitter: TreeSitterExtractor instance for tree-sitter languages
+            python_chunker: CodeChunker for Python files (created if not provided)
+            config: Chunking configuration
+            text_chunker: TextChunkerProtocol for sliding window (Rust/Python)
+        """
+        self._ts = tree_sitter
+        self._py_chunker = python_chunker or CodeChunker(config)
+        self._config = config or ChunkConfig()
+
+        # Lazy-load text chunker to avoid import cycles
+        if text_chunker is not None:
+            self._text_chunker = text_chunker
+        else:
+            self._text_chunker = None  # Lazy-loaded on first use
+
+    def _get_text_chunker(self) -> "TextChunkerProtocol":
+        """Get text chunker, lazy-loading if needed.
+
+        Uses Rust implementation when available for 3-5x speedup on
+        sliding window chunking.
+        """
+        if self._text_chunker is None:
+            from victor.processing.native import get_default_text_chunker
+            self._text_chunker = get_default_text_chunker()
+        return self._text_chunker
+
+    def _chunk_info_to_code_chunk(
+        self,
+        chunk_info: "ChunkInfo",
+        relative_path: str,
+        language: str,
+        chunk_index: int,
+    ) -> CodeChunk:
+        """Convert protocol ChunkInfo to domain CodeChunk.
+
+        Bridges the generic text chunking protocol (Rust/Python) with
+        the domain-specific CodeChunk used for embedding.
+
+        ID Format: `module/path:window:chunk_idx` with line range in metadata.
+
+        Args:
+            chunk_info: Protocol ChunkInfo from TextChunkerProtocol
+            relative_path: File path for ID and metadata
+            language: Detected language
+            chunk_index: Sequential chunk number
+
+        Returns:
+            CodeChunk ready for embedding
+        """
+        # Build context header with line range
+        header = f"# {relative_path} (lines {chunk_info.start_line}-{chunk_info.end_line})"
+
+        return CodeChunk(
+            id=f"{relative_path}:window:{chunk_index}:L{chunk_info.start_line}-L{chunk_info.end_line}",
+            content=f"{header}\n{chunk_info.text}",
+            chunk_type=ChunkType.METHOD_BODY,
+            file_path=relative_path,
+            line_start=chunk_info.start_line,
+            line_end=chunk_info.end_line,
+            metadata={
+                "chunk_index": chunk_index,
+                "language": language,
+                "chunking": "sliding_window",
+                "has_overlap": chunk_info.overlap_prev > 0,
+                "start_offset": chunk_info.start_offset,
+                "end_offset": chunk_info.end_offset,
+            },
+        )
+
+    def chunk_file(
+        self,
+        file_path: Path,
+        relative_path: str,
+        language: Optional[str] = None,
+        content: Optional[str] = None,
+    ) -> List[CodeChunk]:
+        """Chunk a file using the optimal strategy with robust fallback.
+
+        Fallback chain (simple, no regex):
+        1. Python AST (for Python files)
+        2. Tree-sitter (for supported languages)
+        3. Config-aware (for config files)
+        4. Sliding window (Rust/Python - universal fallback)
+
+        Regex is intentionally skipped - if tree-sitter can't parse it,
+        sliding window is more robust than fragile regex patterns.
+
+        Args:
+            file_path: Absolute path to the file
+            relative_path: Relative path for IDs and metadata
+            language: Language name (auto-detected if not provided)
+            content: Optional file content (reads file if not provided)
+
+        Returns:
+            List of CodeChunk objects ready for embedding
+        """
+        # Detect language if not provided
+        if language is None:
+            language = detect_language(str(file_path))
+
+        # Read content if not provided
+        if content is None:
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"Failed to read {file_path}: {e}")
+                return []
+
+        # Determine fallback chain based on language
+        fallbacks = self._get_fallback_chain(language, file_path)
+
+        # Try each fallback in order
+        for fallback in fallbacks:
+            try:
+                chunks = self._apply_fallback(
+                    fallback, file_path, relative_path, language, content
+                )
+                if chunks:
+                    logger.debug(
+                        f"Chunked {relative_path} with {fallback.value}: "
+                        f"{len(chunks)} chunks"
+                    )
+                    return chunks
+            except Exception as e:
+                logger.debug(f"{fallback.value} failed for {relative_path}: {e}")
+                continue
+
+        # Ultimate fallback - should never reach here but just in case
+        return self._chunk_with_overlap(file_path, relative_path, language, content)
+
+    def _get_fallback_chain(
+        self, language: str, file_path: Path
+    ) -> List[ChunkingFallback]:
+        """Determine the fallback chain for a language.
+
+        Args:
+            language: Language identifier
+            file_path: Path to the file
+
+        Returns:
+            Ordered list of fallback strategies to try
+        """
+        # Python always uses AST first
+        if language == "python":
+            return [ChunkingFallback.PYTHON_AST, ChunkingFallback.SLIDING_WINDOW]
+
+        # Check if language has tree-sitter support
+        try:
+            from victor.coding.languages.tiers import get_tier, LanguageTier
+
+            tier_config = get_tier(language)
+            has_tree_sitter = tier_config.has_tree_sitter and self._ts is not None
+        except ImportError:
+            has_tree_sitter = self._ts is not None
+
+        # Config files get special treatment
+        config_languages = {"yaml", "json", "toml", "xml", "ini", "properties", "hocon"}
+        is_config = language in config_languages or self._is_config_file(file_path)
+
+        # Build fallback chain - simple and robust
+        # Regex is intentionally NOT used because:
+        # 1. If code is parseable → tree-sitter handles it (grammar-aware)
+        # 2. If code is unparseable → sliding window is more robust than fragile regex
+        chain = []
+
+        if has_tree_sitter:
+            chain.append(ChunkingFallback.TREE_SITTER)
+
+        if is_config:
+            chain.append(ChunkingFallback.CONFIG_AWARE)
+
+        # Always end with sliding window (Rust/Python native - fast and robust)
+        # This handles: unparseable code, unknown languages, tree-sitter failures
+        chain.append(ChunkingFallback.SLIDING_WINDOW)
+
+        return chain
+
+    def _is_config_file(self, file_path: Path) -> bool:
+        """Check if a file is a config file based on name patterns."""
+        name = file_path.name.lower()
+        config_patterns = [
+            "config", "settings", "properties", ".conf", ".cfg",
+            ".ini", ".env", "dockerfile", "makefile", "gemfile",
+            "rakefile", "procfile", "vagrantfile", ".rc",
+        ]
+        return any(pattern in name for pattern in config_patterns)
+
+    def _apply_fallback(
+        self,
+        fallback: ChunkingFallback,
+        file_path: Path,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Apply a specific fallback strategy."""
+        if fallback == ChunkingFallback.PYTHON_AST:
+            return self._py_chunker.chunk_file(file_path, relative_path, content)
+
+        elif fallback == ChunkingFallback.TREE_SITTER:
+            return self._chunk_with_tree_sitter(
+                file_path, relative_path, language, content
+            )
+
+        elif fallback == ChunkingFallback.REGEX_SYMBOLS:
+            return self._chunk_with_regex(
+                file_path, relative_path, language, content
+            )
+
+        elif fallback == ChunkingFallback.CONFIG_AWARE:
+            return self._chunk_config_file(
+                file_path, relative_path, language, content
+            )
+
+        elif fallback == ChunkingFallback.SLIDING_WINDOW:
+            return self._chunk_with_overlap(
+                file_path, relative_path, language, content
+            )
+
+        return []
+
+    def _chunk_with_tree_sitter(
+        self,
+        file_path: Path,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Chunk using tree-sitter symbol extraction."""
+        if not self._ts:
+            return []
+
+        chunks: List[CodeChunk] = []
+        lines = content.split("\n")
+
+        symbols = self._ts.extract_symbols(file_path, language)
+
+        if not symbols:
+            return []  # Let next fallback handle it
+
+        # File summary
+        if self._config.include_file_summary:
+            symbol_names = [s.name for s in symbols[:10]]
+            summary = f"File: {relative_path}\nLanguage: {language}\nContains: {', '.join(symbol_names)}"
+            if len(symbols) > 10:
+                summary += f"\n  ... and {len(symbols) - 10} more"
+
+            chunks.append(CodeChunk(
+                id=f"{relative_path}:__file__",
+                content=summary,
+                chunk_type=ChunkType.FILE_SUMMARY,
+                file_path=relative_path,
+                line_start=1,
+                line_end=len(lines),
+                metadata={"symbol_count": len(symbols), "language": language},
+            ))
+
+        # Symbol chunks
+        for sym in symbols:
+            start = sym.line_number - 1
+            end = (sym.end_line or sym.line_number) - 1
+
+            if start < 0 or start >= len(lines):
+                continue
+
+            symbol_content = "\n".join(lines[start:end + 1])
+            if len(symbol_content) > self._config.max_chunk_chars:
+                symbol_content = symbol_content[:self._config.max_chunk_chars] + "\n# ... truncated"
+
+            chunk_type = (
+                ChunkType.CLASS_SUMMARY
+                if sym.type in ("class", "struct", "interface", "trait")
+                else ChunkType.METHOD_HEADER
+            )
+
+            parent = sym.parent_symbol
+            chunk_id = (
+                f"{relative_path}:{parent}.{sym.name}"
+                if parent
+                else f"{relative_path}:{sym.name}"
+            )
+
+            chunks.append(CodeChunk(
+                id=chunk_id,
+                content=f"{sym.type.title()}: {sym.name}\n{symbol_content}",
+                chunk_type=chunk_type,
+                file_path=relative_path,
+                symbol_name=sym.name,
+                symbol_type=sym.type,
+                line_start=sym.line_number,
+                line_end=sym.end_line or sym.line_number,
+                parent_id=f"{relative_path}:{parent}" if parent else None,
+                metadata={"language": language, "line_count": end - start + 1},
+            ))
+
+        return chunks
+
+    def _chunk_with_regex(
+        self,
+        file_path: Path,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Chunk using regex-based symbol extraction for legacy languages."""
+        patterns = REGEX_SYMBOL_PATTERNS.get(language.lower(), [])
+        if not patterns:
+            return []
+
+        chunks: List[CodeChunk] = []
+        lines = content.split("\n")
+
+        # Extract symbols using regex
+        symbols: List[Dict[str, Any]] = []
+        for line_num, line in enumerate(lines, 1):
+            for sym_type, pattern in patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    name = match.group(1) if match.groups() else sym_type
+                    symbols.append({
+                        "name": name,
+                        "type": sym_type,
+                        "line": line_num,
+                    })
+
+        if not symbols:
+            return []  # Let next fallback handle
+
+        # File summary
+        if self._config.include_file_summary:
+            symbol_names = [s["name"] for s in symbols[:10]]
+            summary = f"File: {relative_path}\nLanguage: {language}\nSymbols: {', '.join(symbol_names)}"
+
+            chunks.append(CodeChunk(
+                id=f"{relative_path}:__file__",
+                content=summary,
+                chunk_type=ChunkType.FILE_SUMMARY,
+                file_path=relative_path,
+                line_start=1,
+                line_end=len(lines),
+                metadata={"symbol_count": len(symbols), "language": language},
+            ))
+
+        # Create chunks around each symbol
+        for i, sym in enumerate(symbols):
+            # Determine end line (next symbol or end of file)
+            start_line = sym["line"]
+            if i + 1 < len(symbols):
+                end_line = symbols[i + 1]["line"] - 1
+            else:
+                end_line = min(start_line + 50, len(lines))
+
+            symbol_lines = lines[start_line - 1:end_line]
+            symbol_content = "\n".join(symbol_lines)
+
+            if len(symbol_content) > self._config.max_chunk_chars:
+                symbol_content = symbol_content[:self._config.max_chunk_chars] + "\n... truncated"
+
+            chunks.append(CodeChunk(
+                id=f"{relative_path}:{sym['name']}",
+                content=f"{sym['type'].title()}: {sym['name']}\n{symbol_content}",
+                chunk_type=ChunkType.METHOD_HEADER,
+                file_path=relative_path,
+                symbol_name=sym["name"],
+                symbol_type=sym["type"],
+                line_start=start_line,
+                line_end=end_line,
+                metadata={"language": language, "extraction": "regex"},
+            ))
+
+        return chunks
+
+    def _chunk_config_file(
+        self,
+        file_path: Path,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Chunk config files with structure awareness."""
+        chunks: List[CodeChunk] = []
+        lines = content.split("\n")
+
+        # File summary
+        chunks.append(CodeChunk(
+            id=f"{relative_path}:__file__",
+            content=f"Config File: {relative_path}\nFormat: {language}\nLines: {len(lines)}",
+            chunk_type=ChunkType.FILE_SUMMARY,
+            file_path=relative_path,
+            line_start=1,
+            line_end=len(lines),
+            metadata={"language": language, "config_type": language},
+        ))
+
+        # For YAML/JSON/TOML - try to identify top-level sections
+        if language in ("yaml", "json", "toml", "hocon"):
+            sections = self._extract_config_sections(content, language)
+
+            for section in sections:
+                section_content = section.get("content", "")
+                if len(section_content) > self._config.max_chunk_chars:
+                    section_content = section_content[:self._config.max_chunk_chars] + "\n# ... truncated"
+
+                chunks.append(CodeChunk(
+                    id=f"{relative_path}:{section['name']}",
+                    content=f"Section: {section['name']}\n{section_content}",
+                    chunk_type=ChunkType.CLASS_SUMMARY,
+                    file_path=relative_path,
+                    symbol_name=section["name"],
+                    symbol_type="config_section",
+                    line_start=section.get("start_line", 1),
+                    line_end=section.get("end_line", len(lines)),
+                    metadata={"language": language},
+                ))
+
+            if chunks:
+                return chunks
+
+        # Fallback: chunk by sections/blocks
+        return self._chunk_with_overlap(file_path, relative_path, language, content)
+
+    def _extract_config_sections(
+        self, content: str, language: str
+    ) -> List[Dict[str, Any]]:
+        """Extract top-level sections from config files."""
+        sections = []
+        lines = content.split("\n")
+
+        if language == "yaml":
+            # YAML top-level keys
+            current_section = None
+            section_start = 0
+            section_lines = []
+
+            for i, line in enumerate(lines):
+                # Top-level key (no leading whitespace)
+                if line and not line[0].isspace() and ":" in line:
+                    # Save previous section
+                    if current_section:
+                        sections.append({
+                            "name": current_section,
+                            "content": "\n".join(section_lines),
+                            "start_line": section_start,
+                            "end_line": i,
+                        })
+
+                    current_section = line.split(":")[0].strip()
+                    section_start = i + 1
+                    section_lines = [line]
+                elif current_section:
+                    section_lines.append(line)
+
+            # Save last section
+            if current_section:
+                sections.append({
+                    "name": current_section,
+                    "content": "\n".join(section_lines),
+                    "start_line": section_start,
+                    "end_line": len(lines),
+                })
+
+        elif language == "toml":
+            # TOML sections [section]
+            current_section = "root"
+            section_start = 1
+            section_lines = []
+
+            for i, line in enumerate(lines):
+                match = re.match(r"^\s*\[([^\]]+)\]", line)
+                if match:
+                    if section_lines:
+                        sections.append({
+                            "name": current_section,
+                            "content": "\n".join(section_lines),
+                            "start_line": section_start,
+                            "end_line": i,
+                        })
+                    current_section = match.group(1)
+                    section_start = i + 1
+                    section_lines = [line]
+                else:
+                    section_lines.append(line)
+
+            if section_lines:
+                sections.append({
+                    "name": current_section,
+                    "content": "\n".join(section_lines),
+                    "start_line": section_start,
+                    "end_line": len(lines),
+                })
+
+        return sections
+
+    def _chunk_with_overlap(
+        self,
+        file_path: Path,
+        relative_path: str,
+        language: str,
+        content: str,
+    ) -> List[CodeChunk]:
+        """Universal fallback: sliding window with overlap.
+
+        Delegates to TextChunkerProtocol (Rust when available) for
+        3-5x performance improvement on large files.
+
+        Works for ANY file type. Creates overlapping chunks based on
+        line boundaries for context preservation.
+        """
+        chunks: List[CodeChunk] = []
+        lines = content.split("\n")
+
+        # File summary (always created)
+        chunks.append(CodeChunk(
+            id=f"{relative_path}:__file__",
+            content=f"File: {relative_path}\nLanguage: {language}\nLines: {len(lines)}",
+            chunk_type=ChunkType.FILE_SUMMARY,
+            file_path=relative_path,
+            line_start=1,
+            line_end=len(lines),
+            metadata={"language": language, "chunking": "sliding_window"},
+        ))
+
+        # Skip empty content
+        if not content.strip():
+            return chunks
+
+        # Delegate to protocol (Rust or Python) for line-aware chunking
+        text_chunker = self._get_text_chunker()
+        chunk_infos = text_chunker.chunk_with_overlap(
+            content,
+            self._config.max_chunk_chars,
+            self._config.overlap_chars,
+        )
+
+        # Convert protocol ChunkInfo to domain CodeChunk
+        for idx, chunk_info in enumerate(chunk_infos):
+            if chunk_info.text.strip():
+                chunks.append(
+                    self._chunk_info_to_code_chunk(
+                        chunk_info,
+                        relative_path,
+                        language,
+                        chunk_index=idx,
+                    )
+                )
+
+            # Safety limit (100 chunks per file)
+            if idx >= 99:
+                logger.debug(f"Reached chunk limit for {relative_path}")
+                break
+
+        return chunks

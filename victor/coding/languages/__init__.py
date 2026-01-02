@@ -60,6 +60,16 @@ from victor.coding.languages.base import (
 )
 from victor.coding.languages.registry import LanguageRegistry, get_language_registry
 from victor.coding.languages.manager import LanguageManager
+from victor.coding.languages.tiers import (
+    LanguageTier,
+    TierConfig,
+    LANGUAGE_TIERS,
+    get_tier,
+    get_languages_by_tier,
+    is_lsp_recommended,
+    has_native_ast,
+    get_tier_summary,
+)
 
 __all__ = [
     # Base types
@@ -74,4 +84,13 @@ __all__ = [
     "LanguageRegistry",
     "get_language_registry",
     "LanguageManager",
+    # Tier system
+    "LanguageTier",
+    "TierConfig",
+    "LANGUAGE_TIERS",
+    "get_tier",
+    "get_languages_by_tier",
+    "is_lsp_recommended",
+    "has_native_ast",
+    "get_tier_summary",
 ]

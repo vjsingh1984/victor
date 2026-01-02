@@ -79,42 +79,70 @@ class ToolCategory(str, Enum):
 
 
 # =============================================================================
-# Built-in Category Defaults (Fallback)
+# Built-in Category Defaults (Loaded from YAML)
 # =============================================================================
 
-# These serve as fallback when ToolMetadataRegistry hasn't populated categories yet.
-# Plugins and verticals can extend these via ToolCategoryRegistry.
-_BUILTIN_CATEGORY_TOOLS = {
-    ToolCategory.CORE: {"read", "write", "edit", "shell", "search", "code_search", "ls"},
-    ToolCategory.FILESYSTEM: {
-        "read",
-        "write",
-        "edit",
-        "ls",
-        "list_directory",
-        "glob",
-        "find_files",
-        "file_info",
-        "mkdir",
-        "rm",
-        "mv",
-        "cp",
-    },
-    ToolCategory.GIT: {"git", "git_status", "git_diff", "git_commit", "git_branch", "git_log"},
-    ToolCategory.SEARCH: {"grep", "glob", "code_search", "semantic_code_search", "search"},
-    ToolCategory.WEB: {"web_search", "web_fetch", "http_request", "fetch_url"},
-    ToolCategory.DATABASE: {"sql_query", "db_schema", "database"},
-    ToolCategory.DOCKER: {"docker", "docker_run", "docker_build", "docker_compose"},
-    ToolCategory.TESTING: {"run_tests", "pytest", "test_runner", "test"},
-    ToolCategory.REFACTORING: {"refactor", "rename_symbol", "extract_function", "rename"},
-    ToolCategory.DOCUMENTATION: {"generate_docs", "update_readme", "documentation", "docstring"},
-    ToolCategory.ANALYSIS: {"analyze", "complexity"},
-    ToolCategory.COMMUNICATION: {"slack", "teams", "jira"},
-    ToolCategory.CUSTOM: set(),  # User-defined tools
-}
+# Phase 7.5: Tool categories are now loaded from victor/config/tool_categories.yaml
+# This provides OCP compliance - new categories can be added without code changes.
+# The YAML loader falls back to hardcoded defaults if the file is unavailable.
 
-# Alias for legacy REFACTOR
-_BUILTIN_CATEGORY_TOOLS[ToolCategory.REFACTOR] = _BUILTIN_CATEGORY_TOOLS[ToolCategory.REFACTORING]
+
+def _load_builtin_category_tools() -> dict:
+    """Load category-to-tools mapping from YAML configuration.
+
+    Returns:
+        Dict mapping ToolCategory enum -> set of tool names
+    """
+    from victor.config.tool_categories import load_tool_categories, get_fallback_categories
+
+    # Try loading from YAML
+    yaml_categories = load_tool_categories()
+
+    if yaml_categories:
+        # Convert string keys to ToolCategory enum
+        result = {}
+        for category_name, tools in yaml_categories.items():
+            try:
+                category_enum = ToolCategory(category_name)
+                result[category_enum] = tools
+            except ValueError:
+                # Custom category not in enum - skip for _BUILTIN_CATEGORY_TOOLS
+                # These are handled by ToolCategoryRegistry
+                pass
+
+        # Alias for legacy REFACTOR
+        if ToolCategory.REFACTORING in result:
+            result[ToolCategory.REFACTOR] = result[ToolCategory.REFACTORING]
+
+        return result
+
+    # Fallback to hardcoded defaults
+    fallback = get_fallback_categories()
+    result = {}
+    for category_name, tools in fallback.items():
+        try:
+            category_enum = ToolCategory(category_name)
+            result[category_enum] = tools
+        except ValueError:
+            pass
+
+    # Alias for legacy REFACTOR
+    if ToolCategory.REFACTORING in result:
+        result[ToolCategory.REFACTOR] = result[ToolCategory.REFACTORING]
+
+    return result
+
+
+# Lazy-loaded category tools (populated on first access)
+_BUILTIN_CATEGORY_TOOLS: Optional[dict] = None
+
+
+def _get_builtin_category_tools() -> dict:
+    """Get the builtin category tools, loading from YAML if needed."""
+    global _BUILTIN_CATEGORY_TOOLS
+    if _BUILTIN_CATEGORY_TOOLS is None:
+        _BUILTIN_CATEGORY_TOOLS = _load_builtin_category_tools()
+    return _BUILTIN_CATEGORY_TOOLS
 
 
 # =============================================================================
@@ -268,7 +296,7 @@ class ToolCategoryRegistry:
         if not result:
             try:
                 cat_enum = ToolCategory(category_lower)
-                result.update(_BUILTIN_CATEGORY_TOOLS.get(cat_enum, set()))
+                result.update(_get_builtin_category_tools().get(cat_enum, set()))
             except ValueError:
                 pass  # Unknown category
 

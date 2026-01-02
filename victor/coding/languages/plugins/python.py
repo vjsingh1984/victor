@@ -85,11 +85,15 @@ class PythonPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
-        """Create tree-sitter queries for Python symbol/call extraction."""
+        """Create tree-sitter queries for Python symbol/call extraction.
+
+        The @def capture is used for end_line (function body boundaries).
+        The @name capture is used for the symbol name.
+        """
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_definition name: (identifier) @name)"),
-                QueryPattern("function", "(function_definition name: (identifier) @name)"),
+                QueryPattern("class", "(class_definition name: (identifier) @name) @def"),
+                QueryPattern("function", "(function_definition name: (identifier) @name) @def"),
             ],
             calls="""
                 (call function: (identifier) @callee)

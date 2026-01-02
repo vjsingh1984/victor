@@ -39,8 +39,60 @@ logging:
 
   # Module-specific level overrides (reduce noise from chatty libraries)
   modules:
-    httpx: WARNING              # HTTP request logs
-    urllib3: WARNING            # Connection pool logs
-    asyncio: WARNING            # Async event loop logs
-    aiofiles: WARNING           # Async file operations
-    watchfiles: WARNING         # File watcher logs
+    # HTTP/Network libraries (very verbose at DEBUG)
+    httpx: WARNING
+    httpcore: WARNING
+    urllib3: WARNING
+    requests: WARNING
+    aiohttp: WARNING
+    http.client: WARNING
+    hpack: WARNING
+    h2: WARNING
+    h11: WARNING
+    # Async/IO libraries
+    asyncio: WARNING
+    aiofiles: WARNING
+    watchfiles: WARNING
+    # Database libraries
+    lancedb: WARNING
+    chromadb: WARNING
+    sqlite3: WARNING
+    # ML libraries
+    sentence_transformers: WARNING
+    transformers: WARNING
+    torch: WARNING
+    # Other noisy libraries
+    openai: WARNING
+    anthropic: WARNING
+    PIL: WARNING
+    matplotlib: WARNING
+
+    # Victor internal modules - downgrade startup noise to WARNING
+    # These log initialization details that clutter logs
+    victor.agent.service_provider: WARNING
+    victor.core.verticals.vertical_loader: WARNING
+    victor.coding.service_provider: WARNING
+    victor.core.bootstrap: WARNING
+    victor.agent.orchestrator_factory: WARNING
+    victor.context.project_context: WARNING
+    victor.core.database: WARNING
+    victor.agent.rl.coordinator: WARNING
+    victor.agent.rl.learners: WARNING
+    victor.agent.rl.learners.cache_eviction: WARNING
+    victor.agent.rl.learners.mode_transition: WARNING
+    victor.storage.cache.tiered_cache: WARNING
+    victor.agent.conversation_memory: WARNING
+    victor.storage.embeddings.service: WARNING
+    victor.agent.shared_tool_registry: WARNING
+    victor.tools.plugin_registry: WARNING
+    victor.tools.semantic_selector: WARNING
+    victor.agent.unified_task_tracker: WARNING
+    victor.agent.mode_controller: WARNING
+    victor.agent.orchestrator_utils: WARNING
+    victor.agent.capability_registry: WARNING
+    victor.agent.conversation_embedding_store: WARNING
+    victor.storage.embeddings.task_classifier: WARNING
+    victor.storage.embeddings.intent_classifier: WARNING
+    victor.agent.adaptive_mode_controller: WARNING
+    victor.agent.model_switcher: WARNING
+    victor.agent.provider_manager: WARNING

@@ -95,17 +95,11 @@ from victor.framework.event_registry import (
 )
 
 
+# Wrapper functions - delegate to EventRegistry (single source of truth)
+# These are kept for backward compatibility with existing callers.
+
 def framework_event_to_cqrs(event: Event) -> Dict[str, Any]:
-    """Convert a framework Event to CQRS event data.
-
-    Delegates to EventRegistry for the actual conversion.
-
-    Args:
-        event: Framework Event instance.
-
-    Returns:
-        Dictionary suitable for CQRS Event creation.
-    """
+    """Convert framework Event to CQRS data. Delegates to EventRegistry."""
     return convert_to_cqrs(event)
 
 
@@ -266,16 +260,7 @@ def observability_event_to_framework(victor_event: "VictorEvent") -> Event:
 
 
 def framework_event_to_observability(event: Event) -> Dict[str, Any]:
-    """Convert a framework Event to observability VictorEvent data.
-
-    Delegates to EventRegistry for the actual conversion.
-
-    Args:
-        event: Framework Event instance.
-
-    Returns:
-        Dictionary suitable for creating VictorEvent.
-    """
+    """Convert framework Event to observability data. Delegates to EventRegistry."""
     return convert_to_observability(event)
 
 

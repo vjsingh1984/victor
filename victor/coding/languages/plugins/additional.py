@@ -96,14 +96,18 @@ class CPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
+        """Create tree-sitter queries for C/C++ symbol extraction.
+
+        The @def capture is used for end_line (function body boundaries).
+        """
         return TreeSitterQueries(
             symbols=[
                 QueryPattern(
                     "function",
-                    "(function_definition declarator: (function_declarator declarator: (identifier) @name))",
+                    "(function_definition declarator: (function_declarator declarator: (identifier) @name)) @def",
                 ),
-                QueryPattern("class", "(struct_specifier name: (type_identifier) @name)"),
-                QueryPattern("class", "(enum_specifier name: (type_identifier) @name)"),
+                QueryPattern("class", "(struct_specifier name: (type_identifier) @name) @def"),
+                QueryPattern("class", "(enum_specifier name: (type_identifier) @name) @def"),
             ],
             calls="""
                 (call_expression function: (identifier) @callee)
