@@ -643,9 +643,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # RLCoordinator: Framework-level RL with unified SQLite storage (via factory)
         self._rl_coordinator = self._factory.create_rl_coordinator()
 
+        # Get context pruning learner from RL coordinator (if available)
+        pruning_learner = None
+        if self._rl_coordinator is not None:
+            try:
+                pruning_learner = self._rl_coordinator.get_learner("context_pruning")
+            except Exception as e:
+                logger.debug(f"Could not get context_pruning learner: {e}")
+
         # ContextCompactor: Proactive context management and tool result truncation (via factory)
         self._context_compactor = self._factory.create_context_compactor(
-            conversation_controller=self._conversation_controller
+            conversation_controller=self._conversation_controller,
+            pruning_learner=pruning_learner,
         )
 
         # ToolOutputFormatter: LLM-context-aware formatting of tool results
@@ -2193,6 +2202,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "[AgentOrchestrator] ConversationEmbeddingStore configured. "
                 "Message embeddings will sync to LanceDB."
             )
+
+            # Set up semantic tool result cache using the embedding service
+            # This enables FAISS-based semantic caching with mtime invalidation
+            try:
+                from victor.agent.tool_result_cache import ToolResultCache
+
+                semantic_cache = ToolResultCache(
+                    embedding_service=embedding_service,
+                    max_entries=500,
+                    cleanup_interval=60.0,
+                )
+                # Wire semantic cache to tool pipeline
+                if self._tool_pipeline is not None:
+                    self._tool_pipeline.set_semantic_cache(semantic_cache)
+                    logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize semantic tool cache: {e}")
+
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
             self._conversation_embedding_store = None

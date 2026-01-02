@@ -650,6 +650,10 @@ class RLCoordinator:
                 from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
 
                 return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+            elif name == "context_pruning":
+                from victor.agent.rl.learners.context_pruning import ContextPruningLearner
+
+                return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None

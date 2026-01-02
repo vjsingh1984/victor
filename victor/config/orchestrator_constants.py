@@ -263,6 +263,58 @@ class StageToolLimits:
 STAGE_TOOL_LIMITS = StageToolLimits()
 
 
+@dataclass(frozen=True)
+class SemanticCacheConfig:
+    """Configuration for semantic tool result cache (FAISS-based).
+
+    Attributes:
+        max_entries: Maximum cache entries before LRU eviction
+        cleanup_interval: Seconds between TTL cleanup runs
+        default_ttl: Default TTL for cached results (seconds)
+        enabled: Whether semantic caching is enabled
+
+    **Design Notes:**
+    - max_entries (500) balances memory usage vs cache effectiveness
+    - cleanup_interval (60) provides regular cleanup without overhead
+    - Uses mtime-based invalidation for file content, TTL as fallback
+    """
+
+    max_entries: int = 500
+    cleanup_interval: float = 60.0
+    default_ttl: int = 3600  # 1 hour (mtime handles freshness)
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
+class RLLearnerConfig:
+    """Configuration for RL-based context pruning learner.
+
+    Attributes:
+        learning_rate: Q-value update rate (alpha)
+        discount_factor: Future reward discount (gamma)
+        enabled: Whether RL-based pruning is enabled
+        min_samples: Minimum samples before confident recommendation
+        prior_alpha: Thompson Sampling prior alpha (Beta distribution)
+        prior_beta: Thompson Sampling prior beta (Beta distribution)
+
+    **Design Notes:**
+    - learning_rate (0.15) provides moderate learning speed
+    - discount_factor (0.90) values future rewards appropriately
+    - Uses Thompson Sampling for exploration-exploitation balance
+    """
+
+    learning_rate: float = 0.15
+    discount_factor: float = 0.90
+    enabled: bool = True
+    min_samples: int = 10
+    prior_alpha: float = 1.0
+    prior_beta: float = 1.0
+
+
+SEMANTIC_CACHE_CONFIG = SemanticCacheConfig()
+RL_LEARNER_CONFIG = RLLearnerConfig()
+
+
 # ============================================================================
 # Singleton instances (read-only)
 # ============================================================================

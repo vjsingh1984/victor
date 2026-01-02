@@ -128,23 +128,25 @@ class CacheStats:
 
 
 # TTL configuration per tool (seconds)
-# Shorter TTLs for volatile data, longer for stable data
+# Since we use mtime-based invalidation for file operations,
+# TTLs can be extended - they're just fallback expiry.
 TOOL_TTL = {
-    # File content - can change frequently
-    "read": 120,  # 2 minutes
-    "grep": 120,  # 2 minutes
-    "code_search": 120,  # 2 minutes
-    "semantic_code_search": 180,  # 3 minutes
+    # File content - mtime-based invalidation, long TTL as fallback
+    "read": 3600,  # 1 hour (mtime handles freshness)
+    "grep": 1800,  # 30 min (mtime for files, TTL for pattern changes)
+    "code_search": 1800,  # 30 min
+    "semantic_code_search": 1800,  # 30 min
 
-    # Directory structure - more stable
-    "ls": 300,  # 5 minutes
-    "overview": 600,  # 10 minutes
-    "find": 300,  # 5 minutes
+    # Directory structure - mtime-based, extended TTL
+    "ls": 3600,  # 1 hour
+    "overview": 3600,  # 1 hour
+    "find": 1800,  # 30 min
+    "glob": 1800,  # 30 min
 
-    # Symbol/reference lookups - moderately stable
-    "symbol": 180,  # 3 minutes
-    "refs": 180,  # 3 minutes
-    "graph": 300,  # 5 minutes
+    # Symbol/reference lookups - index-backed, long TTL
+    "symbol": 3600,  # 1 hour
+    "refs": 3600,  # 1 hour
+    "graph": 3600,  # 1 hour
 
     # Never cache (side effects or volatile)
     "shell": 0,

@@ -44,11 +44,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from victor.config.orchestrator_constants import COMPACTION_CONFIG, CONTEXT_LIMITS
+from victor.config.orchestrator_constants import (
+    COMPACTION_CONFIG,
+    CONTEXT_LIMITS,
+    RL_LEARNER_CONFIG,
+)
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
+    from victor.agent.rl.learners.context_pruning import ContextPruningLearner
 
 logger = logging.getLogger(__name__)
 
@@ -282,22 +287,36 @@ class ContextCompactor:
         self,
         controller: Optional["ConversationController"] = None,
         config: Optional[CompactorConfig] = None,
+        pruning_learner: Optional["ContextPruningLearner"] = None,
+        provider_type: str = "cloud",
     ):
         """Initialize the context compactor.
 
         Args:
             controller: The ConversationController to wrap (optional for testing)
             config: Optional compactor configuration
+            pruning_learner: Optional RL learner for adaptive pruning decisions
+            provider_type: Provider type for RL state (cloud, local)
         """
         self.controller = controller
         self.config = config or CompactorConfig()
+        self.pruning_learner = pruning_learner
+        self.provider_type = provider_type
         self._last_compaction_turn: int = 0
         self._total_chars_freed: int = 0
         self._total_tokens_freed: int = 0
         self._compaction_count: int = 0
 
+        # Track RL learner recommendations
+        self._rl_enabled = (
+            RL_LEARNER_CONFIG.enabled and pruning_learner is not None
+        )
+        self._last_rl_action: Optional[str] = None
+        self._last_task_success: bool = True
+
         logger.debug(
-            f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%})"
+            f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%}, "
+            f"rl_enabled: {self._rl_enabled})"
         )
 
     # ========================================================================
@@ -372,15 +391,20 @@ class ContextCompactor:
         self,
         current_query: Optional[str] = None,
         force: bool = False,
+        tool_call_count: int = 0,
+        task_complexity: str = "medium",
     ) -> CompactionAction:
         """Check context utilization and compact if needed.
 
         Proactively compacts when utilization exceeds threshold, rather
-        than waiting for overflow.
+        than waiting for overflow. Uses RL learner for adaptive pruning
+        when available.
 
         Args:
             current_query: Current user query for semantic relevance
             force: Force compaction regardless of utilization
+            tool_call_count: Number of tool calls made (for RL state)
+            task_complexity: Task complexity level (for RL state)
 
         Returns:
             CompactionAction describing what was done
@@ -388,12 +412,42 @@ class ContextCompactor:
         metrics = self.controller.get_context_metrics()
         utilization = metrics.utilization
 
+        # Get RL recommendation if learner is available
+        rl_config = None
+        rl_action = None
+        if self._rl_enabled and self.pruning_learner is not None:
+            try:
+                recommendation = self.pruning_learner.get_recommendation(
+                    context_utilization=utilization,
+                    tool_call_count=tool_call_count,
+                    task_complexity=task_complexity,
+                    provider_type=self.provider_type,
+                )
+                rl_action = recommendation.action
+                rl_config = recommendation.metadata.get("config", {})
+                self._last_rl_action = rl_action
+                logger.debug(
+                    f"RL recommendation: action={rl_action}, confidence={recommendation.confidence:.2f}"
+                )
+            except Exception as e:
+                logger.warning(f"RL recommendation failed: {e}")
+
+        # Get effective thresholds (RL config or defaults)
+        effective_threshold = (
+            rl_config.get("compaction_threshold", self.config.proactive_threshold)
+            if rl_config else self.config.proactive_threshold
+        )
+        effective_min_messages = (
+            rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
+            if rl_config else self.config.min_messages_after_compact
+        )
+
         # Determine trigger
         if force:
             trigger = CompactionTrigger.MANUAL
         elif metrics.is_overflow_risk:
             trigger = CompactionTrigger.OVERFLOW
-        elif self.config.enable_proactive and utilization >= self.config.proactive_threshold:
+        elif self.config.enable_proactive and utilization >= effective_threshold:
             trigger = CompactionTrigger.THRESHOLD
         else:
             return CompactionAction(
@@ -401,12 +455,15 @@ class ContextCompactor:
                 new_utilization=utilization,
             )
 
-        logger.info(f"Compaction triggered: {trigger.value} " f"(utilization: {utilization:.1%})")
+        logger.info(
+            f"Compaction triggered: {trigger.value} (utilization: {utilization:.1%}, "
+            f"threshold: {effective_threshold:.0%})"
+        )
 
         # Perform compaction
         chars_before = metrics.char_count
         messages_removed = self.controller.smart_compact_history(
-            target_messages=self.config.min_messages_after_compact,
+            target_messages=effective_min_messages,
             current_query=current_query,
         )
 
@@ -420,17 +477,21 @@ class ContextCompactor:
         self._compaction_count += 1
         self._last_compaction_turn = len(self.controller.messages)
 
+        details = [
+            f"Removed {messages_removed} messages",
+            f"Freed ~{tokens_freed} tokens",
+            f"New utilization: {metrics_after.utilization:.1%}",
+        ]
+        if rl_action:
+            details.append(f"RL action: {rl_action}")
+
         action = CompactionAction(
             trigger=trigger,
             messages_removed=messages_removed,
             chars_freed=chars_freed,
             tokens_freed=tokens_freed,
             new_utilization=metrics_after.utilization,
-            details=[
-                f"Removed {messages_removed} messages",
-                f"Freed ~{tokens_freed} tokens",
-                f"New utilization: {metrics_after.utilization:.1%}",
-            ],
+            details=details,
         )
 
         logger.info(
@@ -439,6 +500,46 @@ class ContextCompactor:
         )
 
         return action
+
+    def record_task_outcome(self, task_success: bool, tokens_saved: int = 0) -> None:
+        """Record task outcome for RL learning.
+
+        Call this after a task completes to update the RL learner with
+        the outcome of the most recent pruning decision.
+
+        Args:
+            task_success: Whether the task completed successfully
+            tokens_saved: Estimated tokens saved by pruning
+        """
+        if not self._rl_enabled or self.pruning_learner is None:
+            return
+
+        if self._last_rl_action is None:
+            return  # No pruning decision was made
+
+        try:
+            # Get current state for recording
+            metrics = self.controller.get_context_metrics() if self.controller else None
+            utilization = metrics.utilization if metrics else 0.5
+
+            self.pruning_learner.record_outcome(
+                context_utilization=utilization,
+                tool_call_count=0,  # Will be refined later
+                action=self._last_rl_action,
+                task_success=task_success,
+                tokens_saved=tokens_saved,
+                task_complexity="medium",
+                provider_type=self.provider_type,
+            )
+            self._last_task_success = task_success
+            logger.debug(
+                f"Recorded RL outcome: action={self._last_rl_action}, "
+                f"success={task_success}, tokens_saved={tokens_saved}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record RL outcome: {e}")
+        finally:
+            self._last_rl_action = None
 
     def should_compact(self) -> Tuple[bool, CompactionTrigger]:
         """Check if compaction should be performed.
@@ -913,6 +1014,8 @@ def create_context_compactor(
     preserve_code_blocks: bool = True,
     enable_proactive: bool = True,
     enable_tool_truncation: bool = True,
+    pruning_learner: Optional["ContextPruningLearner"] = None,
+    provider_type: str = "cloud",
 ) -> ContextCompactor:
     """Factory function to create a configured ContextCompactor.
 
@@ -926,6 +1029,8 @@ def create_context_compactor(
         preserve_code_blocks: Preserve code blocks during truncation (default: True)
         enable_proactive: Enable proactive compaction (default: True)
         enable_tool_truncation: Enable tool result truncation (default: True)
+        pruning_learner: Optional RL learner for adaptive pruning decisions
+        provider_type: Provider type for RL state (cloud, local)
 
     Returns:
         Configured ContextCompactor instance
@@ -940,4 +1045,9 @@ def create_context_compactor(
         enable_proactive=enable_proactive,
         enable_tool_truncation=enable_tool_truncation,
     )
-    return ContextCompactor(controller, config)
+    return ContextCompactor(
+        controller=controller,
+        config=config,
+        pruning_learner=pruning_learner,
+        provider_type=provider_type,
+    )
