@@ -77,6 +77,7 @@ def create_symbol_store(
 
     if backend == "sqlite+lancedb":
         from victor.storage.unified.sqlite_lancedb import SqliteLanceDBStore
+
         return SqliteLanceDBStore(repo_root, **kwargs)
 
     elif backend == "postgres+pgvector":

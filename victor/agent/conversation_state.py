@@ -401,9 +401,7 @@ class ConversationStateMachine:
             elif self.state.stage in tied_stages:
                 # Current stage is tied - stay to avoid oscillation
                 detected = self.state.stage
-                logger.debug(
-                    f"_detect_stage_from_tools: Tie resolved by staying at current stage"
-                )
+                logger.debug(f"_detect_stage_from_tools: Tie resolved by staying at current stage")
             else:
                 # Pick the most advanced (highest in workflow order)
                 detected = max(tied_stages, key=lambda s: STAGE_ORDER[s])
@@ -418,7 +416,9 @@ class ConversationStateMachine:
             )
             return detected
 
-        logger.debug(f"_detect_stage_from_tools: No stage overlap for tools={self.state.last_tools}")
+        logger.debug(
+            f"_detect_stage_from_tools: No stage overlap for tools={self.state.last_tools}"
+        )
         return None
 
     def _maybe_transition(self) -> None:

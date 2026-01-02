@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
     from victor.evaluation.protocol import TokenUsage
+
     # Factory-created components (type hints only)
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.search_router import SearchRouter
@@ -144,13 +145,21 @@ from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
+
 # Recovery - enums and functions used at runtime
 from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.protocols import RecoveryHandlerProtocol
-from victor.agent.orchestrator_recovery import create_recovery_integration, RecoveryAction as OrchestratorRecoveryAction
-from victor.agent.tool_output_formatter import ToolOutputFormatterConfig, FormattingContext, create_tool_output_formatter
+from victor.agent.orchestrator_recovery import (
+    create_recovery_integration,
+    RecoveryAction as OrchestratorRecoveryAction,
+)
+from victor.agent.tool_output_formatter import (
+    ToolOutputFormatterConfig,
+    FormattingContext,
+    create_tool_output_formatter,
+)
 
 # Pipeline - configs and results used at runtime
 from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
@@ -168,7 +177,11 @@ from victor.agent.orchestrator_integration import IntegrationConfig
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.tool_calling import ToolCallParseResult
 from victor.agent.tool_executor import ValidationMode
-from victor.agent.orchestrator_utils import calculate_max_context_chars, infer_git_operation, get_tool_status_message
+from victor.agent.orchestrator_utils import (
+    calculate_max_context_chars,
+    infer_git_operation,
+    get_tool_status_message,
+)
 from victor.agent.orchestrator_factory import OrchestratorFactory
 from victor.agent.parallel_executor import create_parallel_executor
 from victor.agent.response_completer import ToolFailureContext, create_response_completer

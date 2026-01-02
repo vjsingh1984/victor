@@ -1478,6 +1478,7 @@ async def read(
         """Get appropriate truncation limits based on current provider."""
         try:
             from victor.config.settings import get_settings
+
             settings = get_settings()
 
             # Check for airgapped mode or local providers
@@ -1491,6 +1492,7 @@ async def read(
                 # Try to get model context size from capabilities
                 try:
                     from victor.providers.model_capabilities import get_model_capabilities
+
                     model = getattr(settings, "model", "")
                     caps = get_model_capabilities(model)
                     context_window = caps.get("context_window", 0)

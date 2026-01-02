@@ -203,25 +203,19 @@ class TestPythonSimilarityComputer:
 
     def test_cosine_orthogonal_vectors(self, similarity_computer, sample_vectors):
         """Test cosine similarity of orthogonal vectors."""
-        sim = similarity_computer.cosine(
-            sample_vectors["unit_x"], sample_vectors["unit_y"]
-        )
+        sim = similarity_computer.cosine(sample_vectors["unit_x"], sample_vectors["unit_y"])
 
         assert math.isclose(sim, 0.0, abs_tol=1e-5)
 
     def test_cosine_opposite_vectors(self, similarity_computer, sample_vectors):
         """Test cosine similarity of opposite vectors."""
-        sim = similarity_computer.cosine(
-            sample_vectors["unit_x"], sample_vectors["neg_x"]
-        )
+        sim = similarity_computer.cosine(sample_vectors["unit_x"], sample_vectors["neg_x"])
 
         assert math.isclose(sim, -1.0, rel_tol=1e-5)
 
     def test_cosine_zero_vector(self, similarity_computer, sample_vectors):
         """Test cosine similarity with zero vector."""
-        sim = similarity_computer.cosine(
-            sample_vectors["unit_x"], sample_vectors["zero"]
-        )
+        sim = similarity_computer.cosine(sample_vectors["unit_x"], sample_vectors["zero"])
 
         assert sim == 0.0
 
@@ -290,9 +284,7 @@ class TestPythonTextChunker:
 
     def test_chunk_respects_line_boundaries(self, text_chunker, sample_multiline_text):
         """Test that chunking respects line boundaries."""
-        chunks = text_chunker.chunk_with_overlap(
-            sample_multiline_text, chunk_size=50, overlap=0
-        )
+        chunks = text_chunker.chunk_with_overlap(sample_multiline_text, chunk_size=50, overlap=0)
 
         # Each chunk should not cut words mid-line
         for chunk in chunks:
@@ -302,9 +294,7 @@ class TestPythonTextChunker:
 
     def test_chunk_with_overlap(self, text_chunker, sample_multiline_text):
         """Test chunking with overlap."""
-        chunks = text_chunker.chunk_with_overlap(
-            sample_multiline_text, chunk_size=50, overlap=20
-        )
+        chunks = text_chunker.chunk_with_overlap(sample_multiline_text, chunk_size=50, overlap=20)
 
         # Should produce multiple chunks
         assert len(chunks) > 1
@@ -316,9 +306,7 @@ class TestPythonTextChunker:
 
     def test_chunk_line_numbers(self, text_chunker, sample_multiline_text):
         """Test that chunk line numbers are correct."""
-        chunks = text_chunker.chunk_with_overlap(
-            sample_multiline_text, chunk_size=100, overlap=0
-        )
+        chunks = text_chunker.chunk_with_overlap(sample_multiline_text, chunk_size=100, overlap=0)
 
         # First chunk should start at line 1
         assert chunks[0].start_line == 1

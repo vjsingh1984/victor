@@ -196,9 +196,7 @@ class UnifiedSymbolExtractor:
         # Base extraction via tree-sitter (all tiers)
         try:
             ts_symbols = self._ts.extract_symbols(file_path, lang)
-            enriched = [
-                self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols
-            ]
+            enriched = [self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols]
         except Exception as e:
             logger.warning(f"Tree-sitter extraction failed for {file_path}: {e}")
             enriched = []
@@ -255,9 +253,7 @@ class UnifiedSymbolExtractor:
 
         try:
             ts_symbols = self._ts.extract_symbols(file_path, lang)
-            enriched = [
-                self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols
-            ]
+            enriched = [self._convert_ts_symbol(s, file_path, tier_config.tier) for s in ts_symbols]
         except Exception:
             return []
 

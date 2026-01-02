@@ -195,9 +195,7 @@ class ToolOutputFormatter:
         if tool_name in ("read_file", "read"):
             if original_len > self.config.file_structure_threshold:
                 # Skip truncation - use file structure mode instead
-                return self._format_large_file_structure(
-                    args, output, output_str, original_len
-                )
+                return self._format_large_file_structure(args, output, output_str, original_len)
 
         # Use smart truncation if truncator available
         if self._truncator:

@@ -1277,10 +1277,7 @@ class ToolPipeline:
 
         # Check semantic cache (FAISS-based with mtime invalidation)
         # This catches similar-but-not-identical queries that would return same results
-        if (
-            self.config.enable_semantic_caching
-            and self.semantic_cache is not None
-        ):
+        if self.config.enable_semantic_caching and self.semantic_cache is not None:
             try:
                 semantic_result = await self.semantic_cache.get(tool_name, normalized_args)
                 if semantic_result is not None:
@@ -1492,10 +1489,7 @@ class ToolPipeline:
             self.cache_result(tool_name, normalized_args, call_result)
 
             # Store in semantic cache (FAISS-based with mtime tracking)
-            if (
-                self.config.enable_semantic_caching
-                and self.semantic_cache is not None
-            ):
+            if self.config.enable_semantic_caching and self.semantic_cache is not None:
                 try:
                     # Get file path for mtime tracking
                     file_path = normalized_args.get("path") or normalized_args.get("file_path")

@@ -108,6 +108,7 @@ class SqliteLanceDBStore:
 
         # Initialize SQLite graph store
         from victor.storage.graph.sqlite_store import SqliteGraphStore
+
         graph_db_path = self.persist_directory / "project.db"
         self._graph_store = SqliteGraphStore(str(graph_db_path))
         await self._graph_store.initialize()
@@ -117,6 +118,7 @@ class SqliteLanceDBStore:
             EmbeddingModelConfig,
             create_embedding_model,
         )
+
         model_config = EmbeddingModelConfig(
             model_type=self.embedding_model_type,
             model_name=self.embedding_model_name,
@@ -137,6 +139,7 @@ class SqliteLanceDBStore:
         """Initialize LanceDB for vector storage."""
         try:
             import lancedb
+
             embeddings_dir = self.persist_directory / "embeddings"
             embeddings_dir.mkdir(parents=True, exist_ok=True)
             self._vector_store = lancedb.connect(str(embeddings_dir))
@@ -241,31 +244,35 @@ class SqliteLanceDBStore:
         embedding_items = []
 
         for symbol, embedding_text in symbols:
-            nodes.append(GraphNode(
-                node_id=symbol.unified_id,
-                type=symbol.type,
-                name=symbol.name,
-                file=symbol.file_path,
-                line=symbol.line,
-                end_line=symbol.end_line,
-                lang=symbol.lang,
-                signature=symbol.signature,
-                docstring=symbol.docstring,
-                parent_id=symbol.parent_id,
-                embedding_ref=symbol.unified_id,
-                metadata=symbol.metadata,
-            ))
+            nodes.append(
+                GraphNode(
+                    node_id=symbol.unified_id,
+                    type=symbol.type,
+                    name=symbol.name,
+                    file=symbol.file_path,
+                    line=symbol.line,
+                    end_line=symbol.end_line,
+                    lang=symbol.lang,
+                    signature=symbol.signature,
+                    docstring=symbol.docstring,
+                    parent_id=symbol.parent_id,
+                    embedding_ref=symbol.unified_id,
+                    metadata=symbol.metadata,
+                )
+            )
 
             if embedding_text:
-                embedding_items.append({
-                    "id": symbol.unified_id,
-                    "text": embedding_text,
-                    "metadata": {
-                        "file_path": symbol.file_path,
-                        "symbol_type": symbol.type,
-                        "line_number": symbol.line,
-                    },
-                })
+                embedding_items.append(
+                    {
+                        "id": symbol.unified_id,
+                        "text": embedding_text,
+                        "metadata": {
+                            "file_path": symbol.file_path,
+                            "symbol_type": symbol.type,
+                            "line_number": symbol.line,
+                        },
+                    }
+                )
 
         # Batch upsert to graph
         await self._graph_store.upsert_nodes(nodes)
@@ -275,7 +282,7 @@ class SqliteLanceDBStore:
             # Process in batches
             indexed = 0
             for i in range(0, len(embedding_items), batch_size):
-                batch = embedding_items[i:i + batch_size]
+                batch = embedding_items[i : i + batch_size]
                 texts = [item["text"] for item in batch]
 
                 # Batch embed
@@ -284,17 +291,17 @@ class SqliteLanceDBStore:
                 # Prepare LanceDB documents (no content, just vector + metadata)
                 lance_docs = []
                 for item, vector in zip(batch, vectors, strict=False):
-                    lance_docs.append({
-                        "id": item["id"],
-                        "vector": vector,
-                        **item["metadata"],
-                    })
+                    lance_docs.append(
+                        {
+                            "id": item["id"],
+                            "vector": vector,
+                            **item["metadata"],
+                        }
+                    )
 
                 # Upsert to LanceDB
                 if self._vector_table is None:
-                    self._vector_table = self._vector_store.create_table(
-                        "symbols", data=lance_docs
-                    )
+                    self._vector_table = self._vector_store.create_table("symbols", data=lance_docs)
                 else:
                     self._vector_table.add(lance_docs)
 
@@ -419,7 +426,7 @@ class SqliteLanceDBStore:
             results.values(),
             key=lambda r: r.score,
             reverse=True,
-        )[:params.limit]
+        )[: params.limit]
 
         # Optionally include neighbors
         if params.include_neighbors:
@@ -482,12 +489,14 @@ class SqliteLanceDBStore:
             if not symbol:
                 continue
 
-            search_results.append(SearchResult(
-                symbol=symbol,
-                score=score,
-                match_type="semantic",
-                semantic_score=score,
-            ))
+            search_results.append(
+                SearchResult(
+                    symbol=symbol,
+                    score=score,
+                    match_type="semantic",
+                    semantic_score=score,
+                )
+            )
 
         return search_results
 
@@ -510,12 +519,14 @@ class SqliteLanceDBStore:
         results = []
         for node in nodes:
             symbol = self._node_to_symbol(node)
-            results.append(SearchResult(
-                symbol=symbol,
-                score=1.0,  # FTS doesn't provide scores
-                match_type="keyword",
-                keyword_score=1.0,
-            ))
+            results.append(
+                SearchResult(
+                    symbol=symbol,
+                    score=1.0,  # FTS doesn't provide scores
+                    match_type="keyword",
+                    keyword_score=1.0,
+                )
+            )
 
         return results
 

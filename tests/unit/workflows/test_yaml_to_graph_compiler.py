@@ -28,6 +28,7 @@ def suppress_compiler_logging(caplog):
     # from intentional edge-case testing (no orchestrator, unknown branch, etc.)
     logging.getLogger("victor.workflows.yaml_to_graph_compiler").setLevel(logging.CRITICAL)
 
+
 from victor.workflows.definition import (
     AgentNode,
     ComputeNode,

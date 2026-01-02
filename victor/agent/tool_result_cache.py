@@ -136,18 +136,15 @@ TOOL_TTL = {
     "grep": 1800,  # 30 min (mtime for files, TTL for pattern changes)
     "code_search": 1800,  # 30 min
     "semantic_code_search": 1800,  # 30 min
-
     # Directory structure - mtime-based, extended TTL
     "ls": 3600,  # 1 hour
     "overview": 3600,  # 1 hour
     "find": 1800,  # 30 min
     "glob": 1800,  # 30 min
-
     # Symbol/reference lookups - index-backed, long TTL
     "symbol": 3600,  # 1 hour
     "refs": 3600,  # 1 hour
     "graph": 3600,  # 1 hour
-
     # Never cache (side effects or volatile)
     "shell": 0,
     "write": 0,
@@ -264,7 +261,8 @@ class ToolResultCache:
 
         self._last_cleanup = now
         expired_keys = [
-            key for key, entry in self._entries.items()
+            key
+            for key, entry in self._entries.items()
             if entry.is_expired() or entry.is_file_stale()
         ]
 
@@ -532,8 +530,7 @@ class ToolResultCache:
         """
         with self._lock:
             to_remove = [
-                key for key, entry in self._entries.items()
-                if entry.file_path == file_path
+                key for key, entry in self._entries.items() if entry.file_path == file_path
             ]
             for key in to_remove:
                 self._remove_entry(key)
@@ -555,8 +552,7 @@ class ToolResultCache:
         """
         with self._lock:
             to_remove = [
-                key for key, entry in self._entries.items()
-                if entry.tool_name == tool_name
+                key for key, entry in self._entries.items() if entry.tool_name == tool_name
             ]
             for key in to_remove:
                 self._remove_entry(key)

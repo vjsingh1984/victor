@@ -44,8 +44,10 @@ from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple, TypeVar
 # UNIFIED ID SCHEME
 # =============================================================================
 
+
 class SymbolType(str, Enum):
     """Symbol type for unified IDs."""
+
     FILE = "file"
     MODULE = "module"
     CLASS = "class"
@@ -72,6 +74,7 @@ class UnifiedId:
         - Portability issues with absolute paths
         - Hash collisions from filename-only IDs
     """
+
     type: str  # symbol, file, class, function, etc.
     path: str  # repo-relative path (e.g., victor/tools/graph_tool.py)
     name: str  # symbol name (empty for file type)
@@ -117,6 +120,7 @@ class UnifiedId:
 # UNIFIED SYMBOL NODE - Combines Graph + Embedding Data
 # =============================================================================
 
+
 @dataclass
 class UnifiedSymbol:
     """Symbol with both graph and embedding data.
@@ -129,6 +133,7 @@ class UnifiedSymbol:
     - Graph: relationships (callers, callees, etc.)
     - Semantic: embedding vector reference
     """
+
     # Identity
     unified_id: str  # UnifiedId as string for serialization
     name: str
@@ -163,6 +168,7 @@ class UnifiedSymbol:
 @dataclass
 class UnifiedEdge:
     """Edge between unified symbols."""
+
     src_id: str  # UnifiedId as string
     dst_id: str  # UnifiedId as string
     type: str  # CALLS, REFERENCES, INHERITS, IMPLEMENTS, CONTAINS
@@ -174,8 +180,10 @@ class UnifiedEdge:
 # SEARCH PARAMETERS AND RESULTS
 # =============================================================================
 
+
 class SearchMode(str, Enum):
     """Search mode for unified queries."""
+
     KEYWORD = "keyword"  # FTS only
     SEMANTIC = "semantic"  # Vector similarity only
     HYBRID = "hybrid"  # Combined (default)
@@ -185,6 +193,7 @@ class SearchMode(str, Enum):
 @dataclass
 class SearchParams:
     """Parameters for unified search."""
+
     query: str
     mode: SearchMode = SearchMode.HYBRID
     limit: int = 20
@@ -208,6 +217,7 @@ class SearchParams:
 @dataclass
 class SearchResult:
     """Result from unified search."""
+
     symbol: UnifiedSymbol
     score: float  # combined relevance score
     match_type: str  # keyword, semantic, graph, hybrid
@@ -224,6 +234,7 @@ class SearchResult:
 # =============================================================================
 # PROTOCOLS - Dependency Inversion Principle
 # =============================================================================
+
 
 class VectorStoreProtocol(Protocol):
     """Protocol for vector stores (semantic search).

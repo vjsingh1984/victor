@@ -29,6 +29,7 @@ except ImportError:
         """Fallback stub when native not available."""
         return ("string", value, None)
 
+
 logger = logging.getLogger(__name__)
 
 

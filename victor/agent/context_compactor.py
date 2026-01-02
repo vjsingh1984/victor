@@ -308,9 +308,7 @@ class ContextCompactor:
         self._compaction_count: int = 0
 
         # Track RL learner recommendations
-        self._rl_enabled = (
-            RL_LEARNER_CONFIG.enabled and pruning_learner is not None
-        )
+        self._rl_enabled = RL_LEARNER_CONFIG.enabled and pruning_learner is not None
         self._last_rl_action: Optional[str] = None
         self._last_task_success: bool = True
 
@@ -435,11 +433,13 @@ class ContextCompactor:
         # Get effective thresholds (RL config or defaults)
         effective_threshold = (
             rl_config.get("compaction_threshold", self.config.proactive_threshold)
-            if rl_config else self.config.proactive_threshold
+            if rl_config
+            else self.config.proactive_threshold
         )
         effective_min_messages = (
             rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
-            if rl_config else self.config.min_messages_after_compact
+            if rl_config
+            else self.config.min_messages_after_compact
         )
 
         # Determine trigger

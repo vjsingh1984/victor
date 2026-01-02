@@ -205,8 +205,7 @@ class TreeSitterExtractor:
 
                     # Search for def node that contains this name
                     for def_start, def_node in def_by_start_line.items():
-                        if (def_start <= name_line and
-                            def_node.end_point[0] >= name_line):
+                        if def_start <= name_line and def_node.end_point[0] >= name_line:
                             end_line = def_node.end_point[0] + 1
                             break
 

@@ -70,6 +70,7 @@ except ImportError:
         """Fallback stub when native not available."""
         return False
 
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -255,13 +256,15 @@ def _process_file_parallel(
                                     end_line = def_node.end_point[0] + 1
                                     break
 
-                            symbols_data.append({
-                                "name": text,
-                                "type": sym_type,
-                                "file_path": str(file_path.relative_to(root)),
-                                "line_number": name_line + 1,
-                                "end_line": end_line,
-                            })
+                            symbols_data.append(
+                                {
+                                    "name": text,
+                                    "type": sym_type,
+                                    "file_path": str(file_path.relative_to(root)),
+                                    "line_number": name_line + 1,
+                                    "end_line": end_line,
+                                }
+                            )
                 except Exception:
                     continue
 
@@ -467,7 +470,10 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
             "function",
             "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression))) @def",
         ),
-        ("function", "(assignment_expression left: (identifier) @name right: (arrow_function)) @def"),
+        (
+            "function",
+            "(assignment_expression left: (identifier) @name right: (arrow_function)) @def",
+        ),
     ],
     "typescript": [
         ("class", "(class_declaration name: (identifier) @name) @def"),
@@ -482,7 +488,10 @@ SYMBOL_QUERIES: Dict[str, List[tuple[str, str]]] = {
             "function",
             "(lexical_declaration (variable_declarator name: (identifier) @name value: (function_expression))) @def",
         ),
-        ("function", "(assignment_expression left: (identifier) @name right: (arrow_function)) @def"),
+        (
+            "function",
+            "(assignment_expression left: (identifier) @name right: (arrow_function)) @def",
+        ),
     ],
     "go": [
         ("function", "(function_declaration name: (identifier) @name) @def"),
@@ -1018,6 +1027,7 @@ class CodebaseIndex:
             # Auto-detect: cap at 4 workers (benchmarks show only 2x speedup,
             # so loading more tree-sitter parsers has diminishing returns)
             import multiprocessing
+
             self._parallel_workers = min(multiprocessing.cpu_count(), 4)
         else:
             self._parallel_workers = parallel_workers
@@ -1258,23 +1268,25 @@ class CodebaseIndex:
                     if text_for_embedding:
                         # Use unified ID for correlation with graph nodes
                         unified_id = self.make_symbol_id(rel_path, symbol.name)
-                        documents.append({
-                            "id": unified_id,
-                            "content": text_for_embedding,
-                            "metadata": {
-                                "file_path": rel_path,
-                                "symbol_name": symbol.name,
-                                "symbol_type": symbol.type,
-                                "line_number": symbol.line_number,
-                                "end_line": symbol.end_line,  # For precise reads
-                            },
-                        })
+                        documents.append(
+                            {
+                                "id": unified_id,
+                                "content": text_for_embedding,
+                                "metadata": {
+                                    "file_path": rel_path,
+                                    "symbol_name": symbol.name,
+                                    "symbol_type": symbol.type,
+                                    "line_number": symbol.line_number,
+                                    "end_line": symbol.end_line,  # For precise reads
+                                },
+                            }
+                        )
 
             # Batch embed for performance (process in chunks of 500)
             batch_size = 500
             embedding_count = 0
             for i in range(0, len(documents), batch_size):
-                batch = documents[i:i + batch_size]
+                batch = documents[i : i + batch_size]
                 try:
                     await self.embedding_provider.index_documents(batch)
                     embedding_count += len(batch)
@@ -1307,24 +1319,17 @@ class CodebaseIndex:
         errors = 0
 
         logger.info(
-            f"Starting parallel indexing: {total_files} files, "
-            f"{self._parallel_workers} workers"
+            f"Starting parallel indexing: {total_files} files, " f"{self._parallel_workers} workers"
         )
 
         # Prepare arguments for parallel processing
-        tasks = [
-            (str(file_path), root_str, language)
-            for file_path, language in files_to_index
-        ]
+        tasks = [(str(file_path), root_str, language) for file_path, language in files_to_index]
 
         # Process files in parallel using ProcessPoolExecutor
         loop = asyncio.get_event_loop()
         with ProcessPoolExecutor(max_workers=self._parallel_workers) as executor:
             # Submit all tasks
-            futures = {
-                executor.submit(_process_file_parallel, *task): task
-                for task in tasks
-            }
+            futures = {executor.submit(_process_file_parallel, *task): task for task in tasks}
 
             # Process results as they complete
             for future in as_completed(futures):
@@ -2142,9 +2147,7 @@ class CodebaseIndex:
                     file_path, language, content
                 )
                 if enriched:
-                    symbols = [
-                        self._enriched_to_symbol(s, relative_path) for s in enriched
-                    ]
+                    symbols = [self._enriched_to_symbol(s, relative_path) for s in enriched]
                     logger.debug(
                         f"Unified extractor: {len(symbols)} symbols from {file_path.name} "
                         f"(tier={tier_config.tier.name})"

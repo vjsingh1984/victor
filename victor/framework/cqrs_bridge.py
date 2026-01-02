@@ -98,6 +98,7 @@ from victor.framework.event_registry import (
 # Wrapper functions - delegate to EventRegistry (single source of truth)
 # These are kept for backward compatibility with existing callers.
 
+
 def framework_event_to_cqrs(event: Event) -> Dict[str, Any]:
     """Convert framework Event to CQRS data. Delegates to EventRegistry."""
     return convert_to_cqrs(event)

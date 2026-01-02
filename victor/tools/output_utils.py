@@ -348,7 +348,9 @@ def truncate_by_lines(
     # Add continuation hint if truncated
     if was_truncated:
         remaining = total_lines - end_line
-        truncated_content += f"\n\n[... {remaining} more lines. Use offset={end_line} to continue ...]"
+        truncated_content += (
+            f"\n\n[... {remaining} more lines. Use offset={end_line} to continue ...]"
+        )
 
     return truncated_content, info
 
