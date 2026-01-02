@@ -232,9 +232,9 @@ class EmbeddingCacheManager:
         self._categories: Dict[CacheType, Dict] = {
             CacheType.TOOL: {
                 "name": "Tool Embeddings",
-                "desc": "Semantic tool selection",
+                "desc": "Semantic tool selection (project-isolated)",
                 "path": self._global_embeddings,
-                "pattern": "tool_embeddings_*.pkl",
+                "pattern": "tool_embeddings_*_*.pkl",  # model_hash pattern
             },
             CacheType.INTENT: {
                 "name": "Task Classifier",

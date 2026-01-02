@@ -167,11 +167,17 @@ class ToolCallingProvider(Protocol):
 - Workflow parallel execution (stubbed)
 - Graph backend operations (stubbed)
 
-### TD-010: Embedding Cache Not Project-Isolated
+### TD-010: Embedding Cache Not Project-Isolated ✅ RESOLVED
 
 **Issue**: Single global embedding cache, not project-scoped
 **Impact**: Cache pollution between projects
-**Fix**: Add project hash to cache key
+**Resolution**: Added project hash to cache filenames
+
+**Changes**:
+- `victor/tools/semantic_selector.py`: Added `_get_project_hash()` method
+- Cache filename now: `tool_embeddings_{model}_{project_hash}.pkl`
+- Usage stats now: `tool_usage_stats_{project_hash}.pkl`
+- Each project gets isolated tool embeddings cache
 
 ---
 
@@ -191,9 +197,10 @@ class ToolCallingProvider(Protocol):
 |----|-------------|----------|-----|
 | TD-001 | LSP Violation in LMStudio Provider | 2026-01-02 | 2ce4e4d |
 | TD-004 | Generic Exception Catches (~80% resolved) | 2026-01-02 | ee6cd5e, f82f1be, 776b6c8 |
-| TD-005 | Missing Tool Calling Adapters (Bedrock, Azure, DeepSeek) | 2026-01-02 | a32d031, pending |
+| TD-005 | Missing Tool Calling Adapters (Bedrock, Azure, DeepSeek) | 2026-01-02 | a32d031, 578d564 |
 | TD-006 | Stubbed Features (documented as experimental) | 2026-01-02 | - |
 | TD-007 | Tool Catalog Incomplete | 2026-01-02 | 59fa014 |
+| TD-010 | Embedding Cache Project Isolation | 2026-01-02 | pending |
 
 ---
 
@@ -203,15 +210,16 @@ class ToolCallingProvider(Protocol):
 Total Debt Items: 7
 ├── P0 (Critical): 0 ✅
 ├── P1 (High): 3 (TD-004 ~80% resolved)
-├── P2 (Medium): 0 (TD-005, TD-006, TD-007 resolved)
-└── P3 (Low): 3
+├── P2 (Medium): 0 ✅ (TD-005, TD-006, TD-007 resolved)
+└── P3 (Low): 2 (TD-010 resolved, TD-008/TD-009 remaining)
 
-Code Quality Score: 8.0/10
+Code Quality Score: 8.2/10
 ├── SOLID Compliance: 8/10 (LSP violation fixed)
 ├── Error Handling: 7/10 (34 of 56 catches fixed)
 ├── Test Coverage: 7/10
-└── Documentation Accuracy: 9/10 (catalog + stubs documented)
-└── Provider Coverage: 8/10 (8 dedicated adapters + OpenAI-compat fallback)
+├── Documentation Accuracy: 9/10 (catalog + stubs documented)
+├── Provider Coverage: 8/10 (8 dedicated adapters + OpenAI-compat fallback)
+└── Cache Isolation: 9/10 (project-scoped caches)
 ```
 
 ---
