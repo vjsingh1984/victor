@@ -15,7 +15,7 @@
 """Base provider interface for LLM providers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,139 @@ from victor.providers.circuit_breaker import (
     CircuitBreakerRegistry,
 )
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+
+
+# -----------------------------------------------------------------------------
+# Protocol classes for Interface Segregation (ISP)
+# These allow providers to optionally implement specific capabilities without
+# requiring all providers to implement methods they don't support.
+# -----------------------------------------------------------------------------
+
+
+@runtime_checkable
+class StreamingProvider(Protocol):
+    """Protocol for providers that support streaming responses.
+
+    Providers implementing this protocol can stream chat completions
+    incrementally rather than returning the full response at once.
+
+    Example:
+        class MyProvider(BaseProvider):
+            def supports_streaming(self) -> bool:
+                return True
+
+            async def stream(self, messages, **kwargs) -> AsyncIterator[StreamChunk]:
+                # Implementation here
+                ...
+
+    Type checking:
+        if isinstance(provider, StreamingProvider):
+            async for chunk in provider.stream(messages, model=model):
+                print(chunk.content)
+    """
+
+    def supports_streaming(self) -> bool:
+        """Whether the provider supports streaming responses.
+
+        Returns:
+            True if provider supports streaming, False otherwise
+        """
+        ...
+
+    async def stream(
+        self,
+        messages: List["Message"],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List["ToolDefinition"]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator["StreamChunk"]:
+        """Stream a chat completion response.
+
+        Args:
+            messages: List of conversation messages
+            model: Model identifier
+            temperature: Sampling temperature (0-2)
+            max_tokens: Maximum tokens to generate
+            tools: Available tools for the model to use
+            **kwargs: Additional provider-specific parameters
+
+        Yields:
+            StreamChunk objects with incremental content
+        """
+        ...
+
+
+@runtime_checkable
+class ToolCallingProvider(Protocol):
+    """Protocol for providers that support tool/function calling.
+
+    Providers implementing this protocol can receive tool definitions
+    and return structured tool calls in their responses.
+
+    Example:
+        class MyProvider(BaseProvider):
+            def supports_tools(self) -> bool:
+                return True
+
+            async def chat(self, messages, *, model, tools=None, **kwargs):
+                # Handle tools in implementation
+                ...
+
+    Type checking:
+        if isinstance(provider, ToolCallingProvider):
+            response = await provider.chat(
+                messages, model=model, tools=my_tools
+            )
+            if response.tool_calls:
+                # Process tool calls
+                ...
+    """
+
+    def supports_tools(self) -> bool:
+        """Whether the provider supports tool/function calling.
+
+        Returns:
+            True if provider supports tools, False otherwise
+        """
+        ...
+
+
+# Helper functions for type checking
+def is_streaming_provider(provider: Any) -> bool:
+    """Check if a provider supports streaming.
+
+    This is a convenience function that checks both protocol implementation
+    and the supports_streaming() method result.
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider supports streaming responses
+    """
+    if hasattr(provider, "supports_streaming"):
+        return provider.supports_streaming()
+    return False
+
+
+def is_tool_calling_provider(provider: Any) -> bool:
+    """Check if a provider supports tool calling.
+
+    This is a convenience function that checks both protocol implementation
+    and the supports_tools() method result.
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider supports tool/function calling
+    """
+    if hasattr(provider, "supports_tools"):
+        return provider.supports_tools()
+    return False
 
 
 class Message(BaseModel):
@@ -141,11 +274,33 @@ class BaseProvider(ABC):
         return self._circuit_breaker
 
     def supports_tools(self) -> bool:
-        """Whether the provider supports tool calling."""
+        """Check if provider supports tool/function calling.
+
+        Default implementation returns False. Providers that support tool calling
+        should override this method to return True. This follows the Interface
+        Segregation Principle - providers don't need to implement tool calling
+        if they don't support it.
+
+        See also: ToolCallingProvider protocol for type checking.
+
+        Returns:
+            True if provider supports tools, False otherwise (default)
+        """
         return False
 
     def supports_streaming(self) -> bool:
-        """Whether the provider supports streaming responses."""
+        """Check if provider supports streaming responses.
+
+        Default implementation returns False. Providers that support streaming
+        should override this method to return True. This follows the Interface
+        Segregation Principle - providers don't need to implement streaming
+        if they don't support it.
+
+        See also: StreamingProvider protocol for type checking.
+
+        Returns:
+            True if provider supports streaming, False otherwise (default)
+        """
         return False
 
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
@@ -276,24 +431,6 @@ class BaseProvider(ABC):
             **kwargs,
         ):
             yield chunk
-
-    @abstractmethod
-    def supports_tools(self) -> bool:
-        """Check if provider supports tool/function calling.
-
-        Returns:
-            True if provider supports tools, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    def supports_streaming(self) -> bool:
-        """Check if provider supports streaming responses.
-
-        Returns:
-            True if provider supports streaming, False otherwise
-        """
-        pass
 
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
