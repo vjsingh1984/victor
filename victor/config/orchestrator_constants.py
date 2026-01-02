@@ -236,6 +236,33 @@ class ToolSelectionPresets:
         )
 
 
+@dataclass(frozen=True)
+class StageToolLimits:
+    """Maximum tools per conversation stage.
+
+    Controls how many tools are broadcast to the LLM at each stage.
+    Higher limits for execution stages, lower for exploration stages.
+
+    **Design Notes:**
+    - INITIAL/READING: Lower limit since only read tools needed
+    - EXECUTING: Higher limit to allow write/edit/test tools
+    - BUILD mode uses executing_max for all stages
+    - These limits are applied AFTER semantic/keyword selection
+    """
+
+    initial_max: int = 12  # Early exploration - focus on read tools
+    planning_max: int = 12  # Planning stage
+    reading_max: int = 12  # Reading/analysis
+    analysis_max: int = 14  # Analysis may need more tools
+    executing_max: int = 20  # Execution needs write/edit/shell/git/test
+    verification_max: int = 15  # Verification stage
+    completion_max: int = 10  # Completion - minimal tools
+    build_mode_max: int = 20  # BUILD mode override (allows more tools)
+
+
+STAGE_TOOL_LIMITS = StageToolLimits()
+
+
 # ============================================================================
 # Singleton instances (read-only)
 # ============================================================================

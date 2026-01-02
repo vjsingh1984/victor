@@ -979,11 +979,29 @@ class ToolSelector(ModeAwareMixin):
         since they are essential for the vertical's operation even in early stages.
         For example, DevOps needs 'docker' and 'shell', Research needs 'web_search'.
         """
-        # Skip stage filtering in BUILD mode (allow_all_tools=True)
-        # Uses ModeAwareMixin for consistent mode controller access
+        # In BUILD mode, apply lenient filtering (keep write tools, but limit total)
+        # This prevents token explosion from 34+ tools while still allowing edits
         if self.is_build_mode:
-            logger.debug("Stage filtering skipped: BUILD mode allows all tools")
-            return tools
+            from victor.config.orchestrator_constants import STAGE_TOOL_LIMITS
+
+            max_build_tools = STAGE_TOOL_LIMITS.build_mode_max
+            if len(tools) <= max_build_tools:
+                logger.debug(f"BUILD mode: keeping all {len(tools)} tools")
+                return tools
+            # Prioritize core tools + write tools, limit the rest
+            core_tools = self._get_core_tools_cached()
+            write_tools = {"write", "edit", "shell", "git", "test"}
+            priority_names = core_tools | write_tools
+            priority = [t for t in tools if t.name in priority_names]
+            others = [t for t in tools if t.name not in priority_names]
+            # Take priority tools + fill remaining slots with others
+            remaining_slots = max(0, max_build_tools - len(priority))
+            result = priority + others[:remaining_slots]
+            logger.debug(
+                f"BUILD mode: filtered {len(tools)} -> {len(result)} tools "
+                f"(priority={len(priority)}, others={remaining_slots})"
+            )
+            return result
 
         if stage not in {
             ConversationStage.INITIAL,
@@ -1018,7 +1036,8 @@ class ToolSelector(ModeAwareMixin):
                 logger.debug(
                     f"Stage filtering preserved vertical tools: {preserved_tools & {t.name for t in filtered}}"
                 )
-            return filtered
+            # Apply stage-based limit
+            return self._apply_stage_limit(filtered, stage)
 
         # Fallback to core readonly if filtering removed everything
         readonly_core = self._get_stage_core_tools(stage)
@@ -1032,7 +1051,48 @@ class ToolSelector(ModeAwareMixin):
                         name=tool.name, description=tool.description, parameters=tool.parameters
                     )
                 )
-        return fallback or tools
+        return self._apply_stage_limit(fallback, stage) if fallback else tools
+
+    def _apply_stage_limit(
+        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
+    ) -> List["ToolDefinition"]:
+        """Apply stage-based tool limit.
+
+        Args:
+            tools: List of tools to limit
+            stage: Current conversation stage
+
+        Returns:
+            Tools limited to stage-appropriate count
+        """
+        from victor.config.orchestrator_constants import STAGE_TOOL_LIMITS
+
+        # Get limit for current stage
+        stage_limits = {
+            ConversationStage.INITIAL: STAGE_TOOL_LIMITS.initial_max,
+            ConversationStage.PLANNING: STAGE_TOOL_LIMITS.planning_max,
+            ConversationStage.READING: STAGE_TOOL_LIMITS.reading_max,
+            ConversationStage.ANALYSIS: STAGE_TOOL_LIMITS.analysis_max,
+            ConversationStage.EXECUTING: STAGE_TOOL_LIMITS.executing_max,
+            ConversationStage.VERIFICATION: STAGE_TOOL_LIMITS.verification_max,
+            ConversationStage.COMPLETION: STAGE_TOOL_LIMITS.completion_max,
+        }
+        max_tools = stage_limits.get(stage, STAGE_TOOL_LIMITS.executing_max)
+
+        if len(tools) <= max_tools:
+            return tools
+
+        # Prioritize core tools when limiting
+        core_tools = self._get_core_tools_cached()
+        priority = [t for t in tools if t.name in core_tools]
+        others = [t for t in tools if t.name not in core_tools]
+        remaining_slots = max(0, max_tools - len(priority))
+        result = priority + others[:remaining_slots]
+
+        logger.debug(
+            f"Stage {stage.name if stage else 'UNKNOWN'}: limited {len(tools)} -> {len(result)} tools"
+        )
+        return result
 
     def _get_web_tools_cached(self) -> Set[str]:
         """Get web tools with caching for performance.
@@ -1529,11 +1589,19 @@ class ToolSelector(ModeAwareMixin):
             similarity_threshold=threshold,
         )
 
-        # Blend with keyword-selected tools
+        # Blend with keyword-selected tools (limited to prevent token explosion)
         keyword_tools = self.select_keywords(user_message, planned_tools=planned_tools)
         if keyword_tools:
             existing = {t.name for t in tools}
-            tools.extend([t for t in keyword_tools if t.name not in existing])
+            new_keyword_tools = [t for t in keyword_tools if t.name not in existing]
+            # Limit keyword additions to prevent exceeding max_tools significantly
+            max_keyword_additions = max(3, max_tools - len(tools))
+            if len(new_keyword_tools) > max_keyword_additions:
+                logger.debug(
+                    f"Limiting keyword tools: {len(new_keyword_tools)} -> {max_keyword_additions}"
+                )
+                new_keyword_tools = new_keyword_tools[:max_keyword_additions]
+            tools.extend(new_keyword_tools)
 
         # Ensure web tools if explicitly mentioned (dynamic discovery)
         message_lower = user_message.lower()
