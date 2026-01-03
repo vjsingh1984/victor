@@ -41,7 +41,7 @@ def supports_tools(self) -> bool:
 ### TD-002: God Class - AgentOrchestrator ⏳ IN PROGRESS
 
 **File**: `victor/agent/orchestrator.py`
-**Metrics**: ~7,536 lines, 194 methods (was 7,948 lines)
+**Metrics**: ~7,481 lines, 194 methods (was 7,948 lines)
 **Issue**: Single Responsibility Principle violation - handles 8+ distinct responsibilities
 
 **Progress** (2026-01-02):
@@ -49,6 +49,7 @@ def supports_tools(self) -> bool:
 - ✅ `_load_tool_configurations` - 119 lines consolidated into ToolRegistrar
 - ✅ `switch_provider/switch_model` - 80 lines deduplicated via `_apply_post_switch_hooks()`
 - ✅ MCP methods - 74 lines consolidated into ToolRegistrar delegation
+- ✅ `_register_default_tool_dependencies` - 57 lines consolidated into ToolRegistrar
 - Already extracted: ConversationController, ToolPipeline, StreamingController, ContinuationStrategy, ToolRegistrar
 
 **Remaining Responsibilities to Extract**:
@@ -214,6 +215,7 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-002 | God Class - ToolConfigLoader consolidation (119 lines) | 2026-01-02 | 95a17a6 |
 | TD-002 | God Class - ProviderSwitch hooks consolidation (80 lines) | 2026-01-02 | 082b8b7 |
 | TD-002 | God Class - MCP methods consolidation (74 lines) | 2026-01-02 | e4b95cb |
+| TD-002 | God Class - Tool dependencies consolidation (57 lines) | 2026-01-02 | e6897ee |
 
 ---
 
