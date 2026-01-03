@@ -334,10 +334,19 @@ class ProviderCoordinator:
         Returns:
             Wait time in seconds
         """
+        # Check for retry_after attribute (e.g., ProviderRateLimitError)
+        if hasattr(error, "retry_after") and error.retry_after is not None:
+            try:
+                return min(float(error.retry_after), self.config.max_rate_limit_wait)
+            except (ValueError, TypeError):
+                pass
+
         error_str = str(error)
 
         # Try to extract retry-after from common patterns
         patterns = [
+            # "try again in X.XXs" or "try again in X seconds"
+            r"try\s+again\s+in\s+(\d+(?:\.\d+)?)\s*(?:seconds?|s)?",
             # "retry after X seconds"
             r"retry\s+after\s+(\d+(?:\.\d+)?)\s*(?:seconds?|s)?",
             # "wait X seconds"

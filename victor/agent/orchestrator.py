@@ -86,6 +86,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker
     from victor.agent.auto_commit import AutoCommitter
+    from victor.agent.conversation_manager import ConversationManager, create_conversation_manager
 
 # Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
@@ -4794,7 +4795,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return await self._stream_with_rate_limit_retry(tools, provider_kwargs, stream_ctx)
 
     def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
-        """Extract wait time from rate limit error or calculate exponential backoff.
+        """Get wait time for rate limit retry.
+
+        Delegates to ProviderCoordinator for base wait time calculation (TD-002).
 
         Args:
             exc: The rate limit exception
@@ -4803,22 +4806,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Number of seconds to wait before retrying
         """
-        import re
+        # Get base wait time from coordinator (handles parsing retry_after, patterns, etc.)
+        base_wait = self._provider_coordinator.get_rate_limit_wait_time(exc)
 
-        # Check if it's a ProviderRateLimitError with retry_after
-        if isinstance(exc, ProviderRateLimitError) and exc.retry_after:
-            return min(float(exc.retry_after) + 0.5, 60.0)
+        # Apply exponential backoff based on attempt number
+        # For attempt 0: base_wait * 1, attempt 1: base_wait * 2, etc.
+        backoff_multiplier = 2**attempt
+        wait_time = base_wait * backoff_multiplier
 
-        # Try to extract "try again in X.XXs" or "Please retry after Xs" patterns
-        exc_str = str(exc)
-        wait_match = re.search(
-            r"(?:try again|retry after)\s*(?:in\s*)?(\d+(?:\.\d+)?)\s*s", exc_str, re.I
-        )
-        if wait_match:
-            return min(float(wait_match.group(1)) + 0.5, 60.0)
-
-        # Default exponential backoff: 2, 4, 8, 16, 32 seconds (capped at 32)
-        return min(2 ** (attempt + 1), 32.0)
+        # Cap at 5 minutes (300 seconds) - matches coordinator's max_rate_limit_wait
+        return min(wait_time, 300.0)
 
     async def _stream_with_rate_limit_retry(
         self,
