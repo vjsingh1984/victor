@@ -287,7 +287,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
             Dict mapping tool names to restricted argument patterns.
         """
         return {
-            "bash": [
+            "shell": [
                 # Prevent execution of discovered malicious code
                 r"eval\s+",
                 r"exec\s+",

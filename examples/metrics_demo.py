@@ -66,7 +66,7 @@ def moderate_function(values):
         print("=" * 70)
         result = await metrics(
             path=str(file_path),
-            metrics=["complexity"],
+            metrics_list=["complexity"],
         )
         if result["success"]:
             print(result.get("formatted_report", ""))
@@ -77,7 +77,7 @@ def moderate_function(values):
         print("=" * 70)
         result = await metrics(
             path=str(file_path),
-            metrics=["maintainability"],
+            metrics_list=["maintainability"],
         )
         if result["success"]:
             print(result.get("formatted_report", ""))
@@ -88,7 +88,7 @@ def moderate_function(values):
         print("=" * 70)
         result = await metrics(
             path=str(file_path),
-            metrics=["debt"],
+            metrics_list=["debt"],
         )
         if result["success"]:
             print(result.get("formatted_report", ""))
@@ -99,7 +99,7 @@ def moderate_function(values):
         print("=" * 70)
         result = await metrics(
             path=str(file_path),
-            metrics=["all"],
+            metrics_list=["all"],
         )
         if result["success"]:
             print(result.get("formatted_report", ""))

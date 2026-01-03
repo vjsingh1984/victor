@@ -226,14 +226,14 @@ Common security tools you can invoke via bash:
             "RECONNAISSANCE": StageDefinition(
                 name="RECONNAISSANCE",
                 description="Mapping application architecture and technology stack",
-                tools={"ls", "read", "overview", "grep"},
+                tools={"ls", "read", "overview", "code_search"},
                 keywords=["architecture", "stack", "dependencies", "structure", "components"],
                 next_stages={"ANALYSIS"},
             ),
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Performing security scans and code review",
-                tools={"grep", "bash", "read", "code_search"},
+                tools={"code_search", "shell", "read"},
                 keywords=[
                     "scan",
                     "analyze",
@@ -248,7 +248,7 @@ Common security tools you can invoke via bash:
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Validating findings and assessing severity",
-                tools={"read", "grep", "bash"},
+                tools={"read", "code_search", "shell"},
                 keywords=["verify", "confirm", "validate", "check", "assess", "severity"],
                 next_stages={"REPORTING", "ANALYSIS"},
             ),
