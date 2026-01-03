@@ -41,7 +41,7 @@ def supports_tools(self) -> bool:
 ### TD-002: God Class - AgentOrchestrator ⏳ IN PROGRESS
 
 **File**: `victor/agent/orchestrator.py`
-**Metrics**: ~7,134 lines, ~175 methods (was 7,948 lines, 10.2% reduction)
+**Metrics**: ~7,252 lines, ~175 methods (was 7,948 lines, 8.8% reduction)
 **Issue**: Single Responsibility Principle violation - handles 8+ distinct responsibilities
 
 **Progress** (2026-01-02):
@@ -60,15 +60,26 @@ def supports_tools(self) -> bool:
 - ✅ Phase 2C/D: `_get_context_size`, `_record_first_token` removed (~14 lines)
 - Already extracted: ConversationController, ToolPipeline, StreamingController, ContinuationStrategy, ToolRegistrar
 
-**Remaining Responsibilities to Extract**:
-1. `ConversationManager` - Conversation state, history, memory
-2. `ToolExecutionController` - Tool selection, execution, result handling
-3. `ProviderCoordinator` - Provider selection, failover, rate limiting
-4. `StreamingManager` - Stream handling, chunk processing
-5. `SessionStateManager` - State machine, session lifecycle
+**Phase 3: Major Extractions** (2026-01-02):
+- ✅ `SessionStateManager` - Created `victor/agent/session_state_manager.py` (~400 lines, 52 tests)
+  - Consolidates execution state: tool_calls_used, observed_files, executed_tools, failed_tool_signatures
+  - Consolidates session flags: system_added, all_files_read_nudge_sent, tool_capability_warned
+  - Manages token usage tracking and checkpoint state
+  - Integrated into orchestrator via property delegation pattern
+- ✅ `ConversationManager` - Created `victor/agent/conversation_manager.py` (~350 lines, 42 tests)
+  - Facade composing ConversationController, ConversationStore, ConversationEmbeddingStore
+  - Ready for integration (orchestrator still uses direct components)
+- ✅ `ProviderCoordinator` - Created `victor/agent/provider_coordinator.py` (~300 lines, 36 tests)
+  - Wraps ProviderManager with rate limiting and health monitoring
+  - Ready for integration (orchestrator still uses ProviderManager directly)
 
-**Effort**: High (2-3 sprints remaining)
-**Risk**: High - central component, needs careful refactoring
+**Remaining Work**:
+1. Complete ConversationManager integration into orchestrator
+2. Complete ProviderCoordinator integration into orchestrator
+3. Further extract remaining responsibilities
+
+**Effort**: Medium (1-2 sprints remaining)
+**Risk**: Medium - manager classes created and tested, integration pattern established
 
 ### TD-003: Factory Bloat - OrchestratorFactory
 
@@ -229,6 +240,9 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-002 | God Class - Inline recovery coordinator delegations (71 lines) | 2026-01-02 | 5468bc5 |
 | TD-002 | God Class - Inline pure delegator methods (88 lines) | 2026-01-02 | 825feb04 |
 | TD-002 | God Class - Phase 2: handlers, wrappers, metrics (~156 lines) | 2026-01-02 | pending |
+| TD-002 | God Class - Phase 3: SessionStateManager (~400 lines, 52 tests) | 2026-01-02 | pending |
+| TD-002 | God Class - Phase 3: ConversationManager (~350 lines, 42 tests) | 2026-01-02 | pending |
+| TD-002 | God Class - Phase 3: ProviderCoordinator (~300 lines, 36 tests) | 2026-01-02 | pending |
 
 ---
 
@@ -237,17 +251,18 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 ```
 Total Debt Items: 5
 ├── P0 (Critical): 0 ✅
-├── P1 (High): 3 (TD-002, TD-003 deferred; TD-004 ~80% resolved)
+├── P1 (High): 2 (TD-002 in progress, TD-003 deferred)
 ├── P2 (Medium): 0 ✅ (TD-005, TD-006, TD-007 resolved)
 └── P3 (Low): 0 ✅ (TD-008, TD-009, TD-010 all resolved)
 
 Code Quality Score: 8.5/10
 ├── SOLID Compliance: 9/10 (LSP + ISP violations fixed)
 ├── Error Handling: 7/10 (34 of 56 catches fixed)
-├── Test Coverage: 8/10 (31 new adapter tests, 66 total)
+├── Test Coverage: 8.5/10 (130 new manager tests + 31 adapter tests)
 ├── Documentation Accuracy: 9/10 (catalog + stubs documented)
 ├── Provider Coverage: 9/10 (8 dedicated adapters + OpenAI-compat fallback)
-└── Cache Isolation: 9/10 (project-scoped caches)
+├── Cache Isolation: 9/10 (project-scoped caches)
+└── God Class Refactoring: 6.5/10 (Phase 3 managers created, integration in progress)
 ```
 
 ---

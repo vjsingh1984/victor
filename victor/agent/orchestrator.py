@@ -145,6 +145,7 @@ from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
+from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
 
 # Recovery - enums and functions used at runtime
 from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
@@ -424,29 +425,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize tool call budget (via factory) - uses adapter recommendations with settings override
         self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
-        self.tool_calls_used = 0
+
+        # Initialize SessionStateManager for consolidated execution state tracking (TD-002)
+        # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
+        # failed_tool_signatures, _read_files_session, _required_files, _required_outputs, etc.
+        self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
 
         # Gap implementations: Complexity classifier, action authorizer, search router (via factory)
         self.task_classifier = self._factory.create_complexity_classifier()
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
-
-        # Initialize execution state containers (via factory)
-        (
-            self.observed_files,
-            self.executed_tools,
-            self.failed_tool_signatures,
-            self._tool_capability_warned,
-        ) = self._factory.initialize_execution_state()
-
-        # Track files read during this session for task completion detection
-        self._read_files_session: Set[str] = set()
-        # Track required files extracted from user prompts
-        self._required_files: List[str] = []
-        # Track required outputs extracted from user prompts (e.g., "findings table", "top-3 fixes")
-        self._required_outputs: List[str] = []
-        # Flag to track if we've already sent a nudge to produce output
-        self._all_files_read_nudge_sent: bool = False
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes
@@ -708,15 +696,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize UsageAnalytics singleton for data-driven optimization (via factory)
         self._usage_analytics = self._factory.create_usage_analytics()
 
-        # Token usage tracking for evaluation/benchmarking
-        # Accumulates across all stream_chat calls for accurate reporting
-        self._cumulative_token_usage: Dict[str, int] = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-            "cache_creation_input_tokens": 0,
-            "cache_read_input_tokens": 0,
-        }
+        # Token usage tracking now managed by SessionStateManager (TD-002)
+        # Access via self._cumulative_token_usage property or self._session_state.get_token_usage()
 
         # Initialize ToolSequenceTracker for intelligent next-tool suggestions (via factory)
         self._sequence_tracker = self._factory.create_sequence_tracker()
@@ -1273,6 +1254,145 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             CodeCorrectionMiddleware instance or None if not enabled
         """
         return self._code_correction_middleware
+
+    # =====================================================================
+    # Session state delegation properties (TD-002)
+    # These delegate to SessionStateManager for consolidated state tracking
+    # =====================================================================
+
+    @property
+    def session_state(self) -> SessionStateManager:
+        """Get the session state manager.
+
+        Returns:
+            SessionStateManager instance for consolidated state tracking
+        """
+        return self._session_state
+
+    @property
+    def tool_calls_used(self) -> int:
+        """Get the number of tool calls used in this session.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.tool_calls_used
+
+    @tool_calls_used.setter
+    def tool_calls_used(self, value: int) -> None:
+        """Set the number of tool calls used (for backward compatibility)."""
+        self._session_state.execution_state.tool_calls_used = value
+
+    @property
+    def observed_files(self) -> Set[str]:
+        """Get set of files observed/read during this session.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.observed_files
+
+    @observed_files.setter
+    def observed_files(self, value: Set[str]) -> None:
+        """Set observed files (for checkpoint restore)."""
+        self._session_state.execution_state.observed_files = set(value) if value else set()
+
+    @property
+    def executed_tools(self) -> List[str]:
+        """Get list of executed tool names in order.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.executed_tools
+
+    @executed_tools.setter
+    def executed_tools(self, value: List[str]) -> None:
+        """Set executed tools (for checkpoint restore)."""
+        self._session_state.execution_state.executed_tools = list(value) if value else []
+
+    @property
+    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+        """Get set of (tool_name, args_hash) tuples for failed calls.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.failed_tool_signatures
+
+    @failed_tool_signatures.setter
+    def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
+        """Set failed tool signatures (for checkpoint restore)."""
+        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
+
+    @property
+    def _tool_capability_warned(self) -> bool:
+        """Get whether we've warned about tool capability limitations.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.session_flags.tool_capability_warned
+
+    @_tool_capability_warned.setter
+    def _tool_capability_warned(self, value: bool) -> None:
+        """Set tool capability warning flag."""
+        self._session_state.session_flags.tool_capability_warned = value
+
+    @property
+    def _read_files_session(self) -> Set[str]:
+        """Get files read during this session for task completion detection.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.read_files_session
+
+    @property
+    def _required_files(self) -> List[str]:
+        """Get required files extracted from user prompts.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.required_files
+
+    @_required_files.setter
+    def _required_files(self, value: List[str]) -> None:
+        """Set required files list."""
+        self._session_state.execution_state.required_files = list(value)
+
+    @property
+    def _required_outputs(self) -> List[str]:
+        """Get required outputs extracted from user prompts.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.required_outputs
+
+    @_required_outputs.setter
+    def _required_outputs(self, value: List[str]) -> None:
+        """Set required outputs list."""
+        self._session_state.execution_state.required_outputs = list(value)
+
+    @property
+    def _all_files_read_nudge_sent(self) -> bool:
+        """Get whether we've sent a nudge that all required files are read.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.session_flags.all_files_read_nudge_sent
+
+    @_all_files_read_nudge_sent.setter
+    def _all_files_read_nudge_sent(self, value: bool) -> None:
+        """Set all files read nudge flag."""
+        self._session_state.session_flags.all_files_read_nudge_sent = value
+
+    @property
+    def _cumulative_token_usage(self) -> Dict[str, int]:
+        """Get cumulative token usage for evaluation/benchmarking.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.get_token_usage()
+
+    @_cumulative_token_usage.setter
+    def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
+        """Set cumulative token usage (for backward compatibility)."""
+        self._session_state.execution_state.token_usage = dict(value)
 
     @property
     def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
@@ -3934,10 +4054,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Ensure system prompt is included once at start of conversation
         self.conversation.ensure_system_prompt()
         self._system_added = True
-        self.tool_calls_used = 0
-        self.observed_files = []
-        self.executed_tools = []
-        self.failed_tool_signatures = set()
+        # Reset session state for new stream via SessionStateManager
+        self._session_state.reset_for_new_turn()
 
         # Reset unified tracker for new conversation (single source of truth)
         self.unified_tracker.reset()
@@ -6286,7 +6404,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_calls_used += 1
             self.executed_tools.append(tool_name)
             if tool_name == "read" and "path" in normalized_args:
-                self.observed_files.append(str(normalized_args.get("path")))
+                self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset continuation prompts counter on successful tool call
             # This allows the model to get fresh continuation prompts if it pauses again
