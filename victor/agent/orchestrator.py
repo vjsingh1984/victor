@@ -2124,16 +2124,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self.conversation.messages
 
-    def _get_context_size(self) -> tuple[int, int]:
-        """Calculate current context size in chars and estimated tokens.
-
-        Returns:
-            Tuple of (char_count, estimated_token_count)
-        """
-        # Delegate to ConversationController for centralized context tracking
-        metrics = self._conversation_controller.get_context_metrics()
-        return metrics.char_count, metrics.estimated_tokens
-
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
 
@@ -2288,10 +2278,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
             self._conversation_embedding_store = None
-
-    def _record_first_token(self) -> None:
-        """Record the time of first token received."""
-        self._metrics_collector.record_first_token()
 
     def _finalize_stream_metrics(
         self, usage_data: Optional[Dict[str, int]] = None
@@ -3258,31 +3244,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # RL hook failure should never block prompt building
             logger.debug(f"Failed to emit prompt_used event: {e}")
 
-    def _strip_markup(self, text: str) -> str:
-        """Remove simple XML/HTML-like tags to salvage plain text."""
-        return self.sanitizer.strip_markup(text)
-
-    def _sanitize_response(self, text: str) -> str:
-        """Sanitize model response by removing malformed patterns."""
-        return self.sanitizer.sanitize(text)
-
-    def _is_garbage_content(self, content: str) -> bool:
-        """Detect if content is garbage/malformed output from local models."""
-        return self.sanitizer.is_garbage_content(content)
-
-    def _is_valid_tool_name(self, name: str) -> bool:
-        """Check if a tool name is valid and not a hallucination."""
-        return self.sanitizer.is_valid_tool_name(name)
-
-    def _infer_git_operation(
-        self, original_name: str, canonical_name: str, args: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Infer git operation from alias when not explicitly provided.
-
-        Delegates to orchestrator_utils.infer_git_operation.
-        """
-        return infer_git_operation(original_name, canonical_name, args)
-
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
 
@@ -3423,13 +3384,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"Context signals applied: {result.context_signals}")
 
         return result.to_legacy_dict()
-
-    def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
-        """Generate a user-friendly status message for a tool execution.
-
-        Delegates to orchestrator_utils.get_tool_status_message.
-        """
-        return get_tool_status_message(tool_name, tool_args)
 
     def _determine_continuation_action(
         self,
@@ -3864,7 +3818,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         tools=None,
                     )
                     if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
+                        sanitized = self.sanitizer.sanitize(response.content)
                         if sanitized:
                             self.add_message("assistant", sanitized)
                             chunk = StreamChunk(content=sanitized, is_final=True)
@@ -3910,7 +3864,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     tools=None,
                 )
                 if response and response.content:
-                    sanitized = self._sanitize_response(response.content)
+                    sanitized = self.sanitizer.sanitize(response.content)
                     if sanitized:
                         self.add_message("assistant", sanitized)
                         chunk = StreamChunk(content=sanitized)
@@ -4566,27 +4520,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Increment turn counter
         self.unified_tracker.increment_turn()
 
-    def _check_tool_budget_with_handler(
-        self, stream_ctx: StreamingChatContext
-    ) -> Optional[StreamChunk]:
-        """Check tool budget using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_tool_budget() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk with warning if approaching limit, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
-        return self._recovery_coordinator.check_tool_budget(recovery_ctx, warning_threshold)
-
     def _check_progress_with_handler(self, stream_ctx: StreamingChatContext) -> bool:
         """Check progress using the recovery coordinator.
 
@@ -4613,33 +4546,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return True
 
         return False
-
-    def _truncate_tool_calls_with_handler(
-        self,
-        tool_calls: List[Dict[str, Any]],
-        stream_ctx: StreamingChatContext,
-    ) -> List[Dict[str, Any]]:
-        """Truncate tool calls using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viatruncate_tool_calls() directly.
-
-
-        Args:
-            tool_calls: List of tool calls
-            stream_ctx: The streaming context
-
-        Returns:
-            Truncated list of tool calls
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        remaining = stream_ctx.get_remaining_budget()
-        truncated_calls, _ = self._recovery_coordinator.truncate_tool_calls(
-            recovery_ctx, tool_calls, remaining
-        )
-        return truncated_calls
 
     def _handle_force_completion_with_handler(
         self,
@@ -4674,82 +4580,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if result and result.chunks:
             return result.chunks[0]
         return None
-
-    def _get_recovery_prompts_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> List[tuple[str, float]]:
-        """Get recovery prompts using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_prompts() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            List of (prompt, temperature) tuples for recovery attempts
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Get thinking mode settings
-        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-
-        # Delegate to streaming handler (RecoveryCoordinator implementation is incomplete)
-        return self._streaming_handler.get_recovery_prompts(
-            ctx=stream_ctx,
-            base_temperature=self.temperature,
-            has_thinking_mode=has_thinking_mode,
-            thinking_disable_prefix=thinking_prefix,
-        )
-
-    def _should_use_tools_for_recovery_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-        attempt: int,
-    ) -> bool:
-        """Check if tools should be enabled for recovery using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viashould_use_tools_for_recovery() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            attempt: The recovery attempt number (1-indexed)
-
-        Returns:
-            True if tools should be enabled, False otherwise
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Delegate to streaming handler (RecoveryCoordinator doesn't take attempt parameter)
-        return self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
-
-    def _handle_loop_warning_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-        warning_message: Optional[str],
-    ) -> Optional[StreamChunk]:
-        """Handle loop warning using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viahandle_loop_warning() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            warning_message: The warning message from unified tracker
-
-        Returns:
-            StreamChunk with warning if applicable, None otherwise
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Delegate to streaming handler (RecoveryCoordinator signature is different)
-        return self._streaming_handler.handle_loop_warning(stream_ctx, warning_message)
 
     def _parse_and_validate_tool_calls(
         self,
@@ -4988,7 +4818,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             full_content += chunk.content
             stream_ctx.stream_metrics.total_chunks += 1
             if chunk.content:
-                self._record_first_token()
+                self._metrics_collector.record_first_token()
                 total_tokens += len(chunk.content) / 4
                 stream_ctx.stream_metrics.total_content_length += len(chunk.content)
 
@@ -5023,7 +4853,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         garbage_detected: bool,
     ) -> tuple[Any, int, bool]:
         """Handle garbage detection for a streaming chunk."""
-        if chunk.content and self._is_garbage_content(chunk.content):
+        if chunk.content and self.sanitizer.is_garbage_content(chunk.content):
             consecutive_garbage_chunks += 1
             if consecutive_garbage_chunks >= max_garbage_chunks:
                 if not garbage_detected:
@@ -5346,12 +5176,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             if full_content:
                 # Sanitize response to remove malformed patterns from local models
-                sanitized = self._sanitize_response(full_content)
+                sanitized = self.sanitizer.sanitize(full_content)
                 if sanitized:
                     self.add_message("assistant", sanitized)
                 else:
                     # If sanitization removed everything, use stripped markup as fallback
-                    plain_text = self._strip_markup(full_content)
+                    plain_text = self.sanitizer.strip_markup(full_content)
                     if plain_text:
                         self.add_message("assistant", plain_text)
 
@@ -5387,9 +5217,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # The should_force flag confirms the handler's decision
                     continue
 
-                # Get recovery prompts using handler delegation (testable)
+                # Get recovery prompts via streaming handler directly
                 # Handler handles thinking mode prefix and task-aware prompts
-                recovery_prompts = self._get_recovery_prompts_with_handler(stream_ctx)
+                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+                recovery_prompts = self._streaming_handler.get_recovery_prompts(
+                    ctx=stream_ctx,
+                    base_temperature=self.temperature,
+                    has_thinking_mode=has_thinking_mode,
+                    thinking_disable_prefix=thinking_prefix,
+                )
 
                 recovery_success = False
                 for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
@@ -5402,8 +5239,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     )
                     recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
-                    # Use handler to decide if tools should be enabled (testable)
-                    use_tools = self._should_use_tools_for_recovery_with_handler(
+                    # Check if tools should be enabled via streaming handler directly
+                    use_tools = self._streaming_handler.should_use_tools_for_recovery(
                         stream_ctx, attempt
                     )
                     recovery_tools = tools if use_tools else None
@@ -5477,7 +5314,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             except Exception as e:
                                 logger.debug(f"Text extraction failed during recovery: {e}")
 
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized and len(sanitized) > 20:
                                 self.add_message("assistant", sanitized)
                                 yield self._chunk_generator.generate_content_chunk(
@@ -5604,9 +5441,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Set flag to force completion in continuation logic
                     self._force_finalize = True
 
-            # Check for loop warning using handler delegation (testable)
+            # Check for loop warning via streaming handler directly
             unified_loop_warning = self.unified_tracker.check_loop_warning()
-            loop_warning_chunk = self._handle_loop_warning_with_handler(
+            loop_warning_chunk = self._streaming_handler.handle_loop_warning(
                 stream_ctx, unified_loop_warning
             )
             if loop_warning_chunk:
@@ -5631,7 +5468,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Save content for intent classification before yielding
                     content_for_intent = full_content or ""
                     if full_content:
-                        sanitized = self._sanitize_response(full_content)
+                        sanitized = self.sanitizer.sanitize(full_content)
                         if sanitized:
                             logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
                             yield self._chunk_generator.generate_content_chunk(sanitized)
@@ -5803,7 +5640,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     elif action == "return_to_user":
                         # Yield the accumulated content before returning
                         if full_content:
-                            sanitized = self._sanitize_response(full_content)
+                            sanitized = self.sanitizer.sanitize(full_content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
                         yield self._chunk_generator.generate_final_marker_chunk()
@@ -5859,7 +5696,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                                     tools=None,  # DISABLE tools to force text response
                                 )
                                 if response and response.content:
-                                    sanitized = self._sanitize_response(response.content)
+                                    sanitized = self.sanitizer.sanitize(response.content)
                                     if sanitized:
                                         self.add_message("assistant", sanitized)
                                         yield self._chunk_generator.generate_content_chunk(
@@ -5932,7 +5769,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         # Handle action: finish - No more tool calls requested
                         # Yield the accumulated content to the UI (was missing!)
                         if full_content:
-                            sanitized = self._sanitize_response(full_content)
+                            sanitized = self.sanitizer.sanitize(full_content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
 
@@ -5974,8 +5811,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 remaining = stream_ctx.get_remaining_budget()
 
-                # Warn when approaching budget limit - uses handler delegation
-                budget_warning = self._check_tool_budget_with_handler(stream_ctx)
+                # Warn when approaching budget limit via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
+                budget_warning = self._recovery_coordinator.check_tool_budget(
+                    recovery_ctx, warning_threshold
+                )
                 if budget_warning:
                     yield budget_warning
 
@@ -5997,7 +5838,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             tools=None,
                         )
                         if response and response.content:
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(
                                     sanitized, suffix="\n"
@@ -6059,7 +5900,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             tools=None,  # No tools - force text response
                         )
                         if response and response.content:
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized:
                                 self.add_message("assistant", sanitized)
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
@@ -6071,11 +5912,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
                 # but continuation logic decided to continue the loop)
-                # Truncate to remaining budget using handler delegation
-                tool_calls = self._truncate_tool_calls_with_handler(tool_calls or [], stream_ctx)
+                # Truncate to remaining budget via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                remaining = stream_ctx.get_remaining_budget()
+                tool_calls, _ = self._recovery_coordinator.truncate_tool_calls(
+                    recovery_ctx, tool_calls or [], remaining
+                )
 
                 # Filter out tool calls that are blocked via recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
                 filtered_tool_calls, blocked_chunks, blocked_count = (
                     self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
                 )
@@ -6105,7 +5949,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     tool_name = tool_call.get("name", "tool")
                     tool_args = tool_call.get("arguments", {})
                     # Generate user-friendly status message with relevant context
-                    status_msg = self._get_tool_status_message(tool_name, tool_args)
+                    status_msg = get_tool_status_message(tool_name, tool_args)
                     # Emit structured tool_start event using handler delegation (testable)
                     yield self._chunk_generator.generate_tool_start_chunk(
                         tool_name, tool_args, status_msg
@@ -6300,7 +6144,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 continue
 
             # Validate tool name format (reject hallucinated/malformed names)
-            if not self._is_valid_tool_name(tool_name):
+            if not self.sanitizer.is_valid_tool_name(tool_name):
                 self.console.print(
                     f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
                 )
@@ -6381,7 +6225,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
 
             # Infer operation from alias for git tool (e.g., git_log → git with operation=log)
-            normalized_args = self._infer_git_operation(
+            normalized_args = infer_git_operation(
                 original_tool_name, canonical_tool_name, normalized_args
             )
 

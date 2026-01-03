@@ -41,7 +41,7 @@ def supports_tools(self) -> bool:
 ### TD-002: God Class - AgentOrchestrator ⏳ IN PROGRESS
 
 **File**: `victor/agent/orchestrator.py`
-**Metrics**: ~7,290 lines, 190 methods (was 7,948 lines)
+**Metrics**: ~7,134 lines, ~175 methods (was 7,948 lines, 10.2% reduction)
 **Issue**: Single Responsibility Principle violation - handles 8+ distinct responsibilities
 
 **Progress** (2026-01-02):
@@ -55,6 +55,9 @@ def supports_tools(self) -> bool:
 - ✅ Thin wrappers inlined: `_ensure_system_message()`, `_init_stream_metrics()` (7 lines)
 - ✅ Recovery coordinator delegations inlined: 3 methods (69 lines)
 - ✅ Pure delegators inlined: 4 methods (88 lines) - `_check_natural_completion_with_handler`, `_check_blocked_threshold_with_handler`, `_filter_blocked_tool_calls_with_handler`, `_get_recovery_fallback_message_with_handler`
+- ✅ Phase 2A handler methods inlined: 5 methods (~75 lines) - `_check_tool_budget_with_handler`, `_truncate_tool_calls_with_handler`, `_get_recovery_prompts_with_handler`, `_should_use_tools_for_recovery_with_handler`, `_handle_loop_warning_with_handler`
+- ✅ Phase 2B thin wrappers removed: 6 methods (~30 lines) - sanitizer delegations, utility delegations
+- ✅ Phase 2C/D: `_get_context_size`, `_record_first_token` removed (~14 lines)
 - Already extracted: ConversationController, ToolPipeline, StreamingController, ContinuationStrategy, ToolRegistrar
 
 **Remaining Responsibilities to Extract**:
@@ -225,6 +228,7 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-002 | God Class - Remove unused methods, inline wrappers (32 lines) | 2026-01-02 | 9b66fe1 |
 | TD-002 | God Class - Inline recovery coordinator delegations (71 lines) | 2026-01-02 | 5468bc5 |
 | TD-002 | God Class - Inline pure delegator methods (88 lines) | 2026-01-02 | 825feb04 |
+| TD-002 | God Class - Phase 2: handlers, wrappers, metrics (~156 lines) | 2026-01-02 | pending |
 
 ---
 
