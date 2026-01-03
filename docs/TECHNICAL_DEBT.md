@@ -41,7 +41,7 @@ def supports_tools(self) -> bool:
 ### TD-002: God Class - AgentOrchestrator ⏳ IN PROGRESS
 
 **File**: `victor/agent/orchestrator.py`
-**Metrics**: ~7,449 lines, 194 methods (was 7,948 lines)
+**Metrics**: ~7,378 lines, 194 methods (was 7,948 lines)
 **Issue**: Single Responsibility Principle violation - handles 8+ distinct responsibilities
 
 **Progress** (2026-01-02):
@@ -53,6 +53,7 @@ def supports_tools(self) -> bool:
 - ✅ `ToolAccessContext` construction - DRY refactor via `_build_tool_access_context()` helper
 - ✅ Unused methods removed: `cancel()`, `_check_iteration_limit_with_handler` (25 lines)
 - ✅ Thin wrappers inlined: `_ensure_system_message()`, `_init_stream_metrics()` (7 lines)
+- ✅ Recovery coordinator delegations inlined: 3 methods (69 lines)
 - Already extracted: ConversationController, ToolPipeline, StreamingController, ContinuationStrategy, ToolRegistrar
 
 **Remaining Responsibilities to Extract**:
@@ -221,6 +222,7 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-002 | God Class - Tool dependencies consolidation (57 lines) | 2026-01-02 | e6897ee |
 | TD-002 | God Class - ToolAccessContext DRY refactor | 2026-01-02 | 25d8bd4 |
 | TD-002 | God Class - Remove unused methods, inline wrappers (32 lines) | 2026-01-02 | 9b66fe1 |
+| TD-002 | God Class - Inline recovery coordinator delegations (71 lines) | 2026-01-02 | 5468bc5 |
 
 ---
 
