@@ -29,7 +29,7 @@ from pathlib import Path
 
 from victor.tools.code_review_tool import code_review
 from victor.tools.scaffold_tool import scaffold
-from victor.tools.security_scanner_tool import security_scan
+from victor.tools.security_scanner_tool import scan
 
 
 async def demo_code_review():
@@ -172,7 +172,7 @@ async def demo_project_scaffolding():
     print("  ✓ Testing setup")
 
 
-async def demo_security_scanner():
+async def demo_scanner():
     """Demo security scanner tool."""
     print("\n\n🔒 Security Scanner Tool Demo")
     print("=" * 70)
@@ -213,7 +213,7 @@ pyyaml==5.4
         env_file.write_text("SECRET_KEY=production_key_12345")
 
         print("\n1️⃣ Scan for secrets...")
-        result = await security_scan(
+        result = await scan(
             path=str(tmpdir_path),
             scan_types=["secrets"],
         )
@@ -221,7 +221,7 @@ pyyaml==5.4
             print(result.get("formatted_report", ""))
 
         print("\n2️⃣ Check dependencies for vulnerabilities...")
-        result = await security_scan(
+        result = await scan(
             path=str(tmpdir_path),
             scan_types=["dependencies"],
         )
@@ -229,7 +229,7 @@ pyyaml==5.4
             print(result.get("formatted_report", ""))
 
         print("\n3️⃣ Comprehensive security scan...")
-        result = await security_scan(
+        result = await scan(
             path=str(tmpdir_path),
             scan_types=["secrets", "dependencies", "config"],
         )
@@ -265,7 +265,7 @@ async def main():
     await demo_project_scaffolding()
 
     # Security Scanner
-    await demo_security_scanner()
+    await demo_scanner()
 
     print("\n\n✨ Demo Complete!")
     print("\nVictor's Enterprise Tools provide:")

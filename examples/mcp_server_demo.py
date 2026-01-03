@@ -29,9 +29,9 @@ import asyncio
 import argparse
 from victor.integrations.mcp import MCPServer, MCPResource
 from victor.tools.base import ToolRegistry
-from victor.tools.bash import execute_bash
-from victor.tools.filesystem import ReadFileTool, WriteFileTool, ListDirectoryTool
-from victor.tools.git_tool import GitTool
+from victor.tools.bash import shell_readonly
+from victor.tools.filesystem import read, write, ls
+from victor.tools.git_tool import git
 
 
 async def demo_server():
@@ -45,11 +45,11 @@ async def demo_server():
     print("1️⃣ Setting up tool registry...")
     print("-" * 70)
     tool_registry = ToolRegistry()
-    tool_registry.register(ReadFileTool())
-    tool_registry.register(WriteFileTool())
-    tool_registry.register(ListDirectoryTool())
-    tool_registry.register(execute_bash)
-    tool_registry.register(GitTool())
+    tool_registry.register(read)
+    tool_registry.register(write)
+    tool_registry.register(ls)
+    tool_registry.register(shell_readonly)
+    tool_registry.register(git)
 
     tools_list = tool_registry.list_tools()
     print(f"✓ Registered {len(tools_list)} tools:")
@@ -140,12 +140,12 @@ async def demo_server():
         print(f"  - {resource['name']}: {resource['uri']}")
 
     # Call a tool
-    print("\nTest 4: Call Tool (list_directory)")
+    print("\nTest 4: Call Tool (ls)")
     call_tool_msg = {
         "jsonrpc": "2.0",
         "id": "4",
         "method": "tools/call",
-        "params": {"name": "list_directory", "arguments": {"path": "."}},
+        "params": {"name": "ls", "arguments": {"path": "."}},
     }
     response = await server.handle_message(call_tool_msg)
     result = response["result"]
@@ -229,11 +229,11 @@ async def run_stdio_server():
     """Run MCP server on stdio."""
     # Create tool registry
     tool_registry = ToolRegistry()
-    tool_registry.register(ReadFileTool())
-    tool_registry.register(WriteFileTool())
-    tool_registry.register(ListDirectoryTool())
-    tool_registry.register(execute_bash)
-    tool_registry.register(GitTool())
+    tool_registry.register(read)
+    tool_registry.register(write)
+    tool_registry.register(ls)
+    tool_registry.register(shell_readonly)
+    tool_registry.register(git)
 
     # Create and start server
     server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)

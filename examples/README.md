@@ -306,41 +306,39 @@ providers:
 Then use profiles:
 
 ```bash
-victor --profile dev    # Ollama
-victor --profile claude # Claude
-victor --profile gpt35  # GPT-3.5
-victor --profile grok   # Grok
-victor --profile gemini # Gemini
+victor chat --profile dev    # Ollama
+victor chat --profile claude # Claude
+victor chat --profile gpt35  # GPT-3.5
+victor chat --profile grok   # Grok
+victor chat --profile gemini # Gemini
 ```
 
 ## Creating Your Own Examples
 
 ```python
 import asyncio
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.providers.ollama_provider import OllamaProvider
+from victor.framework.agent import Agent
+from victor.framework.events import EventType
 
 async def main():
-    # Create provider
-    provider = OllamaProvider()
-
     # Create agent
-    agent = AgentOrchestrator(
-        provider=provider,
+    agent = await Agent.create(
+        provider="ollama",
         model="qwen2.5-coder:7b",
         temperature=0.7,
     )
 
     # Chat
-    response = await agent.chat("Your question here")
+    response = await agent.run("Your question here")
     print(response.content)
 
     # Stream
-    async for chunk in agent.stream_chat("Another question"):
-        print(chunk.content, end="", flush=True)
+    async for event in agent.stream("Another question"):
+        if event.type == EventType.CONTENT:
+            print(event.content, end="", flush=True)
 
     # Clean up
-    await provider.close()
+    await agent.close()
 
 if __name__ == "__main__":
     asyncio.run(main())

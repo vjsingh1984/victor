@@ -52,7 +52,7 @@ async def example_programmatic_agents():
         name="api_developer",
         description="Specializes in REST API development",
         capabilities=AgentCapabilities(
-            tools={"read_file", "edit_file", "write_file", "execute_bash"},
+            tools={"read", "edit", "write", "shell"},
             skills={"api_design", "openapi", "validation"},
             can_execute_code=True,
             can_modify_files=True,
@@ -73,7 +73,7 @@ Follow OpenAPI standards and implement proper validation.""",
 
     # Extend a preset agent
     enhanced_coder = coder_agent.with_capabilities(
-        tools={"run_tests", "lint_code"},
+        tools={"test", "code_review"},
         can_browse_web=True,  # Allow looking up documentation
     )
 
@@ -116,12 +116,12 @@ async def example_parallel_ensemble():
     security = AgentSpec(
         name="security_check",
         description="Security analysis",
-        capabilities=AgentCapabilities(tools={"grep", "read_file"}),
+        capabilities=AgentCapabilities(tools={"code_search", "read"}),
     )
     performance = AgentSpec(
         name="perf_check",
         description="Performance analysis",
-        capabilities=AgentCapabilities(tools={"read_file"}),
+        capabilities=AgentCapabilities(tools={"read"}),
     )
 
     parallel = Parallel(

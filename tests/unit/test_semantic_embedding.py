@@ -215,13 +215,15 @@ class TestEmbeddingCaching:
 
     @pytest.mark.asyncio
     async def test_cache_file_naming(self, temp_cache_dir):
-        """Test cache file uses correct naming convention."""
+        """Test cache file uses correct naming convention with project hash."""
         selector = SemanticToolSelector(
             embedding_model="all-MiniLM-L6-v2", cache_dir=temp_cache_dir
         )
 
-        expected_filename = "tool_embeddings_all-MiniLM-L6-v2.pkl"
-        assert selector.cache_file.name == expected_filename
+        # Cache filename now includes project hash for isolation (TD-010)
+        # Format: tool_embeddings_{model}_{hash}.pkl
+        assert selector.cache_file.name.startswith("tool_embeddings_all-MiniLM-L6-v2")
+        assert selector.cache_file.name.endswith(".pkl")
 
     @pytest.mark.asyncio
     async def test_cache_file_naming_with_special_chars(self, temp_cache_dir):
@@ -230,9 +232,9 @@ class TestEmbeddingCaching:
             embedding_model="qwen3-embedding:8b", cache_dir=temp_cache_dir
         )
 
-        # Colons and slashes should be replaced
-        expected_filename = "tool_embeddings_qwen3-embedding_8b.pkl"
-        assert selector.cache_file.name == expected_filename
+        # Colons and slashes should be replaced, includes project hash
+        assert selector.cache_file.name.startswith("tool_embeddings_qwen3-embedding_8b")
+        assert selector.cache_file.name.endswith(".pkl")
 
 
 class TestProviderFallback:

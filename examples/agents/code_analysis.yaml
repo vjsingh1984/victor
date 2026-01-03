@@ -12,10 +12,9 @@ agents:
     description: "Analyzes code for security vulnerabilities (OWASP Top 10)"
     capabilities:
       tools:
-        - read_file
-        - grep
-        - glob
+        - read
         - code_search
+        - find
       skills:
         - security
         - vulnerability_analysis
@@ -38,8 +37,7 @@ agents:
     description: "Identifies performance issues and optimization opportunities"
     capabilities:
       tools:
-        - read_file
-        - grep
+        - read
         - code_search
       skills:
         - performance
@@ -62,9 +60,9 @@ agents:
     description: "Reviews code quality, patterns, and maintainability"
     capabilities:
       tools:
-        - read_file
-        - grep
-        - glob
+        - read
+        - code_search
+        - find
       skills:
         - quality
         - design_patterns

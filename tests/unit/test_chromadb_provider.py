@@ -17,6 +17,12 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+# Skip entire module if chromadb has import issues (e.g., OpenTelemetry conflict)
+try:
+    import chromadb  # noqa: F401
+except ImportError:
+    pytest.skip("chromadb not available or has import errors", allow_module_level=True)
+
 from victor.storage.vector_stores.base import EmbeddingConfig, SearchResult
 from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 
