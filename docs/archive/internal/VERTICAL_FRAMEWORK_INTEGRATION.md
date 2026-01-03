@@ -405,4 +405,4 @@ victor/verticals/coding/
 
 - [ARCHITECTURE_DEEP_DIVE.md](./ARCHITECTURE_DEEP_DIVE.md) - Overall architecture
 - [VERTICALS.md](./VERTICALS.md) - Vertical implementations
-- [RL_FRAMEWORK_PROGRESS.md](./RL_FRAMEWORK_PROGRESS.md) - RL learner details
+- [RL_FRAMEWORK_PROGRESS.md](../progress/RL_FRAMEWORK_PROGRESS.md) - RL learner details (archived)

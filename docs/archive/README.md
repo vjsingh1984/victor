@@ -12,6 +12,11 @@ These documents are preserved for reference but are no longer actively maintaine
 | [FEATURE_PARITY_PLAN.md](FEATURE_PARITY_PLAN.md) | Historical | Competitor analysis snapshot |
 | [CODEBASE_CONSOLIDATION_PLAN.md](CODEBASE_CONSOLIDATION_PLAN.md) | Historical | Technical debt tracking |
 
+## Subdirectories
+
+- `internal/`: internal development docs, audits, and design notes
+- `progress/`: completion logs, phase summaries, and status reports
+
 ## Active Documentation
 
 For current documentation, see:

@@ -4,6 +4,7 @@ Short, task-focused docs for the Victor CLI and framework.
 
 ## Start Here
 - Quick Start: `guides/QUICKSTART.md`
+- 60‑Second Quickstart: `QUICKSTART_60S.md`
 - Installation: `guides/INSTALLATION.md`
 - First Run: `guides/FIRST_RUN.md`
 - User Guide: `USER_GUIDE.md`
@@ -37,12 +38,8 @@ Short, task-focused docs for the Victor CLI and framework.
 ## Architecture
 - Deep Dive: `ARCHITECTURE_DEEP_DIVE.md`
 - Deep Dive appendix: `ARCHITECTURE_DEEP_DIVE_APPENDIX.md`
-- Roadmap: `ARCHITECTURE_ROADMAP.md`
 - State Machine: `STATE_MACHINE.md`
 - Embeddings: `embeddings/ARCHITECTURE.md`
-- Strategic analysis: `STRATEGIC_FRAMEWORK_ANALYSIS.md`
-- Codebase analysis: `CODEBASE_ANALYSIS_REPORT.md`
-- Framework enhancements: `FRAMEWORK_ENHANCEMENTS.md`
 - Model comparison: `MODEL_COMPARISON.md`
 
 ## Archive

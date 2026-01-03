@@ -195,6 +195,6 @@
 
   <!-- Footer -->
   <text x="500" y="685" text-anchor="middle" fill="#64748b" font-size="11">
-    Generated from codebase analysis | See docs/ARCHITECTURE_ROADMAP.md for details
+    Generated from codebase analysis | See docs/ARCHITECTURE_DEEP_DIVE.md for details
   </text>
 </svg>

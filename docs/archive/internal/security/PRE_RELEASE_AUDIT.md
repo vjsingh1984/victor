@@ -84,8 +84,8 @@ victor/agent/.embeddings/
 docs/
 ├── README.md                      # Documentation hub
 ├── ARCHITECTURE_DEEP_DIVE.md      # Technical architecture
-├── BENCHMARK_EVALUATION.md        # Performance benchmarks
-├── CODEBASE_ANALYSIS_REPORT.md    # Current implementation status
+├── ../BENCHMARK_EVALUATION.md     # Performance benchmarks (archived)
+├── ../CODEBASE_ANALYSIS_REPORT.md # Current implementation status (archived)
 ├── DEVELOPER_GUIDE.md             # Contributor guide
 ├── ENTERPRISE.md                  # Enterprise deployment
 ├── RELEASING.md                   # Release process

@@ -20,5 +20,3 @@ Victor is a provider‑agnostic coding assistant with a CLI/TUI front end, a cor
 
 ## Where to Dig Deeper
 - Full deep‑dive appendix: `docs/ARCHITECTURE_DEEP_DIVE_APPENDIX.md`
-- Roadmap: `docs/ARCHITECTURE_ROADMAP.md`
-- Core patterns: `docs/CORE_PATTERNS.md`

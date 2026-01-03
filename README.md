@@ -157,7 +157,7 @@ See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 
 - CLI and core workflows are stable for daily use.
 - VS Code extension is beta.
-- See `docs/ARCHITECTURE_ROADMAP.md` for active work.
+- See `docs/ARCHITECTURE_DEEP_DIVE.md` for system details.
 
 ---
 

@@ -18,7 +18,7 @@ Provides a LangGraph-like fluent API for defining multi-agent workflows
 as directed acyclic graphs (DAGs).
 
 Architecture Overview:
-    See docs/workflow-architecture.md for diagrams and detailed explanation.
+    See docs/archive/internal/workflow-architecture.md for diagrams and details.
 
     Two primary execution node types:
     - AgentNode: LLM-powered execution for complex reasoning tasks

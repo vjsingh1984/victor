@@ -382,7 +382,7 @@ victor benchmark compare           # Framework comparison
 ## Related Documentation
 
 - [STATE_MACHINE.md](./STATE_MACHINE.md) - Conversation state details
-- [TOOL_SELECTION.md](./TOOL_SELECTION.md) - Tool selection strategies
-- [CORE_PATTERNS.md](./CORE_PATTERNS.md) - Design patterns
+- [TOOL_SELECTION.md](./archive/internal/TOOL_SELECTION.md) - Tool selection strategies (archived)
+- [CORE_PATTERNS.md](./archive/internal/CORE_PATTERNS.md) - Design patterns (archived)
 - [VERTICALS.md](./VERTICALS.md) - Domain-specific assistants
-- [BENCHMARK_EVALUATION.md](./BENCHMARK_EVALUATION.md) - Benchmark evaluation details
+- [BENCHMARK_EVALUATION.md](./archive/internal/BENCHMARK_EVALUATION.md) - Benchmark evaluation details (archived)
