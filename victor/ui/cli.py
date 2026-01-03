@@ -37,6 +37,7 @@ from victor.ui.commands.serve import serve_app
 from victor.ui.commands.test_provider import test_provider_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
+from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
     name="victor",
@@ -63,6 +64,7 @@ app.add_typer(serve_app)
 app.add_typer(test_provider_app)
 app.add_typer(tools_app)
 app.add_typer(scaffold_app)
+app.add_typer(workflow_app)
 
 console = Console()
 
