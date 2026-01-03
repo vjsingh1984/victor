@@ -411,9 +411,9 @@ def run_workflow(
     from victor.workflows import StateGraphExecutor, ExecutorConfig
     from victor.workflows.definition import AgentNode
     from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-    from victor.config import load_settings
+    from victor.config.settings import load_settings
     from victor.agent import AgentOrchestrator
-    from victor.agent.shutdown import graceful_shutdown
+    from victor.ui.commands.utils import graceful_shutdown
 
     path = Path(workflow_path)
     workflows = _load_workflow_file(path)
