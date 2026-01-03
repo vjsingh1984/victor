@@ -11,12 +11,12 @@ All notable changes to the Victor AI VS Code extension will be documented in thi
   - WebSocket-based real-time updates
   - Cancel running agents, view output
   - Status bar indicator shows active agent count
-- **Terminal Agent**: AI-assisted terminal command execution (like Cursor/Copilot)
+- **Terminal Agent**: AI-assisted terminal command execution
   - Suggest commands based on natural language intent
   - Dangerous command detection with approval workflow
   - Command history and approval tracking
   - Terminal Agent panel in sidebar
-- **@workspace Context**: GitHub Copilot-style repo-aware context
+- **@workspace Context**: Modern repo-aware context
   - `@workspace`: Project structure, configs, open files
   - `@selection`: Current editor selection
   - `@terminal`: Active terminal context
@@ -31,12 +31,12 @@ All notable changes to the Victor AI VS Code extension will be documented in thi
   - Autonomy levels: Manual, Semi-auto, Auto
   - Configurable approval thresholds for terminal/file operations
   - Dangerous command pattern detection
-- **Smart Paste**: Adapt pasted code to current context (like Windsurf)
+- **Smart Paste**: Adapt pasted code to current context
   - Automatically adjusts indentation, naming conventions
   - Adds missing imports based on file context
   - Preview adaptations before applying
   - Keybinding: `Cmd+Shift+P` / `Ctrl+Shift+P`
-- **Multi-file Composer**: Complex multi-file edits in one prompt (like Cursor)
+- **Multi-file Composer**: Complex multi-file edits in one prompt
   - Add multiple files to composer context
   - Describe changes in natural language
   - Preview all changes before applying

@@ -1,6 +1,6 @@
 # Victor AI - VS Code Extension
 
-AI-powered coding assistant with multi-provider support, semantic code search, and 55 enterprise tools. Competitive with GitHub Copilot, Cursor, and Windsurf.
+AI-powered coding assistant with multi-provider support, semantic code search, and 55 enterprise tools for professional development workflows.
 
 [![GitHub](https://img.shields.io/badge/GitHub-vjsingh1984%2Fvictor-blue)](https://github.com/vjsingh1984/victor)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/vjsingh1984/victor/blob/main/LICENSE)
@@ -15,19 +15,19 @@ AI-powered coding assistant with multi-provider support, semantic code search, a
 - Status bar indicator shows active agent count
 
 ### Terminal Agent (NEW in v0.2.0)
-- AI-assisted terminal command execution (like GitHub Copilot CLI)
+- AI-assisted terminal command execution
 - Suggest commands based on natural language intent
 - Dangerous command detection with approval workflow
 - Command history and approval tracking
 
 ### Smart Paste (NEW in v0.2.0)
-- Automatically adapt pasted code to current context (like Windsurf)
+- Automatically adapt pasted code to current context
 - Adjusts indentation, naming conventions
 - Adds missing imports based on file context
 - Preview adaptations before applying
 
 ### Multi-file Composer (NEW in v0.2.0)
-- Complex multi-file edits in one prompt (like Cursor Composer)
+- Complex multi-file edits in one prompt
 - Add multiple files to composer context
 - Describe changes in natural language
 - Preview all changes before applying
@@ -40,7 +40,7 @@ AI-powered coding assistant with multi-provider support, semantic code search, a
 - Dangerous command pattern detection
 
 ### @workspace Context (NEW in v0.2.0)
-- GitHub Copilot-style repo-aware context
+- Modern repo-aware context
 - `@workspace`: Project structure, configs, open files
 - `@selection`: Current editor selection
 - `@terminal`: Active terminal context
