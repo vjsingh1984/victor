@@ -351,6 +351,155 @@ class TaskAnalyzer:
         """
         return self.action_authorizer.detect(message)
 
+    # =========================================================================
+    # Task Classification Methods (moved from AgentOrchestrator)
+    # =========================================================================
+
+    def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+        """Classify task type based on keywords in the user message.
+
+        Uses UnifiedTaskClassifier for robust classification with:
+        - Negation detection (handles "don't analyze", "skip the review")
+        - Confidence scoring for better decisions
+        - Weighted keyword matching
+
+        Args:
+            user_message: The user's input message
+
+        Returns:
+            Dictionary with:
+            - is_action_task: bool - True if task requires action (create/execute/run)
+            - is_analysis_task: bool - True if task requires analysis/exploration
+            - needs_execution: bool - True if task specifically requires execution
+            - coarse_task_type: str - "analysis", "action", or "default"
+            - confidence: float - Classification confidence (0.0-1.0)
+            - source: str - Classification source ("keyword", "context", "ensemble")
+            - task_type: str - Detailed task type
+        """
+        result = self.unified_classifier.classify(user_message)
+
+        # Log negated keywords for debugging
+        if result.negated_keywords:
+            negated_strs = [f"{m.keyword}" for m in result.negated_keywords]
+            logger.debug(f"Negated keywords detected: {negated_strs}")
+
+        return result.to_legacy_dict()
+
+    def classify_task_with_context(
+        self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Classify task with conversation context for improved accuracy.
+
+        Uses conversation history to boost classification confidence when
+        the current message is ambiguous but context suggests a task type.
+
+        Args:
+            user_message: The user's input message
+            history: Optional conversation history for context boosting
+
+        Returns:
+            Dictionary with classification results (same as classify_task_keywords
+            but with potential context boosting applied)
+        """
+        if history:
+            result = self.unified_classifier.classify_with_context(user_message, history)
+        else:
+            result = self.unified_classifier.classify(user_message)
+
+        if result.context_signals:
+            logger.debug(f"Context signals applied: {result.context_signals}")
+
+        return result.to_legacy_dict()
+
+    def extract_required_files_from_prompt(self, user_message: str) -> List[str]:
+        """Extract file paths mentioned in user prompt for task completion tracking.
+
+        Looks for patterns like:
+        - /absolute/path/to/file.py
+        - ./relative/path.py
+        - victor/agent/orchestrator.py
+        - *.py (wildcards not returned)
+
+        Args:
+            user_message: The user's prompt text
+
+        Returns:
+            List of file paths mentioned in the prompt
+        """
+        import re
+
+        required_files: List[str] = []
+
+        # Pattern for file paths (absolute, relative, or module-style)
+        # Matches paths with at least one / and a file extension
+        # Handles: "path/file.py", path/file.py, path/file.py. (sentence end)
+        file_path_pattern = re.compile(
+            r"(?:^|\s|[\"'\-])"  # Start of string, whitespace, quote, or dash (for bullet lists)
+            r"((?:\.{0,2}/)?"  # Optional ./ or ../ or /
+            r"[\w./-]+/"  # At least one directory component
+            r"[\w.-]+\.[a-z]{1,10})"  # Filename with extension
+            r"(?:\s|[\"']|$|[,;:.\)]|\Z)",  # End: space, quote, EOL, punctuation (incl. period, paren)
+            re.IGNORECASE,
+        )
+
+        for match in file_path_pattern.finditer(user_message):
+            path = match.group(1)
+            # Skip wildcards and patterns
+            if "*" not in path and "?" not in path:
+                required_files.append(path)
+
+        # Also look for explicit "read", "analyze", "audit" + file patterns
+        explicit_pattern = re.compile(
+            r"(?:read|analyze|audit|check|review|examine)\s+" r"([/\w.-]+(?:/[\w.-]+)+)",
+            re.IGNORECASE,
+        )
+        for match in explicit_pattern.finditer(user_message):
+            path = match.group(1)
+            if path not in required_files and "*" not in path:
+                required_files.append(path)
+
+        logger.debug(f"Extracted required files from prompt: {required_files}")
+        return required_files
+
+    def extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
+        """Extract output requirements from user prompt.
+
+        Looks for patterns indicating required output format:
+        - "create a findings table"
+        - "provide top-3 fixes"
+        - "6-10 findings"
+        - "must output"
+
+        Args:
+            user_message: The user's prompt text
+
+        Returns:
+            List of required output types (e.g., ["findings table", "top-3 fixes"])
+        """
+        import re
+
+        required_outputs: List[str] = []
+        message_lower = user_message.lower()
+
+        # Check for findings table requirement
+        if re.search(r"findings?\s*table|table\s+of\s+findings?", message_lower):
+            required_outputs.append("findings table")
+
+        # Check for top-N fixes requirement
+        if re.search(r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower):
+            required_outputs.append("top-3 fixes")
+
+        # Check for summary requirement
+        if re.search(r"summary\s+of|provide\s+summary|create\s+summary", message_lower):
+            required_outputs.append("summary")
+
+        # Check for numbered findings requirement (e.g., "6-10 findings")
+        if re.search(r"\d+[-\u2013]\d+\s+findings?", message_lower):
+            required_outputs.append("findings table")
+
+        logger.debug(f"Extracted required outputs from prompt: {required_outputs}")
+        return required_outputs
+
 
 # Global instance (legacy - prefer DI container)
 _analyzer: Optional[TaskAnalyzer] = None

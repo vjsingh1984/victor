@@ -142,6 +142,11 @@ from victor.agent.context_compactor import (
     create_context_compactor,
     calculate_parallel_read_budget,
 )
+from victor.agent.context_manager import (
+    ContextManager,
+    ContextManagerConfig,
+    create_context_manager,
+)
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
@@ -704,6 +709,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             pruning_learner=pruning_learner,
         )
 
+        # ContextManager: Centralized context window management (TD-002 refactoring)
+        # Consolidates _get_model_context_window, _get_max_context_chars,
+        # _check_context_overflow, and _handle_compaction
+        self._context_manager = create_context_manager(
+            provider_name=self.provider_name,
+            model=self.model,
+            conversation_controller=self._conversation_controller,
+            context_compactor=self._context_compactor,
+            debug_logger=self.debug_logger,
+            settings=self.settings,
+        )
+
         # ToolOutputFormatter: LLM-context-aware formatting of tool results
         # (Initialization consolidated: the definitive initialization occurs
         # later in this method to avoid accidental double-initialization.)
@@ -984,11 +1001,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
 
-        Looks for patterns like:
-        - /absolute/path/to/file.py
-        - ./relative/path.py
-        - victor/agent/orchestrator.py
-        - *.py (wildcards not returned)
+        Delegates to TaskAnalyzer.extract_required_files_from_prompt().
 
         Args:
             user_message: The user's prompt text
@@ -996,49 +1009,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of file paths mentioned in the prompt
         """
-        import re
-
-        required_files: List[str] = []
-
-        # Pattern for file paths (absolute, relative, or module-style)
-        # Matches paths with at least one / and a file extension
-        # Handles: "path/file.py", path/file.py, path/file.py. (sentence end)
-        file_path_pattern = re.compile(
-            r"(?:^|\s|[\"'\-])"  # Start of string, whitespace, quote, or dash (for bullet lists)
-            r"((?:\.{0,2}/)?"  # Optional ./ or ../ or /
-            r"[\w./-]+/"  # At least one directory component
-            r"[\w.-]+\.[a-z]{1,10})"  # Filename with extension
-            r"(?:\s|[\"']|$|[,;:.\)]|\Z)",  # End: space, quote, EOL, punctuation (incl. period, paren)
-            re.IGNORECASE,
-        )
-
-        for match in file_path_pattern.finditer(user_message):
-            path = match.group(1)
-            # Skip wildcards and patterns
-            if "*" not in path and "?" not in path:
-                required_files.append(path)
-
-        # Also look for explicit "read", "analyze", "audit" + file patterns
-        explicit_pattern = re.compile(
-            r"(?:read|analyze|audit|check|review|examine)\s+" r"([/\w.-]+(?:/[\w.-]+)+)",
-            re.IGNORECASE,
-        )
-        for match in explicit_pattern.finditer(user_message):
-            path = match.group(1)
-            if path not in required_files and "*" not in path:
-                required_files.append(path)
-
-        logger.debug(f"Extracted required files from prompt: {required_files}")
-        return required_files
+        return self._task_analyzer.extract_required_files_from_prompt(user_message)
 
     def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
         """Extract output requirements from user prompt.
 
-        Looks for patterns indicating required output format:
-        - "create a findings table"
-        - "provide top-3 fixes"
-        - "6-10 findings"
-        - "must output"
+        Delegates to TaskAnalyzer.extract_required_outputs_from_prompt().
 
         Args:
             user_message: The user's prompt text
@@ -1046,29 +1022,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of required output types (e.g., ["findings table", "top-3 fixes"])
         """
-        import re
-
-        required_outputs: List[str] = []
-        message_lower = user_message.lower()
-
-        # Check for findings table requirement
-        if re.search(r"findings?\s*table|table\s+of\s+findings?", message_lower):
-            required_outputs.append("findings table")
-
-        # Check for top-N fixes requirement
-        if re.search(r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower):
-            required_outputs.append("top-3 fixes")
-
-        # Check for summary requirement
-        if re.search(r"summary\s+of|provide\s+summary|create\s+summary", message_lower):
-            required_outputs.append("summary")
-
-        # Check for numbered findings requirement (e.g., "6-10 findings")
-        if re.search(r"\d+[-–]\d+\s+findings?", message_lower):
-            required_outputs.append("findings table")
-
-        logger.debug(f"Extracted required outputs from prompt: {required_outputs}")
-        return required_outputs
+        return self._task_analyzer.extract_required_outputs_from_prompt(user_message)
 
     # =====================================================================
     # Component accessors for external use
@@ -1820,10 +1774,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[Dict[str, Any]]:
         """Pre-request hook for intelligent pipeline integration.
 
-        Called at the start of stream_chat to:
-        - Get mode transition recommendations (Q-learning)
-        - Get optimal tool budget for task type
-        - Enable prompt optimization if configured
+        Delegates to OrchestratorIntegration.prepare_intelligent_request().
 
         Args:
             task: The user's task/query
@@ -1836,48 +1787,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return None
 
-        try:
-            # Get current mode from conversation state
-            # Note: ConversationStage uses auto() which returns int values,
-            # so we use stage.name.lower() to get a string mode name
-            stage = self.conversation_state.get_current_stage()
-            current_mode = stage.name.lower() if stage else "explore"
-
-            # Prepare request context (async call to pipeline)
-            context = await integration.prepare_request(
-                task=task,
-                task_type=task_type,
-                current_mode=current_mode,
-            )
-
-            # Apply recommended tool budget if available (skip if user made a sticky override)
-            # NOTE: We no longer reduce the budget based on pipeline recommendations.
-            # The pipeline may suggest a smaller budget based on Q-learning, but this
-            # caused premature stopping (e.g., 50 -> 5). The user's budget is authoritative.
-            # We only log the recommendation for debugging purposes.
-            if context.recommended_tool_budget:
-                sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-                if not sticky_budget:
-                    current_budget = self.unified_tracker.progress.tool_budget
-                    # Only log significant differences, but don't reduce the budget
-                    if abs(context.recommended_tool_budget - current_budget) > 10:
-                        logger.debug(
-                            f"IntelligentPipeline recommended budget {context.recommended_tool_budget} "
-                            f"differs from current {current_budget}, keeping current budget"
-                        )
-
-            return {
-                "recommended_mode": context.recommended_mode,
-                "recommended_tool_budget": context.recommended_tool_budget,
-                "should_continue": context.should_continue,
-                "system_prompt_addition": context.system_prompt if context.system_prompt else None,
-            }
-        except (AttributeError, KeyError) as e:
-            logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")
-            return None
-        except (ValueError, TypeError) as e:
-            logger.debug(f"IntelligentPipeline prepare_request failed (data error): {e}")
-            return None
+        return await integration.prepare_intelligent_request(
+            task=task,
+            task_type=task_type,
+            conversation_state=self.conversation_state,
+            unified_tracker=self.unified_tracker,
+        )
 
     async def _validate_intelligent_response(
         self,
@@ -1888,10 +1803,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[Dict[str, Any]]:
         """Post-response hook for intelligent pipeline integration.
 
-        Called after each streaming iteration to:
-        - Score response quality (coherence, completeness, relevance)
-        - Verify grounding (detect hallucinations)
-        - Record feedback for Q-learning
+        Delegates to OrchestratorIntegration.validate_intelligent_response().
 
         Args:
             response: The model's response content
@@ -1906,45 +1818,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return None
 
-        # Skip validation for empty or very short responses
-        if not response or len(response.strip()) < 50:
-            return None
-
-        try:
-            result = await integration.validate_response(
-                response=response,
-                query=query,
-                tool_calls=tool_calls,
-                success=True,
-                task_type=task_type,
-            )
-
-            # Log quality warnings if below threshold
-            if not result.is_valid:
-                logger.warning(
-                    f"IntelligentPipeline: Response below quality threshold "
-                    f"(quality={result.quality_score:.2f}, grounded={result.is_grounded})"
-                )
-
-            return {
-                "quality_score": result.quality_score,
-                "grounding_score": result.grounding_score,
-                "is_grounded": result.is_grounded,
-                "is_valid": result.is_valid,
-                "grounding_issues": result.grounding_issues,
-                # Grounding failure handling - force finalize after max retries
-                "should_finalize": getattr(result, "should_finalize", False),
-                "should_retry": getattr(result, "should_retry", False),
-                "finalize_reason": getattr(result, "finalize_reason", ""),
-                # Actionable feedback for grounding correction on retry
-                "grounding_feedback": getattr(result, "grounding_feedback", ""),
-            }
-        except (AttributeError, KeyError) as e:
-            logger.debug(f"IntelligentPipeline validate_response skipped (not configured): {e}")
-            return None
-        except (ValueError, TypeError) as e:
-            logger.debug(f"IntelligentPipeline validate_response failed (data error): {e}")
-            return None
+        return await integration.validate_intelligent_response(
+            response=response,
+            query=query,
+            tool_calls=tool_calls,
+            task_type=task_type,
+        )
 
     def _record_intelligent_outcome(
         self,
@@ -1955,11 +1834,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> None:
         """Record outcome for Q-learning feedback.
 
-        Called at the end of a conversation to record the outcome
-        for reinforcement learning. This helps the system learn
-        optimal mode transitions and tool budgets.
-
-        Also records continuation prompt learning outcomes if RL learner enabled.
+        Delegates to OrchestratorIntegration.record_intelligent_outcome().
 
         Args:
             success: Whether the task was completed successfully
@@ -1967,112 +1842,39 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             user_satisfied: Whether user seemed satisfied
             completed: Whether task reached completion
         """
-        # Record RL outcomes for all learners
-        if self._rl_coordinator and hasattr(self, "_current_stream_context"):
-            try:
-                from victor.agent.rl.base import RLOutcome
-
-                ctx = self._current_stream_context
-                # Determine task type from context
-                task_type = "default"
-                if ctx.is_analysis_task:
-                    task_type = "analysis"
-                elif ctx.is_action_task:
-                    task_type = "action"
-
-                # Get continuation prompts used (track from orchestrator state)
-                continuation_prompts_used = getattr(self, "_continuation_prompts", 0)
-                max_prompts_configured = getattr(self, "_max_continuation_prompts_used", 6)
-                stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
-
-                # Get vertical name from context (avoid hardcoded "coding")
-                vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
-
-                # Record outcome for continuation_prompts learner
-                outcome = RLOutcome(
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    success=success and completed,
-                    quality_score=quality_score,
-                    metadata={
-                        "continuation_prompts_used": continuation_prompts_used,
-                        "max_prompts_configured": max_prompts_configured,
-                        "stuck_loop_detected": stuck_loop_detected,
-                        "forced_completion": ctx.force_completion,
-                        "tool_calls_total": self.tool_calls_used,
-                    },
-                    vertical=vertical_name,
-                )
-                self._rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
-
-                # Emit RL hook for continuation prompt
-                self._emit_continuation_event(
-                    event_type="prompt",
-                    success=success and completed,
-                    quality_score=quality_score,
-                    task_type=task_type,
-                    prompts_used=continuation_prompts_used,
-                )
-
-                # Also record for continuation_patience learner if we have stuck loop data
-                if continuation_prompts_used > 0:
-                    patience_outcome = RLOutcome(
-                        provider=self.provider.name,
-                        model=self.model,
-                        task_type=task_type,
-                        success=success and completed,
-                        quality_score=quality_score,
-                        metadata={
-                            "flagged_as_stuck": stuck_loop_detected,
-                            "actually_stuck": stuck_loop_detected and not success,
-                            "eventually_made_progress": not stuck_loop_detected and success,
-                        },
-                        vertical=vertical_name,
-                    )
-                    self._rl_coordinator.record_outcome(
-                        "continuation_patience", patience_outcome, vertical_name
-                    )
-
-                    # Emit RL hook for continuation patience
-                    self._emit_continuation_event(
-                        event_type="patience",
-                        success=success and completed,
-                        quality_score=quality_score,
-                        task_type=task_type,
-                        prompts_used=continuation_prompts_used,
-                        stuck_detected=stuck_loop_detected,
-                    )
-
-            except Exception as e:
-                logger.warning(f"RL: Failed to record RL outcomes: {e}")
-
         integration = self.intelligent_integration
         if not integration:
             return
 
+        # Get orchestrator state to pass to integration
+        stream_context = getattr(self, "_current_stream_context", None)
+        continuation_prompts = getattr(self, "_continuation_prompts", 0)
+        max_continuation_prompts_used = getattr(self, "_max_continuation_prompts_used", 6)
+        stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
+
         try:
-            # Access the mode controller through the pipeline
-            pipeline = integration.pipeline
-            if hasattr(pipeline, "_mode_controller") and pipeline._mode_controller:
-                pipeline._mode_controller.record_outcome(
-                    success=success,
-                    quality_score=quality_score,
-                    user_satisfied=user_satisfied,
-                    completed=completed,
-                )
-                logger.debug(
-                    f"IntelligentPipeline recorded outcome: "
-                    f"success={success}, quality={quality_score:.2f}"
-                )
+            integration.record_intelligent_outcome(
+                success=success,
+                quality_score=quality_score,
+                user_satisfied=user_satisfied,
+                completed=completed,
+                rl_coordinator=self._rl_coordinator,
+                stream_context=stream_context,
+                vertical_context=self._vertical_context,
+                provider_name=self.provider.name,
+                model=self.model,
+                tool_calls_used=self.tool_calls_used,
+                continuation_prompts=continuation_prompts,
+                max_continuation_prompts_used=max_continuation_prompts_used,
+                stuck_loop_detected=stuck_loop_detected,
+            )
         except Exception as e:
             logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
 
     def _should_continue_intelligent(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
 
-        Uses Q-learning based decisions to determine if the agent
-        should continue processing or transition to completion.
+        Delegates to OrchestratorIntegration.should_continue_intelligent().
 
         Returns:
             Tuple of (should_continue, reason)
@@ -2081,68 +1883,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return True, "Pipeline disabled"
 
-        try:
-            return integration.should_continue()
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline should_continue failed: {e}")
-            return True, "Fallback to continue"
-
-    def _emit_continuation_event(
-        self,
-        event_type: str,
-        success: bool,
-        quality_score: float,
-        task_type: str,
-        prompts_used: int,
-        stuck_detected: bool = False,
-    ) -> None:
-        """Emit RL event for continuation attempt.
-
-        Args:
-            event_type: Either "prompt" or "patience"
-            success: Whether the continuation was successful
-            quality_score: Quality score of the result
-            task_type: Type of task
-            prompts_used: Number of continuation prompts used
-            stuck_detected: Whether a stuck loop was detected
-        """
-        try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
-
-            hooks = get_rl_hooks()
-            if hooks is None:
-                return
-
-            if event_type == "prompt":
-                event = RLEvent(
-                    type=RLEventType.CONTINUATION_PROMPT,
-                    success=success,
-                    quality_score=quality_score,
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    metadata={
-                        "prompts_used": prompts_used,
-                    },
-                )
-            else:  # patience
-                event = RLEvent(
-                    type=RLEventType.CONTINUATION_ATTEMPT,
-                    success=success,
-                    quality_score=quality_score,
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    metadata={
-                        "prompts_used": prompts_used,
-                        "stuck_detected": stuck_detected,
-                    },
-                )
-
-            hooks.emit(event)
-
-        except Exception as e:
-            logger.debug(f"Continuation event emission failed: {e}")
+        return integration.should_continue_intelligent()
 
     @property
     def safety_checker(self) -> "SafetyChecker":
@@ -2263,11 +2004,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
 
-        Queries the provider limits config for model-specific context window.
+        Delegates to ContextManager when available (TD-002 refactoring).
+        Falls back to direct implementation during __init__ before
+        ContextManager is created.
 
         Returns:
             Context window size in tokens
         """
+        # Delegate to ContextManager if available
+        if hasattr(self, "_context_manager") and self._context_manager is not None:
+            return self._context_manager.get_model_context_window()
+
+        # Fallback for calls during __init__ before ContextManager is created
         try:
             from victor.config.config_loaders import get_provider_limits
 
@@ -2280,24 +2028,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _get_max_context_chars(self) -> int:
         """Get maximum context size in characters.
 
-        Derives from model context window, converting tokens to chars.
-        Average ~4 chars per token, with safety margin.
+        Delegates to ContextManager (TD-002 refactoring).
 
         Returns:
             Maximum context size in characters
         """
-        # Check settings override first
-        settings_max = getattr(self.settings, "max_context_chars", None)
-        if settings_max and settings_max > 0:
-            return settings_max
-
-        # Calculate from model context window
-        # Use ~3.5 chars per token with 80% safety margin
-        context_tokens = self._get_model_context_window()
-        return int(context_tokens * 3.5 * 0.8)
+        return self._context_manager.get_max_context_chars()
 
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
+
+        Delegates to ContextManager (TD-002 refactoring).
 
         Args:
             max_context_chars: Maximum allowed context size in chars
@@ -2305,29 +2046,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if context is dangerously large
         """
-        # Delegate to ConversationController
-        metrics = self._conversation_controller.get_context_metrics()
-
-        # Update debug logger
-        self.debug_logger.log_context_size(metrics.char_count, metrics.estimated_tokens)
-
-        if metrics.is_overflow_risk:
-            logger.warning(
-                f"Context overflow risk: {metrics.char_count:,} chars "
-                f"(~{metrics.estimated_tokens:,} tokens). "
-                f"Max: {metrics.max_context_chars:,} chars"
-            )
-            return True
-
-        return False
+        return self._context_manager.check_context_overflow(max_context_chars)
 
     def get_context_metrics(self) -> ContextMetrics:
         """Get detailed context metrics.
 
+        Delegates to ContextManager (TD-002 refactoring).
+
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._conversation_controller.get_context_metrics()
+        return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
@@ -3425,65 +3154,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Uses UnifiedTaskClassifier for robust classification with:
-        - Negation detection (handles "don't analyze", "skip the review")
-        - Confidence scoring for better decisions
-        - Weighted keyword matching
+        Delegates to TaskAnalyzer.classify_task_keywords().
 
         Args:
             user_message: The user's input message
 
         Returns:
-            Dictionary with:
-            - is_action_task: bool - True if task requires action (create/execute/run)
-            - is_analysis_task: bool - True if task requires analysis/exploration
-            - needs_execution: bool - True if task specifically requires execution
-            - coarse_task_type: str - "analysis", "action", or "default"
-            - confidence: float - Classification confidence (0.0-1.0)
-            - source: str - Classification source ("keyword", "context", "ensemble")
-            - task_type: str - Detailed task type
+            Dictionary with classification results (see TaskAnalyzer.classify_task_keywords)
         """
-        from victor.agent.unified_classifier import get_unified_classifier
-
-        classifier = get_unified_classifier()
-        result = classifier.classify(user_message)
-
-        # Log negated keywords for debugging
-        if result.negated_keywords:
-            negated_strs = [f"{m.keyword}" for m in result.negated_keywords]
-            logger.debug(f"Negated keywords detected: {negated_strs}")
-
-        return result.to_legacy_dict()
+        return self._task_analyzer.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
         self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Uses conversation history to boost classification confidence when
-        the current message is ambiguous but context suggests a task type.
+        Delegates to TaskAnalyzer.classify_task_with_context().
 
         Args:
             user_message: The user's input message
             history: Optional conversation history for context boosting
 
         Returns:
-            Dictionary with classification results (same as _classify_task_keywords
-            but with potential context boosting applied)
+            Dictionary with classification results (see TaskAnalyzer.classify_task_with_context)
         """
-        from victor.agent.unified_classifier import get_unified_classifier
-
-        classifier = get_unified_classifier()
-
-        if history:
-            result = classifier.classify_with_context(user_message, history)
-        else:
-            result = classifier.classify(user_message)
-
-        if result.context_signals:
-            logger.debug(f"Context signals applied: {result.context_signals}")
-
-        return result.to_legacy_dict()
+        return self._task_analyzer.classify_task_with_context(user_message, history)
 
     def _determine_continuation_action(
         self,
@@ -3840,32 +3535,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     def _handle_compaction(self, user_message: str) -> Optional[StreamChunk]:
-        """Perform proactive compaction if enabled."""
-        if not (hasattr(self, "_context_compactor") and self._context_compactor):
-            return None
+        """Perform proactive compaction if enabled.
 
-        compaction_action = self._context_compactor.check_and_compact(current_query=user_message)
-        if not compaction_action.action_taken:
-            return None
-
-        logger.info(
-            f"Proactive compaction: {compaction_action.trigger.value}, "
-            f"removed {compaction_action.messages_removed} messages, "
-            f"freed {compaction_action.chars_freed:,} chars"
-        )
-        chunk: Optional[StreamChunk] = None
-        if compaction_action.messages_removed > 0:
-            chunk = StreamChunk(
-                content=(
-                    f"\n[context] Proactively compacted history "
-                    f"({compaction_action.messages_removed} messages, "
-                    f"{compaction_action.chars_freed:,} chars freed).\n"
-                )
-            )
-            # Inject context reminder about compacted content
-            self._conversation_controller.inject_compaction_context()
-
-        return chunk
+        Delegates to ContextManager (TD-002 refactoring).
+        """
+        return self._context_manager.handle_compaction(user_message)
 
     async def _handle_context_and_iteration_limits(
         self,
