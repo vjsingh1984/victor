@@ -160,11 +160,11 @@ class BaseProvider(ABC):
 
 ### Tool Selection Strategy
 
-| Strategy | Speed | Accuracy | Use Case |
-|----------|-------|----------|----------|
-| Keyword | <1ms | Good | Air-gapped, quick lookups |
-| Semantic | 10-50ms | Best | Complex queries |
-| Hybrid | 5-30ms | Very Good | Default (70% semantic, 30% keyword) |
+| Strategy | Characteristics | Use Case |
+|----------|-----------------|----------|
+| Keyword | Fast, deterministic | Air-gapped, quick lookups |
+| Semantic | Higher recall, needs embeddings | Complex queries |
+| Hybrid | Blends keyword + semantic | Mixed workloads |
 
 ---
 
@@ -371,7 +371,7 @@ victor benchmark compare           # Framework comparison
 
 > **Air-Gapped Mode**: Only local providers (Ollama, LMStudio, vLLM), no web tools, local embeddings.
 
-> **Tool Selection**: Default hybrid strategy (70% semantic, 30% keyword). Configure via `tool_selection_strategy` setting.
+> **Tool Selection**: Strategy is configurable via `tool_selection_strategy` (or legacy `use_semantic_tool_selection`).
 
 > **Context Compaction**: Triggers at 70% context window usage. Truncates tool results, summarizes history.
 
