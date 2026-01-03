@@ -188,6 +188,44 @@ class VerticalBase(ABC):
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _extensions_cache: Dict[str, Any] = {}
 
+    # =========================================================================
+    # Extension Caching Infrastructure
+    # =========================================================================
+
+    @classmethod
+    def _get_cached_extension(cls, key: str, factory: callable) -> Any:
+        """Get extension from cache or create and cache it.
+
+        This helper enables fine-grained caching of individual extension
+        instances, avoiding repeated object creation when extensions are
+        accessed multiple times.
+
+        The cache uses a composite key of (class_name, extension_key) to
+        ensure proper isolation between different vertical subclasses.
+
+        Args:
+            key: Unique key for this extension type (e.g., "middleware",
+                 "safety_extension", "workflow_provider")
+            factory: Zero-argument callable that creates the extension instance.
+                     Only called if the extension is not already cached.
+
+        Returns:
+            Cached or newly created extension instance.
+
+        Example:
+            @classmethod
+            def get_middleware(cls) -> List[MiddlewareProtocol]:
+                def _create():
+                    from myvertical.middleware import MyMiddleware
+                    return [MyMiddleware()]
+                return cls._get_cached_extension("middleware", _create)
+        """
+        # Use composite key to avoid collisions between different vertical classes
+        cache_key = f"{cls.__name__}:{key}"
+        if cache_key not in cls._extensions_cache:
+            cls._extensions_cache[cache_key] = factory()
+        return cls._extensions_cache[cache_key]
+
     @classmethod
     @abstractmethod
     def get_tools(cls) -> List[str]:
@@ -693,6 +731,9 @@ class VerticalBase(ABC):
     def clear_config_cache(cls, *, clear_all: bool = False) -> None:
         """Clear the config cache for this vertical.
 
+        Also clears individual extension cache entries created by
+        _get_cached_extension() for this class.
+
         Args:
             clear_all: If True, clear cache for all verticals.
                        If False (default), clear only for this class.
@@ -703,7 +744,13 @@ class VerticalBase(ABC):
         else:
             cache_key = cls.__name__
             cls._config_cache.pop(cache_key, None)
+            # Clear composite extensions cache entry
             cls._extensions_cache.pop(cache_key, None)
+            # Also clear individual extension cache entries (format: "ClassName:key")
+            prefix = f"{cache_key}:"
+            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
+            for key in keys_to_remove:
+                cls._extensions_cache.pop(key, None)
 
     @classmethod
     def get_tool_set(cls) -> ToolSet:

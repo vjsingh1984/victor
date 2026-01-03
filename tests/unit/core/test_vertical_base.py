@@ -202,3 +202,71 @@ class TestVerticalBaseConfig:
         config2 = ConcreteVertical.get_config(use_cache=True)
 
         assert config1 is config2, "Cached configs should be same object"
+
+
+class TestGetCachedExtension:
+    """Tests for VerticalBase._get_cached_extension() helper method."""
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+    def test_caches_extension_on_first_call(self):
+        """Verify that factory is called once and result is cached."""
+        call_count = 0
+
+        def factory():
+            nonlocal call_count
+            call_count += 1
+            return {"created": call_count}
+
+        result1 = ConcreteVertical._get_cached_extension("test_key", factory)
+        result2 = ConcreteVertical._get_cached_extension("test_key", factory)
+
+        assert call_count == 1, "Factory should be called only once"
+        assert result1 is result2, "Should return same cached object"
+        assert result1["created"] == 1
+
+    def test_different_keys_cache_separately(self):
+        """Verify that different keys maintain separate cache entries."""
+        result1 = ConcreteVertical._get_cached_extension("key_a", lambda: "value_a")
+        result2 = ConcreteVertical._get_cached_extension("key_b", lambda: "value_b")
+
+        assert result1 == "value_a"
+        assert result2 == "value_b"
+        assert result1 != result2
+
+    def test_different_verticals_cache_separately(self):
+        """Verify that different vertical subclasses have isolated caches."""
+
+        class AnotherVertical(VerticalBase):
+            name = "another"
+            description = "Another"
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return []
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return ""
+
+        # Both use same key but should be cached separately
+        result1 = ConcreteVertical._get_cached_extension("shared_key", lambda: "concrete")
+        result2 = AnotherVertical._get_cached_extension("shared_key", lambda: "another")
+
+        assert result1 == "concrete"
+        assert result2 == "another"
+
+    def test_clear_config_cache_clears_extensions(self):
+        """Verify that clear_config_cache() also clears extension cache."""
+        # Populate cache
+        result1 = ConcreteVertical._get_cached_extension("test_key", lambda: "original")
+        assert result1 == "original"
+
+        # Clear cache
+        ConcreteVertical.clear_config_cache()
+
+        # Should call factory again
+        result2 = ConcreteVertical._get_cached_extension("test_key", lambda: "new_value")
+        assert result2 == "new_value"

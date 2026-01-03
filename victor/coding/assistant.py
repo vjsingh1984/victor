@@ -83,38 +83,11 @@ class CodingAssistant(VerticalBase):
     version = "2.0.0"  # Extension support
 
     # =========================================================================
-    # Extension Caching (Phase 3: Performance fix)
+    # Extension Caching
     # =========================================================================
-    # Cache extension instances to avoid repeated object creation.
-    # Cache is invalidated on clear_extension_cache() call.
-
-    _extension_cache: Dict[str, Any] = {}
-    _extensions_instance: Optional[VerticalExtensions] = None
-
-    @classmethod
-    def _get_cached_extension(cls, key: str, factory: callable) -> Any:
-        """Get extension from cache or create and cache it.
-
-        Args:
-            key: Cache key for the extension
-            factory: Callable that creates the extension instance
-
-        Returns:
-            Cached or newly created extension instance
-        """
-        if key not in cls._extension_cache:
-            cls._extension_cache[key] = factory()
-        return cls._extension_cache[key]
-
-    @classmethod
-    def clear_extension_cache(cls) -> None:
-        """Clear the extension cache.
-
-        Call this if you need to force re-creation of extension instances
-        (e.g., after configuration changes or for testing).
-        """
-        cls._extension_cache.clear()
-        cls._extensions_instance = None
+    # Individual extension caching is provided by VerticalBase._get_cached_extension()
+    # Composite extensions caching is provided by VerticalBase.get_extensions()
+    # Use clear_config_cache() to invalidate all caches.
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -640,36 +613,9 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
         return cls._get_cached_extension("personas", _create)
 
-    @classmethod
-    def get_extensions(cls) -> VerticalExtensions:
-        """Get all coding vertical extensions (cached).
-
-        Convenience method that aggregates all extension implementations
-        for framework integration. Results are cached to avoid repeated
-        object creation on multiple calls.
-
-        Returns:
-            VerticalExtensions containing all coding extensions
-        """
-        if cls._extensions_instance is not None:
-            return cls._extensions_instance
-
-        safety = cls.get_safety_extension()
-        prompt = cls.get_prompt_contributor()
-
-        cls._extensions_instance = VerticalExtensions(
-            middleware=cls.get_middleware(),
-            safety_extensions=[safety] if safety else [],
-            prompt_contributors=[prompt] if prompt else [],
-            mode_config_provider=cls.get_mode_config_provider(),
-            tool_dependency_provider=cls.get_tool_dependency_provider(),
-            workflow_provider=cls.get_workflow_provider(),
-            service_provider=cls.get_service_provider(),
-            rl_config_provider=cls.get_rl_config_provider(),
-            team_spec_provider=cls.get_team_spec_provider(),
-            enrichment_strategy=cls.get_enrichment_strategy(),
-        )
-        return cls._extensions_instance
+    # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
+    # Individual extension getters use _get_cached_extension() from VerticalBase.
+    # To clear all caches, use cls.clear_config_cache().
 
 
 __all__ = ["CodingAssistant"]
