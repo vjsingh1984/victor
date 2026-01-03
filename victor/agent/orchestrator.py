@@ -498,8 +498,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
         # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
+        # Tool dependencies are registered via ToolRegistrar after it's created
         self.tool_graph = self._factory.create_tool_dependency_graph()
-        self._register_default_tool_dependencies()
 
         # Stateful managers (DI with fallback)
         # Code execution manager for Docker-based code execution (via factory, DI with fallback)
@@ -554,6 +554,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tools, self.tool_graph, provider, model
         )
         self.tool_registrar.set_background_task_callback(self._create_background_task)
+
+        # Register tool dependencies for planning (delegates to ToolRegistrar)
+        self.tool_registrar._register_tool_dependencies()
 
         # Synchronous registration (dynamic tools, configs)
         self._register_default_tools()  # Delegates to ToolRegistrar
@@ -3555,64 +3558,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.mcp_registry = getattr(self.tool_registrar, "mcp_registry", None)
             if mcp_tools_count > 0:
                 logger.debug(f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar")
-
-    def _register_default_tool_dependencies(self) -> None:
-        """Register minimal tool input/output specs for planning with cost tiers."""
-        try:
-            # Search tools - FREE tier (local operations)
-            self.tool_graph.add_tool(
-                "code_search",
-                inputs=["query"],
-                outputs=["file_candidates"],
-                cost_tier=CostTier.FREE,
-            )
-            self.tool_graph.add_tool(
-                "semantic_code_search",
-                inputs=["query"],
-                outputs=["file_candidates"],
-                cost_tier=CostTier.FREE,
-            )
-            # File operations - FREE tier
-            self.tool_graph.add_tool(
-                "read_file",
-                inputs=["file_candidates"],
-                outputs=["file_contents"],
-                cost_tier=CostTier.FREE,
-            )
-
-            # Analysis tools - LOW tier (more compute but local)
-            self.tool_graph.add_tool(
-                "analyze_docs",
-                inputs=["file_contents"],
-                outputs=["summary"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "code_review",
-                inputs=["file_contents"],
-                outputs=["summary"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "generate_docs",
-                inputs=["file_contents"],
-                outputs=["documentation"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "security_scan",
-                inputs=["file_contents"],
-                outputs=["security_report"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "analyze_metrics",
-                inputs=["file_contents"],
-                outputs=["metrics_report"],
-                cost_tier=CostTier.LOW,
-            )
-        except Exception as exc:
-            logger.debug(f"Failed to register tool dependencies: {exc}")
 
     def _initialize_plugins(self) -> None:
         """Initialize and load tool plugins from configured directories.

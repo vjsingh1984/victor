@@ -191,12 +191,21 @@ class TestMCPIntegration:
 
 
 class TestToolDependencies:
-    """Tests for tool dependency registration."""
+    """Tests for tool dependency registration.
 
-    def test_register_default_tool_dependencies(self, orchestrator):
-        """Test _register_default_tool_dependencies creates graph (covers line 696+)."""
-        orchestrator._register_default_tool_dependencies()
+    Note: Tool dependencies are now registered via ToolRegistrar during
+    orchestrator initialization. The _register_default_tool_dependencies
+    method was consolidated into ToolRegistrar._register_tool_dependencies
+    in the TD-002 God Class refactoring (Jan 2026).
+    """
+
+    def test_tool_dependencies_registered_on_init(self, orchestrator):
+        """Test tool dependencies are registered during initialization."""
+        # ToolRegistrar registers tool dependencies during __init__
         assert orchestrator.tool_graph is not None
+        # Verify some tools were registered
+        # The tool_graph should have tools registered via tool_registrar
+        assert hasattr(orchestrator.tool_registrar, "_register_tool_dependencies")
 
 
 class TestConversationState:

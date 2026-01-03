@@ -265,6 +265,13 @@ class TestToolConfiguration:
 
     def test_load_disabled_tools(self, registrar):
         """Test loading disabled tools configuration."""
+        # Mock registered tools to include the tools we want to disable
+        mock_tool1 = MagicMock()
+        mock_tool1.name = "tool1"
+        mock_tool2 = MagicMock()
+        mock_tool2.name = "tool2"
+        registrar.tools.list_tools.return_value = [mock_tool1, mock_tool2]
+
         registrar.settings.load_tool_config.return_value = {
             "disabled": ["tool1", "tool2"],
         }
@@ -290,6 +297,11 @@ class TestToolConfiguration:
 
     def test_load_per_tool_config(self, registrar):
         """Test loading per-tool configuration."""
+        # Mock registered tools to include the tool we want to configure
+        mock_tool = MagicMock()
+        mock_tool.name = "my_tool"
+        registrar.tools.list_tools.return_value = [mock_tool]
+
         registrar.settings.load_tool_config.return_value = {
             "my_tool": {"enabled": False},
         }
