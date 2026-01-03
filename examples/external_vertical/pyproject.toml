@@ -54,7 +54,7 @@ requires-python = ">=3.10"
 
 # Dependencies - Victor is the only required dependency
 dependencies = [
-    "victor>=0.1.0",  # Main Victor package
+    "victor-ai>=0.3.0",  # Main Victor package
 ]
 
 [project.optional-dependencies]

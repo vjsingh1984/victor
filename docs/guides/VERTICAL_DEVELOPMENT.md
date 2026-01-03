@@ -20,14 +20,15 @@ Each vertical consists of these core components:
 
 ```
 victor/{vertical_name}/
-├── __init__.py           # Package init, exports VerticalAssistant
-├── assistant.py          # Main VerticalAssistant class
-├── safety.py             # Safety patterns and constraints
-├── prompts.py            # Prompt contributors
-├── mode_config.py        # Agent mode configurations
-├── service_provider.py   # Dependency injection services (optional)
-├── tool_dependencies.py  # Tool dependency declarations (optional)
-└── workflows/            # YAML workflow definitions
+├── __init__.py              # Package init, exports VerticalAssistant
+├── assistant.py             # Main VerticalAssistant class
+├── safety.py                # Safety patterns and constraints
+├── prompts.py               # Prompt contributors
+├── mode_config.py           # Agent mode configurations
+├── service_provider.py      # Dependency injection services (optional)
+├── tool_dependencies.py     # Tool dependency provider class (optional)
+├── tool_dependencies.yaml   # YAML tool dependency configuration (recommended)
+└── workflows/               # YAML workflow definitions
     └── {workflow_name}.yaml
 ```
 
@@ -306,6 +307,215 @@ workflows:
         goal: "Generate security audit report"
         tool_budget: 5
         output: final_report
+```
+
+### YAML Tool Dependencies
+
+Tool dependencies define execution patterns and transition probabilities for intelligent tool selection. The YAML-based configuration replaces hand-coded Python dictionaries.
+
+#### Configuration File
+
+Create `tool_dependencies.yaml` in your vertical directory:
+
+```yaml
+# victor/security/tool_dependencies.yaml
+version: "1.0"
+vertical: security
+
+# Tool transition probabilities (weights sum to <= 1.0)
+transitions:
+  grep:
+    - tool: read
+      weight: 0.6
+    - tool: code_search
+      weight: 0.3
+    - tool: bash
+      weight: 0.1
+
+  read:
+    - tool: grep
+      weight: 0.4
+    - tool: web_fetch
+      weight: 0.3
+    - tool: edit
+      weight: 0.3
+
+# Groups of related tools
+clusters:
+  file_operations:
+    - read
+    - write
+    - edit
+    - ls
+
+  security_scanning:
+    - grep
+    - bash
+    - code_search
+
+# Named tool sequences for task types
+sequences:
+  vulnerability_scan:
+    - grep
+    - read
+    - bash
+
+  code_review:
+    - read
+    - grep
+    - code_search
+    - read
+
+# Tool dependency relationships
+dependencies:
+  - tool: edit
+    depends_on:
+      - read
+    enables:
+      - bash
+    weight: 0.9
+
+  - tool: bash
+    depends_on: []
+    enables:
+      - read
+    weight: 0.8
+
+# Essential tools for this vertical
+required_tools:
+  - read
+  - grep
+  - bash
+
+# Optional enhancement tools
+optional_tools:
+  - code_search
+  - web_fetch
+  - write
+  - edit
+
+# Fallback sequence for unknown tasks
+default_sequence:
+  - read
+  - grep
+  - bash
+
+# Extensible metadata
+metadata:
+  description: "Tool dependencies for security analysis workflows"
+  author: "Your Name"
+```
+
+#### Schema Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | Schema version (currently "1.0") |
+| `vertical` | string | Vertical name (lowercase) |
+| `transitions` | dict | Tool -> list of {tool, weight} transitions |
+| `clusters` | dict | Named groups of related tools |
+| `sequences` | dict | Named ordered tool sequences |
+| `dependencies` | list | Tool dependency entries with depends_on/enables |
+| `required_tools` | list | Essential tools for the vertical |
+| `optional_tools` | list | Enhancement tools (not required) |
+| `default_sequence` | list | Fallback sequence for unknown tasks |
+| `metadata` | dict | Extensible metadata (description, author, etc.) |
+
+#### Using YAMLToolDependencyProvider
+
+Create a provider class that loads from YAML:
+
+```python
+# victor/security/tool_dependencies.py
+from pathlib import Path
+from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+
+_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
+
+class SecurityToolDependencyProvider(YAMLToolDependencyProvider):
+    """Tool dependency provider for security vertical."""
+
+    def __init__(self):
+        super().__init__(
+            yaml_path=_YAML_CONFIG_PATH,
+            canonicalize=True,  # Normalize tool names
+        )
+
+# Usage
+provider = SecurityToolDependencyProvider()
+deps = provider.get_dependencies()
+sequence = provider.get_recommended_sequence("vulnerability_scan")
+weight = provider.get_transition_weight("grep", "read")
+```
+
+#### Adding Custom Dependencies at Runtime
+
+Merge additional dependencies with the YAML config:
+
+```python
+from victor.core.tool_types import ToolDependency
+
+provider = SecurityToolDependencyProvider(
+    additional_dependencies=[
+        ToolDependency(
+            tool_name="custom_scanner",
+            depends_on={"read"},
+            enables={"bash"},
+            weight=0.7,
+        )
+    ],
+    additional_sequences={
+        "custom_workflow": ["read", "custom_scanner", "bash"],
+    },
+)
+```
+
+#### Migration from Python to YAML
+
+**Before (hand-coded Python):**
+
+```python
+# victor/security/tool_dependencies.py
+SECURITY_TOOL_DEPENDENCIES = [
+    ToolDependency(tool_name="edit", depends_on={"read"}, enables={"bash"}, weight=0.9),
+]
+SECURITY_TOOL_SEQUENCES = {"scan": ["grep", "read", "bash"]}
+SECURITY_REQUIRED_TOOLS = {"read", "grep", "bash"}
+```
+
+**After (YAML-based):**
+
+1. Create `tool_dependencies.yaml` with the schema above
+2. Update `tool_dependencies.py` to use `YAMLToolDependencyProvider`:
+
+```python
+# victor/security/tool_dependencies.py
+from pathlib import Path
+from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+
+_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
+
+class SecurityToolDependencyProvider(YAMLToolDependencyProvider):
+    def __init__(self):
+        super().__init__(yaml_path=_YAML_CONFIG_PATH, canonicalize=True)
+
+# Deprecated legacy constants (backward compatibility)
+def __getattr__(name: str):
+    """Provide deprecation warnings for legacy constant access."""
+    import warnings
+    deprecated = {
+        "SECURITY_TOOL_DEPENDENCIES": "get_dependencies()",
+        "SECURITY_TOOL_SEQUENCES": "get_tool_sequences()",
+        "SECURITY_REQUIRED_TOOLS": "get_required_tools()",
+    }
+    if name in deprecated:
+        warnings.warn(
+            f"{name} is deprecated. Use SecurityToolDependencyProvider().{deprecated[name]}",
+            DeprecationWarning,
+        )
+        provider = SecurityToolDependencyProvider()
+        # Return appropriate value...
+    raise AttributeError(f"module has no attribute {name!r}")
 ```
 
 ## Protocol Reference
