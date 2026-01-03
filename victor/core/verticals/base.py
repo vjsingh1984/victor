@@ -250,53 +250,95 @@ class VerticalBase(ABC):
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get stage definitions for this vertical.
 
-        Default implementation returns standard coding stages.
-        Override for domain-specific stages.
+        Default implementation provides a comprehensive 7-stage workflow
+        representing a generic problem-solving lifecycle:
+
+        1. INITIAL: Understand the request and gather initial context
+        2. PLANNING: Design the approach and strategy
+        3. READING: Gather detailed information and context
+        4. ANALYSIS: Analyze information and identify solutions
+        5. EXECUTION: Implement the planned changes
+        6. VERIFICATION: Validate results and test outcomes
+        7. COMPLETION: Finalize, document, and wrap up
+
+        This workflow applies to most domains:
+        - Coding: understand → plan → read code → analyze → implement → test → commit
+        - DevOps: assess → plan → implement → validate → deploy → monitor
+        - Research: question → search → read → synthesize → write → verify
+        - Data Analysis: understand → explore → analyze → visualize → report
+
+        Verticals should override this method to provide domain-specific:
+        - Stage names (e.g., DEPLOYMENT, SYNTHESIZING)
+        - Tools appropriate for each stage
+        - Domain-specific keywords
 
         Returns:
-            Dictionary mapping stage names to definitions.
+            Dictionary mapping stage names to StageDefinition objects.
+            Each stage includes description, keywords, and valid transitions.
         """
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
-                description="Understanding the request",
-                keywords=["what", "how", "explain", "help"],
+                description="Understanding the request and gathering initial context",
+                keywords=[
+                    "what", "how", "explain", "help", "where", "show me",
+                    "describe", "overview", "understand", "clarify",
+                ],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
-                description="Planning the approach",
-                keywords=["plan", "approach", "strategy"],
+                description="Designing the approach and creating a strategy",
+                keywords=[
+                    "plan", "approach", "strategy", "design", "architecture",
+                    "outline", "steps", "roadmap", "how should", "what's the best way",
+                ],
                 next_stages={"READING", "EXECUTION"},
             ),
             "READING": StageDefinition(
                 name="READING",
-                description="Gathering information",
-                keywords=["read", "show", "find", "search"],
+                description="Gathering detailed information and context",
+                keywords=[
+                    "read", "show", "find", "search", "look", "check",
+                    "examine", "inspect", "review", "fetch", "get", "retrieve",
+                ],
                 next_stages={"ANALYSIS", "EXECUTION"},
             ),
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
-                description="Analyzing information",
-                keywords=["analyze", "review", "understand"],
+                description="Analyzing information and identifying solutions",
+                keywords=[
+                    "analyze", "review", "understand", "why", "how does",
+                    "compare", "evaluate", "assess", "investigate", "diagnose",
+                ],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
             "EXECUTION": StageDefinition(
                 name="EXECUTION",
-                description="Taking action",
-                keywords=["change", "modify", "create", "implement"],
+                description="Implementing the planned changes or actions",
+                keywords=[
+                    "change", "modify", "create", "add", "remove", "fix",
+                    "implement", "write", "update", "refactor", "build",
+                    "configure", "set up", "install", "run", "execute",
+                ],
                 next_stages={"VERIFICATION", "COMPLETION"},
             ),
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
-                description="Verifying results",
-                keywords=["test", "verify", "check", "validate"],
+                description="Validating results and testing outcomes",
+                keywords=[
+                    "test", "verify", "check", "validate", "confirm",
+                    "ensure", "run tests", "build", "compile", "lint",
+                ],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
-                description="Wrapping up",
-                keywords=["done", "finished", "complete"],
+                description="Finalizing, documenting, and wrapping up",
+                keywords=[
+                    "done", "finish", "complete", "commit", "summarize",
+                    "document", "conclude", "wrap up", "finalize",
+                ],
                 next_stages=set(),
             ),
         }

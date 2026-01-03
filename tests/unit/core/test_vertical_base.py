@@ -270,3 +270,49 @@ class TestGetCachedExtension:
         # Should call factory again
         result2 = ConcreteVertical._get_cached_extension("test_key", lambda: "new_value")
         assert result2 == "new_value"
+
+
+class TestDefaultStageDefinitions:
+    """Tests for VerticalBase default stage definitions."""
+
+    def test_has_seven_stages(self):
+        """Verify default implementation has 7 stages."""
+        stages = ConcreteVertical.get_stages()
+        assert len(stages) == 7
+
+    def test_required_stages_present(self):
+        """Verify all required stages are defined."""
+        stages = ConcreteVertical.get_stages()
+        required = {"INITIAL", "PLANNING", "READING", "ANALYSIS", "EXECUTION", "VERIFICATION", "COMPLETION"}
+        assert set(stages.keys()) == required
+
+    def test_stages_have_comprehensive_keywords(self):
+        """Verify stages have comprehensive keyword lists."""
+        stages = ConcreteVertical.get_stages()
+
+        # Each stage should have at least 8 keywords
+        for stage_name, stage in stages.items():
+            assert len(stage.keywords) >= 8, f"{stage_name} has too few keywords: {len(stage.keywords)}"
+
+    def test_stages_have_valid_transitions(self):
+        """Verify stage transitions form valid workflow graph."""
+        stages = ConcreteVertical.get_stages()
+
+        # All next_stages should reference valid stage names
+        for stage_name, stage in stages.items():
+            for next_stage in stage.next_stages:
+                assert next_stage in stages, f"{stage_name} references invalid stage: {next_stage}"
+
+        # COMPLETION should have no next stages (terminal state)
+        assert len(stages["COMPLETION"].next_stages) == 0
+
+        # INITIAL should be able to reach other stages
+        assert len(stages["INITIAL"].next_stages) > 0
+
+    def test_stages_have_descriptions(self):
+        """Verify all stages have non-empty descriptions."""
+        stages = ConcreteVertical.get_stages()
+
+        for stage_name, stage in stages.items():
+            assert stage.description, f"{stage_name} has empty description"
+            assert len(stage.description) > 20, f"{stage_name} description too short"
