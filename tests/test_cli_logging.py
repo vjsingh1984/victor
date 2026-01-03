@@ -13,18 +13,6 @@ from victor.ui.cli import app
 runner = CliRunner()
 
 
-@pytest.mark.skip(
-    reason="Logging behavior changed: configure_logging_levels only called with explicit --log-level"
-)
-def test_default_logging_level():
-    """Test that default logging level is WARNING when no arguments provided.
-
-    SKIPPED: configure_logging_levels is only called when --log-level is explicitly
-    provided. Default logging is handled by setup_logging() instead.
-    """
-    pass
-
-
 def test_log_level_debug():
     """Test --log-level DEBUG sets logging to DEBUG level."""
 
@@ -151,18 +139,6 @@ def test_invalid_log_level_shows_error():
     output = result.stdout
     assert "Invalid log level" in output or "invalid" in output.lower()
     assert "INVALID" in output or "invalid" in output.lower()
-
-
-@pytest.mark.skip(
-    reason="Logging behavior changed: configure_logging_levels only called with explicit --log-level"
-)
-def test_environment_variable_fallback():
-    """Test that VICTOR_LOG_LEVEL environment variable is used as fallback.
-
-    SKIPPED: Environment variable fallback is now handled differently.
-    configure_logging_levels is only called when --log-level is explicitly provided.
-    """
-    pass
 
 
 def test_cli_argument_overrides_environment_variable():
