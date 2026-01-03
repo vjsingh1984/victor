@@ -43,6 +43,7 @@ venv.bak/
 .pytest_cache/
 .coverage
 htmlcov/
+htmlcov_lang/
 .tox/
 .hypothesis/
 *.cover

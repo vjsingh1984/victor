@@ -253,6 +253,7 @@ async def _do_query(
     connection_id: str,
     sql: str,
     limit: Optional[int] = None,
+    allow_modifications: Optional[bool] = None,
     connection_pool: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Internal query handler."""
@@ -267,7 +268,10 @@ async def _do_query(
         return {"success": False, "error": "Missing required parameter: sql"}
 
     # Check for dangerous patterns
-    if not _DEFAULT_ALLOW_MODIFICATIONS:
+    allow_writes = (
+        _DEFAULT_ALLOW_MODIFICATIONS if allow_modifications is None else allow_modifications
+    )
+    if not allow_writes:
         sql_upper = sql.upper()
         for pattern in DANGEROUS_PATTERNS:
             if pattern in sql_upper:
@@ -480,6 +484,7 @@ async def database(
     sql: Optional[str] = None,
     table: Optional[str] = None,
     limit: Optional[int] = None,
+    allow_modifications: Optional[bool] = None,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -505,6 +510,7 @@ async def database(
         sql: SQL query to execute (required for query action).
         table: Table name (required for describe action).
         limit: Maximum rows to return for query (default: 100).
+        allow_modifications: Allow modification statements for query action (default: False).
 
     Returns:
         Dictionary containing:
@@ -546,7 +552,7 @@ async def database(
             return {"success": False, "error": "Missing required parameter: connection_id"}
         if not sql:
             return {"success": False, "error": "Missing required parameter: sql"}
-        return await _do_query(connection_id, sql, limit, pool)
+        return await _do_query(connection_id, sql, limit, allow_modifications, pool)
 
     elif action_lower == "tables":
         if not connection_id:
