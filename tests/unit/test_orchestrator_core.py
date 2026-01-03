@@ -58,8 +58,8 @@ class TestStreamMetrics:
 
     def test_record_first_token_time(self, orchestrator):
         """Test _record_first_token records time correctly."""
-        # Initialize stream metrics through the public API
-        stream_metrics = orchestrator._init_stream_metrics()
+        # Initialize stream metrics through the metrics collector
+        stream_metrics = orchestrator._metrics_collector.init_stream_metrics()
         assert stream_metrics.first_token_time is None
 
         orchestrator._record_first_token()
@@ -76,8 +76,8 @@ class TestStreamMetrics:
         """Test _finalize_stream_metrics returns metrics (covers lines 306-321)."""
         import time
 
-        # Initialize metrics through the API
-        stream_metrics = orchestrator._init_stream_metrics()
+        # Initialize metrics through the metrics collector
+        stream_metrics = orchestrator._metrics_collector.init_stream_metrics()
         stream_metrics.first_token_time = time.time()
         stream_metrics.total_chunks = 10
 
@@ -95,7 +95,7 @@ class TestStreamMetrics:
     def test_get_last_stream_metrics(self, orchestrator):
         """Test get_last_stream_metrics returns stored metrics (covers line 325)."""
         # Initialize metrics first
-        orchestrator._init_stream_metrics()
+        orchestrator._metrics_collector.init_stream_metrics()
         result = orchestrator.get_last_stream_metrics()
         assert result is not None
 
@@ -724,8 +724,15 @@ class TestAddMessage:
         )
 
 
+@pytest.mark.skip(
+    reason="Method _ensure_system_message was inlined in TD-002 refactoring (Jan 2026). "
+    "The logic now exists directly in chat() and stream_chat() methods."
+)
 class TestEnsureSystemMessage:
-    """Tests for _ensure_system_message method."""
+    """Tests for _ensure_system_message method.
+
+    DEPRECATED: Method was inlined - logic moved directly to chat() and stream_chat().
+    """
 
     def test_ensure_system_message(self, orchestrator):
         """Test _ensure_system_message adds system prompt (covers lines 992-993)."""
@@ -4197,8 +4204,15 @@ class TestGetContextMetrics:
         assert hasattr(metrics, "estimated_tokens")
 
 
+@pytest.mark.skip(
+    reason="Method _init_stream_metrics was inlined in TD-002 refactoring (Jan 2026). "
+    "Use orchestrator._metrics_collector.init_stream_metrics() directly."
+)
 class TestInitStreamMetrics:
-    """Tests for _init_stream_metrics method."""
+    """Tests for _init_stream_metrics method.
+
+    DEPRECATED: Method was inlined to _metrics_collector.init_stream_metrics().
+    """
 
     def test_returns_stream_metrics(self, orchestrator):
         """Test _init_stream_metrics returns StreamMetrics."""
@@ -5028,8 +5042,15 @@ class TestCheckTimeLimitWithHandler:
         assert hasattr(result, "content")
 
 
+@pytest.mark.skip(
+    reason="Method _check_iteration_limit_with_handler was removed in TD-002 refactoring "
+    "(Jan 2026). The method was unused in production code."
+)
 class TestCheckIterationLimitWithHandler:
-    """Tests for _check_iteration_limit_with_handler method."""
+    """Tests for _check_iteration_limit_with_handler method.
+
+    DEPRECATED: Method was removed as it had no production callers.
+    """
 
     def test_returns_none_when_under_limit(self, orchestrator):
         """Test returns None when under iteration limit."""

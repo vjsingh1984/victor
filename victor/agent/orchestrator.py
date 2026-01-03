@@ -2203,10 +2203,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._conversation_controller.get_context_metrics()
 
-    def _init_stream_metrics(self) -> StreamMetrics:
-        """Initialize fresh stream metrics for a new streaming session."""
-        return self._metrics_collector.init_stream_metrics()
-
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
 
@@ -3626,11 +3622,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         elif role == "assistant":
             self.usage_logger.log_event("assistant_response", {"content": content})
 
-    def _ensure_system_message(self) -> None:
-        """Ensure the system prompt is included once at the start of the conversation."""
-        self.conversation.ensure_system_prompt()
-        self._system_added = True
-
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
@@ -3646,7 +3637,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             CompletionResponse from the model with complete response
         """
-        self._ensure_system_message()
+        # Ensure system prompt is included once at start of conversation
+        self.conversation.ensure_system_prompt()
+        self._system_added = True
         # Add user message to history
         self.add_message("user", user_message)
 
@@ -3971,7 +3964,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._is_streaming = True
 
         # Track performance metrics using StreamMetrics
-        stream_metrics = self._init_stream_metrics()
+        stream_metrics = self._metrics_collector.init_stream_metrics()
         start_time = stream_metrics.start_time
         total_tokens: float = 0
 
@@ -3984,7 +3977,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "cache_read_input_tokens": 0,
         }
 
-        self._ensure_system_message()
+        # Ensure system prompt is included once at start of conversation
+        self.conversation.ensure_system_prompt()
+        self._system_added = True
         self.tool_calls_used = 0
         self.observed_files = []
         self.executed_tools = []
@@ -4340,26 +4335,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
         return chunk
-
-    def _check_iteration_limit_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Optional[StreamChunk]:
-        """Check iteration limit.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk if iteration limit reached, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.check_iteration_limit(recovery_ctx)
 
     def _check_natural_completion_with_handler(
         self,
@@ -7374,13 +7349,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # --- Lifecycle Methods ---
     # Note: is_streaming() already exists at line ~5285
     # Note: reset() is provided via reset_conversation() at line ~5221
-
-    def cancel(self) -> None:
-        """Cancel any in-progress operation (protocol method).
-
-        Alias for request_cancellation() for protocol conformance.
-        """
-        self.request_cancellation()
 
     def reset(self) -> None:
         """Reset conversation state (protocol method).
