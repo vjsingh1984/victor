@@ -10,13 +10,18 @@ from typing import Optional
 from victor.config.api_keys import (
     APIKeyManager,
     get_configured_providers,
+    get_configured_services,
     create_api_keys_template,
     DEFAULT_KEYS_FILE,
     PROVIDER_ENV_VARS,
+    SERVICE_ENV_VARS,
     is_keyring_available,
     _get_key_from_keyring,
     _set_key_in_keyring,
     _delete_key_from_keyring,
+    get_service_key,
+    set_service_key,
+    delete_service_key_from_keyring,
 )
 
 keys_app = typer.Typer(name="keys", help="Manage API keys for cloud providers.")
@@ -49,24 +54,39 @@ def keys(
     setup: bool = typer.Option(False, "--setup", "-s", help="Create API keys template file"),
     list_keys: bool = typer.Option(True, "--list", "-l", help="List configured providers"),
     provider: Optional[str] = typer.Option(None, "--set", help="Set API key for a provider"),
+    service: Optional[str] = typer.Option(
+        None, "--set-service", help="Set API key for a service (e.g., finnhub, fred)"
+    ),
     keyring: bool = typer.Option(
         False, "--keyring", "-k", help="Store key in system keyring (secure)"
     ),
     migrate: bool = typer.Option(False, "--migrate", help="Migrate keys from file to keyring"),
     delete_keyring: Optional[str] = typer.Option(
-        None, "--delete-keyring", help="Delete key from keyring"
+        None, "--delete-keyring", help="Delete provider key from keyring"
+    ),
+    delete_service_keyring: Optional[str] = typer.Option(
+        None, "--delete-service-keyring", help="Delete service key from keyring"
+    ),
+    list_services: bool = typer.Option(
+        False, "--services", help="List configured services (finnhub, fred, etc.)"
     ),
 ):
-    """Manage API keys for cloud providers."""
+    """Manage API keys for cloud providers and external services."""
     if ctx.invoked_subcommand is None:
         if setup:
             _setup()
         elif delete_keyring:
             _delete_keyring(delete_keyring)
+        elif delete_service_keyring:
+            _delete_service_keyring(delete_service_keyring)
         elif migrate:
             _migrate()
         elif provider:
             _set_key(provider, keyring)
+        elif service:
+            _set_service_key(service, keyring)
+        elif list_services:
+            _list_services()
         else:
             _list_keys()
 
@@ -266,3 +286,116 @@ def _get_keyring_info() -> tuple[str, str]:
         return "Secret Service (GNOME Keyring/KWallet)", "[green]Supported[/]"
     else:
         return "Unknown", "[yellow]May not be supported[/]"
+
+
+def _set_service_key(service_name: str, use_keyring: bool):
+    """Set API key for an external service."""
+    service_name = service_name.lower()
+    if service_name not in SERVICE_ENV_VARS:
+        console.print(f"[red]Unknown service:[/] {service_name}")
+        console.print(f"Valid services: {', '.join(sorted(SERVICE_ENV_VARS.keys()))}")
+        raise typer.Exit(1)
+
+    # Check keyring availability if requested
+    if use_keyring and not is_keyring_available():
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+        console.print("[dim]Falling back to file storage...[/]")
+        use_keyring = False
+
+    storage_type = "keyring" if use_keyring else "file"
+    env_var = SERVICE_ENV_VARS[service_name]
+    console.print(f"[cyan]Setting API key for service {service_name}[/] (storage: {storage_type})")
+    console.print(f"[dim]Environment variable: {env_var}[/]")
+    console.print("[dim]Paste your API key (input hidden):[/]")
+
+    key = getpass.getpass("")
+
+    if not key.strip():
+        console.print("[red]No key provided. Cancelled.[/]")
+        raise typer.Exit(1)
+
+    if set_service_key(service_name, key.strip(), use_keyring=use_keyring):
+        location = "system keyring" if use_keyring else str(DEFAULT_KEYS_FILE)
+        console.print(f"[green]✓[/] API key for service [cyan]{service_name}[/] saved to {location}")
+    else:
+        console.print("[red]Failed to save API key")
+        raise typer.Exit(1)
+
+
+def _delete_service_keyring(service_name: str):
+    """Delete service key from keyring."""
+    service_name = service_name.lower()
+    if not is_keyring_available():
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+        raise typer.Exit(1)
+
+    if delete_service_key_from_keyring(service_name):
+        console.print(f"[green]✓[/] Deleted service [cyan]{service_name}[/] from keyring")
+    else:
+        console.print(f"[yellow]Key for service {service_name} not found in keyring")
+
+
+def _list_services():
+    """List configured external services."""
+    configured = get_configured_services()
+
+    table = Table(title="External Service API Keys Status", show_header=True)
+    table.add_column("Service", style="cyan")
+    table.add_column("Status")
+    table.add_column("Source")
+    table.add_column("Env Var")
+    table.add_column("Description", style="dim")
+
+    # Service descriptions
+    service_descriptions = {
+        "finnhub": "Stock data, analyst estimates",
+        "fred": "Federal Reserve Economic Data",
+        "alphavantage": "Stock/forex/crypto data",
+        "polygon": "Real-time market data",
+        "tiingo": "Stock/crypto/forex data",
+        "iex": "IEX Cloud market data",
+        "quandl": "Nasdaq Data Link",
+        "nasdaq": "Nasdaq Data Link",
+        "newsapi": "News aggregation",
+        "marketaux": "Financial news API",
+        "sec": "SEC EDGAR API",
+        "openweather": "Weather data",
+        "geocoding": "Geocoding services",
+    }
+
+    for svc, env_var in sorted(SERVICE_ENV_VARS.items()):
+        # Determine source
+        source = "[dim]--[/]"
+        is_configured = svc in configured
+
+        if os.environ.get(env_var):
+            source = "[green]env[/]"
+        elif is_keyring_available() and _get_key_from_keyring(f"service_{svc}"):
+            source = "[blue]keyring[/]"
+        elif is_configured:
+            source = "[yellow]file[/]"
+
+        status = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
+        description = service_descriptions.get(svc, "")
+        table.add_row(svc, status, source, env_var, description)
+
+    console.print(table)
+
+    # Count stats
+    configured_count = len(configured)
+    total_count = len(SERVICE_ENV_VARS)
+
+    console.print(f"\n[dim]Configured: {configured_count}/{total_count} services[/]")
+
+    # Show keyring status
+    backend_name, status = _get_keyring_info()
+    keyring_status = (
+        "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
+    )
+    console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
+
+    if not configured:
+        console.print()
+        console.print("[yellow]No service API keys configured.[/]")
+        console.print("  [cyan]victor keys --set-service finnhub --keyring[/]  Store Finnhub key in keyring")
+        console.print("  [cyan]victor keys --set-service fred --keyring[/]     Store FRED key in keyring")

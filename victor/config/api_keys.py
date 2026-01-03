@@ -31,6 +31,11 @@ Security Features:
 - Keys are never logged or exposed in error messages
 - Provider isolation prevents cross-provider key leakage
 
+Configuration:
+- Provider and service definitions are loaded from api_keys_registry.yaml
+- This allows external configuration of supported providers/services
+- The registry file is the single source of truth for key metadata
+
 Resolution Order:
 1. Environment variable (highest priority - for automation/CI)
 2. System keyring (secure encrypted storage)
@@ -41,9 +46,67 @@ import ctypes
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import yaml
+
+
+def _get_registry_path() -> Path:
+    """Get the path to the API keys registry YAML file."""
+    return Path(__file__).parent / "api_keys_registry.yaml"
+
+
+def _load_registry() -> Dict[str, Any]:
+    """Load the API keys registry from YAML.
+
+    Returns cached version if already loaded.
+    Falls back to hardcoded defaults if file not found.
+    """
+    global _REGISTRY_CACHE
+    if _REGISTRY_CACHE is not None:
+        return _REGISTRY_CACHE
+
+    registry_path = _get_registry_path()
+    if registry_path.exists():
+        try:
+            with open(registry_path, "r") as f:
+                _REGISTRY_CACHE = yaml.safe_load(f) or {}
+                return _REGISTRY_CACHE
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Failed to load registry: {e}")
+
+    # Return empty dict - will use hardcoded fallbacks
+    _REGISTRY_CACHE = {}
+    return _REGISTRY_CACHE
+
+
+def _build_env_vars_from_registry(section: str) -> Dict[str, str]:
+    """Build environment variable mapping from registry section.
+
+    Args:
+        section: 'providers' or 'services'
+
+    Returns:
+        Dict mapping name to env_var
+    """
+    registry = _load_registry()
+    items = registry.get(section, {})
+
+    result = {}
+    for name, config in items.items():
+        if isinstance(config, dict):
+            env_var = config.get("env_var")
+            if env_var:
+                result[name] = env_var
+                # Also add aliases
+                for alias in config.get("aliases", []):
+                    result[alias] = env_var
+
+    return result
+
+
+# Cache for loaded registry
+_REGISTRY_CACHE: Optional[Dict[str, Any]] = None
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +129,9 @@ def _get_secure_keys_file() -> Path:
 # Default location for API keys file (computed securely)
 DEFAULT_KEYS_FILE = _get_secure_keys_file()
 
-# Provider to environment variable mapping
-PROVIDER_ENV_VARS: Dict[str, str] = {
+# Hardcoded fallback for provider environment variables
+# These are used if api_keys_registry.yaml is not found or fails to load
+_PROVIDER_ENV_VARS_FALLBACK: Dict[str, str] = {
     # Premium API providers
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
@@ -96,8 +160,74 @@ PROVIDER_ENV_VARS: Dict[str, str] = {
     "replicate": "REPLICATE_API_TOKEN",
 }
 
+
+def _get_provider_env_vars() -> Dict[str, str]:
+    """Get provider to environment variable mapping.
+
+    Loads from registry if available, falls back to hardcoded values.
+    """
+    registry_vars = _build_env_vars_from_registry("providers")
+    if registry_vars:
+        return registry_vars
+    return _PROVIDER_ENV_VARS_FALLBACK.copy()
+
+
+# Provider to environment variable mapping (lazy-loaded from registry)
+PROVIDER_ENV_VARS: Dict[str, str] = _get_provider_env_vars()
+
 # Providers that don't require API keys
 LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
+
+# ============================================================================
+# SERVICE API KEYS (External Data Services - not LLM providers)
+# ============================================================================
+# Hardcoded fallback for service environment variables
+_SERVICE_ENV_VARS_FALLBACK: Dict[str, str] = {
+    # Market Data & Financial Services
+    "finnhub": "FINNHUB_API_KEY",  # Stock data, news sentiment, analyst estimates
+    "fred": "FRED_API_KEY",  # Federal Reserve Economic Data
+    "alphavantage": "ALPHAVANTAGE_API_KEY",  # Stock/forex/crypto data
+    "polygon": "POLYGON_API_KEY",  # Real-time & historical market data
+    "tiingo": "TIINGO_API_KEY",  # Stock/crypto/forex data
+    "iex": "IEX_API_KEY",  # IEX Cloud market data
+    "quandl": "QUANDL_API_KEY",  # Financial/economic datasets (now Nasdaq Data Link)
+    "nasdaq": "NASDAQ_API_KEY",  # Nasdaq Data Link
+    # News & Sentiment
+    "newsapi": "NEWSAPI_API_KEY",  # News aggregation
+    "marketaux": "MARKETAUX_API_KEY",  # Financial news API
+    # SEC & Regulatory
+    "sec": "SEC_API_KEY",  # SEC EDGAR API (optional, for higher rate limits)
+    # Other Data Services
+    "openweather": "OPENWEATHER_API_KEY",  # Weather data
+    "geocoding": "GEOCODING_API_KEY",  # Geocoding services
+}
+
+
+def _get_service_env_vars() -> Dict[str, str]:
+    """Get service to environment variable mapping.
+
+    Loads from registry if available, falls back to hardcoded values.
+    """
+    registry_vars = _build_env_vars_from_registry("services")
+    if registry_vars:
+        return registry_vars
+    return _SERVICE_ENV_VARS_FALLBACK.copy()
+
+
+# Service to environment variable mapping (lazy-loaded from registry)
+SERVICE_ENV_VARS: Dict[str, str] = _get_service_env_vars()
+
+
+def get_all_key_types() -> Dict[str, Dict[str, str]]:
+    """Get all known key types (providers + services)."""
+    return {
+        "provider": PROVIDER_ENV_VARS,
+        "service": SERVICE_ENV_VARS,
+    }
+
+
+# All known keys (providers + services) for comprehensive listing
+ALL_KEY_TYPES = get_all_key_types()
 
 # Keyring service name for Victor
 KEYRING_SERVICE = "victor"
@@ -730,6 +860,209 @@ def clear_api_key_cache() -> None:
         _manager.clear_cache()
 
 
+def get_service_key(service: str) -> Optional[str]:
+    """Get API key for an external service (convenience function).
+
+    This is for non-LLM services like Finnhub, FRED, etc.
+
+    Args:
+        service: Service name (e.g., "finnhub", "fred")
+
+    Returns:
+        API key or None
+    """
+    service = service.lower()
+
+    # Check if it's a known service
+    if service not in SERVICE_ENV_VARS:
+        logger.warning(f"Unknown service: {service}. Known services: {list(SERVICE_ENV_VARS.keys())}")
+        return None
+
+    global _manager
+    if _manager is None:
+        _manager = APIKeyManager()
+
+    # Priority 1: Environment variable
+    env_var = SERVICE_ENV_VARS.get(service)
+    if env_var:
+        env_key = os.environ.get(env_var)
+        if env_key:
+            _audit_log_secret_access(
+                action="loaded",
+                provider=f"service:{service}",
+                source="environment",
+                success=True,
+                key_length=len(env_key),
+            )
+            return env_key
+
+    # Priority 2: System keyring
+    keyring_key = _get_key_from_keyring(f"service_{service}")
+    if keyring_key:
+        _audit_log_secret_access(
+            action="loaded",
+            provider=f"service:{service}",
+            source="keyring",
+            success=True,
+            key_length=len(keyring_key),
+        )
+        return keyring_key
+
+    # Priority 3: Keys file (under 'services' section)
+    if _manager.keys_file.exists():
+        try:
+            with open(_manager.keys_file, "r") as f:
+                data = yaml.safe_load(f) or {}
+            services = data.get("services", {})
+            file_key = services.get(service)
+            if file_key:
+                _audit_log_secret_access(
+                    action="loaded",
+                    provider=f"service:{service}",
+                    source="file",
+                    success=True,
+                    key_length=len(file_key),
+                )
+                return file_key
+        except Exception:
+            pass
+
+    _audit_log_secret_access(
+        action="not_found",
+        provider=f"service:{service}",
+        source="none",
+        success=False,
+        key_length=0,
+    )
+    return None
+
+
+def set_service_key(service: str, key: str, use_keyring: bool = False) -> bool:
+    """Set API key for an external service.
+
+    Args:
+        service: Service name (e.g., "finnhub", "fred")
+        key: API key value
+        use_keyring: If True, store in system keyring (more secure)
+
+    Returns:
+        True if saved successfully
+    """
+    service = service.lower()
+
+    if service not in SERVICE_ENV_VARS:
+        logger.warning(f"Unknown service: {service}")
+        return False
+
+    if use_keyring:
+        success = _set_key_in_keyring(f"service_{service}", key)
+        if success:
+            _audit_log_secret_access(
+                action="saved",
+                provider=f"service:{service}",
+                source="keyring",
+                success=True,
+                key_length=len(key),
+            )
+        return success
+
+    # Store in file under 'services' section
+    global _manager
+    if _manager is None:
+        _manager = APIKeyManager()
+
+    try:
+        _manager.keys_file.parent.mkdir(parents=True, exist_ok=True)
+
+        existing_data: Dict = {}
+        if _manager.keys_file.exists():
+            with open(_manager.keys_file, "r") as f:
+                existing_data = yaml.safe_load(f) or {}
+
+        if "services" not in existing_data:
+            existing_data["services"] = {}
+
+        existing_data["services"][service] = key
+
+        content = yaml.dump(existing_data, default_flow_style=False)
+
+        # Atomic write with secure permissions
+        temp_path = _manager.keys_file.with_suffix(".yaml.tmp")
+        fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+        except Exception:
+            os.close(fd)
+            raise
+        os.rename(temp_path, _manager.keys_file)
+
+        _audit_log_secret_access(
+            action="saved",
+            provider=f"service:{service}",
+            source="file",
+            success=True,
+            key_length=len(key),
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to save service key: {e}")
+        return False
+
+
+def delete_service_key_from_keyring(service: str) -> bool:
+    """Delete service API key from system keyring.
+
+    Args:
+        service: Service name
+
+    Returns:
+        True if deleted successfully
+    """
+    return _delete_key_from_keyring(f"service_{service}")
+
+
+def get_configured_services() -> list[str]:
+    """Get list of services with configured API keys.
+
+    Returns:
+        List of service names
+    """
+    configured = []
+
+    # Check environment variables
+    for service, env_var in SERVICE_ENV_VARS.items():
+        if os.environ.get(env_var):
+            configured.append(service)
+
+    # Check keyring
+    if _KEYRING_AVAILABLE:
+        for service in SERVICE_ENV_VARS.keys():
+            if service not in configured:
+                keyring_key = _get_key_from_keyring(f"service_{service}")
+                if keyring_key:
+                    configured.append(service)
+
+    # Check keys file
+    global _manager
+    if _manager is None:
+        _manager = APIKeyManager()
+
+    if _manager.keys_file.exists():
+        try:
+            with open(_manager.keys_file, "r") as f:
+                data = yaml.safe_load(f) or {}
+            services = data.get("services", {})
+            for service, key in services.items():
+                if key and service not in configured:
+                    configured.append(service)
+        except Exception:
+            pass
+
+    return sorted(configured)
+
+
 def create_api_keys_template() -> str:
     """Generate a template for the API keys file.
 
@@ -814,4 +1147,32 @@ api_keys:
   # ollama: (no key needed) - Run: ollama serve
   # lmstudio: (no key needed) - Run LMStudio desktop app
   # vllm: (no key needed) - Run: python -m vllm.entrypoints.openai.api_server
+
+# ============================================================================
+# EXTERNAL DATA SERVICES (non-LLM APIs)
+# ============================================================================
+# These are API keys for market data, financial data, and other external services.
+# Use: victor keys --set-service finnhub --keyring
+
+services:
+  # Market Data & Financial Services
+  finnhub: ""        # FINNHUB_API_KEY - Stock data, news sentiment, analyst estimates (finnhub.io)
+  fred: ""           # FRED_API_KEY - Federal Reserve Economic Data (fred.stlouisfed.org)
+  alphavantage: ""   # ALPHAVANTAGE_API_KEY - Stock/forex/crypto data (alphavantage.co)
+  polygon: ""        # POLYGON_API_KEY - Real-time & historical market data (polygon.io)
+  tiingo: ""         # TIINGO_API_KEY - Stock/crypto/forex data (tiingo.com)
+  iex: ""            # IEX_API_KEY - IEX Cloud market data (iexcloud.io)
+  quandl: ""         # QUANDL_API_KEY - Financial datasets, now Nasdaq Data Link
+  nasdaq: ""         # NASDAQ_API_KEY - Nasdaq Data Link (data.nasdaq.com)
+
+  # News & Sentiment
+  newsapi: ""        # NEWSAPI_API_KEY - News aggregation (newsapi.org)
+  marketaux: ""      # MARKETAUX_API_KEY - Financial news API (marketaux.com)
+
+  # SEC & Regulatory
+  sec: ""            # SEC_API_KEY - SEC EDGAR API (optional, for higher rate limits)
+
+  # Other Data Services
+  openweather: ""    # OPENWEATHER_API_KEY - Weather data (openweathermap.org)
+  geocoding: ""      # GEOCODING_API_KEY - Geocoding services
 """

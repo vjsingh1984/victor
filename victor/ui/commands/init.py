@@ -1,15 +1,93 @@
 import typer
 import asyncio
+import re
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from pathlib import Path
 from typing import Optional, List
+import yaml
 
 from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
 from victor.core.database import get_database, get_project_database
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
+
+
+def _ensure_profile_preset(
+    profiles_file: Path,
+    name: str,
+    description: str,
+    provider: str = "ollama",
+    model: str = "qwen2.5-coder:7b",
+) -> Optional[bool]:
+    """Add a profile preset if missing. True=added, False=exists, None=error."""
+    data: dict = {}
+    if profiles_file.exists():
+        try:
+            data = yaml.safe_load(profiles_file.read_text(encoding="utf-8")) or {}
+        except Exception as e:
+            console.print(f"[red]Error loading profiles:[/] {e}")
+            return None
+
+    profiles = data.get("profiles") or {}
+    if name in profiles:
+        return False
+
+    profiles[name] = {
+        "provider": provider,
+        "model": model,
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "description": description,
+    }
+    data["profiles"] = profiles
+
+    providers = data.get("providers") or {}
+    if provider == "ollama":
+        ollama_config = providers.get("ollama") or {}
+        if "base_url" not in ollama_config:
+            ollama_config["base_url"] = "http://localhost:11434"
+        providers["ollama"] = ollama_config
+    data["providers"] = providers
+
+    try:
+        profiles_file.parent.mkdir(parents=True, exist_ok=True)
+        profiles_file.write_text(
+            yaml.safe_dump(data, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        console.print(f"[red]Error saving profiles:[/] {e}")
+        return None
+
+    return True
+
+
+def _ensure_airgapped_env(env_path: Path) -> Optional[bool]:
+    """Ensure AIRGAPPED_MODE=true in .env. True=added, False=exists, None=error."""
+    content = ""
+    if env_path.exists():
+        try:
+            content = env_path.read_text(encoding="utf-8")
+        except Exception as e:
+            console.print(f"[red]Error reading {env_path}:[/] {e}")
+            return None
+        if re.search(r"^\s*AIRGAPPED_MODE\s*=", content, flags=re.MULTILINE):
+            return False
+
+    content = content.rstrip("\n")
+    if content:
+        content += "\n"
+    content += "AIRGAPPED_MODE=true\n"
+
+    try:
+        env_path.write_text(content, encoding="utf-8")
+    except Exception as e:
+        console.print(f"[red]Error saving {env_path}:[/] {e}")
+        return None
+
+    return True
 
 
 @init_app.callback(invoke_without_command=True)
@@ -42,6 +120,12 @@ def init(
     interactive: bool = typer.Option(
         True, "--interactive/--no-interactive", "-I", help="Use interactive wizard for scoping"
     ),
+    local: bool = typer.Option(
+        False, "--local", help="Add a local profile preset (Ollama)"
+    ),
+    airgapped: bool = typer.Option(
+        False, "--airgapped", help="Enable air-gapped mode for this repo"
+    ),
 ):
     """Initialize project context and configuration."""
     if ctx.invoked_subcommand is None:
@@ -52,6 +136,7 @@ def init(
         config_dir.mkdir(parents=True, exist_ok=True)
 
         profiles_file = config_dir / "profiles.yaml"
+        created_profiles = False
         if not profiles_file.exists():
             console.print(f"[dim]Creating default configuration at {profiles_file}[/]")
 
@@ -69,8 +154,56 @@ providers:
 """
             profiles_file.write_text(default_config)
             console.print(f"[green]✓[/] Global config created at {config_dir}")
+            created_profiles = True
         else:
             console.print(f"[dim]Global config exists at {config_dir}[/]")
+
+        if local:
+            add_local = True
+            if not created_profiles and interactive:
+                add_local = Confirm.ask(
+                    "[cyan]Add a local profile preset to profiles.yaml?[/]",
+                    default=True,
+                )
+            if add_local:
+                local_profile_result = _ensure_profile_preset(
+                    profiles_file,
+                    name="local",
+                    description="Local Ollama profile",
+                )
+                if local_profile_result is True:
+                    console.print("[green]✓[/] Added local profile preset")
+                    console.print("  [dim]Use with:[/] victor chat --profile local")
+                    console.print("  [dim]Set default:[/] victor profiles set-default local")
+                elif local_profile_result is False:
+                    console.print("[dim]Local profile preset already present[/]")
+                else:
+                    console.print("[yellow]![/] Failed to update profiles.yaml")
+            else:
+                console.print("[dim]Skipped local profile preset[/]")
+
+        if airgapped:
+            airgapped_profile_result = _ensure_profile_preset(
+                profiles_file,
+                name="airgapped",
+                description="Air-gapped local profile",
+            )
+            if airgapped_profile_result is True:
+                console.print("[green]✓[/] Added air-gapped profile preset")
+                console.print("  [dim]Use with:[/] victor chat --profile airgapped")
+            elif airgapped_profile_result is False:
+                console.print("[dim]Air-gapped profile preset already present[/]")
+            else:
+                console.print("[yellow]![/] Failed to update profiles.yaml")
+
+            env_path = Path.cwd() / ".env"
+            env_result = _ensure_airgapped_env(env_path)
+            if env_result is True:
+                console.print("[green]✓[/] Enabled air-gapped mode in .env")
+            elif env_result is False:
+                console.print("[dim]AIRGAPPED_MODE already set in .env[/]")
+            else:
+                console.print(f"[yellow]![/] Failed to update {env_path}")
 
         # Step 1.5: Initialize databases
         console.print("[dim]Initializing databases...[/]")
@@ -285,6 +418,19 @@ providers:
                         console.print(f"  [yellow]![/] {alias} (file exists, not a symlink)")
 
             console.print(f"\n[dim]Review and customize {target_path} as needed.[/]")
+
+            if interactive and created_profiles:
+                if Confirm.ask("[cyan]Show a 2-minute first-run guide?[/]", default=True):
+                    console.print("\n[bold]First Run Guide[/]")
+                    console.print("1) Start chat: [cyan]victor chat[/]")
+                    console.print("2) Try a repo overview: \"Summarize this repo and list risky areas.\"")
+                    console.print(
+                        "3) Try a one-shot: [cyan]victor \"write tests for src/utils.py\"[/]"
+                    )
+                    console.print(
+                        "4) Switch models in [cyan]~/.victor/profiles.yaml[/]"
+                    )
+                    console.print("See [cyan]docs/guides/FIRST_RUN.md[/] for more.")
 
         except Exception as e:
             console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")

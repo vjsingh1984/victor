@@ -1,0 +1,296 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""{{ name_class }}Assistant - Victor's vertical for {{ name }} tasks.
+
+{{ description }}
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.protocols import (
+    MiddlewareProtocol,
+    ModeConfigProviderProtocol,
+    PromptContributorProtocol,
+    SafetyExtensionProtocol,
+    TieredToolConfig,
+)
+
+
+class {{ name_class }}Assistant(VerticalBase):
+    """{{ name_title }} assistant vertical.
+
+    {{ description }}
+
+    Example:
+        from victor.{{ name }} import {{ name_class }}Assistant
+
+        # Get vertical configuration
+        config = {{ name_class }}Assistant.get_config()
+
+        # Get extensions for framework integration
+        extensions = {{ name_class }}Assistant.get_extensions()
+
+        # Create agent with this vertical
+        agent = await Agent.create(
+            tools=config.tools,
+            vertical={{ name_class }}Assistant,
+        )
+    """
+
+    name = "{{ name }}"
+    description = "{{ description }}"
+    version = "1.0.0"
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        """Get tools for {{ name }} tasks.
+
+        Uses canonical tool names from victor.tools.tool_names.
+
+        Returns:
+            List of tool names for {{ name }} operations.
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return [
+            # Core filesystem
+            ToolNames.READ,
+            ToolNames.WRITE,
+            ToolNames.EDIT,
+            ToolNames.LS,
+            ToolNames.OVERVIEW,
+            # Search
+            ToolNames.GREP,
+            ToolNames.CODE_SEARCH,
+            # Shell
+            ToolNames.SHELL,
+            # Git
+            ToolNames.GIT,
+            # Web (for documentation)
+            ToolNames.WEB_SEARCH,
+            ToolNames.WEB_FETCH,
+        ]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        """Get {{ name }}-focused system prompt.
+
+        Returns:
+            System prompt optimized for {{ name }} tasks.
+        """
+        return """You are Victor, an expert {{ name }} assistant.
+
+Your capabilities:
+- {{ description }}
+- File and configuration analysis
+- Safe operations with validation
+
+Guidelines:
+1. **Understand before modifying**: Always read and understand files before making changes
+2. **Incremental changes**: Make small, focused changes rather than large rewrites
+3. **Verify changes**: Validate after modifications when possible
+4. **Explain reasoning**: Briefly explain your approach when making non-trivial changes
+5. **Handle errors gracefully**: If something fails, diagnose and recover
+
+When exploring:
+- Use grep for exact patterns
+- Use code_search for conceptual queries
+- Use overview to understand file structure
+
+When modifying:
+- Use edit for surgical changes
+- Use write only for new files or complete rewrites
+"""
+
+    @classmethod
+    def get_stages(cls) -> Dict[str, StageDefinition]:
+        """Get {{ name }}-specific stage definitions.
+
+        Uses canonical tool names from victor.tools.tool_names.
+
+        Returns:
+            Stage definitions optimized for {{ name }} workflow.
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return {
+            "INITIAL": StageDefinition(
+                name="INITIAL",
+                description="Understanding the {{ name }} request",
+                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW, ToolNames.GREP},
+                keywords=["what", "how", "explain", "where", "show me"],
+                next_stages={"PLANNING", "READING"},
+            ),
+            "PLANNING": StageDefinition(
+                name="PLANNING",
+                description="Planning the approach",
+                tools={ToolNames.GREP, ToolNames.OVERVIEW, ToolNames.READ},
+                keywords=["plan", "approach", "design", "strategy"],
+                next_stages={"READING", "EXECUTION"},
+            ),
+            "READING": StageDefinition(
+                name="READING",
+                description="Reading and gathering context",
+                tools={ToolNames.READ, ToolNames.CODE_SEARCH, ToolNames.GREP},
+                keywords=["read", "show", "find", "look", "check", "search"],
+                next_stages={"ANALYSIS", "EXECUTION"},
+            ),
+            "ANALYSIS": StageDefinition(
+                name="ANALYSIS",
+                description="Analyzing structure and dependencies",
+                tools={ToolNames.OVERVIEW, ToolNames.GREP},
+                keywords=["analyze", "review", "understand", "why"],
+                next_stages={"EXECUTION", "PLANNING"},
+            ),
+            "EXECUTION": StageDefinition(
+                name="EXECUTION",
+                description="Implementing changes",
+                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.GIT},
+                keywords=["change", "modify", "create", "add", "remove", "fix", "implement"],
+                next_stages={"VERIFICATION", "COMPLETION"},
+            ),
+            "VERIFICATION": StageDefinition(
+                name="VERIFICATION",
+                description="Validating changes",
+                tools={ToolNames.SHELL, ToolNames.READ},
+                keywords=["test", "verify", "check", "validate"],
+                next_stages={"COMPLETION", "EXECUTION"},
+            ),
+            "COMPLETION": StageDefinition(
+                name="COMPLETION",
+                description="Finalizing and summarizing",
+                tools={ToolNames.GIT},
+                keywords=["done", "finish", "complete", "summarize"],
+                next_stages=set(),
+            ),
+        }
+
+    @classmethod
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Get provider hints for {{ name }} tasks.
+
+        Returns:
+            Provider preferences.
+        """
+        return {
+            "preferred_providers": ["anthropic", "openai"],
+            "min_context_window": 100000,
+            "requires_tool_calling": True,
+        }
+
+    @classmethod
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Get evaluation criteria for {{ name }} tasks.
+
+        Returns:
+            Criteria for evaluating quality.
+        """
+        return [
+            "Correctness and functionality",
+            "Adherence to existing patterns",
+            "Clear documentation",
+            "Error handling",
+        ]
+
+    # =========================================================================
+    # Extension Protocol Methods
+    # =========================================================================
+
+    @classmethod
+    def get_middleware(cls) -> List[MiddlewareProtocol]:
+        """Get {{ name }}-specific middleware.
+
+        Returns:
+            List of middleware implementations
+        """
+        # Add middleware as needed for this vertical
+        return []
+
+    @classmethod
+    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
+        """Get {{ name }}-specific safety extension.
+
+        Returns:
+            Safety extension for {{ name }} patterns
+        """
+
+        def _create() -> SafetyExtensionProtocol:
+            from victor.{{ name }}.safety import {{ name_class }}SafetyExtension
+
+            return {{ name_class }}SafetyExtension()
+
+        return cls._get_cached_extension("safety_extension", _create)
+
+    @classmethod
+    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
+        """Get {{ name }}-specific prompt contributor.
+
+        Returns:
+            Prompt contributor with task type hints
+        """
+
+        def _create() -> PromptContributorProtocol:
+            from victor.{{ name }}.prompts import {{ name_class }}PromptContributor
+
+            return {{ name_class }}PromptContributor()
+
+        return cls._get_cached_extension("prompt_contributor", _create)
+
+    @classmethod
+    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
+        """Get {{ name }}-specific mode configuration provider.
+
+        Returns:
+            Mode configuration provider
+        """
+
+        def _create() -> ModeConfigProviderProtocol:
+            from victor.{{ name }}.mode_config import {{ name_class }}ModeConfigProvider
+
+            return {{ name_class }}ModeConfigProvider()
+
+        return cls._get_cached_extension("mode_config_provider", _create)
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Get tiered tool configuration for {{ name }}.
+
+        Returns:
+            TieredToolConfig for {{ name }} vertical
+        """
+        from victor.tools.tool_names import ToolNames
+
+        return TieredToolConfig(
+            # Tier 1: Mandatory - always included for any task
+            mandatory={
+                ToolNames.READ,
+                ToolNames.LS,
+                ToolNames.GREP,
+            },
+            # Tier 2: Vertical Core - essential for {{ name }} tasks
+            vertical_core={
+                ToolNames.EDIT,
+                ToolNames.WRITE,
+                ToolNames.SHELL,
+                ToolNames.OVERVIEW,
+            },
+            readonly_only_for_analysis=False,
+        )
+
+
+__all__ = ["{{ name_class }}Assistant"]

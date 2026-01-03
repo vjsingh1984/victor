@@ -1,0 +1,122 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# =============================================================================
+# Victor Security Vertical - Example External Plugin Package
+# =============================================================================
+#
+# This pyproject.toml demonstrates how to create an external Victor vertical
+# that can be installed via pip and automatically discovered by Victor.
+#
+# Key concepts:
+# 1. Entry Points: Victor discovers verticals via "victor.verticals" entry points
+# 2. Package Structure: src/ layout for clean imports
+# 3. Dependencies: Minimal dependencies - only Victor is required
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-security"
+version = "0.1.0"
+description = "Security auditing and vulnerability analysis vertical for Victor AI"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Victor Community", email = "community@victor.dev"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+keywords = ["victor", "ai", "security", "vulnerability", "audit"]
+requires-python = ">=3.10"
+
+# Dependencies - Victor is the only required dependency
+dependencies = [
+    "victor>=0.1.0",  # Main Victor package
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/victor-security"
+Documentation = "https://victor.dev/verticals/security"
+Repository = "https://github.com/your-org/victor-security"
+Issues = "https://github.com/your-org/victor-security/issues"
+
+# =============================================================================
+# Entry Points - This is how Victor discovers your vertical!
+# =============================================================================
+#
+# Victor uses Python entry points to discover external verticals.
+# The "victor.verticals" group is scanned at startup.
+#
+# Format: <vertical_name> = "<module_path>:<class_name>"
+#
+# After installing this package with `pip install .`, Victor will
+# automatically find and register the SecurityAssistant vertical.
+# =============================================================================
+[project.entry-points."victor.verticals"]
+security = "victor_security:SecurityAssistant"
+
+# You can also register additional tools with the victor.tools entry point
+# [project.entry-points."victor.tools"]
+# security_scan = "victor_security.tools:SecurityScanTool"
+# dependency_audit = "victor_security.tools:DependencyAuditTool"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# =============================================================================
+# Development Tool Configuration
+# =============================================================================
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
