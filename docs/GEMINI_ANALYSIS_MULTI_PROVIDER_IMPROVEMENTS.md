@@ -173,7 +173,7 @@ This document analyzes the performance of Google's Gemini 2.5 Flash model (free 
 
 4. **Hybrid Search (Long Term - 1 day):**
    ```python
-   # Combine semantic + keyword for best of both worlds
+   # Combine semantic + keyword for stronger coverage
    def hybrid_search(query: str, k: int = 5):
        # Get top-2k semantic results
        semantic_results = semantic_search(query, k=k*2)
@@ -264,7 +264,7 @@ provider_tool_preferences:
 - **RL Tuning:** Needs 8-12 continuation prompts for thorough analysis
 
 #### OpenAI GPT-4
-- **Strengths:** Fast, reliable, best general-purpose performance
+- **Strengths:** Fast, reliable, strong general-purpose performance
 - **Weaknesses:** Most expensive, no thinking mode
 - **Best For:** Production deployments, planning, writing
 - **RL Tuning:** Needs only 1-3 continuation prompts (fast completion)
@@ -351,7 +351,7 @@ warnings.filterwarnings(
 
 **Rationale:**
 - Claude Opus may benefit from 15-20 prompts for deep reasoning
-- GPT-4 Turbo may work best with just 1-2 prompts (fast completion)
+- GPT-4 Turbo may work well with just 1-2 prompts (fast completion)
 - Ollama models have wide variability (3-15 prompts depending on model)
 
 ### 4.2 Short-Term Improvements (This Month)
@@ -522,7 +522,7 @@ Recommendations:
 ```python
 # victor/agent/provider_selector.py (NEW FILE)
 class AutoProviderSelector:
-    """Automatically select best provider based on task and constraints."""
+    """Automatically select a provider based on task and constraints."""
 
     def select_provider(
         self,
@@ -551,17 +551,17 @@ class AutoProviderSelector:
             )
             candidates.append((provider, score))
 
-        # Return best match
+        # Return top match
         return max(candidates, key=lambda x: x[1])[0]
 ```
 
 **Usage:**
 ```bash
 $ victor chat --auto-provider --max-cost 0.10 "Analyze this code"
-# Automatically selects Gemini (best quality under $0.10)
+# Automatically selects Gemini (strong quality under $0.10)
 
 $ victor chat --auto-provider --min-speed 50 "Write a function"
-# Automatically selects GPT-4 Turbo (fastest >50 tok/s)
+# Automatically selects GPT-4 Turbo (high throughput >50 tok/s)
 ```
 
 #### I. Provider Capability Testing Framework
@@ -767,7 +767,7 @@ victor chat --provider new_provider --max-tokens 500 "Write 10000 word essay"
 **Adapt tools to providers** - Not all tools work equally well with all providers:
 - Gemini: Great at code analysis, no web access
 - Claude: Great at reasoning, supports extended thinking
-- GPT-4: Great general-purpose, best for planning
+- GPT-4: Great general-purpose, strong for planning
 - Ollama: Variable quality, needs provider-specific prompts
 
 **Learn from usage** - RL system automatically adapts to provider quirks:

@@ -22,7 +22,6 @@ No external servers required!
 """
 
 import asyncio
-from pathlib import Path
 
 from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
 

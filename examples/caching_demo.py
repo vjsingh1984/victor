@@ -22,7 +22,6 @@ Usage:
     python examples/caching_demo.py
 """
 
-import asyncio
 import time
 from victor.storage.cache import CacheConfig, CacheManager
 from victor.storage.cache.tiered_cache import EmbeddingCache, ResponseCache

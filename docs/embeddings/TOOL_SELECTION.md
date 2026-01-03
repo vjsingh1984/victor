@@ -275,7 +275,7 @@ tools = await selector.select_relevant_tools(
 
 ### Hybrid Selection
 
-Combine semantic + keyword for best results:
+Combine semantic + keyword for stronger results:
 
 ```python
 semantic_tools = await semantic_selector.select_relevant_tools(message)
@@ -349,7 +349,7 @@ async def _select_relevant_tools(self, message: str):
 
 ### Performance vs Quality vs Latency
 
-**For 31 tools, all models provide excellent quality. sentence-transformers is best choice:**
+**For 31 tools, all models provide solid quality. sentence-transformers is a strong default:**
 
 ```
 Model Comparison (384 dimensions perfectly adequate for 31 tools):

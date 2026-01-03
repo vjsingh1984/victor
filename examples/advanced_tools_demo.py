@@ -60,6 +60,7 @@ async def demo_database_tool():
             action="query",
             connection_id=conn_id,
             sql="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)",
+            allow_modifications=True,
         )
         if result.get("success"):
             print("Table created")
@@ -72,6 +73,7 @@ async def demo_database_tool():
             action="query",
             connection_id=conn_id,
             sql="INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com'), ('Bob', 'bob@example.com')",
+            allow_modifications=True,
         )
         if result.get("success"):
             print("Inserted rows")

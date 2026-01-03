@@ -1,6 +1,6 @@
 # 60-Second Quickstart (Local, No API Key)
 
-This path runs entirely on your machine.
+This path uses local models and avoids API keys.
 
 ## 1) Install Victor
 

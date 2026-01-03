@@ -201,7 +201,7 @@ from victor.verticals.base import StageDefinition
 | DAG Workflows | YAML-based DSL with HITL nodes | ✅ |
 | Adaptive Learning | 13 RL learners for tool selection | ✅ |
 | Vertical Extensibility | 4 domain verticals | ✅ |
-| Air-Gapped Support | 100% local operation | ✅ |
+| Air-Gapped Support | Local-only operation | ✅ |
 | MCP Protocol | Both client and server | ✅ |
 
 ---

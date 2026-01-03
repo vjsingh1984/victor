@@ -1,17 +1,17 @@
 # Air-gapped Codebase Semantic Search
 
-Victor supports **100% offline codebase semantic search** using local embeddings and vector stores. No network, API keys, or external services required.
+Victor supports offline codebase semantic search using local embeddings and vector stores. When configured for local models, no API keys are required.
 
 ## Overview
 
 ### What is Air-gapped Mode?
 
-Air-gapped mode means **completely offline operation**:
+Air-gapped mode means offline-capable operation with local components:
 - ✅ Local embedding generation (sentence-transformers)
 - ✅ Local vector storage (LanceDB or ChromaDB)
 - ✅ Local LLM inference (Ollama)
-- ✅ No network calls, no API keys, no cloud services
-- ✅ Full privacy and security
+- ✅ No network calls required for the embedding pipeline
+- ✅ Helps keep data local
 
 ### Architecture
 
@@ -31,7 +31,7 @@ flowchart TB
         STEP1 --> STEP2 --> STEP3 --> STEP4
     end
 
-    RESULT["✅ Total: ~15ms overhead + LLM inference<br/>(all offline!)"]
+    RESULT["✅ Total: ~15ms overhead + LLM inference<br/>(offline path)"]
 
     QUERY --> PIPELINE --> RESULT
 
@@ -44,9 +44,9 @@ flowchart TB
     style RESULT fill:#d1fae5,stroke:#10b981
 ```
 
-## Default Configuration (Air-gapped by Default)
+## Default Configuration (Local-first)
 
-Victor is configured for air-gapped operation out of the box:
+Victor defaults to local embeddings and storage:
 
 ```python
 # victor/codebase/embeddings/base.py (EmbeddingConfig defaults)
@@ -121,7 +121,7 @@ config = EmbeddingConfig(
     extra_config={"dimension": 384}
 )
 
-# Quality mode (best semantic understanding)
+# Quality mode (higher semantic understanding)
 config = EmbeddingConfig(
     embedding_model_name="all-mpnet-base-v2",  # ~15ms
     extra_config={"dimension": 768}
@@ -292,7 +292,7 @@ config = EmbeddingConfig(
 ```
 
 **Benefits:**
-- ✅ 100% offline
+- ✅ Offline-friendly
 - ✅ Free
 - ✅ Privacy-preserving
 - ✅ Fast enough for solo work
@@ -375,7 +375,7 @@ python examples/airgapped_codebase_search.py
 # 📦 Vector Store: lancedb
 # 🤖 Embedding Model: all-MiniLM-L12-v2 (sentence-transformers)
 # 📁 Storage: ~/.victor/embeddings/airgapped_demo
-# 🌐 Network Required: NO (100% offline)
+# 🌐 Network Required: NO (for the local pipeline)
 #
 # ✅ ChromaDB provider initialized!
 # ...

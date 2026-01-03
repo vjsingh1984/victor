@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-Comprehensive testing of Victor CLI with xAI (Grok) and DeepSeek profiles across simple, medium, and complex prompts revealed significant provider-specific performance gaps and systemic design issues requiring SOLID-based architectural improvements.
+Targeted testing of Victor CLI with xAI (Grok) and DeepSeek profiles across simple, medium, and complex prompts revealed provider-specific performance gaps and systemic design issues requiring SOLID-based architectural improvements.
 
-### Key Findings
+### Key Findings (observed in this run)
 
 | Metric | Grok (xAI) | DeepSeek | Delta |
 |--------|------------|----------|-------|

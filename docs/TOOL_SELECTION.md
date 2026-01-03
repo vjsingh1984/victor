@@ -10,7 +10,7 @@ Victor's tool selection system dynamically chooses which tools to provide to the
 
 - **Keyword**: Fast registry-based matching (<1ms)
 - **Semantic**: ML-based embedding similarity (10-50ms)
-- **Hybrid**: Blends both approaches (best of both worlds)
+- **Hybrid**: Blends both approaches
 
 ## Architecture
 
@@ -143,10 +143,10 @@ tool_selection_strategy = "auto"  # auto (recommended), keyword, semantic, hybri
 
 ### Auto-Selection Logic
 
-When `strategy = "auto"`, Victor automatically selects the best strategy:
+When `strategy = "auto"`, Victor automatically selects a strategy:
 
 1. If `airgapped_mode` → **keyword** (no embeddings available)
-2. If embedding service available → **semantic** (best quality)
+2. If embedding service available → **semantic** (higher quality)
 3. Fallback → **keyword** (always works)
 
 ```python

@@ -214,7 +214,7 @@ profiles:
 ### Tool Execution
 - **Non-Streaming**: ~2-3 seconds (qwen2.5-coder:7b)
 - **Streaming**: ~2-3 seconds with real-time output
-- **Success Rate**: 100% (after fallback parser implementation)
+- **Success Rate**: High in tests (after fallback parser implementation)
 
 ### Memory Usage
 - **Unified Model Strategy**: 120MB (single model for tool selection + codebase search)
@@ -241,7 +241,7 @@ Works with ANY Ollama model:
 - **Security Compliant**: Suitable for restricted environments
 
 ### 4. Graceful Degradation
-1. Try native tool_calls first (fastest)
+1. Try native tool_calls first (usually fastest)
 2. Fall back to JSON parsing (robust)
 3. Return content as text (safe fallback)
 
@@ -359,7 +359,7 @@ if __name__ == "__main__":
 
 ### For Production Use
 
-1. **Default Model**: Use qwen3-coder:30b for best code quality
+1. **Default Model**: Use qwen3-coder:30b for higher code quality (if resources allow)
 2. **Fallback Model**: Use qwen2.5-coder:7b for resource-constrained environments
 3. **Fast Iteration**: Use mistral:7b-instruct for rapid development
 4. **Maximum Accuracy**: Use llama3.3:70b for mission-critical tasks
@@ -393,18 +393,18 @@ if __name__ == "__main__":
 
 ## Success Metrics
 
-- ✅ **100% Tool Execution Rate**: All selected tools are executed
-- ✅ **Universal Model Support**: Works with 5+ Ollama models
-- ✅ **Air-Gapped**: Zero internet connectivity required
-- ✅ **Performance**: < 10ms embedding inference
-- ✅ **Quality**: Production-ready code from qwen3-coder:30b
+- ✅ **High Tool Execution Rate**: Selected tools are executed in tests
+- ✅ **Broad Model Support**: Works with several Ollama models
+- ✅ **Air-Gapped**: Works without network access when using local models
+- ✅ **Performance**: Low-latency embedding inference (local)
+- ✅ **Quality**: Strong code generation with qwen3-coder:30b
 - ✅ **Reliability**: Graceful fallback handling
 
 ## Conclusion
 
-The air-gapped semantic tool selection system is now fully operational with universal Ollama model support. The fallback parser ensures that ANY model (with native tool calling OR JSON-in-content format) can successfully execute tools. Combined with qwen3-coder:30b as the default model, Victor now provides enterprise-grade code generation with intelligent tool selection in completely offline environments.
+The air-gapped semantic tool selection system supports Ollama models with native tool calling or JSON-in-content fallbacks. The fallback parser improves coverage across model formats. With qwen3-coder:30b as a default, Victor aims to provide strong offline code generation and tool selection when used with local models.
 
-**Status**: ✅ Production Ready
+**Status**: ✅ Stable for local use
 
 **Last Updated**: 2025-11-26
 

@@ -32,7 +32,7 @@ Key Implementation Points:
 
 from typing import Any
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import (
     PromptContributorProtocol,
     SafetyExtensionProtocol,

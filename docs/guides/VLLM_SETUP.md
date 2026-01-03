@@ -138,7 +138,7 @@ vllm:
 ## Tool Calling
 
 ### Native Tool Calling (Recommended)
-For best tool calling performance, start vLLM with these flags:
+For improved tool calling performance, start vLLM with these flags:
 ```bash
 --enable-auto-tool-choice --tool-call-parser hermes
 ```

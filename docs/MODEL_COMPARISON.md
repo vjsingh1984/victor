@@ -127,7 +127,7 @@ graph LR
 
 **Findings:**
 - All Qwen models have native tool calling support
-- qwen3-coder:30b (MoE) is fastest due to sparse activation
+- qwen3-coder:30b (MoE) is often faster due to sparse activation
 - qwen2.5-coder:14b sometimes returns JSON instead of executing
 - qwen3:32b is slower but more thorough
 

@@ -144,7 +144,7 @@ my_vertical_package/
 ```python
 # src/my_vertical/assistant.py
 from typing import List
-from victor.core.verticals.base import VerticalBase
+from victor.core.verticals import VerticalBase
 
 class MyAssistant(VerticalBase):
     # Required class attributes

@@ -168,7 +168,7 @@ victor chat -p vllm "Hello, world!"
 ```
 
 **Models:** Any HuggingFace model
-**Best For:** Production local deployments, high concurrency, GPU utilization
+**Good For:** Local deployments, high concurrency, GPU utilization
 
 ---
 
@@ -188,7 +188,7 @@ These providers offer substantial free tiers - perfect for experimentation, prot
 │                     Ultra-Fast LPU Inference                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  FREE TIER:  14,400 requests/day  •  60K tokens/min  •  No credit card      │
-│  SPEED:      300-1000+ tokens/sec (fastest available!)                      │
+│  SPEED:      300-1000+ tokens/sec (high throughput, vendor-claimed)         │
 │  MODELS:     Llama 3.3 70B, Llama 3.1 8B/70B/405B, Mixtral 8x7B, GPT-oss   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -260,7 +260,7 @@ victor chat -p groqcloud "List 3 Python best practices"
 │                    Wafer-Scale Engine (WSE) Inference                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  FREE TIER:  30 requests/min  •  60-150K tokens/min  •  No credit card      │
-│  SPEED:      1000-2000+ tokens/sec (world's fastest!)                       │
+│  SPEED:      1000-2000+ tokens/sec (high throughput, vendor-claimed)        │
 │  MODELS:     Llama 3.3 70B, Llama 3.1 8B, Qwen 2.5 32B/Coder                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -298,7 +298,7 @@ profiles:
   cerebras:
     provider: cerebras
     model: llama3.3-70b
-    description: "World's fastest inference (WSE hardware)"
+    description: "High-throughput inference (WSE hardware)"
 
   cerebras-coder:
     provider: cerebras
@@ -359,7 +359,7 @@ profiles:
   mistral:
     provider: mistral
     model: mistral-large-latest
-    description: "Mistral Large - 128K context, best quality"
+    description: "Mistral Large - 128K context, high quality"
 
   codestral:
     provider: mistral

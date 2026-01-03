@@ -10,7 +10,7 @@ Victor now uses **Qwen3-Embedding:8b** as the default embedding model for semant
 - **Context Window**: 40,000 tokens (can embed entire large files)
 - **Embedding Dimension**: 4096 (high-quality representations)
 - **Languages Supported**: 100+ (all programming languages)
-- **License**: Apache 2.0 (production-ready)
+- **License**: Apache 2.0
 - **Cost**: Free (runs locally)
 
 ## Quick Start (5 Minutes)

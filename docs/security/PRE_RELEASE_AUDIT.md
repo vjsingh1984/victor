@@ -128,9 +128,9 @@ docs/
 | Narrative | Target Audience | Key Message |
 |-----------|-----------------|-------------|
 | **Provider Freedom** | All users | "Use any AI model. Keep your code private." |
-| **Air-Gapped Security** | Enterprise | "100% offline operation. Zero network calls." |
-| **Open Source** | Developers | "Apache 2.0. Free forever. Community-driven." |
-| **Cost Efficiency** | Budget-conscious | "Local models = 94% Claude performance, $0 cost" |
+| **Air-Gapped Security** | Enterprise | "Offline operation with local models and tools." |
+| **Open Source** | Developers | "Apache 2.0. Community-driven." |
+| **Cost Efficiency** | Budget-conscious | "Local models can be competitive with low or no usage costs." |
 
 ### README Messaging (Already Implemented)
 
@@ -152,7 +152,7 @@ The main README includes:
 
 - 21 LLM providers (Claude, GPT, Gemini, Grok, Ollama, LMStudio, more)
 - 55 enterprise tools (git, refactoring, security scanning, batch ops)
-- 100% air-gapped mode for sensitive environments
+- Air-gapped mode for sensitive environments
 - Semantic codebase search with local embeddings
 - MCP protocol support for Claude Desktop integration
 
