@@ -92,8 +92,8 @@ jobs:
 
       - name: Gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
-        with:
-          args: detect --source . --no-banner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Dependency audit
         uses: pypa/gh-action-pip-audit@v1.0.8
