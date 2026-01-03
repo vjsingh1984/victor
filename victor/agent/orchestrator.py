@@ -81,6 +81,7 @@ if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.provider_manager import ProviderManager
+    from victor.agent.provider_coordinator import ProviderCoordinator
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker
@@ -394,6 +395,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_adapter,
             self.tool_calling_caps,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
+
+        # ProviderCoordinator: Wraps ProviderManager with rate limiting and health monitoring (TD-002)
+        from victor.agent.provider_coordinator import (
+            ProviderCoordinator,
+            ProviderCoordinatorConfig,
+        )
+
+        self._provider_coordinator = ProviderCoordinator(
+            provider_manager=self._provider_manager,
+            config=ProviderCoordinatorConfig(
+                max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
+                enable_health_monitoring=getattr(settings, "provider_health_checks", True),
+            ),
+        )
 
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         self.sanitizer = self._factory.create_sanitizer()
@@ -2906,19 +2921,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def start_health_monitoring(self) -> bool:
         """Start background provider health monitoring.
 
-        Enables automatic health checks at configured intervals and
-        auto-failover to healthy providers when enabled.
+        Delegates to ProviderCoordinator (TD-002).
 
         Returns:
             True if monitoring started, False if already running or unavailable
         """
-        if not hasattr(self, "_provider_manager") or not self._provider_manager:
-            logger.warning("Provider manager not available for health monitoring")
-            return False
-
         try:
-            await self._provider_manager.start_health_monitoring()
-            logger.info("Provider health monitoring started")
+            await self._provider_coordinator.start_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to start health monitoring: {e}")
@@ -2927,17 +2936,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def stop_health_monitoring(self) -> bool:
         """Stop background provider health monitoring.
 
-        Call this during graceful shutdown to clean up monitoring tasks.
+        Delegates to ProviderCoordinator (TD-002).
 
         Returns:
             True if monitoring stopped, False if not running or error
         """
-        if not hasattr(self, "_provider_manager") or not self._provider_manager:
-            return False
-
         try:
-            await self._provider_manager.stop_health_monitoring()
-            logger.debug("Provider health monitoring stopped")
+            await self._provider_coordinator.stop_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to stop health monitoring: {e}")
@@ -2946,38 +2951,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def get_provider_health(self) -> Dict[str, Any]:
         """Get health status of all registered providers.
 
+        Delegates to ProviderCoordinator (TD-002).
+
         Returns:
-            Dictionary with provider health information:
-            - current_provider: Name of current provider
-            - is_healthy: Current provider health status
-            - healthy_providers: List of healthy provider names
-            - can_failover: Whether failover is possible
+            Dictionary with provider health information
         """
-        result: Dict[str, Any] = {
-            "current_provider": self.provider_name,
-            "is_healthy": True,
-            "healthy_providers": [self.provider_name] if self.provider_name else [],
-            "can_failover": False,
-        }
-
-        if hasattr(self, "_provider_manager") and self._provider_manager:
-            try:
-                # Get current state
-                state = self._provider_manager.get_current_state()
-                if state:
-                    result["is_healthy"] = state.is_healthy
-                    result["switch_count"] = state.switch_count
-
-                # Get healthy providers for failover
-                healthy = await self._provider_manager.get_healthy_providers()
-                result["healthy_providers"] = healthy
-                result["can_failover"] = len(healthy) > 1
-
-            except Exception as e:
-                logger.warning(f"Failed to get provider health: {e}")
-                result["error"] = str(e)
-
-        return result
+        return await self._provider_coordinator.get_health()
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
