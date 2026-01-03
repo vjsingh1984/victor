@@ -4362,54 +4362,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             recovery_ctx, has_tool_calls, content_length
         )
 
-    def _handle_empty_response_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Tuple[Optional[StreamChunk], bool]:
-        """Handle empty response.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Tuple of (StreamChunk if threshold exceeded, should_force_completion flag)
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.handle_empty_response(recovery_ctx)
-
-    def _handle_blocked_tool_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        block_reason: str,
-    ) -> StreamChunk:
-        """Handle blocked tool call.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-            tool_name: Name of blocked tool
-            tool_args: Arguments that were passed
-            block_reason: Reason for blocking
-
-        Returns:
-            StreamChunk with block notification
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.handle_blocked_tool(
-            recovery_ctx, tool_name, tool_args, block_reason
-        )
-
     def _check_blocked_threshold_with_handler(
         self,
         stream_ctx: StreamingChatContext,
@@ -4513,30 +4465,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Delegate to RecoveryCoordinator
         return self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
-
-    def _check_force_action_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Tuple[bool, Optional[str]]:
-        """Check if force action should be triggered using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_force_action() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Tuple of (was_triggered, hint):
-            - was_triggered: True if force_completion was newly set
-            - hint: The hint string if triggered
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        # Note: RecoveryCoordinator uses unified_tracker internally
-        return self._recovery_coordinator.check_force_action(recovery_ctx)
 
     def _handle_force_tool_execution_with_handler(
         self,
@@ -5542,9 +5470,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                # Track empty responses using handler delegation for testable logic
-                # Handler tracks consecutive empty responses and forces summary if threshold exceeded
-                recovery_chunk, should_force = self._handle_empty_response_with_handler(stream_ctx)
+                # Track empty responses - delegates to recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                recovery_chunk, should_force = self._recovery_coordinator.handle_empty_response(recovery_ctx)
                 if recovery_chunk:
                     yield recovery_chunk
                     # CRITICAL: Handler already set stream_ctx.force_completion if needed
@@ -5774,8 +5702,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield loop_warning_chunk
             else:
-                # PRIMARY: Check UnifiedTaskTracker for stop decision using handler delegation
-                was_triggered, hint = self._check_force_action_with_handler(stream_ctx)
+                # PRIMARY: Check UnifiedTaskTracker for stop decision via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                was_triggered, hint = self._recovery_coordinator.check_force_action(recovery_ctx)
                 if was_triggered:
                     logger.info(
                         f"UnifiedTaskTracker forcing action: {hint}, "

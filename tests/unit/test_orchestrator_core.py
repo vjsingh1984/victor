@@ -5179,8 +5179,15 @@ class TestCheckNaturalCompletionWithHandler:
         assert result.is_final is True
 
 
+@pytest.mark.skip(
+    reason="Method _handle_empty_response_with_handler was inlined in TD-002 refactoring "
+    "(Jan 2026). Logic now calls _recovery_coordinator.handle_empty_response() directly."
+)
 class TestHandleEmptyResponseWithHandler:
-    """Tests for _handle_empty_response_with_handler method."""
+    """Tests for _handle_empty_response_with_handler method.
+
+    DEPRECATED: Method was inlined to reduce wrapper overhead.
+    """
 
     def test_returns_none_below_threshold(self, orchestrator):
         """Returns (None, False) when empty responses below threshold."""
@@ -5207,8 +5214,15 @@ class TestHandleEmptyResponseWithHandler:
         assert ctx.force_completion is True
 
 
+@pytest.mark.skip(
+    reason="Method _handle_blocked_tool_with_handler was removed in TD-002 refactoring "
+    "(Jan 2026). The method was unused in production code."
+)
 class TestHandleBlockedToolWithHandler:
-    """Tests for _handle_blocked_tool_with_handler method."""
+    """Tests for _handle_blocked_tool_with_handler method.
+
+    DEPRECATED: Method was removed as it had no production callers.
+    """
 
     def test_returns_block_notification_chunk(self, orchestrator):
         """Returns chunk with block notification."""
