@@ -66,19 +66,34 @@ async def main() -> None:
     # Avoid network-dependent setup for catalog generation
     settings.airgapped_mode = True
     settings.use_semantic_tool_selection = False
+    settings.analytics_enabled = False
+    settings.tool_cache_enabled = False
 
     dummy_provider = _DummyProvider()
     agent = AgentOrchestrator(settings=settings, provider=dummy_provider, model="dummy")
 
-    lines = ["# Tool Catalog (auto-generated)", "", "| Tool | Description |", "| --- | --- |"]
+    lines = [
+        "# Tool Catalog (auto-generated)",
+        "",
+        "Descriptions are truncated for brevity. Use `victor tools list` for full details.",
+        "",
+        "| Tool | Description |",
+        "| --- | --- |",
+    ]
+    max_len = 140
     for tool in sorted(agent.tools.list_tools(), key=lambda t: t.name):
         # Collapse whitespace to keep table tidy
         desc = " ".join(tool.description.split())
+        if len(desc) > max_len:
+            cutoff = desc.rfind(" ", 0, max_len - 3)
+            if cutoff == -1:
+                cutoff = max_len - 3
+            desc = f"{desc[:cutoff].rstrip()}..."
         lines.append(f"| `{tool.name}` | {desc} |")
 
     OUTPUT_PATH.write_text("\n".join(lines), encoding="utf-8")
 
-    agent.shutdown()
+    await agent.shutdown()
     await agent.provider.close()
 
 

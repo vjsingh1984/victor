@@ -9,7 +9,6 @@
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-15000%2B%20passing-brightgreen.svg)](#project-status)
 
 [Quick Start](#quick-start) | [Why Victor](#why-victor) | [Providers](#providers) | [Docs](#documentation)
 
@@ -51,7 +50,7 @@ flowchart LR
 ```
 
 <details>
-<summary><b>Local Model (Free, Private)</b></summary>
+<summary><b>Local Model (No API Key)</b></summary>
 
 ```bash
 ollama pull qwen2.5-coder:7b
