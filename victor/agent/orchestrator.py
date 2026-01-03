@@ -7183,6 +7183,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return set(self.tools.list_tools())
         return set()
 
+    def _build_tool_access_context(self) -> "ToolAccessContext":
+        """Build ToolAccessContext for unified access control checks.
+
+        Consolidates context construction used by get_enabled_tools() and
+        is_tool_enabled() to ensure consistent access control decisions.
+
+        Returns:
+            ToolAccessContext with session tools and current mode
+        """
+        from victor.agent.protocols import ToolAccessContext
+
+        return ToolAccessContext(
+            session_enabled_tools=getattr(self, "_enabled_tools", None),
+            current_mode=self.current_mode_name if self.mode_controller else None,
+        )
+
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
@@ -7195,15 +7211,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Use ToolAccessController if available (new unified approach)
         if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
-            from victor.agent.protocols import ToolAccessContext
-
-            # Build context for access check
-            # Uses ModeAwareMixin for consistent mode access
-            context = ToolAccessContext(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-                current_mode=self.current_mode_name if self.mode_controller else None,
-            )
-
+            context = self._build_tool_access_context()
             return self._tool_access_controller.get_allowed_tools(context)
 
         # Legacy fallback: Check mode controller for BUILD mode (allows all tools)
@@ -7291,15 +7299,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Use ToolAccessController if available (new unified approach)
         if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
-            from victor.agent.protocols import ToolAccessContext
-
-            # Build context for access check
-            # Uses ModeAwareMixin for consistent mode access
-            context = ToolAccessContext(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-                current_mode=self.current_mode_name if self.mode_controller else None,
-            )
-
+            context = self._build_tool_access_context()
             decision = self._tool_access_controller.check_access(tool_name, context)
             return decision.allowed
 
