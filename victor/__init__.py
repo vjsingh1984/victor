@@ -18,7 +18,7 @@ Victor - A universal terminal-based coding agent supporting multiple LLM provide
 Supports frontier models (Claude, GPT, Gemini) and open-source models
 (Ollama, LMStudio, vLLM) with unified tool calling integration.
 
-Package Structure (v0.3.0+):
+Package Structure (v0.4.0+):
     - victor (victor-core): Core framework, providers, orchestration
     - victor_coding: Coding vertical with Tree-sitter, LSP, code tools
 
@@ -40,7 +40,7 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
