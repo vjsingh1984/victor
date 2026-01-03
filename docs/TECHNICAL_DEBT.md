@@ -68,15 +68,16 @@ def supports_tools(self) -> bool:
   - Integrated into orchestrator via property delegation pattern
 - ✅ `ConversationManager` - Created `victor/agent/conversation_manager.py` (~350 lines, 42 tests)
   - Facade composing ConversationController, ConversationStore, ConversationEmbeddingStore
-  - Ready for integration (orchestrator still uses direct components)
+  - Import added to orchestrator; session methods already well-structured
+  - Full delegation deferred (requires test mock updates for API compatibility)
 - ✅ `ProviderCoordinator` - Created `victor/agent/provider_coordinator.py` (~300 lines, 36 tests)
   - Wraps ProviderManager with rate limiting and health monitoring
-  - Ready for integration (orchestrator still uses ProviderManager directly)
+  - Integrated: health monitoring delegated (f0ffc89), rate limit methods delegated (b40adea)
+  - `_get_rate_limit_wait_time()` now delegates to coordinator (~8 lines saved)
 
 **Remaining Work**:
-1. Complete ConversationManager integration into orchestrator
-2. Complete ProviderCoordinator integration into orchestrator
-3. Further extract remaining responsibilities
+1. Complete ConversationManager integration (requires test mock alignment)
+2. Further extract remaining responsibilities
 
 **Effort**: Medium (1-2 sprints remaining)
 **Risk**: Medium - manager classes created and tested, integration pattern established
@@ -240,9 +241,9 @@ Note: "Parallel workflow execution" was incorrectly flagged - the executor suppo
 | TD-002 | God Class - Inline recovery coordinator delegations (71 lines) | 2026-01-02 | 5468bc5 |
 | TD-002 | God Class - Inline pure delegator methods (88 lines) | 2026-01-02 | 825feb04 |
 | TD-002 | God Class - Phase 2: handlers, wrappers, metrics (~156 lines) | 2026-01-02 | pending |
-| TD-002 | God Class - Phase 3: SessionStateManager (~400 lines, 52 tests) | 2026-01-02 | pending |
-| TD-002 | God Class - Phase 3: ConversationManager (~350 lines, 42 tests) | 2026-01-02 | pending |
-| TD-002 | God Class - Phase 3: ProviderCoordinator (~300 lines, 36 tests) | 2026-01-02 | pending |
+| TD-002 | God Class - Phase 3: SessionStateManager integration | 2026-01-02 | 52264fc |
+| TD-002 | God Class - Phase 3: ConversationManager (import added) | 2026-01-02 | b40adea |
+| TD-002 | God Class - Phase 3: ProviderCoordinator (health + rate limit) | 2026-01-02 | f0ffc89, b40adea |
 
 ---
 
@@ -262,7 +263,7 @@ Code Quality Score: 8.5/10
 ├── Documentation Accuracy: 9/10 (catalog + stubs documented)
 ├── Provider Coverage: 9/10 (8 dedicated adapters + OpenAI-compat fallback)
 ├── Cache Isolation: 9/10 (project-scoped caches)
-└── God Class Refactoring: 6.5/10 (Phase 3 managers created, integration in progress)
+└── God Class Refactoring: 7.0/10 (Phase 3 managers integrated: SessionState, ProviderCoordinator)
 ```
 
 ---
