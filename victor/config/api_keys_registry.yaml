@@ -1,0 +1,360 @@
+# Victor API Keys Registry
+# ============================================================================
+# This file defines all supported API key providers and services.
+# It is the single source of truth for:
+#   - Provider names and their environment variable mappings
+#   - Service names and their environment variable mappings
+#   - Registration URLs and documentation links
+#   - Free tier availability and rate limits
+#
+# The actual keys are stored securely via:
+#   1. Environment variables (highest priority)
+#   2. System keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+#   3. ~/.victor/api_keys.yaml (fallback, chmod 600)
+#
+# Usage:
+#   victor keys --list              # List all LLM provider keys
+#   victor keys --services          # List all service keys
+#   victor keys --set anthropic -k  # Set provider key in keyring
+#   victor keys --set-service finnhub -k  # Set service key in keyring
+# ============================================================================
+
+# ============================================================================
+# LLM PROVIDERS
+# ============================================================================
+# These are API keys for Large Language Model providers.
+
+providers:
+  # --------------------------------------------------------------------------
+  # Premium API Providers (Paid, high quality)
+  # --------------------------------------------------------------------------
+  anthropic:
+    env_var: ANTHROPIC_API_KEY
+    description: "Claude models (claude-opus-4, claude-sonnet-4)"
+    registration_url: "https://console.anthropic.com/"
+    docs_url: "https://docs.anthropic.com/"
+    free_tier: false
+    notes: "Requires credit card. Pay-per-token."
+
+  openai:
+    env_var: OPENAI_API_KEY
+    description: "GPT models (gpt-4o, gpt-4-turbo, o1)"
+    registration_url: "https://platform.openai.com/api-keys"
+    docs_url: "https://platform.openai.com/docs/"
+    free_tier: false
+    notes: "Requires credit card. Pay-per-token."
+
+  google:
+    env_var: GOOGLE_API_KEY
+    description: "Gemini models (gemini-2.0-flash, gemini-1.5-pro)"
+    registration_url: "https://aistudio.google.com/app/apikey"
+    docs_url: "https://ai.google.dev/docs"
+    free_tier: true
+    free_tier_limits: "15 RPM, 1M TPM, 1500 RPD"
+    notes: "Generous free tier for experimentation."
+
+  xai:
+    env_var: XAI_API_KEY
+    aliases: ["grok"]
+    description: "Grok models (grok-2, grok-beta)"
+    registration_url: "https://console.x.ai/"
+    docs_url: "https://docs.x.ai/"
+    free_tier: false
+    notes: "Requires X Premium subscription or API credits."
+
+  moonshot:
+    env_var: MOONSHOT_API_KEY
+    aliases: ["kimi"]
+    description: "Kimi K2 models (kimi-k2-0711-preview)"
+    registration_url: "https://platform.moonshot.cn/"
+    docs_url: "https://platform.moonshot.cn/docs/"
+    free_tier: true
+    free_tier_limits: "Limited free credits on signup"
+    notes: "Chinese provider, excellent for multilingual tasks."
+
+  deepseek:
+    env_var: DEEPSEEK_API_KEY
+    description: "DeepSeek models (deepseek-chat, deepseek-reasoner)"
+    registration_url: "https://platform.deepseek.com/"
+    docs_url: "https://api-docs.deepseek.com/"
+    free_tier: true
+    free_tier_limits: "Free credits on signup"
+    notes: "Excellent price-performance ratio."
+
+  # --------------------------------------------------------------------------
+  # Free-Tier Providers (Great for getting started)
+  # --------------------------------------------------------------------------
+  groqcloud:
+    env_var: GROQCLOUD_API_KEY
+    description: "Ultra-fast LPU inference (Llama, Mixtral, Gemma)"
+    registration_url: "https://console.groq.com/"
+    docs_url: "https://console.groq.com/docs/"
+    free_tier: true
+    free_tier_limits: "14,400 requests/day, various TPM limits"
+    notes: "Fastest inference. Free tier is very generous."
+
+  cerebras:
+    env_var: CEREBRAS_API_KEY
+    description: "Fast inference (Llama models)"
+    registration_url: "https://cloud.cerebras.ai/"
+    docs_url: "https://cloud.cerebras.ai/docs/"
+    free_tier: true
+    free_tier_limits: "Free tier available"
+    notes: "Very fast inference speeds."
+
+  mistral:
+    env_var: MISTRAL_API_KEY
+    description: "Mistral models (mistral-large, codestral)"
+    registration_url: "https://console.mistral.ai/"
+    docs_url: "https://docs.mistral.ai/"
+    free_tier: true
+    free_tier_limits: "500K tokens/min free tier"
+    notes: "Excellent code generation with Codestral."
+
+  together:
+    env_var: TOGETHER_API_KEY
+    description: "Open-source model hosting (Llama, Qwen, etc.)"
+    registration_url: "https://api.together.xyz/"
+    docs_url: "https://docs.together.ai/"
+    free_tier: true
+    free_tier_limits: "$25 free credits on signup"
+    notes: "Wide variety of open-source models."
+
+  openrouter:
+    env_var: OPENROUTER_API_KEY
+    description: "Unified gateway to multiple providers"
+    registration_url: "https://openrouter.ai/keys"
+    docs_url: "https://openrouter.ai/docs"
+    free_tier: true
+    free_tier_limits: "Free daily limits for some models"
+    notes: "Access multiple providers with one API key."
+
+  fireworks:
+    env_var: FIREWORKS_API_KEY
+    description: "Fast open-source model inference"
+    registration_url: "https://fireworks.ai/"
+    docs_url: "https://docs.fireworks.ai/"
+    free_tier: true
+    free_tier_limits: "$1 free credits"
+    notes: "Fast inference, function calling support."
+
+  # --------------------------------------------------------------------------
+  # Enterprise Cloud Providers
+  # --------------------------------------------------------------------------
+  vertex:
+    env_var: GOOGLE_APPLICATION_CREDENTIALS
+    aliases: ["vertexai"]
+    description: "Google Cloud Vertex AI"
+    registration_url: "https://console.cloud.google.com/vertex-ai"
+    docs_url: "https://cloud.google.com/vertex-ai/docs"
+    free_tier: false
+    notes: "Uses service account JSON or ADC. Run: gcloud auth application-default login"
+
+  azure:
+    env_var: AZURE_OPENAI_API_KEY
+    aliases: ["azure-openai"]
+    description: "Azure OpenAI Service"
+    registration_url: "https://azure.microsoft.com/en-us/products/ai-services/openai-service"
+    docs_url: "https://learn.microsoft.com/en-us/azure/ai-services/openai/"
+    free_tier: false
+    additional_env_vars:
+      - AZURE_OPENAI_ENDPOINT
+    notes: "Also requires AZURE_OPENAI_ENDPOINT (e.g., https://your-resource.openai.azure.com)"
+
+  bedrock:
+    env_var: AWS_ACCESS_KEY_ID
+    aliases: ["aws"]
+    description: "AWS Bedrock (Claude, Titan, Llama)"
+    registration_url: "https://aws.amazon.com/bedrock/"
+    docs_url: "https://docs.aws.amazon.com/bedrock/"
+    free_tier: false
+    additional_env_vars:
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_REGION
+    notes: "Uses AWS credentials chain. Run: aws configure"
+
+  huggingface:
+    env_var: HF_TOKEN
+    aliases: ["hf"]
+    description: "Hugging Face Inference API"
+    registration_url: "https://huggingface.co/settings/tokens"
+    docs_url: "https://huggingface.co/docs/api-inference/"
+    free_tier: true
+    free_tier_limits: "Rate-limited free tier"
+    notes: "Access to many open-source models."
+
+  replicate:
+    env_var: REPLICATE_API_TOKEN
+    description: "Pay-per-second model hosting"
+    registration_url: "https://replicate.com/account/api-tokens"
+    docs_url: "https://replicate.com/docs"
+    free_tier: false
+    notes: "Pay only for compute time used."
+
+  # --------------------------------------------------------------------------
+  # Local Providers (No API key required)
+  # --------------------------------------------------------------------------
+  ollama:
+    env_var: null
+    description: "Local LLM inference"
+    registration_url: "https://ollama.com/"
+    docs_url: "https://github.com/ollama/ollama"
+    free_tier: true
+    notes: "Run locally: ollama serve"
+
+  lmstudio:
+    env_var: null
+    description: "Local LLM with GUI"
+    registration_url: "https://lmstudio.ai/"
+    docs_url: "https://lmstudio.ai/docs"
+    free_tier: true
+    notes: "Desktop app with OpenAI-compatible API."
+
+  vllm:
+    env_var: null
+    description: "High-throughput LLM serving"
+    registration_url: "https://github.com/vllm-project/vllm"
+    docs_url: "https://docs.vllm.ai/"
+    free_tier: true
+    notes: "Run: python -m vllm.entrypoints.openai.api_server"
+
+# ============================================================================
+# EXTERNAL DATA SERVICES
+# ============================================================================
+# These are API keys for market data, financial data, and other external services.
+
+services:
+  # --------------------------------------------------------------------------
+  # Market Data & Financial Services
+  # --------------------------------------------------------------------------
+  finnhub:
+    env_var: FINNHUB_API_KEY
+    description: "Stock data, news sentiment, analyst estimates"
+    registration_url: "https://finnhub.io/register"
+    docs_url: "https://finnhub.io/docs/api"
+    free_tier: true
+    free_tier_limits: "60 API calls/minute"
+    notes: "Excellent for real-time stock data and sentiment."
+
+  fred:
+    env_var: FRED_API_KEY
+    description: "Federal Reserve Economic Data"
+    registration_url: "https://fred.stlouisfed.org/docs/api/api_key.html"
+    docs_url: "https://fred.stlouisfed.org/docs/api/fred/"
+    free_tier: true
+    free_tier_limits: "Unlimited (fair use)"
+    notes: "Essential for macroeconomic data. Completely free."
+
+  alphavantage:
+    env_var: ALPHAVANTAGE_API_KEY
+    description: "Stock, forex, crypto data"
+    registration_url: "https://www.alphavantage.co/support/#api-key"
+    docs_url: "https://www.alphavantage.co/documentation/"
+    free_tier: true
+    free_tier_limits: "25 requests/day"
+    notes: "Good for historical data. Paid plans for higher limits."
+
+  polygon:
+    env_var: POLYGON_API_KEY
+    description: "Real-time & historical market data"
+    registration_url: "https://polygon.io/dashboard/signup"
+    docs_url: "https://polygon.io/docs"
+    free_tier: true
+    free_tier_limits: "5 API calls/minute, delayed data"
+    notes: "Professional-grade market data."
+
+  tiingo:
+    env_var: TIINGO_API_KEY
+    description: "Stock, crypto, forex data"
+    registration_url: "https://www.tiingo.com/"
+    docs_url: "https://api.tiingo.com/documentation/general/overview"
+    free_tier: true
+    free_tier_limits: "500 requests/hour"
+    notes: "Good for historical EOD data."
+
+  iex:
+    env_var: IEX_API_KEY
+    description: "IEX Cloud market data"
+    registration_url: "https://iexcloud.io/console/tokens"
+    docs_url: "https://iexcloud.io/docs/"
+    free_tier: true
+    free_tier_limits: "50,000 messages/month"
+    notes: "Good for US equity data."
+
+  quandl:
+    env_var: QUANDL_API_KEY
+    description: "Nasdaq Data Link (formerly Quandl)"
+    registration_url: "https://data.nasdaq.com/sign-up"
+    docs_url: "https://docs.data.nasdaq.com/"
+    free_tier: true
+    free_tier_limits: "50 calls/day for free datasets"
+    notes: "Now part of Nasdaq Data Link."
+
+  nasdaq:
+    env_var: NASDAQ_API_KEY
+    description: "Nasdaq Data Link"
+    registration_url: "https://data.nasdaq.com/sign-up"
+    docs_url: "https://docs.data.nasdaq.com/"
+    free_tier: true
+    free_tier_limits: "50 calls/day for free datasets"
+    notes: "Access to various financial datasets."
+
+  # --------------------------------------------------------------------------
+  # News & Sentiment
+  # --------------------------------------------------------------------------
+  newsapi:
+    env_var: NEWSAPI_API_KEY
+    description: "News aggregation"
+    registration_url: "https://newsapi.org/register"
+    docs_url: "https://newsapi.org/docs"
+    free_tier: true
+    free_tier_limits: "100 requests/day, 1 month old articles"
+    notes: "Good for general news. Developer plan is free."
+
+  marketaux:
+    env_var: MARKETAUX_API_KEY
+    description: "Financial news API"
+    registration_url: "https://www.marketaux.com/"
+    docs_url: "https://www.marketaux.com/documentation"
+    free_tier: true
+    free_tier_limits: "100 requests/day"
+    notes: "Focused on financial/market news."
+
+  # --------------------------------------------------------------------------
+  # SEC & Regulatory
+  # --------------------------------------------------------------------------
+  sec:
+    env_var: SEC_API_KEY
+    description: "SEC EDGAR API (optional, for higher rate limits)"
+    registration_url: "https://www.sec.gov/developer"
+    docs_url: "https://www.sec.gov/edgar/sec-api-documentation"
+    free_tier: true
+    notes: "SEC EDGAR is free. API key optional for higher limits."
+
+  # --------------------------------------------------------------------------
+  # Other Data Services
+  # --------------------------------------------------------------------------
+  openweather:
+    env_var: OPENWEATHER_API_KEY
+    description: "Weather data"
+    registration_url: "https://openweathermap.org/api"
+    docs_url: "https://openweathermap.org/api"
+    free_tier: true
+    free_tier_limits: "60 calls/minute, 1M calls/month"
+    notes: "Weather data for location-based analysis."
+
+  geocoding:
+    env_var: GEOCODING_API_KEY
+    description: "Geocoding services"
+    registration_url: null
+    docs_url: null
+    free_tier: true
+    notes: "Various geocoding providers available."
+
+# ============================================================================
+# METADATA
+# ============================================================================
+metadata:
+  version: "1.0.0"
+  last_updated: "2026-01-02"
+  maintainer: "Victor Team"

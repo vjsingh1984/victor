@@ -4,9 +4,9 @@
 
 Victor supports all major LLM providers through a unified interface. This guide covers setup and usage for each provider.
 
-## Supported Providers (25+)
+## Supported Providers (21)
 
-Victor supports 25+ LLM providers organized by category. For detailed setup instructions, see [Provider Setup Guide](../guides/PROVIDER_SETUP.md).
+Victor supports 21 LLM providers organized by category. For detailed setup instructions, see [Provider Setup Guide](../guides/PROVIDER_SETUP.md).
 
 ### Local Providers (Free, Private)
 
@@ -142,7 +142,7 @@ providers:
 
 #### Available Models
 
-- `claude-sonnet-4-5` - Latest Sonnet (best balance)
+- `claude-sonnet-4-5` - Latest Sonnet (balanced)
 - `claude-3-opus-20240229` - Most capable
 - `claude-3-sonnet-20240229` - Balanced
 - `claude-3-haiku-20240307` - Fast & efficient
@@ -249,7 +249,7 @@ The Google provider supports configurable safety filters for code generation:
 ```python
 from victor.providers.google_provider import GoogleProvider
 
-# Default: No blocking (best for code generation)
+# Default: No blocking (recommended for code generation)
 provider = GoogleProvider(api_key=key, safety_level="block_none")
 
 # Available levels (least to most restrictive):
@@ -572,7 +572,7 @@ victor --profile ollama "Draft initial implementation"
 # Refine with cheaper cloud model
 victor --profile gpt4o-mini "Improve the code"
 
-# Final review with best model
+# Final review with higher-quality model
 victor --profile claude-sonnet "Review and polish"
 ```
 
@@ -715,7 +715,7 @@ Template:
 ## FAQ
 
 **Q: Which provider should I use?**
-A: Start with Ollama for free development, then use Claude Sonnet or GPT-4 for production.
+A: Start with a local model for development, then use a cloud model when you need higher quality or larger context.
 
 **Q: Can I use multiple providers in one session?**
 A: Not yet - coming in v0.3.0. Currently restart with different profile.
@@ -726,8 +726,8 @@ A: Yes! All implemented providers support tool/function calling.
 **Q: Which is the cheapest?**
 A: Ollama (free), then GPT-4o mini or Gemini Flash.
 
-**Q: Which is the best for coding?**
-A: Claude Sonnet, GPT-4, or local Qwen2.5-Coder are all excellent.
+**Q: Which is a good default for coding?**
+A: Claude Sonnet, GPT-4, or local Qwen2.5-Coder are common picks. Choose based on cost and hardware.
 
 **Q: How do I add a new provider?**
 A: See [CONTRIBUTING.md](CONTRIBUTING.md) for the provider template.

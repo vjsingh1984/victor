@@ -1,0 +1,443 @@
+# Test-Driven Development Workflow
+# ================================
+# Red-Green-Refactor cycle with:
+# - Write failing tests first
+# - Implement minimal code to pass
+# - Refactor while keeping tests green
+# - Iterate until feature complete
+
+workflows:
+  tdd:
+    description: "Test-Driven Development with red-green-refactor cycle"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: coding
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Understand Feature
+      # =====================================================================
+      - id: analyze_feature
+        type: agent
+        name: "Analyze Feature for TDD"
+        role: researcher
+        goal: |
+          Analyze the feature and break it down for TDD:
+          1. Identify testable units/components
+          2. Define expected behaviors
+          3. List edge cases to cover
+          4. Determine test file locations
+        tool_budget: 20
+        tools: [read, grep, code_search]
+        llm_config:
+          temperature: 0.3
+        output: tdd_analysis
+        next: [define_tests]
+
+      - id: define_tests
+        type: agent
+        name: "Define Test Cases"
+        role: planner
+        goal: |
+          Define the test cases for TDD:
+          1. List all test cases to implement
+          2. Order by priority/dependency
+          3. Estimate complexity of each
+          4. Identify required test fixtures
+
+          Feature: {feature_description}
+          Analysis: {tdd_analysis}
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        output: test_cases
+        next: [start_tdd_cycle]
+
+      # =====================================================================
+      # Stage 2: TDD Cycle - Red Phase
+      # =====================================================================
+      - id: start_tdd_cycle
+        type: transform
+        name: "Initialize TDD Cycle"
+        transform: |
+          tdd_iteration = tdd_iteration + 1 if tdd_iteration else 1
+          current_phase = "red"
+        next: [write_test]
+
+      - id: write_test
+        type: agent
+        name: "Write Failing Test (Red)"
+        role: executor
+        goal: |
+          Write a failing test for the current feature increment:
+          - Test should be minimal and focused
+          - Test should fail for the right reason
+          - Use existing test patterns in codebase
+          - Follow naming conventions
+
+          Test Case: {current_test_case}
+        tool_budget: 20
+        tools: [read, write, shell]
+        llm_config:
+          temperature: 0.2
+        output: test_code
+        next: [verify_red]
+
+      - id: verify_red
+        type: compute
+        name: "Verify Test Fails"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+          expect_failure: true
+        output: red_result
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_red]
+
+      - id: check_red
+        type: condition
+        name: "Check Red Phase"
+        condition: "test_failed_as_expected"
+        branches:
+          "true": implement_minimum
+          "false": fix_test
+
+      - id: fix_test
+        type: agent
+        name: "Fix Test Setup"
+        role: executor
+        goal: |
+          Fix the test so it fails for the right reason:
+          - Test passed unexpectedly: Make it test new behavior
+          - Test has error: Fix syntax/import issues
+          - Test fails incorrectly: Fix assertion logic
+        tool_budget: 15
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.1
+        output: test_fix
+        next: [verify_red]
+
+      # =====================================================================
+      # Stage 3: TDD Cycle - Green Phase
+      # =====================================================================
+      - id: implement_minimum
+        type: agent
+        name: "Implement Minimum Code (Green)"
+        role: executor
+        goal: |
+          Write the MINIMUM code to make the test pass:
+          - Only implement what the test requires
+          - Don't add extra features or optimizations
+          - Focus on correctness, not elegance
+          - It's okay if code is "ugly" for now
+
+          Failing Test: {test_code}
+        tool_budget: 25
+        tools: [read, edit, write, shell]
+        llm_config:
+          temperature: 0.2
+        output: implementation
+        next: [verify_green]
+
+      - id: verify_green
+        type: compute
+        name: "Verify Test Passes"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: green_result
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_green]
+
+      - id: check_green
+        type: condition
+        name: "Check Green Phase"
+        condition: "tests_passing"
+        branches:
+          "true": refactor
+          "false": retry_implementation
+
+      - id: retry_implementation
+        type: condition
+        name: "Check Retry Limit"
+        condition: "implementation_attempts < 3"
+        branches:
+          "true": implement_minimum
+          "false": escalate_failure
+
+      - id: escalate_failure
+        type: hitl
+        name: "Implementation Stuck"
+        hitl_type: input
+        prompt: |
+          ## TDD Implementation Stuck
+
+          **Test Case:** {current_test_case}
+          **Attempts:** {implementation_attempts}
+          **Last Error:** {last_error}
+
+          Options:
+          1. Simplify the test
+          2. Skip this test case
+          3. Get help from user
+          4. Abort TDD session
+        context_keys:
+          - current_test_case
+          - implementation_attempts
+          - last_error
+        choices:
+          - "Simplify"
+          - "Skip"
+          - "Get help"
+          - "Abort"
+        timeout: 600
+        fallback: abort
+        next: [handle_escalation]
+
+      - id: handle_escalation
+        type: condition
+        name: "Handle Escalation"
+        condition: "escalation_choice"
+        branches:
+          "Simplify": write_test
+          "Skip": check_more_tests
+          "Get help": wait_for_help
+          "Abort": abort
+
+      - id: wait_for_help
+        type: hitl
+        name: "User Assistance"
+        hitl_type: input
+        prompt: |
+          Please provide guidance for implementing:
+          {current_test_case}
+
+          Error: {last_error}
+        context_keys:
+          - current_test_case
+          - last_error
+        timeout: 1800
+        fallback: abort
+        next: [implement_minimum]
+
+      # =====================================================================
+      # Stage 4: TDD Cycle - Refactor Phase
+      # =====================================================================
+      - id: refactor
+        type: agent
+        name: "Refactor Code (Refactor)"
+        role: executor
+        goal: |
+          Refactor the code while keeping tests green:
+          - Remove duplication
+          - Improve naming
+          - Extract methods/functions
+          - Simplify logic
+          - Add documentation
+          - Follow SOLID principles
+
+          Keep changes small and incremental.
+        tool_budget: 20
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.3
+        output: refactored_code
+        next: [verify_still_green]
+
+      - id: verify_still_green
+        type: compute
+        name: "Verify Tests Still Pass"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: refactor_result
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_refactor]
+
+      - id: check_refactor
+        type: condition
+        name: "Check After Refactor"
+        condition: "tests_passing"
+        branches:
+          "true": check_more_tests
+          "false": revert_refactor
+
+      - id: revert_refactor
+        type: agent
+        name: "Revert Refactor"
+        role: executor
+        goal: |
+          Revert the refactoring changes that broke tests:
+          - Use git to identify changes
+          - Revert to last passing state
+          - Note what refactoring failed
+        tool_budget: 10
+        tools: [shell, edit]
+        llm_config:
+          temperature: 0.1
+        output: revert_result
+        next: [check_more_tests]
+
+      # =====================================================================
+      # Stage 5: Continue or Complete
+      # =====================================================================
+      - id: check_more_tests
+        type: condition
+        name: "More Tests to Write?"
+        condition: "remaining_test_cases > 0"
+        branches:
+          "true": next_test_case
+          "false": final_verification
+
+      - id: next_test_case
+        type: transform
+        name: "Select Next Test Case"
+        transform: |
+          current_test_case = test_cases[tdd_iteration]
+          implementation_attempts = 0
+        next: [start_tdd_cycle]
+
+      - id: final_verification
+        type: compute
+        name: "Run Full Test Suite"
+        tools: [shell]
+        inputs:
+          command: $ctx.full_test_command
+          coverage: true
+        output: final_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_coverage]
+
+      - id: check_coverage
+        type: condition
+        name: "Check Coverage"
+        condition: "coverage >= min_coverage"
+        branches:
+          "true": generate_report
+          "false": add_coverage_tests
+
+      - id: add_coverage_tests
+        type: agent
+        name: "Add Coverage Tests"
+        role: executor
+        goal: |
+          Add tests to improve coverage:
+          - Identify uncovered lines
+          - Write targeted tests
+          - Focus on edge cases and error paths
+        tool_budget: 20
+        tools: [read, write, shell]
+        output: coverage_tests
+        next: [final_verification]
+
+      - id: generate_report
+        type: agent
+        name: "Generate TDD Report"
+        role: writer
+        goal: |
+          Generate a TDD session report:
+          - Tests written and passed
+          - Coverage achieved
+          - Refactoring performed
+          - Lessons learned
+        tool_budget: 10
+        output: tdd_report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "TDD Complete"
+        transform: |
+          status = "completed"
+          tests_written = tdd_iteration
+          final_coverage = coverage
+
+      - id: abort
+        type: transform
+        name: "TDD Aborted"
+        transform: |
+          status = "aborted"
+
+
+  # =========================================================================
+  # Quick TDD - Single Test Case
+  # =========================================================================
+  tdd_quick:
+    description: "Quick TDD for a single test case"
+
+    metadata:
+      vertical: coding
+
+    nodes:
+      - id: write_test
+        type: agent
+        name: "Write Failing Test"
+        role: executor
+        goal: "Write a failing test for the feature."
+        tool_budget: 15
+        tools: [read, write, shell]
+        output: test_code
+        next: [run_test]
+
+      - id: run_test
+        type: compute
+        name: "Run Test"
+        tools: [shell]
+        output: test_result
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_test]
+
+      - id: check_test
+        type: condition
+        name: "Check Test"
+        condition: "test_failed"
+        branches:
+          "true": implement
+          "false": complete
+
+      - id: implement
+        type: agent
+        name: "Implement Code"
+        role: executor
+        goal: "Write minimum code to pass the test."
+        tool_budget: 20
+        tools: [read, edit, write, shell]
+        output: implementation
+        next: [verify]
+
+      - id: verify
+        type: compute
+        name: "Verify Implementation"
+        tools: [shell]
+        output: verify_result
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_pass]
+
+      - id: check_pass
+        type: condition
+        name: "Check Pass"
+        condition: "tests_passing"
+        branches:
+          "true": complete
+          "false": implement
+
+      - id: complete
+        type: transform
+        name: "Done"
+        transform: |
+          status = "completed"

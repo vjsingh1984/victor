@@ -24,6 +24,12 @@ from victor.providers.base import (
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderTimeoutError,
+    # ISP Protocol classes
+    StreamingProvider,
+    ToolCallingProvider,
+    # Helper functions
+    is_streaming_provider,
+    is_tool_calling_provider,
 )
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
@@ -39,6 +45,12 @@ __all__ = [
     "Message",
     "CompletionResponse",
     "StreamChunk",
+    # ISP Protocol classes (Interface Segregation Principle)
+    "StreamingProvider",
+    "ToolCallingProvider",
+    # Helper functions for capability checking
+    "is_streaming_provider",
+    "is_tool_calling_provider",
     # Error classes
     "ProviderError",
     "ProviderNotFoundError",

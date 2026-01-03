@@ -481,13 +481,16 @@ class EvaluationOrchestrator:
         logger.info(f"Starting task {task.instance_id}")
 
         try:
+            # Convert to BenchmarkTask first (needed for workspace setup)
+            benchmark_task = task.to_benchmark_task()
+
             # Stage 1: Setup workspace
             progress.stage = EvaluationStage.ENVIRONMENT_SETUP
             self._notify_progress(progress)
 
             workspace = await self._workspace_manager.setup_workspace(
-                task.repo,
-                task.base_commit,
+                task=benchmark_task,
+                use_cache=True,
             )
 
             # Setup environment
@@ -525,12 +528,10 @@ class EvaluationOrchestrator:
                 config=adapter_config,
             )
 
-            # Convert to BenchmarkTask for agent
-            benchmark_task = task.to_benchmark_task()
-
-            # Execute agent
+            # Execute agent in repo subdirectory (workspace/repo contains the cloned code)
+            repo_dir = workspace / "repo"
             trace = await asyncio.wait_for(
-                adapter.execute_task(benchmark_task, workspace),
+                adapter.execute_task(benchmark_task, repo_dir),
                 timeout=self.config.task_timeout,
             )
             progress.execution_trace = trace

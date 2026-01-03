@@ -147,10 +147,11 @@ class SemanticToolSelector:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Cache file path (includes model name for version control)
-        cache_filename = (
-            f"tool_embeddings_{embedding_model.replace(':', '_').replace('/', '_')}.pkl"
-        )
+        # Cache file path (includes model name AND project hash for isolation)
+        # TD-010: Add project hash to prevent cache pollution between projects
+        project_hash = self._get_project_hash()
+        model_safe = embedding_model.replace(":", "_").replace("/", "_")
+        cache_filename = f"tool_embeddings_{model_safe}_{project_hash}.pkl"
         self.cache_file = self.cache_dir / cache_filename
 
         # In-memory cache: tool_name → embedding vector
@@ -167,8 +168,8 @@ class SemanticToolSelector:
         if embedding_provider in ["ollama", "vllm", "lmstudio"]:
             self._client = httpx.AsyncClient(base_url=ollama_base_url, timeout=30.0)
 
-        # Phase 3: Tool usage tracking and learning
-        self._usage_cache_file = self.cache_dir / "tool_usage_stats.pkl"
+        # Phase 3: Tool usage tracking and learning (also project-isolated)
+        self._usage_cache_file = self.cache_dir / f"tool_usage_stats_{project_hash}.pkl"
         self._tool_usage_cache: Dict[str, Dict[str, Any]] = {}
         self._usage_cache_dirty = False  # Dirty flag - only save when changed
         self._load_usage_cache()
@@ -255,6 +256,27 @@ class SemanticToolSelector:
     # Cache version - aligned with Victor version, increment on breaking cache format changes
     # Format: "{victor_version}.{cache_revision}" e.g., "0.2.0.1" for first revision of 0.2.0
     CACHE_VERSION = "0.2.0"
+
+    @staticmethod
+    def _get_project_hash() -> str:
+        """Get a short hash of the current project root for cache isolation.
+
+        This ensures each project has its own tool embeddings cache,
+        preventing cache pollution when switching between projects.
+
+        Returns:
+            8-character hash of the project root path
+        """
+        from victor.config.settings import get_project_paths
+
+        try:
+            project_root = get_project_paths().project_root
+            # Use absolute path for consistent hashing
+            path_str = str(project_root.resolve())
+            return hashlib.sha256(path_str.encode()).hexdigest()[:8]
+        except Exception:
+            # Fallback to "global" if project detection fails
+            return "global"
 
     def _calculate_tools_hash(self, tools: ToolRegistry) -> str:
         """Calculate hash of all tool definitions to detect changes.
@@ -1546,6 +1568,8 @@ class SemanticToolSelector:
     def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         """Calculate cosine similarity between two vectors.
 
+        Uses Rust-accelerated implementation with NumPy fallback.
+
         Args:
             a: First vector
             b: Second vector
@@ -1553,14 +1577,10 @@ class SemanticToolSelector:
         Returns:
             Similarity score (0-1)
         """
-        dot_product = np.dot(a, b)
-        norm_a = np.linalg.norm(a)
-        norm_b = np.linalg.norm(b)
+        from victor.processing.native import cosine_similarity
 
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-
-        return float(dot_product / (norm_a * norm_b))
+        # Convert numpy arrays to lists for Rust/fallback interface
+        return cosine_similarity(a.tolist(), b.tolist())
 
     @classmethod
     def _create_tool_text(cls, tool: Any) -> str:
@@ -2002,10 +2022,10 @@ class SemanticToolSelector:
                 success=len(selected_tools) > 0,
                 quality_score=avg_score,
                 tool_name=",".join(tool_names[:5]),  # First 5 tools
-                context={
-                    "threshold": threshold,
+                threshold_value=threshold,
+                task_type=task_type,
+                metadata={
                     "tools_selected": len(selected_tools),
-                    "task_type": task_type,
                     "classification_aware": classification_aware,
                     "excluded_count": excluded_count,
                     "avg_similarity": avg_score,

@@ -1,0 +1,271 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Shared HITL (Human-in-the-Loop) gate definitions
+# These can be referenced from any vertical workflow using $ref syntax:
+#   - $ref: "../../workflows/common/hitl_gates.yaml#approval_gate"
+
+nodes:
+  # =============================================================================
+  # Generic Approval Gates
+  # =============================================================================
+
+  - id: approval_gate
+    type: hitl
+    name: "Approval Required"
+    hitl_type: approval
+    prompt: |
+      ## Approval Required
+
+      The workflow has reached a checkpoint that requires human approval.
+
+      **Current State:**
+      {current_state}
+
+      Please review and approve to continue.
+    context_keys:
+      - current_state
+    timeout: 900
+    fallback: abort
+
+  - id: quick_approval
+    type: hitl
+    name: "Quick Approval"
+    hitl_type: confirmation
+    prompt: "Confirm to proceed with the next step?"
+    timeout: 300
+    fallback: continue
+
+  # =============================================================================
+  # Quality Gates
+  # =============================================================================
+
+  - id: quality_review
+    type: hitl
+    name: "Quality Review"
+    hitl_type: review
+    prompt: |
+      ## Quality Review Required
+
+      Please review the following output for quality:
+
+      **Results:**
+      {results}
+
+      **Quality Score:** {quality_score}
+
+      You may approve, reject, or request modifications.
+    context_keys:
+      - results
+      - quality_score
+    timeout: 600
+    fallback: continue
+
+  - id: quality_choice
+    type: hitl
+    name: "Quality Decision"
+    hitl_type: choice
+    prompt: |
+      The quality score is {quality_score}.
+
+      How would you like to proceed?
+    context_keys:
+      - quality_score
+    choices:
+      - "Accept as-is"
+      - "Request improvements"
+      - "Reject and restart"
+    timeout: 300
+    fallback: continue
+
+  # =============================================================================
+  # Deployment Gates
+  # =============================================================================
+
+  - id: deploy_approval
+    type: hitl
+    name: "Deployment Approval"
+    hitl_type: approval
+    prompt: |
+      ## Deployment Approval Required
+
+      **Target Environment:** {environment}
+      **Version:** {version}
+      **Changes:**
+      {change_summary}
+
+      **Pre-deployment Checks:**
+      {validation_results}
+
+      Approve to proceed with deployment.
+    context_keys:
+      - environment
+      - version
+      - change_summary
+      - validation_results
+    timeout: 1800
+    fallback: abort
+
+  - id: rollback_approval
+    type: hitl
+    name: "Rollback Approval"
+    hitl_type: approval
+    prompt: |
+      ## Rollback Required
+
+      Deployment health checks have failed.
+
+      **Failed Checks:**
+      {failed_checks}
+
+      **Rollback Target:** {rollback_version}
+
+      Approve to initiate rollback.
+    context_keys:
+      - failed_checks
+      - rollback_version
+    timeout: 300
+    fallback: continue
+
+  # =============================================================================
+  # Research Gates
+  # =============================================================================
+
+  - id: source_review
+    type: hitl
+    name: "Source Review"
+    hitl_type: review
+    prompt: |
+      ## Source Verification Required
+
+      Please review the following sources for credibility:
+
+      **Sources Found:**
+      {sources}
+
+      **Coverage Score:** {coverage_score}
+
+      You may approve, request more sources, or reject unreliable ones.
+    context_keys:
+      - sources
+      - coverage_score
+    timeout: 600
+    fallback: continue
+
+  - id: synthesis_approval
+    type: hitl
+    name: "Synthesis Approval"
+    hitl_type: approval
+    prompt: |
+      ## Research Synthesis Review
+
+      Please review the synthesized research findings:
+
+      {synthesis}
+
+      **Sources Used:** {source_count}
+      **Confidence:** {confidence_score}
+    context_keys:
+      - synthesis
+      - source_count
+      - confidence_score
+    timeout: 900
+    fallback: continue
+
+  # =============================================================================
+  # Data Analysis Gates
+  # =============================================================================
+
+  - id: data_quality_gate
+    type: hitl
+    name: "Data Quality Gate"
+    hitl_type: choice
+    prompt: |
+      ## Data Quality Assessment
+
+      **Quality Score:** {quality_score}
+      **Missing Values:** {missing_pct}%
+      **Outliers Detected:** {outlier_count}
+
+      How would you like to proceed?
+    context_keys:
+      - quality_score
+      - missing_pct
+      - outlier_count
+    choices:
+      - "Proceed with current data"
+      - "Apply automatic cleaning"
+      - "Manual review required"
+      - "Abort analysis"
+    timeout: 600
+    fallback: continue
+
+  - id: model_approval
+    type: hitl
+    name: "Model Approval"
+    hitl_type: approval
+    prompt: |
+      ## Model Training Complete
+
+      **Model Type:** {model_type}
+      **Accuracy:** {accuracy}
+      **F1 Score:** {f1_score}
+
+      **Cross-Validation Results:**
+      {cv_results}
+
+      Approve to deploy this model.
+    context_keys:
+      - model_type
+      - accuracy
+      - f1_score
+      - cv_results
+    timeout: 900
+    fallback: abort
+
+  # =============================================================================
+  # Input Gates
+  # =============================================================================
+
+  - id: user_input
+    type: hitl
+    name: "User Input Required"
+    hitl_type: input
+    prompt: |
+      Additional input is required to continue:
+
+      {input_prompt}
+    context_keys:
+      - input_prompt
+    timeout: 600
+    fallback: abort
+
+  - id: parameter_input
+    type: hitl
+    name: "Parameter Configuration"
+    hitl_type: input
+    prompt: |
+      ## Configure Parameters
+
+      Please provide the following parameters:
+
+      {parameter_descriptions}
+
+      **Current Defaults:**
+      {default_values}
+    context_keys:
+      - parameter_descriptions
+      - default_values
+    timeout: 600
+    fallback: continue

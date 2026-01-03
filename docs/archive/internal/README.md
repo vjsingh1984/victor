@@ -1,14 +1,14 @@
 # Internal Development Documents
 
-This directory contains internal development documentation, session summaries, and analysis documents that were created during Victor's development.
+This directory contains internal development docs, session summaries, and analysis notes created during Victor's development.
 
-These documents are preserved for historical reference but are not intended for end users.
+These documents are preserved for historical reference and are not intended for end users.
 
-## Contents
+## Contents (Examples)
 
-- Analysis and fix plans for specific LLM providers
-- Session summaries from development phases
-- Internal optimization plans
-- Pre-release review documents
+- Provider audits and fix plans
+- Architecture notes, benchmarks, and debt tracking
+- Internal workflow and tooling experiments
+- Security and pre-release review artifacts
 
-For user-facing documentation, please see the main `/docs` directory.
+For user-facing documentation, see `docs/README.md`.

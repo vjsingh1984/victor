@@ -43,10 +43,15 @@ class TestTaskTypeDetection:
         assert tracker.detect_task_type(prompt) == TaskType.EDIT
 
     def test_detect_edit_task_with_fix_keyword(self):
-        """Detect EDIT task when 'fix' keyword is present."""
+        """Detect BUG_FIX task when 'fix the bug' pattern is present.
+
+        Note: "Fix the bug" is now correctly classified as BUG_FIX (not EDIT)
+        since the unified classification module prioritizes bug-fix patterns.
+        """
         tracker = TaskMilestoneMonitor()
         prompt = "Fix the bug in the authentication module"
-        assert tracker.detect_task_type(prompt) == TaskType.EDIT
+        # BUG_FIX is more accurate than EDIT for bug fix requests
+        assert tracker.detect_task_type(prompt) == TaskType.BUG_FIX
 
     def test_detect_search_task_with_find_keyword(self):
         """Detect SEARCH task when 'find' keyword is present."""

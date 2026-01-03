@@ -23,11 +23,18 @@ index = CodebaseIndex(root_path=".", graph_store_name="memory")
 ```
 
 ## Built-in backends
-- `sqlite` (persistent, default)
-- `duckdb` (persistent, optional `duckdb` dependency)
-- `memory` (ephemeral, testing)
-- `lancedb` (placeholder, optional `lancedb` dependency)
-- `neo4j` (placeholder, optional `neo4j` dependency)
+
+### Production-Ready
+- `sqlite` (persistent, default) - Recommended for most use cases
+- `duckdb` (persistent, optional `duckdb` dependency) - Better for large graphs
+- `memory` (ephemeral, testing) - Fast but not persistent
+
+### Experimental (Not Yet Implemented)
+> **Warning**: The following backends are stubs and will raise `NotImplementedError`.
+> They are planned for future releases. Contributions welcome!
+
+- `lancedb` - Columnar storage for graph data (requires `lancedb`)
+- `neo4j` - Native graph database integration (requires `neo4j`)
 
 ## Adding a backend
 1. Implement `GraphStoreProtocol` (see `victor/codebase/graph/protocol.py`).

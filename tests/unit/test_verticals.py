@@ -895,3 +895,121 @@ class TestVerticalHelperFunctions:
         assert isinstance(names, list)
         assert "coding" in names
         assert "research" in names
+
+
+class TestVerticalRegistryExternalDiscovery:
+    """Tests for VerticalRegistry.discover_external_verticals()."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset registry to known state before and after each test."""
+        # Store current state
+        original_registry = dict(VerticalRegistry._registry)
+        original_discovered = VerticalRegistry._external_discovered
+        yield
+        # Restore
+        VerticalRegistry._registry = original_registry
+        VerticalRegistry._external_discovered = original_discovered
+
+    def test_discover_external_verticals_returns_dict(self):
+        """discover_external_verticals should return a dictionary."""
+        # Reset discovery flag to allow discovery
+        VerticalRegistry.reset_discovery()
+
+        result = VerticalRegistry.discover_external_verticals()
+        assert isinstance(result, dict)
+
+    def test_discover_external_verticals_caches_result(self):
+        """discover_external_verticals should only run once."""
+        VerticalRegistry.reset_discovery()
+
+        # First call
+        result1 = VerticalRegistry.discover_external_verticals()
+
+        # Mark as discovered
+        assert VerticalRegistry._external_discovered is True
+
+        # Second call should return empty (already discovered)
+        result2 = VerticalRegistry.discover_external_verticals()
+        assert result2 == {}
+
+    def test_reset_discovery_allows_rediscovery(self):
+        """reset_discovery should allow discover_external_verticals to run again."""
+        VerticalRegistry.reset_discovery()
+
+        # First discovery
+        VerticalRegistry.discover_external_verticals()
+        assert VerticalRegistry._external_discovered is True
+
+        # Reset and discover again
+        VerticalRegistry.reset_discovery()
+        assert VerticalRegistry._external_discovered is False
+
+        # Should be able to discover again
+        VerticalRegistry.discover_external_verticals()
+        assert VerticalRegistry._external_discovered is True
+
+    def test_clear_resets_discovery_flag(self):
+        """clear() should reset the external_discovered flag."""
+        VerticalRegistry.reset_discovery()
+        VerticalRegistry.discover_external_verticals()
+
+        assert VerticalRegistry._external_discovered is True
+
+        # Clear should reset the flag
+        VerticalRegistry.clear()
+        assert VerticalRegistry._external_discovered is False
+
+    def test_validate_external_vertical_rejects_non_class(self):
+        """_validate_external_vertical should reject non-class objects."""
+        result = VerticalRegistry._validate_external_vertical("not a class", "test_ep")
+        assert result is False
+
+    def test_validate_external_vertical_rejects_non_verticalbase(self):
+        """_validate_external_vertical should reject classes not inheriting VerticalBase."""
+
+        class NotAVertical:
+            name = "test"
+
+        result = VerticalRegistry._validate_external_vertical(NotAVertical, "test_ep")
+        assert result is False
+
+    def test_validate_external_vertical_rejects_no_name(self):
+        """_validate_external_vertical should reject verticals without name."""
+
+        class NoNameVertical(VerticalBase):
+            name = ""
+            description = "Test"
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return []
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return ""
+
+        result = VerticalRegistry._validate_external_vertical(NoNameVertical, "test_ep")
+        assert result is False
+
+    def test_validate_external_vertical_accepts_valid_vertical(self):
+        """_validate_external_vertical should accept valid verticals."""
+
+        class ValidVertical(VerticalBase):
+            name = "valid_test"
+            description = "Valid test vertical"
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "You are a test assistant."
+
+        result = VerticalRegistry._validate_external_vertical(ValidVertical, "test_ep")
+        assert result is True
+
+    def test_entry_point_group_constant(self):
+        """ENTRY_POINT_GROUP should be the correct value."""
+        assert VerticalRegistry.ENTRY_POINT_GROUP == "victor.verticals"

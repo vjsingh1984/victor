@@ -62,7 +62,7 @@ p4_exploration:
 # ==============================================================================
 # Profile 3: Bug Hunting (Favor Exact Matches)
 # ==============================================================================
-# Use this for: Finding specific functions, debugging, grep-like searches
+# Use this for: Finding specific functions, debugging, code_search-like queries
 #
 p4_bug_hunting:
   provider: anthropic

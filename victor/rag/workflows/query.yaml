@@ -1,0 +1,631 @@
+# RAG Query Workflow
+# ==================
+# Retrieval-augmented generation pipeline demonstrating:
+# - Query understanding and expansion
+# - Hybrid search (dense + sparse)
+# - Context ranking and selection
+# - Answer generation with citations
+# - Confidence assessment and fallback
+# - Feedback collection for improvement
+
+workflows:
+  rag_query:
+    description: "Answer questions using retrieved context with citations"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: rag
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Query Understanding
+      # =====================================================================
+      - id: analyze_query
+        type: agent
+        name: "Analyze Query"
+        role: analyst
+        goal: |
+          Analyze the user query to understand:
+          1. Query type (factual, analytical, comparative, procedural)
+          2. Key concepts and entities
+          3. Implicit constraints (time range, domain)
+          4. Required depth of answer
+          5. Whether multi-hop reasoning is needed
+
+          Output structured analysis for search optimization.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-haiku
+        output: query_analysis
+        next: [expand_query]
+
+      - id: expand_query
+        type: agent
+        name: "Query Expansion"
+        role: executor
+        goal: |
+          Expand the query to improve retrieval:
+
+          Techniques:
+          - Synonym expansion
+          - Acronym resolution
+          - Concept decomposition (for multi-hop)
+          - Alternative phrasings
+
+          Generate 3-5 query variants ranked by expected relevance.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          analysis: query_analysis
+          original_query: $ctx.user_query
+        output: expanded_queries
+        next: [parallel_search]
+
+      # =====================================================================
+      # Stage 2: Hybrid Search (Parallel)
+      # =====================================================================
+      - id: parallel_search
+        type: parallel
+        name: "Hybrid Search"
+        parallel_nodes: [dense_search, sparse_search, entity_search]
+        join_strategy: all
+        next: [merge_results]
+
+      - id: dense_search
+        type: compute
+        name: "Dense Vector Search"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          queries: $ctx.expanded_queries
+          index_name: $ctx.index_name
+          top_k: 20
+          similarity_threshold: $ctx.similarity_threshold
+        output: dense_results
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 30
+
+      - id: sparse_search
+        type: compute
+        name: "Sparse BM25 Search"
+        tools: [shell]
+        inputs:
+          queries: $ctx.expanded_queries
+          index_name: $ctx.sparse_index
+          top_k: 20
+        output: sparse_results
+        constraints:
+          llm_allowed: false
+          timeout: 15
+
+      - id: entity_search
+        type: compute
+        name: "Entity-Based Search"
+        tools: [shell]
+        inputs:
+          entities: $ctx.query_analysis.entities
+          index_name: $ctx.entity_index
+          top_k: 10
+        output: entity_results
+        constraints:
+          llm_allowed: false
+          timeout: 15
+
+      - id: merge_results
+        type: compute
+        name: "Merge and Deduplicate Results"
+        tools: [shell]
+        inputs:
+          dense: $ctx.dense_results
+          sparse: $ctx.sparse_results
+          entity: $ctx.entity_results
+          fusion_method: reciprocal_rank
+        output: merged_results
+        constraints:
+          llm_allowed: false
+          timeout: 10
+        next: [check_results]
+
+      # =====================================================================
+      # Stage 3: Result Validation
+      # =====================================================================
+      - id: check_results
+        type: condition
+        name: "Check Search Results"
+        condition: "result_count >= 3"
+        branches:
+          "true": rerank
+          "false": fallback_search
+
+      - id: fallback_search
+        type: compute
+        name: "Fallback Broad Search"
+        tools: [shell]
+        inputs:
+          query: $ctx.user_query
+          index_name: $ctx.index_name
+          top_k: 50
+          similarity_threshold: 0.3
+        output: fallback_results
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        next: [check_fallback]
+
+      - id: check_fallback
+        type: condition
+        name: "Check Fallback Results"
+        condition: "fallback_count >= 1"
+        branches:
+          "true": rerank
+          "false": no_context_answer
+
+      - id: no_context_answer
+        type: agent
+        name: "Answer Without Context"
+        role: executor
+        goal: |
+          No relevant context was found in the knowledge base.
+
+          Options:
+          1. Answer from general knowledge (if appropriate)
+          2. Explain what information is missing
+          3. Suggest reformulating the query
+
+          Be transparent about lack of supporting evidence.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        output: fallback_answer
+        next: [complete_no_context]
+
+      - id: complete_no_context
+        type: transform
+        name: "Complete (No Context)"
+        transform: |
+          status = "completed"
+          answer = fallback_answer
+          confidence = "low"
+          sources = []
+
+      # =====================================================================
+      # Stage 4: Reranking
+      # =====================================================================
+      - id: rerank
+        type: agent
+        name: "Rerank and Filter Results"
+        role: analyst
+        goal: |
+          Rerank retrieved chunks for relevance:
+
+          Consider:
+          1. Semantic similarity to query
+          2. Factual completeness
+          3. Recency (if time-sensitive)
+          4. Source authority
+          5. Context overlap (reduce redundancy)
+
+          Select top 5-10 most relevant chunks.
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          results: merged_results
+          query: $ctx.user_query
+          analysis: query_analysis
+        output: ranked_results
+        next: [check_coverage]
+
+      # =====================================================================
+      # Stage 5: Context Sufficiency Check
+      # =====================================================================
+      - id: check_coverage
+        type: agent
+        name: "Check Context Coverage"
+        role: analyst
+        goal: |
+          Evaluate if the retrieved context can answer the query:
+
+          Assessment criteria:
+          1. Does context contain the answer? (yes/partial/no)
+          2. Are there missing pieces needed?
+          3. Confidence level (high/medium/low)
+
+          If partial, identify what's missing.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          context: ranked_results
+          query: $ctx.user_query
+        output: coverage_assessment
+        next: [coverage_decision]
+
+      - id: coverage_decision
+        type: condition
+        name: "Coverage Decision"
+        condition: "coverage_assessment.has_answer"
+        branches:
+          "true": generate_answer
+          "false": handle_partial
+
+      - id: handle_partial
+        type: condition
+        name: "Check Confidence Level"
+        condition: "coverage_assessment.confidence >= 'medium'"
+        branches:
+          "true": generate_answer
+          "false": request_clarification
+
+      - id: request_clarification
+        type: hitl
+        name: "Request Query Clarification"
+        hitl_type: input
+        prompt: |
+          ## Additional Information Needed
+
+          **Original Query:** {user_query}
+
+          **Available Context:** The knowledge base contains partial information but
+          cannot fully answer your question.
+
+          **Missing:** {missing_information}
+
+          Would you like to:
+          1. Proceed with partial answer
+          2. Rephrase your question
+          3. Specify which aspect to focus on
+        context_keys:
+          - user_query
+          - missing_information
+        timeout: 300
+        fallback: continue
+        next: [handle_clarification]
+
+      - id: handle_clarification
+        type: condition
+        name: "Handle Clarification"
+        condition: "clarification_choice"
+        branches:
+          "proceed_partial": generate_answer
+          "rephrase": analyze_query
+          "focus": generate_answer
+
+      # =====================================================================
+      # Stage 6: Answer Generation
+      # =====================================================================
+      - id: generate_answer
+        type: agent
+        name: "Generate Answer with Citations"
+        role: writer
+        goal: |
+          Generate a comprehensive answer using the retrieved context.
+
+          Requirements:
+          1. Answer the specific question asked
+          2. Support claims with inline citations [1], [2], etc.
+          3. Synthesize information from multiple sources
+          4. Acknowledge uncertainty where appropriate
+          5. Stay factual - don't hallucinate beyond context
+
+          Format:
+          - Clear, well-structured prose
+          - Citations linked to source chunks
+          - Confidence indicator at end
+        tool_budget: 25
+        llm_config:
+          temperature: 0.3
+          max_tokens: 2000
+        input_mapping:
+          context: ranked_results
+          query: $ctx.user_query
+          analysis: query_analysis
+        output: draft_answer
+        next: [verify_answer]
+
+      # =====================================================================
+      # Stage 7: Answer Verification
+      # =====================================================================
+      - id: verify_answer
+        type: agent
+        name: "Verify Answer Accuracy"
+        role: reviewer
+        goal: |
+          Verify the generated answer:
+
+          Checks:
+          1. All claims are supported by cited context
+          2. No hallucinated facts
+          3. Citations are accurate (quote matches source)
+          4. Logical coherence
+          5. Addresses the query completely
+
+          Flag any issues for revision.
+        tool_budget: 15
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          answer: draft_answer
+          context: ranked_results
+          query: $ctx.user_query
+        output: verification
+        next: [check_verification]
+
+      - id: check_verification
+        type: condition
+        name: "Check Verification"
+        condition: "verification.passed"
+        branches:
+          "true": format_response
+          "false": revise_answer
+
+      - id: revise_answer
+        type: condition
+        name: "Check Revision Count"
+        condition: "revision_count < 2"
+        branches:
+          "true": apply_revision
+          "false": format_response
+
+      - id: apply_revision
+        type: agent
+        name: "Revise Answer"
+        role: executor
+        goal: |
+          Revise the answer based on verification feedback:
+          {verification_issues}
+
+          Fix identified issues while maintaining accuracy.
+        tool_budget: 15
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          current_answer: draft_answer
+          issues: verification.issues
+          context: ranked_results
+        output: revised_answer
+        next: [verify_answer]
+
+      # =====================================================================
+      # Stage 8: Response Formatting
+      # =====================================================================
+      - id: format_response
+        type: transform
+        name: "Format Final Response"
+        transform: |
+          final_answer = draft_answer if verification.passed else revised_answer
+          sources = [
+            {
+              "id": i + 1,
+              "title": chunk.source_title,
+              "url": chunk.source_url,
+              "excerpt": chunk.text[:200],
+            }
+            for i, chunk in enumerate(ranked_results[:10])
+          ]
+          confidence = coverage_assessment.confidence
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Query Complete"
+        transform: |
+          status = "completed"
+          query_time = elapsed_time()
+
+
+  # =========================================================================
+  # Multi-Turn Conversation
+  # =========================================================================
+  conversation:
+    description: "Multi-turn RAG conversation with context persistence"
+
+    metadata:
+      vertical: rag
+
+    nodes:
+      - id: load_history
+        type: compute
+        name: "Load Conversation History"
+        tools: [read]
+        inputs:
+          session_id: $ctx.session_id
+        output: history
+        constraints:
+          llm_allowed: false
+          timeout: 10
+        next: [contextualize]
+
+      - id: contextualize
+        type: agent
+        name: "Contextualize Query"
+        role: analyst
+        goal: |
+          Understand the current query in context of conversation history:
+
+          1. Resolve pronouns and references
+          2. Inherit constraints from prior turns
+          3. Identify if this is a follow-up or new topic
+          4. Expand query with conversation context
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          current_query: $ctx.user_query
+          history: history
+        output: contextualized_query
+        next: [parallel_search]
+
+      - id: parallel_search
+        type: parallel
+        name: "Search with Context"
+        parallel_nodes: [dense_search, sparse_search]
+        join_strategy: all
+        next: [generate]
+
+      - id: dense_search
+        type: compute
+        name: "Dense Search"
+        tools: [shell]
+        inputs:
+          query: $ctx.contextualized_query
+          top_k: 15
+        output: dense
+        constraints:
+          llm_allowed: false
+          timeout: 30
+
+      - id: sparse_search
+        type: compute
+        name: "Sparse Search"
+        tools: [shell]
+        inputs:
+          query: $ctx.contextualized_query
+          top_k: 15
+        output: sparse
+        constraints:
+          llm_allowed: false
+          timeout: 15
+
+      - id: generate
+        type: agent
+        name: "Generate Contextual Answer"
+        role: writer
+        goal: |
+          Generate answer considering conversation context.
+
+          Maintain consistency with previous answers.
+          Reference prior discussion where relevant.
+        tool_budget: 20
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          context: merged(dense, sparse)
+          query: contextualized_query
+          history: history
+        output: answer
+        next: [save_turn]
+
+      - id: save_turn
+        type: compute
+        name: "Save Conversation Turn"
+        tools: [write]
+        inputs:
+          session_id: $ctx.session_id
+          turn:
+            query: $ctx.user_query
+            answer: $ctx.answer
+            sources: $ctx.sources
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 10
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Turn Complete"
+        transform: |
+          status = "completed"
+
+
+  # =========================================================================
+  # Agentic RAG with Tool Use
+  # =========================================================================
+  agentic_rag:
+    description: "RAG with agentic reasoning and tool use"
+
+    metadata:
+      vertical: rag
+
+    nodes:
+      - id: plan_approach
+        type: agent
+        name: "Plan Query Approach"
+        role: planner
+        goal: |
+          Analyze the query and plan how to answer it:
+
+          1. Identify sub-questions to answer
+          2. Determine which tools/searches are needed
+          3. Plan reasoning steps
+          4. Estimate confidence achievable
+
+          Complex queries may need multiple search rounds.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        output: plan
+        next: [execute_plan]
+
+      - id: execute_plan
+        type: agent
+        name: "Execute Search Plan"
+        role: executor
+        goal: |
+          Execute the search plan step by step.
+
+          For each sub-question:
+          1. Search relevant sources
+          2. Extract key information
+          3. Note gaps or contradictions
+
+          Use tools as needed.
+        tool_budget: 40
+        tools: [web_search, read, shell]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          plan: plan
+        output: execution_results
+        next: [synthesize]
+
+      - id: synthesize
+        type: agent
+        name: "Synthesize Findings"
+        role: analyst
+        goal: |
+          Synthesize findings from all search steps:
+
+          1. Combine evidence from multiple sources
+          2. Resolve contradictions
+          3. Fill gaps with reasoning
+          4. Assess overall confidence
+        tool_budget: 20
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          results: execution_results
+          original_query: $ctx.user_query
+        output: synthesis
+        next: [generate_response]
+
+      - id: generate_response
+        type: agent
+        name: "Generate Final Response"
+        role: writer
+        goal: |
+          Generate comprehensive response from synthesis.
+
+          Include:
+          - Clear answer
+          - Supporting evidence
+          - Confidence assessment
+          - Limitations/caveats
+        tool_budget: 15
+        llm_config:
+          temperature: 0.3
+          max_tokens: 2000
+        output: final_response
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"

@@ -4,7 +4,8 @@ import logging.handlers
 import os
 import signal
 import sys
-from typing import Any, Optional
+import uuid
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
@@ -21,6 +22,9 @@ from victor.agent.safety import (
 from victor.coding.codebase.indexer import CodebaseIndex
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
+if TYPE_CHECKING:
+    from victor.config.config_loaders import LoggingConfig
+
 logger = logging.getLogger(__name__)
 console = Console()
 
@@ -30,6 +34,149 @@ _current_agent: Optional[AgentOrchestrator] = None
 # Default log file location
 DEFAULT_LOG_DIR = Path.home() / ".victor" / "logs"
 DEFAULT_LOG_FILE = DEFAULT_LOG_DIR / "victor.log"
+
+
+def configure_logging_from_config(
+    config: "LoggingConfig",
+    stream: Optional[Any] = None,
+    session_id: Optional[str] = None,
+    repo_path: Optional[str] = None,
+) -> None:
+    """Configure logging from a centralized LoggingConfig object.
+
+    This is the preferred method for configuring logging. It uses the
+    centralized config system with proper priority chain:
+    1. CLI arguments (passed when creating config)
+    2. Environment variables
+    3. User config (~/.victor/config.yaml)
+    4. Command-specific overrides
+    5. Package defaults
+
+    Args:
+        config: LoggingConfig with all settings
+        stream: Stream for console output (default stderr)
+        session_id: Optional session identifier for log context
+        repo_path: Optional repo path for log context
+
+    Example:
+        from victor.config.config_loaders import get_logging_config
+        config = get_logging_config(command="benchmark", cli_console_level="DEBUG")
+        configure_logging_from_config(config)
+    """
+    # Get the root logger
+    root_logger = logging.getLogger()
+
+    # Clear existing handlers
+    root_logger.handlers.clear()
+
+    # Set root logger to lowest level (handlers will filter)
+    root_logger.setLevel(logging.DEBUG)
+
+    # Auto-detect repo from cwd if not provided
+    if repo_path is None:
+        repo_path = os.path.basename(os.getcwd())
+    if session_id is None:
+        session_id = str(uuid.uuid4())[:8]
+
+    # Console handler
+    console_formatter = logging.Formatter(config.console_format)
+    console_handler = logging.StreamHandler(stream or sys.stderr)
+    console_handler.setLevel(config.get_console_level_int())
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+
+    # File handler (with rotation)
+    if config.file_enabled:
+        try:
+            log_path = config.expanded_file_path
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Build file format with session context
+            file_format = config.file_format.replace("%(session)s", f"{repo_path}-{session_id}")
+            file_formatter = logging.Formatter(file_format)
+
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_path,
+                maxBytes=config.file_max_bytes,
+                backupCount=config.file_backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(config.get_file_level_int())
+            file_handler.setFormatter(file_formatter)
+            root_logger.addHandler(file_handler)
+            logger.debug(
+                f"File logging enabled: {log_path} (session={session_id}, repo={repo_path})"
+            )
+        except Exception as e:
+            logger.warning(f"Could not enable file logging: {e}")
+
+    # Apply module-specific level overrides
+    for module_name, level in config.module_levels.items():
+        module_logger = logging.getLogger(module_name)
+        module_logger.setLevel(getattr(logging, level.upper(), logging.WARNING))
+
+    # EventBus → Logging integration
+    if config.event_logging:
+        try:
+            from victor.observability.event_bus import EventBus
+            from victor.observability.exporters import LoggingExporter
+
+            event_bus = EventBus.get_instance()
+            has_logging_exporter = any(
+                isinstance(exp, LoggingExporter) for exp in event_bus._exporters
+            )
+            if not has_logging_exporter:
+                logging_exporter = LoggingExporter(
+                    "victor.events",
+                    log_level=logging.INFO,
+                    include_data=True,
+                )
+                event_bus.add_exporter(logging_exporter)
+                logger.debug("EventBus → Logging integration enabled")
+        except Exception as e:
+            logger.debug(f"Could not enable event logging: {e}")
+
+
+def setup_logging(
+    command: Optional[str] = None,
+    cli_log_level: Optional[str] = None,
+    stream: Optional[Any] = None,
+    session_id: Optional[str] = None,
+    repo_path: Optional[str] = None,
+) -> "LoggingConfig":
+    """Convenience function to load config and configure logging in one call.
+
+    This is the recommended entry point for subcommands to set up logging.
+    It handles the full priority chain and applies the configuration.
+
+    Args:
+        command: Command name for command-specific overrides (e.g., "chat", "benchmark")
+        cli_log_level: CLI-provided log level (highest priority, applies to console)
+        stream: Stream for console output (default stderr)
+        session_id: Optional session identifier for log context
+        repo_path: Optional repo path for log context
+
+    Returns:
+        The LoggingConfig that was applied (for inspection if needed)
+
+    Example:
+        # In a subcommand
+        config = setup_logging(command="benchmark", cli_log_level=log_level)
+        # Logging is now configured, proceed with command
+    """
+    from victor.config.config_loaders import get_logging_config
+
+    config = get_logging_config(
+        command=command,
+        cli_console_level=cli_log_level,
+    )
+    configure_logging_from_config(
+        config,
+        stream=stream,
+        session_id=session_id,
+        repo_path=repo_path,
+    )
+    return config
 
 
 def configure_logging(
@@ -44,6 +191,9 @@ def configure_logging(
     repo_path: Optional[str] = None,
 ) -> None:
     """Configure logging with dual output: file (INFO) and console (WARNING).
+
+    DEPRECATED: Use setup_logging() or configure_logging_from_config() instead.
+    This function is kept for backward compatibility.
 
     Args:
         log_level: Overall log level (for backward compatibility)
@@ -74,8 +224,6 @@ def configure_logging(
     if repo_path is None:
         repo_path = os.path.basename(os.getcwd())
     if session_id is None:
-        import uuid
-
         session_id = str(uuid.uuid4())[:8]  # Short session ID
 
     file_format = f"%(asctime)s - {repo_path}-{session_id} - %(name)s - %(levelname)s - %(message)s"

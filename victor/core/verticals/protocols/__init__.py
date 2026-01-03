@@ -50,6 +50,8 @@ from victor.core.verticals.protocols.tool_provider import (
     ToolSelectionResult,
     ToolSelectionStrategyProtocol,
     VerticalToolSelectionProviderProtocol,
+    TieredToolConfigProviderProtocol,
+    VerticalTieredToolProviderProtocol,
 )
 
 # Safety Provider
@@ -111,6 +113,7 @@ from victor.core.verticals.protocols.capability_provider import (
     CapabilityProviderProtocol,
     ChainProviderProtocol,
     PersonaProviderProtocol,
+    VerticalPersonaProviderProtocol,
 )
 
 # Re-export from core for backward compatibility
@@ -122,7 +125,7 @@ from victor.core.vertical_types import StageDefinition, TieredToolConfig
 # =============================================================================
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -142,6 +145,7 @@ class VerticalExtensions:
         service_provider: Service provider
         enrichment_strategy: Prompt enrichment strategy for DSPy-like optimization
         tool_selection_strategy: Strategy for vertical-specific tool selection
+        tiered_tool_config: Tiered tool configuration for context-efficient selection
     """
 
     middleware: List[MiddlewareProtocol] = field(default_factory=list)
@@ -155,6 +159,7 @@ class VerticalExtensions:
     team_spec_provider: Optional[TeamSpecProviderProtocol] = None
     enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
     tool_selection_strategy: Optional[ToolSelectionStrategyProtocol] = None
+    tiered_tool_config: Optional[Any] = None  # TieredToolConfig
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
@@ -198,6 +203,8 @@ __all__ = [
     "ToolSelectionResult",
     "ToolSelectionStrategyProtocol",
     "VerticalToolSelectionProviderProtocol",
+    "TieredToolConfigProviderProtocol",
+    "VerticalTieredToolProviderProtocol",
     # Safety
     "SafetyExtensionProtocol",
     "SafetyPattern",
@@ -229,6 +236,7 @@ __all__ = [
     "CapabilityProviderProtocol",
     "ChainProviderProtocol",
     "PersonaProviderProtocol",
+    "VerticalPersonaProviderProtocol",
     # Re-exports from core
     "ToolDependency",
     "ToolDependencyProviderProtocol",

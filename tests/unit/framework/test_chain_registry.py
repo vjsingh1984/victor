@@ -27,6 +27,9 @@ from victor.framework.chain_registry import (
     get_chain_registry,
     register_chain,
     get_chain,
+    create_chain,
+    chain,
+    reset_chain_registry,
 )
 
 
@@ -485,3 +488,333 @@ class TestChainRegistryThreadSafety:
             t.join()
 
         assert len(errors) == 0
+
+
+# =============================================================================
+# Singleton Pattern Tests
+# =============================================================================
+
+
+class TestChainRegistrySingleton:
+    """Tests for ChainRegistry singleton behavior."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry_singleton(self):
+        """Reset the singleton before and after each test."""
+        reset_chain_registry()
+        yield
+        reset_chain_registry()
+
+    def test_get_instance_returns_same_instance(self):
+        """get_instance() should return the same instance."""
+        instance1 = ChainRegistry.get_instance()
+        instance2 = ChainRegistry.get_instance()
+        assert instance1 is instance2
+
+    def test_reset_instance_clears_singleton(self):
+        """reset_instance() should clear the singleton."""
+        instance1 = ChainRegistry.get_instance()
+        ChainRegistry.reset_instance()
+        instance2 = ChainRegistry.get_instance()
+        assert instance1 is not instance2
+
+    def test_reset_chain_registry_function(self):
+        """reset_chain_registry() convenience function works."""
+        instance1 = get_chain_registry()
+        reset_chain_registry()
+        instance2 = get_chain_registry()
+        assert instance1 is not instance2
+
+
+# =============================================================================
+# Factory Registration Tests
+# =============================================================================
+
+
+class TestChainRegistryFactory:
+    """Tests for ChainRegistry factory pattern."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset the registry before and after each test."""
+        reset_chain_registry()
+        yield
+        reset_chain_registry()
+
+    def test_register_factory_and_create(self):
+        """Can register factory and create chain."""
+        registry = get_chain_registry()
+        call_count = 0
+
+        def factory():
+            nonlocal call_count
+            call_count += 1
+            return {"type": "chain", "count": call_count}
+
+        registry.register_factory(
+            "counter",
+            factory,
+            vertical="test",
+            description="Counter chain",
+        )
+
+        chain1 = registry.create("counter", vertical="test")
+        chain2 = registry.create("counter", vertical="test")
+
+        assert chain1["count"] == 1
+        assert chain2["count"] == 2  # Factory called again
+
+    def test_register_factory_with_colon_name(self):
+        """Factory supports 'vertical:name' format in name parameter."""
+        registry = get_chain_registry()
+
+        registry.register_factory(
+            "coding:analyze",  # vertical:name format
+            lambda: "analysis_chain",
+        )
+
+        chain_obj = registry.create("analyze", vertical="coding")
+        assert chain_obj == "analysis_chain"
+
+    def test_create_with_colon_name(self):
+        """create() supports 'vertical:name' format."""
+        registry = get_chain_registry()
+
+        registry.register_factory(
+            "devops:deploy",
+            lambda: "deploy_chain",
+        )
+
+        chain_obj = registry.create("devops:deploy")
+        assert chain_obj == "deploy_chain"
+
+    def test_create_nonexistent_returns_none(self):
+        """create() returns None for non-existent factory."""
+        registry = get_chain_registry()
+        result = registry.create("nonexistent")
+        assert result is None
+
+    def test_create_with_failing_factory_raises(self):
+        """create() raises RuntimeError if factory fails."""
+        registry = get_chain_registry()
+
+        def failing_factory():
+            raise ValueError("Factory error")
+
+        registry.register_factory("failing", failing_factory)
+
+        with pytest.raises(RuntimeError, match="Factory execution failed"):
+            registry.create("failing")
+
+    def test_create_chain_convenience_function(self):
+        """create_chain() convenience function works."""
+        registry = get_chain_registry()
+        registry.register_factory(
+            "coding:test",
+            lambda: "test_chain",
+        )
+
+        chain_obj = create_chain("coding:test")
+        assert chain_obj == "test_chain"
+
+    def test_list_factories(self):
+        """list_factories() returns factory names."""
+        registry = get_chain_registry()
+        registry.register_factory("coding:a", lambda: "a")
+        registry.register_factory("coding:b", lambda: "b")
+        registry.register_factory("devops:c", lambda: "c")
+
+        all_factories = registry.list_factories()
+        assert len(all_factories) == 3
+
+        coding_factories = registry.list_factories(vertical="coding")
+        assert set(coding_factories) == {"coding:a", "coding:b"}
+
+    def test_has_returns_true_for_factory(self):
+        """has() returns True for registered factories."""
+        registry = get_chain_registry()
+        registry.register_factory("test_factory", lambda: "chain")
+
+        assert registry.has("test_factory") is True
+        assert registry.has("nonexistent") is False
+
+    def test_unregister_factory(self):
+        """unregister() removes factories too."""
+        registry = get_chain_registry()
+        registry.register_factory("factory_to_remove", lambda: "chain")
+
+        assert registry.has("factory_to_remove")
+        result = registry.unregister("factory_to_remove")
+
+        assert result is True
+        assert not registry.has("factory_to_remove")
+        assert registry.create("factory_to_remove") is None
+
+
+# =============================================================================
+# Chain Decorator Tests
+# =============================================================================
+
+
+class TestChainDecorator:
+    """Tests for @chain decorator for declarative registration."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset the registry before and after each test."""
+        reset_chain_registry()
+        yield
+        reset_chain_registry()
+
+    def test_chain_decorator_registers_factory(self):
+        """@chain decorator registers factory function."""
+
+        @chain("test:decorated", description="Decorated chain")
+        def my_chain():
+            return "decorated_result"
+
+        registry = get_chain_registry()
+        assert registry.has("decorated", vertical="test")
+
+        result = registry.create("decorated", vertical="test")
+        assert result == "decorated_result"
+
+    def test_chain_decorator_preserves_function(self):
+        """@chain decorator preserves original function."""
+
+        @chain("test:preserved")
+        def original_func():
+            return "original"
+
+        # Function still callable directly
+        assert original_func() == "original"
+
+    def test_chain_decorator_with_tags(self):
+        """@chain decorator passes tags to metadata."""
+
+        @chain("test:tagged", tags=["tag1", "tag2"])
+        def tagged_chain():
+            return "tagged"
+
+        registry = get_chain_registry()
+        metadata = registry.get_metadata("tagged", vertical="test")
+
+        assert metadata is not None
+        assert set(metadata.tags) == {"tag1", "tag2"}
+
+    def test_chain_decorator_metadata_is_factory(self):
+        """@chain decorator sets is_factory=True in metadata."""
+
+        @chain("test:factory_check")
+        def factory_chain():
+            return "factory"
+
+        registry = get_chain_registry()
+        metadata = registry.get_metadata("factory_check", vertical="test")
+
+        assert metadata is not None
+        assert metadata.is_factory is True
+
+    def test_chain_decorator_with_version(self):
+        """@chain decorator passes version to metadata."""
+
+        @chain("test:versioned", version="2.0.0")
+        def versioned_chain():
+            return "v2"
+
+        registry = get_chain_registry()
+        metadata = registry.get_metadata("versioned", vertical="test")
+
+        assert metadata is not None
+        assert metadata.version == "2.0.0"
+
+
+# =============================================================================
+# ChainMetadata Serialization Tests
+# =============================================================================
+
+
+class TestChainMetadataSerialization:
+    """Tests for ChainMetadata serialization."""
+
+    def test_to_dict_serialization(self):
+        """to_dict() serializes metadata correctly."""
+        metadata = ChainMetadata(
+            name="analyze",
+            vertical="coding",
+            description="Analyze code",
+            input_type="str",
+            output_type="dict",
+            tags=["analysis", "code"],
+            is_factory=True,
+            version="2.0.0",
+        )
+        d = metadata.to_dict()
+
+        assert d["name"] == "analyze"
+        assert d["vertical"] == "coding"
+        assert d["full_name"] == "coding:analyze"
+        assert d["description"] == "Analyze code"
+        assert d["input_type"] == "str"
+        assert d["output_type"] == "dict"
+        assert d["tags"] == ["analysis", "code"]
+        assert d["is_factory"] is True
+        assert d["version"] == "2.0.0"
+
+
+# =============================================================================
+# Registry Serialization Tests
+# =============================================================================
+
+
+class TestChainRegistrySerialization:
+    """Tests for ChainRegistry serialization."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset the registry before and after each test."""
+        reset_chain_registry()
+        yield
+        reset_chain_registry()
+
+    def test_to_dict(self):
+        """to_dict() serializes registry."""
+        registry = get_chain_registry()
+        registry.register("a", MagicMock(), description="Chain A")
+        registry.register_factory("b", lambda: "b", description="Chain B")
+
+        d = registry.to_dict()
+
+        assert "a" in d
+        assert "b" in d
+        assert d["a"]["description"] == "Chain A"
+        assert d["b"]["is_factory"] is True
+
+
+# =============================================================================
+# Clear Tests (Enhanced)
+# =============================================================================
+
+
+class TestChainRegistryClear:
+    """Tests for clear functionality with factories."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset the registry before and after each test."""
+        reset_chain_registry()
+        yield
+        reset_chain_registry()
+
+    def test_clear_removes_chains_and_factories(self):
+        """clear() removes all chains and factories."""
+        registry = get_chain_registry()
+        registry.register("a", MagicMock())
+        registry.register_factory("b", lambda: "b")
+
+        registry.clear()
+
+        assert not registry.has("a")
+        assert not registry.has("b")
+        assert len(registry.list_chains()) == 0
+        assert len(registry.list_factories()) == 0

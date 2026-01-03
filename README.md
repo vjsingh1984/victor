@@ -2,16 +2,16 @@
 
 # Victor
 
-**Open Source AI Coding Assistant**
+**Open-source, local-first coding assistant**
 
-*Any model. Any provider. Your infrastructure.*
+*Run local or cloud models with one CLI.*
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-11100%2B%20passing-brightgreen.svg)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-15000%2B%20passing-brightgreen.svg)](#project-status)
 
-[Quick Start](#quick-start) | [Features](#features) | [Providers](#provider-comparison) | [Documentation](#documentation)
+[Quick Start](#quick-start) | [Why Victor](#why-victor) | [Providers](#providers) | [Docs](#documentation)
 
 </div>
 
@@ -19,14 +19,28 @@
 
 ## Quick Start
 
+**60-second quickstart (no API key):**
 ```bash
-# 1. Install
-pip install victor-ai
+# 1. Install (recommended)
+pipx install victor-ai
 
-# 2. Initialize and run
+# Or:
+# pip install victor-ai
+
+# 2. Local model
+ollama pull qwen2.5-coder:7b
+
+# 3. Initialize and chat
 victor init
 victor chat
 ```
+
+**One-shot:**
+```bash
+victor "refactor this file for clarity"
+```
+
+See `docs/QUICKSTART_60S.md` for a concise walkthrough.
 
 ```mermaid
 flowchart LR
@@ -40,7 +54,7 @@ flowchart LR
 <summary><b>Local Model (Free, Private)</b></summary>
 
 ```bash
-ollama pull qwen2.5-coder:32b
+ollama pull qwen2.5-coder:7b
 victor chat
 ```
 </details>
@@ -58,99 +72,32 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 ## Why Victor?
 
-| Challenge | Traditional Tools | Victor |
-|-----------|------------------|--------|
-| Vendor Lock-in | Single provider | 25+ providers |
-| Data Privacy | Cloud-only | Air-gapped mode |
-| Domain Expertise | Generic | 5 specialized verticals |
-| Tool Access | Limited | 45 cost-aware tools |
-| Protocol Support | Proprietary | MCP client + server |
+- Local-first by default: run Ollama/LM Studio/vLLM without an API key.
+- Provider-agnostic: switch models without rewriting workflows.
+- Practical workflows: review, refactor, and test from the CLI.
+- Extensible: add tools, verticals, and MCP integrations as needed.
 
 ---
 
-## Provider Comparison
+## Providers
 
-| Provider | Quality | Speed | Cost | Local | Notes |
-|----------|:-------:|:-----:|:----:|:-----:|-------|
-| **Anthropic** | 5/5 | 3/5 | $$$ | No | Best reasoning |
-| **OpenAI** | 4/5 | 4/5 | $$$ | No | GPT-4o multimodal |
-| **Google** | 4/5 | 4/5 | $$ | No | 1M token context |
-| **Groq** | 3/5 | 5/5 | $ | No | Fastest inference |
-| **DeepSeek** | 4/5 | 3/5 | $ | No | $0.14/1M tokens |
-| **Ollama** | 3/5 | 2/5 | Free | Yes | 100+ local models |
-| **LMStudio** | 3/5 | 2/5 | Free | Yes | GUI + API |
-| **vLLM** | 3/5 | 3/5 | Free | Yes | Production serving |
+Use the same CLI with local or cloud models. Pick based on privacy, cost, and speed.
 
-> **Tip**: Use Groq/Cerebras for speed, Anthropic for quality, Ollama for privacy.
+- Local: Ollama, LM Studio, vLLM, llama.cpp
+- Cloud: Anthropic, OpenAI, Google, Groq, DeepSeek, Mistral, xAI, and more
 
-**Additional Providers**: xAI (Grok), Mistral, Moonshot, Cerebras, Together, Fireworks, OpenRouter, Azure OpenAI, AWS Bedrock, Google Vertex AI
+See `docs/reference/PROVIDERS.md` for setup and examples.
 
 ---
 
-## Features
+## What You Can Do
 
-### Domain Verticals
+- Run local or cloud models with the same CLI.
+- Use built-in workflows for review, refactor, tests, and docs.
+- Make multi-file edits with previews and rollback.
+- Add MCP tools and custom verticals when needed.
 
-| Vertical | Tools | Specialization |
-|----------|:-----:|----------------|
-| **Coding** | 30 | Multi-file refactoring, AST ops, test gen |
-| **Research** | 9 | Web search, citations, fact synthesis |
-| **DevOps** | 13 | Docker, Terraform, CI/CD |
-| **Data Analysis** | 11 | Pandas, visualization, statistics |
-| **RAG** | 10 | Document ingestion, vector search |
-
-### Tool System
-
-| Category | Examples | Cost Tier |
-|----------|----------|:---------:|
-| File Ops | read, write, edit, ls, grep | FREE |
-| Git | status, diff, commit, branch | FREE |
-| Code | review, refactor, metrics | LOW |
-| Web | search, fetch | MEDIUM |
-| Batch | 100+ file operations | HIGH |
-
-### Key Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **Semantic Search** | 10 languages, Tree-sitter AST, sub-100ms |
-| **Air-Gapped Mode** | 100% offline with local models |
-| **MCP Protocol** | Client + server for Claude Desktop |
-| **StateGraph DSL** | LangGraph-compatible workflows |
-| **Multi-Agent Teams** | 4 formations: Sequential, Parallel, Pipeline, Hierarchical |
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
-    subgraph Clients
-        CLI[CLI/TUI]
-        VS[VS Code]
-        MCP[MCP]
-    end
-
-    subgraph Protocol
-        Direct[Direct]
-        HTTP[HTTP]
-        MCPS[MCP Server]
-    end
-
-    subgraph Core
-        Orch[Orchestrator]
-        Prov[25+ Providers]
-        Tools[45 Tools]
-        Vert[5 Verticals]
-    end
-
-    CLI --> Direct --> Orch
-    VS --> HTTP --> Orch
-    MCP --> MCPS --> Orch
-    Orch --> Prov
-    Orch --> Tools
-    Orch --> Vert
-```
+See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 
 ---
 
@@ -176,6 +123,11 @@ flowchart TB
 | `victor serve` | API server |
 | `victor mcp` | MCP server |
 | `victor keys --set X` | Configure API key |
+| `victor workflow validate <path>` | Validate YAML workflow file |
+| `victor workflow render <path>` | Render workflow as diagram (SVG/PNG/ASCII) |
+| `victor vertical create <name>` | Scaffold new vertical structure |
+| `victor vertical list` | List available verticals |
+| `victor dashboard` | Launch observability dashboard |
 
 ### Agent Modes
 
@@ -193,8 +145,9 @@ flowchart TB
 |----------|-------------|
 | [User Guide](docs/USER_GUIDE.md) | Complete usage |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing |
-| [Tool Catalog](docs/TOOL_CATALOG.md) | All 45 tools |
+| [Tool Catalog](docs/TOOL_CATALOG.md) | All 55 tools |
 | [Provider Setup](docs/guides/PROVIDER_SETUP.md) | Provider config |
+| [Local Models](docs/guides/LOCAL_MODELS.md) | Ollama, LM Studio, vLLM, llama.cpp |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Workflow DSL](docs/guides/WORKFLOW_DSL.md) | StateGraph guide |
 
@@ -202,17 +155,9 @@ flowchart TB
 
 ## Project Status
 
-| Component | Status |
-|-----------|:------:|
-| Agent Orchestrator | Stable |
-| 45 Tools | Stable |
-| 25+ Providers | Stable |
-| 5 Verticals | Stable |
-| Semantic Search | Stable |
-| VS Code Extension | Beta |
-| MCP Support | Stable |
-
-> **Note**: 11,100+ passing tests. See [ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) for improvement plans.
+- CLI and core workflows are stable for daily use.
+- VS Code extension is beta.
+- See `docs/ARCHITECTURE_DEEP_DIVE.md` for system details.
 
 ---
 

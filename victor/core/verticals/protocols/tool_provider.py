@@ -192,9 +192,101 @@ class VerticalToolSelectionProviderProtocol(Protocol):
         ...
 
 
+# =============================================================================
+# Tiered Tool Config Provider Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class TieredToolConfigProviderProtocol(Protocol):
+    """Protocol for verticals providing tiered tool configuration.
+
+    Tiered tool configuration enables context-efficient tool management with
+    three tiers:
+    1. Mandatory: Always included tools (e.g., read, ls, grep)
+    2. Vertical Core: Always included for this vertical (e.g., web_search for research)
+    3. Semantic Pool: Dynamically selected based on task context
+
+    This protocol follows ISP (Interface Segregation Principle) by focusing
+    solely on tiered tool configuration, separate from tool selection strategy.
+
+    Example:
+        class ResearchVertical(VerticalBase, TieredToolConfigProviderProtocol):
+            @classmethod
+            def get_tiered_tool_config(cls) -> TieredToolConfig:
+                return TieredToolConfig(
+                    mandatory={"read", "ls", "grep"},
+                    vertical_core={"web_search", "web_fetch", "overview"},
+                    readonly_only_for_analysis=True,
+                )
+
+            @classmethod
+            def get_tool_tier_name(cls) -> str:
+                return "research"  # For registry lookup
+
+    Integration:
+        The ToolTierRegistry singleton can be used to register and retrieve
+        tiered configurations across verticals, enabling cross-vertical
+        tier management and inheritance.
+    """
+
+    @classmethod
+    def get_tiered_tool_config(cls) -> Optional[Any]:
+        """Get the tiered tool configuration for this vertical.
+
+        Returns:
+            TieredToolConfig instance or None if not using tiered configuration
+        """
+        ...
+
+    @classmethod
+    def get_tool_tier_name(cls) -> str:
+        """Get the tier name for registry lookup.
+
+        Returns:
+            Tier name string (typically the vertical name)
+        """
+        ...
+
+
+@runtime_checkable
+class VerticalTieredToolProviderProtocol(Protocol):
+    """Protocol for verticals that provide tiered tool management.
+
+    This protocol enables type-safe isinstance() checks when integrating
+    tiered tool configuration with the framework's VerticalIntegrationPipeline.
+
+    The protocol is @runtime_checkable, allowing:
+        if isinstance(vertical, VerticalTieredToolProviderProtocol):
+            config = vertical.get_tiered_tool_config()
+    """
+
+    @classmethod
+    def get_tiered_tool_config(cls) -> Optional[Any]:
+        """Get the tiered tool configuration for this vertical.
+
+        Returns:
+            TieredToolConfig instance or None
+        """
+        ...
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[Any]:
+        """Legacy method for backward compatibility.
+
+        DEPRECATED: Use get_tiered_tool_config() instead.
+
+        Returns:
+            TieredToolConfig instance or None
+        """
+        ...
+
+
 __all__ = [
     "ToolSelectionContext",
     "ToolSelectionResult",
     "ToolSelectionStrategyProtocol",
     "VerticalToolSelectionProviderProtocol",
+    "TieredToolConfigProviderProtocol",
+    "VerticalTieredToolProviderProtocol",
 ]

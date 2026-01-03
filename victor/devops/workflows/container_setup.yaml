@@ -1,0 +1,409 @@
+# Container Setup Workflow
+# ========================
+# Docker/container setup and configuration with:
+# - Requirements analysis
+# - Dockerfile creation and optimization
+# - Multi-stage builds
+# - Security scanning
+# - Registry push
+
+workflows:
+  container_setup:
+    description: "Container setup with Dockerfile creation and optimization"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: devops
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Requirements Analysis
+      # =====================================================================
+      - id: analyze_requirements
+        type: agent
+        name: "Analyze Container Requirements"
+        role: analyst
+        goal: |
+          Analyze application requirements for containerization:
+
+          1. **Application Analysis**
+             - Detect language/runtime (Python, Node, Go, etc.)
+             - Identify dependencies (package managers, libraries)
+             - Find configuration files
+
+          2. **Resource Requirements**
+             - Estimate CPU/memory needs
+             - Identify storage requirements
+             - Note network dependencies
+
+          3. **Environment Variables**
+             - Find required env vars
+             - Identify secrets management needs
+
+          4. **Base Image Selection**
+             - Recommend appropriate base image
+             - Consider security vs. size trade-offs
+        tool_budget: 20
+        tools: [read, shell, grep]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          app_path: application_path
+        output: requirements
+        next: [create_dockerfile]
+
+      # =====================================================================
+      # Stage 2: Dockerfile Creation
+      # =====================================================================
+      - id: create_dockerfile
+        type: agent
+        name: "Create Dockerfile"
+        role: executor
+        goal: |
+          Create an optimized Dockerfile:
+
+          **Best Practices:**
+          1. Use specific base image tags (not :latest)
+          2. Implement multi-stage builds for smaller images
+          3. Order layers for optimal caching
+          4. Minimize layer count
+          5. Use .dockerignore
+
+          **Security Considerations:**
+          - Run as non-root user
+          - Remove build dependencies
+          - No secrets in image
+
+          **Performance:**
+          - Copy dependency files first
+          - Install dependencies before code
+          - Clean up apt/npm caches
+        tool_budget: 25
+        tools: [read, write]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          reqs: requirements
+          app_path: application_path
+        output: dockerfile_path
+        next: [create_compose]
+
+      - id: create_compose
+        type: agent
+        name: "Create Docker Compose"
+        role: executor
+        goal: |
+          Create docker-compose.yml for development:
+
+          - Service definition
+          - Volume mounts for live reload
+          - Environment variables
+          - Network configuration
+          - Health checks
+          - Depends_on for service ordering
+        tool_budget: 15
+        tools: [read, write]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          dockerfile: dockerfile_path
+          requirements: requirements
+        output: compose_path
+        next: [build_image]
+
+      # =====================================================================
+      # Stage 3: Build and Validate
+      # =====================================================================
+      - id: build_image
+        type: compute
+        name: "Build Container Image"
+        handler: container_ops
+        inputs:
+          operation: build
+          dockerfile: $ctx.dockerfile_path
+          tag: $ctx.image_tag
+          build_args: $ctx.build_args
+        output: build_result
+        constraints:
+          llm_allowed: false
+          timeout: 600
+        next: [check_build]
+
+      - id: check_build
+        type: condition
+        name: "Check Build Status"
+        condition: "container_build_status"
+        branches:
+          "success": security_scan
+          "warning": review_size
+          "failed": fix_dockerfile
+          "default": security_scan
+
+      - id: fix_dockerfile
+        type: agent
+        name: "Fix Dockerfile Issues"
+        role: executor
+        goal: |
+          Fix Dockerfile build errors:
+          {build_error}
+
+          Common fixes:
+          - Missing dependencies
+          - Wrong base image
+          - Permission issues
+          - Path errors
+        tool_budget: 15
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          error: build_result.error
+        output: fixed_dockerfile
+        next: [build_image]
+
+      - id: review_size
+        type: hitl
+        name: "Review Image Size"
+        hitl_type: approval
+        prompt: |
+          ## Image Size Warning
+
+          The built image is larger than recommended.
+
+          **Image Size:** {image_size} MB
+          **Recommended Maximum:** {max_size} MB
+
+          **Optimization Suggestions:**
+          - Use multi-stage builds
+          - Choose a smaller base image (alpine)
+          - Remove unnecessary files
+          - Combine RUN commands
+
+          Proceed anyway?
+        context_keys:
+          - image_size
+          - max_size
+        timeout: 600
+        fallback: continue
+        next: [security_scan]
+
+      # =====================================================================
+      # Stage 4: Security Scan
+      # =====================================================================
+      - id: security_scan
+        type: compute
+        name: "Security Scan"
+        tools: [shell]
+        inputs:
+          image: $ctx.image_tag
+          scanner: trivy
+        output: scan_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_security]
+
+      - id: check_security
+        type: condition
+        name: "Check Security Results"
+        condition: "security_scan_verdict"
+        branches:
+          "pass": test_container
+          "warn": review_vulnerabilities
+          "fail": block_push
+
+      - id: review_vulnerabilities
+        type: hitl
+        name: "Review Vulnerabilities"
+        hitl_type: review
+        prompt: |
+          ## Security Vulnerabilities Found
+
+          **Critical:** {critical_count}
+          **High:** {high_count}
+          **Medium:** {medium_count}
+          **Low:** {low_count}
+
+          **Top Vulnerabilities:**
+          {vulnerability_summary}
+
+          Review and decide whether to proceed.
+        context_keys:
+          - critical_count
+          - high_count
+          - medium_count
+          - low_count
+          - vulnerability_summary
+        timeout: 900
+        fallback: abort
+        next: [test_container]
+
+      - id: block_push
+        type: transform
+        name: "Block Push"
+        transform: |
+          push_blocked = true
+          block_reason = "Critical security vulnerabilities"
+
+      # =====================================================================
+      # Stage 5: Test Container
+      # =====================================================================
+      - id: test_container
+        type: agent
+        name: "Test Container"
+        role: executor
+        goal: |
+          Test the container:
+
+          1. **Start container**
+             - Run with appropriate settings
+             - Wait for healthy status
+
+          2. **Basic tests**
+             - Health endpoint responds
+             - Application starts correctly
+             - Logs look normal
+
+          3. **Cleanup**
+             - Stop test container
+             - Remove test artifacts
+        tool_budget: 20
+        tools: [shell]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          image: image_tag
+          compose: compose_path
+        output: test_results
+        next: [check_tests]
+
+      - id: check_tests
+        type: condition
+        name: "Check Test Results"
+        condition: "test_results.success"
+        branches:
+          "true": push_approval
+          "false": investigate_failure
+          "default": push_approval
+
+      - id: investigate_failure
+        type: agent
+        name: "Investigate Test Failure"
+        role: analyst
+        goal: |
+          Investigate why container tests failed:
+          {test_error}
+
+          Check:
+          - Container logs
+          - Startup sequence
+          - Port bindings
+          - Environment variables
+        tool_budget: 15
+        tools: [shell, read]
+        llm_config:
+          temperature: 0.2
+        output: investigation
+        next: [fix_dockerfile]
+
+      # =====================================================================
+      # Stage 6: Push to Registry
+      # =====================================================================
+      - id: push_approval
+        type: hitl
+        name: "Push Approval"
+        hitl_type: approval
+        prompt: |
+          ## Ready to Push to Registry
+
+          **Image:** {image_tag}
+          **Size:** {image_size} MB
+          **Security:** {security_status}
+          **Tests:** Passed
+
+          Push to registry?
+        context_keys:
+          - image_tag
+          - image_size
+          - security_status
+        timeout: 600
+        fallback: continue
+        next: [push_image]
+
+      - id: push_image
+        type: compute
+        name: "Push to Registry"
+        handler: container_ops
+        inputs:
+          operation: push
+          tag: $ctx.image_tag
+          registry: $ctx.container_registry
+        output: push_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 300
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Container Setup Complete"
+        transform: |
+          workflow_status = "completed"
+          outputs = {
+            "dockerfile": dockerfile_path,
+            "compose": compose_path,
+            "image": image_tag,
+            "pushed": push_result.success
+          }
+
+
+  # =========================================================================
+  # Quick Container Build
+  # =========================================================================
+  container_quick:
+    description: "Quick container build without security scan"
+
+    metadata:
+      vertical: devops
+
+    nodes:
+      - id: quick_analyze
+        type: agent
+        name: "Quick Analysis"
+        role: analyst
+        goal: |
+          Quickly analyze application and create Dockerfile.
+          Focus on getting it working, optimize later.
+        tool_budget: 15
+        tools: [read, write]
+        llm_config:
+          temperature: 0.3
+          model_hint: claude-3-sonnet
+        output: dockerfile
+        next: [quick_build]
+
+      - id: quick_build
+        type: compute
+        name: "Quick Build"
+        handler: container_ops
+        inputs:
+          operation: build
+          tag: $ctx.image_tag
+        output: build_result
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [quick_test]
+
+      - id: quick_test
+        type: compute
+        name: "Quick Test"
+        tools: [shell]
+        inputs:
+          command: "docker run --rm ${image_tag} echo 'Container works'"
+        output: test_result
+        constraints:
+          llm_allowed: false
+          timeout: 60

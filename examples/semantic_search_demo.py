@@ -24,7 +24,7 @@ Usage:
 """
 
 import asyncio
-from victor_coding.codebase.indexer import CodebaseIndex
+from victor.coding.codebase import CodebaseIndex
 
 
 async def main():
@@ -59,7 +59,7 @@ async def main():
     print(f"Embeddings enabled: {stats['embeddings_enabled']}")
     if "embedding_stats" in stats:
         emb_stats = stats["embedding_stats"]
-        print(f"\nEmbedding stats:")
+        print("\nEmbedding stats:")
         print(f"  Model: {emb_stats.get('model_name', 'N/A')}")
         print(f"  Documents: {emb_stats.get('total_documents', 0)}")
 
@@ -129,7 +129,7 @@ async def main():
     print("  ✓ Ask questions in natural language")
 
     print("\n💡 Try your own queries:")
-    print("   from victor_coding.codebase.indexer import CodebaseIndex")
+    print("   from victor.coding.codebase import CodebaseIndex")
     print("   indexer = CodebaseIndex('.', use_embeddings=True)")
     print("   await indexer.index_codebase()")
     print("   results = await indexer.semantic_search('your question here')")

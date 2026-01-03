@@ -175,28 +175,53 @@ class TaskEnvironment:
         return self._temp_dir
 
     async def _clone_repo(self) -> None:
-        """Clone the task's repository."""
+        """Clone the task's repository.
+
+        For SWE-bench tasks, we need to clone the full repo (or enough history)
+        to be able to checkout the specific base_commit.
+        """
         if not self.task.repo or not self._temp_dir:
             return
 
         repo_dir = self._temp_dir / "repo"
-        clone_cmd = ["git", "clone", "--depth", "1"]
 
-        if self.task.base_commit:
-            clone_cmd.extend(["--branch", self.task.base_commit])
-
-        clone_cmd.extend([self.task.repo, str(repo_dir)])
+        # Clone with enough history to access base_commit
+        # Using --depth 100 as compromise between speed and history
+        clone_cmd = ["git", "clone", "--depth", "100", self.task.repo, str(repo_dir)]
 
         try:
+            logger.info(f"Cloning {self.task.repo}...")
             result = await asyncio.create_subprocess_exec(
                 *clone_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            await result.wait()
+            stdout, stderr = await result.communicate()
 
-            # Checkout specific commit
-            if self.task.base_commit:
+            if result.returncode != 0:
+                # Try full clone if shallow clone failed
+                logger.warning(f"Shallow clone failed, trying full clone: {stderr.decode()}")
+                clone_cmd = ["git", "clone", self.task.repo, str(repo_dir)]
+                result = await asyncio.create_subprocess_exec(
+                    *clone_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await result.communicate()
+
+            # Checkout specific commit if provided
+            if self.task.base_commit and repo_dir.exists():
+                # Fetch the specific commit if not available
+                fetch_cmd = ["git", "fetch", "--depth", "1", "origin", self.task.base_commit]
+                result = await asyncio.create_subprocess_exec(
+                    *fetch_cmd,
+                    cwd=repo_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await result.communicate()
+
+                # Checkout the commit
                 checkout_cmd = ["git", "checkout", self.task.base_commit]
                 result = await asyncio.create_subprocess_exec(
                     *checkout_cmd,
@@ -204,7 +229,11 @@ class TaskEnvironment:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                await result.wait()
+                stdout, stderr = await result.communicate()
+                if result.returncode != 0:
+                    logger.warning(f"Failed to checkout {self.task.base_commit}: {stderr.decode()}")
+                else:
+                    logger.info(f"Checked out {self.task.base_commit}")
 
         except Exception as e:
             logger.warning(f"Failed to clone repo: {e}")
@@ -638,7 +667,34 @@ class EvaluationHarness:
             except asyncio.TimeoutError:
                 task_result.status = TaskStatus.TIMEOUT
                 task_result.error_message = "Agent timeout"
+                # Check if callback stored partial data before cancellation
+                partial_data = getattr(agent_callback, "_partial_data", None)
+                if partial_data:
+                    task_result.tokens_input = partial_data.get("tokens_input", 0)
+                    task_result.tokens_output = partial_data.get("tokens_output", 0)
+                    task_result.tokens_used = partial_data.get("tokens_used", 0)
+                    task_result.tool_calls = partial_data.get("tool_calls", 0)
+                    task_result.turns = partial_data.get("turns", 0)
+                    task_result.generated_code = partial_data.get("code", "")
+                    logger.info(
+                        f"Task timed out - partial metrics recovered: "
+                        f"tool_calls={task_result.tool_calls}, turns={task_result.turns}"
+                    )
+                else:
+                    logger.info("Task timed out - no partial metrics available")
                 return task_result
+
+            # Handle dict return type for token tracking (P1 fix)
+            # Callbacks can return either:
+            # - str: Just the generated code (legacy)
+            # - dict: Code plus metrics {code, tokens_input, tokens_output, tokens_used, tool_calls, turns}
+            if isinstance(agent_output, dict):
+                task_result.tokens_input = agent_output.get("tokens_input", 0)
+                task_result.tokens_output = agent_output.get("tokens_output", 0)
+                task_result.tokens_used = agent_output.get("tokens_used", 0)
+                task_result.tool_calls = agent_output.get("tool_calls", 0)
+                task_result.turns = agent_output.get("turns", 0)
+                agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)
             if config.enable_self_correction:

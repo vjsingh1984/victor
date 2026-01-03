@@ -29,10 +29,10 @@ import tempfile
 from pathlib import Path
 
 from victor.tools.refactor_tool import (
-    refactor_rename_symbol,
-    refactor_extract_function,
-    refactor_inline_variable,
-    refactor_organize_imports,
+    rename,
+    extract,
+    inline,
+    organize_imports,
 )
 
 
@@ -72,8 +72,8 @@ def main():
         print(demo_code)
 
         print("\n2️⃣ Preview: Rename 'process_data' to 'transform_items'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="process_data",
             new_name="transform_items",
             preview=True,
@@ -85,8 +85,8 @@ def main():
             print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute: Rename 'process_data' to 'transform_items'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="process_data",
             new_name="transform_items",
             preview=False,
@@ -132,7 +132,7 @@ def process_user_data(users):
         print(demo_code)
 
         print("\n2️⃣ Extract validation logic (lines 6-11) into 'validate_user' function...")
-        result = await refactor_extract_function(
+        result = await extract(
             file=str(file_path),
             start_line=6,
             end_line=11,
@@ -172,7 +172,7 @@ def calculate_total(items):
         print(demo_code)
 
         print("\n2️⃣ Inline 'tax_rate' variable (preview)...")
-        result = await refactor_inline_variable(
+        result = await inline(
             file=str(file_path),
             variable_name="tax_rate",
             preview=True,
@@ -184,7 +184,7 @@ def calculate_total(items):
             print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute inlining...")
-        result = await refactor_inline_variable(
+        result = await inline(
             file=str(file_path),
             variable_name="tax_rate",
             preview=False,
@@ -216,7 +216,7 @@ from victor.tools.base import BaseTool
 import sys
 from collections import defaultdict
 import os
-from victor.cache.manager import CacheManager
+from victor.storage.cache import CacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +230,7 @@ class DataProcessor:
         print(demo_code[:300] + "...")
 
         print("\n2️⃣ Preview: Organize imports...")
-        result = await refactor_organize_imports(
+        result = await organize_imports(
             file=str(file_path),
             preview=True,
         )
@@ -241,7 +241,7 @@ class DataProcessor:
             print(f"❌ Error: {result.get('error', '')}")
 
         print("\n3️⃣ Execute: Organize imports...")
-        result = await refactor_organize_imports(
+        result = await organize_imports(
             file=str(file_path),
             preview=False,
         )
@@ -288,7 +288,7 @@ def main():
         print(demo_code)
 
         print("\n2️⃣ STEP 1: Organize imports...")
-        result = await refactor_organize_imports(
+        result = await organize_imports(
             file=str(file_path),
             preview=False,
         )
@@ -296,8 +296,8 @@ def main():
             print("✓ Imports organized")
 
         print("\n3️⃣ STEP 2: Rename 'proc' to 'filter_active_items'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="proc",
             new_name="filter_active_items",
             preview=False,
@@ -306,8 +306,8 @@ def main():
             print("✓ Function renamed")
 
         print("\n4️⃣ STEP 3: Rename 'd' to 'items'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="d",
             new_name="items",
             preview=False,
@@ -316,8 +316,8 @@ def main():
             print("✓ Parameter renamed")
 
         print("\n5️⃣ STEP 4: Rename 'x' to 'active_items'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="x",
             new_name="active_items",
             preview=False,
@@ -326,8 +326,8 @@ def main():
             print("✓ Variable renamed")
 
         print("\n6️⃣ STEP 5: Rename 'i' to 'item'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="i",
             new_name="item",
             preview=False,
@@ -336,8 +336,8 @@ def main():
             print("✓ Loop variable renamed")
 
         print("\n7️⃣ STEP 6: Rename 'r' to 'filtered_data'...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="r",
             new_name="filtered_data",
             preview=False,
@@ -372,8 +372,8 @@ def calculate(a, b):
         file_path = setup_demo_file(temp_path, "safe.py", demo_code.strip())
 
         print("\n1️⃣ Try to rename non-existent symbol...")
-        result = await refactor_rename_symbol(
-            file=str(file_path),
+        result = await rename(
+            path=str(file_path),
             old_name="nonexistent",
             new_name="something",
         )
@@ -382,8 +382,8 @@ def calculate(a, b):
             print(f"❌ Expected error: {result.get('error', '')}")
 
         print("\n2️⃣ Try to refactor non-existent file...")
-        result = await refactor_rename_symbol(
-            file="/tmp/does_not_exist.py",
+        result = await rename(
+            path="/tmp/does_not_exist.py",
             old_name="foo",
             new_name="bar",
         )
@@ -392,7 +392,7 @@ def calculate(a, b):
             print(f"❌ Expected error: {result.get('error', '')}")
 
         print("\n3️⃣ Try extract with invalid line range...")
-        result = await refactor_extract_function(
+        result = await extract(
             file=str(file_path),
             start_line=10,
             end_line=20,

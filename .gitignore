@@ -43,6 +43,7 @@ venv.bak/
 .pytest_cache/
 .coverage
 htmlcov/
+htmlcov_lang/
 .tox/
 .hypothesis/
 *.cover
@@ -212,3 +213,19 @@ docs/PROMOTION_SPECIFICATION.md
 
 # Announcements and marketing materials
 /announcements/
+
+# Root-level archive (internal docs moved during cleanup)
+/archive/
+
+# ML model files (prevent accidental commits of large binary models)
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+*.bin
+!scripts/*.bin
+*.pt
+*.pth
+models/
+**/sentence-transformers/
+**/bge-*/

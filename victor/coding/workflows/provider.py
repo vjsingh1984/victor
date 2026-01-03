@@ -18,6 +18,13 @@ Implements WorkflowProviderProtocol to provide coding-specific workflows
 to the framework, with support for streaming execution via
 StreamingWorkflowExecutor.
 
+Supports hybrid loading:
+- Python workflows (inline @workflow definitions)
+- YAML workflows (external files in workflows/*.yaml)
+
+YAML workflows override Python workflows when names collide,
+allowing customization without code changes.
+
 Example:
     provider = CodingWorkflowProvider()
 
@@ -31,10 +38,14 @@ Example:
             print(f"Completed: {chunk.node_name}")
 """
 
+import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import WorkflowDefinition
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -60,39 +71,80 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
         """Initialize the provider."""
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
 
+    def _load_python_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Load Python-defined workflows.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
+        from victor.coding.workflows.bugfix import (
+            bug_fix_workflow,
+            quick_fix_workflow,
+        )
+        from victor.coding.workflows.feature import (
+            feature_implementation_workflow,
+            quick_feature_workflow,
+        )
+        from victor.coding.workflows.review import (
+            code_review_workflow,
+            pr_review_workflow,
+            quick_review_workflow,
+        )
+
+        return {
+            # Feature workflows
+            "feature_implementation": feature_implementation_workflow(),
+            "quick_feature": quick_feature_workflow(),
+            # Bug fix workflows
+            "bug_fix": bug_fix_workflow(),
+            "quick_fix": quick_fix_workflow(),
+            # Review workflows
+            "code_review": code_review_workflow(),
+            "quick_review": quick_review_workflow(),
+            "pr_review": pr_review_workflow(),
+        }
+
+    def _load_yaml_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Load YAML-defined workflows from workflows/*.yaml.
+
+        Returns:
+            Dict mapping workflow names to definitions
+        """
+        try:
+            from victor.workflows.yaml_loader import load_workflows_from_directory
+
+            # Load from the workflows directory (same as this file)
+            workflows_dir = Path(__file__).parent
+            yaml_workflows = load_workflows_from_directory(workflows_dir)
+            logger.debug(f"Loaded {len(yaml_workflows)} YAML workflows from {workflows_dir}")
+            return yaml_workflows
+        except Exception as e:
+            logger.warning(f"Failed to load YAML workflows: {e}")
+            return {}
+
     def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Lazy load all workflows.
+        """Lazy load all workflows with hybrid Python/YAML support.
+
+        YAML workflows override Python workflows when names collide,
+        allowing external customization without code changes.
 
         Returns:
             Dict mapping workflow names to definitions
         """
         if self._workflows is None:
-            from victor.coding.workflows.bugfix import (
-                bug_fix_workflow,
-                quick_fix_workflow,
-            )
-            from victor.coding.workflows.feature import (
-                feature_implementation_workflow,
-                quick_feature_workflow,
-            )
-            from victor.coding.workflows.review import (
-                code_review_workflow,
-                pr_review_workflow,
-                quick_review_workflow,
-            )
+            # Start with Python workflows as base
+            python_workflows = self._load_python_workflows()
 
-            self._workflows = {
-                # Feature workflows
-                "feature_implementation": feature_implementation_workflow(),
-                "quick_feature": quick_feature_workflow(),
-                # Bug fix workflows
-                "bug_fix": bug_fix_workflow(),
-                "quick_fix": quick_fix_workflow(),
-                # Review workflows
-                "code_review": code_review_workflow(),
-                "quick_review": quick_review_workflow(),
-                "pr_review": pr_review_workflow(),
-            }
+            # Override with YAML workflows (external overrides inline)
+            yaml_workflows = self._load_yaml_workflows()
+
+            # Merge: YAML takes precedence
+            self._workflows = {**python_workflows, **yaml_workflows}
+
+            logger.debug(
+                f"Loaded {len(python_workflows)} Python + {len(yaml_workflows)} YAML workflows "
+                f"= {len(self._workflows)} total"
+            )
         return self._workflows
 
     def get_workflows(self) -> Dict[str, WorkflowDefinition]:
@@ -258,6 +310,11 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
     def __repr__(self) -> str:
         return f"CodingWorkflowProvider(workflows={len(self._load_workflows())})"
 
+
+# Register Coding domain handlers when this module is loaded
+from victor.coding.handlers import register_handlers as _register_handlers
+
+_register_handlers()
 
 __all__ = [
     "CodingWorkflowProvider",

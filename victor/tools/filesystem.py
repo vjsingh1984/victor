@@ -1123,8 +1123,8 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: Output limited to ~15,000 chars. Use offset/limit for large files.",
-        "PAGINATION: For files >100KB, use limit=200-500 and increment offset to read in chunks.",
+        "TRUNCATION: Cloud models 750 lines/25KB, local models 150 lines/6KB. Always ends on complete lines.",
+        "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
         "Use search parameter for efficient grep-like targeted lookups",
@@ -1144,15 +1144,22 @@ async def read(
 ) -> str:
     """Read text/code file. Binary files rejected.
 
-    IMPORTANT: Output is truncated to ~15,000 chars (~500 lines). For large files:
-    - Use offset/limit for paginated reads: read(path, offset=0, limit=200), then offset=200, etc.
+    TRUNCATION LIMITS:
+    - Cloud models: Maximum 750 lines OR 25KB (whichever is reached first)
+    - Local models: Maximum 150 lines OR 6KB
+    - Always truncates at complete line boundaries (never mid-line)
+    - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
+
+    PAGINATION (for large files):
+    - Use offset/limit: read(path, offset=0, limit=200), then offset=200, etc.
+    - Or let auto-truncation guide you with the offset value in output
     - Use search param to find specific content without reading entire file
 
     Args:
         path: File path
         offset: Start line (0=beginning). Use for pagination of large files.
-        limit: Max lines to read (0=all, but truncated at ~500 lines).
-               Recommended: Use limit=200-500 for large files and paginate.
+        limit: Max lines to read (0=auto, applies configured limits).
+               Set explicit limit to override auto-truncation.
         search: Grep pattern - efficient for finding specific content
         ctx: Context lines around matches
         regex: Pattern is regex
@@ -1160,7 +1167,8 @@ async def read(
         line_end: Alias for limit (some models use this name)
 
     Returns:
-        File content (truncated if >15,000 chars). Use offset to continue reading.
+        File content with line numbers. If truncated, includes continuation hint
+        with exact offset to use for next read.
     """
     # Handle parameter aliases from models that use different names
     if line_start is not None and offset == 0:
@@ -1460,28 +1468,109 @@ async def read(
         )
         return result.to_string(show_line_numbers=True, max_matches=50)
 
-    # If no offset/limit, return full content
-    if offset == 0 and limit == 0:
-        return content
+    # Import truncation utilities
+    from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
 
-    # Handle offset and limit
+    # Determine truncation limits based on model context
+    # Cloud models (Anthropic, OpenAI, etc.): 750 lines / 25KB (balanced for context efficiency)
+    # Local models (Ollama, LMStudio, vLLM): 150 lines / 6KB (conservative for smaller context)
+    def _get_truncation_limits() -> tuple:
+        """Get appropriate truncation limits based on current provider."""
+        try:
+            from victor.config.settings import get_settings
+
+            settings = get_settings()
+
+            # Check for airgapped mode or local providers
+            if settings.airgapped_mode:
+                return 150, 6144  # 150 lines, 6KB for local models
+
+            # Check provider name for local indicators
+            provider = getattr(settings, "provider", "").lower()
+            local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
+            if any(p in provider for p in local_providers):
+                # Try to get model context size from capabilities
+                try:
+                    from victor.providers.model_capabilities import get_model_capabilities
+
+                    model = getattr(settings, "model", "")
+                    caps = get_model_capabilities(model)
+                    context_window = caps.get("context_window", 0)
+                    if context_window > 0:
+                        # Scale limits based on context window
+                        # ~10% of context for read output is reasonable
+                        max_tokens = context_window // 10
+                        # Estimate ~4 chars per token, ~40 chars per line
+                        max_lines = min(300, max(50, max_tokens // 10))
+                        max_bytes = min(12288, max(2048, max_tokens * 4))
+                        return max_lines, max_bytes
+                except Exception:
+                    pass
+                return 150, 6144  # Fallback for local models
+
+            # Cloud models get balanced limits
+            return 750, 25600  # 750 lines, 25KB
+        except Exception:
+            # Default to cloud limits if settings unavailable
+            return 750, 25600
+
+    MAX_LINES, MAX_BYTES = _get_truncation_limits()
+
     lines = content.split("\n")
     total_lines = len(lines)
 
     # Clamp offset to valid range
     offset = max(0, min(offset, total_lines))
 
-    # Select lines
-    if limit > 0:
-        selected = lines[offset : offset + limit]
-        end_line = min(offset + limit, total_lines)
+    # Apply offset first
+    if offset > 0:
+        remaining_content = "\n".join(lines[offset:])
     else:
-        selected = lines[offset:]
-        end_line = total_lines
+        remaining_content = content
 
-    # Add header showing line range
-    header = f"[Lines {offset + 1}-{end_line} of {total_lines}]\n"
-    return header + "\n".join(selected)
+    # Determine effective limit
+    if limit > 0:
+        # User specified explicit limit - honor it (but still apply byte limit for safety)
+        effective_max_lines = limit
+    else:
+        # Auto-truncation mode - apply default limits
+        effective_max_lines = MAX_LINES
+
+    # Apply truncation (always ends on complete lines)
+    truncated_content, info = truncate_by_lines(
+        remaining_content,
+        max_lines=effective_max_lines,
+        max_bytes=MAX_BYTES,
+        start_line=0,  # Already applied offset above
+    )
+
+    # Format with line numbers (1-indexed, adjusted for offset)
+    numbered_content = format_with_line_numbers(truncated_content, start_line=offset + 1)
+
+    # Build informative header
+    actual_end_line = offset + info.lines_returned
+    header_parts = [
+        f"[File: {path}]",
+        f"[Lines {offset + 1}-{actual_end_line} of {total_lines}]",
+        f"[Size: {info.bytes_returned:,} bytes]",
+    ]
+
+    # Add truncation warning with specific details
+    if info.was_truncated:
+        remaining = total_lines - actual_end_line
+        if info.truncation_reason == "line_limit":
+            header_parts.append(
+                f"[TRUNCATED: Hit {effective_max_lines} line limit. "
+                f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
+            )
+        elif info.truncation_reason == "byte_limit":
+            header_parts.append(
+                f"[TRUNCATED: Hit {MAX_BYTES // 1024}KB byte limit at line {actual_end_line}. "
+                f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
+            )
+
+    header = "\n".join(header_parts) + "\n\n"
+    return header + numbered_content
 
 
 @tool(

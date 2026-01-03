@@ -17,9 +17,7 @@
 import asyncio
 import os
 
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
-from victor.providers.openai_provider import OpenAIProvider
+from victor import Agent, EventType
 
 
 async def main():
@@ -34,18 +32,13 @@ async def main():
     print("🤖 OpenAI GPT Example\n")
     print("=" * 60)
 
-    # Create OpenAI provider
-    provider = OpenAIProvider(api_key=api_key)
-
     # Example with GPT-4o
     print("\n💎 Using GPT-4o")
     print("-" * 60)
 
-    settings = Settings()
-    agent = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
+    agent = await Agent.create(
         model="gpt-4o",
+        provider="openai",
         temperature=0.7,
     )
 
@@ -61,7 +54,7 @@ def calculate_total(items):
     return total
 """
 
-    response = await agent.chat(
+    response = await agent.run(
         f"Review this Python code and suggest improvements:\n\n{code_to_review}"
     )
     print(f"GPT-4o: {response.content}")
@@ -69,9 +62,9 @@ def calculate_total(items):
     # Example 2: Creative writing
     print("\n\n✍️ Example 2: Creative Writing")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Write a creative product name and tagline for an AI coding assistant that works with any LLM."
     )
     print(f"GPT-4o: {response.content}")
@@ -80,34 +73,32 @@ def calculate_total(items):
     print("\n\n⚡ Using GPT-4o mini (faster)")
     print("-" * 60)
 
-    provider2 = OpenAIProvider(api_key=api_key)
-    agent2 = AgentOrchestrator(
-        settings=settings,
-        provider=provider2,
+    agent2 = await Agent.create(
+        provider="openai",
         model="gpt-4o-mini",
         temperature=0.5,
     )
 
     print("\nGPT-4o mini: ", end="", flush=True)
-    async for chunk in agent2.stream_chat("List 5 Python best practices in one sentence each."):
-        if chunk.content:
-            print(chunk.content, end="", flush=True)
+    async for event in agent2.stream("List 5 Python best practices in one sentence each."):
+        if event.type == EventType.CONTENT:
+            print(event.content, end="", flush=True)
     print()
 
     # Example 3: Problem solving
     print("\n\n🧩 Example 3: Problem Solving")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "I have a list of 1 million integers. I need to find the top 10 largest numbers efficiently. "
         "What's the best approach and why?"
     )
     print(f"GPT-4o: {response.content}")
 
     # Clean up
-    await provider.close()
-    await provider2.close()
+    await agent.close()
+    await agent2.close()
 
     print("\n\n✅ Examples completed!")
     print("\n💡 Tip: Use GPT-4o mini for quick tasks, GPT-4o for complex reasoning")

@@ -449,6 +449,350 @@ class OrchestratorIntegration:
         """Get the intelligent pipeline."""
         return self._pipeline
 
+    # =========================================================================
+    # Intelligent Pipeline Methods (moved from AgentOrchestrator)
+    # =========================================================================
+
+    async def prepare_intelligent_request(
+        self,
+        task: str,
+        task_type: str,
+        conversation_state: Any,
+        unified_tracker: Any,
+    ) -> Optional[Dict[str, Any]]:
+        """Pre-request hook for intelligent pipeline integration.
+
+        Called at the start of stream_chat to:
+        - Get mode transition recommendations (Q-learning)
+        - Get optimal tool budget for task type
+        - Enable prompt optimization if configured
+
+        Args:
+            task: The user's task/query
+            task_type: Detected task type (analysis, edit, etc.)
+            conversation_state: Orchestrator's conversation state
+            unified_tracker: Orchestrator's unified tracker
+
+        Returns:
+            Dictionary with recommendations, or None if pipeline disabled
+        """
+        try:
+            # Get current mode from conversation state
+            # Note: ConversationStage uses auto() which returns int values,
+            # so we use stage.name.lower() to get a string mode name
+            stage = conversation_state.get_current_stage()
+            current_mode = stage.name.lower() if stage else "explore"
+
+            # Prepare request context (async call to pipeline)
+            context = await self.prepare_request(
+                task=task,
+                task_type=task_type,
+                current_mode=current_mode,
+            )
+
+            # Apply recommended tool budget if available (skip if user made a sticky override)
+            # NOTE: We no longer reduce the budget based on pipeline recommendations.
+            # The pipeline may suggest a smaller budget based on Q-learning, but this
+            # caused premature stopping (e.g., 50 -> 5). The user's budget is authoritative.
+            # We only log the recommendation for debugging purposes.
+            if context.recommended_tool_budget:
+                sticky_budget = getattr(unified_tracker, "_sticky_user_budget", False)
+                if not sticky_budget:
+                    current_budget = unified_tracker.progress.tool_budget
+                    # Only log significant differences, but don't reduce the budget
+                    if abs(context.recommended_tool_budget - current_budget) > 10:
+                        logger.debug(
+                            f"IntelligentPipeline recommended budget {context.recommended_tool_budget} "
+                            f"differs from current {current_budget}, keeping current budget"
+                        )
+
+            return {
+                "recommended_mode": context.recommended_mode,
+                "recommended_tool_budget": context.recommended_tool_budget,
+                "should_continue": context.should_continue,
+                "system_prompt_addition": context.system_prompt if context.system_prompt else None,
+            }
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"IntelligentPipeline prepare_request failed (data error): {e}")
+            return None
+
+    async def validate_intelligent_response(
+        self,
+        response: str,
+        query: str,
+        tool_calls: int,
+        task_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Post-response hook for intelligent pipeline integration.
+
+        Called after each streaming iteration to:
+        - Score response quality (coherence, completeness, relevance)
+        - Verify grounding (detect hallucinations)
+        - Record feedback for Q-learning
+
+        Args:
+            response: The model's response content
+            query: Original user query
+            tool_calls: Number of tool calls made so far
+            task_type: Task type for context
+
+        Returns:
+            Dictionary with quality/grounding scores, or None if pipeline disabled
+        """
+        # Skip validation for empty or very short responses
+        if not response or len(response.strip()) < 50:
+            return None
+
+        try:
+            result = await self.validate_response(
+                response=response,
+                query=query,
+                tool_calls=tool_calls,
+                success=True,
+                task_type=task_type,
+            )
+
+            # Log quality warnings if below threshold
+            if not result.is_valid:
+                logger.warning(
+                    f"IntelligentPipeline: Response below quality threshold "
+                    f"(quality={result.quality_score:.2f}, grounded={result.is_grounded})"
+                )
+
+            return {
+                "quality_score": result.quality_score,
+                "grounding_score": result.grounding_score,
+                "is_grounded": result.is_grounded,
+                "is_valid": result.is_valid,
+                "grounding_issues": result.grounding_issues,
+                # Grounding failure handling - force finalize after max retries
+                "should_finalize": getattr(result, "should_finalize", False),
+                "should_retry": getattr(result, "should_retry", False),
+                "finalize_reason": getattr(result, "finalize_reason", ""),
+                # Actionable feedback for grounding correction on retry
+                "grounding_feedback": getattr(result, "grounding_feedback", ""),
+            }
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"IntelligentPipeline validate_response skipped (not configured): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"IntelligentPipeline validate_response failed (data error): {e}")
+            return None
+
+    def record_intelligent_outcome(
+        self,
+        success: bool,
+        quality_score: float,
+        user_satisfied: bool,
+        completed: bool,
+        rl_coordinator: Any,
+        stream_context: Any,
+        vertical_context: Any,
+        provider_name: str,
+        model: str,
+        tool_calls_used: int,
+        continuation_prompts: int,
+        max_continuation_prompts_used: int,
+        stuck_loop_detected: bool,
+    ) -> None:
+        """Record outcome for Q-learning feedback.
+
+        Called at the end of a conversation to record the outcome
+        for reinforcement learning. This helps the system learn
+        optimal mode transitions and tool budgets.
+
+        Also records continuation prompt learning outcomes if RL learner enabled.
+
+        Args:
+            success: Whether the task was completed successfully
+            quality_score: Final quality score (0.0-1.0)
+            user_satisfied: Whether user seemed satisfied
+            completed: Whether task reached completion
+            rl_coordinator: The RL coordinator for recording outcomes
+            stream_context: Current stream context
+            vertical_context: Vertical context for vertical name
+            provider_name: Name of the provider
+            model: Model name
+            tool_calls_used: Total tool calls used
+            continuation_prompts: Number of continuation prompts used
+            max_continuation_prompts_used: Max continuation prompts configured
+            stuck_loop_detected: Whether a stuck loop was detected
+        """
+        # Record RL outcomes for all learners
+        if rl_coordinator and stream_context:
+            try:
+                from victor.agent.rl.base import RLOutcome
+
+                ctx = stream_context
+                # Determine task type from context
+                task_type = "default"
+                if ctx.is_analysis_task:
+                    task_type = "analysis"
+                elif ctx.is_action_task:
+                    task_type = "action"
+
+                # Get vertical name from context (avoid hardcoded "coding")
+                vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
+
+                # Record outcome for continuation_prompts learner
+                outcome = RLOutcome(
+                    provider=provider_name,
+                    model=model,
+                    task_type=task_type,
+                    success=success and completed,
+                    quality_score=quality_score,
+                    metadata={
+                        "continuation_prompts_used": continuation_prompts,
+                        "max_prompts_configured": max_continuation_prompts_used,
+                        "stuck_loop_detected": stuck_loop_detected,
+                        "forced_completion": ctx.force_completion,
+                        "tool_calls_total": tool_calls_used,
+                    },
+                    vertical=vertical_name,
+                )
+                rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
+
+                # Emit RL hook for continuation prompt
+                self.emit_continuation_event(
+                    event_type="prompt",
+                    success=success and completed,
+                    quality_score=quality_score,
+                    task_type=task_type,
+                    prompts_used=continuation_prompts,
+                    provider_name=provider_name,
+                    model=model,
+                )
+
+                # Also record for continuation_patience learner if we have stuck loop data
+                if continuation_prompts > 0:
+                    patience_outcome = RLOutcome(
+                        provider=provider_name,
+                        model=model,
+                        task_type=task_type,
+                        success=success and completed,
+                        quality_score=quality_score,
+                        metadata={
+                            "flagged_as_stuck": stuck_loop_detected,
+                            "actually_stuck": stuck_loop_detected and not success,
+                            "eventually_made_progress": not stuck_loop_detected and success,
+                        },
+                        vertical=vertical_name,
+                    )
+                    rl_coordinator.record_outcome(
+                        "continuation_patience", patience_outcome, vertical_name
+                    )
+
+                    # Emit RL hook for continuation patience
+                    self.emit_continuation_event(
+                        event_type="patience",
+                        success=success and completed,
+                        quality_score=quality_score,
+                        task_type=task_type,
+                        prompts_used=continuation_prompts,
+                        stuck_detected=stuck_loop_detected,
+                        provider_name=provider_name,
+                        model=model,
+                    )
+
+            except Exception as e:
+                logger.warning(f"RL: Failed to record RL outcomes: {e}")
+
+        try:
+            # Access the mode controller through the pipeline
+            pipeline = self._pipeline
+            if hasattr(pipeline, "_mode_controller") and pipeline._mode_controller:
+                pipeline._mode_controller.record_outcome(
+                    success=success,
+                    quality_score=quality_score,
+                    user_satisfied=user_satisfied,
+                    completed=completed,
+                )
+                logger.debug(
+                    f"IntelligentPipeline recorded outcome: "
+                    f"success={success}, quality={quality_score:.2f}"
+                )
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
+
+    def should_continue_intelligent(self) -> tuple[bool, str]:
+        """Check if processing should continue using learned behaviors.
+
+        Uses Q-learning based decisions to determine if the agent
+        should continue processing or transition to completion.
+
+        Returns:
+            Tuple of (should_continue, reason)
+        """
+        try:
+            return self.should_continue()
+        except Exception as e:
+            logger.debug(f"IntelligentPipeline should_continue failed: {e}")
+            return True, "Fallback to continue"
+
+    def emit_continuation_event(
+        self,
+        event_type: str,
+        success: bool,
+        quality_score: float,
+        task_type: str,
+        prompts_used: int,
+        provider_name: str,
+        model: str,
+        stuck_detected: bool = False,
+    ) -> None:
+        """Emit RL event for continuation attempt.
+
+        Args:
+            event_type: Either "prompt" or "patience"
+            success: Whether the continuation was successful
+            quality_score: Quality score of the result
+            task_type: Type of task
+            prompts_used: Number of continuation prompts used
+            provider_name: Provider name for the event
+            model: Model name for the event
+            stuck_detected: Whether a stuck loop was detected
+        """
+        try:
+            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+
+            hooks = get_rl_hooks()
+            if hooks is None:
+                return
+
+            if event_type == "prompt":
+                event = RLEvent(
+                    type=RLEventType.CONTINUATION_PROMPT,
+                    success=success,
+                    quality_score=quality_score,
+                    provider=provider_name,
+                    model=model,
+                    task_type=task_type,
+                    metadata={
+                        "prompts_used": prompts_used,
+                    },
+                )
+            else:  # patience
+                event = RLEvent(
+                    type=RLEventType.CONTINUATION_ATTEMPT,
+                    success=success,
+                    quality_score=quality_score,
+                    provider=provider_name,
+                    model=model,
+                    task_type=task_type,
+                    metadata={
+                        "prompts_used": prompts_used,
+                        "stuck_detected": stuck_detected,
+                    },
+                )
+
+            hooks.emit(event)
+
+        except Exception as e:
+            logger.debug(f"Continuation event emission failed: {e}")
+
 
 # Convenience function for quick integration
 async def enhance_orchestrator(

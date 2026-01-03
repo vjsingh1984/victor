@@ -39,9 +39,10 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Type, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
 
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
 from victor.core.vertical_types import StageDefinition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -177,6 +180,12 @@ class VerticalBase(ABC):
         The get_config() method caches its result per-class to avoid
         repeated computation. Call clear_config_cache() to invalidate
         when config sources change (typically only needed in tests).
+
+    Extension Loading:
+        The get_extensions() method now supports strict error handling.
+        Set strict_extension_loading=True to raise ExtensionLoadError on
+        any failure. Set required_extensions to specify which extensions
+        must load successfully even in non-strict mode.
     """
 
     # Subclasses must define these
@@ -184,9 +193,57 @@ class VerticalBase(ABC):
     description: str = ""
     version: str = "1.0.0"
 
+    # Extension loading configuration
+    # When True, any extension loading failure raises ExtensionLoadError
+    strict_extension_loading: ClassVar[bool] = False
+
+    # Extensions that must load successfully even when strict_extension_loading=False
+    # Valid values: "middleware", "safety", "prompt", "mode_config", "tool_deps",
+    #               "workflow", "service", "rl_config", "team_spec", "enrichment",
+    #               "tiered_tools"
+    required_extensions: ClassVar[Set[str]] = set()
+
     # Config cache (keyed by class name, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _extensions_cache: Dict[str, Any] = {}
+
+    # =========================================================================
+    # Extension Caching Infrastructure
+    # =========================================================================
+
+    @classmethod
+    def _get_cached_extension(cls, key: str, factory: callable) -> Any:
+        """Get extension from cache or create and cache it.
+
+        This helper enables fine-grained caching of individual extension
+        instances, avoiding repeated object creation when extensions are
+        accessed multiple times.
+
+        The cache uses a composite key of (class_name, extension_key) to
+        ensure proper isolation between different vertical subclasses.
+
+        Args:
+            key: Unique key for this extension type (e.g., "middleware",
+                 "safety_extension", "workflow_provider")
+            factory: Zero-argument callable that creates the extension instance.
+                     Only called if the extension is not already cached.
+
+        Returns:
+            Cached or newly created extension instance.
+
+        Example:
+            @classmethod
+            def get_middleware(cls) -> List[MiddlewareProtocol]:
+                def _create():
+                    from myvertical.middleware import MyMiddleware
+                    return [MyMiddleware()]
+                return cls._get_cached_extension("middleware", _create)
+        """
+        # Use composite key to avoid collisions between different vertical classes
+        cache_key = f"{cls.__name__}:{key}"
+        if cache_key not in cls._extensions_cache:
+            cls._extensions_cache[cache_key] = factory()
+        return cls._extensions_cache[cache_key]
 
     @classmethod
     @abstractmethod
@@ -212,53 +269,157 @@ class VerticalBase(ABC):
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get stage definitions for this vertical.
 
-        Default implementation returns standard coding stages.
-        Override for domain-specific stages.
+        Default implementation provides a comprehensive 7-stage workflow
+        representing a generic problem-solving lifecycle:
+
+        1. INITIAL: Understand the request and gather initial context
+        2. PLANNING: Design the approach and strategy
+        3. READING: Gather detailed information and context
+        4. ANALYSIS: Analyze information and identify solutions
+        5. EXECUTION: Implement the planned changes
+        6. VERIFICATION: Validate results and test outcomes
+        7. COMPLETION: Finalize, document, and wrap up
+
+        This workflow applies to most domains:
+        - Coding: understand → plan → read code → analyze → implement → test → commit
+        - DevOps: assess → plan → implement → validate → deploy → monitor
+        - Research: question → search → read → synthesize → write → verify
+        - Data Analysis: understand → explore → analyze → visualize → report
+
+        Verticals should override this method to provide domain-specific:
+        - Stage names (e.g., DEPLOYMENT, SYNTHESIZING)
+        - Tools appropriate for each stage
+        - Domain-specific keywords
 
         Returns:
-            Dictionary mapping stage names to definitions.
+            Dictionary mapping stage names to StageDefinition objects.
+            Each stage includes description, keywords, and valid transitions.
         """
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
-                description="Understanding the request",
-                keywords=["what", "how", "explain", "help"],
+                description="Understanding the request and gathering initial context",
+                keywords=[
+                    "what",
+                    "how",
+                    "explain",
+                    "help",
+                    "where",
+                    "show me",
+                    "describe",
+                    "overview",
+                    "understand",
+                    "clarify",
+                ],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
-                description="Planning the approach",
-                keywords=["plan", "approach", "strategy"],
+                description="Designing the approach and creating a strategy",
+                keywords=[
+                    "plan",
+                    "approach",
+                    "strategy",
+                    "design",
+                    "architecture",
+                    "outline",
+                    "steps",
+                    "roadmap",
+                    "how should",
+                    "what's the best way",
+                ],
                 next_stages={"READING", "EXECUTION"},
             ),
             "READING": StageDefinition(
                 name="READING",
-                description="Gathering information",
-                keywords=["read", "show", "find", "search"],
+                description="Gathering detailed information and context",
+                keywords=[
+                    "read",
+                    "show",
+                    "find",
+                    "search",
+                    "look",
+                    "check",
+                    "examine",
+                    "inspect",
+                    "review",
+                    "fetch",
+                    "get",
+                    "retrieve",
+                ],
                 next_stages={"ANALYSIS", "EXECUTION"},
             ),
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
-                description="Analyzing information",
-                keywords=["analyze", "review", "understand"],
+                description="Analyzing information and identifying solutions",
+                keywords=[
+                    "analyze",
+                    "review",
+                    "understand",
+                    "why",
+                    "how does",
+                    "compare",
+                    "evaluate",
+                    "assess",
+                    "investigate",
+                    "diagnose",
+                ],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
             "EXECUTION": StageDefinition(
                 name="EXECUTION",
-                description="Taking action",
-                keywords=["change", "modify", "create", "implement"],
+                description="Implementing the planned changes or actions",
+                keywords=[
+                    "change",
+                    "modify",
+                    "create",
+                    "add",
+                    "remove",
+                    "fix",
+                    "implement",
+                    "write",
+                    "update",
+                    "refactor",
+                    "build",
+                    "configure",
+                    "set up",
+                    "install",
+                    "run",
+                    "execute",
+                ],
                 next_stages={"VERIFICATION", "COMPLETION"},
             ),
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
-                description="Verifying results",
-                keywords=["test", "verify", "check", "validate"],
+                description="Validating results and testing outcomes",
+                keywords=[
+                    "test",
+                    "verify",
+                    "check",
+                    "validate",
+                    "confirm",
+                    "ensure",
+                    "run tests",
+                    "build",
+                    "compile",
+                    "lint",
+                ],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
-                description="Wrapping up",
-                keywords=["done", "finished", "complete"],
+                description="Finalizing, documenting, and wrapping up",
+                keywords=[
+                    "done",
+                    "finish",
+                    "complete",
+                    "commit",
+                    "summarize",
+                    "document",
+                    "conclude",
+                    "wrap up",
+                    "finalize",
+                ],
                 next_stages=set(),
             ),
         }
@@ -589,24 +750,43 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
-    def get_extensions(cls, *, use_cache: bool = True) -> "VerticalExtensions":
-        """Get all extensions for this vertical.
+    def get_extensions(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Get all extensions for this vertical with strict error handling.
 
         Aggregates all extension implementations for framework integration.
         Override for custom extension aggregation.
 
         LSP Compliance: This method ALWAYS returns a valid VerticalExtensions
-        object, never None. Even on exceptions, it returns an empty
-        VerticalExtensions with default values.
+        object, never None. Even on exceptions (in non-strict mode), it returns
+        a VerticalExtensions with successfully loaded extensions.
+
+        Error Handling Modes:
+        - strict=True: Raises ExtensionLoadError on ANY extension failure
+        - strict=False: Collects errors, logs warnings, returns partial extensions
+        - strict=None: Uses class-level strict_extension_loading setting
+
+        Required Extensions:
+        Even when strict=False, extensions listed in required_extensions will
+        raise ExtensionLoadError if they fail to load.
 
         Args:
             use_cache: If True (default), return cached extensions if available.
                        Set to False to force rebuild.
+            strict: Override the class-level strict_extension_loading setting.
+                    If None (default), uses cls.strict_extension_loading.
 
         Returns:
             VerticalExtensions containing all vertical extensions (never None)
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
         """
-        # Import at top of method to ensure it's available for fallback
+        from victor.core.errors import ExtensionLoadError
         from victor.core.verticals.protocols import VerticalExtensions
 
         cache_key = cls.__name__
@@ -615,30 +795,101 @@ class VerticalBase(ABC):
         if use_cache and cache_key in cls._extensions_cache:
             return cls._extensions_cache[cache_key]
 
-        try:
-            safety = cls.get_safety_extension()
-            prompt = cls.get_prompt_contributor()
+        # Determine strict mode
+        is_strict = strict if strict is not None else cls.strict_extension_loading
 
-            extensions = VerticalExtensions(
-                middleware=cls.get_middleware(),
-                safety_extensions=[safety] if safety else [],
-                prompt_contributors=[prompt] if prompt else [],
-                mode_config_provider=cls.get_mode_config_provider(),
-                tool_dependency_provider=cls.get_tool_dependency_provider(),
-                workflow_provider=cls.get_workflow_provider(),
-                service_provider=cls.get_service_provider(),
-                rl_config_provider=cls.get_rl_config_provider(),
-                team_spec_provider=cls.get_team_spec_provider(),
-                enrichment_strategy=cls.get_enrichment_strategy(),
+        # Collect errors for reporting
+        errors: List["ExtensionLoadError"] = []
+
+        def _load_extension(
+            extension_type: str,
+            loader: callable,
+            is_list: bool = False,
+        ) -> Any:
+            """Load an extension with error handling.
+
+            Args:
+                extension_type: Type name for error reporting
+                loader: Callable that loads the extension
+                is_list: If True, the extension should be a list
+
+            Returns:
+                The loaded extension, or default value on error
+            """
+            try:
+                result = loader()
+                return result
+            except Exception as e:
+                is_required = extension_type in cls.required_extensions
+                error = ExtensionLoadError(
+                    message=f"Failed to load '{extension_type}' extension for vertical '{cls.name}': {e}",
+                    extension_type=extension_type,
+                    vertical_name=cls.name,
+                    original_error=e,
+                    is_required=is_required,
+                )
+                errors.append(error)
+
+                # Log the error with appropriate severity
+                if is_strict or is_required:
+                    logger.error(
+                        f"[{error.correlation_id}] {extension_type} extension failed to load "
+                        f"for vertical '{cls.name}': {e}",
+                        exc_info=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[{error.correlation_id}] {extension_type} extension failed to load "
+                        f"for vertical '{cls.name}': {e}"
+                    )
+
+                # Return default value
+                return [] if is_list else None
+
+        # Load each extension with error handling
+        middleware = _load_extension("middleware", cls.get_middleware, is_list=True)
+        safety = _load_extension("safety", cls.get_safety_extension)
+        prompt = _load_extension("prompt", cls.get_prompt_contributor)
+        mode_config = _load_extension("mode_config", cls.get_mode_config_provider)
+        tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
+        workflow = _load_extension("workflow", cls.get_workflow_provider)
+        service = _load_extension("service", cls.get_service_provider)
+        rl_config = _load_extension("rl_config", cls.get_rl_config_provider)
+        team_spec = _load_extension("team_spec", cls.get_team_spec_provider)
+        enrichment = _load_extension("enrichment", cls.get_enrichment_strategy)
+        tiered_tools = _load_extension("tiered_tools", cls.get_tiered_tool_config)
+
+        # Check for critical failures (strict mode or required extensions)
+        critical_errors = [e for e in errors if is_strict or e.is_required]
+        if critical_errors:
+            # Raise the first critical error
+            raise critical_errors[0]
+
+        # Log summary if there were non-critical errors
+        if errors:
+            logger.warning(
+                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
+                f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
             )
 
-            # Cache the extensions
-            cls._extensions_cache[cache_key] = extensions
-            return extensions
-        except Exception:
-            # LSP compliance: return empty VerticalExtensions instead of None
-            # This handles any errors in extension getter methods
-            return VerticalExtensions()
+        # Build extensions object
+        extensions = VerticalExtensions(
+            middleware=middleware if middleware else [],
+            safety_extensions=[safety] if safety else [],
+            prompt_contributors=[prompt] if prompt else [],
+            mode_config_provider=mode_config,
+            tool_dependency_provider=tool_deps,
+            workflow_provider=workflow,
+            service_provider=service,
+            rl_config_provider=rl_config,
+            team_spec_provider=team_spec,
+            enrichment_strategy=enrichment,
+            tiered_tool_config=tiered_tools,
+        )
+
+        # Cache the extensions
+        cls._extensions_cache[cache_key] = extensions
+        return extensions
 
     # =========================================================================
     # Template Method Implementation
@@ -693,6 +944,9 @@ class VerticalBase(ABC):
     def clear_config_cache(cls, *, clear_all: bool = False) -> None:
         """Clear the config cache for this vertical.
 
+        Also clears individual extension cache entries created by
+        _get_cached_extension() for this class.
+
         Args:
             clear_all: If True, clear cache for all verticals.
                        If False (default), clear only for this class.
@@ -703,7 +957,13 @@ class VerticalBase(ABC):
         else:
             cache_key = cls.__name__
             cls._config_cache.pop(cache_key, None)
+            # Clear composite extensions cache entry
             cls._extensions_cache.pop(cache_key, None)
+            # Also clear individual extension cache entries (format: "ClassName:key")
+            prefix = f"{cache_key}:"
+            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
+            for key in keys_to_remove:
+                cls._extensions_cache.pop(key, None)
 
     @classmethod
     def get_tool_set(cls) -> ToolSet:
@@ -751,6 +1011,10 @@ class VerticalRegistry:
 
     Implements the Registry pattern for vertical discovery.
 
+    Supports both built-in verticals and external verticals installed as
+    pip packages via entry_points. External packages can register verticals
+    using the 'victor.verticals' entry point group.
+
     Example:
         # Register a vertical
         VerticalRegistry.register(MyVertical)
@@ -761,9 +1025,16 @@ class VerticalRegistry:
 
         # Get a specific vertical
         coding = VerticalRegistry.get("coding")
+
+    Entry Point Format (for external packages):
+        # In external package's pyproject.toml
+        [project.entry-points."victor.verticals"]
+        security = "victor_security:SecurityAssistant"
     """
 
     _registry: Dict[str, Type[VerticalBase]] = {}
+    _external_discovered: bool = False
+    ENTRY_POINT_GROUP: str = "victor.verticals"
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -823,3 +1094,172 @@ class VerticalRegistry:
     def clear(cls) -> None:
         """Clear all registered verticals (for testing)."""
         cls._registry.clear()
+        cls._external_discovered = False
+
+    @classmethod
+    def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:
+        """Discover and register external verticals from entry points.
+
+        Scans installed packages for the 'victor.verticals' entry point group
+        and registers any valid vertical classes found. External verticals must:
+        - Inherit from VerticalBase
+        - Have a non-empty 'name' attribute
+
+        Returns:
+            Dictionary of newly discovered vertical names to their classes.
+
+        Example entry point in external package's pyproject.toml:
+            [project.entry-points."victor.verticals"]
+            security = "victor_security:SecurityAssistant"
+
+        This would load SecurityAssistant from the victor_security package
+        and register it if it's a valid VerticalBase subclass.
+        """
+        import logging
+        from importlib.metadata import entry_points
+
+        logger = logging.getLogger(__name__)
+        discovered: Dict[str, Type[VerticalBase]] = {}
+
+        # Avoid re-discovery on repeated calls
+        if cls._external_discovered:
+            return discovered
+
+        try:
+            # Python 3.10+ API: entry_points() returns a SelectableGroups object
+            # Use group parameter for filtering
+            eps = entry_points(group=cls.ENTRY_POINT_GROUP)
+        except TypeError:
+            # Fallback for older Python versions (shouldn't happen with Python 3.10+)
+            all_eps = entry_points()
+            eps = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+
+        for ep in eps:
+            try:
+                # Load the entry point (imports the module and gets the object)
+                vertical_class = ep.load()
+
+                # Validate that it's a proper VerticalBase subclass
+                if not cls._validate_external_vertical(vertical_class, ep.name):
+                    continue
+
+                # Check for name conflicts with existing verticals
+                if vertical_class.name in cls._registry:
+                    existing = cls._registry[vertical_class.name]
+                    logger.warning(
+                        f"External vertical '{ep.name}' has name '{vertical_class.name}' "
+                        f"which conflicts with existing vertical {existing.__name__}. "
+                        f"Skipping registration."
+                    )
+                    continue
+
+                # Register the vertical
+                cls.register(vertical_class)
+                discovered[vertical_class.name] = vertical_class
+                logger.info(
+                    f"Discovered external vertical: {vertical_class.name} " f"(from {ep.value})"
+                )
+
+            except Exception as e:
+                # Log the error but continue with other entry points
+                logger.warning(
+                    f"Failed to load external vertical '{ep.name}' from "
+                    f"entry point '{ep.value}': {e}"
+                )
+                continue
+
+        cls._external_discovered = True
+
+        if discovered:
+            logger.info(
+                f"Discovered {len(discovered)} external vertical(s): "
+                f"{', '.join(discovered.keys())}"
+            )
+
+        return discovered
+
+    @classmethod
+    def _validate_external_vertical(
+        cls,
+        vertical_class: Any,
+        entry_point_name: str,
+    ) -> bool:
+        """Validate that an external vertical class is properly implemented.
+
+        Args:
+            vertical_class: The class loaded from the entry point.
+            entry_point_name: Name of the entry point (for error messages).
+
+        Returns:
+            True if the vertical is valid, False otherwise.
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Check if it's a class
+        if not isinstance(vertical_class, type):
+            logger.warning(
+                f"External vertical '{entry_point_name}' is not a class "
+                f"(got {type(vertical_class).__name__}). Skipping."
+            )
+            return False
+
+        # Check if it inherits from VerticalBase
+        if not issubclass(vertical_class, VerticalBase):
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"does not inherit from VerticalBase. Skipping."
+            )
+            return False
+
+        # Check if it has a name defined
+        if not getattr(vertical_class, "name", None):
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has no 'name' attribute defined. Skipping."
+            )
+            return False
+
+        # Check if abstract methods are implemented
+        # VerticalBase requires get_tools() and get_system_prompt()
+        try:
+            # Try to call the abstract methods to ensure they're implemented
+            # These are classmethods so we can call them on the class
+            tools = vertical_class.get_tools()
+            if not isinstance(tools, list):
+                logger.warning(
+                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                    f"get_tools() must return a list. Skipping."
+                )
+                return False
+
+            prompt = vertical_class.get_system_prompt()
+            if not isinstance(prompt, str):
+                logger.warning(
+                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                    f"get_system_prompt() must return a string. Skipping."
+                )
+                return False
+        except NotImplementedError:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has unimplemented abstract methods. Skipping."
+            )
+            return False
+        except Exception as e:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"failed validation: {e}. Skipping."
+            )
+            return False
+
+        return True
+
+    @classmethod
+    def reset_discovery(cls) -> None:
+        """Reset the external discovery flag (for testing).
+
+        This allows discover_external_verticals() to run again.
+        """
+        cls._external_discovered = False

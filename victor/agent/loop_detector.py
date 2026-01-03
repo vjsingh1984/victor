@@ -968,7 +968,7 @@ def create_tracker_from_classification(
         # Use detector in orchestrator loop
         # Inject hint into system prompt
     """
-    from victor.agent.complexity_classifier import TaskComplexity
+    from victor.agent.complexity_classifier import TaskComplexity, get_prompt_hint
 
     # Map TaskComplexity to TaskType
     complexity_to_task_type = {
@@ -984,20 +984,20 @@ def create_tracker_from_classification(
     config = base_config or ProgressConfig()
     config.tool_budget = classification.tool_budget
 
-    # Adjust max iterations based on complexity
-    if classification.complexity == TaskComplexity.SIMPLE:
-        config.max_total_iterations = 3
-    elif classification.complexity == TaskComplexity.GENERATION:
-        config.max_total_iterations = 2
+    # Adjust max iterations based on budget (budget + 1 to allow final response)
+    config.max_total_iterations = classification.tool_budget + 1
 
     tracker = LoopDetector(config=config, task_type=task_type)
+
+    # Get prompt hint via enricher (SRP: hints separated from classification)
+    prompt_hint = get_prompt_hint(classification.complexity)
 
     logger.debug(
         f"Created detector for {classification.complexity.value} task: "
         f"budget={classification.tool_budget}, type={task_type.value}"
     )
 
-    return tracker, classification.prompt_hint
+    return tracker, prompt_hint
 
 
 def classify_and_create_tracker(

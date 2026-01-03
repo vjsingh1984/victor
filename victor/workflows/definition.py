@@ -17,7 +17,18 @@
 Provides a LangGraph-like fluent API for defining multi-agent workflows
 as directed acyclic graphs (DAGs).
 
-Example:
+Architecture Overview:
+    See docs/archive/internal/workflow-architecture.md for diagrams and details.
+
+    Two primary execution node types:
+    - AgentNode: LLM-powered execution for complex reasoning tasks
+    - ComputeNode: Direct tool execution for deterministic pipelines
+
+    Key difference:
+    - AgentNode = Brain + Hands (LLM decides, then executes)
+    - ComputeNode = Just Hands (predefined tool sequence)
+
+Example (Python builder):
     @workflow("code_review", "Comprehensive code review")
     def code_review_workflow():
         return (
@@ -29,6 +40,21 @@ Example:
             .add_agent("report", "planner", "Summarize findings")
             .build()
         )
+
+Example (YAML):
+    nodes:
+      - id: fetch_data
+        type: compute
+        tools: [sec_filing, market_data]
+        constraints:
+          llm_allowed: false
+          max_cost_tier: FREE
+
+      - id: analyze
+        type: agent
+        role: researcher
+        goal: "Analyze the data and provide insights"
+        tool_budget: 20
 """
 
 from __future__ import annotations
@@ -50,6 +76,7 @@ class NodeType(Enum):
     """Type of workflow node."""
 
     AGENT = "agent"  # Spawns an agent to execute
+    COMPUTE = "compute"  # Direct tool execution without LLM (extensible)
     CONDITION = "condition"  # Branch based on condition
     PARALLEL = "parallel"  # Execute multiple nodes in parallel
     TRANSFORM = "transform"  # Transform context data
@@ -99,6 +126,7 @@ class AgentNode(WorkflowNode):
         allowed_tools: Specific tools to allow (None = role defaults)
         input_mapping: Map context keys to agent inputs
         output_key: Key to store agent output in context
+        llm_config: Optional LLM configuration (temperature, model_hint, etc.)
     """
 
     role: str = "executor"
@@ -107,6 +135,7 @@ class AgentNode(WorkflowNode):
     allowed_tools: Optional[List[str]] = None
     input_mapping: Dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
+    llm_config: Optional[Dict[str, Any]] = None
 
     @property
     def node_type(self) -> NodeType:
@@ -122,6 +151,7 @@ class AgentNode(WorkflowNode):
                 "allowed_tools": self.allowed_tools,
                 "input_mapping": self.input_mapping,
                 "output_key": self.output_key,
+                "llm_config": self.llm_config,
             }
         )
         return d
@@ -199,6 +229,244 @@ class TransformNode(WorkflowNode):
     @property
     def node_type(self) -> NodeType:
         return NodeType.TRANSFORM
+
+
+class ConstraintsProtocol(ABC):
+    """Protocol for task execution constraints.
+
+    Extend this protocol to create domain-specific constraints.
+    The framework provides TaskConstraints as a standard implementation.
+
+    Example custom constraints:
+        @dataclass
+        class InvestmentConstraints(ConstraintsProtocol):
+            max_api_calls_per_minute: int = 10
+            require_sec_compliance: bool = True
+
+            def allows_tool(self, tool_name: str, tool_cost_tier: str = "FREE") -> bool:
+                # Custom validation logic
+                ...
+    """
+
+    @abstractmethod
+    def allows_tool(self, tool_name: str, tool_cost_tier: str = "FREE") -> bool:
+        """Check if a tool is allowed under these constraints."""
+        pass
+
+    @abstractmethod
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize constraints to dictionary."""
+        pass
+
+    @property
+    @abstractmethod
+    def timeout(self) -> float:
+        """Maximum execution time in seconds."""
+        pass
+
+    @property
+    @abstractmethod
+    def max_tool_calls(self) -> int:
+        """Maximum number of tool invocations."""
+        pass
+
+
+@dataclass
+class TaskConstraints(ConstraintsProtocol):
+    """Standard execution constraints for compute nodes.
+
+    Defines what resources and capabilities a task can use.
+    This enables airgapped execution, cost control, and security.
+
+    Extend this class or implement ConstraintsProtocol for domain-specific needs.
+
+    Attributes:
+        llm_allowed: Whether LLM inference is permitted (default: False)
+        network_allowed: Whether network calls are permitted (default: True)
+        write_allowed: Whether disk writes are permitted (default: False)
+        max_cost_tier: Maximum tool cost tier allowed (default: "FREE")
+        max_tool_calls: Maximum number of tool invocations (default: 100)
+        timeout: Maximum execution time in seconds (default: 300)
+        allowed_tools: Explicit list of allowed tools (None = all)
+        blocked_tools: Explicit list of blocked tools (None = none)
+
+    Example YAML:
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          max_cost_tier: LOW
+          timeout: 60
+
+    Example extension:
+        @dataclass
+        class StrictConstraints(TaskConstraints):
+            require_approval: bool = True
+    """
+
+    llm_allowed: bool = False
+    network_allowed: bool = True
+    write_allowed: bool = False
+    max_cost_tier: str = "FREE"  # FREE, LOW, MEDIUM, HIGH
+    _max_tool_calls: int = 100
+    _timeout: float = 300.0
+    allowed_tools: Optional[List[str]] = None
+    blocked_tools: Optional[List[str]] = None
+
+    @property
+    def timeout(self) -> float:
+        return self._timeout
+
+    @property
+    def max_tool_calls(self) -> int:
+        return self._max_tool_calls
+
+    def allows_tool(self, tool_name: str, tool_cost_tier: str = "FREE") -> bool:
+        """Check if a tool is allowed under these constraints."""
+        # Check explicit blocklist
+        if self.blocked_tools and tool_name in self.blocked_tools:
+            return False
+
+        # Check explicit allowlist
+        if self.allowed_tools is not None and tool_name not in self.allowed_tools:
+            return False
+
+        # Check cost tier
+        tier_order = {"FREE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3}
+        max_tier = tier_order.get(self.max_cost_tier.upper(), 0)
+        tool_tier = tier_order.get(tool_cost_tier.upper(), 0)
+        if tool_tier > max_tier:
+            return False
+
+        return True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "llm_allowed": self.llm_allowed,
+            "network_allowed": self.network_allowed,
+            "write_allowed": self.write_allowed,
+            "max_cost_tier": self.max_cost_tier,
+            "max_tool_calls": self._max_tool_calls,
+            "timeout": self._timeout,
+            "allowed_tools": self.allowed_tools,
+            "blocked_tools": self.blocked_tools,
+        }
+
+
+# Standard constraint presets
+class AirgappedConstraints(TaskConstraints):
+    """Constraints for airgapped/offline execution."""
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            llm_allowed=False,
+            network_allowed=False,
+            write_allowed=False,
+            max_cost_tier="FREE",
+            **kwargs,
+        )
+
+
+class ComputeOnlyConstraints(TaskConstraints):
+    """Constraints for pure computation (no LLM, no writes)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            llm_allowed=False,
+            network_allowed=True,
+            write_allowed=False,
+            max_cost_tier="LOW",
+            **kwargs,
+        )
+
+
+class FullAccessConstraints(TaskConstraints):
+    """Constraints with full access (use carefully)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            llm_allowed=True,
+            network_allowed=True,
+            write_allowed=True,
+            max_cost_tier="HIGH",
+            **kwargs,
+        )
+
+
+@dataclass
+class ComputeNode(WorkflowNode):
+    """Node that executes tools with configurable constraints.
+
+    This node type enables LLM-free execution and fine-grained control
+    over what resources a task can access. Ideal for:
+    - Pure computation workflows (valuation, data processing)
+    - Airgapped or security-sensitive environments
+    - Cost-controlled execution
+
+    Attributes:
+        tools: List of tool names to execute in sequence
+        input_mapping: Map context keys to tool parameters
+        output_key: Key to store combined tool outputs in context
+        constraints: Execution constraints (LLM, network, cost tier, etc.)
+        handler: Optional custom handler name for domain-specific logic
+        fail_fast: Stop on first tool failure (default: True)
+        parallel: Execute tools in parallel (default: False)
+
+    Example YAML:
+        - id: run_valuation
+          type: compute
+          tools: [multi_model_valuation, sector_valuation]
+          inputs:
+            symbol: $ctx.symbol
+            financials: $ctx.sec_data
+          output: fair_values
+          constraints:
+            llm_allowed: false
+            max_cost_tier: FREE
+            timeout: 60
+          next: [blend]
+
+        # With custom handler for domain-specific logic
+        - id: rl_weights
+          type: compute
+          handler: rl_decision  # Domain-specific handler
+          inputs:
+            features: $ctx.valuation_features
+          output: model_weights
+          constraints:
+            llm_allowed: false
+    """
+
+    tools: List[str] = field(default_factory=list)
+    input_mapping: Dict[str, str] = field(default_factory=dict)
+    output_key: Optional[str] = None
+    constraints: TaskConstraints = field(default_factory=TaskConstraints)
+    handler: Optional[str] = None  # Custom handler name for extensibility
+    fail_fast: bool = True
+    parallel: bool = False
+
+    @property
+    def node_type(self) -> NodeType:
+        return NodeType.COMPUTE
+
+    @property
+    def timeout(self) -> float:
+        """Convenience property for timeout from constraints."""
+        return self.constraints.timeout
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update(
+            {
+                "tools": self.tools,
+                "input_mapping": self.input_mapping,
+                "output_key": self.output_key,
+                "constraints": self.constraints.to_dict(),
+                "handler": self.handler,
+                "fail_fast": self.fail_fast,
+                "parallel": self.parallel,
+            }
+        )
+        return d
 
 
 @dataclass
@@ -481,6 +749,91 @@ class WorkflowBuilder:
             id=node_id,
             name=name or node_id,
             transform=transform,
+            next_nodes=next_nodes or [],
+        )
+        return self._add_node(node)
+
+    def add_compute(
+        self,
+        node_id: str,
+        tools: Optional[List[str]] = None,
+        *,
+        name: Optional[str] = None,
+        input_mapping: Optional[Dict[str, str]] = None,
+        output_key: Optional[str] = None,
+        handler: Optional[str] = None,
+        constraints: Optional[TaskConstraints] = None,
+        llm_allowed: bool = False,
+        network_allowed: bool = True,
+        max_cost_tier: str = "FREE",
+        timeout: float = 60.0,
+        fail_fast: bool = True,
+        parallel: bool = False,
+        next_nodes: Optional[List[str]] = None,
+    ) -> "WorkflowBuilder":
+        """Add a compute node for constrained task execution.
+
+        Compute nodes execute tools with configurable constraints,
+        enabling LLM-free execution, airgapped environments, and
+        cost-controlled workflows.
+
+        Args:
+            node_id: Unique identifier
+            tools: List of tool names to execute (optional if using handler)
+            name: Optional display name
+            input_mapping: Map context keys to tool parameters
+            output_key: Key to store outputs in context
+            handler: Custom handler name for domain-specific logic
+            constraints: Full TaskConstraints object (overrides individual params)
+            llm_allowed: Whether LLM inference is permitted
+            network_allowed: Whether network calls are permitted
+            max_cost_tier: Maximum tool cost tier (FREE, LOW, MEDIUM, HIGH)
+            timeout: Timeout per tool in seconds
+            fail_fast: Stop on first tool failure
+            parallel: Execute tools in parallel
+            next_nodes: Nodes to execute after
+
+        Returns:
+            Self for chaining
+
+        Example:
+            # Pure computation with tools
+            workflow.add_compute(
+                "valuation",
+                tools=["multi_model_valuation", "sector_valuation"],
+                input_mapping={"symbol": "ctx.symbol"},
+                output_key="fair_values",
+                llm_allowed=False,
+                max_cost_tier="FREE",
+            )
+
+            # Custom handler for domain-specific logic
+            workflow.add_compute(
+                "rl_weights",
+                handler="rl_decision",  # Domain-specific handler
+                input_mapping={"features": "valuation_features"},
+                output_key="model_weights",
+            )
+        """
+        # Build constraints from individual params or use provided
+        if constraints is None:
+            constraints = TaskConstraints(
+                llm_allowed=llm_allowed,
+                network_allowed=network_allowed,
+                max_cost_tier=max_cost_tier,
+                _timeout=timeout,
+            )
+
+        node = ComputeNode(
+            id=node_id,
+            name=name or node_id,
+            tools=tools or [],
+            input_mapping=input_mapping or {},
+            output_key=output_key or node_id,
+            constraints=constraints,
+            handler=handler,
+            fail_fast=fail_fast,
+            parallel=parallel,
             next_nodes=next_nodes or [],
         )
         return self._add_node(node)
@@ -797,12 +1150,21 @@ def get_registered_workflows() -> Dict[str, Callable[[], WorkflowDefinition]]:
 
 
 __all__ = [
+    # Node types
     "NodeType",
     "WorkflowNode",
     "AgentNode",
+    "ComputeNode",
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    # Constraints (extensible protocol + standard implementations)
+    "ConstraintsProtocol",
+    "TaskConstraints",
+    "AirgappedConstraints",
+    "ComputeOnlyConstraints",
+    "FullAccessConstraints",
+    # Workflow definition and builder
     "WorkflowDefinition",
     "WorkflowBuilder",
     "workflow",

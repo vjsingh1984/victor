@@ -1482,3 +1482,525 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                     "4. Do NOT output [TOOL_REQUEST] or similar markers.",
                 ]
             )
+
+
+class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Dedicated adapter for DeepSeek models.
+
+    DeepSeek provides OpenAI-compatible API with model-specific behaviors:
+    - deepseek-chat: Non-thinking mode with native function calling
+    - deepseek-reasoner: Thinking mode with Chain of Thought (NO function calling)
+
+    This adapter handles:
+    - Model-specific capability detection
+    - Reasoning content extraction for deepseek-reasoner
+    - Appropriate system prompts for each model type
+    - Fallback parsing for edge cases
+
+    References:
+    - https://api-docs.deepseek.com/guides/function_calling
+    - https://api-docs.deepseek.com/guides/reasoning_model
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "deepseek"
+
+    def _is_reasoner_model(self) -> bool:
+        """Check if current model is deepseek-reasoner (thinking mode)."""
+        return "reasoner" in self.model_lower or "r1" in self.model_lower
+
+    def _has_native_support(self) -> bool:
+        """Check if current model supports native tool calling.
+
+        deepseek-reasoner does NOT support function calling.
+        deepseek-chat and other variants do.
+        """
+        return not self._is_reasoner_model()
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for DeepSeek models."""
+        is_reasoner = self._is_reasoner_model()
+
+        # Load from YAML config with model pattern matching
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("deepseek", self.model, ToolCallFormat.OPENAI)
+
+        # Override based on model type - reasoner has no tool support
+        if is_reasoner:
+            return ToolCallingCapabilities(
+                native_tool_calls=False,
+                streaming_tool_calls=False,
+                parallel_tool_calls=False,
+                tool_choice_param=False,
+                json_fallback_parsing=False,  # No tool parsing for reasoner
+                xml_fallback_parsing=False,
+                thinking_mode=True,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.OPENAI,
+                argument_format="json",
+                recommended_max_tools=0,  # No tools for reasoner
+                recommended_tool_budget=0,
+            )
+
+        # deepseek-chat: Full native tool calling support
+        if not caps.native_tool_calls:
+            return ToolCallingCapabilities(
+                native_tool_calls=True,
+                streaming_tool_calls=True,
+                parallel_tool_calls=True,
+                tool_choice_param=True,
+                json_fallback_parsing=True,
+                xml_fallback_parsing=False,
+                thinking_mode=False,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.OPENAI,
+                argument_format="json",
+                recommended_max_tools=50,
+                recommended_tool_budget=20,
+            )
+        return caps
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI function format (DeepSeek is OpenAI-compatible)."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse DeepSeek tool calls.
+
+        DeepSeek returns tool calls in OpenAI format:
+        {"id": "...", "function": {"name": "...", "arguments": "..."}}
+        where arguments is a JSON string.
+
+        For deepseek-reasoner, no tool calls are expected.
+        """
+        warnings: List[str] = []
+
+        # Reasoner model: no tool parsing
+        if self._is_reasoner_model():
+            return ToolCallParseResult(remaining_content=content)
+
+        # Try native tool calls first
+        if raw_tool_calls:
+            tool_calls = []
+
+            for tc in raw_tool_calls:
+                # Handle OpenAI format with nested function
+                if "function" in tc:
+                    func = tc["function"]
+                    name = func.get("name", "")
+                    args = func.get("arguments", "{}")
+                else:
+                    # Direct format
+                    name = tc.get("name", "")
+                    args = tc.get("arguments", {})
+
+                if not self.is_valid_tool_name(name):
+                    warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
+
+                # Parse arguments (may be string or dict)
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
+
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings,
+                )
+
+        # Fallback: Try parsing from content (using mixin)
+        if content:
+            result = self.parse_from_content(content, self.is_valid_tool_name)
+            if result.tool_calls:
+                all_warnings = warnings + result.warnings
+                return ToolCallParseResult(
+                    tool_calls=result.tool_calls,
+                    remaining_content=result.remaining_content,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=all_warnings,
+                )
+
+        return ToolCallParseResult(remaining_content=content, warnings=warnings)
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for DeepSeek models."""
+        if self._is_reasoner_model():
+            # Reasoner mode: No tools, emphasize reasoning
+            return "\n".join(
+                [
+                    "DEEPSEEK REASONER MODE:",
+                    "- You are in reasoning/thinking mode.",
+                    "- Focus on step-by-step logical analysis.",
+                    "- Tools are NOT available in this mode.",
+                    "- Provide thorough explanations with your reasoning.",
+                ]
+            )
+
+        # deepseek-chat: Normal tool calling
+        return "\n".join(
+            [
+                "TOOL USAGE:",
+                "- Use the available tools to gather information when needed.",
+                "- Call MULTIPLE tools in parallel when operations are independent.",
+                "- After gathering sufficient information (2-4 tool calls), provide your answer.",
+                "- Do NOT repeat identical tool calls.",
+                "",
+                "RESPONSE FORMAT:",
+                "- Provide your final answer in clear, readable text.",
+                "- Be concise and directly answer the question.",
+            ]
+        )
+
+
+class BedrockToolCallingAdapter(BaseToolCallingAdapter):
+    """Adapter for AWS Bedrock models using the Converse API.
+
+    Bedrock uses a distinct tool format with toolSpec/inputSchema.
+    Tool calls are returned as toolUse blocks with toolUseId, name, input.
+
+    Supports Claude, Llama, Mistral, and Cohere models on Bedrock.
+    Amazon Titan models do NOT support tool calling.
+    """
+
+    # Models that support tool calling on Bedrock
+    TOOL_SUPPORTED_PREFIXES = (
+        "anthropic.claude",
+        "meta.llama",
+        "mistral.",
+        "cohere.command",
+    )
+
+    # Models that do NOT support tool calling
+    NO_TOOL_PREFIXES = ("amazon.titan",)
+
+    @property
+    def provider_name(self) -> str:
+        return "bedrock"
+
+    def _supports_tools(self) -> bool:
+        """Check if the current model supports tools."""
+        model_lower = self.model.lower()
+
+        # Check explicit no-tool models
+        for prefix in self.NO_TOOL_PREFIXES:
+            if model_lower.startswith(prefix):
+                return False
+
+        # Check supported prefixes
+        for prefix in self.TOOL_SUPPORTED_PREFIXES:
+            if model_lower.startswith(prefix):
+                return True
+
+        # Default: assume no support for unknown models
+        return False
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for Bedrock models."""
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("bedrock", self.model, ToolCallFormat.BEDROCK)
+
+        if caps.native_tool_calls:
+            return caps
+
+        # Determine capabilities based on model
+        supports_tools = self._supports_tools()
+
+        return ToolCallingCapabilities(
+            native_tool_calls=supports_tools,
+            streaming_tool_calls=supports_tools,
+            parallel_tool_calls=supports_tools,
+            tool_choice_param=supports_tools,
+            json_fallback_parsing=False,
+            xml_fallback_parsing=False,
+            thinking_mode=False,
+            requires_strict_prompting=False,
+            tool_call_format=ToolCallFormat.BEDROCK,
+            argument_format="json",
+            recommended_max_tools=30,
+            recommended_tool_budget=15,
+        )
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to Bedrock Converse API format.
+
+        Bedrock uses toolSpec with inputSchema.json for tool definitions.
+        """
+        if not self._supports_tools():
+            return []
+
+        return [
+            {
+                "toolSpec": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "inputSchema": {"json": tool.parameters},
+                }
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Bedrock tool calls.
+
+        Bedrock returns tool calls in the raw_tool_calls list with format:
+        {"id": "...", "name": "...", "arguments": {...}}
+
+        The arguments are already parsed (not JSON strings like OpenAI).
+        """
+        if not raw_tool_calls or not self._supports_tools():
+            return ToolCallParseResult(remaining_content=content)
+
+        tool_calls = []
+        warnings: List[str] = []
+
+        for tc in raw_tool_calls:
+            name = tc.get("name", "")
+
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                continue
+
+            # Bedrock returns arguments already parsed as dict
+            arguments = tc.get("arguments", {})
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    warnings.append(f"Failed to parse arguments for {name}")
+                    arguments = {}
+
+            tool_calls.append(
+                ToolCall(
+                    name=name,
+                    arguments=arguments,
+                    id=tc.get("id"),
+                )
+            )
+
+        return ToolCallParseResult(
+            tool_calls=tool_calls,
+            remaining_content=content,
+            parse_method="native",
+            confidence=1.0,
+            warnings=warnings if warnings else None,
+        )
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for Bedrock models."""
+        if not self._supports_tools():
+            return ""
+
+        return "\n".join(
+            [
+                "TOOL USAGE:",
+                "- Use available tools to gather information when needed.",
+                "- Tools return results in structured format.",
+                "- Provide clear, direct answers based on tool results.",
+            ]
+        )
+
+
+class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
+    """Adapter for Azure OpenAI Service models.
+
+    Azure OpenAI uses the same format as OpenAI but has some model-specific
+    considerations:
+    - o1-preview and o1-mini do NOT support tool calling
+    - Standard GPT models (gpt-4o, gpt-4-turbo, gpt-35-turbo) support tools
+    - Microsoft Phi models on Azure AI also support tools
+
+    Uses FallbackParsingMixin for robustness with edge cases.
+    """
+
+    # o1 models do NOT support tools
+    NO_TOOL_MODELS = ("o1-preview", "o1-mini", "o1")
+
+    @property
+    def provider_name(self) -> str:
+        return "azure"
+
+    def _is_o1_model(self) -> bool:
+        """Check if this is an o1 reasoning model (no tool support)."""
+        model_lower = self.model.lower()
+        return any(model_lower.startswith(prefix) for prefix in self.NO_TOOL_MODELS)
+
+    def _supports_tools(self) -> bool:
+        """Check if the current model supports tools."""
+        return not self._is_o1_model()
+
+    def get_capabilities(self) -> ToolCallingCapabilities:
+        """Get capabilities for Azure OpenAI models."""
+        loader = _get_capability_loader()
+        caps = loader.get_capabilities("azure", self.model, ToolCallFormat.OPENAI)
+
+        if caps.native_tool_calls and not self._is_o1_model():
+            return caps
+
+        # o1 models: no tools, thinking mode
+        if self._is_o1_model():
+            return ToolCallingCapabilities(
+                native_tool_calls=False,
+                streaming_tool_calls=False,
+                parallel_tool_calls=False,
+                tool_choice_param=False,
+                json_fallback_parsing=False,
+                xml_fallback_parsing=False,
+                thinking_mode=True,
+                requires_strict_prompting=False,
+                tool_call_format=ToolCallFormat.NONE,
+                argument_format="json",
+                recommended_max_tools=0,
+                recommended_tool_budget=0,
+            )
+
+        # Standard Azure OpenAI models (GPT-4o, GPT-4-turbo, etc.)
+        return ToolCallingCapabilities(
+            native_tool_calls=True,
+            streaming_tool_calls=True,
+            parallel_tool_calls=True,
+            tool_choice_param=True,
+            json_fallback_parsing=True,
+            xml_fallback_parsing=False,
+            thinking_mode=False,
+            requires_strict_prompting=False,
+            tool_call_format=ToolCallFormat.OPENAI,
+            argument_format="json",
+            recommended_max_tools=50,
+            recommended_tool_budget=20,
+        )
+
+    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+        """Convert to OpenAI function format (Azure uses same format)."""
+        if not self._supports_tools():
+            return []
+
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+
+    def parse_tool_calls(
+        self,
+        content: str,
+        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ToolCallParseResult:
+        """Parse Azure OpenAI tool calls (same as OpenAI format)."""
+        if self._is_o1_model():
+            # o1 models don't support tools
+            return ToolCallParseResult(remaining_content=content)
+
+        warnings: List[str] = []
+
+        # Try native tool calls first
+        if raw_tool_calls:
+            tool_calls = []
+
+            for tc in raw_tool_calls:
+                # Handle OpenAI format with nested function
+                if "function" in tc:
+                    func = tc["function"]
+                    name = func.get("name", "")
+                    args = func.get("arguments", "{}")
+                else:
+                    # Direct format (already normalized)
+                    name = tc.get("name", "")
+                    args = tc.get("arguments", {})
+
+                if not self.is_valid_tool_name(name):
+                    warnings.append(f"Skipped invalid tool name: {name}")
+                    continue
+
+                # Parse arguments (may be string or dict)
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        warnings.append(f"Failed to parse arguments for {name}")
+                        args = {}
+
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+
+            if tool_calls:
+                return ToolCallParseResult(
+                    tool_calls=tool_calls,
+                    remaining_content=content,
+                    parse_method="native",
+                    confidence=1.0,
+                    warnings=warnings if warnings else None,
+                )
+
+        # Fallback: Try parsing from content (using mixin)
+        if content:
+            result = self.parse_from_content(content, self.is_valid_tool_name)
+            if result.tool_calls:
+                all_warnings = warnings + (result.warnings or [])
+                return ToolCallParseResult(
+                    tool_calls=result.tool_calls,
+                    remaining_content=result.remaining_content,
+                    parse_method=result.parse_method,
+                    confidence=result.confidence,
+                    warnings=all_warnings if all_warnings else None,
+                )
+
+        return ToolCallParseResult(
+            remaining_content=content, warnings=warnings if warnings else None
+        )
+
+    def get_system_prompt_hints(self) -> str:
+        """Get system prompt hints for Azure OpenAI models."""
+        if self._is_o1_model():
+            return "\n".join(
+                [
+                    "AZURE O1 REASONING MODE:",
+                    "- You are in advanced reasoning mode.",
+                    "- Focus on step-by-step logical analysis.",
+                    "- Tools are NOT available in this mode.",
+                    "- Provide thorough explanations with your reasoning.",
+                ]
+            )
+
+        return "\n".join(
+            [
+                "TOOL USAGE:",
+                "- Use available tools to gather information when needed.",
+                "- Call MULTIPLE tools in parallel when operations are independent.",
+                "- After gathering sufficient information, provide your answer.",
+                "- Do NOT repeat identical tool calls.",
+            ]
+        )

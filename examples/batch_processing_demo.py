@@ -29,7 +29,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from victor.tools.batch_processor_tool import batch, set_batch_processor_config
+from victor.tools.batch_processor_tool import batch
 
 
 def setup_demo_files(temp_dir: Path) -> None:
@@ -118,8 +118,6 @@ async def demo_batch_search():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        set_batch_processor_config(max_workers=4)
-
         print("\n1️⃣ Search for 'TODO' comments across all files...")
         result = await batch(
             operation="search",
@@ -165,8 +163,6 @@ async def demo_batch_replace():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
-        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ DRY RUN: Preview replacing 'print' with 'logger.info'...")
         result = await batch(
@@ -229,8 +225,6 @@ async def demo_batch_analyze():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-        set_batch_processor_config(max_workers=4)
-
         print("\n1️⃣ Analyze all Python files...")
         result = await batch(
             operation="analyze",
@@ -260,8 +254,6 @@ async def demo_list_files():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
-        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ List all Python files...")
         result = await batch(
@@ -293,8 +285,6 @@ async def demo_real_world_workflow():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
-        set_batch_processor_config(max_workers=4)
 
         print("\n1️⃣ STEP 1: Find all print statements...")
         result = await batch(
@@ -384,7 +374,6 @@ def function_{i}():
         print("✓ Created 100 files")
 
         print("\n2️⃣ Searching across all files with parallel processing...")
-        set_batch_processor_config(max_workers=8)
 
         start = time.time()
 

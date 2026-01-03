@@ -922,7 +922,12 @@ class StreamingChatHandler:
             "Please retry or simplify the request."
         )
 
-    def format_completion_metrics(self, ctx: StreamingChatContext, elapsed_time: float) -> str:
+    def format_completion_metrics(
+        self,
+        ctx: StreamingChatContext,
+        elapsed_time: float,
+        cost_str: Optional[str] = None,
+    ) -> str:
         """Format performance metrics for normal completion.
 
         This generates the detailed metrics line with cache info when available,
@@ -931,6 +936,7 @@ class StreamingChatHandler:
         Args:
             ctx: The streaming context
             elapsed_time: Elapsed time in seconds
+            cost_str: Optional cost string to append (e.g., "$0.0123")
 
         Returns:
             Formatted metrics line string
@@ -959,20 +965,27 @@ class StreamingChatHandler:
                     f"| {tokens_per_second:.1f} tok/s",
                 ]
             )
+            # Append cost if provided
+            if cost_str:
+                metrics_parts.append(f"| {cost_str}")
             return " ".join(metrics_parts)
         else:
             # Fallback to estimate
             tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
-            return (
+            base = (
                 f"📊 ~{ctx.total_tokens:.0f} tokens (est.) | "
                 f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
             )
+            if cost_str:
+                base += f" | {cost_str}"
+            return base
 
     def format_budget_exhausted_metrics(
         self,
         ctx: StreamingChatContext,
         elapsed_time: float,
         time_to_first_token: Optional[float] = None,
+        cost_str: Optional[str] = None,
     ) -> str:
         """Format performance metrics for budget exhausted completion.
 
@@ -982,6 +995,7 @@ class StreamingChatHandler:
             ctx: The streaming context
             elapsed_time: Elapsed time in seconds
             time_to_first_token: Optional time to first token
+            cost_str: Optional cost string to append (e.g., "$0.0123")
 
         Returns:
             Formatted metrics line string
@@ -990,7 +1004,10 @@ class StreamingChatHandler:
         ttft_info = ""
         if time_to_first_token:
             ttft_info = f" | TTFT: {time_to_first_token:.2f}s"
-        return f"📊 {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}"
+        cost_info = ""
+        if cost_str:
+            cost_info = f" | {cost_str}"
+        return f"📊 {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}{cost_info}"
 
     def generate_tool_result_chunk(
         self,

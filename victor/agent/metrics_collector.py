@@ -225,8 +225,15 @@ class MetricsCollector:
             if self._current_stream_metrics.first_token_time is None:
                 self._current_stream_metrics.first_token_time = time.time()
 
-    def finalize_stream_metrics(self) -> Optional[StreamMetrics]:
+    def finalize_stream_metrics(
+        self, usage_data: Optional[Dict[str, int]] = None
+    ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
+
+        Args:
+            usage_data: Optional cumulative token usage from provider API.
+                       If provided, this will be recorded to enable actual
+                       token counts instead of estimates.
 
         Returns:
             Finalized StreamMetrics or None if no active session
@@ -234,19 +241,34 @@ class MetricsCollector:
         if not self._current_stream_metrics:
             return None
 
+        # Record actual token usage from provider API if available
+        # This enables accurate token counts instead of estimates
+        if usage_data:
+            self._current_stream_metrics.record_usage(usage_data)
+
+        # Calculate cost using provider capabilities
+        try:
+            from victor.config.metrics_capabilities import get_metrics_capabilities
+
+            capabilities = get_metrics_capabilities(self.config.provider, self.config.model)
+            self._current_stream_metrics.calculate_cost(capabilities)
+        except Exception as e:
+            logger.debug(f"Failed to calculate cost: {e}")
+
         self._current_stream_metrics.end_time = time.time()
         metrics = self._current_stream_metrics
 
-        # Log stream metrics
-        self.usage_logger.log_event(
-            "stream_completed",
-            {
-                "ttft": metrics.time_to_first_token,
-                "total_duration": metrics.total_duration,
-                "tokens_per_second": metrics.tokens_per_second,
-                "total_chunks": metrics.total_chunks,
-            },
-        )
+        # Log stream metrics including cost if available
+        log_data: Dict[str, Any] = {
+            "ttft": metrics.time_to_first_token,
+            "total_duration": metrics.total_duration,
+            "tokens_per_second": metrics.tokens_per_second,
+            "total_chunks": metrics.total_chunks,
+        }
+        if metrics.cost_calculated:
+            log_data["total_cost"] = metrics.total_cost
+
+        self.usage_logger.log_event("stream_completed", log_data)
 
         # Record to streaming metrics collector if available
         if self.streaming_metrics_collector:
@@ -255,8 +277,9 @@ class MetricsCollector:
                     StreamMetrics as AnalyticsMetrics,
                 )
 
-                # Estimate total tokens from content length (roughly 4 chars per token)
-                estimated_tokens = metrics.total_content_length // 4
+                # Use actual token count from API when available, fall back to estimate
+                # StreamMetrics.effective_total_tokens handles this logic
+                total_tokens = metrics.effective_total_tokens
 
                 # Convert to analytics format and record
                 analytics_metrics = AnalyticsMetrics(
@@ -265,11 +288,17 @@ class MetricsCollector:
                     first_token_time=metrics.first_token_time,
                     last_token_time=metrics.end_time,
                     total_chunks=metrics.total_chunks,
-                    total_tokens=estimated_tokens,
+                    total_tokens=total_tokens,
                     model=self.config.model,
                     provider=self.config.provider,
                 )
                 self.streaming_metrics_collector.record_metrics(analytics_metrics)
+
+                # Log source of token data for debugging
+                if metrics.has_actual_usage:
+                    logger.debug(f"Metrics using actual API tokens: {total_tokens}")
+                else:
+                    logger.debug(f"Metrics using estimated tokens: {total_tokens}")
             except Exception as e:
                 logger.debug(f"Failed to record to metrics collector: {e}")
 

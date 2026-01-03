@@ -185,9 +185,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
     ) -> None:
         """Index a single document.
 
+        Note: Content is NOT stored in LanceDB to avoid duplication.
+        Use unified_id to lookup content from graph store.
+
         Args:
-            doc_id: Document identifier
-            content: Document content
+            doc_id: Document identifier (unified ID for graph correlation)
+            content: Document content (used for embedding, not stored)
             metadata: Optional metadata
         """
         if not self._initialized:
@@ -196,11 +199,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Generate embedding
         embedding = await self.embed_text(content)
 
-        # Prepare document
+        # Prepare document - NO content storage (deduplication)
+        # Content can be looked up via unified_id from graph store
         document = {
             "id": doc_id,
             "vector": embedding,
-            "content": content,
+            # "content": content,  # REMOVED - deduplicated, lookup via graph
             **(metadata or {}),
         }
 
@@ -213,6 +217,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
         """Index multiple documents in batch.
+
+        Note: Content is NOT stored in LanceDB to avoid duplication.
+        Use unified_id to lookup content from graph store.
 
         Args:
             documents: List of documents with id, content, metadata
@@ -227,13 +234,13 @@ class LanceDBProvider(BaseEmbeddingProvider):
         contents = [doc["content"] for doc in documents]
         embeddings = await self.embed_batch(contents)
 
-        # Prepare documents for insertion
+        # Prepare documents for insertion - NO content storage (deduplication)
         lance_docs = []
         for doc, embedding in zip(documents, embeddings, strict=False):
             lance_doc = {
                 "id": doc["id"],
                 "vector": embedding,
-                "content": doc["content"],
+                # "content": doc["content"],  # REMOVED - deduplicated, lookup via graph
                 **doc.get("metadata", {}),
             }
             lance_docs.append(lance_doc)
@@ -253,13 +260,16 @@ class LanceDBProvider(BaseEmbeddingProvider):
     ) -> List[SearchResult]:
         """Search for similar documents.
 
+        Note: Content is not stored in LanceDB. Use the returned id (unified_id)
+        to lookup full content from the graph store.
+
         Args:
             query: Search query
             limit: Maximum number of results
             filter_metadata: Optional metadata filters
 
         Returns:
-            List of search results
+            List of search results (content field contains unified_id for lookup)
         """
         if not self._initialized:
             await self.initialize()
@@ -286,14 +296,21 @@ class LanceDBProvider(BaseEmbeddingProvider):
             distance = result.get("_distance", 0.0)
             score = 1.0 / (1.0 + distance)  # Convert distance to similarity
 
+            # unified_id is stored in the "id" field
+            unified_id = result.get("id", "")
+
             search_results.append(
                 SearchResult(
                     file_path=result.get("file_path", ""),
                     symbol_name=result.get("symbol_name"),
-                    content=result.get("content", ""),
+                    # Content not stored - use unified_id for graph lookup
+                    content=unified_id,  # Store unified_id for graph correlation
                     score=score,
                     line_number=result.get("line_number"),
-                    metadata={k: v for k, v in result.items() if not k.startswith("_")},
+                    metadata={
+                        "unified_id": unified_id,  # Explicit correlation key
+                        **{k: v for k, v in result.items() if not k.startswith("_")},
+                    },
                 )
             )
 

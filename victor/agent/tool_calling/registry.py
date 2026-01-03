@@ -81,6 +81,9 @@ class ToolCallingAdapterRegistry:
         # Import adapters here to avoid circular imports
         from victor.agent.tool_calling.adapters import (
             AnthropicToolCallingAdapter,
+            AzureOpenAIToolCallingAdapter,
+            BedrockToolCallingAdapter,
+            DeepSeekToolCallingAdapter,
             GoogleToolCallingAdapter,
             LMStudioToolCallingAdapter,
             OllamaToolCallingAdapter,
@@ -99,8 +102,12 @@ class ToolCallingAdapterRegistry:
                 "lmstudio": LMStudioToolCallingAdapter,
                 # vLLM uses OpenAI-compatible adapter
                 "vllm": OpenAICompatToolCallingAdapter,
-                # DeepSeek uses OpenAI-compatible API format
-                "deepseek": OpenAIToolCallingAdapter,
+                # DeepSeek has dedicated adapter with model-specific handling
+                "deepseek": DeepSeekToolCallingAdapter,
+                # AWS Bedrock uses Converse API with toolSpec/toolUse format
+                "bedrock": BedrockToolCallingAdapter,
+                # Azure OpenAI has dedicated adapter (handles o1 models without tools)
+                "azure": AzureOpenAIToolCallingAdapter,
                 # Groq Cloud uses OpenAI-compatible API format
                 "groqcloud": OpenAIToolCallingAdapter,
                 # Cerebras uses OpenAI-compatible API format

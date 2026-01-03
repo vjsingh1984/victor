@@ -40,7 +40,13 @@ from victor.tools.filesystem import (
 
 @pytest.mark.asyncio
 async def test_read_file_success():
-    """Test successful file reading."""
+    """Test successful file reading.
+
+    Note: read() now returns formatted output with:
+    - Header: [File: path] [Lines X-Y of Z] [Size: N bytes]
+    - Line numbers prefixed to each line
+    - Truncation info if applicable
+    """
     # Create temporary file
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Hello, World!")
@@ -49,7 +55,12 @@ async def test_read_file_success():
     try:
         result = await read(path=temp_path)
 
-        assert result == "Hello, World!"
+        # Check for header components
+        assert "[File:" in result
+        assert "[Lines 1-1 of 1]" in result
+        assert "[Size:" in result
+        # Check content is included (with line number prefix)
+        assert "Hello, World!" in result
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -646,7 +657,9 @@ async def test_read_file_allows_text_with_no_magic():
         f.flush()
 
         content = await read(path=f.name)
-        assert content == "This is plain text content"
+        # Content is now included in formatted output with headers and line numbers
+        assert "This is plain text content" in content
+        assert "[Lines 1-1 of 1]" in content
 
         os.unlink(f.name)
 
@@ -855,7 +868,8 @@ class TestFileCacheIntegration:
         try:
             # First read - cache miss
             content1 = await read(path=temp_path)
-            assert content1 == "print('hello')"
+            # Content is now wrapped with headers and line numbers
+            assert "print('hello')" in content1
 
             cache = get_file_content_cache()
             stats = cache.get_stats()
@@ -863,7 +877,7 @@ class TestFileCacheIntegration:
 
             # Second read - cache hit
             content2 = await read(path=temp_path)
-            assert content2 == "print('hello')"
+            assert "print('hello')" in content2
 
             stats = cache.get_stats()
             assert stats["hits"] == 1
@@ -880,14 +894,15 @@ class TestFileCacheIntegration:
         try:
             # Read to populate cache
             content1 = await read(path=temp_path)
-            assert content1 == "original"
+            # Content is now wrapped with headers and line numbers
+            assert "original" in content1
 
             # Write new content
             await write(path=temp_path, content="updated")
 
             # Read should get fresh content
             content2 = await read(path=temp_path)
-            assert content2 == "updated"
+            assert "updated" in content2
         finally:
             os.unlink(temp_path)
 

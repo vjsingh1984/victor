@@ -56,27 +56,49 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CH
 from rich.console import Console
 
 if TYPE_CHECKING:
+    # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
     from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
+    from victor.agent.protocols import ToolAccessContext
+    from victor.evaluation.protocol import TokenUsage
 
+    # Factory-created components (type hints only)
+    from victor.agent.response_sanitizer import ResponseSanitizer
+    from victor.agent.search_router import SearchRouter
+    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.agent.metrics_collector import MetricsCollector
+    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.context_compactor import ContextCompactor
+    from victor.agent.usage_analytics import UsageAnalytics
+    from victor.agent.tool_sequence_tracker import ToolSequenceTracker
+    from victor.agent.recovery import RecoveryHandler
+    from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
+    from victor.agent.tool_output_formatter import ToolOutputFormatter
+    from victor.agent.tool_pipeline import ToolPipeline
+    from victor.agent.streaming_controller import StreamingController
+    from victor.agent.task_analyzer import TaskAnalyzer
+    from victor.agent.tool_registrar import ToolRegistrar
+    from victor.agent.provider_manager import ProviderManager
+    from victor.agent.provider_coordinator import ProviderCoordinator
+    from victor.agent.tool_selection import ToolSelector
+    from victor.agent.tool_executor import ToolExecutor
+    from victor.agent.safety import SafetyChecker
+    from victor.agent.auto_commit import AutoCommitter
+    from victor.agent.conversation_manager import ConversationManager, create_conversation_manager
+
+# Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation_memory import (
-    ConversationStore,
-    MessageRole,
-)
+from victor.agent.conversation_memory import ConversationStore, MessageRole
 
-# DI container bootstrap - ensures services are available
+# DI container bootstrap
 from victor.core.bootstrap import ensure_bootstrapped, get_service_optional
-from victor.core.container import (
-    MetricsServiceProtocol,
-    LoggerServiceProtocol,
-)
+from victor.core.container import MetricsServiceProtocol, LoggerServiceProtocol
 
-# Service protocols for DI resolution (Phase 10)
+# Service protocols for DI resolution
 from victor.agent.protocols import (
     ResponseSanitizerProtocol,
     ComplexityClassifierProtocol,
@@ -93,130 +115,85 @@ from victor.agent.protocols import (
     ContextCompactorProtocol,
 )
 
-# Mode-aware mixin for consistent mode controller access
+# Mixins (used at class definition time)
 from victor.protocols.mode_aware import ModeAwareMixin
-
-# Capability registry mixin for explicit capability discovery (replaces hasattr)
 from victor.agent.capability_registry import CapabilityRegistryMixin
 
-# Config loaders for externalized configuration
+# Config and enums (used at runtime)
 from victor.config.config_loaders import get_provider_limits
-from victor.agent.conversation_embedding_store import (
-    ConversationEmbeddingStore,
-)
+from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
-from victor.agent.action_authorizer import (
-    ActionAuthorizer,
-    ActionIntent,
-    INTENT_BLOCKED_TOOLS,
-)
-from victor.agent.prompt_builder import SystemPromptBuilder, get_task_type_hint
-from victor.agent.response_sanitizer import ResponseSanitizer
-from victor.agent.search_router import SearchRouter, SearchRoute, SearchType
-from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity, DEFAULT_BUDGETS
+from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
+from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
+from victor.agent.search_router import SearchRoute, SearchType
+from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.metrics_collector import (
-    MetricsCollector,
-    MetricsCollectorConfig,
-)
-from victor.agent.unified_task_tracker import (
-    UnifiedTaskTracker,
-    TaskType,
-)
+from victor.agent.metrics_collector import MetricsCollectorConfig
+from victor.agent.unified_task_tracker import UnifiedTaskTracker, TaskType
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
-# New decomposed components (facades for orchestrator responsibilities)
+# Decomposed components - configs, strategies, functions
 from victor.agent.conversation_controller import (
-    ConversationController,
     ConversationConfig,
     ContextMetrics,
     CompactionStrategy,
 )
 from victor.agent.context_compactor import (
-    ContextCompactor,
     TruncationStrategy,
     create_context_compactor,
     calculate_parallel_read_budget,
 )
+from victor.agent.context_manager import (
+    ContextManager,
+    ContextManagerConfig,
+    create_context_manager,
+)
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.agent.rl.coordinator import get_rl_coordinator
-from victor.agent.usage_analytics import (
-    UsageAnalytics,
-    AnalyticsConfig,
-)
-from victor.agent.tool_sequence_tracker import (
-    ToolSequenceTracker,
-    create_sequence_tracker,
-)
-from victor.agent.recovery import (
-    RecoveryHandler,
-    RecoveryOutcome,
-    FailureType,
-    RecoveryAction,
-)
+from victor.agent.usage_analytics import AnalyticsConfig
+from victor.agent.tool_sequence_tracker import create_sequence_tracker
+from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
+
+# Recovery - enums and functions used at runtime
+from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.protocols import RecoveryHandlerProtocol
 from victor.agent.orchestrator_recovery import (
-    OrchestratorRecoveryIntegration,
     create_recovery_integration,
     RecoveryAction as OrchestratorRecoveryAction,
 )
 from victor.agent.tool_output_formatter import (
-    ToolOutputFormatter,
     ToolOutputFormatterConfig,
     FormattingContext,
     create_tool_output_formatter,
 )
 
-# CodeCorrectionMiddleware imported lazily to avoid circular import
-# (code_correction_middleware -> evaluation.correction -> evaluation.__init__ -> agent_adapter -> orchestrator)
-from victor.agent.tool_pipeline import (
-    ToolPipeline,
-    ToolPipelineConfig,
-    ToolCallResult,
-)
-from victor.agent.streaming_controller import (
-    StreamingController,
-    StreamingControllerConfig,
-    StreamingSession,
-)
-from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
-from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-from victor.agent.provider_manager import ProviderManager, ProviderManagerConfig, ProviderState
+# Pipeline - configs and results used at runtime
+from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
+from victor.agent.streaming_controller import StreamingControllerConfig, StreamingSession
+from victor.agent.task_analyzer import get_task_analyzer
+from victor.agent.tool_registrar import ToolRegistrarConfig
+from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
-# Observability integration (EventBus, hooks, exporters)
+# Observability
 from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 from victor.observability.integration import ObservabilityIntegration
-
-# Intelligent pipeline integration (lazy initialization to avoid circular imports)
-# These enable RL-based mode learning, quality scoring, and prompt optimization
 from victor.agent.orchestrator_integration import IntegrationConfig
 
-from victor.agent.tool_selection import (
-    get_critical_tools,
-    ToolSelector,
-)
-from victor.agent.tool_calling import (
-    ToolCallParseResult,
-)
-from victor.agent.tool_executor import ToolExecutor, ValidationMode
-from victor.agent.safety import SafetyChecker
+# Tool execution - functions and enums
+from victor.agent.tool_selection import get_critical_tools
+from victor.agent.tool_calling import ToolCallParseResult
+from victor.agent.tool_executor import ValidationMode
 from victor.agent.orchestrator_utils import (
     calculate_max_context_chars,
     infer_git_operation,
     get_tool_status_message,
 )
 from victor.agent.orchestrator_factory import OrchestratorFactory
-from victor.agent.auto_commit import AutoCommitter
-from victor.agent.parallel_executor import (
-    create_parallel_executor,
-)
-from victor.agent.response_completer import (
-    ToolFailureContext,
-    create_response_completer,
-)
+from victor.agent.parallel_executor import create_parallel_executor
+from victor.agent.response_completer import ToolFailureContext, create_response_completer
 from victor.observability.analytics.logger import UsageLogger
 from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 from victor.storage.cache.tool_cache import ToolCache
@@ -231,7 +208,13 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.registry import ProviderRegistry
-from victor.core.errors import ProviderRateLimitError
+from victor.core.errors import (
+    ProviderAuthError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ToolNotFoundError,
+    ToolValidationError,
+)
 from victor.tools.base import CostTier, ToolRegistry
 from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
@@ -420,6 +403,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_calling_caps,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
+        # ProviderCoordinator: Wraps ProviderManager with rate limiting and health monitoring (TD-002)
+        from victor.agent.provider_coordinator import (
+            ProviderCoordinator,
+            ProviderCoordinatorConfig,
+        )
+
+        self._provider_coordinator = ProviderCoordinator(
+            provider_manager=self._provider_manager,
+            config=ProviderCoordinatorConfig(
+                max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
+                enable_health_monitoring=getattr(settings, "provider_health_checks", True),
+            ),
+        )
+
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         self.sanitizer = self._factory.create_sanitizer()
 
@@ -450,29 +447,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize tool call budget (via factory) - uses adapter recommendations with settings override
         self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
-        self.tool_calls_used = 0
+
+        # Initialize SessionStateManager for consolidated execution state tracking (TD-002)
+        # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
+        # failed_tool_signatures, _read_files_session, _required_files, _required_outputs, etc.
+        self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
 
         # Gap implementations: Complexity classifier, action authorizer, search router (via factory)
         self.task_classifier = self._factory.create_complexity_classifier()
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
-
-        # Initialize execution state containers (via factory)
-        (
-            self.observed_files,
-            self.executed_tools,
-            self.failed_tool_signatures,
-            self._tool_capability_warned,
-        ) = self._factory.initialize_execution_state()
-
-        # Track files read during this session for task completion detection
-        self._read_files_session: Set[str] = set()
-        # Track required files extracted from user prompts
-        self._required_files: List[str] = []
-        # Track required outputs extracted from user prompts (e.g., "findings table", "top-3 fixes")
-        self._required_outputs: List[str] = []
-        # Flag to track if we've already sent a nudge to produce output
-        self._all_files_read_nudge_sent: bool = False
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes
@@ -512,11 +496,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
             ),
         )
+
+        # Session cost tracking (for LLM API cost monitoring)
+        from victor.agent.session_cost_tracker import SessionCostTracker
+
+        self._session_cost_tracker = SessionCostTracker(
+            provider=self.provider.name,
+            model=self.model,
+        )
+
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
         # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
+        # Tool dependencies are registered via ToolRegistrar after it's created
         self.tool_graph = self._factory.create_tool_dependency_graph()
-        self._register_default_tool_dependencies()
 
         # Stateful managers (DI with fallback)
         # Code execution manager for Docker-based code execution (via factory, DI with fallback)
@@ -539,8 +532,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self.memory_manager and getattr(settings, "conversation_embeddings_enabled", True):
             try:
                 self._init_conversation_embedding_store()
-            except Exception as embed_err:
-                logger.warning(f"Failed to initialize ConversationEmbeddingStore: {embed_err}")
+            except ImportError as embed_err:
+                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
+            except (OSError, IOError) as embed_err:
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
+                )
+            except (ValueError, TypeError) as embed_err:
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}"
+                )
 
         # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
         self.conversation_state = self._factory.create_conversation_state_machine()
@@ -568,9 +569,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         self.tool_registrar.set_background_task_callback(self._create_background_task)
 
+        # Register tool dependencies for planning (delegates to ToolRegistrar)
+        self.tool_registrar._register_tool_dependencies()
+
         # Synchronous registration (dynamic tools, configs)
         self._register_default_tools()  # Delegates to ToolRegistrar
-        self._load_tool_configurations()  # Load tool enable/disable states from config
+        self.tool_registrar._load_tool_configurations()  # Delegates to ToolRegistrar
         self.tools.register_before_hook(self._log_tool_call)
 
         # Plugin system for extensible tools (via factory, delegates to ToolRegistrar)
@@ -673,6 +677,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             middleware_chain=self._middleware_chain,
         )
 
+        # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
+        if hasattr(self, "_pending_semantic_cache") and self._pending_semantic_cache is not None:
+            self._tool_pipeline.set_semantic_cache(self._pending_semantic_cache)
+            logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
+            self._pending_semantic_cache = None  # Clear reference
+
         # StreamingController: Manages streaming sessions and metrics (via factory)
         self._streaming_controller = self._factory.create_streaming_controller(
             streaming_metrics_collector=self.streaming_metrics_collector,
@@ -688,9 +698,32 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # RLCoordinator: Framework-level RL with unified SQLite storage (via factory)
         self._rl_coordinator = self._factory.create_rl_coordinator()
 
+        # Get context pruning learner from RL coordinator (if available)
+        pruning_learner = None
+        if self._rl_coordinator is not None:
+            try:
+                pruning_learner = self._rl_coordinator.get_learner("context_pruning")
+            except KeyError:
+                logger.debug("context_pruning learner not registered in RL coordinator")
+            except AttributeError:
+                logger.debug("RL coordinator interface mismatch (missing get_learner)")
+
         # ContextCompactor: Proactive context management and tool result truncation (via factory)
         self._context_compactor = self._factory.create_context_compactor(
-            conversation_controller=self._conversation_controller
+            conversation_controller=self._conversation_controller,
+            pruning_learner=pruning_learner,
+        )
+
+        # ContextManager: Centralized context window management (TD-002 refactoring)
+        # Consolidates _get_model_context_window, _get_max_context_chars,
+        # _check_context_overflow, and _handle_compaction
+        self._context_manager = create_context_manager(
+            provider_name=self.provider_name,
+            model=self.model,
+            conversation_controller=self._conversation_controller,
+            context_compactor=self._context_compactor,
+            debug_logger=self.debug_logger,
+            settings=self.settings,
         )
 
         # ToolOutputFormatter: LLM-context-aware formatting of tool results
@@ -700,6 +733,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize UsageAnalytics singleton for data-driven optimization (via factory)
         self._usage_analytics = self._factory.create_usage_analytics()
+
+        # Token usage tracking now managed by SessionStateManager (TD-002)
+        # Access via self._cumulative_token_usage property or self._session_state.get_token_usage()
 
         # Initialize ToolSequenceTracker for intelligent next-tool suggestions (via factory)
         self._sequence_tracker = self._factory.create_sequence_tracker()
@@ -960,18 +996,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except ImportError:
             # RL module not available - skip silently
             pass
-        except Exception as e:
-            # Don't let RL errors affect main flow
-            logger.warning(f"Failed to send RL reward signal: {e}")
+        except (KeyError, AttributeError) as e:
+            # RL coordinator not properly initialized
+            logger.debug(f"RL reward signal skipped (not configured): {e}")
+        except (ValueError, TypeError) as e:
+            # Invalid reward data
+            logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
 
-        Looks for patterns like:
-        - /absolute/path/to/file.py
-        - ./relative/path.py
-        - victor/agent/orchestrator.py
-        - *.py (wildcards not returned)
+        Delegates to TaskAnalyzer.extract_required_files_from_prompt().
 
         Args:
             user_message: The user's prompt text
@@ -979,49 +1014,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of file paths mentioned in the prompt
         """
-        import re
-
-        required_files: List[str] = []
-
-        # Pattern for file paths (absolute, relative, or module-style)
-        # Matches paths with at least one / and a file extension
-        # Handles: "path/file.py", path/file.py, path/file.py. (sentence end)
-        file_path_pattern = re.compile(
-            r"(?:^|\s|[\"'\-])"  # Start of string, whitespace, quote, or dash (for bullet lists)
-            r"((?:\.{0,2}/)?"  # Optional ./ or ../ or /
-            r"[\w./-]+/"  # At least one directory component
-            r"[\w.-]+\.[a-z]{1,10})"  # Filename with extension
-            r"(?:\s|[\"']|$|[,;:.\)]|\Z)",  # End: space, quote, EOL, punctuation (incl. period, paren)
-            re.IGNORECASE,
-        )
-
-        for match in file_path_pattern.finditer(user_message):
-            path = match.group(1)
-            # Skip wildcards and patterns
-            if "*" not in path and "?" not in path:
-                required_files.append(path)
-
-        # Also look for explicit "read", "analyze", "audit" + file patterns
-        explicit_pattern = re.compile(
-            r"(?:read|analyze|audit|check|review|examine)\s+" r"([/\w.-]+(?:/[\w.-]+)+)",
-            re.IGNORECASE,
-        )
-        for match in explicit_pattern.finditer(user_message):
-            path = match.group(1)
-            if path not in required_files and "*" not in path:
-                required_files.append(path)
-
-        logger.debug(f"Extracted required files from prompt: {required_files}")
-        return required_files
+        return self._task_analyzer.extract_required_files_from_prompt(user_message)
 
     def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
         """Extract output requirements from user prompt.
 
-        Looks for patterns indicating required output format:
-        - "create a findings table"
-        - "provide top-3 fixes"
-        - "6-10 findings"
-        - "must output"
+        Delegates to TaskAnalyzer.extract_required_outputs_from_prompt().
 
         Args:
             user_message: The user's prompt text
@@ -1029,36 +1027,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of required output types (e.g., ["findings table", "top-3 fixes"])
         """
-        import re
-
-        required_outputs: List[str] = []
-        message_lower = user_message.lower()
-
-        # Check for findings table requirement
-        if re.search(r"findings?\s*table|table\s+of\s+findings?", message_lower):
-            required_outputs.append("findings table")
-
-        # Check for top-N fixes requirement
-        if re.search(r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower):
-            required_outputs.append("top-3 fixes")
-
-        # Check for summary requirement
-        if re.search(r"summary\s+of|provide\s+summary|create\s+summary", message_lower):
-            required_outputs.append("summary")
-
-        # Check for numbered findings requirement (e.g., "6-10 findings")
-        if re.search(r"\d+[-–]\d+\s+findings?", message_lower):
-            required_outputs.append("findings table")
-
-        logger.debug(f"Extracted required outputs from prompt: {required_outputs}")
-        return required_outputs
+        return self._task_analyzer.extract_required_outputs_from_prompt(user_message)
 
     # =====================================================================
     # Component accessors for external use
     # =====================================================================
 
     @property
-    def conversation_controller(self) -> ConversationController:
+    def conversation_controller(self) -> "ConversationController":
         """Get the conversation controller component.
 
         Returns:
@@ -1067,7 +1043,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._conversation_controller
 
     @property
-    def tool_pipeline(self) -> ToolPipeline:
+    def tool_pipeline(self) -> "ToolPipeline":
         """Get the tool pipeline component.
 
         Returns:
@@ -1076,7 +1052,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._tool_pipeline
 
     @property
-    def streaming_controller(self) -> StreamingController:
+    def streaming_controller(self) -> "StreamingController":
         """Get the streaming controller component.
 
         Returns:
@@ -1094,7 +1070,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._streaming_handler
 
     @property
-    def task_analyzer(self) -> TaskAnalyzer:
+    def task_analyzer(self) -> "TaskAnalyzer":
         """Get the task analyzer component.
 
         Returns:
@@ -1124,7 +1100,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._observability = value
 
     @property
-    def provider_manager(self) -> ProviderManager:
+    def provider_manager(self) -> "ProviderManager":
         """Get the provider manager component.
 
         Returns:
@@ -1133,7 +1109,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._provider_manager
 
     @property
-    def context_compactor(self) -> ContextCompactor:
+    def context_compactor(self) -> "ContextCompactor":
         """Get the context compactor component.
 
         Returns:
@@ -1142,7 +1118,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._context_compactor
 
     @property
-    def tool_output_formatter(self) -> ToolOutputFormatter:
+    def tool_output_formatter(self) -> "ToolOutputFormatter":
         """Get the tool output formatter for LLM-context-aware formatting.
 
         Returns:
@@ -1151,7 +1127,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._tool_output_formatter
 
     @property
-    def usage_analytics(self) -> UsageAnalytics:
+    def usage_analytics(self) -> "UsageAnalytics":
         """Get the usage analytics singleton.
 
         Returns:
@@ -1160,7 +1136,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._usage_analytics
 
     @property
-    def sequence_tracker(self) -> ToolSequenceTracker:
+    def sequence_tracker(self) -> "ToolSequenceTracker":
         """Get the tool sequence tracker for intelligent next-tool suggestions.
 
         Returns:
@@ -1169,7 +1145,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._sequence_tracker
 
     @property
-    def recovery_handler(self) -> Optional[RecoveryHandler]:
+    def recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Get the recovery handler for model failure recovery.
 
         Returns:
@@ -1178,7 +1154,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._recovery_handler
 
     @property
-    def recovery_integration(self) -> OrchestratorRecoveryIntegration:
+    def recovery_integration(self) -> "OrchestratorRecoveryIntegration":
         """Get the recovery integration submodule.
 
         Returns:
@@ -1254,6 +1230,145 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._code_correction_middleware
 
+    # =====================================================================
+    # Session state delegation properties (TD-002)
+    # These delegate to SessionStateManager for consolidated state tracking
+    # =====================================================================
+
+    @property
+    def session_state(self) -> SessionStateManager:
+        """Get the session state manager.
+
+        Returns:
+            SessionStateManager instance for consolidated state tracking
+        """
+        return self._session_state
+
+    @property
+    def tool_calls_used(self) -> int:
+        """Get the number of tool calls used in this session.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.tool_calls_used
+
+    @tool_calls_used.setter
+    def tool_calls_used(self, value: int) -> None:
+        """Set the number of tool calls used (for backward compatibility)."""
+        self._session_state.execution_state.tool_calls_used = value
+
+    @property
+    def observed_files(self) -> Set[str]:
+        """Get set of files observed/read during this session.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.observed_files
+
+    @observed_files.setter
+    def observed_files(self, value: Set[str]) -> None:
+        """Set observed files (for checkpoint restore)."""
+        self._session_state.execution_state.observed_files = set(value) if value else set()
+
+    @property
+    def executed_tools(self) -> List[str]:
+        """Get list of executed tool names in order.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.executed_tools
+
+    @executed_tools.setter
+    def executed_tools(self, value: List[str]) -> None:
+        """Set executed tools (for checkpoint restore)."""
+        self._session_state.execution_state.executed_tools = list(value) if value else []
+
+    @property
+    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+        """Get set of (tool_name, args_hash) tuples for failed calls.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.failed_tool_signatures
+
+    @failed_tool_signatures.setter
+    def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
+        """Set failed tool signatures (for checkpoint restore)."""
+        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
+
+    @property
+    def _tool_capability_warned(self) -> bool:
+        """Get whether we've warned about tool capability limitations.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.session_flags.tool_capability_warned
+
+    @_tool_capability_warned.setter
+    def _tool_capability_warned(self, value: bool) -> None:
+        """Set tool capability warning flag."""
+        self._session_state.session_flags.tool_capability_warned = value
+
+    @property
+    def _read_files_session(self) -> Set[str]:
+        """Get files read during this session for task completion detection.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.read_files_session
+
+    @property
+    def _required_files(self) -> List[str]:
+        """Get required files extracted from user prompts.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.required_files
+
+    @_required_files.setter
+    def _required_files(self, value: List[str]) -> None:
+        """Set required files list."""
+        self._session_state.execution_state.required_files = list(value)
+
+    @property
+    def _required_outputs(self) -> List[str]:
+        """Get required outputs extracted from user prompts.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.execution_state.required_outputs
+
+    @_required_outputs.setter
+    def _required_outputs(self, value: List[str]) -> None:
+        """Set required outputs list."""
+        self._session_state.execution_state.required_outputs = list(value)
+
+    @property
+    def _all_files_read_nudge_sent(self) -> bool:
+        """Get whether we've sent a nudge that all required files are read.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.session_flags.all_files_read_nudge_sent
+
+    @_all_files_read_nudge_sent.setter
+    def _all_files_read_nudge_sent(self, value: bool) -> None:
+        """Set all files read nudge flag."""
+        self._session_state.session_flags.all_files_read_nudge_sent = value
+
+    @property
+    def _cumulative_token_usage(self) -> Dict[str, int]:
+        """Get cumulative token usage for evaluation/benchmarking.
+
+        Delegates to SessionStateManager.
+        """
+        return self._session_state.get_token_usage()
+
+    @_cumulative_token_usage.setter
+    def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
+        """Set cumulative token usage (for backward compatibility)."""
+        self._session_state.execution_state.token_usage = dict(value)
+
     @property
     def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
         """Get the intelligent pipeline integration (lazy initialization).
@@ -1310,8 +1425,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.info(
                     f"IntelligentPipeline initialized for {self.provider_name}:{self.model}"
                 )
-            except Exception as e:
-                logger.warning(f"Failed to initialize IntelligentPipeline: {e}")
+            except ImportError as e:
+                logger.debug(f"IntelligentPipeline dependencies not available: {e}")
+                self._intelligent_pipeline_enabled = False
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
                 self._intelligent_pipeline_enabled = False
 
         return self._intelligent_integration
@@ -1337,8 +1455,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 self._subagent_orchestrator = SubAgentOrchestrator(parent=self)
                 logger.info("SubAgentOrchestrator initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize SubAgentOrchestrator: {e}")
+            except ImportError as e:
+                logger.debug(f"SubAgentOrchestrator module not available: {e}")
+                self._subagent_orchestration_enabled = False
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
                 self._subagent_orchestration_enabled = False
 
         return self._subagent_orchestrator
@@ -1487,6 +1608,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         logger.debug("Tiered tool config set")
 
+    def set_workspace(self, workspace_dir: Path) -> None:
+        """Set the workspace directory for task execution.
+
+        Updates the global project root and orchestrator's project context
+        to work in the specified directory. This is essential for benchmark
+        evaluations where each task operates in a different workspace.
+
+        Args:
+            workspace_dir: Path to the workspace directory
+        """
+        from victor.config.settings import set_project_root
+        from victor.context.project_context import ProjectContext
+
+        # Update global project root
+        set_project_root(workspace_dir)
+        logger.info(f"Project root set to: {workspace_dir}")
+
+        # Create new project context for this workspace
+        self.project_context = ProjectContext(root_path=str(workspace_dir))
+        self.project_context.load()
+
+        # Update system prompt if new context has content
+        if self.project_context.content:
+            base_prompt = self._build_system_prompt_with_adapter()
+            self._system_prompt = (
+                base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
+
     def _apply_vertical_tools(self, tools: Set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
 
@@ -1529,8 +1679,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             logger.info(f"Manual checkpoint saved: {checkpoint_id[:20]}...")
             return checkpoint_id
-        except Exception as e:
-            logger.warning(f"Failed to save checkpoint: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to save checkpoint (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to save checkpoint (serialization error): {e}")
             return None
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
@@ -1551,8 +1704,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._apply_checkpoint_state(state)
             logger.info(f"Restored checkpoint: {checkpoint_id[:20]}...")
             return True
-        except Exception as e:
-            logger.warning(f"Failed to restore checkpoint: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to restore checkpoint (I/O error): {e}")
+            return False
+        except (KeyError, ValueError) as e:
+            logger.warning(f"Failed to restore checkpoint (invalid data): {e}")
             return False
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
@@ -1574,8 +1730,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 session_id=self._memory_session_id or "default",
                 state=state,
             )
-        except Exception as e:
-            logger.debug(f"Auto-checkpoint failed: {e}")
+        except (OSError, IOError) as e:
+            logger.debug(f"Auto-checkpoint failed (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Auto-checkpoint failed (serialization error): {e}")
             return None
 
     def _get_checkpoint_state(self) -> dict:
@@ -1620,10 +1779,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[Dict[str, Any]]:
         """Pre-request hook for intelligent pipeline integration.
 
-        Called at the start of stream_chat to:
-        - Get mode transition recommendations (Q-learning)
-        - Get optimal tool budget for task type
-        - Enable prompt optimization if configured
+        Delegates to OrchestratorIntegration.prepare_intelligent_request().
 
         Args:
             task: The user's task/query
@@ -1636,45 +1792,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return None
 
-        try:
-            # Get current mode from conversation state
-            # Note: ConversationStage uses auto() which returns int values,
-            # so we use stage.name.lower() to get a string mode name
-            stage = self.conversation_state.get_current_stage()
-            current_mode = stage.name.lower() if stage else "explore"
-
-            # Prepare request context (async call to pipeline)
-            context = await integration.prepare_request(
-                task=task,
-                task_type=task_type,
-                current_mode=current_mode,
-            )
-
-            # Apply recommended tool budget if available (skip if user made a sticky override)
-            # NOTE: We no longer reduce the budget based on pipeline recommendations.
-            # The pipeline may suggest a smaller budget based on Q-learning, but this
-            # caused premature stopping (e.g., 50 -> 5). The user's budget is authoritative.
-            # We only log the recommendation for debugging purposes.
-            if context.recommended_tool_budget:
-                sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-                if not sticky_budget:
-                    current_budget = self.unified_tracker.progress.tool_budget
-                    # Only log significant differences, but don't reduce the budget
-                    if abs(context.recommended_tool_budget - current_budget) > 10:
-                        logger.debug(
-                            f"IntelligentPipeline recommended budget {context.recommended_tool_budget} "
-                            f"differs from current {current_budget}, keeping current budget"
-                        )
-
-            return {
-                "recommended_mode": context.recommended_mode,
-                "recommended_tool_budget": context.recommended_tool_budget,
-                "should_continue": context.should_continue,
-                "system_prompt_addition": context.system_prompt if context.system_prompt else None,
-            }
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline prepare_request failed: {e}")
-            return None
+        return await integration.prepare_intelligent_request(
+            task=task,
+            task_type=task_type,
+            conversation_state=self.conversation_state,
+            unified_tracker=self.unified_tracker,
+        )
 
     async def _validate_intelligent_response(
         self,
@@ -1685,10 +1808,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[Dict[str, Any]]:
         """Post-response hook for intelligent pipeline integration.
 
-        Called after each streaming iteration to:
-        - Score response quality (coherence, completeness, relevance)
-        - Verify grounding (detect hallucinations)
-        - Record feedback for Q-learning
+        Delegates to OrchestratorIntegration.validate_intelligent_response().
 
         Args:
             response: The model's response content
@@ -1703,42 +1823,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return None
 
-        # Skip validation for empty or very short responses
-        if not response or len(response.strip()) < 50:
-            return None
-
-        try:
-            result = await integration.validate_response(
-                response=response,
-                query=query,
-                tool_calls=tool_calls,
-                success=True,
-                task_type=task_type,
-            )
-
-            # Log quality warnings if below threshold
-            if not result.is_valid:
-                logger.warning(
-                    f"IntelligentPipeline: Response below quality threshold "
-                    f"(quality={result.quality_score:.2f}, grounded={result.is_grounded})"
-                )
-
-            return {
-                "quality_score": result.quality_score,
-                "grounding_score": result.grounding_score,
-                "is_grounded": result.is_grounded,
-                "is_valid": result.is_valid,
-                "grounding_issues": result.grounding_issues,
-                # Grounding failure handling - force finalize after max retries
-                "should_finalize": getattr(result, "should_finalize", False),
-                "should_retry": getattr(result, "should_retry", False),
-                "finalize_reason": getattr(result, "finalize_reason", ""),
-                # Actionable feedback for grounding correction on retry
-                "grounding_feedback": getattr(result, "grounding_feedback", ""),
-            }
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline validate_response failed: {e}")
-            return None
+        return await integration.validate_intelligent_response(
+            response=response,
+            query=query,
+            tool_calls=tool_calls,
+            task_type=task_type,
+        )
 
     def _record_intelligent_outcome(
         self,
@@ -1749,11 +1839,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> None:
         """Record outcome for Q-learning feedback.
 
-        Called at the end of a conversation to record the outcome
-        for reinforcement learning. This helps the system learn
-        optimal mode transitions and tool budgets.
-
-        Also records continuation prompt learning outcomes if RL learner enabled.
+        Delegates to OrchestratorIntegration.record_intelligent_outcome().
 
         Args:
             success: Whether the task was completed successfully
@@ -1761,112 +1847,39 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             user_satisfied: Whether user seemed satisfied
             completed: Whether task reached completion
         """
-        # Record RL outcomes for all learners
-        if self._rl_coordinator and hasattr(self, "_current_stream_context"):
-            try:
-                from victor.agent.rl.base import RLOutcome
-
-                ctx = self._current_stream_context
-                # Determine task type from context
-                task_type = "default"
-                if ctx.is_analysis_task:
-                    task_type = "analysis"
-                elif ctx.is_action_task:
-                    task_type = "action"
-
-                # Get continuation prompts used (track from orchestrator state)
-                continuation_prompts_used = getattr(self, "_continuation_prompts", 0)
-                max_prompts_configured = getattr(self, "_max_continuation_prompts_used", 6)
-                stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
-
-                # Get vertical name from context (avoid hardcoded "coding")
-                vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
-
-                # Record outcome for continuation_prompts learner
-                outcome = RLOutcome(
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    success=success and completed,
-                    quality_score=quality_score,
-                    metadata={
-                        "continuation_prompts_used": continuation_prompts_used,
-                        "max_prompts_configured": max_prompts_configured,
-                        "stuck_loop_detected": stuck_loop_detected,
-                        "forced_completion": ctx.force_completion,
-                        "tool_calls_total": self.tool_calls_used,
-                    },
-                    vertical=vertical_name,
-                )
-                self._rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
-
-                # Emit RL hook for continuation prompt
-                self._emit_continuation_event(
-                    event_type="prompt",
-                    success=success and completed,
-                    quality_score=quality_score,
-                    task_type=task_type,
-                    prompts_used=continuation_prompts_used,
-                )
-
-                # Also record for continuation_patience learner if we have stuck loop data
-                if continuation_prompts_used > 0:
-                    patience_outcome = RLOutcome(
-                        provider=self.provider.name,
-                        model=self.model,
-                        task_type=task_type,
-                        success=success and completed,
-                        quality_score=quality_score,
-                        metadata={
-                            "flagged_as_stuck": stuck_loop_detected,
-                            "actually_stuck": stuck_loop_detected and not success,
-                            "eventually_made_progress": not stuck_loop_detected and success,
-                        },
-                        vertical=vertical_name,
-                    )
-                    self._rl_coordinator.record_outcome(
-                        "continuation_patience", patience_outcome, vertical_name
-                    )
-
-                    # Emit RL hook for continuation patience
-                    self._emit_continuation_event(
-                        event_type="patience",
-                        success=success and completed,
-                        quality_score=quality_score,
-                        task_type=task_type,
-                        prompts_used=continuation_prompts_used,
-                        stuck_detected=stuck_loop_detected,
-                    )
-
-            except Exception as e:
-                logger.warning(f"RL: Failed to record RL outcomes: {e}")
-
         integration = self.intelligent_integration
         if not integration:
             return
 
+        # Get orchestrator state to pass to integration
+        stream_context = getattr(self, "_current_stream_context", None)
+        continuation_prompts = getattr(self, "_continuation_prompts", 0)
+        max_continuation_prompts_used = getattr(self, "_max_continuation_prompts_used", 6)
+        stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
+
         try:
-            # Access the mode controller through the pipeline
-            pipeline = integration.pipeline
-            if hasattr(pipeline, "_mode_controller") and pipeline._mode_controller:
-                pipeline._mode_controller.record_outcome(
-                    success=success,
-                    quality_score=quality_score,
-                    user_satisfied=user_satisfied,
-                    completed=completed,
-                )
-                logger.debug(
-                    f"IntelligentPipeline recorded outcome: "
-                    f"success={success}, quality={quality_score:.2f}"
-                )
+            integration.record_intelligent_outcome(
+                success=success,
+                quality_score=quality_score,
+                user_satisfied=user_satisfied,
+                completed=completed,
+                rl_coordinator=self._rl_coordinator,
+                stream_context=stream_context,
+                vertical_context=self._vertical_context,
+                provider_name=self.provider.name,
+                model=self.model,
+                tool_calls_used=self.tool_calls_used,
+                continuation_prompts=continuation_prompts,
+                max_continuation_prompts_used=max_continuation_prompts_used,
+                stuck_loop_detected=stuck_loop_detected,
+            )
         except Exception as e:
             logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
 
     def _should_continue_intelligent(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
 
-        Uses Q-learning based decisions to determine if the agent
-        should continue processing or transition to completion.
+        Delegates to OrchestratorIntegration.should_continue_intelligent().
 
         Returns:
             Tuple of (should_continue, reason)
@@ -1875,71 +1888,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not integration:
             return True, "Pipeline disabled"
 
-        try:
-            return integration.should_continue()
-        except Exception as e:
-            logger.debug(f"IntelligentPipeline should_continue failed: {e}")
-            return True, "Fallback to continue"
-
-    def _emit_continuation_event(
-        self,
-        event_type: str,
-        success: bool,
-        quality_score: float,
-        task_type: str,
-        prompts_used: int,
-        stuck_detected: bool = False,
-    ) -> None:
-        """Emit RL event for continuation attempt.
-
-        Args:
-            event_type: Either "prompt" or "patience"
-            success: Whether the continuation was successful
-            quality_score: Quality score of the result
-            task_type: Type of task
-            prompts_used: Number of continuation prompts used
-            stuck_detected: Whether a stuck loop was detected
-        """
-        try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
-
-            hooks = get_rl_hooks()
-            if hooks is None:
-                return
-
-            if event_type == "prompt":
-                event = RLEvent(
-                    type=RLEventType.CONTINUATION_PROMPT,
-                    success=success,
-                    quality_score=quality_score,
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    metadata={
-                        "prompts_used": prompts_used,
-                    },
-                )
-            else:  # patience
-                event = RLEvent(
-                    type=RLEventType.CONTINUATION_ATTEMPT,
-                    success=success,
-                    quality_score=quality_score,
-                    provider=self.provider.name,
-                    model=self.model,
-                    task_type=task_type,
-                    metadata={
-                        "prompts_used": prompts_used,
-                        "stuck_detected": stuck_detected,
-                    },
-                )
-
-            hooks.emit(event)
-
-        except Exception as e:
-            logger.debug(f"Continuation event emission failed: {e}")
+        return integration.should_continue_intelligent()
 
     @property
-    def safety_checker(self) -> SafetyChecker:
+    def safety_checker(self) -> "SafetyChecker":
         """Get the safety checker for dangerous operation detection.
 
         UI layers can use this to set confirmation callbacks:
@@ -1951,7 +1903,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._safety_checker
 
     @property
-    def auto_committer(self) -> Optional[AutoCommitter]:
+    def auto_committer(self) -> Optional["AutoCommitter"]:
         """Get the auto-committer for AI-assisted code change commits.
 
         Usage:
@@ -2054,24 +2006,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self.conversation.messages
 
-    def _get_context_size(self) -> tuple[int, int]:
-        """Calculate current context size in chars and estimated tokens.
-
-        Returns:
-            Tuple of (char_count, estimated_token_count)
-        """
-        # Delegate to ConversationController for centralized context tracking
-        metrics = self._conversation_controller.get_context_metrics()
-        return metrics.char_count, metrics.estimated_tokens
-
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
 
-        Queries the provider limits config for model-specific context window.
+        Delegates to ContextManager when available (TD-002 refactoring).
+        Falls back to direct implementation during __init__ before
+        ContextManager is created.
 
         Returns:
             Context window size in tokens
         """
+        # Delegate to ContextManager if available
+        if hasattr(self, "_context_manager") and self._context_manager is not None:
+            return self._context_manager.get_model_context_window()
+
+        # Fallback for calls during __init__ before ContextManager is created
         try:
             from victor.config.config_loaders import get_provider_limits
 
@@ -2084,24 +2033,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _get_max_context_chars(self) -> int:
         """Get maximum context size in characters.
 
-        Derives from model context window, converting tokens to chars.
-        Average ~4 chars per token, with safety margin.
+        Delegates to ContextManager (TD-002 refactoring).
 
         Returns:
             Maximum context size in characters
         """
-        # Check settings override first
-        settings_max = getattr(self.settings, "max_context_chars", None)
-        if settings_max and settings_max > 0:
-            return settings_max
-
-        # Calculate from model context window
-        # Use ~3.5 chars per token with 80% safety margin
-        context_tokens = self._get_model_context_window()
-        return int(context_tokens * 3.5 * 0.8)
+        return self._context_manager.get_max_context_chars()
 
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
+
+        Delegates to ContextManager (TD-002 refactoring).
 
         Args:
             max_context_chars: Maximum allowed context size in chars
@@ -2109,33 +2051,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if context is dangerously large
         """
-        # Delegate to ConversationController
-        metrics = self._conversation_controller.get_context_metrics()
-
-        # Update debug logger
-        self.debug_logger.log_context_size(metrics.char_count, metrics.estimated_tokens)
-
-        if metrics.is_overflow_risk:
-            logger.warning(
-                f"Context overflow risk: {metrics.char_count:,} chars "
-                f"(~{metrics.estimated_tokens:,} tokens). "
-                f"Max: {metrics.max_context_chars:,} chars"
-            )
-            return True
-
-        return False
+        return self._context_manager.check_context_overflow(max_context_chars)
 
     def get_context_metrics(self) -> ContextMetrics:
         """Get detailed context metrics.
 
+        Delegates to ContextManager (TD-002 refactoring).
+
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._conversation_controller.get_context_metrics()
-
-    def _init_stream_metrics(self) -> StreamMetrics:
-        """Initialize fresh stream metrics for a new streaming session."""
-        return self._metrics_collector.init_stream_metrics()
+        return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
@@ -2199,17 +2125,53 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "[AgentOrchestrator] ConversationEmbeddingStore configured. "
                 "Message embeddings will sync to LanceDB."
             )
+
+            # Set up semantic tool result cache using the embedding service
+            # This enables FAISS-based semantic caching with mtime invalidation
+            try:
+                from victor.agent.tool_result_cache import ToolResultCache
+
+                semantic_cache = ToolResultCache(
+                    embedding_service=embedding_service,
+                    max_entries=500,
+                    cleanup_interval=60.0,
+                )
+                # Store semantic cache for later wiring to tool pipeline
+                # (tool pipeline is created after this method runs)
+                self._pending_semantic_cache = semantic_cache
+                logger.debug(
+                    "[AgentOrchestrator] Semantic tool cache created, pending wire to pipeline"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize semantic tool cache: {e}")
+
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
             self._conversation_embedding_store = None
 
-    def _record_first_token(self) -> None:
-        """Record the time of first token received."""
-        self._metrics_collector.record_first_token()
+    def _finalize_stream_metrics(
+        self, usage_data: Optional[Dict[str, int]] = None
+    ) -> Optional[StreamMetrics]:
+        """Finalize stream metrics at end of streaming session.
 
-    def _finalize_stream_metrics(self) -> Optional[StreamMetrics]:
-        """Finalize stream metrics at end of streaming session."""
-        return self._metrics_collector.finalize_stream_metrics()
+        Args:
+            usage_data: Optional cumulative token usage from provider API.
+                       When provided, enables accurate token counts.
+        """
+        metrics = self._metrics_collector.finalize_stream_metrics(usage_data)
+
+        # Record to session cost tracker for cumulative tracking
+        if metrics and hasattr(self, "_session_cost_tracker"):
+            self._session_cost_tracker.record_request(
+                prompt_tokens=metrics.prompt_tokens,
+                completion_tokens=metrics.completion_tokens,
+                cache_read_tokens=metrics.cache_read_tokens,
+                cache_write_tokens=metrics.cache_write_tokens,
+                duration_seconds=metrics.total_duration,
+                tool_calls=metrics.tool_calls_count,
+            )
+
+        return metrics
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
@@ -2237,6 +2199,44 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             List of recent metrics dictionaries
         """
         return self._metrics_collector.get_streaming_metrics_history(limit)
+
+    def get_session_cost_summary(self) -> Dict[str, Any]:
+        """Get session cost summary.
+
+        Returns:
+            Dictionary with session cost statistics
+        """
+        if hasattr(self, "_session_cost_tracker"):
+            return self._session_cost_tracker.get_summary()
+        return {}
+
+    def get_session_cost_formatted(self) -> str:
+        """Get formatted session cost string.
+
+        Returns:
+            Cost string like "$0.0123" or "cost n/a"
+        """
+        if hasattr(self, "_session_cost_tracker"):
+            return self._session_cost_tracker.format_inline_cost()
+        return "cost n/a"
+
+    def export_session_costs(self, path: str, format: str = "json") -> None:
+        """Export session costs to file.
+
+        Args:
+            path: Output file path
+            format: Export format ("json" or "csv")
+        """
+        from pathlib import Path
+
+        if not hasattr(self, "_session_cost_tracker"):
+            return
+
+        output_path = Path(path)
+        if format == "csv":
+            self._session_cost_tracker.export_csv(output_path)
+        else:
+            self._session_cost_tracker.export_json(output_path)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -2435,8 +2435,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     },
                 )
                 self._rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
-            except Exception as e:
-                logger.debug(f"Failed to record tool outcome to RL: {e}")
+            except ImportError:
+                logger.debug("RLOutcome not available, skipping RL recording")
+            except KeyError as e:
+                logger.debug(f"RL learner not registered: {e}")
+            except ValueError as e:
+                logger.warning(f"Invalid outcome data for RL recording: {e}")
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -2451,6 +2455,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._metrics_collector.get_tool_usage_stats(
             conversation_state_summary=self.conversation_state.get_state_summary()
         )
+
+    def get_token_usage(self) -> "TokenUsage":
+        """Get cumulative token usage for evaluation tracking.
+
+        Returns cumulative tokens used across all stream_chat calls.
+        Used by VictorAgentAdapter for benchmark token tracking.
+
+        Returns:
+            TokenUsage dataclass with input/output/total token counts
+        """
+        from victor.evaluation.protocol import TokenUsage
+
+        return TokenUsage(
+            input_tokens=self._cumulative_token_usage.get("prompt_tokens", 0),
+            output_tokens=self._cumulative_token_usage.get("completion_tokens", 0),
+            total_tokens=self._cumulative_token_usage.get("total_tokens", 0),
+        )
+
+    def reset_token_usage(self) -> None:
+        """Reset cumulative token usage tracking.
+
+        Call this at the start of a new evaluation task to get fresh counts.
+        """
+        for key in self._cumulative_token_usage:
+            self._cumulative_token_usage[key] = 0
 
     def get_conversation_stage(self) -> ConversationStage:
         """Get the current conversation stage.
@@ -2627,19 +2656,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def start_health_monitoring(self) -> bool:
         """Start background provider health monitoring.
 
-        Enables automatic health checks at configured intervals and
-        auto-failover to healthy providers when enabled.
+        Delegates to ProviderCoordinator (TD-002).
 
         Returns:
             True if monitoring started, False if already running or unavailable
         """
-        if not hasattr(self, "_provider_manager") or not self._provider_manager:
-            logger.warning("Provider manager not available for health monitoring")
-            return False
-
         try:
-            await self._provider_manager.start_health_monitoring()
-            logger.info("Provider health monitoring started")
+            await self._provider_coordinator.start_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to start health monitoring: {e}")
@@ -2648,17 +2671,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def stop_health_monitoring(self) -> bool:
         """Stop background provider health monitoring.
 
-        Call this during graceful shutdown to clean up monitoring tasks.
+        Delegates to ProviderCoordinator (TD-002).
 
         Returns:
             True if monitoring stopped, False if not running or error
         """
-        if not hasattr(self, "_provider_manager") or not self._provider_manager:
-            return False
-
         try:
-            await self._provider_manager.stop_health_monitoring()
-            logger.debug("Provider health monitoring stopped")
+            await self._provider_coordinator.stop_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to stop health monitoring: {e}")
@@ -2667,38 +2686,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def get_provider_health(self) -> Dict[str, Any]:
         """Get health status of all registered providers.
 
+        Delegates to ProviderCoordinator (TD-002).
+
         Returns:
-            Dictionary with provider health information:
-            - current_provider: Name of current provider
-            - is_healthy: Current provider health status
-            - healthy_providers: List of healthy provider names
-            - can_failover: Whether failover is possible
+            Dictionary with provider health information
         """
-        result: Dict[str, Any] = {
-            "current_provider": self.provider_name,
-            "is_healthy": True,
-            "healthy_providers": [self.provider_name] if self.provider_name else [],
-            "can_failover": False,
-        }
-
-        if hasattr(self, "_provider_manager") and self._provider_manager:
-            try:
-                # Get current state
-                state = self._provider_manager.get_current_state()
-                if state:
-                    result["is_healthy"] = state.is_healthy
-                    result["switch_count"] = state.switch_count
-
-                # Get healthy providers for failover
-                healthy = await self._provider_manager.get_healthy_providers()
-                result["healthy_providers"] = healthy
-                result["can_failover"] = len(healthy) > 1
-
-            except Exception as e:
-                logger.warning(f"Failed to get provider health: {e}")
-                result["error"] = str(e)
-
-        return result
+        return await self._provider_coordinator.get_health()
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
@@ -2805,48 +2798,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_adapter = self._provider_manager.tool_adapter
             self.tool_calling_caps = self._provider_manager.capabilities
 
-            # Apply model-specific exploration settings to unified tracker
-            self.unified_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Get prompt contributors from vertical extensions
-            prompt_contributors = []
-            try:
-                from victor.core.verticals.protocols import VerticalExtensions
-
-                extensions = self._container.get_optional(VerticalExtensions)
-                if extensions and extensions.prompt_contributors:
-                    prompt_contributors = extensions.prompt_contributors
-            except Exception:
-                pass
-
-            # Reinitialize prompt builder
-            self.prompt_builder = SystemPromptBuilder(
-                provider_name=self.provider_name,
-                model=new_model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self.tool_calling_caps,
-                prompt_contributors=prompt_contributors,
-            )
-
-            # Rebuild system prompt with new adapter hints
-            base_system_prompt = self._build_system_prompt_with_adapter()
-            if self.project_context.content:
-                self._system_prompt = (
-                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-                )
-            else:
-                self._system_prompt = base_system_prompt
-
-            # Update tool budget based on new adapter's recommendation unless user override is sticky
-            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-            if sticky_budget:
-                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
-            else:
-                default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-                self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
+            self._apply_post_switch_hooks(respect_sticky_budget=True)
 
             # Log the switch
             logger.info(
@@ -2907,44 +2860,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_adapter = self._provider_manager.tool_adapter
             self.tool_calling_caps = self._provider_manager.capabilities
 
-            # Apply model-specific exploration settings to unified tracker
-            self.unified_tracker.set_model_exploration_settings(
-                exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-                continuation_patience=self.tool_calling_caps.continuation_patience,
-            )
-
-            # Get prompt contributors from vertical extensions
-            prompt_contributors = []
-            try:
-                from victor.core.verticals.protocols import VerticalExtensions
-
-                extensions = self._container.get_optional(VerticalExtensions)
-                if extensions and extensions.prompt_contributors:
-                    prompt_contributors = extensions.prompt_contributors
-            except Exception:
-                pass
-
-            # Reinitialize prompt builder
-            self.prompt_builder = SystemPromptBuilder(
-                provider_name=self.provider_name,
-                model=model,
-                tool_adapter=self.tool_adapter,
-                capabilities=self.tool_calling_caps,
-                prompt_contributors=prompt_contributors,
-            )
-
-            # Rebuild system prompt
-            base_system_prompt = self._build_system_prompt_with_adapter()
-            if self.project_context.content:
-                self._system_prompt = (
-                    base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-                )
-            else:
-                self._system_prompt = base_system_prompt
-
-            # Update tool budget
-            default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-            self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
+            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
+            self._apply_post_switch_hooks()
 
             logger.info(
                 f"Switched model: {old_model} -> {model} "
@@ -2991,6 +2908,71 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         return info
+
+    def _apply_post_switch_hooks(self, respect_sticky_budget: bool = False) -> None:
+        """Apply post-switch hooks after provider/model switch.
+
+        Consolidates common post-switch logic used by both switch_provider()
+        and switch_model() methods:
+        - Apply model-specific exploration settings to unified tracker
+        - Reinitialize prompt builder with new capabilities
+        - Rebuild system prompt
+        - Update tool budget
+
+        Args:
+            respect_sticky_budget: If True, don't reset tool budget when user
+                override is sticky (used by switch_provider).
+
+        Note:
+            This method assumes self.model, self.provider_name, self.tool_adapter,
+            and self.tool_calling_caps are already updated before calling.
+        """
+        # Apply model-specific exploration settings to unified tracker
+        self.unified_tracker.set_model_exploration_settings(
+            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
+            continuation_patience=self.tool_calling_caps.continuation_patience,
+        )
+
+        # Get prompt contributors from vertical extensions
+        prompt_contributors = []
+        try:
+            from victor.core.verticals.protocols import VerticalExtensions
+
+            extensions = self._container.get_optional(VerticalExtensions)
+            if extensions and extensions.prompt_contributors:
+                prompt_contributors = extensions.prompt_contributors
+        except ImportError:
+            logger.debug("VerticalExtensions module not available")
+        except AttributeError as e:
+            logger.warning(f"VerticalExtensions missing expected attributes: {e}")
+
+        # Reinitialize prompt builder
+        self.prompt_builder = SystemPromptBuilder(
+            provider_name=self.provider_name,
+            model=self.model,
+            tool_adapter=self.tool_adapter,
+            capabilities=self.tool_calling_caps,
+            prompt_contributors=prompt_contributors,
+        )
+
+        # Rebuild system prompt with new adapter hints
+        base_system_prompt = self._build_system_prompt_with_adapter()
+        if self.project_context.content:
+            self._system_prompt = (
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+        else:
+            self._system_prompt = base_system_prompt
+
+        # Update tool budget based on new adapter's recommendation
+        if respect_sticky_budget:
+            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
+            if sticky_budget:
+                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
+                return
+
+        default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
+        self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -3096,31 +3078,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # RL hook failure should never block prompt building
             logger.debug(f"Failed to emit prompt_used event: {e}")
 
-    def _strip_markup(self, text: str) -> str:
-        """Remove simple XML/HTML-like tags to salvage plain text."""
-        return self.sanitizer.strip_markup(text)
-
-    def _sanitize_response(self, text: str) -> str:
-        """Sanitize model response by removing malformed patterns."""
-        return self.sanitizer.sanitize(text)
-
-    def _is_garbage_content(self, content: str) -> bool:
-        """Detect if content is garbage/malformed output from local models."""
-        return self.sanitizer.is_garbage_content(content)
-
-    def _is_valid_tool_name(self, name: str) -> bool:
-        """Check if a tool name is valid and not a hallucination."""
-        return self.sanitizer.is_valid_tool_name(name)
-
-    def _infer_git_operation(
-        self, original_name: str, canonical_name: str, args: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Infer git operation from alias when not explicitly provided.
-
-        Delegates to orchestrator_utils.infer_git_operation.
-        """
-        return infer_git_operation(original_name, canonical_name, args)
-
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
 
@@ -3202,72 +3159,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Uses UnifiedTaskClassifier for robust classification with:
-        - Negation detection (handles "don't analyze", "skip the review")
-        - Confidence scoring for better decisions
-        - Weighted keyword matching
+        Delegates to TaskAnalyzer.classify_task_keywords().
 
         Args:
             user_message: The user's input message
 
         Returns:
-            Dictionary with:
-            - is_action_task: bool - True if task requires action (create/execute/run)
-            - is_analysis_task: bool - True if task requires analysis/exploration
-            - needs_execution: bool - True if task specifically requires execution
-            - coarse_task_type: str - "analysis", "action", or "default"
-            - confidence: float - Classification confidence (0.0-1.0)
-            - source: str - Classification source ("keyword", "context", "ensemble")
-            - task_type: str - Detailed task type
+            Dictionary with classification results (see TaskAnalyzer.classify_task_keywords)
         """
-        from victor.agent.unified_classifier import get_unified_classifier
-
-        classifier = get_unified_classifier()
-        result = classifier.classify(user_message)
-
-        # Log negated keywords for debugging
-        if result.negated_keywords:
-            negated_strs = [f"{m.keyword}" for m in result.negated_keywords]
-            logger.debug(f"Negated keywords detected: {negated_strs}")
-
-        return result.to_legacy_dict()
+        return self._task_analyzer.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
         self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Uses conversation history to boost classification confidence when
-        the current message is ambiguous but context suggests a task type.
+        Delegates to TaskAnalyzer.classify_task_with_context().
 
         Args:
             user_message: The user's input message
             history: Optional conversation history for context boosting
 
         Returns:
-            Dictionary with classification results (same as _classify_task_keywords
-            but with potential context boosting applied)
+            Dictionary with classification results (see TaskAnalyzer.classify_task_with_context)
         """
-        from victor.agent.unified_classifier import get_unified_classifier
-
-        classifier = get_unified_classifier()
-
-        if history:
-            result = classifier.classify_with_context(user_message, history)
-        else:
-            result = classifier.classify(user_message)
-
-        if result.context_signals:
-            logger.debug(f"Context signals applied: {result.context_signals}")
-
-        return result.to_legacy_dict()
-
-    def _get_tool_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
-        """Generate a user-friendly status message for a tool execution.
-
-        Delegates to orchestrator_utils.get_tool_status_message.
-        """
-        return get_tool_status_message(tool_name, tool_args)
+        return self._task_analyzer.classify_task_with_context(user_message, history)
 
     def _determine_continuation_action(
         self,
@@ -3283,9 +3199,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
-        Encapsulates the complex decision logic for handling responses without tool
-        calls, including intent classification, continuation prompting, and summary
-        requests.
+        DEPRECATED: This method delegates to ContinuationStrategy.determine_continuation_action().
+        Kept for backward compatibility with existing tests.
 
         Args:
             intent_result: Result from intent classifier (has .intent, .confidence)
@@ -3299,314 +3214,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             mentioned_tools: Tools mentioned but not executed (hallucinated tool calls)
 
         Returns:
-            Dictionary with:
-            - action: str - One of: "continue_asking_input", "return_to_user",
-                          "prompt_tool_call", "request_summary",
-                          "request_completion", "finish", "force_tool_execution"
-            - message: Optional[str] - System message to inject (if any)
-            - reason: str - Human-readable reason for the action
-            - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
+            Dictionary with action, message, reason, and updates.
         """
-        updates: Dict[str, Any] = {}
-
-        # CRITICAL FIX: If summary was already requested in a previous iteration,
-        # we should finish now - don't ask for another summary or loop again.
-        # This prevents duplicate output where the same content is yielded multiple times.
-        if getattr(self, "_max_prompts_summary_requested", False):
-            logger.info("Summary was already requested - finishing to prevent duplicate output")
-            return {
-                "action": "finish",
-                "message": None,
-                "reason": "Summary already requested - final response received",
-                "updates": updates,
-            }
-
-        # Extract intent type
-        intends_to_continue = intent_result.intent == IntentType.CONTINUATION
-        is_completion = intent_result.intent == IntentType.COMPLETION
-        is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
-        is_stuck_loop = intent_result.intent == IntentType.STUCK_LOOP
-
-        # CRITICAL FIX: Handle stuck loop immediately - model is planning but not executing
-        if is_stuck_loop:
-            logger.warning(
-                "Detected STUCK_LOOP intent - model is planning but not executing. "
-                "Forcing summary."
-            )
-            return {
-                "action": "request_summary",
-                "message": (
-                    "You appear to be stuck in a planning loop - you keep describing what "
-                    "you will do but are not making actual tool calls.\n\n"
-                    "Please either:\n"
-                    "1. Make an ACTUAL tool call NOW (not just describe it), OR\n"
-                    "2. Provide your response based on what you already know.\n\n"
-                    "Do not describe what you will do - just do it or provide your answer."
-                ),
-                "reason": "STUCK_LOOP detected - forcing summary",
-                "updates": {"continuation_prompts": 99},  # Prevent further prompting
-            }
-
-        # Configuration - use configurable thresholds from settings
-        max_asking_input_prompts = 3
-        requires_continuation_support = is_analysis_task or is_action_task or intends_to_continue
-        # Get continuation prompt limits from settings with provider/model-specific overrides
-        max_cont_analysis = getattr(self.settings, "max_continuation_prompts_analysis", 6)
-        max_cont_action = getattr(self.settings, "max_continuation_prompts_action", 5)
-        max_cont_default = getattr(self.settings, "max_continuation_prompts_default", 3)
-
-        # Check for provider/model-specific overrides (RL-learned or manually configured)
-        provider_model_key = f"{self.provider.name}:{self.model}"
-
-        # First, try RL-learned recommendations if coordinator is enabled
-        if self._rl_coordinator:
-            for task_type_name, default_val in [
-                ("analysis", max_cont_analysis),
-                ("action", max_cont_action),
-                ("default", max_cont_default),
-            ]:
-                recommendation = self._rl_coordinator.get_recommendation(
-                    "continuation_prompts", self.provider.name, self.model, task_type_name
-                )
-                if recommendation and recommendation.value is not None:
-                    learned_val = recommendation.value
-                    if task_type_name == "analysis":
-                        max_cont_analysis = learned_val
-                    elif task_type_name == "action":
-                        max_cont_action = learned_val
-                    else:
-                        max_cont_default = learned_val
-                    logger.debug(
-                        f"RL: Using learned continuation prompt for {provider_model_key}:{task_type_name}: "
-                        f"{default_val} → {learned_val} (confidence={recommendation.confidence:.2f})"
-                    )
-
-        # Then, apply manual overrides (take precedence over RL)
-        overrides = getattr(self.settings, "continuation_prompt_overrides", {})
-        if provider_model_key in overrides:
-            override = overrides[provider_model_key]
-            max_cont_analysis = override.get("analysis", max_cont_analysis)
-            max_cont_action = override.get("action", max_cont_action)
-            max_cont_default = override.get("default", max_cont_default)
-            logger.debug(
-                f"Using manual continuation prompt overrides for {provider_model_key}: "
-                f"analysis={max_cont_analysis}, action={max_cont_action}, default={max_cont_default}"
-            )
-
-        max_continuation_prompts = (
-            max_cont_analysis
-            if is_analysis_task
-            else (max_cont_action if is_action_task else max_cont_default)
+        # Delegate to ContinuationStrategy (extracted in Phase 2E)
+        strategy = ContinuationStrategy()
+        return strategy.determine_continuation_action(
+            intent_result=intent_result,
+            is_analysis_task=is_analysis_task,
+            is_action_task=is_action_task,
+            content_length=content_length,
+            full_content=full_content,
+            continuation_prompts=continuation_prompts,
+            asking_input_prompts=asking_input_prompts,
+            one_shot_mode=one_shot_mode,
+            mentioned_tools=mentioned_tools,
+            # Context from orchestrator
+            max_prompts_summary_requested=getattr(self, "_max_prompts_summary_requested", False),
+            settings=self.settings,
+            rl_coordinator=self._rl_coordinator,
+            provider_name=self.provider.name,
+            model=self.model,
+            tool_budget=self.tool_budget,
+            unified_tracker_config=self.unified_tracker.config,
+            task_completion_signals=None,  # Legacy caller doesn't use this
         )
-
-        # Track for RL learning (what max was actually used this session)
-        self._max_continuation_prompts_used = max_continuation_prompts
-
-        # Budget/iteration thresholds
-        budget_threshold = (
-            self.tool_budget // 4 if requires_continuation_support else self.tool_budget // 2
-        )
-        max_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
-        iteration_threshold = (
-            max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
-        )
-
-        # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
-        # If model says "let me call search()" but didn't actually call it, force action
-        if mentioned_tools and len(mentioned_tools) > 0:
-            # Track consecutive hallucinated tool mentions
-            if not hasattr(self, "_hallucinated_tool_count"):
-                self._hallucinated_tool_count = 0
-            self._hallucinated_tool_count += 1
-
-            # After 2 consecutive hallucinations, force a more aggressive response
-            if self._hallucinated_tool_count >= 2:
-                self._hallucinated_tool_count = 0  # Reset counter
-                updates["continuation_prompts"] = continuation_prompts + 2  # Double increment
-                return {
-                    "action": "force_tool_execution",
-                    "message": (
-                        f"CRITICAL: You mentioned using {', '.join(mentioned_tools)} but did NOT "
-                        "actually execute any tool call. Your response contained TEXT describing "
-                        "what you would do, but no actual tool invocation.\n\n"
-                        "You MUST respond with an ACTUAL tool call in the proper format. "
-                        "Do NOT describe what you will do - just DO it.\n\n"
-                        "Example correct format:\n"
-                        '{"name": "read", "arguments": {"path": "some/file.py"}}\n\n'
-                        "If you cannot call tools, provide your final answer NOW."
-                    ),
-                    "reason": f"Forcing tool execution after {self._hallucinated_tool_count + 2} hallucinated tool mentions",
-                    "updates": updates,
-                    "mentioned_tools": mentioned_tools,  # Pass tools for handler delegation
-                }
-            else:
-                updates["continuation_prompts"] = continuation_prompts + 1
-                return {
-                    "action": "prompt_tool_call",
-                    "message": (
-                        f"You mentioned {', '.join(mentioned_tools)} but did not call any tool. "
-                        "Please ACTUALLY call the tool now, or provide your analysis.\n\n"
-                        "DO NOT just describe what you will do - make the actual tool call."
-                    ),
-                    "reason": f"Tool mentioned but not executed: {mentioned_tools}",
-                    "updates": updates,
-                }
-
-        # Reset hallucinated tool count on successful non-hallucination
-        if hasattr(self, "_hallucinated_tool_count"):
-            self._hallucinated_tool_count = 0
-
-        # Handle model asking for user input
-        if is_asking_input:
-            if one_shot_mode and asking_input_prompts < max_asking_input_prompts:
-                updates["asking_input_prompts"] = asking_input_prompts + 1
-                return {
-                    "action": "continue_asking_input",
-                    "message": (
-                        "Yes, please continue with the implementation. "
-                        "Proceed with the most sensible approach based on what you've learned."
-                    ),
-                    "reason": f"Model asking input (one-shot) - auto-continuing ({asking_input_prompts + 1}/{max_asking_input_prompts})",
-                    "updates": updates,
-                }
-            elif not one_shot_mode:
-                return {
-                    "action": "return_to_user",
-                    "message": None,
-                    "reason": "Model asking input (interactive) - returning to user",
-                    "updates": updates,
-                }
-
-        # Check for structured content that indicates completion
-        has_substantial_structured_content = content_length > 500 and any(
-            marker in (full_content or "")
-            for marker in ["## ", "**Summary", "**Strengths", "**Weaknesses"]
-        )
-        content_looks_incomplete = content_length < 800 and not has_substantial_structured_content
-
-        # Determine if we should prompt for continuation
-        should_prompt_continuation = intends_to_continue or (
-            intent_result.intent == IntentType.NEUTRAL
-            and content_looks_incomplete
-            and not is_completion
-        )
-
-        # CRITICAL FIX: Detect stuck continuation loop pattern
-        # If model keeps saying "let me read" but never calls tools, after patience threshold
-        # stop prompting and force a summary instead. Use provider-specific patience.
-        # Track tool calls at start of continuation prompting to detect when model is stuck
-        # even if it made tool calls earlier in the session.
-        if not hasattr(self, "_tool_calls_at_continuation_start"):
-            self._tool_calls_at_continuation_start = self.tool_calls_used
-        if continuation_prompts == 0:
-            # Reset tracking on first prompt of a new sequence
-            self._tool_calls_at_continuation_start = self.tool_calls_used
-
-        tool_calls_during_continuation = (
-            self.tool_calls_used - self._tool_calls_at_continuation_start
-        )
-
-        # Use provider-specific patience for continuation loops (e.g., DeepSeek needs more patience)
-        patience_threshold = self.tool_calling_caps.continuation_patience
-
-        if (
-            intends_to_continue
-            and continuation_prompts >= patience_threshold
-            and tool_calls_during_continuation == 0
-            and not getattr(self, "_max_prompts_summary_requested", False)
-        ):
-            # Model is in a continuation loop without making any progress
-            logger.warning(
-                f"Detected stuck continuation loop: {continuation_prompts} prompts, "
-                f"0 tool calls since continuation started (total: {self.tool_calls_used}), "
-                f"intent={intent_result.intent.name}"
-            )
-            updates["continuation_prompts"] = 99  # Prevent further prompting
-            self._stuck_loop_detected = True  # Track for RL learning
-            return {
-                "action": "request_summary",
-                "message": (
-                    "You have been saying you will examine files but have not made any tool calls. "
-                    "Please provide your response NOW based on what you know, or explain "
-                    "specifically what is preventing you from making tool calls."
-                ),
-                "reason": "Stuck continuation loop - no tool calls after multiple prompts",
-                "updates": updates,
-                "set_max_prompts_summary_requested": True,
-            }
-
-        # Prompt model to make tool call if appropriate
-        if (
-            requires_continuation_support
-            and should_prompt_continuation
-            and self.tool_calls_used < budget_threshold
-            and self.unified_tracker.iterations < iteration_threshold
-            and continuation_prompts < max_continuation_prompts
-        ):
-            updates["continuation_prompts"] = continuation_prompts + 1
-            return {
-                "action": "prompt_tool_call",
-                "message": (
-                    "You said you would examine more files but did not call any tool. "
-                    "Either:\n"
-                    "1. Call ls(path='...') to explore a directory, OR\n"
-                    "2. Call read(path='...') to read a specific file, OR\n"
-                    "3. Provide your analysis NOW if you have enough information.\n\n"
-                    "Make a tool call or provide your final response."
-                ),
-                "reason": f"Prompting for tool call ({continuation_prompts + 1}/{max_continuation_prompts})",
-                "updates": updates,
-            }
-
-        # Request summary if max continuation prompts reached
-        if (
-            requires_continuation_support
-            and continuation_prompts >= max_continuation_prompts
-            and self.tool_calls_used > 0
-            and not getattr(self, "_max_prompts_summary_requested", False)
-        ):
-            updates["continuation_prompts"] = 99  # Prevent further prompting
-            return {
-                "action": "request_summary",
-                "message": (
-                    "Please complete the task NOW based on what you have done so far. "
-                    "Provide a summary of your progress and any remaining steps."
-                ),
-                "reason": f"Max continuation prompts ({max_continuation_prompts}) reached",
-                "updates": updates,
-                "set_max_prompts_summary_requested": True,
-            }
-
-        # Request completion for incomplete output
-        if (
-            requires_continuation_support
-            and self.tool_calls_used > 0
-            and content_looks_incomplete
-            and not is_completion
-            and not getattr(self, "_final_summary_requested", False)
-        ):
-            return {
-                "action": "request_completion",
-                "message": (
-                    "You have examined several files. Please provide a complete summary "
-                    "of your analysis including:\n"
-                    "1. **Strengths** - What the codebase does well\n"
-                    "2. **Weaknesses** - Areas that need improvement\n"
-                    "3. **Recommendations** - Specific suggestions for improvement\n\n"
-                    "Provide your analysis NOW."
-                ),
-                "reason": "Incomplete output - requesting final summary",
-                "updates": updates,
-                "set_final_summary_requested": True,
-            }
-
-        # No more tool calls needed - finish
-        return {
-            "action": "finish",
-            "message": None,
-            "reason": "No more tool calls requested",
-            "updates": updates,
-        }
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
@@ -3670,143 +3301,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         registered_count = self.tool_registrar._register_dynamic_tools()
         logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
 
-        # MCP integration (handled separately via registrar config)
+        # MCP integration - delegate to ToolRegistrar
         if getattr(self.settings, "use_mcp_tools", False):
-            self._setup_mcp_integration()
-
-    def _setup_mcp_integration(self) -> None:
-        """Set up MCP integration using registry or legacy client.
-
-        Uses MCPRegistry for auto-discovery if available, falls back to
-        legacy single-client approach for backwards compatibility.
-        """
-        mcp_command = getattr(self.settings, "mcp_command", None)
-
-        # Try MCPRegistry with auto-discovery first
-        try:
-            from victor.integrations.mcp.registry import MCPRegistry
-
-            # Auto-discover MCP servers from standard locations
-            self.mcp_registry = MCPRegistry.discover_servers()
-
-            # Also register command from settings if specified
-            if mcp_command:
-                from victor.integrations.mcp.registry import MCPServerConfig
-
-                cmd_parts = mcp_command.split()
-                self.mcp_registry.register_server(
-                    MCPServerConfig(
-                        name="settings_mcp",
-                        command=cmd_parts,
-                        description="MCP server from settings",
-                        auto_connect=True,
-                    )
+            mcp_tools_count = self.tool_registrar._setup_mcp_integration()
+            # Copy mcp_registry reference for backwards compatibility
+            self.mcp_registry = getattr(self.tool_registrar, "mcp_registry", None)
+            if mcp_tools_count > 0:
+                logger.debug(
+                    f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar"
                 )
-
-            # Start registry and connect to servers in background
-            if self.mcp_registry.list_servers():
-                logger.info(
-                    f"MCP Registry initialized with {len(self.mcp_registry.list_servers())} server(s)"
-                )
-                self._create_background_task(self._start_mcp_registry(), name="mcp_registry_start")
-            else:
-                logger.debug("No MCP servers configured")
-
-        except ImportError:
-            logger.debug("MCPRegistry not available, using legacy client")
-            self._setup_legacy_mcp(mcp_command)
-
-        # Register MCP tool definitions
-        for mcp_tool in get_mcp_tool_definitions():
-            self.tools.register_dict(mcp_tool)
-
-    def _setup_legacy_mcp(self, mcp_command: Optional[str]) -> None:
-        """Set up legacy single MCP client (backwards compatibility)."""
-        if mcp_command:
-            try:
-                from victor.integrations.mcp.client import MCPClient
-
-                mcp_client = MCPClient()
-                cmd_parts = mcp_command.split()
-                self._create_background_task(
-                    mcp_client.connect(cmd_parts), name="mcp_legacy_connect"
-                )
-                # MCP client setup is now handled via context injection
-            except Exception as exc:
-                logger.warning(f"Failed to start MCP client: {exc}")
-
-    async def _start_mcp_registry(self) -> None:
-        """Start MCP registry and connect to discovered servers."""
-        try:
-            await self.mcp_registry.start()
-            results = await self.mcp_registry.connect_all()
-            connected = sum(1 for v in results.values() if v)
-            if connected > 0:
-                logger.info(f"Connected to {connected} MCP server(s)")
-                # Update available tools from MCP
-                mcp_tools = self.mcp_registry.get_all_tools()
-                if mcp_tools:
-                    logger.info(f"Discovered {len(mcp_tools)} MCP tools")
-        except Exception as e:
-            logger.warning(f"Failed to start MCP registry: {e}")
-
-    def _register_default_tool_dependencies(self) -> None:
-        """Register minimal tool input/output specs for planning with cost tiers."""
-        try:
-            # Search tools - FREE tier (local operations)
-            self.tool_graph.add_tool(
-                "code_search",
-                inputs=["query"],
-                outputs=["file_candidates"],
-                cost_tier=CostTier.FREE,
-            )
-            self.tool_graph.add_tool(
-                "semantic_code_search",
-                inputs=["query"],
-                outputs=["file_candidates"],
-                cost_tier=CostTier.FREE,
-            )
-            # File operations - FREE tier
-            self.tool_graph.add_tool(
-                "read_file",
-                inputs=["file_candidates"],
-                outputs=["file_contents"],
-                cost_tier=CostTier.FREE,
-            )
-
-            # Analysis tools - LOW tier (more compute but local)
-            self.tool_graph.add_tool(
-                "analyze_docs",
-                inputs=["file_contents"],
-                outputs=["summary"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "code_review",
-                inputs=["file_contents"],
-                outputs=["summary"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "generate_docs",
-                inputs=["file_contents"],
-                outputs=["documentation"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "security_scan",
-                inputs=["file_contents"],
-                outputs=["security_report"],
-                cost_tier=CostTier.LOW,
-            )
-            self.tool_graph.add_tool(
-                "analyze_metrics",
-                inputs=["file_contents"],
-                outputs=["metrics_report"],
-                cost_tier=CostTier.LOW,
-            )
-        except Exception as exc:
-            logger.debug(f"Failed to register tool dependencies: {exc}")
 
     def _initialize_plugins(self) -> None:
         """Initialize and load tool plugins from configured directories.
@@ -3819,125 +3322,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.plugin_manager = self.tool_registrar.plugin_manager
         if tool_count > 0:
             logger.info(f"Plugins initialized via ToolRegistrar: {tool_count} tools")
-
-    def _load_tool_configurations(self) -> None:
-        """Load tool configurations from profiles.yaml.
-
-        Loads tool enable/disable states from the 'tools' section in profiles.yaml.
-        Expected format:
-
-        tools:
-          enabled:
-            - read_file
-            - write_file
-            - execute_bash
-          disabled:
-            - code_review
-            - security_scan
-
-        Or:
-
-        tools:
-          code_review:
-            enabled: false
-          security_scan:
-            enabled: false
-        """
-        try:
-            tool_config = self.settings.load_tool_config()
-            if not tool_config:
-                return
-
-            # Get all registered tool names for validation
-            registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
-
-            # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
-            core_tools = get_critical_tools(self.tools)
-
-            # Format 1: Lists of enabled/disabled tools
-            if "enabled" in tool_config:
-                enabled_tools = tool_config.get("enabled", [])
-
-                # Validate tool names
-                invalid_tools = [t for t in enabled_tools if t not in registered_tools]
-                if invalid_tools:
-                    logger.warning(
-                        f"Configuration contains invalid tool names in 'enabled' list: {', '.join(invalid_tools)}. "
-                        f"Available tools: {', '.join(sorted(registered_tools))}"
-                    )
-
-                # Check if core tools are included (use dynamically discovered core tools)
-                missing_core = core_tools - set(enabled_tools)
-                if missing_core:
-                    logger.warning(
-                        f"'enabled' list is missing recommended core tools: {', '.join(missing_core)}. "
-                        f"This may limit agent functionality."
-                    )
-
-                # First disable all tools
-                for tool in self.tools.list_tools(only_enabled=False):
-                    self.tools.disable_tool(tool.name)
-                # Then enable only the specified ones
-                for tool_name in enabled_tools:
-                    if tool_name in registered_tools:
-                        self.tools.enable_tool(tool_name)
-
-            if "disabled" in tool_config:
-                disabled_tools = tool_config.get("disabled", [])
-
-                # Validate tool names
-                invalid_tools = [t for t in disabled_tools if t not in registered_tools]
-                if invalid_tools:
-                    logger.warning(
-                        f"Configuration contains invalid tool names in 'disabled' list: {', '.join(invalid_tools)}. "
-                        f"Available tools: {', '.join(sorted(registered_tools))}"
-                    )
-
-                # Warn if disabling core tools
-                disabled_core = core_tools & set(disabled_tools)
-                if disabled_core:
-                    logger.warning(
-                        f"Disabling core tools: {', '.join(disabled_core)}. "
-                        f"This may limit agent functionality."
-                    )
-
-                for tool_name in disabled_tools:
-                    if tool_name in registered_tools:
-                        self.tools.disable_tool(tool_name)
-
-            # Format 2: Individual tool settings
-            for tool_name, config in tool_config.items():
-                if isinstance(config, dict) and "enabled" in config:
-                    if tool_name not in registered_tools:
-                        logger.warning(
-                            f"Configuration contains invalid tool name: '{tool_name}'. "
-                            f"Available tools: {', '.join(sorted(registered_tools))}"
-                        )
-                        continue
-
-                    if config["enabled"]:
-                        self.tools.enable_tool(tool_name)
-                    else:
-                        self.tools.disable_tool(tool_name)
-                        # Warn if disabling core tools
-                        if tool_name in core_tools:
-                            logger.warning(
-                                f"Disabling core tool '{tool_name}'. This may limit agent functionality."
-                            )
-
-            # Log tool states
-            disabled_tools = [
-                name for name, enabled in self.tools.get_tool_states().items() if not enabled
-            ]
-            if disabled_tools:
-                logger.info(f"Disabled tools: {', '.join(sorted(disabled_tools))}")
-
-            # Log enabled tool count
-            enabled_count = sum(1 for enabled in self.tools.get_tool_states().values() if enabled)
-            logger.info(f"Enabled tools: {enabled_count}/{len(registered_tools)}")
-
-        except Exception as e:
-            logger.warning(f"Failed to load tool configurations: {e}")
 
     def _should_use_tools(self) -> bool:
         """Always return True - tool selection is handled by _select_relevant_tools()."""
@@ -3994,11 +3378,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         elif role == "assistant":
             self.usage_logger.log_event("assistant_response", {"content": content})
 
-    def _ensure_system_message(self) -> None:
-        """Ensure the system prompt is included once at the start of the conversation."""
-        self.conversation.ensure_system_prompt()
-        self._system_added = True
-
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
@@ -4014,7 +3393,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             CompletionResponse from the model with complete response
         """
-        self._ensure_system_message()
+        # Ensure system prompt is included once at start of conversation
+        self.conversation.ensure_system_prompt()
+        self._system_added = True
         # Add user message to history
         self.add_message("user", user_message)
 
@@ -4065,6 +3446,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tools=tools,
                 **provider_kwargs,
             )
+
+            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
+            if response.usage:
+                self._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
+                self._cumulative_token_usage["completion_tokens"] += response.usage.get(
+                    "completion_tokens", 0
+                )
+                self._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
 
             # Add assistant response to history if has content
             if response.content:
@@ -4149,32 +3542,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     def _handle_compaction(self, user_message: str) -> Optional[StreamChunk]:
-        """Perform proactive compaction if enabled."""
-        if not (hasattr(self, "_context_compactor") and self._context_compactor):
-            return None
+        """Perform proactive compaction if enabled.
 
-        compaction_action = self._context_compactor.check_and_compact(current_query=user_message)
-        if not compaction_action.action_taken:
-            return None
-
-        logger.info(
-            f"Proactive compaction: {compaction_action.trigger.value}, "
-            f"removed {compaction_action.messages_removed} messages, "
-            f"freed {compaction_action.chars_freed:,} chars"
-        )
-        chunk: Optional[StreamChunk] = None
-        if compaction_action.messages_removed > 0:
-            chunk = StreamChunk(
-                content=(
-                    f"\n[context] Proactively compacted history "
-                    f"({compaction_action.messages_removed} messages, "
-                    f"{compaction_action.chars_freed:,} chars freed).\n"
-                )
-            )
-            # Inject context reminder about compacted content
-            self._conversation_controller.inject_compaction_context()
-
-        return chunk
+        Delegates to ContextManager (TD-002 refactoring).
+        """
+        return self._context_manager.handle_compaction(user_message)
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -4227,7 +3599,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         tools=None,
                     )
                     if response and response.content:
-                        sanitized = self._sanitize_response(response.content)
+                        sanitized = self.sanitizer.sanitize(response.content)
                         if sanitized:
                             self.add_message("assistant", sanitized)
                             chunk = StreamChunk(content=sanitized, is_final=True)
@@ -4273,12 +3645,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     tools=None,
                 )
                 if response and response.content:
-                    sanitized = self._sanitize_response(response.content)
+                    sanitized = self.sanitizer.sanitize(response.content)
                     if sanitized:
                         self.add_message("assistant", sanitized)
                         chunk = StreamChunk(content=sanitized)
-            except Exception as e:
-                logger.warning(f"Final response generation failed: {e}")
+            except (ProviderRateLimitError, ProviderTimeoutError) as e:
+                logger.error(f"Rate limit/timeout during final response: {e}")
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
+            except ProviderAuthError as e:
+                logger.error(f"Auth error during final response: {e}")
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
+            except (ConnectionError, TimeoutError) as e:
+                logger.error(f"Network error during final response: {e}")
+                chunk = StreamChunk(content="Network error. Check connection.\n")
+            except Exception:
+                logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
                     content="Unable to generate final summary due to iteration limit.\n"
                 )
@@ -4312,7 +3693,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._is_streaming = True
 
         # Track performance metrics using StreamMetrics
-        stream_metrics = self._init_stream_metrics()
+        stream_metrics = self._metrics_collector.init_stream_metrics()
         start_time = stream_metrics.start_time
         total_tokens: float = 0
 
@@ -4325,11 +3706,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "cache_read_input_tokens": 0,
         }
 
-        self._ensure_system_message()
-        self.tool_calls_used = 0
-        self.observed_files = []
-        self.executed_tools = []
-        self.failed_tool_signatures = set()
+        # Ensure system prompt is included once at start of conversation
+        self.conversation.ensure_system_prompt()
+        self._system_added = True
+        # Reset session state for new stream via SessionStateManager
+        self._session_state.reset_for_new_turn()
 
         # Reset unified tracker for new conversation (single source of truth)
         self.unified_tracker.reset()
@@ -4682,123 +4063,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return chunk
 
-    def _check_iteration_limit_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Optional[StreamChunk]:
-        """Check iteration limit.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk if iteration limit reached, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.check_iteration_limit(recovery_ctx)
-
-    def _check_natural_completion_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        has_tool_calls: bool,
-        content_length: int,
-    ) -> Optional[StreamChunk]:
-        """Check for natural completion.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-            has_tool_calls: Whether there are tool calls
-            content_length: Length of current content
-
-        Returns:
-            StreamChunk if natural completion detected, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.check_natural_completion(
-            recovery_ctx, has_tool_calls, content_length
-        )
-
-    def _handle_empty_response_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Tuple[Optional[StreamChunk], bool]:
-        """Handle empty response.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Tuple of (StreamChunk if threshold exceeded, should_force_completion flag)
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.handle_empty_response(recovery_ctx)
-
-    def _handle_blocked_tool_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        block_reason: str,
-    ) -> StreamChunk:
-        """Handle blocked tool call.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-            tool_name: Name of blocked tool
-            tool_args: Arguments that were passed
-            block_reason: Reason for blocking
-
-        Returns:
-            StreamChunk with block notification
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.handle_blocked_tool(
-            recovery_ctx, tool_name, tool_args, block_reason
-        )
-
-    def _check_blocked_threshold_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        all_blocked: bool,
-    ) -> Optional[Tuple[StreamChunk, bool]]:
-        """Check blocked threshold using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_blocked_threshold() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            all_blocked: Whether all tool calls were blocked
-
-        Returns:
-            Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator (thresholds are read from settings internally)
-        return self._recovery_coordinator.check_blocked_threshold(recovery_ctx, all_blocked)
-
     async def _handle_recovery_with_integration(
         self,
         stream_ctx: StreamingChatContext,
@@ -4856,53 +4120,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._recovery_coordinator.apply_recovery_action(
             recovery_action, recovery_ctx, message_adder=self.add_message
         )
-
-    def _filter_blocked_tool_calls_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
-    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
-        """Filter blocked tool calls using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viafilter_blocked_tool_calls() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            tool_calls: List of tool calls to filter
-
-        Returns:
-            Tuple of (filtered_tool_calls, blocked_chunks, blocked_count)
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
-
-    def _check_force_action_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-    ) -> Tuple[bool, Optional[str]]:
-        """Check if force action should be triggered using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_force_action() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Tuple of (was_triggered, hint):
-            - was_triggered: True if force_completion was newly set
-            - hint: The hint string if triggered
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        # Note: RecoveryCoordinator uses unified_tracker internally
-        return self._recovery_coordinator.check_force_action(recovery_ctx)
 
     def _handle_force_tool_execution_with_handler(
         self,
@@ -5076,27 +4293,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Increment turn counter
         self.unified_tracker.increment_turn()
 
-    def _check_tool_budget_with_handler(
-        self, stream_ctx: StreamingChatContext
-    ) -> Optional[StreamChunk]:
-        """Check tool budget using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_tool_budget() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk with warning if approaching limit, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
-        return self._recovery_coordinator.check_tool_budget(recovery_ctx, warning_threshold)
-
     def _check_progress_with_handler(self, stream_ctx: StreamingChatContext) -> bool:
         """Check progress using the recovery coordinator.
 
@@ -5123,33 +4319,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return True
 
         return False
-
-    def _truncate_tool_calls_with_handler(
-        self,
-        tool_calls: List[Dict[str, Any]],
-        stream_ctx: StreamingChatContext,
-    ) -> List[Dict[str, Any]]:
-        """Truncate tool calls using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viatruncate_tool_calls() directly.
-
-
-        Args:
-            tool_calls: List of tool calls
-            stream_ctx: The streaming context
-
-        Returns:
-            Truncated list of tool calls
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        remaining = stream_ctx.get_remaining_budget()
-        truncated_calls, _ = self._recovery_coordinator.truncate_tool_calls(
-            recovery_ctx, tool_calls, remaining
-        )
-        return truncated_calls
 
     def _handle_force_completion_with_handler(
         self,
@@ -5184,103 +4353,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if result and result.chunks:
             return result.chunks[0]
         return None
-
-    def _get_recovery_prompts_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> List[tuple[str, float]]:
-        """Get recovery prompts using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_prompts() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            List of (prompt, temperature) tuples for recovery attempts
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Get thinking mode settings
-        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-
-        # Delegate to streaming handler (RecoveryCoordinator implementation is incomplete)
-        return self._streaming_handler.get_recovery_prompts(
-            ctx=stream_ctx,
-            base_temperature=self.temperature,
-            has_thinking_mode=has_thinking_mode,
-            thinking_disable_prefix=thinking_prefix,
-        )
-
-    def _should_use_tools_for_recovery_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-        attempt: int,
-    ) -> bool:
-        """Check if tools should be enabled for recovery using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viashould_use_tools_for_recovery() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            attempt: The recovery attempt number (1-indexed)
-
-        Returns:
-            True if tools should be enabled, False otherwise
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Delegate to streaming handler (RecoveryCoordinator doesn't take attempt parameter)
-        return self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
-
-    def _get_recovery_fallback_message_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> str:
-        """Get recovery fallback message using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_fallback_message() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Fallback message string
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.get_recovery_fallback_message(recovery_ctx)
-
-    def _handle_loop_warning_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-        warning_message: Optional[str],
-    ) -> Optional[StreamChunk]:
-        """Handle loop warning using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viahandle_loop_warning() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            warning_message: The warning message from unified tracker
-
-        Returns:
-            StreamChunk with warning if applicable, None otherwise
-        """
-        # Create recovery context from current state (reserved for RecoveryCoordinator)
-        _recovery_ctx = self._create_recovery_context(stream_ctx)  # noqa: F841
-
-        # Delegate to streaming handler (RecoveryCoordinator signature is different)
-        return self._streaming_handler.handle_loop_warning(stream_ctx, warning_message)
 
     def _parse_and_validate_tool_calls(
         self,
@@ -5398,7 +4470,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return await self._stream_with_rate_limit_retry(tools, provider_kwargs, stream_ctx)
 
     def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
-        """Extract wait time from rate limit error or calculate exponential backoff.
+        """Get wait time for rate limit retry.
+
+        Delegates to ProviderCoordinator for base wait time calculation (TD-002).
 
         Args:
             exc: The rate limit exception
@@ -5407,22 +4481,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Number of seconds to wait before retrying
         """
-        import re
+        # Get base wait time from coordinator (handles parsing retry_after, patterns, etc.)
+        base_wait = self._provider_coordinator.get_rate_limit_wait_time(exc)
 
-        # Check if it's a ProviderRateLimitError with retry_after
-        if isinstance(exc, ProviderRateLimitError) and exc.retry_after:
-            return min(float(exc.retry_after) + 0.5, 60.0)
+        # Apply exponential backoff based on attempt number
+        # For attempt 0: base_wait * 1, attempt 1: base_wait * 2, etc.
+        backoff_multiplier = 2**attempt
+        wait_time = base_wait * backoff_multiplier
 
-        # Try to extract "try again in X.XXs" or "Please retry after Xs" patterns
-        exc_str = str(exc)
-        wait_match = re.search(
-            r"(?:try again|retry after)\s*(?:in\s*)?(\d+(?:\.\d+)?)\s*s", exc_str, re.I
-        )
-        if wait_match:
-            return min(float(wait_match.group(1)) + 0.5, 60.0)
-
-        # Default exponential backoff: 2, 4, 8, 16, 32 seconds (capped at 32)
-        return min(2 ** (attempt + 1), 32.0)
+        # Cap at 5 minutes (300 seconds) - matches coordinator's max_rate_limit_wait
+        return min(wait_time, 300.0)
 
     async def _stream_with_rate_limit_retry(
         self,
@@ -5519,7 +4587,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             full_content += chunk.content
             stream_ctx.stream_metrics.total_chunks += 1
             if chunk.content:
-                self._record_first_token()
+                self._metrics_collector.record_first_token()
                 total_tokens += len(chunk.content) / 4
                 stream_ctx.stream_metrics.total_content_length += len(chunk.content)
 
@@ -5554,7 +4622,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         garbage_detected: bool,
     ) -> tuple[Any, int, bool]:
         """Handle garbage detection for a streaming chunk."""
-        if chunk.content and self._is_garbage_content(chunk.content):
+        if chunk.content and self.sanitizer.is_garbage_content(chunk.content):
             consecutive_garbage_chunks += 1
             if consecutive_garbage_chunks >= max_garbage_chunks:
                 if not garbage_detected:
@@ -5578,8 +4646,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
-        async for chunk in self._stream_chat_impl(user_message):
-            yield chunk
+        try:
+            async for chunk in self._stream_chat_impl(user_message):
+                yield chunk
+        finally:
+            # Update cumulative token usage after stream completes
+            # This enables accurate token tracking for evaluations/benchmarks
+            if hasattr(self, "_current_stream_context") and self._current_stream_context:
+                ctx = self._current_stream_context
+                if hasattr(ctx, "cumulative_usage"):
+                    for key in self._cumulative_token_usage:
+                        if key in ctx.cumulative_usage:
+                            self._cumulative_token_usage[key] += ctx.cumulative_usage[key]
+                    # Calculate total if not tracked by provider
+                    if self._cumulative_token_usage["total_tokens"] == 0:
+                        self._cumulative_token_usage["total_tokens"] = (
+                            self._cumulative_token_usage["prompt_tokens"]
+                            + self._cumulative_token_usage["completion_tokens"]
+                        )
 
     async def _stream_chat_impl(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Implementation for streaming chat.
@@ -5861,12 +4945,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             if full_content:
                 # Sanitize response to remove malformed patterns from local models
-                sanitized = self._sanitize_response(full_content)
+                sanitized = self.sanitizer.sanitize(full_content)
                 if sanitized:
                     self.add_message("assistant", sanitized)
                 else:
                     # If sanitization removed everything, use stripped markup as fallback
-                    plain_text = self._strip_markup(full_content)
+                    plain_text = self.sanitizer.strip_markup(full_content)
                     if plain_text:
                         self.add_message("assistant", plain_text)
 
@@ -5880,10 +4964,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         "Common with local models - tool syntax detected in response content."
                     )
             elif not tool_calls:
-                # No content and no tool calls - check for natural completion using handler
-                # Handler checks if substantial content was already provided
-                final_chunk = self._check_natural_completion_with_handler(
-                    stream_ctx, has_tool_calls=False, content_length=0
+                # No content and no tool calls - check for natural completion
+                # via recovery coordinator directly (checks if substantial content was provided)
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                final_chunk = self._recovery_coordinator.check_natural_completion(
+                    recovery_ctx, has_tool_calls=False, content_length=0
                 )
                 if final_chunk:
                     yield final_chunk
@@ -5892,18 +4977,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                # Track empty responses using handler delegation for testable logic
-                # Handler tracks consecutive empty responses and forces summary if threshold exceeded
-                recovery_chunk, should_force = self._handle_empty_response_with_handler(stream_ctx)
+                # Track empty responses - delegates to recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                recovery_chunk, should_force = self._recovery_coordinator.handle_empty_response(
+                    recovery_ctx
+                )
                 if recovery_chunk:
                     yield recovery_chunk
                     # CRITICAL: Handler already set stream_ctx.force_completion if needed
                     # The should_force flag confirms the handler's decision
                     continue
 
-                # Get recovery prompts using handler delegation (testable)
+                # Get recovery prompts via streaming handler directly
                 # Handler handles thinking mode prefix and task-aware prompts
-                recovery_prompts = self._get_recovery_prompts_with_handler(stream_ctx)
+                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+                recovery_prompts = self._streaming_handler.get_recovery_prompts(
+                    ctx=stream_ctx,
+                    base_temperature=self.temperature,
+                    has_thinking_mode=has_thinking_mode,
+                    thinking_disable_prefix=thinking_prefix,
+                )
 
                 recovery_success = False
                 for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
@@ -5916,8 +5010,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     )
                     recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
-                    # Use handler to decide if tools should be enabled (testable)
-                    use_tools = self._should_use_tools_for_recovery_with_handler(
+                    # Check if tools should be enabled via streaming handler directly
+                    use_tools = self._streaming_handler.should_use_tools_for_recovery(
                         stream_ctx, attempt
                     )
                     recovery_tools = tools if use_tools else None
@@ -5991,7 +5085,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             except Exception as e:
                                 logger.debug(f"Text extraction failed during recovery: {e}")
 
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized and len(sanitized) > 20:
                                 self.add_message("assistant", sanitized)
                                 yield self._chunk_generator.generate_content_chunk(
@@ -6045,8 +5139,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                     )
                 else:
-                    # All recovery attempts failed - get fallback message using handler (testable)
-                    fallback_msg = self._get_recovery_fallback_message_with_handler(stream_ctx)
+                    # All recovery attempts failed - get fallback message via recovery coordinator
+                    recovery_ctx = self._create_recovery_context(stream_ctx)
+                    fallback_msg = self._recovery_coordinator.get_recovery_fallback_message(
+                        recovery_ctx
+                    )
                     # Record outcome for Q-learning (fallback = partial failure)
                     self._record_intelligent_outcome(
                         success=False,
@@ -6115,17 +5212,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Set flag to force completion in continuation logic
                     self._force_finalize = True
 
-            # Check for loop warning using handler delegation (testable)
+            # Check for loop warning via streaming handler directly
             unified_loop_warning = self.unified_tracker.check_loop_warning()
-            loop_warning_chunk = self._handle_loop_warning_with_handler(
+            loop_warning_chunk = self._streaming_handler.handle_loop_warning(
                 stream_ctx, unified_loop_warning
             )
             if loop_warning_chunk:
                 logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
                 yield loop_warning_chunk
             else:
-                # PRIMARY: Check UnifiedTaskTracker for stop decision using handler delegation
-                was_triggered, hint = self._check_force_action_with_handler(stream_ctx)
+                # PRIMARY: Check UnifiedTaskTracker for stop decision via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                was_triggered, hint = self._recovery_coordinator.check_force_action(recovery_ctx)
                 if was_triggered:
                     logger.info(
                         f"UnifiedTaskTracker forcing action: {hint}, "
@@ -6141,7 +5239,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # Save content for intent classification before yielding
                     content_for_intent = full_content or ""
                     if full_content:
-                        sanitized = self._sanitize_response(full_content)
+                        sanitized = self.sanitizer.sanitize(full_content)
                         if sanitized:
                             logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
                             yield self._chunk_generator.generate_content_chunk(sanitized)
@@ -6313,7 +5411,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     elif action == "return_to_user":
                         # Yield the accumulated content before returning
                         if full_content:
-                            sanitized = self._sanitize_response(full_content)
+                            sanitized = self.sanitizer.sanitize(full_content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
                         yield self._chunk_generator.generate_final_marker_chunk()
@@ -6369,17 +5467,28 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                                     tools=None,  # DISABLE tools to force text response
                                 )
                                 if response and response.content:
-                                    sanitized = self._sanitize_response(response.content)
+                                    sanitized = self.sanitizer.sanitize(response.content)
                                     if sanitized:
                                         self.add_message("assistant", sanitized)
                                         yield self._chunk_generator.generate_content_chunk(
                                             sanitized
                                         )
 
-                                # Display metrics and exit
-                                elapsed_time = time.time() - stream_ctx.start_time
+                                # Finalize and display metrics, then exit
+                                final_metrics = self._finalize_stream_metrics(
+                                    stream_ctx.cumulative_usage
+                                )
+                                elapsed_time = (
+                                    final_metrics.total_duration
+                                    if final_metrics
+                                    else time.time() - stream_ctx.start_time
+                                )
+                                # Include cost if show_cost_metrics is enabled
+                                cost_str = None
+                                if self.settings.show_cost_metrics and final_metrics:
+                                    cost_str = final_metrics.format_cost()
                                 metrics_line = self._chunk_generator.format_completion_metrics(
-                                    stream_ctx, elapsed_time
+                                    stream_ctx, elapsed_time, cost_str
                                 )
                                 yield self._chunk_generator.generate_metrics_chunk(metrics_line)
                                 yield self._chunk_generator.generate_final_marker_chunk()
@@ -6431,14 +5540,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         # Handle action: finish - No more tool calls requested
                         # Yield the accumulated content to the UI (was missing!)
                         if full_content:
-                            sanitized = self._sanitize_response(full_content)
+                            sanitized = self.sanitizer.sanitize(full_content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
 
-                        # Display performance metrics using handler delegation
-                        elapsed_time = time.time() - stream_ctx.start_time
+                        # Finalize and display performance metrics using handler delegation
+                        # Pass cumulative_usage for accurate token counts from provider API
+                        final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
+                        elapsed_time = (
+                            final_metrics.total_duration
+                            if final_metrics
+                            else time.time() - stream_ctx.start_time
+                        )
+                        # Include cost if show_cost_metrics is enabled
+                        cost_str = None
+                        if self.settings.show_cost_metrics and final_metrics:
+                            cost_str = final_metrics.format_cost()
                         metrics_line = self._chunk_generator.format_completion_metrics(
-                            stream_ctx, elapsed_time
+                            stream_ctx, elapsed_time, cost_str
                         )
                         yield self._chunk_generator.generate_metrics_chunk(metrics_line)
                         # Record outcome for Q-learning (normal completion = success)
@@ -6463,8 +5582,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 remaining = stream_ctx.get_remaining_budget()
 
-                # Warn when approaching budget limit - uses handler delegation
-                budget_warning = self._check_tool_budget_with_handler(stream_ctx)
+                # Warn when approaching budget limit via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                warning_threshold = getattr(
+                    self.settings, "tool_call_budget_warning_threshold", 250
+                )
+                budget_warning = self._recovery_coordinator.check_tool_budget(
+                    recovery_ctx, warning_threshold
+                )
                 if budget_warning:
                     yield budget_warning
 
@@ -6486,7 +5611,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             tools=None,
                         )
                         if response and response.content:
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized:
                                 yield self._chunk_generator.generate_content_chunk(
                                     sanitized, suffix="\n"
@@ -6497,15 +5622,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         yield self._chunk_generator.generate_budget_error_chunk()
 
                     # Finalize and display performance metrics using handler delegation
-                    final_metrics = self._finalize_stream_metrics()
+                    # Pass cumulative_usage for accurate token counts from provider API
+                    final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
                     elapsed_time = (
                         final_metrics.total_duration
                         if final_metrics
                         else time.time() - stream_ctx.start_time
                     )
                     ttft = final_metrics.time_to_first_token if final_metrics else None
+                    # Include cost if show_cost_metrics is enabled
+                    cost_str = None
+                    if self.settings.show_cost_metrics and final_metrics:
+                        cost_str = final_metrics.format_cost()
                     metrics_line = self._chunk_generator.format_budget_exhausted_metrics(
-                        stream_ctx, elapsed_time, ttft
+                        stream_ctx, elapsed_time, ttft, cost_str
                     )
                     # Record outcome for Q-learning (budget reached = partial success)
                     self._record_intelligent_outcome(
@@ -6543,7 +5673,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             tools=None,  # No tools - force text response
                         )
                         if response and response.content:
-                            sanitized = self._sanitize_response(response.content)
+                            sanitized = self.sanitizer.sanitize(response.content)
                             if sanitized:
                                 self.add_message("assistant", sanitized)
                                 yield self._chunk_generator.generate_content_chunk(sanitized)
@@ -6555,13 +5685,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
                 # but continuation logic decided to continue the loop)
-                # Truncate to remaining budget using handler delegation
-                tool_calls = self._truncate_tool_calls_with_handler(tool_calls or [], stream_ctx)
+                # Truncate to remaining budget via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                remaining = stream_ctx.get_remaining_budget()
+                tool_calls, _ = self._recovery_coordinator.truncate_tool_calls(
+                    recovery_ctx, tool_calls or [], remaining
+                )
 
-                # Filter out tool calls that are blocked after loop warning
-                # Uses handler delegation for testable blocked tool filtering
+                # Filter out tool calls that are blocked via recovery coordinator
                 filtered_tool_calls, blocked_chunks, blocked_count = (
-                    self._filter_blocked_tool_calls_with_handler(stream_ctx, tool_calls)
+                    self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
                 )
                 for chunk in blocked_chunks:
                     yield chunk
@@ -6571,10 +5704,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tool_results = []
 
                 # Check if we should force completion due to excessive blocking
-                # Uses handler delegation for testable threshold checking
+                # via recovery coordinator directly
                 all_blocked = blocked_count > 0 and not filtered_tool_calls
-                threshold_result = self._check_blocked_threshold_with_handler(
-                    stream_ctx, all_blocked
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                threshold_result = self._recovery_coordinator.check_blocked_threshold(
+                    recovery_ctx, all_blocked
                 )
                 if threshold_result:
                     chunk, should_clear = threshold_result
@@ -6588,7 +5722,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     tool_name = tool_call.get("name", "tool")
                     tool_args = tool_call.get("arguments", {})
                     # Generate user-friendly status message with relevant context
-                    status_msg = self._get_tool_status_message(tool_name, tool_args)
+                    status_msg = get_tool_status_message(tool_name, tool_args)
                     # Emit structured tool_start event using handler delegation (testable)
                     yield self._chunk_generator.generate_tool_start_chunk(
                         tool_name, tool_args, status_msg
@@ -6710,12 +5844,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         )
                         return result, False, error_msg
 
-            except Exception as e:
+            except (ToolNotFoundError, ToolValidationError, PermissionError) as e:
+                # Non-retryable errors - fail immediately
+                logger.error(f"Tool '{tool_name}' permanent failure: {e}")
+                return None, False, str(e)
+            except (TimeoutError, ConnectionError, asyncio.TimeoutError) as e:
+                # Retryable transient errors
                 last_error = str(e)
                 if attempt < max_attempts - 1:
                     delay = min(base_delay * (2**attempt), max_delay)
                     logger.warning(
-                        f"Tool '{tool_name}' raised exception (attempt {attempt + 1}/{max_attempts}): {e}. "
+                        f"Tool '{tool_name}' transient error (attempt {attempt + 1}/{max_attempts}): {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
+                    return None, False, last_error
+            except Exception as e:
+                # Unknown errors - log and retry with caution
+                last_error = str(e)
+                if attempt < max_attempts - 1:
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    logger.warning(
+                        f"Tool '{tool_name}' unexpected error (attempt {attempt + 1}/{max_attempts}): {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
@@ -6763,7 +5915,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 continue
 
             # Validate tool name format (reject hallucinated/malformed names)
-            if not self._is_valid_tool_name(tool_name):
+            if not self.sanitizer.is_valid_tool_name(tool_name):
                 self.console.print(
                     f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
                 )
@@ -6844,7 +5996,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
 
             # Infer operation from alias for git tool (e.g., git_log → git with operation=log)
-            normalized_args = self._infer_git_operation(
+            normalized_args = infer_git_operation(
                 original_tool_name, canonical_tool_name, normalized_args
             )
 
@@ -6905,7 +6057,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_calls_used += 1
             self.executed_tools.append(tool_name)
             if tool_name == "read" and "path" in normalized_args:
-                self.observed_files.append(str(normalized_args.get("path")))
+                self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset continuation prompts counter on successful tool call
             # This allows the model to get fresh continuation prompts if it pauses again
@@ -7220,8 +6372,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
 
+        Delegates to memory_manager.get_session_stats() when available.
+
         Returns:
-            Dictionary with session statistics
+            Dictionary with session statistics including:
+            - enabled: Whether memory manager is active
+            - session_id: Current session ID
+            - message_count: Number of messages
+            - total_tokens: Total token usage
+            - max_tokens: Maximum token budget
+            - available_tokens: Remaining token budget
+            - Other session metadata
         """
         if not self.memory_manager or not self._memory_session_id:
             return {
@@ -7231,27 +6392,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             }
 
         try:
-            session = self.memory_manager.get_session(self._memory_session_id)
-            if not session:
+            # Delegate to memory_manager.get_session_stats()
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)
+            if not stats:
                 return {
                     "enabled": True,
                     "session_id": self._memory_session_id,
                     "error": "Session not found",
                 }
 
-            total_tokens = sum(m.token_count for m in session.messages)
-            return {
-                "enabled": True,
-                "session_id": self._memory_session_id,
-                "message_count": len(session.messages),
-                "total_tokens": total_tokens,
-                "max_tokens": session.max_tokens,
-                "reserved_tokens": session.reserved_tokens,
-                "available_tokens": session.max_tokens - session.reserved_tokens - total_tokens,
-                "project_path": session.project_path,
-                "provider": session.provider,
-                "model": session.model,
-            }
+            # Add orchestrator-specific fields
+            stats["enabled"] = True
+            return stats
         except Exception as e:
             logger.warning(f"Failed to get session stats: {e}")
             return {"enabled": True, "session_id": self._memory_session_id, "error": str(e)}
@@ -7462,6 +6614,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return set(self.tools.list_tools())
         return set()
 
+    def _build_tool_access_context(self) -> "ToolAccessContext":
+        """Build ToolAccessContext for unified access control checks.
+
+        Consolidates context construction used by get_enabled_tools() and
+        is_tool_enabled() to ensure consistent access control decisions.
+
+        Returns:
+            ToolAccessContext with session tools and current mode
+        """
+        from victor.agent.protocols import ToolAccessContext
+
+        return ToolAccessContext(
+            session_enabled_tools=getattr(self, "_enabled_tools", None),
+            current_mode=self.current_mode_name if self.mode_controller else None,
+        )
+
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
@@ -7474,15 +6642,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Use ToolAccessController if available (new unified approach)
         if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
-            from victor.agent.protocols import ToolAccessContext
-
-            # Build context for access check
-            # Uses ModeAwareMixin for consistent mode access
-            context = ToolAccessContext(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-                current_mode=self.current_mode_name if self.mode_controller else None,
-            )
-
+            context = self._build_tool_access_context()
             return self._tool_access_controller.get_allowed_tools(context)
 
         # Legacy fallback: Check mode controller for BUILD mode (allows all tools)
@@ -7570,15 +6730,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Use ToolAccessController if available (new unified approach)
         if hasattr(self, "_tool_access_controller") and self._tool_access_controller:
-            from victor.agent.protocols import ToolAccessContext
-
-            # Build context for access check
-            # Uses ModeAwareMixin for consistent mode access
-            context = ToolAccessContext(
-                session_enabled_tools=getattr(self, "_enabled_tools", None),
-                current_mode=self.current_mode_name if self.mode_controller else None,
-            )
-
+            context = self._build_tool_access_context()
             decision = self._tool_access_controller.check_access(tool_name, context)
             return decision.allowed
 
@@ -7653,13 +6805,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # --- Lifecycle Methods ---
     # Note: is_streaming() already exists at line ~5285
     # Note: reset() is provided via reset_conversation() at line ~5221
-
-    def cancel(self) -> None:
-        """Cancel any in-progress operation (protocol method).
-
-        Alias for request_cancellation() for protocol conformance.
-        """
-        self.request_cancellation()
 
     def reset(self) -> None:
         """Reset conversation state (protocol method).

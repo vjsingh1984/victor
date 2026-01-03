@@ -1,0 +1,138 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""{{ name_title }}-specific prompt contributions.
+
+This module provides task type hints and system prompt sections
+specific to {{ name }} tasks.
+"""
+
+from __future__ import annotations
+
+from typing import Dict
+
+from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+
+
+# Task-type-specific prompt hints for {{ name }} tasks
+{{ name_upper }}_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+    "analyze": TaskTypeHint(
+        task_type="analyze",
+        hint="[ANALYZE] Examine carefully. Read related files. Structured findings.",
+        tool_budget=12,
+        priority_tools=["read", "grep", "ls"],
+    ),
+    "create": TaskTypeHint(
+        task_type="create",
+        hint="[CREATE] Read relevant context first, then create. Follow existing patterns.",
+        tool_budget=8,
+        priority_tools=["read", "write"],
+    ),
+    "modify": TaskTypeHint(
+        task_type="modify",
+        hint="[MODIFY] Read target first, then modify. Focused changes only.",
+        tool_budget=6,
+        priority_tools=["read", "edit"],
+    ),
+    "general": TaskTypeHint(
+        task_type="general",
+        hint="[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.",
+        tool_budget=8,
+        priority_tools=["read", "grep", "ls"],
+    ),
+}
+
+
+# {{ name_title }}-specific grounding rules
+{{ name_upper }}_GROUNDING_RULES = """
+GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
+Quote exactly from tool output. If more info needed, call another tool.
+""".strip()
+
+
+# {{ name_title }}-specific system prompt section
+{{ name_upper }}_SYSTEM_PROMPT_SECTION = """
+When exploring:
+- Use grep for exact patterns
+- Use code_search for conceptual queries
+- Use overview to understand file structure
+
+When modifying:
+- Use edit for surgical changes
+- Use write only for new files or complete rewrites
+- Always verify changes when possible
+
+Guidelines:
+1. **Understand before modifying**: Always read and understand before making changes
+2. **Incremental changes**: Make small, focused changes rather than large rewrites
+3. **Verify changes**: Validate after modifications
+4. **Explain reasoning**: Briefly explain your approach when making non-trivial changes
+5. **Handle errors gracefully**: If something fails, diagnose and recover
+""".strip()
+
+
+class {{ name_class }}PromptContributor(PromptContributorProtocol):
+    """Prompt contributor for {{ name }} vertical.
+
+    Provides {{ name }}-specific task type hints and system prompt sections
+    for integration with the framework's prompt builder.
+    """
+
+    def __init__(self, use_extended_grounding: bool = False):
+        """Initialize the prompt contributor.
+
+        Args:
+            use_extended_grounding: Whether to use extended grounding rules
+        """
+        self._use_extended_grounding = use_extended_grounding
+
+    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+        """Get {{ name }}-specific task type hints.
+
+        Returns:
+            Dict mapping task types to their hints
+        """
+        return {{ name_upper }}_TASK_TYPE_HINTS.copy()
+
+    def get_system_prompt_section(self) -> str:
+        """Get {{ name }}-specific system prompt section.
+
+        Returns:
+            System prompt text for {{ name }} tasks
+        """
+        return {{ name_upper }}_SYSTEM_PROMPT_SECTION
+
+    def get_grounding_rules(self) -> str:
+        """Get {{ name }}-specific grounding rules.
+
+        Returns:
+            Grounding rules text
+        """
+        return {{ name_upper }}_GROUNDING_RULES
+
+    def get_priority(self) -> int:
+        """Get priority for prompt section ordering.
+
+        Returns:
+            Priority value
+        """
+        return 5
+
+
+__all__ = [
+    "{{ name_class }}PromptContributor",
+    "{{ name_upper }}_TASK_TYPE_HINTS",
+    "{{ name_upper }}_GROUNDING_RULES",
+    "{{ name_upper }}_SYSTEM_PROMPT_SECTION",
+]

@@ -81,10 +81,10 @@ class TestConfigLoaderLoadToolConfig:
     def registry_with_tools(self):
         """Create a registry with test tools (using canonical names)."""
         registry = ToolRegistry()
-        registry.register(MockTool("read", category="core"))
-        registry.register(MockTool("write", category="core"))
-        registry.register(MockTool("code_review"))
-        registry.register(MockTool("git"))
+        registry.register_tool(MockTool("read", category="core"))
+        registry.register_tool(MockTool("write", category="core"))
+        registry.register_tool(MockTool("code_review"))
+        registry.register_tool(MockTool("git"))
         return registry
 
     def test_load_empty_config(self, registry_with_tools):
@@ -170,11 +170,11 @@ class TestConfigLoaderHelpers:
     def registry_with_tools(self):
         """Create a registry with test tools (using canonical names)."""
         registry = ToolRegistry()
-        registry.register(MockTool("read", category="core"))
-        registry.register(MockTool("write", category="core"))
-        registry.register(MockTool("ls", category="core"))
-        registry.register(MockTool("shell", category="core"))
-        registry.register(MockTool("code_review"))
+        registry.register_tool(MockTool("read", category="core"))
+        registry.register_tool(MockTool("write", category="core"))
+        registry.register_tool(MockTool("ls", category="core"))
+        registry.register_tool(MockTool("shell", category="core"))
+        registry.register_tool(MockTool("code_review"))
         return registry
 
     def test_apply_enabled_list_warns_about_missing_core(self, registry_with_tools):
@@ -243,8 +243,8 @@ class TestConfigLoaderLogging:
     def test_log_tool_states(self):
         """Test logging tool states."""
         registry = ToolRegistry()
-        registry.register(MockTool("tool1"))
-        registry.register(MockTool("tool2"))
+        registry.register_tool(MockTool("tool1"))
+        registry.register_tool(MockTool("tool2"))
         registry.disable_tool("tool2")
 
         mock_settings = MagicMock()

@@ -540,7 +540,7 @@ class Settings(BaseSettings):
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
     semantic_similarity_threshold: float = (
-        0.5  # Min score [0.1-0.9], lowered from 0.7 to reduce false negatives
+        0.25  # Min score [0.1-0.9], lowered from 0.5 for better recall on technical queries
     )
     semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
     semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
@@ -565,6 +565,7 @@ class Settings(BaseSettings):
     # UI
     theme: str = "monokai"
     show_token_count: bool = True
+    show_cost_metrics: bool = False  # Show cost in metrics display (e.g., "$0.015")
     stream_responses: bool = True
     use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
 

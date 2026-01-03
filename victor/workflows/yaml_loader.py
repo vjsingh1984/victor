@@ -17,13 +17,36 @@
 Enables defining workflows in YAML format for easier configuration and
 version control without code changes.
 
+Extended Schema Features:
+- llm_config: Agent LLM settings (temperature, model_hint, max_tokens)
+- $ref: External file references for node reuse
+- batch_config: Workflow-level batch execution settings
+- temporal_context: Point-in-time analysis for backtesting
+- $env.VAR_NAME: Environment variable interpolation
+- ${VAR:-default}: Shell-style env vars with defaults
+
 Example YAML format:
     workflows:
       feature_implementation:
         description: "End-to-end feature development with review"
+
         metadata:
           version: "1.0"
           author: "team"
+          vertical: dataanalysis
+
+        # Batch execution settings
+        batch_config:
+          batch_size: 10
+          max_concurrent: 5
+          retry_strategy: end_of_batch
+
+        # Point-in-time context for backtesting
+        temporal_context:
+          as_of_date: $ctx.analysis_date
+          lookback_periods: 8
+          period_type: quarters
+
         nodes:
           - id: research
             type: agent
@@ -31,25 +54,35 @@ Example YAML format:
             goal: "Analyze codebase for relevant patterns"
             tool_budget: 20
             tools: [read, grep, code_search, overview]
+            llm_config:
+              temperature: 0.3
+              model_hint: claude-3-sonnet
             output: research_findings
             next: [plan]
+
           - id: plan
             type: agent
             role: planner
             goal: "Create implementation plan"
             tool_budget: 10
             next: [decide]
+
           - id: decide
             type: condition
             condition: "has_tests"  # Simple key check
             branches:
               true: implement
               false: add_tests
+
+          # External node reference
+          - $ref: "./common_nodes.yaml#validation"
+
           - id: implement
             type: agent
             role: executor
             goal: "Implement the feature"
             tool_budget: 30
+
           - id: review
             type: hitl
             hitl_type: approval
@@ -62,17 +95,81 @@ from __future__ import annotations
 
 import logging
 import operator
+import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, TYPE_CHECKING, Union
 
 import yaml
 
+
+# =============================================================================
+# Environment Variable Interpolation
+# =============================================================================
+
+# Pattern for $env.VAR_NAME syntax
+ENV_VAR_PATTERN = re.compile(r"\$env\.([A-Za-z_][A-Za-z0-9_]*)")
+# Pattern for ${VAR:-default} syntax
+SHELL_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def _interpolate_env_vars(value: Any) -> Any:
+    """Recursively interpolate environment variables in YAML values.
+
+    Supports two syntaxes:
+    - $env.VAR_NAME: Simple env var reference
+    - ${VAR_NAME:-default}: Shell-style with optional default
+
+    Args:
+        value: Any YAML value (str, dict, list, or primitive)
+
+    Returns:
+        Value with environment variables interpolated
+
+    Example:
+        input: "$env.DATABASE_URL"
+        output: "postgresql://localhost:5432/db"
+
+        input: "${API_KEY:-default_key}"
+        output: value of API_KEY or "default_key" if not set
+    """
+    if isinstance(value, str):
+        # Handle $env.VAR_NAME syntax
+        def replace_env(match: re.Match) -> str:
+            var_name = match.group(1)
+            return os.environ.get(var_name, f"$env.{var_name}")
+
+        result = ENV_VAR_PATTERN.sub(replace_env, value)
+
+        # Handle ${VAR:-default} syntax
+        def replace_shell(match: re.Match) -> str:
+            var_name = match.group(1)
+            default = match.group(2) if match.group(2) is not None else ""
+            return os.environ.get(var_name, default)
+
+        result = SHELL_VAR_PATTERN.sub(replace_shell, result)
+        return result
+
+    elif isinstance(value, dict):
+        return {k: _interpolate_env_vars(v) for k, v in value.items()}
+
+    elif isinstance(value, list):
+        return [_interpolate_env_vars(item) for item in value]
+
+    return value
+
+
+if TYPE_CHECKING:
+    from victor.workflows.batch_executor import BatchConfig
+    from victor.workflows.services.definition import ServiceConfig
+
 from victor.workflows.definition import (
     AgentNode,
+    ComputeNode,
     ConditionNode,
     ParallelNode,
+    TaskConstraints,
     TransformNode,
     WorkflowDefinition,
     WorkflowNode,
@@ -81,10 +178,506 @@ from victor.workflows.definition import (
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Extended Schema Dataclasses
+# =============================================================================
+
+
+@dataclass
+class LLMConfig:
+    """LLM configuration for agent nodes.
+
+    Allows fine-tuning LLM behavior per agent node.
+
+    Attributes:
+        temperature: Sampling temperature (0.0-1.0)
+        model_hint: Preferred model (e.g., claude-3-sonnet, claude-3-haiku)
+        max_tokens: Maximum tokens for response
+        top_p: Nucleus sampling parameter
+        stop_sequences: Custom stop sequences
+
+    Example YAML:
+        llm_config:
+          temperature: 0.3
+          model_hint: claude-3-sonnet
+          max_tokens: 4096
+    """
+
+    temperature: Optional[float] = None
+    model_hint: Optional[str] = None
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    stop_sequences: Optional[List[str]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {}
+        if self.temperature is not None:
+            result["temperature"] = self.temperature
+        if self.model_hint is not None:
+            result["model_hint"] = self.model_hint
+        if self.max_tokens is not None:
+            result["max_tokens"] = self.max_tokens
+        if self.top_p is not None:
+            result["top_p"] = self.top_p
+        if self.stop_sequences is not None:
+            result["stop_sequences"] = self.stop_sequences
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMConfig":
+        return cls(
+            temperature=data.get("temperature"),
+            model_hint=data.get("model_hint"),
+            max_tokens=data.get("max_tokens"),
+            top_p=data.get("top_p"),
+            stop_sequences=data.get("stop_sequences"),
+        )
+
+
+@dataclass
+class TemporalContextConfig:
+    """Point-in-time context configuration for backtesting.
+
+    Integrates with TemporalContext from executor for historical analysis.
+
+    Attributes:
+        as_of_date: Reference date (YYYY-MM-DD or $ctx.key reference)
+        lookback_periods: Number of periods to look back
+        period_type: Type of period (days, weeks, months, quarters, years)
+        include_end_date: Whether to include the as_of_date in range
+
+    Example YAML:
+        temporal_context:
+          as_of_date: $ctx.analysis_date
+          lookback_periods: 8
+          period_type: quarters
+    """
+
+    as_of_date: Optional[str] = None
+    lookback_periods: int = 1
+    period_type: Literal["days", "weeks", "months", "quarters", "years"] = "quarters"
+    include_end_date: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "as_of_date": self.as_of_date,
+            "lookback_periods": self.lookback_periods,
+            "period_type": self.period_type,
+            "include_end_date": self.include_end_date,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContextConfig":
+        return cls(
+            as_of_date=data.get("as_of_date"),
+            lookback_periods=data.get("lookback_periods", 1),
+            period_type=data.get("period_type", "quarters"),
+            include_end_date=data.get("include_end_date", True),
+        )
+
+
+@dataclass
+class ServiceConfigYAML:
+    """Service configuration from YAML.
+
+    Defines infrastructure services (databases, caches, message queues)
+    that should be started before workflow execution.
+
+    Attributes:
+        name: Service name (used as key in workflow context)
+        provider: Service provider (docker, kubernetes, local, external, aws_rds, etc.)
+        preset: Use a preset (postgres, redis, kafka, elasticsearch, etc.)
+        image: Docker image (for docker provider)
+        command: Override container command
+        ports: Port mappings (host:container or just container)
+        environment: Environment variables
+        volumes: Volume mounts
+        health_check: Health check configuration
+        depends_on: Services this service depends on
+        lifecycle: Lifecycle configuration (startup_order, etc.)
+        exports: Values to export to workflow context
+
+    Example YAML:
+        services:
+          postgres:
+            preset: postgres
+            environment:
+              POSTGRES_PASSWORD: $env.DB_PASSWORD
+            exports:
+              DATABASE_URL: postgresql://postgres:$env.DB_PASSWORD@localhost:5432/victor
+
+          cache:
+            provider: docker
+            image: redis:7-alpine
+            ports: [6379]
+            health_check:
+              type: tcp
+              port: 6379
+    """
+
+    name: str
+    provider: str = "docker"
+    preset: Optional[str] = None
+    image: Optional[str] = None
+    command: Optional[str] = None
+    ports: List[Union[int, str]] = field(default_factory=list)
+    environment: Dict[str, str] = field(default_factory=dict)
+    volumes: List[str] = field(default_factory=list)
+    health_check: Optional[Dict[str, Any]] = None
+    depends_on: List[str] = field(default_factory=list)
+    lifecycle: Optional[Dict[str, Any]] = None
+    exports: Dict[str, str] = field(default_factory=dict)
+    # AWS-specific
+    aws_config: Optional[Dict[str, Any]] = None
+    # Kubernetes-specific
+    k8s_config: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "name": self.name,
+            "provider": self.provider,
+        }
+        if self.preset:
+            result["preset"] = self.preset
+        if self.image:
+            result["image"] = self.image
+        if self.command:
+            result["command"] = self.command
+        if self.ports:
+            result["ports"] = self.ports
+        if self.environment:
+            result["environment"] = self.environment
+        if self.volumes:
+            result["volumes"] = self.volumes
+        if self.health_check:
+            result["health_check"] = self.health_check
+        if self.depends_on:
+            result["depends_on"] = self.depends_on
+        if self.lifecycle:
+            result["lifecycle"] = self.lifecycle
+        if self.exports:
+            result["exports"] = self.exports
+        if self.aws_config:
+            result["aws_config"] = self.aws_config
+        if self.k8s_config:
+            result["k8s_config"] = self.k8s_config
+        return result
+
+    @classmethod
+    def from_dict(cls, name: str, data: Dict[str, Any]) -> "ServiceConfigYAML":
+        return cls(
+            name=name,
+            provider=data.get("provider", "docker"),
+            preset=data.get("preset"),
+            image=data.get("image"),
+            command=data.get("command"),
+            ports=data.get("ports", []),
+            environment=data.get("environment", {}),
+            volumes=data.get("volumes", []),
+            health_check=data.get("health_check"),
+            depends_on=data.get("depends_on", []),
+            lifecycle=data.get("lifecycle"),
+            exports=data.get("exports", {}),
+            aws_config=data.get("aws_config"),
+            k8s_config=data.get("k8s_config"),
+        )
+
+    def to_service_config(self) -> "ServiceConfig":
+        """Convert to ServiceConfig for the service registry.
+
+        Returns:
+            ServiceConfig instance for use with ServiceRegistry
+        """
+        from victor.workflows.services import (
+            HealthCheckConfig,
+            HealthCheckType,
+            LifecycleConfig,
+            PortMapping,
+            ServiceConfig,
+            ServicePresets,
+            VolumeMount,
+        )
+
+        # Use preset if specified
+        if self.preset:
+            preset_factory = getattr(ServicePresets, self.preset, None)
+            if preset_factory:
+                # Get base config from preset
+                base_config = preset_factory(name=self.name)
+                # Override with YAML settings
+                if self.environment:
+                    base_config.environment.update(self.environment)
+                if self.exports:
+                    base_config.exports.update(self.exports)
+                return base_config
+            else:
+                logger.warning(f"Unknown preset '{self.preset}', using manual config")
+
+        # Parse port mappings
+        port_mappings = []
+        for port_spec in self.ports:
+            if isinstance(port_spec, int):
+                port_mappings.append(PortMapping(container_port=port_spec))
+            elif isinstance(port_spec, str) and ":" in port_spec:
+                host_port, container_port = port_spec.split(":", 1)
+                port_mappings.append(
+                    PortMapping(
+                        container_port=int(container_port),
+                        host_port=int(host_port),
+                    )
+                )
+            else:
+                port_mappings.append(PortMapping(container_port=int(port_spec)))
+
+        # Parse volume mounts
+        volume_mounts = []
+        for vol_spec in self.volumes:
+            if ":" in vol_spec:
+                parts = vol_spec.split(":")
+                volume_mounts.append(
+                    VolumeMount(
+                        host_path=parts[0],
+                        container_path=parts[1],
+                        read_only=len(parts) > 2 and parts[2] == "ro",
+                    )
+                )
+
+        # Parse health check
+        health_check = None
+        if self.health_check:
+            hc_type = self.health_check.get("type", "tcp")
+            health_check = HealthCheckConfig(
+                type=HealthCheckType(hc_type),
+                port=self.health_check.get("port"),
+                path=self.health_check.get("path"),
+                interval=self.health_check.get("interval", 5.0),
+                timeout=self.health_check.get("timeout", 30.0),
+                retries=self.health_check.get("retries", 3),
+            )
+
+        # Parse lifecycle
+        lifecycle = LifecycleConfig()
+        if self.lifecycle:
+            lifecycle = LifecycleConfig(
+                startup_order=self.lifecycle.get("startup_order", 0),
+                startup_timeout=self.lifecycle.get("startup_timeout", 60.0),
+                shutdown_timeout=self.lifecycle.get("shutdown_timeout", 30.0),
+                restart_policy=self.lifecycle.get("restart_policy", "no"),
+            )
+
+        return ServiceConfig(
+            name=self.name,
+            provider=self.provider,
+            image=self.image,
+            command=self.command,
+            ports=port_mappings,
+            environment=self.environment,
+            volumes=volume_mounts,
+            health_check=health_check,
+            depends_on=self.depends_on,
+            lifecycle=lifecycle,
+            exports=self.exports,
+        )
+
+
+@dataclass
+class BatchConfigYAML:
+    """Batch execution configuration from YAML.
+
+    Maps to BatchConfig from batch_executor for batch processing.
+
+    Attributes:
+        batch_size: Number of items per batch
+        max_concurrent: Maximum parallel executions
+        delay_seconds: Delay between batches
+        retry_strategy: How to handle failures (none, immediate, end_of_batch)
+        max_retries: Maximum retry attempts per item
+        fail_fast: Stop on first failure
+
+    Example YAML:
+        batch_config:
+          batch_size: 10
+          max_concurrent: 5
+          retry_strategy: end_of_batch
+          max_retries: 2
+    """
+
+    batch_size: int = 5
+    max_concurrent: int = 3
+    delay_seconds: float = 1.0
+    retry_strategy: str = "end_of_batch"
+    max_retries: int = 2
+    retry_delay_seconds: float = 5.0
+    timeout_per_item: Optional[float] = None
+    fail_fast: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "batch_size": self.batch_size,
+            "max_concurrent": self.max_concurrent,
+            "delay_seconds": self.delay_seconds,
+            "retry_strategy": self.retry_strategy,
+            "max_retries": self.max_retries,
+            "retry_delay_seconds": self.retry_delay_seconds,
+            "timeout_per_item": self.timeout_per_item,
+            "fail_fast": self.fail_fast,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BatchConfigYAML":
+        return cls(
+            batch_size=data.get("batch_size", 5),
+            max_concurrent=data.get("max_concurrent", 3),
+            delay_seconds=data.get("delay_seconds", 1.0),
+            retry_strategy=data.get("retry_strategy", "end_of_batch"),
+            max_retries=data.get("max_retries", 2),
+            retry_delay_seconds=data.get("retry_delay_seconds", 5.0),
+            timeout_per_item=data.get("timeout_per_item"),
+            fail_fast=data.get("fail_fast", False),
+        )
+
+    def to_batch_config(self) -> "BatchConfig":
+        """Convert to BatchConfig for executor."""
+        from victor.workflows.batch_executor import BatchConfig, RetryStrategy
+
+        strategy_map = {
+            "none": RetryStrategy.NONE,
+            "immediate": RetryStrategy.IMMEDIATE,
+            "end_of_batch": RetryStrategy.END_OF_BATCH,
+            "exponential_backoff": RetryStrategy.EXPONENTIAL_BACKOFF,
+        }
+
+        return BatchConfig(
+            batch_size=self.batch_size,
+            max_concurrent=self.max_concurrent,
+            delay_seconds=self.delay_seconds,
+            retry_strategy=strategy_map.get(self.retry_strategy, RetryStrategy.END_OF_BATCH),
+            max_retries=self.max_retries,
+            retry_delay_seconds=self.retry_delay_seconds,
+            timeout_per_item=self.timeout_per_item,
+            fail_fast=self.fail_fast,
+        )
+
+
+# =============================================================================
+# Error Types
+# =============================================================================
+
+
 class YAMLWorkflowError(Exception):
     """Error loading or parsing YAML workflow."""
 
     pass
+
+
+# =============================================================================
+# External Reference Resolution ($ref)
+# =============================================================================
+
+
+def _resolve_ref(
+    ref: str,
+    base_dir: Optional[Path],
+    ref_cache: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Resolve an external $ref reference to a node definition.
+
+    Supports two formats:
+    - "./path/to/file.yaml#node_id" - Reference specific node from file
+    - "./path/to/file.yaml" - Load entire file (returns first node)
+
+    Args:
+        ref: The $ref value (e.g., "./common_nodes.yaml#validation")
+        base_dir: Base directory for resolving relative paths
+        ref_cache: Cache of previously loaded files
+
+    Returns:
+        Dict containing the referenced node definition
+
+    Raises:
+        YAMLWorkflowError: If reference cannot be resolved
+    """
+    if "#" in ref:
+        file_path, node_id = ref.rsplit("#", 1)
+    else:
+        file_path = ref
+        node_id = None
+
+    # Resolve path relative to base_dir
+    if base_dir and not Path(file_path).is_absolute():
+        full_path = base_dir / file_path
+    else:
+        full_path = Path(file_path)
+
+    # Check cache
+    cache_key = str(full_path.resolve())
+    if cache_key not in ref_cache:
+        if not full_path.exists():
+            raise YAMLWorkflowError(f"Referenced file not found: {full_path}")
+
+        try:
+            content = full_path.read_text()
+            ref_cache[cache_key] = yaml.safe_load(content)
+        except yaml.YAMLError as e:
+            raise YAMLWorkflowError(f"Invalid YAML in referenced file {full_path}: {e}")
+
+    file_data = ref_cache[cache_key]
+
+    # Extract specific node or return first node
+    if node_id:
+        # Look for node in "nodes" list
+        nodes = file_data.get("nodes", [])
+        for node in nodes:
+            if node.get("id") == node_id:
+                return node
+        raise YAMLWorkflowError(f"Node '{node_id}' not found in {full_path}")
+    else:
+        # Return first node from file
+        nodes = file_data.get("nodes", [])
+        if not nodes:
+            raise YAMLWorkflowError(f"No nodes found in {full_path}")
+        return nodes[0]
+
+
+def _expand_refs(
+    node_list: List[Dict[str, Any]],
+    base_dir: Optional[Path],
+) -> List[Dict[str, Any]]:
+    """Expand $ref references in node list.
+
+    Args:
+        node_list: List of node definitions (may contain $ref)
+        base_dir: Base directory for resolving relative paths
+
+    Returns:
+        List with all $ref nodes replaced with actual definitions
+    """
+    ref_cache: Dict[str, Dict[str, Any]] = {}
+    expanded = []
+
+    for node_data in node_list:
+        if "$ref" in node_data:
+            # Resolve reference
+            ref_value = node_data["$ref"]
+            resolved = _resolve_ref(ref_value, base_dir, ref_cache)
+
+            # Merge any overrides from the referencing node
+            merged = {**resolved}
+            for key, value in node_data.items():
+                if key != "$ref":
+                    merged[key] = value
+
+            expanded.append(merged)
+            logger.debug(f"Resolved $ref '{ref_value}' to node '{merged.get('id')}'")
+        else:
+            expanded.append(node_data)
+
+    return expanded
+
+
+# =============================================================================
+# Configuration
+# =============================================================================
 
 
 @dataclass
@@ -251,8 +844,26 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
 
 
 def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
-    """Parse an agent node from YAML data."""
+    """Parse an agent node from YAML data.
+
+    Supports llm_config for per-node LLM settings:
+        - id: analyze
+          type: agent
+          role: researcher
+          goal: "Analyze data patterns"
+          llm_config:
+            temperature: 0.3
+            model_hint: claude-3-sonnet
+            max_tokens: 4096
+    """
     node_id = node_data["id"]
+
+    # Parse llm_config if present
+    llm_config_data = node_data.get("llm_config")
+    llm_config = None
+    if llm_config_data:
+        llm_config = LLMConfig.from_dict(llm_config_data).to_dict()
+
     return AgentNode(
         id=node_id,
         name=node_data.get("name", node_id),
@@ -262,6 +873,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
         allowed_tools=node_data.get("tools"),
         input_mapping=node_data.get("input_mapping", {}),
         output_key=node_data.get("output", node_id),
+        llm_config=llm_config,
         next_nodes=node_data.get("next", []),
     )
 
@@ -348,6 +960,77 @@ def _parse_hitl_node(node_data: Dict[str, Any]) -> WorkflowNode:
     )
 
 
+def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
+    """Parse a compute node from YAML data.
+
+    Compute nodes execute tools with configurable constraints.
+    Supports LLM-free execution and custom handlers.
+
+    YAML format:
+        - id: run_valuation
+          type: compute
+          tools: [multi_model_valuation, sector_valuation]
+          inputs:
+            symbol: $ctx.symbol
+            financials: $ctx.sec_data
+          output: fair_values
+          handler: null  # Optional custom handler
+          constraints:
+            llm_allowed: false
+            network_allowed: true
+            max_cost_tier: FREE
+            timeout: 60
+          fail_fast: true
+          parallel: false
+          next: [blend]
+
+        # With custom handler
+        - id: rl_weights
+          type: compute
+          handler: rl_decision
+          inputs:
+            features: $ctx.valuation_features
+          output: model_weights
+    """
+    node_id = node_data["id"]
+
+    # Parse input mapping - supports $ctx.key syntax
+    input_mapping = {}
+    inputs = node_data.get("inputs", node_data.get("input_mapping", {}))
+    for key, value in inputs.items():
+        if isinstance(value, str) and value.startswith("$ctx."):
+            # Extract context key reference
+            input_mapping[key] = value[5:]  # Remove $ctx. prefix
+        else:
+            input_mapping[key] = value
+
+    # Parse constraints
+    constraints_data = node_data.get("constraints", {})
+    constraints = TaskConstraints(
+        llm_allowed=constraints_data.get("llm_allowed", False),
+        network_allowed=constraints_data.get("network_allowed", True),
+        write_allowed=constraints_data.get("write_allowed", False),
+        max_cost_tier=constraints_data.get("max_cost_tier", "FREE"),
+        _max_tool_calls=constraints_data.get("max_tool_calls", 100),
+        _timeout=constraints_data.get("timeout", node_data.get("timeout", 60.0)),
+        allowed_tools=constraints_data.get("allowed_tools"),
+        blocked_tools=constraints_data.get("blocked_tools"),
+    )
+
+    return ComputeNode(
+        id=node_id,
+        name=node_data.get("name", node_id),
+        tools=node_data.get("tools", []),
+        input_mapping=input_mapping,
+        output_key=node_data.get("output", node_id),
+        constraints=constraints,
+        handler=node_data.get("handler"),
+        fail_fast=node_data.get("fail_fast", True),
+        parallel=node_data.get("parallel", False),
+        next_nodes=node_data.get("next", []),
+    )
+
+
 def _parse_node(
     node_data: Dict[str, Any],
     config: YAMLWorkflowConfig,
@@ -357,6 +1040,8 @@ def _parse_node(
 
     if node_type == "agent":
         return _parse_agent_node(node_data)
+    elif node_type == "compute":
+        return _parse_compute_node(node_data)
     elif node_type == "condition":
         return _parse_condition_node(node_data, config)
     elif node_type == "parallel":
@@ -376,19 +1061,28 @@ def load_workflow_from_dict(
 ) -> WorkflowDefinition:
     """Load a workflow definition from a dictionary.
 
+    Supports extended schema features:
+    - $ref: External node references resolved from base_dir
+    - batch_config: Batch execution settings stored in metadata
+    - temporal_context: Point-in-time context stored in metadata
+
     Args:
         data: Dictionary containing workflow definition
         name: Name for the workflow
         config: Optional loader configuration
 
     Returns:
-        WorkflowDefinition instance
+        WorkflowDefinition instance with extended metadata
     """
     config = config or YAMLWorkflowConfig()
 
-    nodes: Dict[str, WorkflowNode] = {}
+    # Get node list and expand $ref references
     node_list = data.get("nodes", [])
+    if config.base_dir:
+        node_list = _expand_refs(node_list, config.base_dir)
 
+    # Parse nodes
+    nodes: Dict[str, WorkflowNode] = {}
     for node_data in node_list:
         if "id" not in node_data:
             raise YAMLWorkflowError("Node missing required 'id' field")
@@ -414,12 +1108,39 @@ def load_workflow_from_dict(
     if not start_node and node_list:
         start_node = node_list[0]["id"]
 
+    # Build metadata with extended schema features
+    metadata = dict(data.get("metadata", {}))
+
+    # Parse batch_config if present
+    batch_config_data = data.get("batch_config")
+    if batch_config_data:
+        batch_config = BatchConfigYAML.from_dict(batch_config_data)
+        metadata["batch_config"] = batch_config.to_dict()
+        logger.debug(f"Parsed batch_config for workflow '{name}'")
+
+    # Parse temporal_context if present
+    temporal_context_data = data.get("temporal_context")
+    if temporal_context_data:
+        temporal_context = TemporalContextConfig.from_dict(temporal_context_data)
+        metadata["temporal_context"] = temporal_context.to_dict()
+        logger.debug(f"Parsed temporal_context for workflow '{name}'")
+
+    # Parse services if present
+    services_data = data.get("services", {})
+    if services_data:
+        services = []
+        for svc_name, svc_config in services_data.items():
+            service = ServiceConfigYAML.from_dict(svc_name, svc_config)
+            services.append(service.to_dict())
+        metadata["services"] = services
+        logger.debug(f"Parsed {len(services)} services for workflow '{name}'")
+
     workflow = WorkflowDefinition(
         name=name,
         description=data.get("description", ""),
         nodes=nodes,
         start_node=start_node,
-        metadata=data.get("metadata", {}),
+        metadata=metadata,
     )
 
     # Validate
@@ -453,6 +1174,9 @@ def load_workflow_from_yaml(
 
     if not isinstance(data, dict):
         raise YAMLWorkflowError("YAML must contain a dictionary")
+
+    # Interpolate environment variables
+    data = _interpolate_env_vars(data)
 
     # Check for workflows key
     workflows_data = data.get("workflows", data)
@@ -616,12 +1340,179 @@ class YAMLWorkflowProvider:
         return list(self._workflows.keys())
 
 
+# =============================================================================
+# CLI Arguments Support
+# =============================================================================
+
+
+@dataclass
+class WorkflowArgument:
+    """Definition of a workflow input argument.
+
+    Used to define expected inputs for workflows, similar to argparse.
+
+    Attributes:
+        name: Argument name (used as context key)
+        type: Python type (str, int, float, bool, list)
+        required: Whether argument is required
+        default: Default value if not provided
+        help: Help text for documentation
+        choices: Valid choices (for enum-like args)
+        env_var: Environment variable fallback
+
+    Example YAML:
+        workflows:
+          deploy:
+            arguments:
+              - name: target
+                type: str
+                required: true
+                help: "Deployment target (staging, production)"
+                choices: [staging, production]
+              - name: version
+                type: str
+                default: latest
+                env_var: DEPLOY_VERSION
+              - name: dry_run
+                type: bool
+                default: false
+    """
+
+    name: str
+    type: str = "str"
+    required: bool = False
+    default: Any = None
+    help: str = ""
+    choices: Optional[List[Any]] = None
+    env_var: Optional[str] = None
+
+    def parse_value(self, value: Any) -> Any:
+        """Parse and validate a value for this argument."""
+        if value is None:
+            # Check env var fallback
+            if self.env_var:
+                value = os.environ.get(self.env_var)
+            if value is None:
+                return self.default
+
+        # Type conversion
+        type_map = {
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": lambda v: v.lower() in ("true", "1", "yes") if isinstance(v, str) else bool(v),
+            "list": lambda v: v.split(",") if isinstance(v, str) else list(v),
+        }
+        converter = type_map.get(self.type, str)
+        try:
+            converted = converter(value)
+        except (ValueError, TypeError) as e:
+            raise YAMLWorkflowError(f"Invalid value for argument '{self.name}': {e}")
+
+        # Validate choices
+        if self.choices and converted not in self.choices:
+            raise YAMLWorkflowError(
+                f"Invalid value for argument '{self.name}': " f"'{converted}' not in {self.choices}"
+            )
+
+        return converted
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowArgument":
+        return cls(
+            name=data["name"],
+            type=data.get("type", "str"),
+            required=data.get("required", False),
+            default=data.get("default"),
+            help=data.get("help", ""),
+            choices=data.get("choices"),
+            env_var=data.get("env_var"),
+        )
+
+
+def parse_workflow_args(
+    workflow_def: WorkflowDefinition,
+    cli_args: Optional[Dict[str, Any]] = None,
+    env_prefix: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Parse CLI-style arguments into workflow initial context.
+
+    Args:
+        workflow_def: Workflow definition with optional arguments metadata
+        cli_args: Provided arguments (from CLI, API, etc.)
+        env_prefix: Prefix for environment variable fallbacks
+
+    Returns:
+        Dict suitable for initial_context in workflow execution
+
+    Raises:
+        YAMLWorkflowError: If required arguments are missing
+
+    Example:
+        # YAML workflow with arguments defined
+        workflow = load_workflow_from_file("deploy.yaml")
+        context = parse_workflow_args(
+            workflow,
+            cli_args={"target": "staging", "version": "1.2.3"},
+        )
+        result = await executor.execute(workflow, initial_context=context)
+    """
+    cli_args = cli_args or {}
+    context: Dict[str, Any] = {}
+
+    # Get argument definitions from workflow metadata
+    args_defs = workflow_def.metadata.get("arguments", [])
+    if not args_defs:
+        # No argument schema, pass through cli_args directly
+        return dict(cli_args)
+
+    # Parse each defined argument
+    for arg_data in args_defs:
+        arg = WorkflowArgument.from_dict(arg_data) if isinstance(arg_data, dict) else arg_data
+
+        # Try to get value from cli_args
+        value = cli_args.get(arg.name)
+
+        # Try env var with optional prefix
+        if value is None and env_prefix:
+            env_key = f"{env_prefix}_{arg.name.upper()}"
+            value = os.environ.get(env_key)
+
+        # Parse and validate
+        parsed = arg.parse_value(value)
+
+        # Check required
+        if parsed is None and arg.required:
+            raise YAMLWorkflowError(f"Missing required argument: {arg.name}")
+
+        if parsed is not None:
+            context[arg.name] = parsed
+
+    # Include any extra args not in schema
+    for key, value in cli_args.items():
+        if key not in context:
+            context[key] = value
+
+    return context
+
+
 __all__ = [
+    # Error types
     "YAMLWorkflowError",
+    # Configuration
     "YAMLWorkflowConfig",
     "YAMLWorkflowProvider",
+    # Extended schema types
+    "LLMConfig",
+    "TemporalContextConfig",
+    "BatchConfigYAML",
+    "ServiceConfigYAML",
+    "WorkflowArgument",
+    # Loading functions
     "load_workflow_from_dict",
     "load_workflow_from_yaml",
     "load_workflow_from_file",
     "load_workflows_from_directory",
+    # Argument parsing
+    "parse_workflow_args",
 ]

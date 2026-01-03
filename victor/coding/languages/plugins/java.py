@@ -85,12 +85,16 @@ class JavaPlugin(BaseLanguagePlugin):
         )
 
     def _create_tree_sitter_queries(self) -> TreeSitterQueries:
-        """Create tree-sitter queries for Java symbol/call extraction."""
+        """Create tree-sitter queries for Java symbol/call extraction.
+
+        The @def capture is used for end_line (function body boundaries).
+        The @name capture is used for the symbol name.
+        """
         return TreeSitterQueries(
             symbols=[
-                QueryPattern("class", "(class_declaration name: (identifier) @name)"),
-                QueryPattern("class", "(interface_declaration name: (identifier) @name)"),
-                QueryPattern("function", "(method_declaration name: (identifier) @name)"),
+                QueryPattern("class", "(class_declaration name: (identifier) @name) @def"),
+                QueryPattern("class", "(interface_declaration name: (identifier) @name) @def"),
+                QueryPattern("function", "(method_declaration name: (identifier) @name) @def"),
             ],
             calls="""
                 (method_invocation name: (identifier) @callee)

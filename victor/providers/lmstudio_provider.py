@@ -205,29 +205,36 @@ class LMStudioProvider(BaseProvider):
         """Provider name."""
         return "lmstudio"
 
-    def supports_tools(self, model: Optional[str] = None) -> bool:
-        """Check if model supports tool calling.
+    def supports_tools(self) -> bool:
+        """Check if current model supports tool calling.
+
+        Returns:
+            True if current model supports native tool calling
+        """
+        return self._supports_tools_for_model(self._current_model)
+
+    def _supports_tools_for_model(self, model: Optional[str]) -> bool:
+        """Check if specific model supports tool calling (internal).
 
         Args:
-            model: Model name to check. If None, uses current model or returns True.
+            model: Model name to check. If None, returns True (optimistic).
 
         Returns:
             True if model supports native tool calling
         """
-        check_model = model or self._current_model
-        if not check_model:
-            return True  # Optimistic default
+        if not model:
+            return True  # Optimistic default when model unknown
 
         # Check cache first
-        if check_model in self._model_tool_support_cache:
-            return self._model_tool_support_cache[check_model]
+        if model in self._model_tool_support_cache:
+            return self._model_tool_support_cache[model]
 
         # Check model name patterns
-        supports = _model_supports_tools(check_model)
-        self._model_tool_support_cache[check_model] = supports
+        supports = _model_supports_tools(model)
+        self._model_tool_support_cache[model] = supports
 
         if not supports:
-            logger.debug(f"LMStudio: Model {check_model} does not support native tool calling")
+            logger.debug(f"LMStudio: Model {model} does not support native tool calling")
 
         return supports
 
@@ -553,7 +560,7 @@ class LMStudioProvider(BaseProvider):
 
         # Filter tools if model doesn't support them
         effective_tools = tools
-        if tools and not self.supports_tools(model):
+        if tools and not self._supports_tools_for_model(model):
             logger.debug(
                 f"LMStudio: Model {model} doesn't support native tool calling, "
                 "falling back to text-based parsing"
@@ -677,7 +684,7 @@ class LMStudioProvider(BaseProvider):
 
         # Filter tools if model doesn't support them
         effective_tools = tools
-        if tools and not self.supports_tools(model):
+        if tools and not self._supports_tools_for_model(model):
             logger.debug(
                 f"LMStudio: Model {model} doesn't support native tool calling, "
                 "falling back to text-based parsing"

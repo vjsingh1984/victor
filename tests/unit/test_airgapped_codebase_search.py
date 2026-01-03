@@ -25,10 +25,13 @@ from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 from victor.storage.vector_stores.models import SentenceTransformerModel, EmbeddingModelConfig
 
-# Check if chromadb is available
-import importlib.util
+# Check if chromadb is available and can be imported
+try:
+    import chromadb  # noqa: F401
 
-CHROMADB_AVAILABLE = importlib.util.find_spec("chromadb") is not None
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
 
 
 class TestEmbeddingConfigDefaults:

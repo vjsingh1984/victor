@@ -36,6 +36,7 @@ from victor.evaluation.protocol import (
     BenchmarkTask,
     EvaluationConfig,
     TaskStatus,
+    TokenUsage,
 )
 from victor.evaluation.test_runners import (
     TestRunnerRegistry,
@@ -108,6 +109,9 @@ class AgenticExecutionTrace:
     # Correction/self-correction metrics
     correction_metrics: dict[str, Any] = field(default_factory=dict)
 
+    # Token usage tracking
+    token_usage: TokenUsage = field(default_factory=TokenUsage)
+
     @property
     def duration_seconds(self) -> float:
         """Total execution time."""
@@ -170,6 +174,11 @@ class AgenticExecutionTrace:
             "successful_tool_calls": self.successful_tool_calls,
             "files_modified": self.files_modified,
             "correction_metrics": self.correction_metrics,
+            "token_usage": {
+                "input_tokens": self.token_usage.input_tokens,
+                "output_tokens": self.token_usage.output_tokens,
+                "total_tokens": self.token_usage.total_tokens,
+            },
         }
 
 

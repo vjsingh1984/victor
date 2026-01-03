@@ -26,8 +26,10 @@ Design Principles:
 Usage:
     from victor.tools.output_utils import (
         grep_lines,
-        format_line_matches,
         truncate_output,
+        truncate_by_lines,
+        TruncationInfo,
+        format_with_line_numbers,
         OutputMode,
     )
 """
@@ -235,7 +237,9 @@ def truncate_output(
     chars_per_token: float = 4.0,
     truncation_message: str = "\n[... output truncated ...]",
 ) -> str:
-    """Truncate output to approximate token limit.
+    """Truncate output to approximate token limit (legacy function).
+
+    Note: Consider using truncate_by_lines() for cleaner line-based truncation.
 
     Args:
         content: Content to truncate
@@ -258,6 +262,159 @@ def truncate_output(
         truncated = truncated[:last_newline]
 
     return truncated + truncation_message
+
+
+def truncate_by_lines(
+    content: str,
+    max_lines: int = 750,
+    max_bytes: int = 25600,  # 25KB
+    start_line: int = 0,
+) -> Tuple[str, "TruncationInfo"]:
+    """Truncate content by line count and/or byte size.
+
+    This function always truncates at complete line boundaries, never mid-line.
+    It stops when either the line limit OR byte limit is reached (whichever first).
+
+    Design rationale:
+    - Line-based limits are more intuitive for LLMs and code
+    - Character/byte limits are secondary safeguards
+    - Always ending on line boundaries allows clean continuation requests
+
+    Args:
+        content: The text content to truncate
+        max_lines: Maximum number of lines to include (default 512)
+        max_bytes: Maximum bytes to include (default 20KB)
+        start_line: Starting line number (0-indexed, for offset support)
+
+    Returns:
+        Tuple of (truncated_content, TruncationInfo)
+
+    Example:
+        content = "line1\\nline2\\nline3\\n..."
+        truncated, info = truncate_by_lines(content, max_lines=100)
+        if info.was_truncated:
+            print(f"Truncated at line {info.end_line}. Use offset={info.end_line} for more.")
+    """
+    lines = content.split("\n")
+    total_lines = len(lines)
+
+    # Apply offset if specified
+    if start_line > 0:
+        lines = lines[start_line:]
+
+    result_lines: List[str] = []
+    current_bytes = 0
+    lines_included = 0
+
+    for line in lines:
+        line_bytes = len(line.encode("utf-8")) + 1  # +1 for newline
+
+        # Check limits BEFORE adding the line
+        if lines_included >= max_lines:
+            break
+        if current_bytes + line_bytes > max_bytes and result_lines:
+            # Only enforce byte limit if we have at least one line
+            break
+
+        result_lines.append(line)
+        current_bytes += line_bytes
+        lines_included += 1
+
+    # Build truncation info
+    end_line = start_line + lines_included
+    was_truncated = end_line < total_lines
+
+    # Determine truncation reason
+    truncation_reason: Optional[str] = None
+    if was_truncated:
+        if lines_included >= max_lines:
+            truncation_reason = "line_limit"
+        else:
+            # Must be byte limit (we stopped before reaching line limit)
+            truncation_reason = "byte_limit"
+
+    info = TruncationInfo(
+        was_truncated=was_truncated,
+        total_lines=total_lines,
+        lines_returned=lines_included,
+        start_line=start_line,
+        end_line=end_line,
+        bytes_returned=current_bytes,
+        truncation_reason=truncation_reason,
+    )
+
+    truncated_content = "\n".join(result_lines)
+
+    # Add continuation hint if truncated
+    if was_truncated:
+        remaining = total_lines - end_line
+        truncated_content += (
+            f"\n\n[... {remaining} more lines. Use offset={end_line} to continue ...]"
+        )
+
+    return truncated_content, info
+
+
+@dataclass
+class TruncationInfo:
+    """Information about how content was truncated."""
+
+    was_truncated: bool
+    """Whether the content was truncated."""
+
+    total_lines: int
+    """Total lines in the original content."""
+
+    lines_returned: int
+    """Number of lines included in the output."""
+
+    start_line: int
+    """Starting line number (0-indexed)."""
+
+    end_line: int
+    """Ending line number (exclusive, can be used as next offset)."""
+
+    bytes_returned: int
+    """Approximate bytes in the returned content."""
+
+    truncation_reason: Optional[str] = None
+    """Why truncation occurred: 'line_limit', 'byte_limit', or None."""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for tool responses."""
+        return {
+            "was_truncated": self.was_truncated,
+            "total_lines": self.total_lines,
+            "lines_returned": self.lines_returned,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "bytes_returned": self.bytes_returned,
+            "truncation_reason": self.truncation_reason,
+        }
+
+
+def format_with_line_numbers(
+    content: str,
+    start_line: int = 1,
+) -> str:
+    """Format content with line numbers.
+
+    Args:
+        content: Text content to number
+        start_line: Starting line number (default 1)
+
+    Returns:
+        Content with line numbers prefixed
+    """
+    lines = content.split("\n")
+    width = len(str(start_line + len(lines)))
+
+    numbered = []
+    for i, line in enumerate(lines):
+        line_num = start_line + i
+        numbered.append(f"{line_num:>{width}}\t{line}")
+
+    return "\n".join(numbered)
 
 
 def format_diff(

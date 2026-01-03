@@ -5,11 +5,13 @@ import sys
 import os
 import inspect
 import importlib
+from typing import Optional
 
 from rich.console import Console
 
 from victor.integrations.mcp.server import MCPServer
 from victor.tools.base import ToolRegistry
+from victor.ui.commands.utils import setup_logging
 
 mcp_app = typer.Typer(name="mcp", help="Run Victor as an MCP server.")
 console = Console()
@@ -23,11 +25,11 @@ def mcp(
         "--stdio/--no-stdio",
         help="Run in stdio mode (for MCP clients)",
     ),
-    log_level: str = typer.Option(
-        "WARNING",
+    log_level: Optional[str] = typer.Option(
+        None,
         "--log-level",
         "-l",
-        help="Set logging level",
+        help="Set logging level (defaults to WARNING or VICTOR_LOG_LEVEL env var)",
     ),
 ):
     """Run Victor as an MCP server."""
@@ -35,18 +37,16 @@ def mcp(
         _mcp(stdio, log_level)
 
 
-def _mcp(stdio: bool, log_level: str):
+def _mcp(stdio: bool, log_level: Optional[str]):
     # Configure logging to stderr (stdout is for MCP protocol)
-    log_level = log_level.upper()
-    if log_level == "WARN":
-        log_level = "WARNING"
+    # Validate and normalize log level
+    if log_level is not None:
+        log_level = log_level.upper()
+        if log_level == "WARN":
+            log_level = "WARNING"
 
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stderr,
-        force=True,
-    )
+    # Use centralized logging config (MCP has specific settings in logging_config.yaml)
+    setup_logging(command="mcp", cli_log_level=log_level, stream=sys.stderr)
 
     if stdio:
         asyncio.run(_run_mcp_server())

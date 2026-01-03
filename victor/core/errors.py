@@ -472,6 +472,74 @@ class NetworkError(VictorError):
         self.details["url"] = url
 
 
+class ExtensionLoadError(VictorError):
+    """Raised when a vertical extension fails to load.
+
+    This exception is used by VerticalBase.get_extensions() to report
+    extension loading failures. In strict mode, this exception is raised
+    for critical failures. In non-strict mode, errors are collected and
+    reported without halting execution.
+
+    Attributes:
+        extension_type: The type of extension that failed (e.g., 'safety', 'middleware')
+        vertical_name: Name of the vertical where the failure occurred
+        original_error: The underlying exception that caused the failure
+        is_required: Whether this extension is required for the vertical to function
+
+    Example:
+        try:
+            safety_ext = vertical.get_safety_extension()
+        except Exception as e:
+            raise ExtensionLoadError(
+                message=f"Failed to load safety extension: {e}",
+                extension_type="safety",
+                vertical_name=vertical.name,
+                original_error=e,
+                is_required=True,
+            )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        extension_type: str,
+        vertical_name: str,
+        original_error: Optional[Exception] = None,
+        is_required: bool = False,
+        **kwargs: Any,
+    ):
+        # Set recovery hint based on whether the extension is required
+        if is_required:
+            recovery_hint = (
+                f"The '{extension_type}' extension is required for vertical '{vertical_name}'. "
+                f"Fix the underlying error or mark the extension as optional."
+            )
+        else:
+            recovery_hint = (
+                f"The '{extension_type}' extension failed to load for vertical '{vertical_name}'. "
+                f"The vertical will function with reduced capabilities."
+            )
+
+        super().__init__(
+            message,
+            category=ErrorCategory.CONFIG_INVALID,
+            severity=ErrorSeverity.CRITICAL if is_required else ErrorSeverity.WARNING,
+            recovery_hint=recovery_hint,
+            cause=original_error,
+            **kwargs,
+        )
+        self.extension_type = extension_type
+        self.vertical_name = vertical_name
+        self.original_error = original_error
+        self.is_required = is_required
+        self.details["extension_type"] = extension_type
+        self.details["vertical_name"] = vertical_name
+        self.details["is_required"] = is_required
+        if original_error:
+            self.details["original_error_type"] = type(original_error).__name__
+            self.details["original_error_message"] = str(original_error)
+
+
 # =============================================================================
 # Error Information
 # =============================================================================

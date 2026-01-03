@@ -40,7 +40,7 @@ FROM python:3.12-slim-bookworm AS runtime
 
 # Labels
 LABEL org.opencontainers.image.title="Victor AI Coding Assistant"
-LABEL org.opencontainers.image.description="Enterprise AI coding assistant with 25+ LLM providers"
+LABEL org.opencontainers.image.description="Enterprise AI coding assistant with 21 LLM providers"
 LABEL org.opencontainers.image.authors="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.source="https://github.com/vjsingh/victor"

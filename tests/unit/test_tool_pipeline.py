@@ -611,7 +611,8 @@ class TestToolPipelineCodeCorrection:
         self, pipeline_with_correction, mock_correction_middleware, mock_tool_executor
     ):
         """Test that middleware exceptions are handled gracefully."""
-        mock_correction_middleware.validate_and_fix.side_effect = Exception("Middleware error")
+        # Use ValueError since we now catch specific exception types
+        mock_correction_middleware.validate_and_fix.side_effect = ValueError("Middleware error")
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "test"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})

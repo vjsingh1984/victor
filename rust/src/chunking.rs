@@ -282,6 +282,222 @@ pub fn count_tokens_approx(text: &str) -> usize {
     tokens
 }
 
+// =============================================================================
+// LINE-AWARE CHUNKING (Protocol-compliant)
+// =============================================================================
+
+/// Count lines in text (newline count + 1).
+///
+/// # Arguments
+/// * `text` - Text to count lines in
+///
+/// # Returns
+/// Number of lines (1 for empty string with no newlines)
+#[pyfunction]
+pub fn count_lines(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    text.bytes().filter(|&b| b == b'\n').count() + 1
+}
+
+/// Find byte offsets of all line starts.
+///
+/// # Arguments
+/// * `text` - Text to analyze
+///
+/// # Returns
+/// List of byte offsets where lines start (always includes 0)
+#[pyfunction]
+pub fn find_line_boundaries(text: &str) -> Vec<usize> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    let mut boundaries = vec![0];
+    for (i, b) in text.bytes().enumerate() {
+        if b == b'\n' && i + 1 < text.len() {
+            boundaries.push(i + 1);
+        }
+    }
+    boundaries
+}
+
+/// Get line number for a character offset using binary search.
+///
+/// # Arguments
+/// * `text` - Text
+/// * `offset` - Character offset
+///
+/// # Returns
+/// Line number (1-indexed)
+#[pyfunction]
+pub fn line_at_offset(text: &str, offset: usize) -> usize {
+    if text.is_empty() || offset == 0 {
+        return 1;
+    }
+
+    let offset = offset.min(text.len().saturating_sub(1));
+
+    // Count newlines before offset
+    text[..offset].bytes().filter(|&b| b == b'\n').count() + 1
+}
+
+/// Chunk information with line numbers and offsets.
+#[pyclass]
+#[derive(Clone)]
+pub struct ChunkInfoRust {
+    #[pyo3(get)]
+    pub text: String,
+    #[pyo3(get)]
+    pub start_line: usize,
+    #[pyo3(get)]
+    pub end_line: usize,
+    #[pyo3(get)]
+    pub start_offset: usize,
+    #[pyo3(get)]
+    pub end_offset: usize,
+    #[pyo3(get)]
+    pub overlap_prev: usize,
+    #[pyo3(get)]
+    pub chunk_index: usize,
+}
+
+#[pymethods]
+impl ChunkInfoRust {
+    #[new]
+    pub fn new(
+        text: String,
+        start_line: usize,
+        end_line: usize,
+        start_offset: usize,
+        end_offset: usize,
+        overlap_prev: usize,
+        chunk_index: usize,
+    ) -> Self {
+        Self {
+            text,
+            start_line,
+            end_line,
+            start_offset,
+            end_offset,
+            overlap_prev,
+            chunk_index,
+        }
+    }
+}
+
+/// Chunk text with overlap, respecting line boundaries.
+///
+/// Returns full chunk information including line numbers and offsets.
+///
+/// # Arguments
+/// * `text` - Text to chunk
+/// * `chunk_size` - Target chunk size in characters
+/// * `overlap` - Overlap size in characters
+///
+/// # Returns
+/// List of ChunkInfoRust objects with full metadata
+#[pyfunction]
+#[pyo3(signature = (text, chunk_size=1344, overlap=128))]
+pub fn chunk_with_overlap(text: &str, chunk_size: usize, overlap: usize) -> PyResult<Vec<ChunkInfoRust>> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    if chunk_size == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "chunk_size must be positive",
+        ));
+    }
+
+    if overlap >= chunk_size {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "overlap must be less than chunk_size",
+        ));
+    }
+
+    // Pre-compute line boundaries for efficient line number lookup
+    let line_starts = find_line_boundaries(text);
+
+    let mut chunks = Vec::new();
+    let mut pos = 0;
+    let mut chunk_index = 0;
+    let text_len = text.len();
+
+    while pos < text_len {
+        // Calculate chunk end
+        let mut chunk_end = (pos + chunk_size).min(text_len);
+
+        // If not at end, try to find a line boundary
+        if chunk_end < text_len {
+            // Look for a newline within the chunk
+            if let Some(last_newline) = text[pos..chunk_end].rfind('\n') {
+                let absolute_pos = pos + last_newline;
+                if absolute_pos > pos {
+                    chunk_end = absolute_pos + 1; // Include the newline
+                }
+            }
+        }
+
+        // Extract chunk text
+        let chunk_text = text[pos..chunk_end].to_string();
+
+        // Calculate line numbers using binary search
+        let start_line = line_at_offset_cached(&line_starts, pos);
+        let end_line = line_at_offset_cached(&line_starts, chunk_end.saturating_sub(1));
+
+        // Calculate overlap with previous chunk
+        let overlap_prev = if chunk_index > 0 && pos > 0 {
+            overlap.min(pos)
+        } else {
+            0
+        };
+
+        chunks.push(ChunkInfoRust::new(
+            chunk_text,
+            start_line,
+            end_line,
+            pos,
+            chunk_end,
+            overlap_prev,
+            chunk_index,
+        ));
+
+        // Move position forward, accounting for overlap
+        let step = (chunk_size.saturating_sub(overlap)).max(1);
+        pos += step;
+        chunk_index += 1;
+
+        // Adjust position to line boundary if we have overlap
+        if pos < text_len && overlap > 0 {
+            let overlap_start = pos.saturating_sub(overlap);
+            if let Some(next_newline) = text[overlap_start..pos.min(text_len)].find('\n') {
+                let absolute_pos = overlap_start + next_newline;
+                if absolute_pos < pos {
+                    pos = absolute_pos + 1;
+                }
+            }
+        }
+    }
+
+    Ok(chunks)
+}
+
+/// Binary search for line number using pre-computed boundaries.
+#[inline]
+fn line_at_offset_cached(line_starts: &[usize], offset: usize) -> usize {
+    if line_starts.is_empty() {
+        return 1;
+    }
+
+    // Binary search for the line containing offset
+    match line_starts.binary_search(&offset) {
+        Ok(idx) => idx + 1, // Exact match, 1-indexed
+        Err(idx) => idx,    // Insert position = line number (already 1-indexed due to 0 at start)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

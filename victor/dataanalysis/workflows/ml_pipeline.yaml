@@ -1,0 +1,487 @@
+# ML Pipeline Workflow
+# ====================
+# End-to-end machine learning pipeline demonstrating:
+# - Data preprocessing
+# - Feature engineering
+# - Model training with hyperparameter tuning
+# - Evaluation and model selection
+# - Deployment preparation
+
+workflows:
+  ml_pipeline:
+    description: "End-to-end ML pipeline with training and evaluation"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: dataanalysis
+
+    batch_config:
+      batch_size: 3
+      max_concurrent: 2
+      retry_strategy: immediate
+      max_retries: 3
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Data Preparation
+      # =====================================================================
+      - id: load_train_data
+        type: compute
+        name: "Load Training Data"
+        tools: [read, shell]
+        inputs:
+          train_path: $ctx.train_file
+          test_path: $ctx.test_file
+          target_column: $ctx.target
+        output: raw_datasets
+        constraints:
+          llm_allowed: false
+          max_cost_tier: FREE
+          timeout: 60
+        next: [validate_data]
+
+      - id: validate_data
+        type: compute
+        name: "Validate Data Quality"
+        handler: data_transform
+        inputs:
+          data: $ctx.raw_datasets
+          validations:
+            - check_target_present
+            - check_class_balance
+            - check_missing_values
+            - check_feature_types
+        output: validation_report
+        constraints:
+          llm_allowed: false
+          timeout: 45
+        next: [check_data_quality]
+
+      - id: check_data_quality
+        type: condition
+        name: "Data Quality Gate"
+        condition: "validation_score >= 0.7"
+        branches:
+          "true": feature_engineering
+          "false": auto_fix_data
+
+      - id: auto_fix_data
+        type: agent
+        name: "Auto-Fix Data Issues"
+        role: executor
+        goal: |
+          Fix data quality issues automatically:
+          - Impute missing values using appropriate strategies
+          - Handle class imbalance if detected
+          - Convert data types as needed
+          - Remove or fix outliers
+        tool_budget: 25
+        llm_config:
+          temperature: 0.1
+          model_hint: claude-3-sonnet
+        input_mapping:
+          issues: validation_report
+          data: raw_datasets
+        output: fixed_datasets
+        next: [feature_engineering]
+
+      # =====================================================================
+      # Stage 2: Feature Engineering
+      # =====================================================================
+      - id: feature_engineering
+        type: parallel
+        name: "Feature Engineering (Parallel)"
+        parallel_nodes: [numeric_features, categorical_features, text_features]
+        join_strategy: all
+        next: [combine_features]
+
+      - id: numeric_features
+        type: compute
+        name: "Process Numeric Features"
+        tools: [shell]
+        inputs:
+          operations:
+            - scaling
+            - polynomial_features
+            - binning
+        output: numeric_transformed
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      - id: categorical_features
+        type: compute
+        name: "Process Categorical Features"
+        tools: [shell]
+        inputs:
+          operations:
+            - one_hot_encoding
+            - target_encoding
+            - frequency_encoding
+        output: categorical_transformed
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      - id: text_features
+        type: compute
+        name: "Process Text Features"
+        tools: [shell]
+        inputs:
+          operations:
+            - tfidf
+            - word_embeddings
+        output: text_transformed
+        constraints:
+          llm_allowed: false
+          timeout: 180
+
+      - id: combine_features
+        type: transform
+        name: "Combine All Features"
+        transform: |
+          feature_matrix = concat(
+            numeric_transformed,
+            categorical_transformed,
+            text_transformed
+          )
+        next: [feature_selection]
+
+      - id: feature_selection
+        type: compute
+        name: "Feature Selection"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          methods:
+            - mutual_information
+            - recursive_feature_elimination
+            - correlation_filter
+          top_k: 50
+        output: selected_features
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [train_models]
+
+      # =====================================================================
+      # Stage 3: Model Training (Parallel)
+      # =====================================================================
+      - id: train_models
+        type: parallel
+        name: "Train Multiple Models"
+        parallel_nodes: [train_rf, train_xgb, train_lgb, train_nn]
+        join_strategy: all
+        next: [evaluate_models]
+
+      - id: train_rf
+        type: compute
+        name: "Train Random Forest"
+        tools: [shell]
+        inputs:
+          model_type: random_forest
+          hyperparams:
+            n_estimators: [100, 200, 500]
+            max_depth: [10, 20, null]
+          cv_folds: 5
+        output: rf_model
+        constraints:
+          llm_allowed: false
+          timeout: 600
+
+      - id: train_xgb
+        type: compute
+        name: "Train XGBoost"
+        tools: [shell]
+        inputs:
+          model_type: xgboost
+          hyperparams:
+            n_estimators: [100, 300]
+            learning_rate: [0.01, 0.1]
+            max_depth: [6, 10]
+          cv_folds: 5
+        output: xgb_model
+        constraints:
+          llm_allowed: false
+          timeout: 600
+
+      - id: train_lgb
+        type: compute
+        name: "Train LightGBM"
+        tools: [shell]
+        inputs:
+          model_type: lightgbm
+          hyperparams:
+            n_estimators: [100, 300]
+            learning_rate: [0.01, 0.1]
+            num_leaves: [31, 63]
+          cv_folds: 5
+        output: lgb_model
+        constraints:
+          llm_allowed: false
+          timeout: 600
+
+      - id: train_nn
+        type: compute
+        name: "Train Neural Network"
+        tools: [shell]
+        inputs:
+          model_type: neural_network
+          hyperparams:
+            hidden_layers: [[64, 32], [128, 64, 32]]
+            dropout: [0.2, 0.3]
+          epochs: 100
+          early_stopping: true
+        output: nn_model
+        constraints:
+          llm_allowed: false
+          timeout: 900
+
+      # =====================================================================
+      # Stage 4: Model Evaluation
+      # =====================================================================
+      - id: evaluate_models
+        type: compute
+        name: "Evaluate All Models"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          models:
+            - $ctx.rf_model
+            - $ctx.xgb_model
+            - $ctx.lgb_model
+            - $ctx.nn_model
+          metrics:
+            - accuracy
+            - precision
+            - recall
+            - f1_score
+            - roc_auc
+        output: evaluation_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [analyze_results]
+
+      - id: analyze_results
+        type: agent
+        name: "Analyze Model Performance"
+        role: analyst
+        goal: |
+          Analyze model performance and provide recommendations:
+          1. Compare all models across metrics
+          2. Identify the best performing model
+          3. Analyze trade-offs (speed vs accuracy)
+          4. Check for overfitting signals
+          5. Recommend the production model
+        tool_budget: 15
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          results: evaluation_results
+          validation: validation_report
+        output: analysis
+        next: [select_model]
+
+      - id: select_model
+        type: condition
+        name: "Model Selection"
+        condition: "best_model_score >= 0.85"
+        branches:
+          "true": prepare_deployment
+          "false": request_approval
+
+      - id: request_approval
+        type: hitl
+        name: "Low Score Approval"
+        hitl_type: approval
+        prompt: |
+          ## Model Performance Below Threshold
+
+          Best model achieved {best_model_score} (threshold: 0.85)
+
+          **Analysis:**
+          {analysis}
+
+          Options:
+          1. Proceed with current best model
+          2. Request additional data/features
+          3. Abort pipeline
+        context_keys:
+          - best_model_score
+          - analysis
+        choices:
+          - "Proceed"
+          - "Request more data"
+          - "Abort"
+        timeout: 1800
+        fallback: abort
+        next: [handle_approval]
+
+      - id: handle_approval
+        type: condition
+        name: "Handle Approval Decision"
+        condition: "approval_choice"
+        branches:
+          "Proceed": prepare_deployment
+          "Request more data": end_with_recommendations
+          "Abort": abort_pipeline
+
+      - id: abort_pipeline
+        type: transform
+        name: "Abort Pipeline"
+        transform: |
+          pipeline_status = "aborted"
+          abort_reason = "User decision due to low model performance"
+
+      - id: end_with_recommendations
+        type: agent
+        name: "Generate Recommendations"
+        role: analyst
+        goal: |
+          Generate recommendations for improving model performance:
+          - Additional data sources needed
+          - Feature engineering ideas
+          - Alternative modeling approaches
+        tool_budget: 10
+        output: recommendations
+
+      # =====================================================================
+      # Stage 5: Deployment Preparation
+      # =====================================================================
+      - id: prepare_deployment
+        type: parallel
+        name: "Prepare for Deployment"
+        parallel_nodes: [save_model, generate_docs, create_api_spec]
+        join_strategy: all
+        next: [final_review]
+
+      - id: save_model
+        type: compute
+        name: "Save Best Model"
+        tools: [shell, write]
+        inputs:
+          model: $ctx.best_model
+          output_path: $ctx.model_output_dir
+          format: "pickle,onnx"
+        output: model_artifacts
+        constraints:
+          write_allowed: true
+          timeout: 120
+
+      - id: generate_docs
+        type: agent
+        name: "Generate Model Documentation"
+        role: writer
+        goal: |
+          Generate model documentation including:
+          - Model card (performance, limitations)
+          - Feature descriptions
+          - Usage examples
+          - Deployment notes
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+        output: documentation
+
+      - id: create_api_spec
+        type: compute
+        name: "Create API Specification"
+        tools: [shell, write]
+        inputs:
+          model_info: $ctx.best_model
+          output_path: $ctx.api_spec_path
+        output: api_spec
+        constraints:
+          write_allowed: true
+          timeout: 60
+
+      - id: final_review
+        type: hitl
+        name: "Final Deployment Review"
+        hitl_type: approval
+        prompt: |
+          ## Model Ready for Deployment
+
+          **Best Model:** {best_model_name}
+          **Performance:** {best_model_score}
+
+          **Artifacts Generated:**
+          - Model: {model_artifacts}
+          - Documentation: Generated
+          - API Spec: {api_spec}
+
+          Approve for deployment?
+        context_keys:
+          - best_model_name
+          - best_model_score
+          - model_artifacts
+          - api_spec
+        timeout: 600
+        fallback: continue
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Pipeline Complete"
+        transform: |
+          pipeline_status = "completed"
+          completion_time = current_timestamp()
+
+
+  # =========================================================================
+  # Quick Training - Baseline Model
+  # =========================================================================
+  ml_quick:
+    description: "Quick ML training for baseline model"
+
+    metadata:
+      vertical: dataanalysis
+
+    nodes:
+      - id: load
+        type: compute
+        tools: [read, shell]
+        output: data
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        next: [quick_train]
+
+      - id: quick_train
+        type: compute
+        name: "Train Quick Model"
+        tools: [shell]
+        inputs:
+          model_type: random_forest
+          hyperparams:
+            n_estimators: 100
+            max_depth: 10
+        output: model
+        constraints:
+          llm_allowed: false
+          timeout: 180
+        next: [quick_eval]
+
+      - id: quick_eval
+        type: compute
+        name: "Quick Evaluation"
+        tools: [shell]
+        output: metrics
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [summary]
+
+      - id: summary
+        type: agent
+        name: "Quick Summary"
+        role: analyst
+        goal: "Provide a brief summary of baseline model performance."
+        tool_budget: 5
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-haiku
+        output: summary

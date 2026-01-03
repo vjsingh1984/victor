@@ -14,11 +14,18 @@
 
 """DevOps Tool Dependencies - Tool relationships for infrastructure workflows.
 
-Extends the core BaseToolDependencyProvider with DevOps-specific data.
-Also provides composed tool patterns using ToolExecutionGraph.
+This module provides tool dependency configuration for DevOps workflows.
+The core configuration is now loaded from YAML (tool_dependencies.yaml),
+while composed patterns remain in Python for complex logic.
 
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
+
+Migration Notes:
+    - Transitions, clusters, sequences, dependencies are now in YAML
+    - DevOpsToolDependencyProvider uses YAMLToolDependencyProvider
+    - Composed patterns and graph functions remain in Python for flexibility
+    - All exports preserved for backward compatibility
 
 Example:
     from victor.devops.tool_dependencies import (
@@ -37,152 +44,53 @@ Example:
     plan = graph.plan_for_goal({ToolNames.SHELL, ToolNames.GIT})
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
-from victor.core.tool_types import ToolDependency
+from victor.core.tool_dependency_loader import (
+    YAMLToolDependencyProvider,
+    load_tool_dependency_yaml,
+)
 from victor.framework.tool_naming import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
 
 
-# Tool dependency graph for DevOps workflows
-# Uses canonical ToolNames constants for consistency
-DEVOPS_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
-    # Reading leads to more analysis or writing
-    ToolNames.READ: [
-        (ToolNames.SHELL, 0.3),  # Execute what we read
-        (ToolNames.EDIT, 0.3),  # Modify configuration
-        (ToolNames.GREP, 0.2),  # Find related configs
-        (ToolNames.WRITE, 0.2),  # Write new config
-    ],
-    # Code search for finding configurations
-    ToolNames.GREP: [
-        (ToolNames.READ, 0.5),  # Read found files
-        (ToolNames.CODE_SEARCH, 0.2),  # Refine search
-        (ToolNames.GREP, 0.2),  # Continue searching
-        (ToolNames.OVERVIEW, 0.1),  # Get context
-    ],
-    # Shell for infrastructure commands
-    ToolNames.SHELL: [
-        (ToolNames.READ, 0.3),  # Check results
-        (ToolNames.SHELL, 0.3),  # Chain commands
-        (ToolNames.WRITE, 0.2),  # Save output
-        (ToolNames.GIT, 0.2),  # Check git state
-    ],
-    # Writing configurations
-    ToolNames.WRITE: [
-        (ToolNames.SHELL, 0.4),  # Validate/apply config
-        (ToolNames.READ, 0.3),  # Review what was written
-        (ToolNames.GIT, 0.2),  # Check changes
-        (ToolNames.EDIT, 0.1),  # Refine
-    ],
-    # Editing configurations
-    ToolNames.EDIT: [
-        (ToolNames.SHELL, 0.4),  # Test changes
-        (ToolNames.READ, 0.3),  # Verify edit
-        (ToolNames.GIT, 0.3),  # Review changes / check status
-    ],
-    # Git operations (unified)
-    ToolNames.GIT: [
-        (ToolNames.READ, 0.4),  # Check files
-        (ToolNames.EDIT, 0.3),  # Fix issues
-        (ToolNames.SHELL, 0.3),  # Run commands
-    ],
-    # Web for documentation
-    ToolNames.WEB_SEARCH: [
-        (ToolNames.WEB_FETCH, 0.6),  # Fetch found docs
-        (ToolNames.WEB_SEARCH, 0.2),  # Refine search
-        (ToolNames.READ, 0.1),  # Check local files
-        (ToolNames.WRITE, 0.1),  # Document findings
-    ],
-    ToolNames.WEB_FETCH: [
-        (ToolNames.WRITE, 0.3),  # Apply learnings
-        (ToolNames.WEB_SEARCH, 0.3),  # Find more
-        (ToolNames.WEB_FETCH, 0.2),  # Fetch related
-        (ToolNames.EDIT, 0.2),  # Update configs
-    ],
-    # Docker operations
-    ToolNames.DOCKER: [
-        (ToolNames.SHELL, 0.4),  # Run docker commands
-        (ToolNames.READ, 0.3),  # Check Dockerfile
-        (ToolNames.WRITE, 0.2),  # Create compose file
-        (ToolNames.GIT, 0.1),  # Check changes
-    ],
-}
+# =============================================================================
+# YAML Configuration Path
+# =============================================================================
+_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
-# Tools that work well together in DevOps
-# Uses canonical ToolNames constants for consistency
-DEVOPS_TOOL_CLUSTERS: Dict[str, Set[str]] = {
-    "file_operations": {ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.LS},
-    "git_operations": {ToolNames.GIT},  # Unified git tool
-    "code_exploration": {ToolNames.GREP, ToolNames.CODE_SEARCH, ToolNames.OVERVIEW},
-    "infrastructure": {ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE, ToolNames.DOCKER},
-    "documentation": {ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
-    "container_ops": {ToolNames.DOCKER, ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE},
-}
 
-# Recommended sequences for common DevOps tasks
-# Uses canonical ToolNames constants for consistency
-DEVOPS_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "dockerfile_create": [ToolNames.READ, ToolNames.WRITE, ToolNames.SHELL],
-    "ci_cd_setup": [ToolNames.LS, ToolNames.GREP, ToolNames.READ, ToolNames.WRITE, ToolNames.SHELL],
-    "kubernetes_deploy": [ToolNames.READ, ToolNames.WRITE, ToolNames.SHELL, ToolNames.SHELL],
-    "terraform_apply": [ToolNames.READ, ToolNames.SHELL, ToolNames.SHELL, ToolNames.GIT],
-    "config_update": [ToolNames.READ, ToolNames.EDIT, ToolNames.SHELL, ToolNames.GIT],
-    "docker_build": [ToolNames.READ, ToolNames.WRITE, ToolNames.DOCKER, ToolNames.SHELL],
-    "monitoring_setup": [ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL],
-    "security_scan": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE, ToolNames.GIT],
-}
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
+# These are derived from the YAML config at module load time for backward
+# compatibility with code that imports these constants directly.
 
-# Tool dependencies for DevOps
-# Uses canonical ToolNames constants for consistency
-DEVOPS_TOOL_DEPENDENCIES: List[ToolDependency] = [
-    ToolDependency(
-        tool_name=ToolNames.SHELL,
-        depends_on={ToolNames.READ},
-        enables={ToolNames.WRITE, ToolNames.GIT},
-        weight=0.6,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.EDIT,
-        depends_on={ToolNames.READ},
-        enables={ToolNames.SHELL, ToolNames.GIT},
-        weight=0.5,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.GIT,  # Unified git tool
-        depends_on=set(),
-        enables=set(),
-        weight=0.4,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.WRITE,
-        depends_on={ToolNames.READ},
-        enables={ToolNames.SHELL, ToolNames.GIT},
-        weight=0.5,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.DOCKER,
-        depends_on={ToolNames.READ},
-        enables={ToolNames.SHELL, ToolNames.WRITE},
-        weight=0.6,
-    ),
-]
 
-# Required tools for DevOps
-# Uses canonical ToolNames constants for consistency
-DEVOPS_REQUIRED_TOOLS: Set[str] = {ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL}
+def _load_yaml_config():
+    """Load YAML config and extract data structures for backward compatibility.
 
-# Optional tools that enhance DevOps
-# Uses canonical ToolNames constants for consistency
-DEVOPS_OPTIONAL_TOOLS: Set[str] = {
-    ToolNames.GREP,
-    ToolNames.CODE_SEARCH,
-    ToolNames.GIT,
-    ToolNames.WEB_SEARCH,
-    ToolNames.WEB_FETCH,
-    ToolNames.DOCKER,
-}
+    Note: Canonicalization is disabled to preserve tool names as-is.
+    This is important because the YAML uses distinct tool names like 'grep'
+    (keyword search) and 'code_search' (semantic/AI search) that would
+    otherwise be collapsed by the alias mapping.
+    """
+    config = load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=False)
+    return config
+
+
+# Load config once at module import
+_config = _load_yaml_config()
+
+# Export transitions, clusters, sequences for backward compatibility
+# Code using these constants will get the same data, now from YAML
+DEVOPS_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = _config.transitions
+DEVOPS_TOOL_CLUSTERS: Dict[str, Set[str]] = _config.clusters
+DEVOPS_TOOL_SEQUENCES: Dict[str, List[str]] = _config.sequences
+DEVOPS_TOOL_DEPENDENCIES = _config.dependencies
+DEVOPS_REQUIRED_TOOLS: Set[str] = _config.required_tools
+DEVOPS_OPTIONAL_TOOLS: Set[str] = _config.optional_tools
 
 
 # =============================================================================
@@ -265,27 +173,32 @@ DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
 }
 
 
-class DevOpsToolDependencyProvider(BaseToolDependencyProvider):
+class DevOpsToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for DevOps vertical.
 
-    Extends BaseToolDependencyProvider with DevOps-specific tool
-    relationships for infrastructure and CI/CD workflows.
+    Loads configuration from tool_dependencies.yaml for infrastructure
+    and CI/CD workflows. Extends YAMLToolDependencyProvider with
+    DevOps-specific features.
 
     Uses canonical ToolNames constants for consistency.
+
+    Migration Notes:
+        - Configuration now loaded from YAML instead of hand-coded Python
+        - All functionality preserved via YAMLToolDependencyProvider
+        - Composed patterns remain in DEVOPS_COMPOSED_PATTERNS constant
     """
 
     def __init__(self):
-        """Initialize the provider with DevOps-specific config."""
+        """Initialize the provider from YAML config.
+
+        Note: Canonicalization is disabled to preserve tool names as-is.
+        This is important because the YAML uses distinct tool names like 'grep'
+        (keyword search) and 'code_search' (semantic/AI search) that would
+        otherwise be collapsed by the alias mapping.
+        """
         super().__init__(
-            ToolDependencyConfig(
-                dependencies=DEVOPS_TOOL_DEPENDENCIES,
-                transitions=DEVOPS_TOOL_TRANSITIONS,
-                clusters=DEVOPS_TOOL_CLUSTERS,
-                sequences=DEVOPS_TOOL_SEQUENCES,
-                required_tools=DEVOPS_REQUIRED_TOOLS,
-                optional_tools=DEVOPS_OPTIONAL_TOOLS,
-                default_sequence=[ToolNames.READ, ToolNames.WRITE, ToolNames.SHELL],
-            )
+            yaml_path=_YAML_CONFIG_PATH,
+            canonicalize=False,
         )
 
 

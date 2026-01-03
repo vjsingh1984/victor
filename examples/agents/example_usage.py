@@ -52,7 +52,7 @@ async def example_programmatic_agents():
         name="api_developer",
         description="Specializes in REST API development",
         capabilities=AgentCapabilities(
-            tools={"read_file", "edit_file", "write_file", "execute_bash"},
+            tools={"read", "edit", "write", "shell"},
             skills={"api_design", "openapi", "validation"},
             can_execute_code=True,
             can_modify_files=True,
@@ -73,7 +73,7 @@ Follow OpenAPI standards and implement proper validation.""",
 
     # Extend a preset agent
     enhanced_coder = coder_agent.with_capabilities(
-        tools={"run_tests", "lint_code"},
+        tools={"test", "code_review"},
         can_browse_web=True,  # Allow looking up documentation
     )
 
@@ -101,7 +101,7 @@ async def example_pipeline_ensemble():
         context={"project": "victor", "language": "python"},
     )
 
-    print(f"\nExecution result:")
+    print("\nExecution result:")
     print(f"  Status: {result.status.value}")
     print(f"  Agents completed: {len(result.agent_results)}")
     for ar in result.agent_results:
@@ -116,12 +116,12 @@ async def example_parallel_ensemble():
     security = AgentSpec(
         name="security_check",
         description="Security analysis",
-        capabilities=AgentCapabilities(tools={"grep", "read_file"}),
+        capabilities=AgentCapabilities(tools={"code_search", "read"}),
     )
     performance = AgentSpec(
         name="perf_check",
         description="Performance analysis",
-        capabilities=AgentCapabilities(tools={"read_file"}),
+        capabilities=AgentCapabilities(tools={"read"}),
     )
 
     parallel = Parallel(
@@ -132,7 +132,7 @@ async def example_parallel_ensemble():
 
     result = await parallel.execute("Analyze the authentication module")
 
-    print(f"Parallel execution completed:")
+    print("Parallel execution completed:")
     print(f"  Status: {result.status.value}")
     print(f"  Results: {result.final_output}")
 
@@ -186,15 +186,15 @@ async def example_entity_memory():
     # Sample code to analyze
     code_sample = """
 class UserAuthentication:
-    def __init__(self, token_validator: TokenValidator):
-        self.validator = token_validator
+    def __init__(self, scanner: SecurityScanner):
+        self.scanner = scanner
 
     async def authenticate(self, username: str, password: str) -> User:
         # Hash password with bcrypt
         hashed = bcrypt.hash(password)
         return await self.db.verify(username, hashed)
 
-from victor.security import TokenValidator, JWTHandler
+from victor.security import SecurityScanner, SecurityPolicy
 """
 
     # Extract entities
@@ -225,11 +225,11 @@ async def example_entity_graph():
 
     module = Entity.create("auth_module", EntityType.MODULE)
     auth_class = Entity.create("UserAuth", EntityType.CLASS)
-    validator = Entity.create("TokenValidator", EntityType.CLASS)
+    scanner = Entity.create("SecurityScanner", EntityType.CLASS)
 
     await graph.add_entity(module)
     await graph.add_entity(auth_class)
-    await graph.add_entity(validator)
+    await graph.add_entity(scanner)
 
     # Add relationships
     await graph.add_relation(
@@ -242,7 +242,7 @@ async def example_entity_graph():
     await graph.add_relation(
         EntityRelation(
             source_id=auth_class.id,
-            target_id=validator.id,
+            target_id=scanner.id,
             relation_type=RelationType.DEPENDS_ON,
         )
     )
@@ -255,7 +255,7 @@ async def example_entity_graph():
 
     # Get statistics
     stats = await graph.get_stats()
-    print(f"\nGraph stats:")
+    print("\nGraph stats:")
     print(f"  Entities: {stats.entity_count}")
     print(f"  Relations: {stats.relation_count}")
 

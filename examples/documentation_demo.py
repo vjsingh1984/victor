@@ -27,7 +27,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from victor.tools.documentation_tool import generate_docs, analyze_docs
+from victor.tools.documentation_tool import docs, docs_coverage
 
 
 def setup_demo_file(temp_dir: Path, filename: str, content: str) -> Path:
@@ -38,7 +38,7 @@ def setup_demo_file(temp_dir: Path, filename: str, content: str) -> Path:
     return file_path
 
 
-async def demo_generate_docstrings():
+async def demo_docstrings():
     """Demo generating docstrings."""
     print("\n\n📝 Generate Docstrings Demo")
     print("=" * 70)
@@ -89,7 +89,7 @@ class ShoppingCart:
         print(demo_code[:400] + "...")
 
         print("\n2️⃣ Generate docstrings...")
-        result = await generate_docs(
+        result = await docs(
             path=str(file_path),
             doc_types=["docstrings"],
             format="google",
@@ -192,7 +192,7 @@ class UserManager:
         file_path = setup_demo_file(temp_path, "api.py", demo_code.strip())
 
         print("\n1️⃣ Generate API documentation from code...")
-        result = await generate_docs(
+        result = await docs(
             path=str(file_path),
             doc_types=["api"],
             format="markdown",
@@ -202,7 +202,7 @@ class UserManager:
         if result["success"]:
             print(result.get("formatted_report", ""))
             api_result = result.get("results", {}).get("api", {})
-            print(f"\nGenerated documentation preview:")
+            print("\nGenerated documentation preview:")
             print(api_result.get("preview", ""))
 
 
@@ -252,7 +252,7 @@ def another_function(x, y):
         file_path = setup_demo_file(temp_path, "processor.py", demo_code.strip())
 
         print("\n1️⃣ Analyze documentation coverage...")
-        result = await analyze_docs(path=str(file_path))
+        result = await docs_coverage(path=str(file_path))
 
         if result["success"]:
             print(result.get("formatted_report", ""))
@@ -329,14 +329,14 @@ def format_currency(amount, currency='USD'):
         file_path = setup_demo_file(temp_path, "payment.py", demo_code.strip())
 
         print("\n1️⃣ STEP 1: Analyze current documentation coverage...")
-        result = await analyze_docs(path=str(file_path))
+        result = await docs_coverage(path=str(file_path))
         if result["success"]:
             print("✓ Coverage analyzed")
             report = result.get("formatted_report", "")
             print(report[:400] + "..." if len(report) > 400 else report)
 
         print("\n\n2️⃣ STEP 2: Generate missing docstrings...")
-        result = await generate_docs(
+        result = await docs(
             path=str(file_path),
             doc_types=["docstrings"],
         )
@@ -345,7 +345,7 @@ def format_currency(amount, currency='USD'):
             print(result.get("formatted_report", ""))
 
         print("\n\n3️⃣ STEP 3: Generate API documentation...")
-        result = await generate_docs(
+        result = await docs(
             path=str(file_path),
             doc_types=["api"],
             output=str(temp_path / "payment_api.md"),
@@ -354,7 +354,7 @@ def format_currency(amount, currency='USD'):
             print("✓ API docs generated")
 
         print("\n\n4️⃣ STEP 4: Verify final coverage...")
-        result = await analyze_docs(path=str(file_path))
+        result = await docs_coverage(path=str(file_path))
         if result["success"]:
             print("✓ Final coverage verified")
             report = result.get("formatted_report", "")
@@ -424,7 +424,7 @@ async def main():
     print("\nDemonstrating automated documentation generation\n")
 
     # Run demos
-    await demo_generate_docstrings()
+    await demo_docstrings()
     await demo_generate_api_docs()
     await demo_analyze_coverage()
     await demo_real_world_workflow()

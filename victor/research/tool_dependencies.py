@@ -14,165 +14,123 @@
 
 """Research Tool Dependencies - Tool relationships for research workflows.
 
-Extends the core BaseToolDependencyProvider with research-specific data.
+Migrated to YAML-based configuration for declarative tool dependency management.
+Configuration is loaded from tool_dependencies.yaml in this directory.
 
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
+
+The YAML-based approach provides:
+- Declarative configuration that's easier to read and modify
+- Consistent schema validation via Pydantic
+- Automatic tool name canonicalization
+- Caching for performance
+
+For backward compatibility, the legacy constants are preserved and derived
+from the YAML configuration at import time.
 """
 
+from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_dependency_loader import YAMLToolDependencyProvider, load_tool_dependency_yaml
 from victor.core.tool_types import ToolDependency
-from victor.framework.tool_naming import ToolNames
+
+# Path to the YAML configuration file
+_YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
 
-# Tool dependency graph for research workflows
-# Uses canonical ToolNames constants for consistency
-RESEARCH_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
-    # Search tools lead to fetch/read
-    ToolNames.WEB_SEARCH: [
-        (ToolNames.WEB_FETCH, 0.7),  # Usually fetch after finding results
-        (ToolNames.WEB_SEARCH, 0.2),  # Sometimes refine search
-        (ToolNames.READ, 0.1),  # Check local context
-    ],
-    # Fetch leads to more fetch or synthesis
-    ToolNames.WEB_FETCH: [
-        (ToolNames.WEB_FETCH, 0.4),  # Fetch more pages
-        (ToolNames.WEB_SEARCH, 0.3),  # Search for related info
-        (ToolNames.WRITE, 0.2),  # Write findings
-        (ToolNames.READ, 0.1),  # Check local notes
-    ],
-    # Reading local files
-    ToolNames.READ: [
-        (ToolNames.WEB_SEARCH, 0.4),  # Research based on file content
-        (ToolNames.WRITE, 0.3),  # Update notes
-        (ToolNames.EDIT, 0.2),  # Modify content
-        (ToolNames.LS, 0.1),  # Find more files
-    ],
-    # Writing outputs
-    ToolNames.WRITE: [
-        (ToolNames.READ, 0.4),  # Review what was written
-        (ToolNames.EDIT, 0.3),  # Refine content
-        (ToolNames.WEB_SEARCH, 0.2),  # Verify/expand
-        (ToolNames.WEB_FETCH, 0.1),  # Get more sources
-    ],
-    # Code search for technical research
-    ToolNames.GREP: [
-        (ToolNames.READ, 0.5),  # Read found code
-        (ToolNames.CODE_SEARCH, 0.3),  # Semantic follow-up
-        (ToolNames.GREP, 0.2),  # Refine search
-    ],
-    ToolNames.CODE_SEARCH: [
-        (ToolNames.READ, 0.5),  # Read found code
-        (ToolNames.GREP, 0.3),  # Keyword follow-up
-        (ToolNames.OVERVIEW, 0.2),  # Get context
-    ],
-}
-
-# Tools that should typically be used together
-# Uses canonical ToolNames constants for consistency
-RESEARCH_TOOL_CLUSTERS: Dict[str, Set[str]] = {
-    "web_research": {ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
-    "file_operations": {ToolNames.READ, ToolNames.WRITE, ToolNames.EDIT, ToolNames.LS},
-    "code_research": {ToolNames.GREP, ToolNames.CODE_SEARCH, ToolNames.OVERVIEW},
-}
-
-# Recommended tool sequences for common research patterns
-# Uses canonical ToolNames constants for consistency
-RESEARCH_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "fact_check": [
-        ToolNames.WEB_SEARCH,
-        ToolNames.WEB_FETCH,
-        ToolNames.WEB_SEARCH,
-        ToolNames.WEB_FETCH,
-    ],
-    "literature_review": [
-        ToolNames.WEB_SEARCH,
-        ToolNames.WEB_FETCH,
-        ToolNames.WEB_FETCH,
-        ToolNames.WEB_FETCH,
-        ToolNames.WRITE,
-    ],
-    "technical_lookup": [ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH, ToolNames.GREP, ToolNames.READ],
-    "report_writing": [
-        ToolNames.READ,
-        ToolNames.WEB_SEARCH,
-        ToolNames.WEB_FETCH,
-        ToolNames.WRITE,
-        ToolNames.EDIT,
-    ],
-}
-
-# Tool dependencies for research
-# Uses canonical ToolNames constants for consistency
-RESEARCH_TOOL_DEPENDENCIES: List[ToolDependency] = [
-    ToolDependency(
-        tool_name=ToolNames.WEB_FETCH,
-        depends_on={ToolNames.WEB_SEARCH},
-        enables={ToolNames.WRITE, ToolNames.WEB_FETCH},
-        weight=0.7,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.WRITE,
-        depends_on={ToolNames.WEB_FETCH, ToolNames.READ},
-        enables={ToolNames.READ, ToolNames.EDIT},
-        weight=0.5,
-    ),
-    ToolDependency(
-        tool_name=ToolNames.GREP,
-        depends_on=set(),
-        enables={ToolNames.READ, ToolNames.CODE_SEARCH},
-        weight=0.5,
-    ),
-]
-
-# Required tools for research
-# Uses canonical ToolNames constants for consistency
-RESEARCH_REQUIRED_TOOLS: Set[str] = {
-    ToolNames.WEB_SEARCH,
-    ToolNames.WEB_FETCH,
-    ToolNames.READ,
-    ToolNames.WRITE,
-}
-
-# Optional tools that enhance research
-# Uses canonical ToolNames constants for consistency
-RESEARCH_OPTIONAL_TOOLS: Set[str] = {
-    ToolNames.GREP,
-    ToolNames.CODE_SEARCH,
-    ToolNames.OVERVIEW,
-    ToolNames.LS,
-    ToolNames.EDIT,
-}
-
-
-class ResearchToolDependencyProvider(BaseToolDependencyProvider):
+class ResearchToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for research vertical.
 
-    Extends BaseToolDependencyProvider with research-specific tool
-    relationships for fact-checking, literature review, and report writing.
+    Extends YAMLToolDependencyProvider to load research-specific tool
+    relationships from tool_dependencies.yaml.
 
-    Uses canonical ToolNames constants for consistency.
+    Provides configurations for:
+    - Fact-checking workflows
+    - Literature review workflows
+    - Technical lookup workflows
+    - Report writing workflows
+
+    Uses tool names from ToolNames constants for consistency.
+
+    Note: canonicalize=False is used to preserve the original tool names
+    as defined in the YAML (e.g., code_search vs grep). The tool names
+    in the YAML match the ToolNames constants used in the original Python.
     """
 
     def __init__(self):
-        """Initialize the provider with research-specific config."""
+        """Initialize the provider from YAML configuration."""
         super().__init__(
-            ToolDependencyConfig(
-                dependencies=RESEARCH_TOOL_DEPENDENCIES,
-                transitions=RESEARCH_TOOL_TRANSITIONS,
-                clusters=RESEARCH_TOOL_CLUSTERS,
-                sequences=RESEARCH_TOOL_SEQUENCES,
-                required_tools=RESEARCH_REQUIRED_TOOLS,
-                optional_tools=RESEARCH_OPTIONAL_TOOLS,
-                default_sequence=[ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH],
-            )
+            yaml_path=_YAML_PATH,
+            canonicalize=False,  # Preserve original tool names from ToolNames constants
         )
+
+
+# =============================================================================
+# BACKWARD COMPATIBILITY: Legacy constants derived from YAML
+# =============================================================================
+# These constants are provided for backward compatibility with code that
+# imports them directly. They are derived from the YAML configuration.
+
+
+def _get_legacy_config() -> Dict:
+    """Load config for legacy constant initialization."""
+    config = load_tool_dependency_yaml(_YAML_PATH, canonicalize=True)
+    return config
+
+
+# Lazy initialization to avoid circular imports
+_legacy_config = None
+
+
+def _ensure_legacy_config():
+    """Ensure legacy config is loaded."""
+    global _legacy_config
+    if _legacy_config is None:
+        _legacy_config = _get_legacy_config()
+    return _legacy_config
+
+
+# Legacy constants - these are properties that load from YAML on first access
+# For import compatibility, we define them at module level after loading
+
+# Load the configuration at module import time to populate legacy constants
+try:
+    _config = load_tool_dependency_yaml(_YAML_PATH, canonicalize=False)
+
+    # Tool dependency graph for research workflows
+    RESEARCH_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = _config.transitions
+
+    # Tools that should typically be used together
+    RESEARCH_TOOL_CLUSTERS: Dict[str, Set[str]] = _config.clusters
+
+    # Recommended tool sequences for common research patterns
+    RESEARCH_TOOL_SEQUENCES: Dict[str, List[str]] = _config.sequences
+
+    # Tool dependencies for research
+    RESEARCH_TOOL_DEPENDENCIES: List[ToolDependency] = _config.dependencies
+
+    # Required tools for research
+    RESEARCH_REQUIRED_TOOLS: Set[str] = _config.required_tools
+
+    # Optional tools that enhance research
+    RESEARCH_OPTIONAL_TOOLS: Set[str] = _config.optional_tools
+
+except Exception:
+    # Fallback to empty values if YAML loading fails during import
+    # This allows the module to be imported even if YAML is malformed
+    RESEARCH_TOOL_TRANSITIONS = {}
+    RESEARCH_TOOL_CLUSTERS = {}
+    RESEARCH_TOOL_SEQUENCES = {}
+    RESEARCH_TOOL_DEPENDENCIES = []
+    RESEARCH_REQUIRED_TOOLS = set()
+    RESEARCH_OPTIONAL_TOOLS = set()
 
 
 __all__ = [
     "ResearchToolDependencyProvider",
+    # Legacy constants for backward compatibility
     "RESEARCH_TOOL_DEPENDENCIES",
     "RESEARCH_TOOL_TRANSITIONS",
     "RESEARCH_TOOL_CLUSTERS",

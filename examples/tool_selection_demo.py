@@ -36,28 +36,28 @@ async def main():
     print("🔧 Initializing tool registry...")
     registry = ToolRegistry()
 
-    # Register core tools (filesystem, bash, git, etc.)
-    from victor.tools.filesystem import ReadFile, WriteFile, ListDirectory
-    from victor.tools.bash import BashExecutor
-    from victor.tools.git_tool import GitTool
-    from victor.tools.file_editor_tool import FileEditorTool
-    from victor.tools.code_review_tool import CodeReviewTool
-    from victor.tools.testing_tool import TestingTool
-    from victor.tools.security_scanner_tool import SecurityScannerTool
-    from victor.tools.refactor_tool import RefactorTool
-    from victor.tools.documentation_tool import DocumentationTool
+    # Register core tools (filesystem, shell, git, etc.)
+    from victor.tools.filesystem import read, write, ls
+    from victor.tools.bash import shell_readonly
+    from victor.tools.git_tool import git
+    from victor.tools.file_editor_tool import edit
+    from victor.tools.code_review_tool import code_review
+    from victor.tools.testing_tool import test
+    from victor.tools.security_scanner_tool import scan
+    from victor.tools.refactor_tool import rename
+    from victor.tools.documentation_tool import docs
 
-    registry.register(ReadFile())
-    registry.register(WriteFile())
-    registry.register(ListDirectory())
-    registry.register(BashExecutor())
-    registry.register(GitTool())
-    registry.register(FileEditorTool())
-    registry.register(CodeReviewTool())
-    registry.register(TestingTool())
-    registry.register(SecurityScannerTool())
-    registry.register(RefactorTool())
-    registry.register(DocumentationTool())
+    registry.register(read)
+    registry.register(write)
+    registry.register(ls)
+    registry.register(shell_readonly)
+    registry.register(git)
+    registry.register(edit)
+    registry.register(code_review)
+    registry.register(test)
+    registry.register(scan)
+    registry.register(rename)
+    registry.register(docs)
 
     print(f"✅ Registered {len(registry.list_tools())} tools")
     print()
@@ -77,13 +77,13 @@ async def main():
     test_queries = [
         (
             "I need to review this code for security vulnerabilities",
-            ["security_scanner", "code_review"],
+            ["scan", "code_review"],
         ),
-        ("Generate unit tests for my Python functions", ["testing", "code_review"]),
-        ("Refactor this function to improve readability", ["refactor", "code_review"]),
-        ("Create API documentation from my code", ["documentation"]),
+        ("Generate unit tests for my Python functions", ["test", "code_review"]),
+        ("Refactor this function to improve readability", ["rename", "code_review"]),
+        ("Create API documentation from my code", ["docs"]),
         ("Commit these changes to git with a descriptive message", ["git"]),
-        ("Read the configuration file and parse it", ["read_file"]),
+        ("Read the configuration file and parse it", ["read"]),
     ]
 
     print("=" * 60)
@@ -117,12 +117,12 @@ async def main():
     print("📊 Performance Characteristics")
     print("=" * 60)
     print()
-    print(f"  Model: all-MiniLM-L12-v2")
-    print(f"  Dimension: 384")
-    print(f"  Memory footprint: ~120MB")
-    print(f"  Embedding generation: ~8ms per query")
-    print(f"  Tool selection: Sub-second for 31 tools")
-    print(f"  Cache: Embeddings cached to disk")
+    print("  Model: all-MiniLM-L12-v2")
+    print("  Dimension: 384")
+    print("  Memory footprint: ~120MB")
+    print("  Embedding generation: ~8ms per query")
+    print("  Tool selection: Sub-second for 31 tools")
+    print("  Cache: Embeddings cached to disk")
     print()
 
     print("=" * 60)

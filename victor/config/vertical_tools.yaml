@@ -1,0 +1,179 @@
+# Vertical-Specific Tool Configurations
+#
+# This file defines tool tiers for each vertical to optimize token usage:
+# - core_tools: Always FULL schema (essential for any task)
+# - vertical_tools: COMPACT schema (~20% reduction from FULL)
+# - semantic_pool: STUB schema (minimal description, required params only)
+# - max_semantic_pool: Maximum tools from semantic selection
+#
+# Schema Levels:
+#   FULL: Complete description + all parameters (~100-150 tokens/tool)
+#   COMPACT: Shortened description + all params (~60-80 tokens/tool)
+#   STUB: Name + one-line + required params only (~25-40 tokens/tool)
+#
+# Token savings: ~80% reduction (5,400 -> ~1,080 tokens for 45 tools)
+
+verticals:
+  coding:
+    description: "Software development and code editing"
+    core_tools:  # FULL schema - essential for coding
+      - read
+      - write
+      - edit
+      - ls
+      - grep
+      - shell
+    vertical_tools:  # COMPACT schema - primary coding tools
+      - code_search
+      - semantic_code_search
+      - git
+      - test
+      - lint
+      - refactor
+    semantic_pool:  # STUB schema - included based on query similarity
+      - docker
+      - python_repl
+      - database
+      - web_search
+      - web_fetch
+      - analyze
+      - complexity
+      - documentation
+    max_semantic_pool: 5
+    readonly_only_for_analysis: true
+
+  devops:
+    description: "Infrastructure and deployment operations"
+    core_tools:
+      - read
+      - ls
+      - shell
+      - grep
+    vertical_tools:
+      - docker
+      - kubernetes
+      - terraform
+      - git
+      - yaml
+    semantic_pool:
+      - write
+      - edit
+      - web_search
+      - web_fetch
+      - database
+      - test
+    max_semantic_pool: 4
+    readonly_only_for_analysis: false
+
+  research:
+    description: "Research and information gathering"
+    core_tools:
+      - read
+      - ls
+      - shell
+    vertical_tools:
+      - web_search
+      - web_fetch
+      - write
+      - grep
+    semantic_pool:
+      - edit
+      - git
+      - code_search
+      - database
+      - python_repl
+    max_semantic_pool: 4
+    readonly_only_for_analysis: false
+
+  dataanalysis:
+    description: "Data analysis and visualization"
+    core_tools:
+      - read
+      - write
+      - ls
+      - shell
+    vertical_tools:
+      - python_repl
+      - database
+      - visualization
+      - analyze
+    semantic_pool:
+      - edit
+      - grep
+      - web_search
+      - web_fetch
+      - git
+    max_semantic_pool: 4
+    readonly_only_for_analysis: true
+
+  rag:
+    description: "Retrieval-augmented generation"
+    core_tools:
+      - read
+      - write
+      - ls
+    vertical_tools:
+      - embeddings
+      - vector_search
+      - chunk
+      - grep
+    semantic_pool:
+      - shell
+      - edit
+      - database
+      - web_fetch
+    max_semantic_pool: 3
+    readonly_only_for_analysis: true
+
+# Default configuration for unknown verticals
+default:
+  core_tools:
+    - read
+    - write
+    - edit
+    - ls
+    - grep
+    - shell
+  vertical_tools: []
+  semantic_pool:
+    - code_search
+    - git
+    - web_search
+    - web_fetch
+    - docker
+    - database
+    - test
+  max_semantic_pool: 5
+  readonly_only_for_analysis: true
+
+# Stage-specific tool additions (merged with vertical tools)
+stage_tools:
+  initial:
+    - list_directory
+    - code_search
+    - semantic_code_search
+  planning:
+    - read
+    - ls
+    - grep
+  reading:
+    - read
+    - grep
+    - code_search
+  analysis:
+    - read
+    - grep
+    - analyze
+    - complexity
+  executing:
+    - edit
+    - write
+    - shell
+    - test
+  verification:
+    - read
+    - test
+    - shell
+  completion:
+    - read
+    - git

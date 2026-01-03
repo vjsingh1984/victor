@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path(__file__).parent
 PROVIDER_LIMITS_FILE = CONFIG_DIR / "provider_context_limits.yaml"
 STAGE_KEYWORDS_FILE = CONFIG_DIR / "stage_keywords.yaml"
+LOGGING_CONFIG_FILE = CONFIG_DIR / "logging_config.yaml"
+
+# User config directory
+USER_CONFIG_DIR = Path.home() / ".victor"
+USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
 
 # Cache settings
 _cache_ttl = 300  # 5 minutes
@@ -65,6 +70,56 @@ class StageConfig:
     weight: float = 1.0
     min_score: int = 2
     tool_preferences: List[str] = field(default_factory=list)
+
+
+@dataclass
+class LoggingConfig:
+    """Centralized logging configuration.
+
+    Priority chain (highest to lowest):
+    1. CLI argument
+    2. Environment variable (VICTOR_LOG_LEVEL, VICTOR_LOG_FILE_LEVEL, etc.)
+    3. User config file (~/.victor/config.yaml)
+    4. Command-specific override from package config
+    5. Package defaults (logging_config.yaml)
+    6. Hardcoded fallback
+
+    Attributes:
+        console_level: Log level for console/stderr output
+        file_level: Log level for file output
+        file_enabled: Whether to enable file logging
+        file_path: Path to log file (supports ~ expansion)
+        file_max_bytes: Maximum size per log file before rotation
+        file_backup_count: Number of rotated backup files to keep
+        console_format: Format string for console logs
+        file_format: Format string for file logs
+        event_logging: Enable EventBus -> logging integration
+        module_levels: Per-module log level overrides
+    """
+
+    console_level: str = "WARNING"
+    file_level: str = "INFO"
+    file_enabled: bool = True
+    file_path: str = "~/.victor/logs/victor.log"
+    file_max_bytes: int = 10 * 1024 * 1024  # 10MB
+    file_backup_count: int = 5
+    console_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    file_format: str = "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s"
+    event_logging: bool = True
+    module_levels: Dict[str, str] = field(default_factory=dict)
+
+    @property
+    def expanded_file_path(self) -> Path:
+        """Get file path with ~ expanded."""
+        return Path(self.file_path).expanduser()
+
+    def get_console_level_int(self) -> int:
+        """Get console level as logging int constant."""
+        return getattr(logging, self.console_level.upper(), logging.WARNING)
+
+    def get_file_level_int(self) -> int:
+        """Get file level as logging int constant."""
+        return getattr(logging, self.file_level.upper(), logging.INFO)
 
 
 def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any]]:
@@ -250,3 +305,160 @@ def _get_default_stage_keywords() -> Dict[str, StageConfig]:
             min_score=2,
         ),
     }
+
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+
+
+def _merge_logging_configs(
+    base: Dict[str, Any],
+    override: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Deep merge logging configs (override takes precedence)."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _merge_logging_configs(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _apply_env_overrides(config: LoggingConfig) -> LoggingConfig:
+    """Apply environment variable overrides to logging config.
+
+    Environment variables:
+    - VICTOR_LOG_LEVEL: Override console level
+    - VICTOR_LOG_FILE_LEVEL: Override file level
+    - VICTOR_LOG_FILE: Override log file path
+    - VICTOR_LOG_DISABLED: Disable file logging if "true"
+    """
+    import os
+
+    if env_level := os.getenv("VICTOR_LOG_LEVEL"):
+        config.console_level = env_level.upper()
+
+    if env_file_level := os.getenv("VICTOR_LOG_FILE_LEVEL"):
+        config.file_level = env_file_level.upper()
+
+    if env_file := os.getenv("VICTOR_LOG_FILE"):
+        config.file_path = env_file
+
+    if os.getenv("VICTOR_LOG_DISABLED", "").lower() == "true":
+        config.file_enabled = False
+
+    return config
+
+
+def get_logging_config(
+    command: Optional[str] = None,
+    cli_console_level: Optional[str] = None,
+    cli_file_level: Optional[str] = None,
+) -> LoggingConfig:
+    """Get logging configuration with priority chain applied.
+
+    Priority (highest to lowest):
+    1. CLI arguments (cli_console_level, cli_file_level)
+    2. Environment variables (VICTOR_LOG_LEVEL, etc.)
+    3. User config file (~/.victor/config.yaml)
+    4. Command-specific override from package config
+    5. Package defaults (logging_config.yaml)
+    6. Hardcoded fallback
+
+    Args:
+        command: Command name for command-specific overrides (e.g., "chat", "benchmark")
+        cli_console_level: CLI-provided console level (highest priority)
+        cli_file_level: CLI-provided file level (highest priority)
+
+    Returns:
+        LoggingConfig with all overrides applied
+    """
+    # Start with hardcoded defaults
+    config_dict: Dict[str, Any] = {
+        "console_level": "WARNING",
+        "file_level": "INFO",
+        "file_enabled": True,
+        "file_path": "~/.victor/logs/victor.log",
+        "file_max_bytes": 10 * 1024 * 1024,
+        "file_backup_count": 5,
+        "console_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "file_format": "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s",
+        "event_logging": True,
+        "module_levels": {},
+    }
+
+    # Load package defaults
+    package_data = _load_yaml_cached(LOGGING_CONFIG_FILE, "logging_config")
+    if package_data and "logging" in package_data:
+        logging_section = package_data["logging"]
+
+        # Apply package defaults
+        if "default" in logging_section:
+            for key, value in logging_section["default"].items():
+                if key in config_dict:
+                    config_dict[key] = value
+
+        # Apply module levels from package
+        if "modules" in logging_section:
+            config_dict["module_levels"] = logging_section["modules"]
+
+        # Apply command-specific overrides from package
+        if command and "commands" in logging_section:
+            command_config = logging_section["commands"].get(command, {})
+            for key, value in command_config.items():
+                if key in config_dict:
+                    config_dict[key] = value
+
+    # Load user config (overrides package)
+    user_data = _load_yaml_cached(USER_CONFIG_FILE, "user_config")
+    if user_data and "logging" in user_data:
+        user_logging = user_data["logging"]
+
+        # Apply user defaults
+        if "default" in user_logging:
+            for key, value in user_logging["default"].items():
+                if key in config_dict:
+                    config_dict[key] = value
+
+        # Apply user module levels (merge with package)
+        if "modules" in user_logging:
+            config_dict["module_levels"].update(user_logging["modules"])
+
+        # Apply user command-specific overrides
+        if command and "commands" in user_logging:
+            command_config = user_logging["commands"].get(command, {})
+            for key, value in command_config.items():
+                if key in config_dict:
+                    config_dict[key] = value
+
+    # Create config object
+    config = LoggingConfig(
+        console_level=config_dict["console_level"],
+        file_level=config_dict["file_level"],
+        file_enabled=config_dict["file_enabled"],
+        file_path=config_dict["file_path"],
+        file_max_bytes=config_dict["file_max_bytes"],
+        file_backup_count=config_dict["file_backup_count"],
+        console_format=config_dict["console_format"],
+        file_format=config_dict["file_format"],
+        event_logging=config_dict["event_logging"],
+        module_levels=config_dict["module_levels"],
+    )
+
+    # Apply environment variable overrides
+    config = _apply_env_overrides(config)
+
+    # Apply CLI overrides (highest priority)
+    if cli_console_level:
+        config.console_level = cli_console_level.upper()
+    if cli_file_level:
+        config.file_level = cli_file_level.upper()
+
+    return config
+
+
+def get_default_logging_config() -> LoggingConfig:
+    """Get default logging config (no command-specific overrides)."""
+    return get_logging_config()

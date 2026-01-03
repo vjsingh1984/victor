@@ -79,10 +79,10 @@ async def example_simple_chain():
         return {"path": None, "error": "No Python files found"}
 
     # Build chain: ls -> extract first .py file -> read
-    chain = ls_runnable | RunnableLambda(get_first_python_file) | read_runnable
+    simple_chain = ls_runnable | RunnableLambda(get_first_python_file) | read_runnable
 
     # Execute chain
-    result = await chain.invoke({"path": "victor/tools"})
+    result = await simple_chain.invoke({"path": "victor/tools"})
 
     if result.get("success"):
         output = result.get("output", "")

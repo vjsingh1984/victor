@@ -452,7 +452,8 @@ async def code_search(
         )
 
         # Get semantic search configuration from settings
-        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.5)
+        # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
+        similarity_threshold = getattr(settings, "semantic_similarity_threshold", 0.25)
         expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
         enable_hybrid = getattr(settings, "enable_hybrid_search", False)
 
@@ -611,7 +612,7 @@ async def code_search(
             "success": True,
             "results": truncated_results,
             "count": len(truncated_results),
-            "hint": "Use read_file with line_start/line_end to see full content of specific results.",
+            "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
             "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
             "metadata": {
                 "rebuilt": rebuilt,

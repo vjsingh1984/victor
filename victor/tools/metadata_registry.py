@@ -126,6 +126,30 @@ from victor.tools.base import (
 
 logger = logging.getLogger(__name__)
 
+# Rust-accelerated pattern matching (with Python fallback)
+_RUST_PATTERN_MATCHING_AVAILABLE = False
+try:
+    from victor.processing.native import find_all_patterns
+
+    _RUST_PATTERN_MATCHING_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _get_matched_pattern_indices(text: str, patterns: List[str]) -> List[int]:
+    """Get indices of patterns that match in text (using Rust or Python fallback).
+
+    Returns unique pattern indices (not all matches).
+    """
+    if _RUST_PATTERN_MATCHING_AVAILABLE:
+        matches = find_all_patterns(text, patterns, case_insensitive=True)
+        # Extract unique pattern indices
+        return list({m.pattern_idx for m in matches})
+    else:
+        # Python fallback - simple substring matching
+        text_lower = text.lower()
+        return [i for i, p in enumerate(patterns) if p.lower() in text_lower]
+
 
 # Default fallback tools when registry is empty or keyword matching fails
 _FALLBACK_CRITICAL_TOOLS: Set[str] = {
@@ -681,18 +705,27 @@ class ToolMetadataRegistry:
         Scans the text for keywords that match tools in each category,
         returning categories where at least one keyword is found.
 
+        Uses Rust-accelerated Aho-Corasick pattern matching when available,
+        falling back to Python string matching otherwise.
+
         Args:
             text: Text to analyze for category keywords
 
         Returns:
             Set of category names where matching keywords were found
         """
-        text_lower = text.lower()
         detected: Set[str] = set()
 
         for category in self._by_category.keys():
             keywords = self.get_category_keywords(category)
-            if any(kw in text_lower for kw in keywords):
+            if not keywords:
+                continue
+
+            keywords_list = list(keywords)
+
+            # Use Rust Aho-Corasick when available (O(text_len) vs O(k * text_len))
+            matched = _get_matched_pattern_indices(text, keywords_list)
+            if matched:
                 detected.add(category)
 
         return detected
@@ -1004,17 +1037,29 @@ class ToolMetadataRegistry:
         Scans the text for all registered keywords and returns tools
         that have matching keywords. Useful for goal inference.
 
+        Uses Rust-accelerated Aho-Corasick pattern matching when available,
+        falling back to Python string matching otherwise.
+
         Args:
             text: Text to scan for keywords
 
         Returns:
             Set of tool names whose keywords match
         """
-        text_lower = text.lower()
         result: Set[str] = set()
-        for keyword, tool_names in self._by_keyword.items():
-            if keyword in text_lower:
-                result.update(tool_names)
+
+        # Get all keywords and their indices for Rust pattern matching
+        all_keywords = list(self._by_keyword.keys())
+        if not all_keywords:
+            return result
+
+        # Use Rust Aho-Corasick when available (single pass through text)
+        matched_indices = _get_matched_pattern_indices(text, all_keywords)
+        for idx in matched_indices:
+            if 0 <= idx < len(all_keywords):
+                keyword = all_keywords[idx]
+                result.update(self._by_keyword[keyword])
+
         return result
 
     def get_tools_matching_text_scored(
@@ -1042,19 +1087,26 @@ class ToolMetadataRegistry:
             List of KeywordMatchResult sorted by score (highest first)
         """
         start_time = time.time()
-        text_lower = text.lower()
 
-        # Collect matches per tool
+        # Collect matches per tool using Rust-accelerated pattern matching
         tool_matches: Dict[str, Set[str]] = {}
         matched_keywords: Set[str] = set()
 
-        for keyword, tool_names in self._by_keyword.items():
-            if keyword in text_lower:
-                matched_keywords.add(keyword)
-                for tool_name in tool_names:
-                    if tool_name not in tool_matches:
-                        tool_matches[tool_name] = set()
-                    tool_matches[tool_name].add(keyword)
+        # Get all keywords for single-pass matching
+        all_keywords = list(self._by_keyword.keys())
+        if all_keywords:
+            # Use Rust Aho-Corasick when available (O(text_len) vs O(k * text_len))
+            matched_indices = _get_matched_pattern_indices(text, all_keywords)
+
+            # Map matched indices back to keywords and tools
+            for idx in matched_indices:
+                if 0 <= idx < len(all_keywords):
+                    keyword = all_keywords[idx]
+                    matched_keywords.add(keyword)
+                    for tool_name in self._by_keyword[keyword]:
+                        if tool_name not in tool_matches:
+                            tool_matches[tool_name] = set()
+                        tool_matches[tool_name].add(keyword)
 
         # Calculate scores
         results: List[KeywordMatchResult] = []

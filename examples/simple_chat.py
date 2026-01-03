@@ -12,25 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple example of using CodingAgent with Ollama."""
+"""Simple example of using Victor with Ollama."""
 
 import asyncio
 
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
-from victor.providers.ollama_provider import OllamaProvider
+from victor import Agent, EventType
 
 
 async def main():
     """Run a simple chat example."""
-    # Create Ollama provider
-    provider = OllamaProvider(base_url="http://localhost:11434")
-
-    # Create settings and agent orchestrator
-    settings = Settings()
-    agent = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
+    agent = await Agent.create(
+        provider="ollama",
         model="qwen2.5-coder:7b",  # Change to your preferred model
         temperature=0.7,
     )
@@ -38,14 +30,14 @@ async def main():
     # Example 1: Simple chat
     print("Example 1: Simple Chat")
     print("-" * 50)
-    response = await agent.chat("What is Python?")
+    response = await agent.run("What is Python?")
     print(response.content)
     print()
 
     # Example 2: Follow-up question
     print("Example 2: Follow-up Question")
     print("-" * 50)
-    response = await agent.chat("Can you give me a simple Python code example?")
+    response = await agent.run("Can you give me a simple Python code example?")
     print(response.content)
     print()
 
@@ -53,22 +45,22 @@ async def main():
     print("Example 3: Streaming Response")
     print("-" * 50)
     print("Streaming: ", end="", flush=True)
-    async for chunk in agent.stream_chat("Count from 1 to 5"):
-        if chunk.content:
-            print(chunk.content, end="", flush=True)
+    async for event in agent.stream("Count from 1 to 5"):
+        if event.type == EventType.CONTENT:
+            print(event.content, end="", flush=True)
     print("\n")
 
     # Example 4: Using tools
     print("Example 4: Using Tools (File Operations)")
     print("-" * 50)
-    response = await agent.chat(
+    response = await agent.run(
         "Create a simple hello.txt file with the content 'Hello from CodingAgent!'"
     )
     print(response.content)
     print()
 
     # Clean up
-    await provider.close()
+    await agent.close()
 
 
 if __name__ == "__main__":

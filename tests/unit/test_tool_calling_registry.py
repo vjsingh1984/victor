@@ -19,6 +19,7 @@ from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
 from victor.agent.tool_calling.adapters import (
     AnthropicToolCallingAdapter,
+    DeepSeekToolCallingAdapter,
     GoogleToolCallingAdapter,
     LMStudioToolCallingAdapter,
     OllamaToolCallingAdapter,
@@ -100,9 +101,9 @@ class TestToolCallingAdapterRegistry:
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_deepseek(self):
-        """Test getting DeepSeek adapter uses OpenAI format."""
+        """Test getting DeepSeek adapter uses dedicated adapter."""
         adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
-        assert isinstance(adapter, OpenAIToolCallingAdapter)
+        assert isinstance(adapter, DeepSeekToolCallingAdapter)
 
     def test_get_adapter_cerebras(self):
         """Test getting Cerebras adapter uses OpenAI format."""

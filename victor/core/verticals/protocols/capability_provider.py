@@ -22,6 +22,7 @@ Usage:
         CapabilityProviderProtocol,
         ChainProviderProtocol,
         PersonaProviderProtocol,
+        VerticalPersonaProviderProtocol,
     )
 
     class CodingCapabilityProvider(CapabilityProviderProtocol):
@@ -31,11 +32,26 @@ Usage:
                 "refactoring": True,
                 "max_file_size": 100000,
             }
+
+    class CodingPersonaProvider(VerticalPersonaProviderProtocol):
+        @classmethod
+        def get_persona_specs(cls) -> Dict[str, PersonaSpec]:
+            from victor.framework.persona_registry import PersonaSpec
+            return {
+                "expert_reviewer": PersonaSpec(
+                    name="expert_reviewer",
+                    role="Expert Code Reviewer",
+                    expertise=["code review", "security"],
+                ),
+            }
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from victor.framework.persona_registry import PersonaSpec
 
 
 # =============================================================================
@@ -132,8 +148,76 @@ class PersonaProviderProtocol(Protocol):
         ...
 
 
+# =============================================================================
+# Vertical Persona Provider Protocol (Enhanced)
+# =============================================================================
+
+
+@runtime_checkable
+class VerticalPersonaProviderProtocol(Protocol):
+    """Enhanced protocol for vertical-specific persona providers.
+
+    Provides typed PersonaSpec objects and integrates with PersonaRegistry.
+    Verticals implementing this protocol can contribute personas that are
+    automatically registered in the global PersonaRegistry.
+
+    Example:
+        class CodingPersonaProvider(VerticalPersonaProviderProtocol):
+            @classmethod
+            def get_persona_specs(cls) -> Dict[str, "PersonaSpec"]:
+                from victor.framework.persona_registry import PersonaSpec
+                return {
+                    "expert_reviewer": PersonaSpec(
+                        name="expert_reviewer",
+                        role="Expert Code Reviewer",
+                        expertise=["code review", "security", "best practices"],
+                        communication_style="professional",
+                        behavioral_traits=["thorough", "constructive"],
+                    ),
+                    "mentor": PersonaSpec(
+                        name="mentor",
+                        role="Coding Mentor",
+                        expertise=["teaching", "explaining"],
+                        communication_style="supportive",
+                    ),
+                }
+
+            @classmethod
+            def get_default_persona(cls) -> Optional[str]:
+                return "expert_reviewer"
+    """
+
+    @classmethod
+    def get_persona_specs(cls) -> Dict[str, Any]:  # PersonaSpec
+        """Get typed PersonaSpec objects for this vertical.
+
+        Returns:
+            Dict mapping persona names to PersonaSpec instances
+        """
+        ...
+
+    @classmethod
+    def get_default_persona(cls) -> Optional[str]:
+        """Get the default persona name for this vertical.
+
+        Returns:
+            Name of the default persona, or None to use global default
+        """
+        ...
+
+    @classmethod
+    def get_persona_tags(cls) -> List[str]:
+        """Get tags to apply to all personas from this vertical.
+
+        Returns:
+            List of tags (e.g., ["coding", "development"])
+        """
+        ...
+
+
 __all__ = [
     "CapabilityProviderProtocol",
     "ChainProviderProtocol",
     "PersonaProviderProtocol",
+    "VerticalPersonaProviderProtocol",
 ]

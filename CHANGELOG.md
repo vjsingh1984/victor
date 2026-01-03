@@ -65,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strategy Factory** - `create_tool_selector_strategy()` for creating selectors with auto-selection logic based on air-gapped mode and embedding availability
 - **ToolSelectionContext** - Dataclass encapsulating context (conversation history, stage, vertical mode, etc.) for tool selection
 - **Shared Utilities** - Extracted `selection_filters.py` (pure functions) and `selection_common.py` (stateful utilities) for reuse across strategies
-- **Documentation** - Comprehensive guide at `docs/TOOL_SELECTION.md` with architecture diagrams, migration guide, and examples
+- **Documentation** - Detailed guide at `docs/archive/internal/TOOL_SELECTION.md` (archived) with architecture diagrams, migration guide, and examples
 
 - **FastAPI Server Backend** - New `victor serve --backend fastapi` option with OpenAPI docs at `/docs`
 - **Server Backend Selection** - `--backend` flag for `victor serve` to choose between `aiohttp` (legacy) and `fastapi` (modern)
@@ -117,7 +117,7 @@ settings = Settings(tool_selection_strategy="semantic")  # or "keyword", "hybrid
 tools = await selector.select_tools(message)
 ```
 
-See `docs/TOOL_SELECTION.md` for complete migration guide.
+See `docs/archive/internal/TOOL_SELECTION.md` for the archived migration guide.
 
 ### Fixed
 - Added missing `ServerStatus.Reconnecting` state to VS Code extension status bar configuration

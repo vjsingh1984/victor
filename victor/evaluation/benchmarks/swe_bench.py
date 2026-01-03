@@ -106,10 +106,18 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             tasks = self._loader.load_from_file(self._dataset_path, loader_config)
         else:
             # Load from HuggingFace using the split
-            dataset_name = "lite" if self._split == "lite" else "full"
+            # SWE-bench datasets on HuggingFace:
+            # - princeton-nlp/SWE-bench_Lite (curated ~300 tasks)
+            # - princeton-nlp/SWE-bench (full ~2300 tasks)
+            if self._split == "lite":
+                dataset_name = "princeton-nlp/SWE-bench_Lite"
+                split = "test"
+            else:
+                dataset_name = "princeton-nlp/SWE-bench"
+                split = "test"
             tasks = await self._loader.load_from_huggingface(
                 dataset_name=dataset_name,
-                split="test" if self._split == "lite" else self._split,
+                split=split,
                 config=loader_config,
             )
 

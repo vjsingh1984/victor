@@ -28,7 +28,7 @@ class TestTaskClassifierSimple:
         result = classifier.classify("List all files in the directory")
 
         assert result.complexity == TaskComplexity.SIMPLE
-        assert result.tool_budget == 2
+        assert result.tool_budget == 10  # Minimum budget
 
     def test_show_files_simple(self):
         """Test that 'show files' is classified as SIMPLE."""
@@ -38,7 +38,7 @@ class TestTaskClassifierSimple:
         result = classifier.classify("Show me the Python files in src/")
 
         assert result.complexity == TaskComplexity.SIMPLE
-        assert result.tool_budget == 2
+        assert result.tool_budget == 10  # Minimum budget
 
     def test_git_status_simple(self):
         """Test that 'git status' is classified as SIMPLE."""
@@ -70,25 +70,27 @@ class TestTaskClassifierMedium:
         result = classifier.classify("Explain the file victor/agent/orchestrator.py")
 
         assert result.complexity == TaskComplexity.MEDIUM
-        assert result.tool_budget == 4
+        assert result.tool_budget == 15
 
-    def test_find_classes_medium(self):
-        """Test that 'find classes' is classified as MEDIUM."""
+    def test_find_classes_simple(self):
+        """Test that 'find classes' is classified as SIMPLE (search task)."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Find all classes that inherit from BaseTool")
 
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Search tasks are now correctly classified as SIMPLE
+        assert result.complexity == TaskComplexity.SIMPLE
 
-    def test_where_is_medium(self):
-        """Test that 'where is' is classified as MEDIUM."""
+    def test_where_is_simple(self):
+        """Test that 'where is' is classified as SIMPLE (search task)."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Where is the error handling implemented?")
 
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Search/location tasks are now correctly classified as SIMPLE
+        assert result.complexity == TaskComplexity.SIMPLE
 
     def test_how_does_work_medium(self):
         """Test that 'how does X work' is classified as MEDIUM."""
@@ -104,14 +106,19 @@ class TestTaskClassifierComplex:
     """Tests for COMPLEX task classification."""
 
     def test_analyze_codebase_complex(self):
-        """Test that 'analyze codebase' is classified as COMPLEX."""
+        """Test that 'analyze codebase' is classified as ANALYSIS.
+
+        Note: ANALYSIS is a more appropriate classification for codebase analysis
+        tasks that require exploration rather than modification.
+        """
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Analyze the entire codebase for improvements")
 
-        assert result.complexity == TaskComplexity.COMPLEX
-        assert result.tool_budget == 15
+        # ANALYSIS is correct for exploration/analysis tasks
+        assert result.complexity == TaskComplexity.ANALYSIS
+        assert result.tool_budget == 60  # ANALYSIS gets higher budget for exploration
 
     def test_refactor_complex(self):
         """Test that 'refactor' is classified as COMPLEX."""
@@ -148,8 +155,8 @@ class TestTaskClassifierGeneration:
         result = classifier.classify("Create a simple function that calculates factorial")
 
         assert result.complexity == TaskComplexity.GENERATION
-        # GENERATION tasks have 0 tool budget - no exploration needed for code generation
-        assert result.tool_budget == 0
+        # GENERATION tasks have minimum budget of 10 (may need file reads)
+        assert result.tool_budget == 10
 
     def test_write_code_generation(self):
         """Test that 'write code' is classified as GENERATION."""
@@ -182,16 +189,16 @@ class TestTaskClassificationBehavior:
         result = classifier.classify("List files in the directory")
 
         assert result.complexity == TaskComplexity.SIMPLE
-        assert result.tool_budget == 2
+        assert result.tool_budget == 10  # Minimum budget
 
-        # Should not force at 1 call
-        assert not result.should_force_completion_after(1)
+        # Should not force at 9 calls
+        assert not result.should_force_completion_after(9)
 
-        # Should force at 2 calls
-        assert result.should_force_completion_after(2)
+        # Should force at 10 calls
+        assert result.should_force_completion_after(10)
 
-        # Should force at 3+ calls
-        assert result.should_force_completion_after(3)
+        # Should force at 11+ calls
+        assert result.should_force_completion_after(11)
 
     def test_confidence_score(self):
         """Test that confidence score is reasonable."""
@@ -228,17 +235,18 @@ class TestConvenienceFunctions:
         from victor.agent.complexity_classifier import get_task_prompt_hint
 
         hint = get_task_prompt_hint("List files")
-        assert "Simple Query" in hint
-        assert "1-2 tool calls" in hint
+        # Updated format uses [SIMPLE] instead of "Simple Query"
+        assert "[SIMPLE]" in hint
 
     def test_should_force_answer(self):
         """Test should_force_answer convenience function."""
         from victor.agent.complexity_classifier import should_force_answer
 
-        should_force, reason = should_force_answer("List files", 1)
+        should_force, reason = should_force_answer("List files", 9)
         assert not should_force
 
-        should_force, reason = should_force_answer("List files", 2)
+        # With budget of 10, should force at 10
+        should_force, reason = should_force_answer("List files", 10)
         assert should_force
         assert "simple" in reason.lower()
 
@@ -269,7 +277,6 @@ class TestCustomClassifier:
                 return TaskClassification(
                     complexity=TaskComplexity.SIMPLE,
                     tool_budget=1,
-                    prompt_hint="URGENT: Answer immediately!",
                     confidence=1.0,
                     matched_patterns=["urgent_override"],
                 )
@@ -293,8 +300,9 @@ class TestEdgeCases:
         classifier = ComplexityClassifier()
         result = classifier.classify("")
 
-        # Should default to MEDIUM
-        assert result.complexity == TaskComplexity.MEDIUM
+        # Empty messages default to SIMPLE (fallback semantic classification)
+        # since there's no pattern match or clear task type
+        assert result.complexity == TaskComplexity.SIMPLE
 
     def test_unrecognized_message(self):
         """Test classification of unrecognized message."""

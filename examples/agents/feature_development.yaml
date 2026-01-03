@@ -20,11 +20,9 @@ agents:
     description: "Designs implementation approach and identifies files to modify"
     capabilities:
       tools:
-        - read_file
-        - glob
-        - grep
+        - read
+        - find
         - code_search
-        - semantic_code_search
       skills:
         - architecture
         - design
@@ -55,10 +53,10 @@ agents:
     description: "Reviews implementation for quality and correctness"
     capabilities:
       tools:
-        - read_file
-        - glob
-        - grep
-        - git_diff
+        - read
+        - find
+        - code_search
+        - git
 
 ensemble:
   type: pipeline

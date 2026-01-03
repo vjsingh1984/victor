@@ -184,20 +184,40 @@ class TreeSitterExtractor:
 
         for pattern in queries.symbols:
             captures = self._run_query(tree, pattern.query, parser)
-            for capture_name, nodes in captures.items():
-                if capture_name == "name":
-                    for node in nodes:
-                        text = node.text.decode("utf-8", errors="ignore")
-                        if text:
-                            symbols.append(
-                                ExtractedSymbol(
-                                    name=text,
-                                    type=pattern.symbol_type,
-                                    file_path=relative_path,
-                                    line_number=node.start_point[0] + 1,
-                                    end_line=node.end_point[0] + 1,
-                                )
-                            )
+
+            # Get name and def captures (def is for end_line boundaries)
+            name_nodes = captures.get("name", [])
+            def_nodes = captures.get("def", [])
+
+            # Build a map of line -> def node for end_line lookup
+            # This handles queries that capture both @name and @def
+            def_by_start_line = {}
+            for def_node in def_nodes:
+                def_by_start_line[def_node.start_point[0]] = def_node
+
+            for node in name_nodes:
+                text = node.text.decode("utf-8", errors="ignore")
+                if text:
+                    # Look up corresponding def node for end_line
+                    # The def node contains the name node, so they share the same start area
+                    end_line = node.end_point[0] + 1  # Default: name's end line
+                    name_line = node.start_point[0]
+
+                    # Search for def node that contains this name
+                    for def_start, def_node in def_by_start_line.items():
+                        if def_start <= name_line and def_node.end_point[0] >= name_line:
+                            end_line = def_node.end_point[0] + 1
+                            break
+
+                    symbols.append(
+                        ExtractedSymbol(
+                            name=text,
+                            type=pattern.symbol_type,
+                            file_path=relative_path,
+                            line_number=node.start_point[0] + 1,
+                            end_line=end_line,
+                        )
+                    )
 
         return symbols
 

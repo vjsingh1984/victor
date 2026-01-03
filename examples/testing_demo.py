@@ -27,7 +27,7 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.testing_tool import run_tests
+from victor.tools.testing_tool import test
 
 
 def setup_demo_files(temp_dir: Path) -> tuple[Path, Path]:
@@ -128,7 +128,7 @@ async def demo_run_all_tests(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Running all tests in directory...")
-    result = await run_tests(path=str(temp_dir))
+    result = await test(path=str(temp_dir))
 
     if "error" in result:
         print(f"❌ Error: {result['error']}")
@@ -138,8 +138,8 @@ async def demo_run_all_tests(temp_dir: Path):
             print(f"\nStderr:\n{result['stderr']}")
     else:
         summary = result.get("summary", {})
-        print(f"\n✅ Test run complete!")
-        print(f"\n📊 Results Summary:")
+        print("\n✅ Test run complete!")
+        print("\n📊 Results Summary:")
         print(f"   Total tests: {summary.get('total_tests', 0)}")
         print(f"   ✓ Passed: {summary.get('passed', 0)}")
         print(f"   ✗ Failed: {summary.get('failed', 0)}")
@@ -147,7 +147,7 @@ async def demo_run_all_tests(temp_dir: Path):
 
         failures = result.get("failures", [])
         if failures:
-            print(f"\n❌ Failed Tests:")
+            print("\n❌ Failed Tests:")
             for failure in failures:
                 print(f"\n   {failure['test_name']}:")
                 print(f"      {failure['error_message']}")
@@ -161,7 +161,7 @@ async def demo_run_specific_file(temp_dir: Path):
     test_file = temp_dir / "test_calc.py"
     print(f"\n1️⃣ Running tests in: {test_file.name}")
 
-    result = await run_tests(path=str(test_file))
+    result = await test(path=str(test_file))
 
     if "error" not in result:
         summary = result.get("summary", {})
@@ -174,11 +174,11 @@ async def demo_run_with_args(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Running only TestMath class with verbose output...")
-    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "TestMath", "-v"])
+    result = await test(path=str(temp_dir), pytest_args=["-k", "TestMath", "-v"])
 
     if "error" not in result:
         summary = result.get("summary", {})
-        print(f"\n📊 TestMath Results:")
+        print("\n📊 TestMath Results:")
         print(f"   Total: {summary.get('total_tests', 0)}")
         print(f"   Passed: {summary.get('passed', 0)}")
         print(f"   Failed: {summary.get('failed', 0)}")
@@ -190,11 +190,11 @@ async def demo_run_passing_only(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Excluding the intentionally failing test...")
-    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "not failing_example"])
+    result = await test(path=str(temp_dir), pytest_args=["-k", "not failing_example"])
 
     if "error" not in result:
         summary = result.get("summary", {})
-        print(f"\n📊 Results (excluding failing test):")
+        print("\n📊 Results (excluding failing test):")
         print(f"   Total: {summary.get('total_tests', 0)}")
         print(f"   Passed: {summary.get('passed', 0)}")
         print(f"   Failed: {summary.get('failed', 0)}")

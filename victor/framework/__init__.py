@@ -1060,5 +1060,35 @@ try:
 except ImportError:
     pass
 
+# LSP Protocols (Cross-vertical language intelligence)
+try:
+    from victor.framework.lsp_protocols import (
+        LSPCompletionItem,
+        LSPDiagnostic,
+        LSPHoverInfo,
+        LSPLocation,
+        LSPPoolProtocol,
+        LSPPosition,
+        LSPRange,
+        LSPServiceProtocol,
+        LSPSymbol,
+    )
+
+    _LSP_PROTOCOLS_EXPORTS = [
+        "LSPCompletionItem",
+        "LSPDiagnostic",
+        "LSPHoverInfo",
+        "LSPLocation",
+        "LSPPoolProtocol",
+        "LSPPosition",
+        "LSPRange",
+        "LSPServiceProtocol",
+        "LSPSymbol",
+    ]
+
+    __all__ = list(__all__) + _LSP_PROTOCOLS_EXPORTS
+except ImportError:
+    pass
+
 # Version of the framework API
 __version__ = "0.3.0"

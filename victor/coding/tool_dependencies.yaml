@@ -1,0 +1,294 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Tool Dependency Configuration for Coding Vertical
+#
+# This YAML file defines tool execution patterns and transition probabilities
+# for intelligent tool selection in software development tasks.
+#
+# Schema version 1.0 - compatible with victor.core.tool_dependency_schema
+
+version: "1.0"
+vertical: coding
+
+# ============================================================================
+# Tool Transitions
+# ============================================================================
+# Defines probability-weighted transitions between tools.
+# Higher weight = more likely the transition is useful.
+# Weights should sum to <= 1.0 for each source tool.
+
+transitions:
+  read:
+    - tool: edit
+      weight: 0.4
+    - tool: grep
+      weight: 0.3
+    - tool: write
+      weight: 0.2
+    - tool: test
+      weight: 0.1
+
+  grep:
+    - tool: read
+      weight: 0.6
+    - tool: code_search
+      weight: 0.2
+    - tool: ls
+      weight: 0.2
+
+  ls:
+    - tool: read
+      weight: 0.5
+    - tool: grep
+      weight: 0.3
+    - tool: write
+      weight: 0.2
+
+  edit:
+    - tool: test
+      weight: 0.5
+    - tool: read
+      weight: 0.3
+    - tool: git
+      weight: 0.2
+
+  write:
+    - tool: test
+      weight: 0.4
+    - tool: read
+      weight: 0.3
+    - tool: git
+      weight: 0.3
+
+  test:
+    - tool: edit
+      weight: 0.4
+    - tool: git
+      weight: 0.3
+    - tool: read
+      weight: 0.3
+
+  git:
+    - tool: read
+      weight: 0.5
+    - tool: edit
+      weight: 0.3
+    - tool: test
+      weight: 0.2
+
+# ============================================================================
+# Tool Clusters
+# ============================================================================
+# Groups of related tools that are commonly used together.
+# Enables cluster-based tool suggestions and organization.
+
+clusters:
+  file_operations:
+    - read
+    - write
+    - edit
+    - ls
+
+  search_operations:
+    - grep
+    - code_search
+    - symbol
+
+  git_operations:
+    - git
+
+  testing:
+    - test
+    - shell
+
+  refactoring:
+    - rename
+    - extract
+
+# ============================================================================
+# Tool Sequences
+# ============================================================================
+# Named sequences of tools for common task types.
+# The executor uses these to suggest optimal tool ordering.
+
+sequences:
+  # Exploring and understanding codebase
+  exploration:
+    - ls
+    - read
+    - grep
+
+  # Editing existing files
+  edit:
+    - read
+    - edit
+    - test
+
+  # Creating new files
+  create:
+    - ls
+    - read
+    - write
+    - test
+
+  # Refactoring code
+  refactor:
+    - read
+    - symbol
+    - rename
+    - test
+
+  # Git operations (unified tool handles status/diff/commit)
+  git:
+    - git
+
+  # Debugging issues
+  debug:
+    - read
+    - grep
+    - shell
+
+  # Understanding architecture
+  architecture:
+    - ls
+    - read
+    - code_search
+    - read
+
+  # Fixing failing tests
+  test_fix:
+    - read
+    - test
+    - edit
+    - test
+
+# ============================================================================
+# Tool Dependencies
+# ============================================================================
+# Defines dependency relationships between tools:
+# - depends_on: Tools that should be called before this one
+# - enables: Tools that become more useful after this one succeeds
+# - weight: Strength of the dependency (0.0 to 1.0)
+
+dependencies:
+  # Edit should be preceded by read to understand context
+  - tool: edit
+    depends_on:
+      - read
+    enables:
+      - test
+      - git
+    weight: 0.9
+
+  # Write typically follows understanding structure (read/ls)
+  - tool: write
+    depends_on:
+      - read
+      - ls
+    enables:
+      - test
+      - git
+    weight: 0.8
+
+  # Refactoring depends on understanding code structure
+  - tool: rename
+    depends_on:
+      - read
+      - symbol
+    enables:
+      - test
+    weight: 0.7
+
+  - tool: extract
+    depends_on:
+      - read
+    enables:
+      - test
+    weight: 0.6
+
+  # Git operations (unified tool)
+  - tool: git
+    depends_on: []
+    enables: []
+    weight: 0.9
+
+  # Testing enables git commit
+  - tool: test
+    depends_on: []
+    enables:
+      - git
+    weight: 0.7
+
+  # Search enables read (finding files to read)
+  - tool: grep
+    depends_on: []
+    enables:
+      - read
+    weight: 0.8
+
+  - tool: code_search
+    depends_on: []
+    enables:
+      - read
+    weight: 0.8
+
+  # List enables read (discovering files)
+  - tool: ls
+    depends_on: []
+    enables:
+      - read
+    weight: 0.7
+
+# ============================================================================
+# Required and Optional Tools
+# ============================================================================
+# Required: Essential tools that must be available for this vertical
+# Optional: Tools that enhance functionality but aren't strictly needed
+
+required_tools:
+  - read
+  - write
+  - edit
+  - ls
+  - grep
+
+optional_tools:
+  - code_search
+  - symbol
+  - test
+  - git
+  - rename
+  - extract
+  - shell
+
+# Default sequence for unknown task types
+default_sequence:
+  - read
+  - edit
+  - test
+
+# ============================================================================
+# Metadata
+# ============================================================================
+# Extensible metadata section for additional configuration
+
+metadata:
+  description: "Tool dependencies for software development workflows"
+  author: "Victor AI"
+  created: "2025-01-03"
+  notes:
+    - "Uses canonical tool names from ToolNames for consistency"
+    - "Weights are tuned for typical coding workflows"
+    - "Git tool is unified (handles status, diff, commit, etc.)"

@@ -456,37 +456,122 @@ class ToolRegistrar:
         return registered_count
 
     def _load_tool_configurations(self) -> None:
-        """Load tool configurations from settings.
+        """Load tool configurations from profiles.yaml.
 
-        Applies enabled/disabled states to tools based on configuration.
+        Loads tool enable/disable states from the 'tools' section in profiles.yaml.
+        Expected format:
+
+        tools:
+          enabled:
+            - read_file
+            - write_file
+            - execute_bash
+          disabled:
+            - code_review
+            - security_scan
+
+        Or:
+
+        tools:
+          code_review:
+            enabled: false
+          security_scan:
+            enabled: false
         """
         try:
             tool_config = self.settings.load_tool_config()
-
             if not tool_config:
                 return
 
-            # Handle enabled list
-            enabled_list = tool_config.get("enabled", [])
-            if enabled_list:
-                # Disable all tools not in enabled list
-                for tool in self.tools.list_tools():
-                    if tool.name not in enabled_list:
-                        self.tools.disable_tool(tool.name)
-                logger.debug(f"Enabled {len(enabled_list)} tools from config")
+            # Get all registered tool names for validation
+            registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
-            # Handle disabled list
-            disabled_list = tool_config.get("disabled", [])
-            for tool_name in disabled_list:
-                self.tools.disable_tool(tool_name)
-            if disabled_list:
-                logger.debug(f"Disabled {len(disabled_list)} tools from config")
+            # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
+            from victor.agent.tool_selection import get_critical_tools
 
-            # Handle per-tool configurations
+            core_tools = get_critical_tools(self.tools)
+
+            # Format 1: Lists of enabled/disabled tools
+            if "enabled" in tool_config:
+                enabled_tools = tool_config.get("enabled", [])
+
+                # Validate tool names
+                invalid_tools = [t for t in enabled_tools if t not in registered_tools]
+                if invalid_tools:
+                    logger.warning(
+                        f"Configuration contains invalid tool names in 'enabled' list: {', '.join(invalid_tools)}. "
+                        f"Available tools: {', '.join(sorted(registered_tools))}"
+                    )
+
+                # Check if core tools are included (use dynamically discovered core tools)
+                missing_core = core_tools - set(enabled_tools)
+                if missing_core:
+                    logger.warning(
+                        f"'enabled' list is missing recommended core tools: {', '.join(missing_core)}. "
+                        f"This may limit agent functionality."
+                    )
+
+                # First disable all tools
+                for tool in self.tools.list_tools(only_enabled=False):
+                    self.tools.disable_tool(tool.name)
+                # Then enable only the specified ones
+                for tool_name in enabled_tools:
+                    if tool_name in registered_tools:
+                        self.tools.enable_tool(tool_name)
+
+            if "disabled" in tool_config:
+                disabled_tools = tool_config.get("disabled", [])
+
+                # Validate tool names
+                invalid_tools = [t for t in disabled_tools if t not in registered_tools]
+                if invalid_tools:
+                    logger.warning(
+                        f"Configuration contains invalid tool names in 'disabled' list: {', '.join(invalid_tools)}. "
+                        f"Available tools: {', '.join(sorted(registered_tools))}"
+                    )
+
+                # Warn if disabling core tools
+                disabled_core = core_tools & set(disabled_tools)
+                if disabled_core:
+                    logger.warning(
+                        f"Disabling core tools: {', '.join(disabled_core)}. "
+                        f"This may limit agent functionality."
+                    )
+
+                for tool_name in disabled_tools:
+                    if tool_name in registered_tools:
+                        self.tools.disable_tool(tool_name)
+
+            # Format 2: Individual tool settings
             for tool_name, config in tool_config.items():
                 if isinstance(config, dict) and "enabled" in config:
-                    if not config["enabled"]:
+                    if tool_name not in registered_tools:
+                        logger.warning(
+                            f"Configuration contains invalid tool name: '{tool_name}'. "
+                            f"Available tools: {', '.join(sorted(registered_tools))}"
+                        )
+                        continue
+
+                    if config["enabled"]:
+                        self.tools.enable_tool(tool_name)
+                    else:
                         self.tools.disable_tool(tool_name)
+                        # Warn if disabling core tools
+                        if tool_name in core_tools:
+                            logger.warning(
+                                f"Disabling core tool '{tool_name}'. This may limit agent functionality."
+                            )
+
+            # Log tool states
+            disabled_tools = [
+                name for name, enabled in self.tools.get_tool_states().items() if not enabled
+            ]
+            if disabled_tools:
+                logger.info(f"Disabled tools: {', '.join(sorted(disabled_tools))}")
+
+            # Log enabled tool count
+            enabled_count = sum(1 for enabled in self.tools.get_tool_states().values() if enabled)
+            logger.info(f"Enabled tools: {enabled_count}/{len(registered_tools)}")
 
         except Exception as e:
             logger.warning(f"Failed to load tool configurations: {e}")

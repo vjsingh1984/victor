@@ -142,30 +142,54 @@ class ToolRegistry(BaseRegistry[str, Any]):
         wrapped = self._wrap_hook(hook, critical=critical, name=name)
         self._after_hooks.append(wrapped)
 
-    def register(self, tool: Any, enabled: bool = True) -> None:  # type: ignore[override]
-        """Register a tool.
+    def register(self, *args, enabled: bool = True, **kwargs) -> None:  # type: ignore[override]
+        """Register a tool - supports both signatures for flexibility.
 
-        Can register a BaseTool instance or a function decorated with @tool.
+        Signatures:
+            register(tool)           - Auto-extracts name from tool object (common case)
+            register(key, value)     - Explicit key-value (LSP-compatible with BaseRegistry)
 
-        Note:
-            This overrides BaseRegistry.register() to accept tool objects directly
-            instead of key-value pairs. The tool's name property is used as the key.
+        This unified method provides both backwards compatibility and LSP compliance.
+        The first form is preferred for tool registration; the second allows
+        ToolRegistry to be used where BaseRegistry is expected.
 
         Args:
-            tool: Tool instance or decorated function to register
+            *args: Either (tool,) or (key, value)
             enabled: Whether the tool is enabled by default (default: True)
+
+        Examples:
+            registry.register(my_tool)                    # Auto-extract name
+            registry.register("custom_name", my_tool)     # Explicit name
+            registry.register(decorated_function)         # From @tool decorator
         """
-        if hasattr(tool, "Tool"):  # It's a decorated function
-            tool_instance = tool.Tool
-            super().register(tool_instance.name, tool_instance)
-            self._tool_enabled[tool_instance.name] = enabled
-        elif isinstance(tool, self._BaseTool):  # It's a class instance
-            super().register(tool.name, tool)
-            self._tool_enabled[tool.name] = enabled
+        if len(args) == 1:
+            # Single argument: register(tool) - extract name automatically
+            tool = args[0]
+            if hasattr(tool, "Tool"):  # It's a decorated function
+                tool_instance = tool.Tool
+                super().register(tool_instance.name, tool_instance)
+                self._tool_enabled[tool_instance.name] = enabled
+            elif isinstance(tool, self._BaseTool):  # It's a BaseTool instance
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
+            else:
+                raise TypeError(
+                    "Can only register BaseTool instances or functions decorated with @tool"
+                )
+        elif len(args) == 2:
+            # Two arguments: register(key, value) - LSP-compatible
+            key, value = args
+            super().register(key, value)
+            self._tool_enabled[key] = enabled
         else:
             raise TypeError(
-                "Can only register BaseTool instances or functions decorated with @tool"
+                f"register() takes 1 or 2 positional arguments but {len(args)} were given"
             )
+
+    # Alias for backwards compatibility with code using register_tool()
+    def register_tool(self, tool: Any, enabled: bool = True) -> None:
+        """Alias for register(tool). Kept for backwards compatibility."""
+        self.register(tool, enabled=enabled)
 
     def register_dict(self, tool_dict: Dict[str, Any], enabled: bool = True) -> None:
         """Register a tool from a dictionary definition.

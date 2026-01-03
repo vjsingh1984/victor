@@ -22,10 +22,8 @@ No external servers required!
 """
 
 import asyncio
-from pathlib import Path
 
-from victor.vector_stores.base import EmbeddingConfig
-from victor.vector_stores.lancedb_provider import LanceDBProvider
+from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
 
 
 async def main():
@@ -59,11 +57,11 @@ async def main():
     print(f"📦 Vector Store: {config.vector_store}")
     print(f"🤖 Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})")
     print(f"📁 Storage: {config.persist_directory}")
-    print(f"🌐 Network Required: NO (100% offline)")
+    print("🌐 Network Required: NO (100% offline)")
     print()
 
-    # Initialize provider
-    provider = LanceDBProvider(config)
+    # Initialize provider via registry (auto-detects installed backends)
+    provider = EmbeddingRegistry.create(config)
     await provider.initialize()
 
     print()

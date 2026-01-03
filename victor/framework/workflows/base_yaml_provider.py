@@ -1,0 +1,388 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Base YAML workflow provider for vertical-specific workflow implementations.
+
+This module provides a Template Method + Strategy pattern base class that eliminates
+workflow provider duplication across verticals. Subclasses only need to specify
+the escape hatches module path and optionally the workflows directory.
+
+Design Patterns:
+    - Template Method: Common algorithm in base class, subclass customization via hooks
+    - Strategy: Escape hatches module loaded dynamically based on subclass specification
+    - Lazy Loading: Workflows loaded on first access for performance
+
+Example:
+    class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
+        '''Provides research-specific workflows.'''
+
+        def _get_escape_hatches_module(self) -> str:
+            return "victor.research.escape_hatches"
+
+    # Usage
+    provider = ResearchWorkflowProvider()
+    async for chunk in provider.astream("deep_research", orchestrator, {}):
+        print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+"""
+
+from __future__ import annotations
+
+import importlib
+import logging
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
+
+from victor.core.verticals.protocols import WorkflowProviderProtocol
+from victor.workflows.definition import WorkflowDefinition
+
+logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.streaming import WorkflowStreamChunk
+    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+    from victor.workflows.yaml_loader import YAMLWorkflowConfig
+
+
+class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
+    """Base class for YAML-based workflow providers.
+
+    This abstract base class implements the common workflow provider pattern
+    used across verticals (Research, DevOps, DataAnalysis, etc.), eliminating
+    ~200 lines of duplicated boilerplate per vertical.
+
+    Subclasses only need to implement:
+        - _get_escape_hatches_module(): Return module path for CONDITIONS/TRANSFORMS
+
+    Optionally override:
+        - _get_workflows_directory(): Return Path to YAML workflow files
+        - get_auto_workflows(): Return automatic workflow triggers
+        - get_workflow_for_task_type(): Map task types to workflow names
+
+    Features:
+        - Lazy loading of YAML workflows with caching
+        - Automatic escape hatches registration from vertical-specific modules
+        - Standard and streaming workflow execution
+        - Error handling with graceful degradation
+
+    Example:
+        class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
+            '''Provides DevOps-specific workflows.'''
+
+            def _get_escape_hatches_module(self) -> str:
+                return "victor.devops.escape_hatches"
+
+            def get_auto_workflows(self) -> List[Tuple[str, str]]:
+                return [
+                    (r"deploy\\s+infrastructure", "deploy_infrastructure"),
+                    (r"container(ize)?", "container_setup"),
+                ]
+
+        provider = DevOpsWorkflowProvider()
+        workflows = provider.get_workflows()  # Lazy-loads YAML files
+    """
+
+    def __init__(self) -> None:
+        """Initialize the workflow provider with lazy loading support."""
+        self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        self._config: Optional["YAMLWorkflowConfig"] = None
+
+    @abstractmethod
+    def _get_escape_hatches_module(self) -> str:
+        """Return the fully qualified module path for escape hatches.
+
+        This method must be implemented by subclasses to specify where
+        the CONDITIONS and TRANSFORMS dictionaries are defined.
+
+        Returns:
+            Fully qualified module path string, e.g., "victor.research.escape_hatches"
+
+        Example:
+            def _get_escape_hatches_module(self) -> str:
+                return "victor.research.escape_hatches"
+        """
+        ...
+
+    def _get_workflows_directory(self) -> Path:
+        """Return the directory containing YAML workflow files.
+
+        Override this method if workflows are in a non-standard location.
+        By default, returns the parent directory of the escape hatches module,
+        with "workflows" appended (e.g., victor/research/workflows/).
+
+        Returns:
+            Path to the directory containing *.yaml workflow files
+
+        Example:
+            def _get_workflows_directory(self) -> Path:
+                return Path("/custom/path/to/workflows")
+        """
+        # Default: derive from escape hatches module path
+        # e.g., "victor.research.escape_hatches" -> victor/research/workflows/
+        module_path = self._get_escape_hatches_module()
+        # Remove ".escape_hatches" suffix and convert to path
+        base_module = module_path.rsplit(".", 1)[0]  # "victor.research"
+        module_parts = base_module.split(".")
+
+        # Get the directory of the first module part (victor)
+        try:
+            base_module_obj = importlib.import_module(module_parts[0])
+            if hasattr(base_module_obj, "__path__"):
+                base_path = Path(base_module_obj.__path__[0])
+            elif hasattr(base_module_obj, "__file__") and base_module_obj.__file__:
+                base_path = Path(base_module_obj.__file__).parent
+            else:
+                raise ImportError(f"Cannot determine path for module {module_parts[0]}")
+
+            # Navigate to the submodule directory
+            for part in module_parts[1:]:
+                base_path = base_path / part
+
+            return base_path / "workflows"
+        except (ImportError, AttributeError) as e:
+            logger.warning(f"Failed to determine workflows directory: {e}")
+            # Fallback: use current file's parent as base
+            return Path(__file__).parent
+
+    def _load_escape_hatches(self) -> Tuple[
+        Dict[str, Callable[[Dict[str, Any]], str]],
+        Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]],
+    ]:
+        """Dynamically load escape hatches from the vertical-specific module.
+
+        Returns:
+            Tuple of (CONDITIONS dict, TRANSFORMS dict) from the escape hatches module
+
+        Raises:
+            ImportError: If the escape hatches module cannot be imported
+            AttributeError: If CONDITIONS or TRANSFORMS are not defined
+        """
+        module_path = self._get_escape_hatches_module()
+        try:
+            module = importlib.import_module(module_path)
+            conditions = getattr(module, "CONDITIONS", {})
+            transforms = getattr(module, "TRANSFORMS", {})
+            logger.debug(
+                f"Loaded escape hatches from {module_path}: "
+                f"{len(conditions)} conditions, {len(transforms)} transforms"
+            )
+            return conditions, transforms
+        except ImportError as e:
+            logger.warning(f"Failed to import escape hatches from {module_path}: {e}")
+            return {}, {}
+        except AttributeError as e:
+            logger.warning(f"Missing CONDITIONS/TRANSFORMS in {module_path}: {e}")
+            return {}, {}
+
+    def _get_config(self) -> "YAMLWorkflowConfig":
+        """Get YAML workflow config with escape hatches registered.
+
+        Creates a YAMLWorkflowConfig instance with the vertical-specific
+        conditions and transforms loaded from the escape hatches module.
+
+        Returns:
+            YAMLWorkflowConfig instance configured for this vertical
+        """
+        if self._config is None:
+            from victor.workflows.yaml_loader import YAMLWorkflowConfig
+
+            conditions, transforms = self._load_escape_hatches()
+            workflows_dir = self._get_workflows_directory()
+
+            self._config = YAMLWorkflowConfig(
+                base_dir=workflows_dir,
+                condition_registry=conditions,
+                transform_registry=transforms,
+            )
+            logger.debug(f"Created YAML config with base_dir={workflows_dir}")
+
+        return self._config
+
+    def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Lazy load all YAML workflows from the workflows directory.
+
+        Uses escape hatches for complex conditions that can't be expressed in YAML.
+        Caches loaded workflows for subsequent access.
+
+        Returns:
+            Dict mapping workflow names to WorkflowDefinition instances
+        """
+        if self._workflows is None:
+            try:
+                from victor.workflows.yaml_loader import load_workflows_from_directory
+
+                workflows_dir = self._get_workflows_directory()
+                config = self._get_config()
+
+                self._workflows = load_workflows_from_directory(
+                    workflows_dir,
+                    pattern="*.yaml",
+                    config=config,
+                )
+                logger.debug(f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to load YAML workflows: {e}")
+                self._workflows = {}
+
+        return self._workflows
+
+    def get_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Get all workflow definitions for this vertical.
+
+        Returns:
+            Dict mapping workflow names to WorkflowDefinition instances
+        """
+        return self._load_workflows()
+
+    def get_workflow(self, name: str) -> Optional[WorkflowDefinition]:
+        """Get a specific workflow by name.
+
+        Args:
+            name: The workflow name to retrieve
+
+        Returns:
+            WorkflowDefinition if found, None otherwise
+        """
+        return self._load_workflows().get(name)
+
+    def get_workflow_names(self) -> List[str]:
+        """Get list of all available workflow names.
+
+        Returns:
+            List of workflow name strings
+        """
+        return list(self._load_workflows().keys())
+
+    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+        """Get automatic workflow triggers based on query patterns.
+
+        Override this method in subclasses to define patterns that
+        automatically trigger specific workflows based on user input.
+
+        Returns:
+            List of (regex_pattern, workflow_name) tuples
+
+        Example:
+            def get_auto_workflows(self) -> List[Tuple[str, str]]:
+                return [
+                    (r"deep\\s+research", "deep_research"),
+                    (r"fact\\s*check", "fact_check"),
+                ]
+        """
+        return []
+
+    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
+        """Get recommended workflow for a task type.
+
+        Override this method in subclasses to map task types to workflow names.
+
+        Args:
+            task_type: Type of task (e.g., "research", "deploy", "eda")
+
+        Returns:
+            Workflow name string or None if no mapping exists
+
+        Example:
+            def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
+                mapping = {
+                    "research": "deep_research",
+                    "fact_check": "fact_check",
+                }
+                return mapping.get(task_type.lower())
+        """
+        return None
+
+    def create_executor(
+        self,
+        orchestrator: "AgentOrchestrator",
+    ) -> "WorkflowExecutor":
+        """Create a standard workflow executor.
+
+        Args:
+            orchestrator: Agent orchestrator instance for LLM interactions
+
+        Returns:
+            WorkflowExecutor configured for this orchestrator
+        """
+        from victor.workflows.executor import WorkflowExecutor
+
+        return WorkflowExecutor(orchestrator)
+
+    def create_streaming_executor(
+        self,
+        orchestrator: "AgentOrchestrator",
+    ) -> "StreamingWorkflowExecutor":
+        """Create a streaming workflow executor.
+
+        Args:
+            orchestrator: Agent orchestrator instance for LLM interactions
+
+        Returns:
+            StreamingWorkflowExecutor for real-time progress streaming
+        """
+        from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+
+        return StreamingWorkflowExecutor(orchestrator)
+
+    async def astream(
+        self,
+        workflow_name: str,
+        orchestrator: "AgentOrchestrator",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> AsyncIterator["WorkflowStreamChunk"]:
+        """Stream workflow execution with real-time events.
+
+        Convenience method that creates a streaming executor and
+        streams the specified workflow. Yields progress events
+        as the workflow executes.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            orchestrator: Agent orchestrator instance
+            context: Initial context data for the workflow
+
+        Yields:
+            WorkflowStreamChunk events during execution
+
+        Raises:
+            ValueError: If workflow_name is not found
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            async for chunk in provider.astream("fact_check", orchestrator, {}):
+                if chunk.event_type == WorkflowEventType.NODE_START:
+                    print(f"Starting: {chunk.node_name}")
+                elif chunk.event_type == WorkflowEventType.NODE_COMPLETE:
+                    print(f"Completed: {chunk.node_name}")
+        """
+        workflow = self.get_workflow(workflow_name)
+        if not workflow:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        executor = self.create_streaming_executor(orchestrator)
+        async for chunk in executor.astream(workflow, context or {}):
+            yield chunk
+
+    def __repr__(self) -> str:
+        """Return a string representation of this provider."""
+        class_name = self.__class__.__name__
+        workflow_count = len(self._load_workflows())
+        return f"{class_name}(workflows={workflow_count})"
+
+
+__all__ = [
+    "BaseYAMLWorkflowProvider",
+]

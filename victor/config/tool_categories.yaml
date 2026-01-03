@@ -1,0 +1,177 @@
+# Tool Category Definitions
+#
+# This file externalizes the _BUILTIN_CATEGORY_TOOLS mapping from tools.py
+# Phase 7.5: Configuration-driven tool categories for OCP compliance.
+#
+# Categories can be extended by plugins/verticals via ToolCategoryRegistry.
+# Tools not listed here will use their @tool decorator categories.
+
+categories:
+  core:
+    description: "Essential tools for basic operations"
+    tools:
+      - read
+      - write
+      - edit
+      - shell
+      - search
+      - code_search
+      - ls
+
+  filesystem:
+    description: "File and directory operations"
+    tools:
+      - read
+      - write
+      - edit
+      - ls
+      - list_directory
+      - glob
+      - find_files
+      - file_info
+      - mkdir
+      - rm
+      - mv
+      - cp
+
+  git:
+    description: "Git version control operations"
+    tools:
+      - git
+      - git_status
+      - git_diff
+      - git_commit
+      - git_branch
+      - git_log
+
+  search:
+    description: "Code and text search tools"
+    tools:
+      - grep
+      - glob
+      - code_search
+      - semantic_code_search
+      - search
+
+  web:
+    description: "Web and network operations"
+    tools:
+      - web_search
+      - web_fetch
+      - http_request
+      - fetch_url
+
+  database:
+    description: "Database operations"
+    tools:
+      - sql_query
+      - db_schema
+      - database
+
+  docker:
+    description: "Container operations"
+    tools:
+      - docker
+      - docker_run
+      - docker_build
+      - docker_compose
+
+  testing:
+    description: "Test execution and validation"
+    tools:
+      - run_tests
+      - pytest
+      - test_runner
+      - test
+
+  refactoring:
+    description: "Code refactoring operations"
+    tools:
+      - refactor
+      - rename_symbol
+      - extract_function
+      - rename
+
+  documentation:
+    description: "Documentation generation"
+    tools:
+      - generate_docs
+      - update_readme
+      - documentation
+      - docstring
+
+  analysis:
+    description: "Code analysis and metrics"
+    tools:
+      - analyze
+      - complexity
+
+  communication:
+    description: "External communication tools"
+    tools:
+      - slack
+      - teams
+      - jira
+
+  custom:
+    description: "User-defined tools"
+    tools: []
+
+# Presets for common tool configurations
+presets:
+  default:
+    description: "Balanced configuration for general use"
+    categories:
+      - core
+      - filesystem
+      - git
+
+  minimal:
+    description: "Minimal resources for simple tasks"
+    categories:
+      - core
+
+  full:
+    description: "All available tools"
+    categories:
+      - core
+      - filesystem
+      - git
+      - search
+      - web
+      - database
+      - docker
+      - testing
+      - refactoring
+      - documentation
+      - analysis
+      - communication
+
+  airgapped:
+    description: "No network access (offline mode)"
+    categories:
+      - core
+      - filesystem
+      - git
+      - analysis
+    exclude:
+      - web_search
+      - web_fetch
+      - http_request
+      - fetch_url
+
+  coding:
+    description: "Optimized for coding tasks"
+    categories:
+      - core
+      - filesystem
+      - git
+      - testing
+      - refactoring
+
+  research:
+    description: "Optimized for research tasks"
+    categories:
+      - core
+      - filesystem
+      - web

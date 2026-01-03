@@ -1,0 +1,598 @@
+# RAG Ingestion Workflow
+# ======================
+# Document ingestion pipeline demonstrating:
+# - Multi-format document parsing
+# - Intelligent chunking with overlap
+# - Batch embedding generation
+# - Vector store ingestion
+# - Metadata extraction and indexing
+# - Quality validation and deduplication
+
+workflows:
+  document_ingest:
+    description: "Ingest documents into vector store with chunking and embedding"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: rag
+
+    batch_config:
+      batch_size: 10
+      max_concurrent: 4
+      retry_strategy: end_of_batch
+      max_retries: 3
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Document Discovery and Loading
+      # =====================================================================
+      - id: discover_documents
+        type: compute
+        name: "Discover Documents"
+        tools: [shell, read]
+        inputs:
+          source_path: $ctx.source_directory
+          file_patterns: $ctx.file_patterns
+          recursive: true
+        output: discovered_files
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [filter_documents]
+
+      - id: filter_documents
+        type: compute
+        name: "Filter and Deduplicate"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          files: $ctx.discovered_files
+          checks:
+            - content_hash_dedup
+            - size_filter
+            - date_filter
+        output: filtered_files
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_document_count]
+
+      - id: check_document_count
+        type: condition
+        name: "Check Document Count"
+        condition: "document_count > 0"
+        branches:
+          "true": parallel_parse
+          "false": no_documents
+
+      - id: no_documents
+        type: transform
+        name: "No Documents Found"
+        transform: |
+          status = "skipped"
+          reason = "No documents matched criteria"
+
+      # =====================================================================
+      # Stage 2: Parallel Document Parsing
+      # =====================================================================
+      - id: parallel_parse
+        type: parallel
+        name: "Parse Documents by Type"
+        parallel_nodes: [parse_pdf, parse_docx, parse_markdown, parse_code]
+        join_strategy: all
+        next: [aggregate_parsed]
+
+      - id: parse_pdf
+        type: compute
+        name: "Parse PDF Documents"
+        tools: [shell]
+        inputs:
+          file_type: pdf
+          extract_tables: true
+          extract_images: true
+          ocr_enabled: $ctx.ocr_enabled
+        output: pdf_content
+        constraints:
+          llm_allowed: false
+          timeout: 300
+
+      - id: parse_docx
+        type: compute
+        name: "Parse Word Documents"
+        tools: [shell]
+        inputs:
+          file_type: docx
+          preserve_structure: true
+        output: docx_content
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      - id: parse_markdown
+        type: compute
+        name: "Parse Markdown/Text"
+        tools: [shell, read]
+        inputs:
+          file_types: [md, txt, rst]
+          preserve_headers: true
+        output: md_content
+        constraints:
+          llm_allowed: false
+          timeout: 60
+
+      - id: parse_code
+        type: compute
+        name: "Parse Code Files"
+        tools: [shell, read]
+        inputs:
+          file_types: [py, js, ts, java, go, rs]
+          extract_docstrings: true
+          extract_functions: true
+        output: code_content
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      - id: aggregate_parsed
+        type: transform
+        name: "Aggregate Parsed Content"
+        transform: |
+          all_documents = merge(pdf_content, docx_content, md_content, code_content)
+          total_chars = sum(len(doc.content) for doc in all_documents)
+        next: [validate_content]
+
+      # =====================================================================
+      # Stage 3: Content Validation
+      # =====================================================================
+      - id: validate_content
+        type: compute
+        name: "Validate Parsed Content"
+        handler: data_transform
+        inputs:
+          documents: $ctx.all_documents
+          validations:
+            - check_encoding
+            - check_min_length
+            - check_language
+            - detect_sensitive_data
+        output: validation_report
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_validation]
+
+      - id: check_validation
+        type: condition
+        name: "Check Validation Results"
+        condition: "validation_score >= 0.8"
+        branches:
+          "true": chunking
+          "false": handle_validation_issues
+
+      - id: handle_validation_issues
+        type: agent
+        name: "Handle Validation Issues"
+        role: executor
+        goal: |
+          Review and handle validation issues:
+          {validation_issues}
+
+          Options:
+          1. Clean up documents with encoding issues
+          2. Flag sensitive data for review
+          3. Skip documents below quality threshold
+          4. Attempt re-parsing with different settings
+        tool_budget: 20
+        tools: [shell, read, edit]
+        llm_config:
+          temperature: 0.2
+        output: fixed_documents
+        next: [chunking]
+
+      # =====================================================================
+      # Stage 4: Intelligent Chunking
+      # =====================================================================
+      - id: chunking
+        type: agent
+        name: "Intelligent Chunking"
+        role: executor
+        goal: |
+          Chunk documents using intelligent strategies:
+
+          Strategies by document type:
+          - Technical docs: Section-based with header preservation
+          - Code files: Function/class boundaries
+          - Narratives: Semantic paragraph grouping
+          - Tables: Row-preserving chunks
+
+          Parameters:
+          - target_size: {chunk_size}
+          - overlap: {chunk_overlap}
+          - preserve_context: true
+
+          Ensure chunks maintain semantic coherence.
+        tool_budget: 30
+        tools: [shell]
+        llm_config:
+          temperature: 0.1
+          model_hint: claude-3-haiku
+        input_mapping:
+          documents: all_documents
+          chunk_size: $ctx.chunk_size
+          chunk_overlap: $ctx.chunk_overlap
+        output: chunks
+        next: [extract_metadata]
+
+      # =====================================================================
+      # Stage 5: Metadata Extraction
+      # =====================================================================
+      - id: extract_metadata
+        type: parallel
+        name: "Extract Metadata (Parallel)"
+        parallel_nodes: [extract_entities, extract_topics, extract_dates]
+        join_strategy: all
+        next: [combine_metadata]
+
+      - id: extract_entities
+        type: agent
+        name: "Extract Named Entities"
+        role: analyst
+        goal: |
+          Extract key entities from document chunks:
+          - People, organizations, locations
+          - Product names, technologies
+          - Domain-specific entities
+
+          Return structured entity list with positions.
+        tool_budget: 20
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-haiku
+        output: entities
+
+      - id: extract_topics
+        type: compute
+        name: "Extract Topics"
+        tools: [shell]
+        inputs:
+          method: lda_tfidf
+          num_topics: 10
+        output: topics
+        constraints:
+          llm_allowed: false
+          timeout: 120
+
+      - id: extract_dates
+        type: compute
+        name: "Extract Temporal References"
+        tools: [shell]
+        inputs:
+          patterns: [dates, versions, periods]
+        output: temporal_refs
+        constraints:
+          llm_allowed: false
+          timeout: 60
+
+      - id: combine_metadata
+        type: transform
+        name: "Combine All Metadata"
+        transform: |
+          chunk_metadata = []
+          for chunk in chunks:
+            metadata = {
+              "entities": entities.get(chunk.id, []),
+              "topics": topics.get(chunk.id, []),
+              "temporal_refs": temporal_refs.get(chunk.id, []),
+              "source_file": chunk.source,
+              "position": chunk.position,
+            }
+            chunk_metadata.append((chunk, metadata))
+        next: [generate_embeddings]
+
+      # =====================================================================
+      # Stage 6: Batch Embedding Generation
+      # =====================================================================
+      - id: generate_embeddings
+        type: compute
+        name: "Generate Embeddings"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          chunks: $ctx.chunk_metadata
+          model: $ctx.embedding_model
+          batch_size: 100
+          dimensions: $ctx.embedding_dimensions
+        output: embeddings
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 600
+        next: [verify_embeddings]
+
+      - id: verify_embeddings
+        type: compute
+        name: "Verify Embedding Quality"
+        tools: [shell]
+        inputs:
+          embeddings: $ctx.embeddings
+          checks:
+            - dimensionality
+            - nan_values
+            - norm_range
+        output: embedding_validation
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_embeddings]
+
+      - id: check_embeddings
+        type: condition
+        name: "Check Embedding Quality"
+        condition: "embedding_validation.passed"
+        branches:
+          "true": ingest_vectors
+          "false": retry_embeddings
+
+      - id: retry_embeddings
+        type: condition
+        name: "Check Retry Count"
+        condition: "embedding_retries < 3"
+        branches:
+          "true": generate_embeddings
+          "false": embedding_failure
+
+      - id: embedding_failure
+        type: hitl
+        name: "Embedding Failure Review"
+        hitl_type: input
+        prompt: |
+          ## Embedding Generation Failed
+
+          **Failed chunks:** {failed_count}
+          **Error:** {embedding_error}
+
+          Options:
+          1. Skip failed chunks
+          2. Use fallback embedding model
+          3. Abort ingestion
+        context_keys:
+          - failed_count
+          - embedding_error
+        timeout: 600
+        fallback: skip
+        next: [handle_embedding_decision]
+
+      - id: handle_embedding_decision
+        type: condition
+        name: "Handle Embedding Decision"
+        condition: "embedding_decision"
+        branches:
+          "skip": ingest_vectors
+          "fallback": generate_embeddings
+          "abort": abort
+
+      # =====================================================================
+      # Stage 7: Vector Store Ingestion
+      # =====================================================================
+      - id: ingest_vectors
+        type: compute
+        name: "Ingest to Vector Store"
+        handler: retry_with_backoff
+        tools: [shell]
+        inputs:
+          vectors: $ctx.embeddings
+          metadata: $ctx.chunk_metadata
+          index_name: $ctx.index_name
+          upsert: true
+        output: ingestion_result
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          write_allowed: true
+          timeout: 300
+        next: [verify_ingestion]
+
+      - id: verify_ingestion
+        type: compute
+        name: "Verify Ingestion"
+        tools: [shell]
+        inputs:
+          index_name: $ctx.index_name
+          expected_count: $ctx.chunk_count
+        output: verification
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_verification]
+
+      - id: check_verification
+        type: condition
+        name: "Check Ingestion Verification"
+        condition: "verification.count_match and verification.sample_search_works"
+        branches:
+          "true": update_index_metadata
+          "false": ingestion_review
+
+      - id: ingestion_review
+        type: hitl
+        name: "Ingestion Issue Review"
+        hitl_type: approval
+        prompt: |
+          ## Ingestion Verification Issue
+
+          **Expected:** {expected_count} vectors
+          **Ingested:** {actual_count} vectors
+          **Sample search:** {sample_search_result}
+
+          Continue with partial ingestion or retry?
+        context_keys:
+          - expected_count
+          - actual_count
+          - sample_search_result
+        choices:
+          - "Continue"
+          - "Retry"
+          - "Abort"
+        timeout: 600
+        fallback: continue
+        next: [handle_ingestion_decision]
+
+      - id: handle_ingestion_decision
+        type: condition
+        name: "Handle Ingestion Decision"
+        condition: "ingestion_decision"
+        branches:
+          "Continue": update_index_metadata
+          "Retry": ingest_vectors
+          "Abort": abort
+
+      # =====================================================================
+      # Stage 8: Index Metadata Update
+      # =====================================================================
+      - id: update_index_metadata
+        type: compute
+        name: "Update Index Metadata"
+        tools: [shell, write]
+        inputs:
+          index_name: $ctx.index_name
+          metadata:
+            last_updated: $ctx.current_timestamp
+            document_count: $ctx.document_count
+            chunk_count: $ctx.chunk_count
+            embedding_model: $ctx.embedding_model
+            sources: $ctx.source_files
+        output: metadata_update
+        constraints:
+          llm_allowed: false
+          write_allowed: true
+          timeout: 30
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 9: Ingestion Report
+      # =====================================================================
+      - id: generate_report
+        type: agent
+        name: "Generate Ingestion Report"
+        role: writer
+        goal: |
+          Generate a summary report of the ingestion:
+
+          Include:
+          - Documents processed: count and types
+          - Chunks created: count and average size
+          - Embeddings generated: model and dimensions
+          - Ingestion stats: success rate, time taken
+          - Quality metrics: validation scores
+          - Recommendations for future ingestions
+        tool_budget: 10
+        tools: [write]
+        llm_config:
+          temperature: 0.4
+        output: report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Ingestion Complete"
+        transform: |
+          status = "completed"
+          documents_ingested = document_count
+          chunks_created = chunk_count
+          completion_time = current_timestamp()
+
+      - id: abort
+        type: transform
+        name: "Ingestion Aborted"
+        transform: |
+          status = "aborted"
+
+
+  # =========================================================================
+  # Incremental Update Workflow
+  # =========================================================================
+  incremental_update:
+    description: "Update existing index with new/modified documents"
+
+    metadata:
+      vertical: rag
+
+    nodes:
+      - id: detect_changes
+        type: compute
+        name: "Detect Document Changes"
+        tools: [shell, read]
+        inputs:
+          source_path: $ctx.source_directory
+          index_name: $ctx.index_name
+          change_detection: file_hash
+        output: changes
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_changes]
+
+      - id: check_changes
+        type: condition
+        name: "Check for Changes"
+        condition: "has_changes"
+        branches:
+          "true": process_changes
+          "false": no_changes
+
+      - id: no_changes
+        type: transform
+        name: "No Changes"
+        transform: |
+          status = "up_to_date"
+
+      - id: process_changes
+        type: parallel
+        name: "Process Changes"
+        parallel_nodes: [add_new, update_modified, remove_deleted]
+        join_strategy: all
+        next: [complete]
+
+      - id: add_new
+        type: compute
+        name: "Add New Documents"
+        tools: [shell]
+        inputs:
+          documents: $ctx.new_documents
+        output: added
+        constraints:
+          llm_allowed: false
+          timeout: 300
+
+      - id: update_modified
+        type: compute
+        name: "Update Modified Documents"
+        tools: [shell]
+        inputs:
+          documents: $ctx.modified_documents
+          strategy: replace
+        output: updated
+        constraints:
+          llm_allowed: false
+          timeout: 300
+
+      - id: remove_deleted
+        type: compute
+        name: "Remove Deleted Documents"
+        tools: [shell]
+        inputs:
+          document_ids: $ctx.deleted_document_ids
+        output: removed
+        constraints:
+          llm_allowed: false
+          timeout: 60
+
+      - id: complete
+        type: transform
+        name: "Update Complete"
+        transform: |
+          status = "completed"
+          added_count = len(added)
+          updated_count = len(updated)
+          removed_count = len(removed)

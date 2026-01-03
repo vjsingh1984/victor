@@ -26,6 +26,13 @@ The ContentHasher uses configurable normalization strategies to support
 different deduplication use cases while maintaining a single, well-tested
 hashing implementation.
 
+SOLID Compliance:
+- SRP: Single class handles content hashing with normalization
+- OCP: New normalization strategies can be added via HasherPresets
+- LSP: All presets return ContentHasher instances
+- ISP: Minimal interface (hash, hash_dict, hash_list, hash_block)
+- DIP: Uses native accelerator protocol when available
+
 Usage Examples:
 
     # For text deduplication (normalize whitespace, case-insensitive)
@@ -58,6 +65,7 @@ Performance Characteristics:
 - O(n) where n is content length
 - SHA-256 for cryptographic quality (collision resistance)
 - Configurable hash length for memory efficiency
+- Uses Rust native normalize_block() when available (10-50x faster)
 - No external dependencies beyond stdlib
 """
 
@@ -65,6 +73,18 @@ import hashlib
 import json
 import re
 from typing import Any, Dict, List, Optional
+
+# Try to import native acceleration
+_NATIVE_NORMALIZE_AVAILABLE = False
+_native_normalize_block = None
+
+try:
+    from victor.processing.native import normalize_block as _native_normalize_block
+    from victor.processing.native import is_native_available
+
+    _NATIVE_NORMALIZE_AVAILABLE = is_native_available()
+except ImportError:
+    pass
 
 
 class ContentHasher:
@@ -116,7 +136,7 @@ class ContentHasher:
         """Generate hash for content with optional normalization.
 
         The normalization pipeline applies transformations in this order:
-        1. Whitespace normalization (if enabled)
+        1. Whitespace normalization (if enabled) - uses Rust when available
         2. Punctuation removal (if enabled)
         3. Case conversion (if enabled)
         4. SHA-256 hashing
@@ -143,11 +163,21 @@ class ContentHasher:
 
         # Apply normalization pipeline
         if self.normalize_whitespace:
-            # Collapse multiple whitespace (spaces, tabs, newlines) to single space
-            normalized = re.sub(r"\s+", " ", normalized.strip())
-
-        if self.remove_punctuation:
-            # Remove trailing punctuation
+            # Use Rust native normalization when available (10-50x faster)
+            if (
+                _NATIVE_NORMALIZE_AVAILABLE
+                and _native_normalize_block is not None
+                and self.remove_punctuation
+            ):
+                # Native normalize_block handles whitespace + punctuation in one pass
+                normalized = _native_normalize_block(normalized)
+            else:
+                # Pure Python fallback
+                normalized = re.sub(r"\s+", " ", normalized.strip())
+                if self.remove_punctuation:
+                    normalized = normalized.rstrip(".,;:")
+        elif self.remove_punctuation:
+            # Only punctuation removal (no whitespace normalization)
             normalized = normalized.rstrip(".,;:")
 
         if self.case_insensitive:
@@ -223,6 +253,49 @@ class ContentHasher:
         if min_length > 0 and len(block.strip()) < min_length:
             return None
         return self.hash(block)
+
+    def normalize(self, content: str) -> str:
+        """Normalize content without hashing (for inspection/debugging).
+
+        Applies the same normalization pipeline as hash() but returns
+        the normalized string instead of its hash. Useful for debugging
+        and testing normalization behavior.
+
+        Args:
+            content: Content to normalize
+
+        Returns:
+            Normalized content string
+
+        Example:
+            >>> hasher = ContentHasher(normalize_whitespace=True, case_insensitive=True)
+            >>> hasher.normalize("Hello  World")
+            'hello world'
+        """
+        if not content:
+            return ""
+
+        normalized = content
+
+        # Apply normalization pipeline (same as hash())
+        if self.normalize_whitespace:
+            if (
+                _NATIVE_NORMALIZE_AVAILABLE
+                and _native_normalize_block is not None
+                and self.remove_punctuation
+            ):
+                normalized = _native_normalize_block(normalized)
+            else:
+                normalized = re.sub(r"\s+", " ", normalized.strip())
+                if self.remove_punctuation:
+                    normalized = normalized.rstrip(".,;:")
+        elif self.remove_punctuation:
+            normalized = normalized.rstrip(".,;:")
+
+        if self.case_insensitive:
+            normalized = normalized.lower()
+
+        return normalized
 
 
 # Predefined hasher configurations for common use cases

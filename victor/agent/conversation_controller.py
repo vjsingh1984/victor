@@ -23,6 +23,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
     CONTEXT_LIMITS,
@@ -130,6 +131,7 @@ class ConversationController:
         embedding_service: Optional["EmbeddingService"] = None,
         conversation_store: Optional["ConversationStore"] = None,
         session_id: Optional[str] = None,
+        prompt_normalizer: Optional[PromptNormalizer] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -142,6 +144,8 @@ class ConversationController:
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
+        # PromptNormalizer for input deduplication (DIP compliance)
+        self._normalizer = prompt_normalizer or get_prompt_normalizer()
 
     @property
     def messages(self) -> List[Message]:
@@ -190,10 +194,34 @@ class ConversationController:
         self._system_added = True
 
     def add_user_message(self, content: str) -> Message:
+        """Add a user message with optional normalization.
+
+        Uses PromptNormalizer to:
+        1. Normalize action verbs (view→read, check→read)
+        2. Detect and log duplicate messages
+        3. Collapse repeated continuation requests
+
+        Args:
+            content: User message content
+
+        Returns:
+            The added Message
+        """
         self.ensure_system_message()
-        message = self._history.add_user_message(content)
+
+        # Normalize input using PromptNormalizer
+        result = self._normalizer.normalize(content)
+        normalized_content = result.normalized
+
+        # Log normalizations if any were made
+        if result.changes:
+            logger.debug(f"Normalized prompt: {result.changes}")
+        if result.is_duplicate:
+            logger.debug("Detected duplicate message (will still add for conversational flow)")
+
+        message = self._history.add_user_message(normalized_content)
         if self.config.enable_stage_tracking:
-            self._state_machine.record_message(content, is_user=True)
+            self._state_machine.record_message(normalized_content, is_user=True)
         if (
             self.config.enable_context_monitoring
             and (metrics := self.get_context_metrics()).is_overflow_risk
@@ -516,17 +544,15 @@ class ConversationController:
 
             embeddings = self._embedding_service.embed_batch([t1, t2])
             if len(embeddings) == 2:
-                import numpy as np
+                from victor.processing.native import cosine_similarity
 
                 emb1, emb2 = embeddings[0], embeddings[1]
-                # Cosine similarity
-                dot = np.dot(emb1, emb2)
-                norm1 = np.linalg.norm(emb1)
-                norm2 = np.linalg.norm(emb2)
-                if norm1 > 0 and norm2 > 0:
-                    return float(dot / (norm1 * norm2))
-        except Exception as e:
-            logger.warning(f"Semantic similarity computation failed: {e}")
+                # Use Rust-accelerated cosine similarity (with NumPy fallback)
+                return cosine_similarity(list(emb1), list(emb2))
+        except ImportError:
+            logger.debug("cosine_similarity not available, returning 0.0")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Semantic similarity computation failed (bad embeddings): {e}")
 
         return 0.0
 
@@ -703,8 +729,10 @@ class ConversationController:
                 context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
                 relevant_context.append(context)
 
-        except Exception as e:
-            logger.warning(f"Failed to retrieve relevant history: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to retrieve relevant history (I/O error): {e}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to retrieve relevant history (data error): {e}")
 
         return relevant_context[:limit]
 
@@ -724,8 +752,10 @@ class ConversationController:
                 summary,
                 message_ids,
             )
-        except Exception as e:
-            logger.warning(f"Failed to persist compaction summary: {e}")
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to persist compaction summary (I/O error): {e}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to persist compaction summary (data error): {e}")
 
     def on_context_overflow(self, callback: Callable[[ContextMetrics], None]) -> None:
         """Register callback for context overflow events.
@@ -740,8 +770,11 @@ class ConversationController:
         for callback in self._context_callbacks:
             try:
                 callback(metrics)
+            except (TypeError, ValueError, AttributeError) as e:
+                logger.warning(f"Context callback failed (invalid callback): {e}")
             except Exception as e:
-                logger.warning(f"Context callback failed: {e}")
+                # Log with traceback for unexpected callback failures
+                logger.exception(f"Context callback failed unexpectedly: {e}")
 
     def get_last_user_message(self) -> Optional[str]:
         """Get the content of the last user message.

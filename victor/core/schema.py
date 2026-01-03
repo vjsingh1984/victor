@@ -112,6 +112,9 @@ class Tables:
     RL_QUALITY_WEIGHT = "rl_quality_weight"  # Quality weights
     RL_QUALITY_HISTORY = "rl_quality_history"  # Quality weight history
 
+    # Context pruning (token optimization)
+    RL_CONTEXT_PRUNING = "rl_context_pruning"  # Context pruning Q-values
+
     # Cross-vertical learning
     RL_PATTERN = "rl_pattern"  # Cross-vertical patterns
     RL_PATTERN_USE = "rl_pattern_use"  # Pattern application tracking

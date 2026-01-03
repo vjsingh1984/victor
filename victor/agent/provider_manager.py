@@ -90,6 +90,7 @@ class ProviderState:
         capabilities: Tool calling capabilities
         is_healthy: Whether provider is healthy
         last_error: Last error message (if any)
+        switch_count: Number of times provider/model has been switched
     """
 
     provider: BaseProvider
@@ -100,6 +101,7 @@ class ProviderState:
     is_healthy: bool = True
     last_error: Optional[str] = None
     runtime_capabilities: Optional[ProviderRuntimeCapabilities] = None
+    switch_count: int = 0
 
 
 class ProviderManager:
@@ -200,6 +202,19 @@ class ProviderManager:
     def tool_adapter(self) -> Optional[Any]:
         """Get current tool calling adapter."""
         return self._current_state.tool_adapter if self._current_state else None
+
+    @property
+    def switch_count(self) -> int:
+        """Get the number of provider/model switches."""
+        return self._current_state.switch_count if self._current_state else 0
+
+    def get_current_state(self) -> Optional[ProviderState]:
+        """Get the current provider state.
+
+        Returns:
+            Current ProviderState or None if not configured
+        """
+        return self._current_state
 
     def is_cloud_provider(self) -> bool:
         """Check if current provider is cloud-based."""
@@ -337,12 +352,14 @@ class ProviderManager:
             # Store old state for switch tracking
             old_provider = self.provider_name
             old_model = self.model
+            old_switch_count = self.switch_count
 
             # Create new state
             self._current_state = ProviderState(
                 provider=new_provider,
                 provider_name=provider_name.lower(),
                 model=new_model,
+                switch_count=old_switch_count + 1,
             )
 
             # Initialize tool adapter
@@ -401,6 +418,7 @@ class ProviderManager:
 
             # Update model
             self._current_state.model = model
+            self._current_state.switch_count += 1
 
             # Reinitialize tool adapter
             self.initialize_tool_adapter()

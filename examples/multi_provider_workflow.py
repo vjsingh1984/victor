@@ -17,11 +17,7 @@
 import asyncio
 import os
 
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
-from victor.providers.ollama_provider import OllamaProvider
-from victor.providers.anthropic_provider import AnthropicProvider
-from victor.providers.openai_provider import OpenAIProvider
+from victor import Agent
 
 
 async def main():
@@ -36,31 +32,21 @@ async def main():
     print("\n📝 Step 1: Brainstorming (Using Ollama - FREE)")
     print("-" * 60)
 
-    settings = Settings()
-    ollama = OllamaProvider()
     try:
-        models = await ollama.list_models()
-        if not models:
-            print("⚠️  No Ollama models available. Skipping Ollama step.")
-            ollama_available = False
-        else:
-            ollama_available = True
-            model_name = models[0]["name"]
+        agent_ollama = await Agent.create(
+            provider="ollama",
+            model="qwen2.5-coder:7b",
+            temperature=0.8,
+        )
+        ollama_available = True
 
-            agent_ollama = AgentOrchestrator(
-                settings=settings,
-                provider=ollama,
-                model=model_name,
-                temperature=0.8,
-            )
-
-            response = await agent_ollama.chat(
-                "Brainstorm 3 creative names for a Python function that validates email addresses. "
-                "Just list the names, one per line."
-            )
-            print(f"Ollama: {response.content}")
-            chosen_name = "validate_email_format"  # Pick one
-            print(f"\n✅ Chose: {chosen_name}")
+        response = await agent_ollama.run(
+            "Brainstorm 3 creative names for a Python function that validates email addresses. "
+            "Just list the names, one per line."
+        )
+        print(f"Ollama: {response.content}")
+        chosen_name = "validate_email_format"  # Pick one
+        print(f"\n✅ Chose: {chosen_name}")
     except Exception as e:
         print(f"⚠️  Ollama not available: {e}")
         ollama_available = False
@@ -72,21 +58,19 @@ async def main():
 
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
-        gpt4o_mini = OpenAIProvider(api_key=openai_key)
-        agent_gpt4o_mini = AgentOrchestrator(
-            settings=settings,
-            provider=gpt4o_mini,
+        agent_gpt4o_mini = await Agent.create(
+            provider="openai",
             model="gpt-4o-mini",
             temperature=0.5,
         )
 
-        response = await agent_gpt4o_mini.chat(
+        response = await agent_gpt4o_mini.run(
             f"Write a Python function called {chosen_name} that validates email addresses. "
             "Use regex, include docstring, handle edge cases."
         )
         print(f"GPT-4o mini: {response.content[:500]}...")
         implementation = response.content
-        await gpt4o_mini.close()
+        await agent_gpt4o_mini.close()
     else:
         print("⚠️  OPENAI_API_KEY not set. Skipping GPT-4o mini step.")
         implementation = "# Implementation would go here"
@@ -97,20 +81,18 @@ async def main():
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if anthropic_key:
-        claude = AnthropicProvider(api_key=anthropic_key)
-        agent_claude = AgentOrchestrator(
-            settings=settings,
-            provider=claude,
+        agent_claude = await Agent.create(
+            provider="anthropic",
             model="claude-sonnet-4-5",
             temperature=0.7,
         )
 
-        response = await agent_claude.chat(
+        response = await agent_claude.run(
             f"Review this code for security, edge cases, and best practices:\n\n{implementation}\n\n"
             "Provide specific suggestions for improvement."
         )
         print(f"Claude: {response.content}")
-        await claude.close()
+        await agent_claude.close()
     else:
         print("⚠️  ANTHROPIC_API_KEY not set. Skipping Claude review.")
 
@@ -119,7 +101,7 @@ async def main():
     print("-" * 60)
 
     if ollama_available:
-        response = await agent_ollama.chat(
+        response = await agent_ollama.run(
             f"Write pytest unit tests for this function:\n\n{implementation}\n\n"
             "Include tests for: valid emails, invalid emails, edge cases."
         )
@@ -145,7 +127,7 @@ async def main():
 
     # Clean up
     if ollama_available:
-        await ollama.close()
+        await agent_ollama.close()
 
     print("\n✅ Multi-provider workflow completed!")
 

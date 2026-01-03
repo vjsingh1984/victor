@@ -56,9 +56,12 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 # Singleton instance
 _registry_instance: Optional["PersonaRegistry"] = None
@@ -121,10 +124,14 @@ class PersonaRegistry:
 
     Thread-safe for concurrent access.
 
-    Example:
-        registry = PersonaRegistry()
+    Supports two registration modes:
+    1. Direct registration: Register an already-created PersonaSpec object
+    2. Factory registration: Register a factory function for deferred creation
 
-        # Register a persona
+    Example:
+        registry = PersonaRegistry.get_instance()
+
+        # Register a persona (direct)
         spec = PersonaSpec(
             name="senior_dev",
             role="Senior Developer",
@@ -132,15 +139,55 @@ class PersonaRegistry:
         )
         registry.register("senior_dev", spec, vertical="coding")
 
-        # Query personas
+        # Register a factory (deferred creation)
+        registry.register_factory(
+            "dynamic_persona",
+            lambda: PersonaSpec(name="Dynamic", role="Dynamic Role"),
+            vertical="coding",
+        )
+
+        # Get direct persona
         persona = registry.get("senior_dev", vertical="coding")
+
+        # Create from factory
+        persona = registry.create("dynamic_persona", vertical="coding")
+
+        # Query personas
         python_experts = registry.find_by_expertise("python")
     """
+
+    _instance: Optional["PersonaRegistry"] = None
+    _class_lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         """Initialize the registry."""
         self._personas: Dict[str, PersonaSpec] = {}
+        self._factories: Dict[str, Callable[[], PersonaSpec]] = {}
         self._lock = threading.RLock()
+
+    @classmethod
+    def get_instance(cls) -> "PersonaRegistry":
+        """Get the singleton instance of PersonaRegistry.
+
+        Thread-safe singleton access.
+
+        Returns:
+            The global PersonaRegistry instance.
+        """
+        if cls._instance is None:
+            with cls._class_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance (for testing).
+
+        Creates a fresh registry on next get_instance() call.
+        """
+        with cls._class_lock:
+            cls._instance = None
 
     def register(
         self,
@@ -171,8 +218,96 @@ class PersonaRegistry:
             self._personas[key] = persona
             logger.debug(f"Registered persona: {key}")
 
+    def register_factory(
+        self,
+        name: str,
+        factory: Callable[[], PersonaSpec],
+        vertical: Optional[str] = None,
+        replace: bool = False,
+    ) -> None:
+        """Register a persona factory for deferred creation.
+
+        Factory functions are called when create() is invoked.
+
+        Args:
+            name: Short name for the persona (or "vertical:name" format)
+            factory: Callable that returns a PersonaSpec when invoked
+            vertical: Optional vertical namespace
+            replace: If True, replace existing registration
+        """
+        # Support "vertical:name" format in name parameter
+        if ":" in name and vertical is None:
+            vertical, name = name.split(":", 1)
+
+        key = f"{vertical}:{name}" if vertical else name
+
+        with self._lock:
+            if (key in self._factories or key in self._personas) and not replace:
+                logger.debug(f"Persona/factory '{key}' already registered, skipping")
+                return
+
+            self._factories[key] = factory
+            logger.debug(f"Registered persona factory: {key}")
+
+    def create(self, name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
+        """Create a persona from a registered factory.
+
+        Invokes the factory function and returns the created persona.
+        Each call creates a fresh persona instance.
+
+        Args:
+            name: Persona name (or "vertical:name" format)
+            vertical: Optional vertical namespace
+
+        Returns:
+            Created PersonaSpec object, or None if factory not found
+
+        Raises:
+            RuntimeError: If factory execution fails
+        """
+        # Support "vertical:name" format
+        if ":" in name and vertical is None:
+            vertical, name = name.split(":", 1)
+
+        key = f"{vertical}:{name}" if vertical else name
+
+        with self._lock:
+            if key in self._factories:
+                factory = self._factories[key]
+            elif vertical:
+                factory = self._factories.get(name)
+            else:
+                factory = None
+
+        if factory is None:
+            logger.debug(f"No factory registered for persona: {key}")
+            return None
+
+        try:
+            persona_obj = factory()
+            persona_obj.vertical = vertical
+            logger.debug(f"Created persona from factory: {key}")
+            return persona_obj
+        except Exception as e:
+            logger.error(f"Failed to create persona '{key}': {e}")
+            raise RuntimeError(f"Persona factory execution failed for '{key}': {e}") from e
+
+    def has(self, name: str, vertical: Optional[str] = None) -> bool:
+        """Check if a persona or factory is registered.
+
+        Args:
+            name: Persona name
+            vertical: Optional vertical namespace
+
+        Returns:
+            True if registered (either as persona or factory)
+        """
+        key = f"{vertical}:{name}" if vertical else name
+        with self._lock:
+            return key in self._personas or key in self._factories
+
     def unregister(self, name: str, vertical: Optional[str] = None) -> bool:
-        """Unregister a persona.
+        """Unregister a persona or factory.
 
         Args:
             name: Persona name to unregister
@@ -184,11 +319,17 @@ class PersonaRegistry:
         key = f"{vertical}:{name}" if vertical else name
 
         with self._lock:
+            found = False
             if key in self._personas:
                 del self._personas[key]
+                found = True
+            if key in self._factories:
+                del self._factories[key]
+                found = True
+
+            if found:
                 logger.debug(f"Unregistered persona: {key}")
-                return True
-            return False
+            return found
 
     def get(self, name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
         """Get a persona by name.
@@ -311,10 +452,35 @@ class PersonaRegistry:
             return results
 
     def clear(self) -> None:
-        """Clear all registered personas (for testing)."""
+        """Clear all registered personas and factories (for testing)."""
         with self._lock:
             self._personas.clear()
+            self._factories.clear()
             logger.debug("Cleared persona registry")
+
+    def list_factories(self, vertical: Optional[str] = None) -> List[str]:
+        """List all registered factory names.
+
+        Args:
+            vertical: If provided, only list factories from this vertical
+
+        Returns:
+            List of factory names (full keys)
+        """
+        with self._lock:
+            if vertical:
+                prefix = f"{vertical}:"
+                return [k for k in self._factories.keys() if k.startswith(prefix)]
+            return list(self._factories.keys())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the registry to a dictionary.
+
+        Returns:
+            Dict with persona names as keys and spec dicts as values
+        """
+        with self._lock:
+            return {key: spec.to_dict() for key, spec in self._personas.items()}
 
     def register_from_vertical(
         self,
@@ -407,10 +573,94 @@ def get_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[Pers
     return get_persona_registry().get(name, vertical=vertical)
 
 
+def create_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
+    """Create a persona from a registered factory.
+
+    Convenience function for creating personas from factories.
+
+    Args:
+        name: Persona name (or "vertical:name" format)
+        vertical: Optional vertical namespace
+
+    Returns:
+        Created PersonaSpec object, or None if factory not found
+    """
+    return get_persona_registry().create(name, vertical=vertical)
+
+
+def persona(
+    name: str,
+    *,
+    replace: bool = False,
+) -> Callable[[F], F]:
+    """Decorator for registering a persona factory function.
+
+    The decorated function becomes a factory that is registered in the
+    global PersonaRegistry. When the persona is requested via create(),
+    the factory function is called to create a fresh instance.
+
+    Args:
+        name: Persona name (supports "vertical:name" format)
+        replace: If True, replace existing registration
+
+    Returns:
+        Decorator function
+
+    Example:
+        @persona("coding:expert_reviewer")
+        def expert_reviewer():
+            return PersonaSpec(
+                name="Expert Reviewer",
+                role="Expert Code Reviewer",
+                expertise=["code review", "security"],
+            )
+
+        # Later, create the persona:
+        p = create_persona_spec("coding:expert_reviewer")
+    """
+
+    def decorator(func: F) -> F:
+        # Parse vertical from name if present
+        vertical = None
+        persona_name = name
+        if ":" in name:
+            vertical, persona_name = name.split(":", 1)
+
+        # Register the factory
+        get_persona_registry().register_factory(
+            persona_name,
+            func,
+            vertical=vertical,
+            replace=replace,
+        )
+
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> PersonaSpec:
+            return func(*args, **kwargs)
+
+        return wrapper  # type: ignore[return-value]
+
+    return decorator
+
+
+def reset_persona_registry() -> None:
+    """Reset the global persona registry (for testing).
+
+    Creates a fresh registry on next access.
+    """
+    global _registry_instance
+    with _registry_lock:
+        _registry_instance = None
+    PersonaRegistry.reset_instance()
+
+
 __all__ = [
     "PersonaRegistry",
     "PersonaSpec",
     "get_persona_registry",
     "register_persona_spec",
     "get_persona_spec",
+    "create_persona_spec",
+    "persona",
+    "reset_persona_registry",
 ]
