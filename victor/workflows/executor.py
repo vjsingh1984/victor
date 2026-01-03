@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
 
+from victor.framework.chain_registry import get_chain_registry
 from victor.workflows.definition import (
     AgentNode,
     ComputeNode,
@@ -38,6 +39,9 @@ from victor.workflows.definition import (
     WorkflowNode,
 )
 from victor.workflows.isolation import IsolationMapper
+
+# Chain handler prefix for referencing registered chains
+CHAIN_HANDLER_PREFIX = "chain:"
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -1161,6 +1165,14 @@ class WorkflowExecutor:
 
             # Check for custom handler first
             if node.handler:
+                # Check if this is a chain reference (e.g., "chain:coding:analyze")
+                if node.handler.startswith(CHAIN_HANDLER_PREFIX):
+                    chain_name = node.handler[len(CHAIN_HANDLER_PREFIX):]
+                    logger.debug(f"Executing chain '{chain_name}' for node {node.id}")
+                    return await self._execute_chain_handler(
+                        node, context, chain_name, start_time
+                    )
+
                 handler = get_compute_handler(node.handler)
                 if handler:
                     logger.debug(f"Using custom handler '{node.handler}' for node {node.id}")
@@ -1355,6 +1367,115 @@ class WorkflowExecutor:
             else:
                 params[param_name] = context_key
         return params
+
+    async def _execute_chain_handler(
+        self,
+        node: ComputeNode,
+        context: WorkflowContext,
+        chain_name: str,
+        start_time: float,
+    ) -> NodeResult:
+        """Execute a registered chain from the ChainRegistry.
+
+        Chains can be referenced in YAML workflows using the format:
+            handler: chain:<vertical>:<name>
+        or:
+            handler: chain:<name>
+
+        The chain is created from the registry and invoked with the
+        node's input parameters from context.
+
+        Args:
+            node: The ComputeNode referencing the chain
+            context: Execution context
+            chain_name: Full chain name (e.g., "coding:analyze" or just "analyze")
+            start_time: Node start time
+
+        Returns:
+            NodeResult with chain execution output
+
+        Example YAML:
+            - id: analyze_code
+              type: compute
+              handler: chain:coding:analyze
+              inputs:
+                code: $ctx.source_code
+              output: analysis_result
+        """
+        try:
+            registry = get_chain_registry()
+
+            # Parse vertical from chain_name if present (e.g., "coding:analyze")
+            vertical = None
+            name = chain_name
+            if ":" in chain_name:
+                vertical, name = chain_name.split(":", 1)
+
+            # Try to get as factory first (most common for chains)
+            chain_obj = registry.create(name, vertical=vertical)
+
+            if chain_obj is None:
+                # Fall back to direct chain lookup
+                chain_obj = registry.get(name, vertical=vertical)
+
+            if chain_obj is None:
+                logger.error(f"Chain '{chain_name}' not found in registry")
+                return NodeResult(
+                    node_id=node.id,
+                    status=NodeStatus.FAILED,
+                    error=f"Chain '{chain_name}' not found in ChainRegistry",
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Build input parameters from context
+            input_params = self._build_compute_params(node, context)
+
+            # Execute the chain
+            # Chains can be callables, Runnables (LCEL), or have invoke() method
+            if hasattr(chain_obj, "invoke"):
+                # LCEL Runnable-style chain
+                if asyncio.iscoroutinefunction(chain_obj.invoke):
+                    result = await chain_obj.invoke(input_params)
+                else:
+                    # Run sync invoke in executor
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(
+                        None, lambda: chain_obj.invoke(input_params)
+                    )
+            elif callable(chain_obj):
+                # Simple callable chain
+                if asyncio.iscoroutinefunction(chain_obj):
+                    result = await chain_obj(**input_params)
+                else:
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(
+                        None, lambda: chain_obj(**input_params)
+                    )
+            else:
+                # Chain is not callable - treat as static data
+                result = chain_obj
+
+            # Store result in context
+            output_key = node.output_key or node.id
+            context.set(output_key, result)
+
+            logger.debug(f"Chain '{chain_name}' executed successfully for node {node.id}")
+
+            return NodeResult(
+                node_id=node.id,
+                status=NodeStatus.COMPLETED,
+                output=result,
+                duration_seconds=time.time() - start_time,
+            )
+
+        except Exception as e:
+            logger.error(f"Chain execution failed for node {node.id}: {e}", exc_info=True)
+            return NodeResult(
+                node_id=node.id,
+                status=NodeStatus.FAILED,
+                error=f"Chain execution failed: {e}",
+                duration_seconds=time.time() - start_time,
+            )
 
     async def execute_by_name(
         self,

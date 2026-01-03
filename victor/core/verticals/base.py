@@ -281,8 +281,16 @@ class VerticalBase(ABC):
                 name="INITIAL",
                 description="Understanding the request and gathering initial context",
                 keywords=[
-                    "what", "how", "explain", "help", "where", "show me",
-                    "describe", "overview", "understand", "clarify",
+                    "what",
+                    "how",
+                    "explain",
+                    "help",
+                    "where",
+                    "show me",
+                    "describe",
+                    "overview",
+                    "understand",
+                    "clarify",
                 ],
                 next_stages={"PLANNING", "READING"},
             ),
@@ -290,8 +298,16 @@ class VerticalBase(ABC):
                 name="PLANNING",
                 description="Designing the approach and creating a strategy",
                 keywords=[
-                    "plan", "approach", "strategy", "design", "architecture",
-                    "outline", "steps", "roadmap", "how should", "what's the best way",
+                    "plan",
+                    "approach",
+                    "strategy",
+                    "design",
+                    "architecture",
+                    "outline",
+                    "steps",
+                    "roadmap",
+                    "how should",
+                    "what's the best way",
                 ],
                 next_stages={"READING", "EXECUTION"},
             ),
@@ -299,8 +315,18 @@ class VerticalBase(ABC):
                 name="READING",
                 description="Gathering detailed information and context",
                 keywords=[
-                    "read", "show", "find", "search", "look", "check",
-                    "examine", "inspect", "review", "fetch", "get", "retrieve",
+                    "read",
+                    "show",
+                    "find",
+                    "search",
+                    "look",
+                    "check",
+                    "examine",
+                    "inspect",
+                    "review",
+                    "fetch",
+                    "get",
+                    "retrieve",
                 ],
                 next_stages={"ANALYSIS", "EXECUTION"},
             ),
@@ -308,8 +334,16 @@ class VerticalBase(ABC):
                 name="ANALYSIS",
                 description="Analyzing information and identifying solutions",
                 keywords=[
-                    "analyze", "review", "understand", "why", "how does",
-                    "compare", "evaluate", "assess", "investigate", "diagnose",
+                    "analyze",
+                    "review",
+                    "understand",
+                    "why",
+                    "how does",
+                    "compare",
+                    "evaluate",
+                    "assess",
+                    "investigate",
+                    "diagnose",
                 ],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
@@ -317,9 +351,22 @@ class VerticalBase(ABC):
                 name="EXECUTION",
                 description="Implementing the planned changes or actions",
                 keywords=[
-                    "change", "modify", "create", "add", "remove", "fix",
-                    "implement", "write", "update", "refactor", "build",
-                    "configure", "set up", "install", "run", "execute",
+                    "change",
+                    "modify",
+                    "create",
+                    "add",
+                    "remove",
+                    "fix",
+                    "implement",
+                    "write",
+                    "update",
+                    "refactor",
+                    "build",
+                    "configure",
+                    "set up",
+                    "install",
+                    "run",
+                    "execute",
                 ],
                 next_stages={"VERIFICATION", "COMPLETION"},
             ),
@@ -327,8 +374,16 @@ class VerticalBase(ABC):
                 name="VERIFICATION",
                 description="Validating results and testing outcomes",
                 keywords=[
-                    "test", "verify", "check", "validate", "confirm",
-                    "ensure", "run tests", "build", "compile", "lint",
+                    "test",
+                    "verify",
+                    "check",
+                    "validate",
+                    "confirm",
+                    "ensure",
+                    "run tests",
+                    "build",
+                    "compile",
+                    "lint",
                 ],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
@@ -336,8 +391,15 @@ class VerticalBase(ABC):
                 name="COMPLETION",
                 description="Finalizing, documenting, and wrapping up",
                 keywords=[
-                    "done", "finish", "complete", "commit", "summarize",
-                    "document", "conclude", "wrap up", "finalize",
+                    "done",
+                    "finish",
+                    "complete",
+                    "commit",
+                    "summarize",
+                    "document",
+                    "conclude",
+                    "wrap up",
+                    "finalize",
                 ],
                 next_stages=set(),
             ),
@@ -710,6 +772,7 @@ class VerticalBase(ABC):
                 rl_config_provider=cls.get_rl_config_provider(),
                 team_spec_provider=cls.get_team_spec_provider(),
                 enrichment_strategy=cls.get_enrichment_strategy(),
+                tiered_tool_config=cls.get_tiered_tool_config(),
             )
 
             # Cache the extensions
@@ -840,6 +903,10 @@ class VerticalRegistry:
 
     Implements the Registry pattern for vertical discovery.
 
+    Supports both built-in verticals and external verticals installed as
+    pip packages via entry_points. External packages can register verticals
+    using the 'victor.verticals' entry point group.
+
     Example:
         # Register a vertical
         VerticalRegistry.register(MyVertical)
@@ -850,9 +917,16 @@ class VerticalRegistry:
 
         # Get a specific vertical
         coding = VerticalRegistry.get("coding")
+
+    Entry Point Format (for external packages):
+        # In external package's pyproject.toml
+        [project.entry-points."victor.verticals"]
+        security = "victor_security:SecurityAssistant"
     """
 
     _registry: Dict[str, Type[VerticalBase]] = {}
+    _external_discovered: bool = False
+    ENTRY_POINT_GROUP: str = "victor.verticals"
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -912,3 +986,172 @@ class VerticalRegistry:
     def clear(cls) -> None:
         """Clear all registered verticals (for testing)."""
         cls._registry.clear()
+        cls._external_discovered = False
+
+    @classmethod
+    def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:
+        """Discover and register external verticals from entry points.
+
+        Scans installed packages for the 'victor.verticals' entry point group
+        and registers any valid vertical classes found. External verticals must:
+        - Inherit from VerticalBase
+        - Have a non-empty 'name' attribute
+
+        Returns:
+            Dictionary of newly discovered vertical names to their classes.
+
+        Example entry point in external package's pyproject.toml:
+            [project.entry-points."victor.verticals"]
+            security = "victor_security:SecurityAssistant"
+
+        This would load SecurityAssistant from the victor_security package
+        and register it if it's a valid VerticalBase subclass.
+        """
+        import logging
+        from importlib.metadata import entry_points
+
+        logger = logging.getLogger(__name__)
+        discovered: Dict[str, Type[VerticalBase]] = {}
+
+        # Avoid re-discovery on repeated calls
+        if cls._external_discovered:
+            return discovered
+
+        try:
+            # Python 3.10+ API: entry_points() returns a SelectableGroups object
+            # Use group parameter for filtering
+            eps = entry_points(group=cls.ENTRY_POINT_GROUP)
+        except TypeError:
+            # Fallback for older Python versions (shouldn't happen with Python 3.10+)
+            all_eps = entry_points()
+            eps = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+
+        for ep in eps:
+            try:
+                # Load the entry point (imports the module and gets the object)
+                vertical_class = ep.load()
+
+                # Validate that it's a proper VerticalBase subclass
+                if not cls._validate_external_vertical(vertical_class, ep.name):
+                    continue
+
+                # Check for name conflicts with existing verticals
+                if vertical_class.name in cls._registry:
+                    existing = cls._registry[vertical_class.name]
+                    logger.warning(
+                        f"External vertical '{ep.name}' has name '{vertical_class.name}' "
+                        f"which conflicts with existing vertical {existing.__name__}. "
+                        f"Skipping registration."
+                    )
+                    continue
+
+                # Register the vertical
+                cls.register(vertical_class)
+                discovered[vertical_class.name] = vertical_class
+                logger.info(
+                    f"Discovered external vertical: {vertical_class.name} " f"(from {ep.value})"
+                )
+
+            except Exception as e:
+                # Log the error but continue with other entry points
+                logger.warning(
+                    f"Failed to load external vertical '{ep.name}' from "
+                    f"entry point '{ep.value}': {e}"
+                )
+                continue
+
+        cls._external_discovered = True
+
+        if discovered:
+            logger.info(
+                f"Discovered {len(discovered)} external vertical(s): "
+                f"{', '.join(discovered.keys())}"
+            )
+
+        return discovered
+
+    @classmethod
+    def _validate_external_vertical(
+        cls,
+        vertical_class: Any,
+        entry_point_name: str,
+    ) -> bool:
+        """Validate that an external vertical class is properly implemented.
+
+        Args:
+            vertical_class: The class loaded from the entry point.
+            entry_point_name: Name of the entry point (for error messages).
+
+        Returns:
+            True if the vertical is valid, False otherwise.
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Check if it's a class
+        if not isinstance(vertical_class, type):
+            logger.warning(
+                f"External vertical '{entry_point_name}' is not a class "
+                f"(got {type(vertical_class).__name__}). Skipping."
+            )
+            return False
+
+        # Check if it inherits from VerticalBase
+        if not issubclass(vertical_class, VerticalBase):
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"does not inherit from VerticalBase. Skipping."
+            )
+            return False
+
+        # Check if it has a name defined
+        if not getattr(vertical_class, "name", None):
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has no 'name' attribute defined. Skipping."
+            )
+            return False
+
+        # Check if abstract methods are implemented
+        # VerticalBase requires get_tools() and get_system_prompt()
+        try:
+            # Try to call the abstract methods to ensure they're implemented
+            # These are classmethods so we can call them on the class
+            tools = vertical_class.get_tools()
+            if not isinstance(tools, list):
+                logger.warning(
+                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                    f"get_tools() must return a list. Skipping."
+                )
+                return False
+
+            prompt = vertical_class.get_system_prompt()
+            if not isinstance(prompt, str):
+                logger.warning(
+                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                    f"get_system_prompt() must return a string. Skipping."
+                )
+                return False
+        except NotImplementedError:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has unimplemented abstract methods. Skipping."
+            )
+            return False
+        except Exception as e:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"failed validation: {e}. Skipping."
+            )
+            return False
+
+        return True
+
+    @classmethod
+    def reset_discovery(cls) -> None:
+        """Reset the external discovery flag (for testing).
+
+        This allows discover_external_verticals() to run again.
+        """
+        cls._external_discovered = False

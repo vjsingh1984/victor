@@ -120,8 +120,34 @@ def _register_builtin_verticals() -> None:
         pass
 
 
+def _discover_external_verticals() -> None:
+    """Discover and register external verticals from entry points.
+
+    This function scans installed packages for the 'victor.verticals'
+    entry point group and registers any valid vertical classes found.
+
+    External packages can register verticals by adding an entry point
+    to their pyproject.toml:
+
+        [project.entry-points."victor.verticals"]
+        my_vertical = "my_package:MyVerticalAssistant"
+
+    The vertical class must inherit from VerticalBase and implement
+    the required abstract methods (get_tools, get_system_prompt).
+    """
+    try:
+        VerticalRegistry.discover_external_verticals()
+    except Exception:
+        # Silently ignore discovery failures during import
+        # Errors are logged by discover_external_verticals()
+        pass
+
+
 # Register built-in verticals on import
 _register_builtin_verticals()
+
+# Discover and register external verticals from entry points
+_discover_external_verticals()
 
 
 def get_vertical(name: str | None) -> type[VerticalBase] | None:

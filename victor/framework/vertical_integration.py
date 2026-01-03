@@ -998,6 +998,13 @@ class VerticalIntegrationPipeline:
     ) -> None:
         """Apply tools filter from vertical.
 
+        This method supports both legacy tool lists and tiered tool configuration:
+        1. Tiered config (preferred): Uses TieredToolConfig for context-aware selection
+        2. Legacy tools list: Falls back to get_tools() for backward compatibility
+
+        The tiered configuration is also registered with the ToolTierRegistry
+        for cross-vertical tier management.
+
         Args:
             orchestrator: Orchestrator instance
             vertical: Vertical class
@@ -1005,6 +1012,15 @@ class VerticalIntegrationPipeline:
             result: Result to update
         """
         try:
+            # Try tiered tool configuration first (preferred approach)
+            tiered_config = self._get_tiered_config(vertical)
+            if tiered_config:
+                self._apply_tiered_tools(
+                    orchestrator, vertical, tiered_config, context, result
+                )
+                return
+
+            # Fall back to legacy tool list
             tools = vertical.get_tools()
             if tools:
                 # Canonicalize tool names to ensure consistency
@@ -1026,6 +1042,108 @@ class VerticalIntegrationPipeline:
                 result.add_error(f"Failed to apply tools: {e}")
             else:
                 result.add_warning(f"Tools application error: {e}")
+
+    def _get_tiered_config(self, vertical: Type["VerticalBase"]) -> Optional[Any]:
+        """Get tiered tool configuration from vertical.
+
+        Attempts to get the tiered config via:
+        1. get_tiered_tool_config() method (preferred)
+        2. get_tiered_tools() method (legacy, deprecated)
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            TieredToolConfig or None
+        """
+        # Try preferred method first
+        if hasattr(vertical, "get_tiered_tool_config"):
+            config = vertical.get_tiered_tool_config()
+            if config is not None:
+                return config
+
+        # Fall back to legacy method
+        if hasattr(vertical, "get_tiered_tools"):
+            config = vertical.get_tiered_tools()
+            if config is not None:
+                logger.debug(
+                    "Using deprecated get_tiered_tools(); "
+                    "migrate to get_tiered_tool_config()"
+                )
+                return config
+
+        return None
+
+    def _apply_tiered_tools(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        tiered_config: Any,
+        context: VerticalContext,
+        result: IntegrationResult,
+    ) -> None:
+        """Apply tiered tool configuration.
+
+        Registers the config with ToolTierRegistry and applies the tools
+        to the orchestrator using the tiered approach.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            tiered_config: TieredToolConfig instance
+            context: Vertical context
+            result: Result to update
+        """
+        try:
+            from victor.core.tool_tier_registry import ToolTierRegistry
+
+            # Register with global registry for cross-vertical access
+            registry = ToolTierRegistry.get_instance()
+            vertical_name = getattr(vertical, "name", vertical.__name__.lower())
+
+            # Register if not already present (don't overwrite existing)
+            if not registry.has(vertical_name):
+                registry.register(
+                    name=vertical_name,
+                    config=tiered_config,
+                    parent="base",
+                    description=f"Auto-registered from {vertical.__name__}",
+                )
+                logger.debug(f"Registered tiered config for '{vertical_name}' with registry")
+
+            # Get base tools (mandatory + vertical_core)
+            base_tools = tiered_config.get_base_tools()
+            canonical_tools = self._canonicalize_tool_names(base_tools)
+
+            # Store tiered config in context for downstream use
+            context.apply_enabled_tools(canonical_tools)
+            context.metadata["tiered_tool_config"] = tiered_config
+            result.tools_applied = canonical_tools
+
+            # Apply to orchestrator via capability
+            if _check_capability(orchestrator, "enabled_tools"):
+                _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
+                logger.debug(
+                    f"Applied {len(canonical_tools)} tiered tools via capability "
+                    f"(mandatory={len(tiered_config.mandatory)}, "
+                    f"core={len(tiered_config.vertical_core)})"
+                )
+
+            # Also set tiered config if orchestrator supports it
+            if _check_capability(orchestrator, "tiered_tool_config"):
+                _invoke_capability(orchestrator, "tiered_tool_config", tiered_config)
+                logger.debug("Applied tiered tool config to orchestrator")
+
+        except Exception as e:
+            # Fall back to regular tool application on error
+            logger.warning(f"Tiered tool application failed, falling back: {e}")
+            tools = vertical.get_tools()
+            if tools:
+                canonical_tools = self._canonicalize_tool_names(set(tools))
+                context.apply_enabled_tools(canonical_tools)
+                result.tools_applied = canonical_tools
+                if _check_capability(orchestrator, "enabled_tools"):
+                    _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
 
     def _canonicalize_tool_names(self, tools: Set[str]) -> Set[str]:
         """Canonicalize tool names to ensure consistency.

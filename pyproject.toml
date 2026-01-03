@@ -333,6 +333,43 @@ Issues = "https://github.com/vijayksingh/victor/issues"
 victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 
+# =============================================================================
+# External Vertical Registration (for third-party packages)
+# =============================================================================
+# Third-party packages can register custom verticals with Victor by defining
+# an entry point in the "victor.verticals" group.
+#
+# Example in external package's pyproject.toml:
+#
+#   [project.entry-points."victor.verticals"]
+#   security = "victor_security:SecurityAssistant"
+#   ml_ops = "victor_mlops.vertical:MLOpsAssistant"
+#
+# Requirements for external verticals:
+#   1. Must inherit from victor.core.verticals.VerticalBase
+#   2. Must define a non-empty 'name' class attribute
+#   3. Must implement get_tools() -> List[str]
+#   4. Must implement get_system_prompt() -> str
+#
+# Example vertical implementation:
+#
+#   from victor.core.verticals import VerticalBase
+#
+#   class SecurityAssistant(VerticalBase):
+#       name = "security"
+#       description = "Security vulnerability analysis assistant"
+#
+#       @classmethod
+#       def get_tools(cls):
+#           return ["read", "grep", "security_scan", "dependency_audit"]
+#
+#       @classmethod
+#       def get_system_prompt(cls):
+#           return "You are a security expert..."
+#
+# Victor will automatically discover and register external verticals on import.
+# =============================================================================
+
 [tool.setuptools.packages.find]
 include = ["victor*"]
 exclude = ["tests*", "docs*"]
