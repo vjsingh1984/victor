@@ -20,6 +20,7 @@ This module provides common middleware that all verticals can use:
 2. SecretMaskingMiddleware - Mask secrets in tool results
 3. MetricsMiddleware - Record tool execution metrics
 4. GitSafetyMiddleware - Block dangerous git operations
+5. OutputValidationMiddleware - Validate and optionally fix tool outputs
 
 Example usage:
     from victor.framework.middleware import (
@@ -27,6 +28,7 @@ Example usage:
         SecretMaskingMiddleware,
         MetricsMiddleware,
         GitSafetyMiddleware,
+        OutputValidationMiddleware,
     )
 
     # Add to vertical's middleware list
@@ -36,19 +38,166 @@ Example usage:
         MetricsMiddleware(enable_timing=True),
         GitSafetyMiddleware(block_dangerous=True),
     ]
+
+    # Create custom validation middleware
+    class JsonValidator:
+        def validate(self, content, context=None):
+            try:
+                json.loads(content)
+                return ValidationResult(is_valid=True)
+            except json.JSONDecodeError as e:
+                return ValidationResult(
+                    is_valid=False,
+                    issues=[ValidationIssue(message=str(e))]
+                )
+
+    json_middleware = OutputValidationMiddleware(
+        validator=JsonValidator(),
+        applicable_tools={"generate_json", "create_config"},
+        argument_names={"content", "json_data"},
+    )
 """
 
 from __future__ import annotations
 
 import logging
 import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 from victor.core.verticals.protocols import MiddlewareProtocol
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Output Validation Types
+# =============================================================================
+
+
+class ValidationSeverity(Enum):
+    """Severity level for validation issues."""
+
+    INFO = "info"  # Informational, no action needed
+    WARNING = "warning"  # May need attention
+    ERROR = "error"  # Must be fixed
+    CRITICAL = "critical"  # Blocks execution
+
+
+@dataclass
+class ValidationIssue:
+    """A single validation issue found during content validation.
+
+    Attributes:
+        message: Human-readable description of the issue
+        severity: How serious the issue is
+        location: Optional location info (line, column, path, etc.)
+        suggestion: Optional suggested fix
+        code: Optional error/warning code for programmatic handling
+    """
+
+    message: str
+    severity: ValidationSeverity = ValidationSeverity.ERROR
+    location: Optional[str] = None
+    suggestion: Optional[str] = None
+    code: Optional[str] = None
+
+
+@dataclass
+class ValidationResult:
+    """Result of content validation.
+
+    Attributes:
+        is_valid: Whether the content passed validation
+        issues: List of issues found (empty if valid)
+        fixed_content: Optional auto-fixed content (if validator supports fixing)
+        metadata: Additional validation metadata
+    """
+
+    is_valid: bool = True
+    issues: List[ValidationIssue] = field(default_factory=list)
+    fixed_content: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def error_count(self) -> int:
+        """Count of ERROR and CRITICAL severity issues."""
+        return sum(
+            1
+            for issue in self.issues
+            if issue.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
+        )
+
+    @property
+    def warning_count(self) -> int:
+        """Count of WARNING severity issues."""
+        return sum(1 for issue in self.issues if issue.severity == ValidationSeverity.WARNING)
+
+    @property
+    def has_fix(self) -> bool:
+        """Whether a fix is available."""
+        return self.fixed_content is not None
+
+
+@runtime_checkable
+class ValidatorProtocol(Protocol):
+    """Protocol for content validators.
+
+    Validators check content (code, data, configuration) for issues
+    and optionally provide fixes.
+
+    Example implementations:
+    - Python linter (using ast, pylint, ruff)
+    - JSON schema validator
+    - YAML syntax checker
+    - SQL syntax validator
+    - Pydantic model validator
+    """
+
+    def validate(
+        self,
+        content: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ValidationResult:
+        """Validate content and return results.
+
+        Args:
+            content: The content to validate
+            context: Optional context (tool_name, file_path, etc.)
+
+        Returns:
+            ValidationResult with validation status and any issues
+        """
+        ...
+
+
+class FixableValidatorProtocol(ValidatorProtocol, Protocol):
+    """Extended protocol for validators that can auto-fix issues.
+
+    Inherits from ValidatorProtocol and adds the ability to
+    automatically fix detected issues.
+    """
+
+    def fix(
+        self,
+        content: str,
+        issues: List[ValidationIssue],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Attempt to fix issues in content.
+
+        Args:
+            content: Original content with issues
+            issues: Issues to fix
+            context: Optional context
+
+        Returns:
+            Fixed content (or original if unfixable)
+        """
+        ...
 
 
 # =============================================================================
@@ -816,12 +965,294 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         return {"git", "execute_bash", "bash", "shell", "run_command"}
 
 
+# =============================================================================
+# Output Validation Middleware
+# =============================================================================
+
+
+class OutputValidationMiddleware(MiddlewareProtocol):
+    """Generic middleware for validating and optionally fixing tool outputs.
+
+    This middleware provides a configurable validation framework that can:
+    - Validate tool arguments before execution using custom validators
+    - Optionally auto-fix detected issues
+    - Block execution on critical validation failures
+    - Report validation metadata for downstream processing
+
+    The middleware is domain-agnostic - validators can be implemented for:
+    - Code linting (Python, JavaScript, SQL)
+    - Schema validation (JSON, YAML, XML)
+    - Data validation (Pydantic models, JSON Schema)
+    - Configuration validation (Docker, Kubernetes, Terraform)
+
+    Example:
+        # Create a JSON validator
+        class JsonValidator:
+            def validate(self, content, context=None):
+                import json
+                try:
+                    json.loads(content)
+                    return ValidationResult(is_valid=True)
+                except json.JSONDecodeError as e:
+                    return ValidationResult(
+                        is_valid=False,
+                        issues=[ValidationIssue(
+                            message=f"Invalid JSON: {e.msg}",
+                            location=f"line {e.lineno}, column {e.colno}",
+                        )]
+                    )
+
+        # Use in middleware
+        middleware = OutputValidationMiddleware(
+            validator=JsonValidator(),
+            applicable_tools={"write_config", "create_json"},
+            argument_names={"content", "data"},
+            auto_fix=True,
+            block_on_error=False,
+        )
+    """
+
+    def __init__(
+        self,
+        validator: ValidatorProtocol,
+        applicable_tools: Optional[Set[str]] = None,
+        argument_names: Optional[Set[str]] = None,
+        auto_fix: bool = True,
+        block_on_error: bool = False,
+        max_fix_iterations: int = 3,
+        priority: MiddlewarePriority = MiddlewarePriority.HIGH,
+    ):
+        """Initialize the validation middleware.
+
+        Args:
+            validator: Validator instance implementing ValidatorProtocol
+            applicable_tools: Set of tool names this middleware applies to.
+                             None means apply to all tools.
+            argument_names: Set of argument names to validate.
+                           Default: {"content", "code", "data", "text", "body"}
+            auto_fix: Whether to automatically fix issues if validator supports it
+            block_on_error: Whether to block execution on validation errors
+            max_fix_iterations: Maximum fix attempts before giving up
+            priority: Middleware execution priority
+        """
+        self.validator = validator
+        self._applicable_tools = applicable_tools
+        self._argument_names = argument_names or {"content", "code", "data", "text", "body"}
+        self.auto_fix = auto_fix
+        self.block_on_error = block_on_error
+        self.max_fix_iterations = max_fix_iterations
+        self._priority = priority
+
+    async def before_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> MiddlewareResult:
+        """Validate arguments before tool execution.
+
+        Validates content in specified arguments and optionally applies fixes.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Tool arguments
+
+        Returns:
+            MiddlewareResult with validation status and optionally modified arguments
+        """
+        # Find arguments to validate
+        content_to_validate: Dict[str, str] = {}
+        for arg_name in self._argument_names:
+            if arg_name in arguments and isinstance(arguments[arg_name], str):
+                content_to_validate[arg_name] = arguments[arg_name]
+
+        if not content_to_validate:
+            return MiddlewareResult()
+
+        # Build context for validator
+        context = {
+            "tool_name": tool_name,
+            "argument_names": list(content_to_validate.keys()),
+        }
+
+        # Validate each content field
+        all_issues: List[ValidationIssue] = []
+        modified_arguments: Dict[str, Any] = {}
+        any_fixed = False
+
+        for arg_name, content in content_to_validate.items():
+            result = self._validate_content(content, context)
+
+            if result.issues:
+                all_issues.extend(result.issues)
+
+            # Attempt fix if enabled and validator supports it
+            if not result.is_valid and self.auto_fix and result.has_fix:
+                modified_arguments[arg_name] = result.fixed_content
+                any_fixed = True
+                logger.debug(
+                    f"OutputValidationMiddleware: Fixed issues in '{arg_name}' for {tool_name}"
+                )
+            elif not result.is_valid and self.auto_fix:
+                # Try to fix using the FixableValidatorProtocol
+                fixed = self._try_fix(content, result.issues, context)
+                if fixed != content:
+                    modified_arguments[arg_name] = fixed
+                    any_fixed = True
+                    logger.debug(
+                        f"OutputValidationMiddleware: Applied fixes to '{arg_name}' for {tool_name}"
+                    )
+
+        # Build metadata
+        metadata = {
+            "validation_performed": True,
+            "validation_passed": len(all_issues) == 0,
+            "issue_count": len(all_issues),
+            "error_count": sum(
+                1
+                for i in all_issues
+                if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
+            ),
+            "warning_count": sum(1 for i in all_issues if i.severity == ValidationSeverity.WARNING),
+            "content_fixed": any_fixed,
+        }
+
+        if all_issues:
+            metadata["validation_issues"] = [
+                {"message": i.message, "severity": i.severity.value, "location": i.location}
+                for i in all_issues[:10]  # Limit to first 10 issues
+            ]
+
+        # Determine if we should block
+        has_critical = any(i.severity == ValidationSeverity.CRITICAL for i in all_issues)
+        should_block = self.block_on_error and (has_critical or metadata["error_count"] > 0)
+
+        if should_block and not any_fixed:
+            error_msg = f"Validation failed: {metadata['error_count']} errors"
+            if all_issues:
+                error_msg += f". First issue: {all_issues[0].message}"
+            return MiddlewareResult(
+                proceed=False,
+                error_message=error_msg,
+                metadata=metadata,
+            )
+
+        # Merge modified arguments with original
+        final_arguments = None
+        if modified_arguments:
+            final_arguments = {**arguments, **modified_arguments}
+
+        return MiddlewareResult(
+            proceed=True,
+            modified_arguments=final_arguments,
+            metadata=metadata,
+        )
+
+    def _validate_content(
+        self,
+        content: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ValidationResult:
+        """Validate content using the configured validator.
+
+        Args:
+            content: Content to validate
+            context: Validation context
+
+        Returns:
+            ValidationResult from the validator
+        """
+        try:
+            return self.validator.validate(content, context)
+        except Exception as e:
+            logger.warning(f"OutputValidationMiddleware: Validator error: {e}")
+            return ValidationResult(
+                is_valid=False,
+                issues=[
+                    ValidationIssue(
+                        message=f"Validation error: {e}",
+                        severity=ValidationSeverity.ERROR,
+                    )
+                ],
+            )
+
+    def _try_fix(
+        self,
+        content: str,
+        issues: List[ValidationIssue],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Attempt to fix content if validator supports fixing.
+
+        Args:
+            content: Original content
+            issues: Issues to fix
+            context: Fix context
+
+        Returns:
+            Fixed content (or original if unfixable)
+        """
+        # Check if validator implements FixableValidatorProtocol
+        if not hasattr(self.validator, "fix"):
+            return content
+
+        try:
+            fixed = content
+            for iteration in range(self.max_fix_iterations):
+                fixed = self.validator.fix(fixed, issues, context)  # type: ignore
+                # Re-validate to check if fix worked
+                result = self._validate_content(fixed, context)
+                if result.is_valid:
+                    return fixed
+                issues = result.issues
+            return fixed
+        except Exception as e:
+            logger.warning(f"OutputValidationMiddleware: Fix error: {e}")
+            return content
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Optional[Any]:
+        """Post-execution hook (no-op for validation middleware).
+
+        Returns:
+            None (no modification)
+        """
+        return None
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Get middleware priority.
+
+        Returns:
+            Configured priority (default HIGH)
+        """
+        return self._priority
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Get applicable tools.
+
+        Returns:
+            Set of tool names or None for all tools
+        """
+        return self._applicable_tools
+
+
 __all__ = [
     # Middleware
     "LoggingMiddleware",
     "SecretMaskingMiddleware",
     "MetricsMiddleware",
     "GitSafetyMiddleware",
+    "OutputValidationMiddleware",
+    # Validation Types
+    "ValidationSeverity",
+    "ValidationIssue",
+    "ValidationResult",
+    "ValidatorProtocol",
+    "FixableValidatorProtocol",
     # Types
     "ToolMetrics",
 ]

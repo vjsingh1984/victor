@@ -30,8 +30,13 @@ from victor.framework.middleware import (
     GitSafetyMiddleware,
     LoggingMiddleware,
     MetricsMiddleware,
+    OutputValidationMiddleware,
     SecretMaskingMiddleware,
     ToolMetrics,
+    ValidationIssue,
+    ValidationResult,
+    ValidationSeverity,
+    ValidatorProtocol,
 )
 
 
@@ -494,6 +499,322 @@ class TestGitSafetyMiddleware:
 
 
 # =============================================================================
+# OutputValidationMiddleware Tests
+# =============================================================================
+
+
+class SimpleJsonValidator:
+    """Simple JSON validator for testing."""
+
+    def validate(self, content: str, context=None) -> ValidationResult:
+        """Validate JSON content."""
+        import json
+
+        try:
+            json.loads(content)
+            return ValidationResult(is_valid=True)
+        except json.JSONDecodeError as e:
+            return ValidationResult(
+                is_valid=False,
+                issues=[
+                    ValidationIssue(
+                        message=f"Invalid JSON: {e.msg}",
+                        severity=ValidationSeverity.ERROR,
+                        location=f"line {e.lineno}",
+                    )
+                ],
+            )
+
+
+class FixableValidator:
+    """Validator that can auto-fix issues for testing."""
+
+    def validate(self, content: str, context=None) -> ValidationResult:
+        """Validate content - fails if 'BAD' is in content."""
+        if "BAD" in content:
+            return ValidationResult(
+                is_valid=False,
+                issues=[
+                    ValidationIssue(
+                        message="Content contains BAD",
+                        severity=ValidationSeverity.ERROR,
+                    )
+                ],
+            )
+        return ValidationResult(is_valid=True)
+
+    def fix(self, content: str, issues, context=None) -> str:
+        """Fix issues by replacing BAD with GOOD."""
+        return content.replace("BAD", "GOOD")
+
+
+class TestOutputValidationMiddleware:
+    """Tests for OutputValidationMiddleware."""
+
+    @pytest.fixture
+    def json_validator(self):
+        """Create a JSON validator."""
+        return SimpleJsonValidator()
+
+    @pytest.fixture
+    def fixable_validator(self):
+        """Create a fixable validator."""
+        return FixableValidator()
+
+    @pytest.fixture
+    def middleware(self, json_validator):
+        """Create validation middleware with JSON validator."""
+        return OutputValidationMiddleware(
+            validator=json_validator,
+            applicable_tools={"write_file", "create_config"},
+            argument_names={"content"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_valid_content_passes(self, middleware):
+        """Valid content should pass validation."""
+        result = await middleware.before_tool_call(
+            "write_file", {"content": '{"valid": true}', "path": "/test.json"}
+        )
+
+        assert result.proceed is True
+        assert result.metadata.get("validation_passed") is True
+        assert result.metadata.get("issue_count") == 0
+
+    @pytest.mark.asyncio
+    async def test_invalid_content_detected(self, middleware):
+        """Invalid content should be detected."""
+        result = await middleware.before_tool_call(
+            "write_file", {"content": '{"invalid": }', "path": "/test.json"}
+        )
+
+        assert result.proceed is True  # Default: don't block
+        assert result.metadata.get("validation_passed") is False
+        assert result.metadata.get("issue_count") > 0
+        assert "validation_issues" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_block_on_error(self, json_validator):
+        """Middleware should block when block_on_error is True."""
+        middleware = OutputValidationMiddleware(
+            validator=json_validator,
+            argument_names={"content"},
+            block_on_error=True,
+        )
+
+        result = await middleware.before_tool_call(
+            "write_file", {"content": "not valid json", "path": "/test.json"}
+        )
+
+        assert result.proceed is False
+        assert "Validation failed" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_auto_fix_applied(self, fixable_validator):
+        """Middleware should auto-fix when enabled and validator supports it."""
+        middleware = OutputValidationMiddleware(
+            validator=fixable_validator,
+            argument_names={"content"},
+            auto_fix=True,
+        )
+
+        result = await middleware.before_tool_call(
+            "write_file", {"content": "This is BAD content", "path": "/test.txt"}
+        )
+
+        assert result.proceed is True
+        assert result.modified_arguments is not None
+        assert "GOOD" in result.modified_arguments["content"]
+        assert result.metadata.get("content_fixed") is True
+
+    @pytest.mark.asyncio
+    async def test_auto_fix_disabled(self, fixable_validator):
+        """Middleware should not auto-fix when disabled."""
+        middleware = OutputValidationMiddleware(
+            validator=fixable_validator,
+            argument_names={"content"},
+            auto_fix=False,
+        )
+
+        result = await middleware.before_tool_call(
+            "write_file", {"content": "This is BAD content", "path": "/test.txt"}
+        )
+
+        assert result.proceed is True
+        assert result.modified_arguments is None
+        assert result.metadata.get("content_fixed") is False
+
+    @pytest.mark.asyncio
+    async def test_applicable_tools_filter(self, json_validator):
+        """Middleware should only validate applicable tools."""
+        middleware = OutputValidationMiddleware(
+            validator=json_validator,
+            applicable_tools={"write_json"},
+            argument_names={"content"},
+        )
+
+        # Applicable tool - should validate
+        result = await middleware.before_tool_call(
+            "write_json", {"content": '{"valid": true}'}
+        )
+        assert result.metadata.get("validation_performed") is True
+
+        # Non-applicable tool - should skip
+        result = await middleware.before_tool_call(
+            "other_tool", {"content": "not json"}
+        )
+        assert middleware.get_applicable_tools() == {"write_json"}
+
+    @pytest.mark.asyncio
+    async def test_argument_names_filter(self, json_validator):
+        """Middleware should only validate specified argument names."""
+        middleware = OutputValidationMiddleware(
+            validator=json_validator,
+            argument_names={"json_data"},  # Only validate json_data
+        )
+
+        # Specified argument - should validate
+        result = await middleware.before_tool_call(
+            "write_file", {"json_data": '{"valid": true}', "other": "ignored"}
+        )
+        assert result.metadata.get("validation_performed") is True
+
+        # No matching argument - should skip
+        result = await middleware.before_tool_call(
+            "write_file", {"content": "will not be validated"}
+        )
+        # Empty result since no arguments matched
+        assert result.proceed is True
+
+    @pytest.mark.asyncio
+    async def test_severity_levels(self, json_validator):
+        """Middleware should track severity levels correctly."""
+        result = await OutputValidationMiddleware(
+            validator=json_validator,
+            argument_names={"content"},
+        ).before_tool_call("write_file", {"content": "not json"})
+
+        assert result.metadata.get("error_count") > 0
+
+    @pytest.mark.asyncio
+    async def test_max_fix_iterations(self):
+        """Middleware should respect max_fix_iterations."""
+        call_count = 0
+
+        class InfiniteFixValidator:
+            def validate(self, content, context=None):
+                return ValidationResult(
+                    is_valid=False,
+                    issues=[ValidationIssue(message="Always fails")],
+                )
+
+            def fix(self, content, issues, context=None):
+                nonlocal call_count
+                call_count += 1
+                return content + "_fixed"
+
+        middleware = OutputValidationMiddleware(
+            validator=InfiniteFixValidator(),
+            argument_names={"content"},
+            auto_fix=True,
+            max_fix_iterations=3,
+        )
+
+        await middleware.before_tool_call("tool", {"content": "test"})
+
+        # Should stop after max_fix_iterations
+        assert call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_after_tool_call_no_op(self, middleware):
+        """after_tool_call should be a no-op."""
+        result = await middleware.after_tool_call(
+            "write_file", {"content": "{}"}, "result", success=True
+        )
+        assert result is None
+
+    def test_priority_is_high(self, middleware):
+        """Default priority should be HIGH."""
+        assert middleware.get_priority() == MiddlewarePriority.HIGH
+
+    def test_custom_priority(self, json_validator):
+        """Custom priority should be respected."""
+        middleware = OutputValidationMiddleware(
+            validator=json_validator,
+            priority=MiddlewarePriority.CRITICAL,
+        )
+        assert middleware.get_priority() == MiddlewarePriority.CRITICAL
+
+    @pytest.mark.asyncio
+    async def test_validator_exception_handled(self):
+        """Middleware should handle validator exceptions gracefully."""
+
+        class BrokenValidator:
+            def validate(self, content, context=None):
+                raise RuntimeError("Validator exploded")
+
+        middleware = OutputValidationMiddleware(
+            validator=BrokenValidator(),
+            argument_names={"content"},
+        )
+
+        result = await middleware.before_tool_call("tool", {"content": "test"})
+
+        assert result.proceed is True  # Should not block on exception
+        assert result.metadata.get("validation_passed") is False
+
+
+class TestValidationTypes:
+    """Tests for validation type dataclasses."""
+
+    def test_validation_result_defaults(self):
+        """ValidationResult should have sensible defaults."""
+        result = ValidationResult()
+        assert result.is_valid is True
+        assert result.issues == []
+        assert result.fixed_content is None
+        assert result.metadata == {}
+
+    def test_validation_result_error_count(self):
+        """ValidationResult.error_count should count errors and criticals."""
+        result = ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(message="Error 1", severity=ValidationSeverity.ERROR),
+                ValidationIssue(message="Warning", severity=ValidationSeverity.WARNING),
+                ValidationIssue(message="Critical", severity=ValidationSeverity.CRITICAL),
+                ValidationIssue(message="Info", severity=ValidationSeverity.INFO),
+            ],
+        )
+        assert result.error_count == 2  # ERROR + CRITICAL
+        assert result.warning_count == 1
+
+    def test_validation_result_has_fix(self):
+        """ValidationResult.has_fix should check for fixed_content."""
+        result1 = ValidationResult()
+        assert result1.has_fix is False
+
+        result2 = ValidationResult(fixed_content="fixed")
+        assert result2.has_fix is True
+
+    def test_validation_issue_defaults(self):
+        """ValidationIssue should have sensible defaults."""
+        issue = ValidationIssue(message="test")
+        assert issue.message == "test"
+        assert issue.severity == ValidationSeverity.ERROR
+        assert issue.location is None
+        assert issue.suggestion is None
+        assert issue.code is None
+
+    def test_validation_severity_values(self):
+        """ValidationSeverity should have correct values."""
+        assert ValidationSeverity.INFO.value == "info"
+        assert ValidationSeverity.WARNING.value == "warning"
+        assert ValidationSeverity.ERROR.value == "error"
+        assert ValidationSeverity.CRITICAL.value == "critical"
+
+
+# =============================================================================
 # Integration Tests
 # =============================================================================
 
@@ -569,5 +890,7 @@ __all__ = [
     "TestMetricsMiddleware",
     "TestGitSafetyMiddleware",
     "TestToolMetrics",
+    "TestOutputValidationMiddleware",
+    "TestValidationTypes",
     "TestMiddlewareIntegration",
 ]
