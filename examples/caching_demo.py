@@ -24,9 +24,8 @@ Usage:
 
 import asyncio
 import time
-from victor.cache.manager import CacheManager
-from victor.storage.cache.tiered_cache import ResponseCache, EmbeddingCache
-from victor.cache.config import CacheConfig
+from victor.storage.cache import CacheConfig, CacheManager
+from victor.storage.cache.tiered_cache import EmbeddingCache, ResponseCache
 
 
 def demo_basic_caching():

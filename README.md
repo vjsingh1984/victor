@@ -190,6 +190,11 @@ flowchart TB
 | `victor serve` | API server |
 | `victor mcp` | MCP server |
 | `victor keys --set X` | Configure API key |
+| `victor workflow validate <path>` | Validate YAML workflow file |
+| `victor workflow render <path>` | Render workflow as diagram (SVG/PNG/ASCII) |
+| `victor vertical create <name>` | Scaffold new vertical structure |
+| `victor vertical list` | List available verticals |
+| `victor dashboard` | Launch observability dashboard |
 
 ### Agent Modes
 

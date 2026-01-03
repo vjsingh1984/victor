@@ -216,7 +216,7 @@ from victor.tools.base import BaseTool
 import sys
 from collections import defaultdict
 import os
-from victor.cache.manager import CacheManager
+from victor.storage.cache import CacheManager
 
 logger = logging.getLogger(__name__)
 

@@ -26,8 +26,7 @@ logging.basicConfig(
 # Enable DEBUG for victor providers to see safety filter details
 logging.getLogger("victor.providers").setLevel(logging.DEBUG)
 
-from victor.framework.agent import Agent
-from victor.framework.events import EventType
+from victor import Agent, EventType
 
 
 async def main():

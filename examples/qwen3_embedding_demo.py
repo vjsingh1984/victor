@@ -35,8 +35,7 @@ MTEB Performance:
 import asyncio
 from pathlib import Path
 
-from victor.vector_stores.base import EmbeddingConfig
-from victor.vector_stores.chromadb_provider import ChromaDBProvider
+from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
 
 
 async def main():
@@ -72,8 +71,8 @@ async def main():
     print(f"   Persist Directory: {config.persist_directory}")
     print()
 
-    # Initialize provider
-    provider = ChromaDBProvider(config)
+    # Initialize provider via registry (auto-detects installed backends)
+    provider = EmbeddingRegistry.create(config)
     await provider.initialize()
     print()
 

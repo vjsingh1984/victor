@@ -186,15 +186,15 @@ async def example_entity_memory():
     # Sample code to analyze
     code_sample = """
 class UserAuthentication:
-    def __init__(self, token_validator: TokenValidator):
-        self.validator = token_validator
+    def __init__(self, scanner: SecurityScanner):
+        self.scanner = scanner
 
     async def authenticate(self, username: str, password: str) -> User:
         # Hash password with bcrypt
         hashed = bcrypt.hash(password)
         return await self.db.verify(username, hashed)
 
-from victor.security import TokenValidator, JWTHandler
+from victor.security import SecurityScanner, SecurityPolicy
 """
 
     # Extract entities
@@ -225,11 +225,11 @@ async def example_entity_graph():
 
     module = Entity.create("auth_module", EntityType.MODULE)
     auth_class = Entity.create("UserAuth", EntityType.CLASS)
-    validator = Entity.create("TokenValidator", EntityType.CLASS)
+    scanner = Entity.create("SecurityScanner", EntityType.CLASS)
 
     await graph.add_entity(module)
     await graph.add_entity(auth_class)
-    await graph.add_entity(validator)
+    await graph.add_entity(scanner)
 
     # Add relationships
     await graph.add_relation(
@@ -242,7 +242,7 @@ async def example_entity_graph():
     await graph.add_relation(
         EntityRelation(
             source_id=auth_class.id,
-            target_id=validator.id,
+            target_id=scanner.id,
             relation_type=RelationType.DEPENDS_ON,
         )
     )

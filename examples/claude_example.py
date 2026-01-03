@@ -17,8 +17,7 @@
 import asyncio
 import os
 
-from victor.framework.agent import Agent
-from victor.framework.events import EventType
+from victor import Agent, EventType
 
 
 async def main():

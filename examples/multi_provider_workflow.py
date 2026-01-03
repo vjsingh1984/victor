@@ -17,7 +17,7 @@
 import asyncio
 import os
 
-from victor.framework.agent import Agent
+from victor import Agent
 
 
 async def main():

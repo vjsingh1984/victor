@@ -317,8 +317,7 @@ victor chat --profile gemini # Gemini
 
 ```python
 import asyncio
-from victor.framework.agent import Agent
-from victor.framework.events import EventType
+from victor import Agent, EventType
 
 async def main():
     # Create agent
