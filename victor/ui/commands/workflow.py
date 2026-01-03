@@ -372,7 +372,7 @@ def run_workflow(
         None,
         "--context",
         "-c",
-        help="Initial context as JSON string (e.g., '{\"symbol\": \"AAPL\"}')",
+        help='Initial context as JSON string (e.g., \'{"symbol": "AAPL"}\')',
     ),
     context_file: Optional[str] = typer.Option(
         None,
@@ -476,9 +476,7 @@ def run_workflow(
 
         # Create orchestrator if agent nodes exist
         orchestrator = None
-        has_agent_nodes = any(
-            isinstance(node, AgentNode) for node in workflow.nodes.values()
-        )
+        has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
 
         if has_agent_nodes:
             orchestrator = await AgentOrchestrator.create(
@@ -511,7 +509,8 @@ def run_workflow(
                     console.print("\n[bold]Final State:[/]")
                     # Filter out large/internal keys
                     display_state = {
-                        k: v for k, v in result.final_state.items()
+                        k: v
+                        for k, v in result.final_state.items()
                         if not k.startswith("_") and k not in {"messages", "history"}
                     }
                     console.print(json.dumps(display_state, indent=2, default=str)[:2000])

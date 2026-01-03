@@ -14,11 +14,17 @@
 
 """RAG Tool Dependencies - Tool relationships for RAG workflows.
 
-Extends the core BaseToolDependencyProvider with RAG-specific data.
+This module provides RAG-specific tool dependency configuration loaded from YAML.
+Extends the core YAMLToolDependencyProvider with RAG-specific data.
 Also provides composed tool patterns using ToolExecutionGraph.
 
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
+
+Migration Note:
+    This module has been migrated to use YAML-based configuration.
+    The tool dependencies are now loaded from tool_dependencies.yaml.
+    Backward compatibility is maintained - all existing exports still work.
 
 Example:
     from victor.rag.tool_dependencies import (
@@ -37,227 +43,176 @@ Example:
     plan = graph.plan_for_goal({"rag_ingest", "rag_stats"})
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_dependency_loader import (
+    YAMLToolDependencyProvider,
+    load_tool_dependency_yaml,
+)
 from victor.core.tool_types import ToolDependency
-from victor.framework.tool_naming import ToolNames
 from victor.tools.tool_graph import ToolExecutionGraph
 
 
-# Tool dependency graph for RAG workflows
-# Uses canonical ToolNames constants and RAG-specific tool names
-RAG_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
-    # Reading leads to ingestion or search
-    ToolNames.READ: [
-        ("rag_ingest", 0.5),  # Ingest the file content
-        ("rag_search", 0.2),  # Search for similar content
-        (ToolNames.LS, 0.2),  # List more files
-        (ToolNames.READ, 0.1),  # Read another file
-    ],
-    # Listing files leads to reading or ingestion
-    ToolNames.LS: [
-        (ToolNames.READ, 0.5),  # Read a listed file
-        ("rag_ingest", 0.3),  # Ingest files
-        (ToolNames.LS, 0.2),  # Continue listing
-    ],
-    # Web fetch leads to ingestion
-    ToolNames.WEB_FETCH: [
-        ("rag_ingest", 0.6),  # Ingest web content
-        (ToolNames.READ, 0.2),  # Read local files
-        (ToolNames.WEB_FETCH, 0.2),  # Fetch more pages
-    ],
-    # RAG search transitions
-    "rag_search": [
-        ("rag_query", 0.4),  # Query with found context
-        ("rag_search", 0.3),  # Refine search
-        (ToolNames.READ, 0.2),  # Read source documents
-        ("rag_list", 0.1),  # List documents
-    ],
-    # RAG query transitions
-    "rag_query": [
-        ("rag_search", 0.4),  # Search for more context
-        ("rag_query", 0.3),  # Follow-up query
-        (ToolNames.READ, 0.2),  # Read source files
-        ("rag_stats", 0.1),  # Check statistics
-    ],
-    # RAG ingest transitions
-    "rag_ingest": [
-        ("rag_stats", 0.3),  # Check ingestion stats
-        ("rag_list", 0.3),  # List ingested documents
-        ("rag_search", 0.2),  # Search the new content
-        (ToolNames.READ, 0.2),  # Read more files
-    ],
-    # RAG list transitions
-    "rag_list": [
-        ("rag_search", 0.4),  # Search documents
-        ("rag_delete", 0.2),  # Delete documents
-        ("rag_stats", 0.2),  # Check stats
-        (ToolNames.READ, 0.2),  # Read source files
-    ],
-    # RAG delete transitions
-    "rag_delete": [
-        ("rag_list", 0.4),  # List remaining documents
-        ("rag_stats", 0.3),  # Check updated stats
-        ("rag_ingest", 0.3),  # Re-ingest if needed
-    ],
-    # RAG stats transitions
-    "rag_stats": [
-        ("rag_list", 0.4),  # List documents
-        ("rag_search", 0.3),  # Search content
-        ("rag_ingest", 0.2),  # Add more content
-        ("rag_delete", 0.1),  # Clean up
-    ],
-}
-
-# Tools that work well together in RAG
-RAG_TOOL_CLUSTERS: Dict[str, Set[str]] = {
-    "document_reading": {ToolNames.READ, ToolNames.LS, ToolNames.WEB_FETCH},
-    "search_operations": {"rag_search", "rag_query"},
-    "index_management": {"rag_ingest", "rag_delete", "rag_list", "rag_stats"},
-    "content_retrieval": {"rag_search", "rag_query", ToolNames.READ},
-}
-
-# Recommended sequences for common RAG tasks
-RAG_TOOL_SEQUENCES: Dict[str, List[str]] = {
-    "document_ingest": [ToolNames.READ, "rag_ingest", "rag_stats"],
-    "web_ingest": [ToolNames.WEB_FETCH, "rag_ingest", "rag_stats"],
-    "batch_ingest": [ToolNames.LS, ToolNames.READ, "rag_ingest", "rag_list"],
-    "simple_query": ["rag_query"],
-    "thorough_query": ["rag_search", "rag_query", "rag_search"],
-    "exploration": ["rag_stats", "rag_list", "rag_search"],
-    "cleanup": ["rag_list", "rag_delete", "rag_stats"],
-    "maintenance": ["rag_stats", "rag_list", "rag_delete", "rag_stats"],
-}
-
-# Tool dependencies for RAG
-RAG_TOOL_DEPENDENCIES: List[ToolDependency] = [
-    ToolDependency(
-        tool_name="rag_ingest",
-        depends_on={ToolNames.READ, ToolNames.WEB_FETCH},  # Need content to ingest
-        enables={"rag_search", "rag_query", "rag_list"},  # Enables search after ingest
-        weight=0.7,
-    ),
-    ToolDependency(
-        tool_name="rag_search",
-        depends_on=set(),  # Can search anytime
-        enables={"rag_query"},  # Search enables query
-        weight=0.6,
-    ),
-    ToolDependency(
-        tool_name="rag_query",
-        depends_on=set(),  # Can query directly
-        enables={"rag_search"},  # May need more search
-        weight=0.6,
-    ),
-    ToolDependency(
-        tool_name="rag_delete",
-        depends_on={"rag_list"},  # Should list before delete
-        enables={"rag_stats"},  # Check stats after delete
-        weight=0.5,
-    ),
-    ToolDependency(
-        tool_name="rag_list",
-        depends_on=set(),
-        enables={"rag_delete", "rag_search"},
-        weight=0.4,
-    ),
-    ToolDependency(
-        tool_name="rag_stats",
-        depends_on=set(),
-        enables=set(),
-        weight=0.3,
-    ),
-]
-
-# Required tools for RAG
-RAG_REQUIRED_TOOLS: Set[str] = {"rag_search", "rag_query", "rag_ingest"}
-
-# Optional tools that enhance RAG
-RAG_OPTIONAL_TOOLS: Set[str] = {
-    ToolNames.READ,
-    ToolNames.LS,
-    ToolNames.WEB_FETCH,
-    "rag_list",
-    "rag_delete",
-    "rag_stats",
-}
+# Path to the YAML configuration file
+_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
 
-# =============================================================================
-# Composed Tool Patterns
-# =============================================================================
-# These represent higher-level operations composed of multiple tool calls
-# that commonly appear together in RAG workflows.
-
-RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = {
-    "document_ingestion": {
-        "description": "Ingest documents from local files",
-        "sequence": [ToolNames.LS, ToolNames.READ, "rag_ingest", "rag_stats"],
-        "inputs": {"document_path", "document_type"},
-        "outputs": {"document_ids", "chunk_count"},
-        "weight": 0.9,
-    },
-    "web_content_ingestion": {
-        "description": "Ingest content from web URLs",
-        "sequence": [ToolNames.WEB_FETCH, "rag_ingest", "rag_stats"],
-        "inputs": {"url"},
-        "outputs": {"document_id", "chunk_count"},
-        "weight": 0.85,
-    },
-    "semantic_search": {
-        "description": "Search knowledge base with semantic query",
-        "sequence": ["rag_search", "rag_query"],
-        "inputs": {"query"},
-        "outputs": {"relevant_chunks", "answer"},
-        "weight": 0.9,
-    },
-    "comprehensive_query": {
-        "description": "Query with multiple search strategies",
-        "sequence": ["rag_search", "rag_search", "rag_query"],
-        "inputs": {"query", "search_strategies"},
-        "outputs": {"answer", "sources"},
-        "weight": 0.85,
-    },
-    "index_cleanup": {
-        "description": "Clean up stale documents from index",
-        "sequence": ["rag_stats", "rag_list", "rag_delete", "rag_stats"],
-        "inputs": {"cleanup_criteria"},
-        "outputs": {"deleted_count", "remaining_count"},
-        "weight": 0.8,
-    },
-    "knowledge_base_audit": {
-        "description": "Audit knowledge base content and statistics",
-        "sequence": ["rag_stats", "rag_list"],
-        "inputs": {},
-        "outputs": {"document_count", "total_chunks", "document_list"},
-        "weight": 0.75,
-    },
-}
-
-
-class RAGToolDependencyProvider(BaseToolDependencyProvider):
+class RAGToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for RAG vertical.
 
-    Extends BaseToolDependencyProvider with RAG-specific tool
-    relationships for document ingestion, search, and Q&A workflows.
+    Extends YAMLToolDependencyProvider to load RAG-specific tool
+    relationships from tool_dependencies.yaml.
 
     Uses canonical ToolNames constants for consistency.
+
+    This class maintains backward compatibility with the previous
+    hand-coded Python implementation.
     """
 
     def __init__(self):
-        """Initialize the provider with RAG-specific config."""
+        """Initialize the provider with RAG-specific config from YAML."""
         super().__init__(
-            ToolDependencyConfig(
-                dependencies=RAG_TOOL_DEPENDENCIES,
-                transitions=RAG_TOOL_TRANSITIONS,
-                clusters=RAG_TOOL_CLUSTERS,
-                sequences=RAG_TOOL_SEQUENCES,
-                required_tools=RAG_REQUIRED_TOOLS,
-                optional_tools=RAG_OPTIONAL_TOOLS,
-                default_sequence=["rag_search", "rag_query"],
-            )
+            yaml_path=_YAML_CONFIG_PATH,
+            canonicalize=True,
         )
+
+
+# =============================================================================
+# Backward Compatibility Exports
+# =============================================================================
+# These module-level exports maintain backward compatibility with code that
+# imports the raw data structures directly.
+
+
+def _load_config():
+    """Load and cache the YAML configuration."""
+    return load_tool_dependency_yaml(_YAML_CONFIG_PATH, canonicalize=True)
+
+
+def _get_transitions() -> Dict[str, List[Tuple[str, float]]]:
+    """Get tool transitions from YAML config."""
+    return _load_config().transitions
+
+
+def _get_clusters() -> Dict[str, Set[str]]:
+    """Get tool clusters from YAML config."""
+    return _load_config().clusters
+
+
+def _get_sequences() -> Dict[str, List[str]]:
+    """Get tool sequences from YAML config."""
+    return _load_config().sequences
+
+
+def _get_dependencies() -> List[ToolDependency]:
+    """Get tool dependencies from YAML config."""
+    return _load_config().dependencies
+
+
+def _get_required_tools() -> Set[str]:
+    """Get required tools from YAML config."""
+    return _load_config().required_tools
+
+
+def _get_optional_tools() -> Set[str]:
+    """Get optional tools from YAML config."""
+    return _load_config().optional_tools
+
+
+def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
+    """Get composed patterns from YAML metadata.
+
+    The composed patterns are stored in the metadata.composed_patterns
+    section of the YAML file. We need to load them from the spec directly
+    since they're in metadata.
+    """
+    from victor.core.tool_dependency_loader import ToolDependencyLoader
+
+    loader = ToolDependencyLoader(canonicalize=False)
+    spec = loader._load_and_validate(_YAML_CONFIG_PATH)
+
+    patterns = spec.metadata.get("composed_patterns", {})
+
+    # Convert from YAML format to the expected Python format
+    result = {}
+    for name, data in patterns.items():
+        result[name] = {
+            "description": data.get("description", ""),
+            "sequence": data.get("sequence", []),
+            "inputs": (
+                set(data.get("inputs", []))
+                if isinstance(data.get("inputs"), list)
+                else data.get("inputs", set())
+            ),
+            "outputs": (
+                set(data.get("outputs", []))
+                if isinstance(data.get("outputs"), list)
+                else data.get("outputs", set())
+            ),
+            "weight": data.get("weight", 1.0),
+        }
+
+    return result
+
+
+# Backward compatibility: module-level exports
+# These are loaded lazily to avoid circular imports and improve startup time
+RAG_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = None  # type: ignore
+RAG_TOOL_CLUSTERS: Dict[str, Set[str]] = None  # type: ignore
+RAG_TOOL_SEQUENCES: Dict[str, List[str]] = None  # type: ignore
+RAG_TOOL_DEPENDENCIES: List[ToolDependency] = None  # type: ignore
+RAG_REQUIRED_TOOLS: Set[str] = None  # type: ignore
+RAG_OPTIONAL_TOOLS: Set[str] = None  # type: ignore
+RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = None  # type: ignore
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy loading of module-level exports for backward compatibility.
+
+    This allows existing code to import the module-level constants
+    while actually loading them from the YAML file.
+    """
+    global RAG_TOOL_TRANSITIONS, RAG_TOOL_CLUSTERS, RAG_TOOL_SEQUENCES
+    global RAG_TOOL_DEPENDENCIES, RAG_REQUIRED_TOOLS, RAG_OPTIONAL_TOOLS
+    global RAG_COMPOSED_PATTERNS
+
+    if name == "RAG_TOOL_TRANSITIONS":
+        if RAG_TOOL_TRANSITIONS is None:
+            RAG_TOOL_TRANSITIONS = _get_transitions()
+        return RAG_TOOL_TRANSITIONS
+
+    if name == "RAG_TOOL_CLUSTERS":
+        if RAG_TOOL_CLUSTERS is None:
+            RAG_TOOL_CLUSTERS = _get_clusters()
+        return RAG_TOOL_CLUSTERS
+
+    if name == "RAG_TOOL_SEQUENCES":
+        if RAG_TOOL_SEQUENCES is None:
+            RAG_TOOL_SEQUENCES = _get_sequences()
+        return RAG_TOOL_SEQUENCES
+
+    if name == "RAG_TOOL_DEPENDENCIES":
+        if RAG_TOOL_DEPENDENCIES is None:
+            RAG_TOOL_DEPENDENCIES = _get_dependencies()
+        return RAG_TOOL_DEPENDENCIES
+
+    if name == "RAG_REQUIRED_TOOLS":
+        if RAG_REQUIRED_TOOLS is None:
+            RAG_REQUIRED_TOOLS = _get_required_tools()
+        return RAG_REQUIRED_TOOLS
+
+    if name == "RAG_OPTIONAL_TOOLS":
+        if RAG_OPTIONAL_TOOLS is None:
+            RAG_OPTIONAL_TOOLS = _get_optional_tools()
+        return RAG_OPTIONAL_TOOLS
+
+    if name == "RAG_COMPOSED_PATTERNS":
+        if RAG_COMPOSED_PATTERNS is None:
+            RAG_COMPOSED_PATTERNS = _get_composed_patterns()
+        return RAG_COMPOSED_PATTERNS
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # =============================================================================
@@ -294,10 +249,17 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
     if _rag_tool_graph is not None:
         return _rag_tool_graph
 
+    # Load data from YAML via the lazy-loaded module attributes
+    transitions = __getattr__("RAG_TOOL_TRANSITIONS")
+    clusters = __getattr__("RAG_TOOL_CLUSTERS")
+    sequences = __getattr__("RAG_TOOL_SEQUENCES")
+    dependencies = __getattr__("RAG_TOOL_DEPENDENCIES")
+    composed_patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+
     graph = ToolExecutionGraph(name="rag")
 
     # Add dependencies
-    for dep in RAG_TOOL_DEPENDENCIES:
+    for dep in dependencies:
         graph.add_dependency(
             tool_name=dep.tool_name,
             depends_on=dep.depends_on,
@@ -306,18 +268,18 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
         )
 
     # Add transitions
-    graph.add_transitions(RAG_TOOL_TRANSITIONS)
+    graph.add_transitions(transitions)
 
     # Add sequences
-    for name, sequence in RAG_TOOL_SEQUENCES.items():
+    for name, sequence in sequences.items():
         graph.add_sequence(sequence, weight=0.7)
 
     # Add clusters
-    for name, tools in RAG_TOOL_CLUSTERS.items():
+    for name, tools in clusters.items():
         graph.add_cluster(name, tools)
 
     # Add composed patterns as sequences with higher weights
-    for pattern_name, pattern_data in RAG_COMPOSED_PATTERNS.items():
+    for pattern_name, pattern_data in composed_patterns.items():
         graph.add_sequence(pattern_data["sequence"], weight=pattern_data["weight"])
 
     _rag_tool_graph = graph
@@ -348,7 +310,8 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
             print(f"Sequence: {pattern['sequence']}")
             print(f"Inputs: {pattern['inputs']}")
     """
-    return RAG_COMPOSED_PATTERNS.get(pattern_name)
+    patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+    return patterns.get(pattern_name)
 
 
 def list_composed_patterns() -> List[str]:
@@ -357,13 +320,14 @@ def list_composed_patterns() -> List[str]:
     Returns:
         List of pattern names
     """
-    return list(RAG_COMPOSED_PATTERNS.keys())
+    patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+    return list(patterns.keys())
 
 
 __all__ = [
     # Provider class
     "RAGToolDependencyProvider",
-    # Data exports
+    # Data exports (backward compatibility)
     "RAG_TOOL_DEPENDENCIES",
     "RAG_TOOL_TRANSITIONS",
     "RAG_TOOL_CLUSTERS",

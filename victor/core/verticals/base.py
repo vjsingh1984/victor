@@ -39,9 +39,10 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Type, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
 
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
 from victor.core.vertical_types import StageDefinition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -177,12 +180,28 @@ class VerticalBase(ABC):
         The get_config() method caches its result per-class to avoid
         repeated computation. Call clear_config_cache() to invalidate
         when config sources change (typically only needed in tests).
+
+    Extension Loading:
+        The get_extensions() method now supports strict error handling.
+        Set strict_extension_loading=True to raise ExtensionLoadError on
+        any failure. Set required_extensions to specify which extensions
+        must load successfully even in non-strict mode.
     """
 
     # Subclasses must define these
     name: str = ""
     description: str = ""
     version: str = "1.0.0"
+
+    # Extension loading configuration
+    # When True, any extension loading failure raises ExtensionLoadError
+    strict_extension_loading: ClassVar[bool] = False
+
+    # Extensions that must load successfully even when strict_extension_loading=False
+    # Valid values: "middleware", "safety", "prompt", "mode_config", "tool_deps",
+    #               "workflow", "service", "rl_config", "team_spec", "enrichment",
+    #               "tiered_tools"
+    required_extensions: ClassVar[Set[str]] = set()
 
     # Config cache (keyed by class name, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
@@ -731,24 +750,43 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
-    def get_extensions(cls, *, use_cache: bool = True) -> "VerticalExtensions":
-        """Get all extensions for this vertical.
+    def get_extensions(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Get all extensions for this vertical with strict error handling.
 
         Aggregates all extension implementations for framework integration.
         Override for custom extension aggregation.
 
         LSP Compliance: This method ALWAYS returns a valid VerticalExtensions
-        object, never None. Even on exceptions, it returns an empty
-        VerticalExtensions with default values.
+        object, never None. Even on exceptions (in non-strict mode), it returns
+        a VerticalExtensions with successfully loaded extensions.
+
+        Error Handling Modes:
+        - strict=True: Raises ExtensionLoadError on ANY extension failure
+        - strict=False: Collects errors, logs warnings, returns partial extensions
+        - strict=None: Uses class-level strict_extension_loading setting
+
+        Required Extensions:
+        Even when strict=False, extensions listed in required_extensions will
+        raise ExtensionLoadError if they fail to load.
 
         Args:
             use_cache: If True (default), return cached extensions if available.
                        Set to False to force rebuild.
+            strict: Override the class-level strict_extension_loading setting.
+                    If None (default), uses cls.strict_extension_loading.
 
         Returns:
             VerticalExtensions containing all vertical extensions (never None)
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
         """
-        # Import at top of method to ensure it's available for fallback
+        from victor.core.errors import ExtensionLoadError
         from victor.core.verticals.protocols import VerticalExtensions
 
         cache_key = cls.__name__
@@ -757,31 +795,101 @@ class VerticalBase(ABC):
         if use_cache and cache_key in cls._extensions_cache:
             return cls._extensions_cache[cache_key]
 
-        try:
-            safety = cls.get_safety_extension()
-            prompt = cls.get_prompt_contributor()
+        # Determine strict mode
+        is_strict = strict if strict is not None else cls.strict_extension_loading
 
-            extensions = VerticalExtensions(
-                middleware=cls.get_middleware(),
-                safety_extensions=[safety] if safety else [],
-                prompt_contributors=[prompt] if prompt else [],
-                mode_config_provider=cls.get_mode_config_provider(),
-                tool_dependency_provider=cls.get_tool_dependency_provider(),
-                workflow_provider=cls.get_workflow_provider(),
-                service_provider=cls.get_service_provider(),
-                rl_config_provider=cls.get_rl_config_provider(),
-                team_spec_provider=cls.get_team_spec_provider(),
-                enrichment_strategy=cls.get_enrichment_strategy(),
-                tiered_tool_config=cls.get_tiered_tool_config(),
+        # Collect errors for reporting
+        errors: List["ExtensionLoadError"] = []
+
+        def _load_extension(
+            extension_type: str,
+            loader: callable,
+            is_list: bool = False,
+        ) -> Any:
+            """Load an extension with error handling.
+
+            Args:
+                extension_type: Type name for error reporting
+                loader: Callable that loads the extension
+                is_list: If True, the extension should be a list
+
+            Returns:
+                The loaded extension, or default value on error
+            """
+            try:
+                result = loader()
+                return result
+            except Exception as e:
+                is_required = extension_type in cls.required_extensions
+                error = ExtensionLoadError(
+                    message=f"Failed to load '{extension_type}' extension for vertical '{cls.name}': {e}",
+                    extension_type=extension_type,
+                    vertical_name=cls.name,
+                    original_error=e,
+                    is_required=is_required,
+                )
+                errors.append(error)
+
+                # Log the error with appropriate severity
+                if is_strict or is_required:
+                    logger.error(
+                        f"[{error.correlation_id}] {extension_type} extension failed to load "
+                        f"for vertical '{cls.name}': {e}",
+                        exc_info=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[{error.correlation_id}] {extension_type} extension failed to load "
+                        f"for vertical '{cls.name}': {e}"
+                    )
+
+                # Return default value
+                return [] if is_list else None
+
+        # Load each extension with error handling
+        middleware = _load_extension("middleware", cls.get_middleware, is_list=True)
+        safety = _load_extension("safety", cls.get_safety_extension)
+        prompt = _load_extension("prompt", cls.get_prompt_contributor)
+        mode_config = _load_extension("mode_config", cls.get_mode_config_provider)
+        tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
+        workflow = _load_extension("workflow", cls.get_workflow_provider)
+        service = _load_extension("service", cls.get_service_provider)
+        rl_config = _load_extension("rl_config", cls.get_rl_config_provider)
+        team_spec = _load_extension("team_spec", cls.get_team_spec_provider)
+        enrichment = _load_extension("enrichment", cls.get_enrichment_strategy)
+        tiered_tools = _load_extension("tiered_tools", cls.get_tiered_tool_config)
+
+        # Check for critical failures (strict mode or required extensions)
+        critical_errors = [e for e in errors if is_strict or e.is_required]
+        if critical_errors:
+            # Raise the first critical error
+            raise critical_errors[0]
+
+        # Log summary if there were non-critical errors
+        if errors:
+            logger.warning(
+                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
+                f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
             )
 
-            # Cache the extensions
-            cls._extensions_cache[cache_key] = extensions
-            return extensions
-        except Exception:
-            # LSP compliance: return empty VerticalExtensions instead of None
-            # This handles any errors in extension getter methods
-            return VerticalExtensions()
+        # Build extensions object
+        extensions = VerticalExtensions(
+            middleware=middleware if middleware else [],
+            safety_extensions=[safety] if safety else [],
+            prompt_contributors=[prompt] if prompt else [],
+            mode_config_provider=mode_config,
+            tool_dependency_provider=tool_deps,
+            workflow_provider=workflow,
+            service_provider=service,
+            rl_config_provider=rl_config,
+            team_spec_provider=team_spec,
+            enrichment_strategy=enrichment,
+            tiered_tool_config=tiered_tools,
+        )
+
+        # Cache the extensions
+        cls._extensions_cache[cache_key] = extensions
+        return extensions
 
     # =========================================================================
     # Template Method Implementation

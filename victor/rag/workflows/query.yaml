@@ -284,7 +284,7 @@ workflows:
           - user_query
           - missing_information
         timeout: 300
-        fallback: proceed_partial
+        fallback: continue
         next: [handle_clarification]
 
       - id: handle_clarification

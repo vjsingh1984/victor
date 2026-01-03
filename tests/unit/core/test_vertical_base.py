@@ -326,3 +326,385 @@ class TestDefaultStageDefinitions:
         for stage_name, stage in stages.items():
             assert stage.description, f"{stage_name} has empty description"
             assert len(stage.description) > 20, f"{stage_name} description too short"
+
+
+class TestStrictExtensionLoading:
+    """Tests for strict extension loading in VerticalBase.get_extensions().
+
+    These tests verify the LSP-compliant error handling behavior where:
+    - strict=True raises ExtensionLoadError on any failure
+    - strict=False collects errors and returns partial extensions
+    - required_extensions cause failures even in non-strict mode
+    """
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+    def test_strict_mode_raises_on_any_error(self):
+        """Verify strict=True raises ExtensionLoadError on any extension failure."""
+        from victor.core.errors import ExtensionLoadError
+
+        class StrictFailingVertical(VerticalBase):
+            """Vertical that fails during extension loading."""
+
+            name = "strict_failing"
+            description = "A vertical that fails in strict mode"
+            strict_extension_loading = True  # Enable strict mode at class level
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Strict failing prompt"
+
+            @classmethod
+            def get_safety_extension(cls):
+                raise RuntimeError("Simulated safety extension failure")
+
+        StrictFailingVertical.clear_config_cache(clear_all=True)
+
+        with pytest.raises(ExtensionLoadError) as exc_info:
+            StrictFailingVertical.get_extensions(use_cache=False)
+
+        assert exc_info.value.extension_type == "safety"
+        assert exc_info.value.vertical_name == "strict_failing"
+        assert "Simulated safety extension failure" in str(exc_info.value.original_error)
+
+    def test_strict_parameter_overrides_class_setting(self):
+        """Verify strict parameter overrides class-level strict_extension_loading."""
+        from victor.core.errors import ExtensionLoadError
+
+        class NonStrictVertical(VerticalBase):
+            """Vertical with strict mode disabled at class level."""
+
+            name = "non_strict"
+            description = "A non-strict vertical"
+            strict_extension_loading = False  # Disabled at class level
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Non-strict prompt"
+
+            @classmethod
+            def get_middleware(cls):
+                raise RuntimeError("Middleware failure")
+
+        NonStrictVertical.clear_config_cache(clear_all=True)
+
+        # Should NOT raise because class-level is non-strict
+        extensions = NonStrictVertical.get_extensions(use_cache=False)
+        assert extensions is not None
+        assert extensions.middleware == []
+
+        # Clear cache and test with strict=True override
+        NonStrictVertical.clear_config_cache(clear_all=True)
+
+        # Should raise because we override with strict=True
+        with pytest.raises(ExtensionLoadError) as exc_info:
+            NonStrictVertical.get_extensions(use_cache=False, strict=True)
+
+        assert exc_info.value.extension_type == "middleware"
+
+    def test_required_extensions_fail_even_in_non_strict_mode(self):
+        """Verify required_extensions failures raise even when strict=False."""
+        from victor.core.errors import ExtensionLoadError
+
+        class RequiredExtVertical(VerticalBase):
+            """Vertical with required extensions."""
+
+            name = "required_ext"
+            description = "A vertical with required extensions"
+            strict_extension_loading = False  # Non-strict mode
+            required_extensions = {"safety"}  # Safety is required
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Required ext prompt"
+
+            @classmethod
+            def get_safety_extension(cls):
+                raise RuntimeError("Critical safety failure")
+
+        RequiredExtVertical.clear_config_cache(clear_all=True)
+
+        with pytest.raises(ExtensionLoadError) as exc_info:
+            RequiredExtVertical.get_extensions(use_cache=False)
+
+        assert exc_info.value.extension_type == "safety"
+        assert exc_info.value.is_required is True
+
+    def test_non_strict_mode_returns_partial_extensions(self):
+        """Verify non-strict mode returns partial extensions with failed components empty."""
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        class PartialFailVertical(VerticalBase):
+            """Vertical where some extensions fail."""
+
+            name = "partial_fail"
+            description = "A vertical with partial failures"
+            strict_extension_loading = False
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Partial fail prompt"
+
+            @classmethod
+            def get_middleware(cls):
+                # This succeeds
+                return []
+
+            @classmethod
+            def get_safety_extension(cls):
+                # This fails (non-required)
+                raise RuntimeError("Safety failure")
+
+            @classmethod
+            def get_prompt_contributor(cls):
+                # This succeeds
+                return None
+
+        PartialFailVertical.clear_config_cache(clear_all=True)
+
+        extensions = PartialFailVertical.get_extensions(use_cache=False)
+
+        # Should return valid extensions despite the failure
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
+
+        # Failed extension should have empty/None value
+        assert extensions.safety_extensions == []
+
+        # Successful extensions should work normally
+        assert extensions.middleware == []
+
+    def test_extension_load_error_has_proper_attributes(self):
+        """Verify ExtensionLoadError has all expected attributes."""
+        from victor.core.errors import ExtensionLoadError, ErrorCategory, ErrorSeverity
+
+        original = RuntimeError("Original error")
+        error = ExtensionLoadError(
+            message="Test error",
+            extension_type="safety",
+            vertical_name="test_vertical",
+            original_error=original,
+            is_required=True,
+        )
+
+        assert error.extension_type == "safety"
+        assert error.vertical_name == "test_vertical"
+        assert error.original_error is original
+        assert error.is_required is True
+        assert error.category == ErrorCategory.CONFIG_INVALID
+        assert error.severity == ErrorSeverity.CRITICAL  # Critical because is_required=True
+
+        # Check details dict
+        assert error.details["extension_type"] == "safety"
+        assert error.details["vertical_name"] == "test_vertical"
+        assert error.details["is_required"] is True
+        assert error.details["original_error_type"] == "RuntimeError"
+
+    def test_non_required_extension_error_has_warning_severity(self):
+        """Verify non-required extension errors have WARNING severity."""
+        from victor.core.errors import ExtensionLoadError, ErrorSeverity
+
+        error = ExtensionLoadError(
+            message="Test error",
+            extension_type="enrichment",
+            vertical_name="test_vertical",
+            original_error=RuntimeError("Test"),
+            is_required=False,
+        )
+
+        assert error.severity == ErrorSeverity.WARNING
+
+    def test_backward_compatibility_default_non_strict(self):
+        """Verify backward compatibility: default is non-strict mode."""
+        # ConcreteVertical should have default strict_extension_loading=False
+        assert ConcreteVertical.strict_extension_loading is False
+        assert ConcreteVertical.required_extensions == set()
+
+    def test_multiple_extension_failures_reports_first_critical(self):
+        """Verify that with multiple failures, the first critical one is raised."""
+        from victor.core.errors import ExtensionLoadError
+
+        class MultiFailVertical(VerticalBase):
+            """Vertical with multiple extension failures."""
+
+            name = "multi_fail"
+            description = "Multiple failures"
+            strict_extension_loading = True  # All failures are critical
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Multi fail"
+
+            @classmethod
+            def get_middleware(cls):
+                raise RuntimeError("Middleware failure")
+
+            @classmethod
+            def get_safety_extension(cls):
+                raise RuntimeError("Safety failure")
+
+        MultiFailVertical.clear_config_cache(clear_all=True)
+
+        with pytest.raises(ExtensionLoadError) as exc_info:
+            MultiFailVertical.get_extensions(use_cache=False)
+
+        # First extension in loading order should be the one raised
+        # (middleware is loaded before safety based on the order in get_extensions)
+        assert exc_info.value.extension_type == "middleware"
+
+
+class TestIntegrationResultExtensionErrors:
+    """Tests for IntegrationResult extension error tracking."""
+
+    def test_add_extension_error_creates_error_info(self):
+        """Verify add_extension_error creates proper ExtensionLoadErrorInfo."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        result.add_extension_error(
+            extension_type="safety",
+            vertical_name="test_vertical",
+            error_message="Test error",
+            is_required=False,
+            original_exception=RuntimeError("Original"),
+        )
+
+        assert len(result.extension_errors) == 1
+        error = result.extension_errors[0]
+        assert error.extension_type == "safety"
+        assert error.vertical_name == "test_vertical"
+        assert error.error_message == "Test error"
+        assert error.is_required is False
+        assert error.original_exception_type == "RuntimeError"
+
+    def test_required_extension_error_sets_failed_status(self):
+        """Verify required extension errors set validation_status to failed."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        assert result.validation_status == "success"
+
+        result.add_extension_error(
+            extension_type="safety",
+            vertical_name="test_vertical",
+            error_message="Critical failure",
+            is_required=True,
+        )
+
+        assert result.success is False
+        assert result.validation_status == "failed"
+
+    def test_non_required_extension_error_sets_partial_status(self):
+        """Verify non-required extension errors set validation_status to partial."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        assert result.validation_status == "success"
+
+        result.add_extension_error(
+            extension_type="enrichment",
+            vertical_name="test_vertical",
+            error_message="Non-critical failure",
+            is_required=False,
+        )
+
+        assert result.success is True  # Still success for non-required
+        assert result.validation_status == "partial"
+
+    def test_to_dict_includes_extension_errors(self):
+        """Verify to_dict includes extension_errors and validation_status."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        result.add_extension_error(
+            extension_type="safety",
+            vertical_name="test_vertical",
+            error_message="Test error",
+            is_required=False,
+        )
+
+        data = result.to_dict()
+
+        assert "validation_status" in data
+        assert data["validation_status"] == "partial"
+        assert "extension_errors" in data
+        assert len(data["extension_errors"]) == 1
+        assert data["extension_errors"][0]["extension_type"] == "safety"
+
+    def test_from_dict_restores_extension_errors(self):
+        """Verify from_dict properly restores extension_errors."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        original = IntegrationResult()
+        original.add_extension_error(
+            extension_type="middleware",
+            vertical_name="test_vertical",
+            error_message="Middleware error",
+            is_required=True,
+        )
+
+        data = original.to_dict()
+        restored = IntegrationResult.from_dict(data)
+
+        assert len(restored.extension_errors) == 1
+        assert restored.extension_errors[0].extension_type == "middleware"
+        assert restored.extension_errors[0].is_required is True
+        assert restored.validation_status == "failed"
+
+    def test_has_extension_errors_method(self):
+        """Verify has_extension_errors method works correctly."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        assert result.has_extension_errors() is False
+
+        result.add_extension_error(
+            extension_type="safety",
+            vertical_name="test",
+            error_message="Error",
+        )
+        assert result.has_extension_errors() is True
+
+    def test_get_required_extension_failures_method(self):
+        """Verify get_required_extension_failures filters correctly."""
+        from victor.framework.vertical_integration import IntegrationResult
+
+        result = IntegrationResult()
+        result.add_extension_error(
+            extension_type="safety",
+            vertical_name="test",
+            error_message="Required failure",
+            is_required=True,
+        )
+        result.add_extension_error(
+            extension_type="enrichment",
+            vertical_name="test",
+            error_message="Optional failure",
+            is_required=False,
+        )
+
+        required = result.get_required_extension_failures()
+        assert len(required) == 1
+        assert required[0].extension_type == "safety"

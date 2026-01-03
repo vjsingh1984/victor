@@ -81,6 +81,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Protocol,
     Set,
@@ -456,6 +457,41 @@ def register_extension_handler(
 
 
 @dataclass
+class ExtensionLoadErrorInfo:
+    """Information about an extension loading error.
+
+    Captures details about a failed extension load for reporting.
+
+    Attributes:
+        extension_type: Type of extension that failed
+        vertical_name: Name of the vertical
+        error_message: The error message
+        is_required: Whether this extension was required
+        original_exception_type: Type name of the original exception
+    """
+
+    extension_type: str
+    vertical_name: str
+    error_message: str
+    is_required: bool = False
+    original_exception_type: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "extension_type": self.extension_type,
+            "vertical_name": self.vertical_name,
+            "error_message": self.error_message,
+            "is_required": self.is_required,
+            "original_exception_type": self.original_exception_type,
+        }
+
+
+# Type alias for validation status
+ValidationStatus = Literal["success", "partial", "failed"]
+
+
+@dataclass
 class IntegrationResult:
     """Result from applying a vertical to an orchestrator.
 
@@ -475,6 +511,8 @@ class IntegrationResult:
         errors: List of errors encountered
         warnings: List of warnings
         info: List of informational messages
+        extension_errors: List of ExtensionLoadErrorInfo for extension loading failures
+        validation_status: Overall validation status - "success", "partial", or "failed"
     """
 
     success: bool = True
@@ -492,11 +530,14 @@ class IntegrationResult:
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     info: List[str] = field(default_factory=list)
+    extension_errors: List[ExtensionLoadErrorInfo] = field(default_factory=list)
+    validation_status: ValidationStatus = "success"
 
     def add_error(self, error: str) -> None:
         """Add an error."""
         self.errors.append(error)
         self.success = False
+        self._update_validation_status()
 
     def add_warning(self, warning: str) -> None:
         """Add a warning."""
@@ -505,6 +546,72 @@ class IntegrationResult:
     def add_info(self, message: str) -> None:
         """Add an informational message."""
         self.info.append(message)
+
+    def add_extension_error(
+        self,
+        extension_type: str,
+        vertical_name: str,
+        error_message: str,
+        is_required: bool = False,
+        original_exception: Optional[Exception] = None,
+    ) -> None:
+        """Add an extension loading error.
+
+        Args:
+            extension_type: Type of extension that failed
+            vertical_name: Name of the vertical
+            error_message: The error message
+            is_required: Whether this extension was required
+            original_exception: The original exception (optional)
+        """
+        error_info = ExtensionLoadErrorInfo(
+            extension_type=extension_type,
+            vertical_name=vertical_name,
+            error_message=error_message,
+            is_required=is_required,
+            original_exception_type=(
+                type(original_exception).__name__ if original_exception else None
+            ),
+        )
+        self.extension_errors.append(error_info)
+
+        # If required extension failed, mark as failed
+        if is_required:
+            self.success = False
+            self.validation_status = "failed"
+        else:
+            # Non-required failures result in partial status
+            self._update_validation_status()
+
+    def _update_validation_status(self) -> None:
+        """Update validation status based on current errors."""
+        if not self.success:
+            # Check if any required extension failed
+            required_failures = [e for e in self.extension_errors if e.is_required]
+            if required_failures or self.errors:
+                self.validation_status = "failed"
+            elif self.extension_errors or self.warnings:
+                self.validation_status = "partial"
+        elif self.extension_errors or self.warnings:
+            self.validation_status = "partial"
+        else:
+            self.validation_status = "success"
+
+    def has_extension_errors(self) -> bool:
+        """Check if there are any extension loading errors.
+
+        Returns:
+            True if there are extension errors
+        """
+        return len(self.extension_errors) > 0
+
+    def get_required_extension_failures(self) -> List[ExtensionLoadErrorInfo]:
+        """Get list of required extension failures.
+
+        Returns:
+            List of ExtensionLoadErrorInfo for required extension failures
+        """
+        return [e for e in self.extension_errors if e.is_required]
 
     def record_step_status(
         self,
@@ -551,13 +658,14 @@ class IntegrationResult:
         return self.step_status.get(step_name)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization (SRP: data → dict).
+        """Convert to dictionary for serialization (SRP: data -> dict).
 
         Returns:
             Dict representation suitable for JSON serialization
         """
         return {
             "success": self.success,
+            "validation_status": self.validation_status,
             "vertical_name": self.vertical_name,
             "tools_applied": list(self.tools_applied),
             "middleware_count": self.middleware_count,
@@ -571,6 +679,7 @@ class IntegrationResult:
             "errors": self.errors,
             "warnings": self.warnings,
             "info": self.info,
+            "extension_errors": [e.to_dict() for e in self.extension_errors],
         }
 
     def persist(self, base_path: Optional[Path] = None) -> Optional[Path]:
@@ -626,8 +735,22 @@ class IntegrationResult:
         Returns:
             IntegrationResult instance
         """
+        # Deserialize extension errors
+        extension_errors = []
+        for error_dict in data.get("extension_errors", []):
+            extension_errors.append(
+                ExtensionLoadErrorInfo(
+                    extension_type=error_dict.get("extension_type", "unknown"),
+                    vertical_name=error_dict.get("vertical_name", "unknown"),
+                    error_message=error_dict.get("error_message", ""),
+                    is_required=error_dict.get("is_required", False),
+                    original_exception_type=error_dict.get("original_exception_type"),
+                )
+            )
+
         return cls(
             success=data.get("success", True),
+            validation_status=data.get("validation_status", "success"),
             vertical_name=data.get("vertical_name"),
             tools_applied=set(data.get("tools_applied", [])),
             middleware_count=data.get("middleware_count", 0),
@@ -641,6 +764,7 @@ class IntegrationResult:
             errors=data.get("errors", []),
             warnings=data.get("warnings", []),
             info=data.get("info", []),
+            extension_errors=extension_errors,
         )
 
 
@@ -1863,6 +1987,8 @@ def apply_vertical(
 __all__ = [
     # Core classes
     "IntegrationResult",
+    "ExtensionLoadErrorInfo",
+    "ValidationStatus",
     "VerticalIntegrationPipeline",
     "OrchestratorVerticalProtocol",
     # Extension handler registry (OCP compliance)
