@@ -6695,8 +6695,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
 
+        Delegates to memory_manager.get_session_stats() when available.
+
         Returns:
-            Dictionary with session statistics
+            Dictionary with session statistics including:
+            - enabled: Whether memory manager is active
+            - session_id: Current session ID
+            - message_count: Number of messages
+            - total_tokens: Total token usage
+            - max_tokens: Maximum token budget
+            - available_tokens: Remaining token budget
+            - Other session metadata
         """
         if not self.memory_manager or not self._memory_session_id:
             return {
@@ -6706,27 +6715,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             }
 
         try:
-            session = self.memory_manager.get_session(self._memory_session_id)
-            if not session:
+            # Delegate to memory_manager.get_session_stats()
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)
+            if not stats:
                 return {
                     "enabled": True,
                     "session_id": self._memory_session_id,
                     "error": "Session not found",
                 }
 
-            total_tokens = sum(m.token_count for m in session.messages)
-            return {
-                "enabled": True,
-                "session_id": self._memory_session_id,
-                "message_count": len(session.messages),
-                "total_tokens": total_tokens,
-                "max_tokens": session.max_tokens,
-                "reserved_tokens": session.reserved_tokens,
-                "available_tokens": session.max_tokens - session.reserved_tokens - total_tokens,
-                "project_path": session.project_path,
-                "provider": session.provider,
-                "model": session.model,
-            }
+            # Add orchestrator-specific fields
+            stats["enabled"] = True
+            return stats
         except Exception as e:
             logger.warning(f"Failed to get session stats: {e}")
             return {"enabled": True, "session_id": self._memory_session_id, "error": str(e)}

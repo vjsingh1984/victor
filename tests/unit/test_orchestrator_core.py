@@ -3544,7 +3544,11 @@ class TestGetMemoryContext:
 
 
 class TestGetSessionStats:
-    """Tests for get_session_stats method."""
+    """Tests for get_session_stats method.
+
+    The orchestrator's get_session_stats() delegates to memory_manager.get_session_stats().
+    These tests verify the delegation pattern and error handling.
+    """
 
     def test_returns_disabled_when_no_memory_manager(self, orchestrator):
         """Test returns disabled stats when no memory manager."""
@@ -3562,9 +3566,10 @@ class TestGetSessionStats:
         assert result["message_count"] == 2
 
     def test_returns_error_when_session_not_found(self, orchestrator):
-        """Test returns error when session not found."""
+        """Test returns error when session not found (empty stats from memory_manager)."""
         mock_manager = MagicMock()
-        mock_manager.get_session.return_value = None
+        # Simulate get_session_stats returning empty dict when session not found
+        mock_manager.get_session_stats.return_value = {}
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
 
@@ -3575,37 +3580,39 @@ class TestGetSessionStats:
         assert "error" in result
 
     def test_returns_full_stats(self, orchestrator):
-        """Test returns full session stats."""
-        mock_msg1 = MagicMock()
-        mock_msg1.token_count = 100
-        mock_msg2 = MagicMock()
-        mock_msg2.token_count = 200
-
-        mock_session = MagicMock()
-        mock_session.messages = [mock_msg1, mock_msg2]
-        mock_session.max_tokens = 4000
-        mock_session.reserved_tokens = 500
-        mock_session.project_path = "/test"
-        mock_session.provider = "anthropic"
-        mock_session.model = "claude-3"
-
+        """Test returns full session stats via delegation to memory_manager."""
+        # Mock memory_manager.get_session_stats() to return the expected format
         mock_manager = MagicMock()
-        mock_manager.get_session.return_value = mock_session
+        mock_manager.get_session_stats.return_value = {
+            "session_id": "session-123",
+            "message_count": 2,
+            "total_tokens": 300,
+            "available_tokens": 3200,
+            "utilization": 0.075,
+            "role_distribution": {"user": 1, "assistant": 1},
+            "tool_usage_count": 0,
+            "created_at": "2024-01-01T12:00:00",
+            "last_activity": "2024-01-01T13:00:00",
+            "duration_seconds": 3600.0,
+        }
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
 
         result = orchestrator.get_session_stats()
 
+        # Verify delegation was called with session_id
+        mock_manager.get_session_stats.assert_called_once_with("session-123")
+
+        # Verify orchestrator adds enabled flag
         assert result["enabled"] is True
         assert result["message_count"] == 2
         assert result["total_tokens"] == 300
-        assert result["max_tokens"] == 4000
-        assert result["available_tokens"] == 3200  # 4000 - 500 - 300
+        assert result["available_tokens"] == 3200
 
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns error."""
         mock_manager = MagicMock()
-        mock_manager.get_session.side_effect = Exception("DB error")
+        mock_manager.get_session_stats.side_effect = Exception("DB error")
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
 
