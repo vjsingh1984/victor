@@ -4336,55 +4336,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return chunk
 
-    def _check_natural_completion_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        has_tool_calls: bool,
-        content_length: int,
-    ) -> Optional[StreamChunk]:
-        """Check for natural completion.
-
-        Creates RecoveryContext and delegates to recovery_coordinator.
-
-        Args:
-            stream_ctx: The streaming context
-            has_tool_calls: Whether there are tool calls
-            content_length: Length of current content
-
-        Returns:
-            StreamChunk if natural completion detected, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.check_natural_completion(
-            recovery_ctx, has_tool_calls, content_length
-        )
-
-    def _check_blocked_threshold_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        all_blocked: bool,
-    ) -> Optional[Tuple[StreamChunk, bool]]:
-        """Check blocked threshold using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viacheck_blocked_threshold() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            all_blocked: Whether all tool calls were blocked
-
-        Returns:
-            Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator (thresholds are read from settings internally)
-        return self._recovery_coordinator.check_blocked_threshold(recovery_ctx, all_blocked)
-
     async def _handle_recovery_with_integration(
         self,
         stream_ctx: StreamingChatContext,
@@ -4442,29 +4393,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._recovery_coordinator.apply_recovery_action(
             recovery_action, recovery_ctx, message_adder=self.add_message
         )
-
-    def _filter_blocked_tool_calls_with_handler(
-        self,
-        stream_ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
-    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
-        """Filter blocked tool calls using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viafilter_blocked_tool_calls() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-            tool_calls: List of tool calls to filter
-
-        Returns:
-            Tuple of (filtered_tool_calls, blocked_chunks, blocked_count)
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
 
     def _handle_force_tool_execution_with_handler(
         self,
@@ -4799,27 +4727,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Delegate to streaming handler (RecoveryCoordinator doesn't take attempt parameter)
         return self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
-
-    def _get_recovery_fallback_message_with_handler(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> str:
-        """Get recovery fallback message using the recovery coordinator.
-
-        Creates RecoveryContext and delegates to recovery_coordinator viaget_recovery_fallback_message() directly.
-
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            Fallback message string
-        """
-        # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.get_recovery_fallback_message(recovery_ctx)
 
     def _handle_loop_warning_with_handler(
         self,
@@ -5458,10 +5365,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         "Common with local models - tool syntax detected in response content."
                     )
             elif not tool_calls:
-                # No content and no tool calls - check for natural completion using handler
-                # Handler checks if substantial content was already provided
-                final_chunk = self._check_natural_completion_with_handler(
-                    stream_ctx, has_tool_calls=False, content_length=0
+                # No content and no tool calls - check for natural completion
+                # via recovery coordinator directly (checks if substantial content was provided)
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                final_chunk = self._recovery_coordinator.check_natural_completion(
+                    recovery_ctx, has_tool_calls=False, content_length=0
                 )
                 if final_chunk:
                     yield final_chunk
@@ -5623,8 +5531,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                     )
                 else:
-                    # All recovery attempts failed - get fallback message using handler (testable)
-                    fallback_msg = self._get_recovery_fallback_message_with_handler(stream_ctx)
+                    # All recovery attempts failed - get fallback message via recovery coordinator
+                    recovery_ctx = self._create_recovery_context(stream_ctx)
+                    fallback_msg = self._recovery_coordinator.get_recovery_fallback_message(
+                        recovery_ctx
+                    )
                     # Record outcome for Q-learning (fallback = partial failure)
                     self._record_intelligent_outcome(
                         success=False,
@@ -6163,10 +6074,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Truncate to remaining budget using handler delegation
                 tool_calls = self._truncate_tool_calls_with_handler(tool_calls or [], stream_ctx)
 
-                # Filter out tool calls that are blocked after loop warning
-                # Uses handler delegation for testable blocked tool filtering
+                # Filter out tool calls that are blocked via recovery coordinator
+                recovery_ctx = self._create_recovery_context(stream_ctx)
                 filtered_tool_calls, blocked_chunks, blocked_count = (
-                    self._filter_blocked_tool_calls_with_handler(stream_ctx, tool_calls)
+                    self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
                 )
                 for chunk in blocked_chunks:
                     yield chunk
@@ -6176,10 +6087,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tool_results = []
 
                 # Check if we should force completion due to excessive blocking
-                # Uses handler delegation for testable threshold checking
+                # via recovery coordinator directly
                 all_blocked = blocked_count > 0 and not filtered_tool_calls
-                threshold_result = self._check_blocked_threshold_with_handler(
-                    stream_ctx, all_blocked
+                recovery_ctx = self._create_recovery_context(stream_ctx)
+                threshold_result = self._recovery_coordinator.check_blocked_threshold(
+                    recovery_ctx, all_blocked
                 )
                 if threshold_result:
                     chunk, should_clear = threshold_result

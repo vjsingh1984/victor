@@ -5135,8 +5135,15 @@ class TestStreamingHandlerProperty:
         assert handler.settings is not None
 
 
+@pytest.mark.skip(
+    reason="Method _check_natural_completion_with_handler was inlined in TD-002 refactoring "
+    "(Jan 2026). Logic now calls _recovery_coordinator.check_natural_completion() directly."
+)
 class TestCheckNaturalCompletionWithHandler:
-    """Tests for _check_natural_completion_with_handler method."""
+    """Tests for _check_natural_completion_with_handler method.
+
+    DEPRECATED: Method was inlined to reduce wrapper overhead.
+    """
 
     def test_returns_none_with_tool_calls(self, orchestrator):
         """Returns None when there are tool calls."""
@@ -5242,8 +5249,15 @@ class TestHandleBlockedToolWithHandler:
         assert "⛔" in chunk.content
 
 
+@pytest.mark.skip(
+    reason="Method _check_blocked_threshold_with_handler was inlined in TD-002 refactoring "
+    "(Jan 2026). Logic now calls _recovery_coordinator.check_blocked_threshold() directly."
+)
 class TestCheckBlockedThresholdWithHandler:
-    """Tests for _check_blocked_threshold_with_handler method."""
+    """Tests for _check_blocked_threshold_with_handler method.
+
+    DEPRECATED: Method was inlined to reduce wrapper overhead.
+    """
 
     def test_returns_none_below_threshold(self, orchestrator):
         """Returns None when below thresholds."""
