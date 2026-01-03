@@ -216,3 +216,16 @@ docs/PROMOTION_SPECIFICATION.md
 
 # Root-level archive (internal docs moved during cleanup)
 /archive/
+
+# ML model files (prevent accidental commits of large binary models)
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+*.bin
+!scripts/*.bin
+*.pt
+*.pth
+models/
+**/sentence-transformers/
+**/bge-*/
