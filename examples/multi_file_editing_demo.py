@@ -123,8 +123,8 @@ def test_create_session():
         editor = FileEditor(backup_dir=str(tmpdir / "backups"))
         editor.start_transaction("Add password hashing to auth module")
 
-        # Read current content
-        auth_content = (tmpdir / "auth.py").read_text()
+        # Read current content (verify file exists)
+        _ = (tmpdir / "auth.py").read_text()
 
         # Modify it
         new_auth_content = """\"\"\"Authentication module with password hashing.\"\"\"
@@ -324,10 +324,10 @@ def test_hash_password():
 
         # Show transaction summary
         summary = editor.get_transaction_summary()
-        print(f"\n📊 Transaction Summary:")
+        print("\n📊 Transaction Summary:")
         print(f"   ID: {summary['id']}")
         print(f"   Total operations: {summary['operations']}")
-        print(f"   By type:")
+        print("   By type:")
         for op_type, count in summary["by_type"].items():
             if count > 0:
                 print(f"     - {op_type}: {count}")

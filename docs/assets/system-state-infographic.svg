@@ -63,7 +63,7 @@
   <!-- Tests Card -->
   <g transform="translate(500, 100)" filter="url(#shadow)">
     <rect width="200" height="130" rx="12" fill="url(#purpleGrad)"/>
-    <text x="100" y="50" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700">15.5K</text>
+    <text x="100" y="50" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700">16K+</text>
     <text x="100" y="80" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="600">Tests</text>
     <line x1="30" y1="95" x2="170" y2="95" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
     <text x="100" y="115" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Unit + Integration</text>
@@ -72,7 +72,7 @@
   <!-- Code Lines Card -->
   <g transform="translate(725, 100)" filter="url(#shadow)">
     <rect width="200" height="130" rx="12" fill="url(#amberGrad)"/>
-    <text x="100" y="50" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700">150K+</text>
+    <text x="100" y="50" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700">280K+</text>
     <text x="100" y="80" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="600">Lines of Code</text>
     <line x1="30" y1="95" x2="170" y2="95" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
     <text x="100" y="115" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Python + TypeScript + Rust</text>
@@ -195,6 +195,6 @@
 
   <!-- Footer -->
   <text x="500" y="685" text-anchor="middle" fill="#64748b" font-size="11">
-    Generated from codebase analysis | See docs/CODEBASE_REVIEW_REPORT.md for details
+    Generated from codebase analysis | See docs/ARCHITECTURE_ROADMAP.md for details
   </text>
 </svg>

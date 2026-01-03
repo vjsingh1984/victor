@@ -72,11 +72,11 @@ async def main():
     await agent.reset()
 
     response1 = await agent.run("I'm building a REST API. Should I use FastAPI or Flask?")
-    print(f"User: I'm building a REST API. Should I use FastAPI or Flask?")
+    print("User: I'm building a REST API. Should I use FastAPI or Flask?")
     print(f"Claude: {response1.content[:200]}...")
 
     response2 = await agent.run("Why is async important for this choice?")
-    print(f"\nUser: Why is async important for this choice?")
+    print("\nUser: Why is async important for this choice?")
     print(f"Claude: {response2.content[:200]}...")
 
     # Clean up

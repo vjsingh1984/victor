@@ -5,7 +5,7 @@ This directory contains a complete example of how to create an external Victor v
 ## What is a Victor Vertical?
 
 A vertical is a domain-specific configuration for Victor that provides:
-- **Tools**: Which tools are available for the domain (read, write, bash, etc.)
+- **Tools**: Which tools are available for the domain (read, write, shell, etc.)
 - **System Prompt**: Expert persona and domain guidance
 - **Stages**: Workflow stages for the domain (e.g., reconnaissance, analysis, reporting)
 - **Safety Patterns**: Domain-specific dangerous operation detection
@@ -155,7 +155,7 @@ class MyAssistant(VerticalBase):
     @classmethod
     def get_tools(cls) -> List[str]:
         """Required: Return list of tool names."""
-        return ["read", "write", "grep", "bash"]
+        return ["read", "write", "code_search", "shell"]
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -224,7 +224,7 @@ class MyPromptContributor(PromptContributorProtocol):
                 task_type="my_task",
                 hint="[MY TASK] Do this, then that...",
                 tool_budget=10,
-                priority_tools=["read", "grep"],
+                priority_tools=["read", "code_search"],
             ),
         }
 ```
@@ -239,8 +239,8 @@ from victor.core.verticals.protocols import TieredToolConfig
 @classmethod
 def get_tiered_tool_config(cls) -> TieredToolConfig:
     return TieredToolConfig(
-        mandatory={"read", "ls", "grep"},      # Always available
-        vertical_core={"my_tool", "bash"},     # Core for this vertical
+        mandatory={"read", "ls", "code_search"},      # Always available
+        vertical_core={"my_tool", "shell"},           # Core for this vertical
         readonly_only_for_analysis=True,       # Hide write tools during analysis
     )
 ```

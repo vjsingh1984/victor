@@ -535,9 +535,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             except ImportError as embed_err:
                 logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
             except (OSError, IOError) as embed_err:
-                logger.warning(f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}")
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
+                )
             except (ValueError, TypeError) as embed_err:
-                logger.warning(f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}")
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}"
+                )
 
         # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
         self.conversation_state = self._factory.create_conversation_state_machine()
@@ -3303,7 +3307,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Copy mcp_registry reference for backwards compatibility
             self.mcp_registry = getattr(self.tool_registrar, "mcp_registry", None)
             if mcp_tools_count > 0:
-                logger.debug(f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar")
+                logger.debug(
+                    f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar"
+                )
 
     def _initialize_plugins(self) -> None:
         """Initialize and load tool plugins from configured directories.
@@ -3645,19 +3651,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         chunk = StreamChunk(content=sanitized)
             except (ProviderRateLimitError, ProviderTimeoutError) as e:
                 logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(
-                    content="Rate limited or timeout. Please retry in a moment.\n"
-                )
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
             except ProviderAuthError as e:
                 logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(
-                    content="Authentication error. Check API credentials.\n"
-                )
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
             except (ConnectionError, TimeoutError) as e:
                 logger.error(f"Network error during final response: {e}")
-                chunk = StreamChunk(
-                    content="Network error. Check connection.\n"
-                )
+                chunk = StreamChunk(content="Network error. Check connection.\n")
             except Exception:
                 logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
@@ -4979,7 +4979,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 # Track empty responses - delegates to recovery coordinator
                 recovery_ctx = self._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = self._recovery_coordinator.handle_empty_response(recovery_ctx)
+                recovery_chunk, should_force = self._recovery_coordinator.handle_empty_response(
+                    recovery_ctx
+                )
                 if recovery_chunk:
                     yield recovery_chunk
                     # CRITICAL: Handler already set stream_ctx.force_completion if needed
@@ -5582,7 +5584,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                 # Warn when approaching budget limit via recovery coordinator
                 recovery_ctx = self._create_recovery_context(stream_ctx)
-                warning_threshold = getattr(self.settings, "tool_call_budget_warning_threshold", 250)
+                warning_threshold = getattr(
+                    self.settings, "tool_call_budget_warning_threshold", 250
+                )
                 budget_warning = self._recovery_coordinator.check_tool_budget(
                     recovery_ctx, warning_threshold
                 )
@@ -5855,9 +5859,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     )
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(
-                        f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}"
-                    )
+                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
                     return None, False, last_error
             except Exception as e:
                 # Unknown errors - log and retry with caution

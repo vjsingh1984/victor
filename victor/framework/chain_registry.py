@@ -696,6 +696,7 @@ def chain(
         registry = get_chain_registry()
         my_chain = registry.create("read_analyze", vertical="coding")
     """
+
     def decorator(func: F) -> F:
         # Parse vertical from name if present
         vertical = None

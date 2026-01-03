@@ -115,8 +115,8 @@ class MyClass:
     print("\n3️⃣ Complexity review...")
     result = await code_review(path=test_file, aspects=["complexity"])
     if result["success"]:
-        complexity_result = result.get("results", {}).get("complexity", {})
-        print(f"Complexity analysis complete")
+        _ = result.get("results", {}).get("complexity", {})
+        print("Complexity analysis complete")
         print(f"  Total issues: {result.get('total_issues', 0)}")
 
     # Cleanup

@@ -587,7 +587,9 @@ class ConversationManager:
             List of matching messages with similarity scores
         """
         if not self._embedding_store:
-            logger.warning("Embedding store not initialized. Call initialize_embedding_store() first.")
+            logger.warning(
+                "Embedding store not initialized. Call initialize_embedding_store() first."
+            )
             return []
 
         try:
@@ -602,12 +604,14 @@ class ConversationManager:
             if self._store:
                 enriched = []
                 for result in results:
-                    enriched.append({
-                        "message_id": result.message_id,
-                        "session_id": result.session_id,
-                        "similarity": result.similarity,
-                        "timestamp": result.timestamp.isoformat() if result.timestamp else None,
-                    })
+                    enriched.append(
+                        {
+                            "message_id": result.message_id,
+                            "session_id": result.session_id,
+                            "similarity": result.similarity,
+                            "timestamp": result.timestamp.isoformat() if result.timestamp else None,
+                        }
+                    )
                 return enriched
 
             return [

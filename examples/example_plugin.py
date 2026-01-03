@@ -350,7 +350,7 @@ async def demo_plugin_usage():
 
     # Execute weather tool
     weather_result = await registry.execute("get_weather", context, city="London", units="celsius")
-    print(f"\nWeather for London:")
+    print("\nWeather for London:")
     print(f"  Success: {weather_result.success}")
     if weather_result.success:
         for key, value in weather_result.output.items():
@@ -360,7 +360,7 @@ async def demo_plugin_usage():
     temp_result = await registry.execute(
         "convert_temperature", context, value=100, from_unit="celsius", to_unit="fahrenheit"
     )
-    print(f"\nTemperature Conversion:")
+    print("\nTemperature Conversion:")
     print(f"  Success: {temp_result.success}")
     if temp_result.success:
         print(f"  {temp_result.output['original']} = {temp_result.output['converted']}")

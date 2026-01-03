@@ -63,8 +63,8 @@
     <rect x="230" y="135" width="140" height="30" rx="6" fill="rgba(255,255,255,0.15)"/>
     <text x="300" y="155" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">VS Code Ext</text>
 
-    <rect x="390" y="135" width="140" height="30" rx="6" fill="rgba(255,255,255,0.15)"/>
-    <text x="460" y="155" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">JetBrains</text>
+    <rect x="390" y="135" width="140" height="30" rx="6" fill="rgba(255,255,255,0.1)"/>
+    <text x="460" y="155" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500" opacity="0.6">JetBrains (Planned)</text>
 
     <rect x="550" y="135" width="140" height="30" rx="6" fill="rgba(255,255,255,0.15)"/>
     <text x="620" y="155" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="500">MCP Clients</text>

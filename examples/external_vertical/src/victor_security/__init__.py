@@ -61,8 +61,8 @@ Package Structure:
 """
 
 from victor_security.assistant import SecurityAssistant
-from victor_security.safety import SecuritySafetyExtension
 from victor_security.prompts import SecurityPromptContributor
+from victor_security.safety import SecuritySafetyExtension
 
 __version__ = "0.1.0"
 

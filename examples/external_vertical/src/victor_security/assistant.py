@@ -30,7 +30,7 @@ Key Implementation Points:
    - get_evaluation_criteria(): Performance evaluation criteria
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import (
@@ -75,13 +75,13 @@ class SecurityAssistant(VerticalBase):
     version = "0.1.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tools for security tasks.
 
         Returns tools suitable for security analysis:
         - read: Read source code for security review
-        - grep: Search for security patterns (API keys, passwords, vulnerabilities)
-        - bash: Run security scanning tools (trivy, bandit, snyk, etc.)
+        - code_search: Search for security patterns (API keys, passwords, vulnerabilities)
+        - shell: Run security scanning tools (trivy, bandit, snyk, etc.)
         - ls: Navigate project structure
         - overview: Understand codebase architecture
 
@@ -97,13 +97,11 @@ class SecurityAssistant(VerticalBase):
         return [
             # Core reading tools - essential for code review
             "read",  # Read source files
-            "grep",  # Search for patterns (secrets, vulnerabilities)
+            "code_search",  # Search for patterns (secrets, vulnerabilities)
             "ls",  # Navigate directory structure
             "overview",  # Understand codebase architecture
-            # Code search for finding security issues
-            "code_search",  # Semantic code search
             # Shell for running security scanners
-            "bash",  # Run security tools (bandit, trivy, snyk, etc.)
+            "shell",  # Run security tools (bandit, trivy, snyk, etc.)
             # Optional write tools for generating reports
             "write",  # Write security reports
         ]
@@ -118,7 +116,8 @@ class SecurityAssistant(VerticalBase):
         Returns:
             System prompt text with security domain expertise.
         """
-        return """You are a security expert specialized in code security analysis, vulnerability detection, and security best practices.
+        return """You are a security expert specialized in code security analysis, \
+vulnerability detection, and security best practices.
 
 ## Your Primary Role
 
@@ -126,10 +125,11 @@ You are designed for SECURITY ANALYSIS. Your job is to:
 - Review code for security vulnerabilities (OWASP Top 10, CWE, etc.)
 - Identify hardcoded secrets, API keys, and credentials
 - Analyze dependencies for known vulnerabilities
-- Assess configuration security (Docker, Kubernetes, cloud configs)
+- Assess configuration security (Docker, Kubernetes, cloud)
 - Provide actionable remediation guidance
 
-IMPORTANT: You focus on security issues, not general code quality. When asked about code, prioritize security concerns over style or performance.
+IMPORTANT: You focus on security issues, not general code quality.
+Prioritize security concerns over style or performance.
 
 ## Security Analysis Process
 
@@ -156,10 +156,9 @@ IMPORTANT: You focus on security issues, not general code quality. When asked ab
 ## Available Tools
 
 - **read**: Read source code for security review
-- **grep**: Search for security patterns (passwords, API keys, SQL queries)
-- **bash**: Run security scanners (bandit, trivy, snyk, semgrep, etc.)
+- **code_search**: Search for security patterns (passwords, API keys)
+- **shell**: Run security scanners (bandit, trivy, snyk, etc.)
 - **ls/overview**: Understand project structure and architecture
-- **code_search**: Semantic search for security-related code patterns
 - **write**: Generate security reports
 
 ## Output Format
@@ -175,7 +174,7 @@ When reporting vulnerabilities:
 
 ## Security Scanning Commands
 
-Common security tools you can invoke via bash:
+Common security tools you can invoke via shell:
 - `bandit -r .` - Python security linter
 - `trivy fs .` - Vulnerability scanner for dependencies and containers
 - `semgrep --config=auto .` - Multi-language static analysis
@@ -201,7 +200,7 @@ Common security tools you can invoke via bash:
 """
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get security-specific stage definitions.
 
         Security analysis follows a structured workflow:
@@ -269,15 +268,15 @@ Common security tools you can invoke via bash:
         }
 
     @classmethod
-    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
+    def get_tiered_tool_config(cls) -> TieredToolConfig | None:
         """Get tiered tool configuration for security analysis.
 
         Security analysis prioritizes read operations and specialized
         scanning tools, with limited write access (reports only).
 
         Tiers:
-        - mandatory: Essential tools always available (read, ls, grep)
-        - vertical_core: Security-specific core tools (bash for scanners, code_search)
+        - mandatory: Essential tools always available (read, ls, code_search)
+        - vertical_core: Security-specific core tools (shell for scanners, code_search)
         - semantic_pool: Additional tools selected based on task context
 
         Returns:
@@ -288,11 +287,11 @@ Common security tools you can invoke via bash:
             mandatory={
                 "read",  # Read source files - essential
                 "ls",  # List directory - essential
-                "grep",  # Pattern search - essential for security scanning
+                "code_search",  # Pattern search - essential for security scanning
             },
             # Tier 2: Vertical Core - essential for security tasks
             vertical_core={
-                "bash",  # Run security scanners (bandit, trivy, etc.)
+                "shell",  # Run security scanners (bandit, trivy, etc.)
                 "code_search",  # Semantic search for security patterns
                 "overview",  # Understand codebase architecture
             },
@@ -302,7 +301,7 @@ Common security tools you can invoke via bash:
         )
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
+    def get_provider_hints(cls) -> dict[str, Any]:
         """Get security-specific provider hints.
 
         Security analysis benefits from:
@@ -321,7 +320,7 @@ Common security tools you can invoke via bash:
         }
 
     @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
+    def get_evaluation_criteria(cls) -> list[str]:
         """Get security-specific evaluation criteria.
 
         Criteria for evaluating the quality of security analysis:
@@ -348,7 +347,7 @@ Common security tools you can invoke via bash:
     # =========================================================================
 
     @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
+    def get_safety_extension(cls) -> SafetyExtensionProtocol | None:
         """Get safety extension for security operations.
 
         Security analysis can involve running powerful scanning tools
@@ -363,7 +362,7 @@ Common security tools you can invoke via bash:
         return SecuritySafetyExtension()
 
     @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
+    def get_prompt_contributor(cls) -> PromptContributorProtocol | None:
         """Get prompt contributor for security task hints.
 
         Provides security-specific task type hints for different
@@ -377,7 +376,7 @@ Common security tools you can invoke via bash:
         return SecurityPromptContributor()
 
     @classmethod
-    def get_mode_config(cls) -> Dict[str, Any]:
+    def get_mode_config(cls) -> dict[str, Any]:
         """Get security-specific mode configurations.
 
         Modes for different security analysis scenarios:
@@ -413,7 +412,7 @@ Common security tools you can invoke via bash:
         }
 
     @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
+    def get_task_type_hints(cls) -> dict[str, Any]:
         """Get security-specific task type hints.
 
         Task hints help the agent understand how to approach
@@ -425,26 +424,26 @@ Common security tools you can invoke via bash:
         return {
             "vulnerability_scan": {
                 "task_type": "vulnerability_scan",
-                "hint": "[SECURITY SCAN] Run automated scans, then manual review. Focus on exploitability.",
+                "hint": "[SECURITY SCAN] Run automated scans, manual review.",
                 "tool_budget": 25,
-                "priority_tools": ["bash", "grep", "read"],
+                "priority_tools": ["shell", "code_search", "read"],
             },
             "secret_detection": {
                 "task_type": "secret_detection",
-                "hint": "[SECRET SCAN] Search for API keys, passwords, tokens. Check git history.",
+                "hint": "[SECRET SCAN] Search for API keys, passwords, tokens.",
                 "tool_budget": 15,
-                "priority_tools": ["grep", "bash", "read"],
+                "priority_tools": ["code_search", "shell", "read"],
             },
             "dependency_audit": {
                 "task_type": "dependency_audit",
-                "hint": "[DEPENDENCY AUDIT] Check package manifests for CVEs. Prioritize by severity.",
+                "hint": "[DEPENDENCY AUDIT] Check package manifests for CVEs.",
                 "tool_budget": 20,
-                "priority_tools": ["bash", "read", "grep"],
+                "priority_tools": ["shell", "read", "code_search"],
             },
             "code_review": {
                 "task_type": "code_review",
-                "hint": "[CODE REVIEW] Manual security review. Focus on auth, input validation, crypto.",
+                "hint": "[CODE REVIEW] Manual security review. Focus on auth.",
                 "tool_budget": 30,
-                "priority_tools": ["read", "grep", "code_search"],
+                "priority_tools": ["read", "code_search", "overview"],
             },
         }

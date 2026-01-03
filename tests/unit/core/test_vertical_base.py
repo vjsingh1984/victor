@@ -283,7 +283,15 @@ class TestDefaultStageDefinitions:
     def test_required_stages_present(self):
         """Verify all required stages are defined."""
         stages = ConcreteVertical.get_stages()
-        required = {"INITIAL", "PLANNING", "READING", "ANALYSIS", "EXECUTION", "VERIFICATION", "COMPLETION"}
+        required = {
+            "INITIAL",
+            "PLANNING",
+            "READING",
+            "ANALYSIS",
+            "EXECUTION",
+            "VERIFICATION",
+            "COMPLETION",
+        }
         assert set(stages.keys()) == required
 
     def test_stages_have_comprehensive_keywords(self):
@@ -292,7 +300,9 @@ class TestDefaultStageDefinitions:
 
         # Each stage should have at least 8 keywords
         for stage_name, stage in stages.items():
-            assert len(stage.keywords) >= 8, f"{stage_name} has too few keywords: {len(stage.keywords)}"
+            assert (
+                len(stage.keywords) >= 8
+            ), f"{stage_name} has too few keywords: {len(stage.keywords)}"
 
     def test_stages_have_valid_transitions(self):
         """Verify stage transitions form valid workflow graph."""

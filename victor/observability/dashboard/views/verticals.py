@@ -81,9 +81,7 @@ class VerticalTraceWidget(RichLog):
         color = action_colors.get(action_key, "white")
 
         # Main trace line
-        self.write(
-            f"[dim]{timestamp}[/] [magenta]{vertical_name}[/] [{color}]{action}[/]"
-        )
+        self.write(f"[dim]{timestamp}[/] [magenta]{vertical_name}[/] [{color}]{action}[/]")
 
         # Show configuration details
         if "config" in data:
@@ -220,9 +218,7 @@ class IntegrationResultWidget(Container):
                         continue
 
             # Update display
-            status.update(
-                f"[green]Loaded {len(self._results)} results from {path.name}[/]"
-            )
+            status.update(f"[green]Loaded {len(self._results)} results from {path.name}[/]")
 
             table.clear()
             for result in self._results[-100:]:  # Show last 100

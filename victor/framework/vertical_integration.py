@@ -1015,9 +1015,7 @@ class VerticalIntegrationPipeline:
             # Try tiered tool configuration first (preferred approach)
             tiered_config = self._get_tiered_config(vertical)
             if tiered_config:
-                self._apply_tiered_tools(
-                    orchestrator, vertical, tiered_config, context, result
-                )
+                self._apply_tiered_tools(orchestrator, vertical, tiered_config, context, result)
                 return
 
             # Fall back to legacy tool list
@@ -1067,8 +1065,7 @@ class VerticalIntegrationPipeline:
             config = vertical.get_tiered_tools()
             if config is not None:
                 logger.debug(
-                    "Using deprecated get_tiered_tools(); "
-                    "migrate to get_tiered_tool_config()"
+                    "Using deprecated get_tiered_tools(); " "migrate to get_tiered_tool_config()"
                 )
                 return config
 

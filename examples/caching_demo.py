@@ -24,7 +24,8 @@ Usage:
 
 import asyncio
 import time
-from victor.cache.manager import CacheManager, ResponseCache, EmbeddingCache
+from victor.cache.manager import CacheManager
+from victor.storage.cache.tiered_cache import ResponseCache, EmbeddingCache
 from victor.cache.config import CacheConfig
 
 
@@ -249,19 +250,19 @@ def demo_cache_stats():
     print("\n2️⃣ Cache statistics...")
     stats = cache.get_stats()
 
-    print(f"\nMemory Cache:")
+    print("\nMemory Cache:")
     print(f"  Hits: {stats['memory_hits']}")
     print(f"  Misses: {stats['memory_misses']}")
     print(f"  Hit Rate: {stats['memory_hit_rate']:.2%}")
     print(f"  Current Size: {stats.get('memory_size', 0)}/{stats.get('memory_max_size', 0)}")
 
-    print(f"\nDisk Cache:")
+    print("\nDisk Cache:")
     print(f"  Hits: {stats['disk_hits']}")
     print(f"  Misses: {stats['disk_misses']}")
     print(f"  Hit Rate: {stats['disk_hit_rate']:.2%}")
     print(f"  Entries: {stats.get('disk_size', 0)}")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Total Sets: {stats['sets']}")
     print(f"  Total Requests: {stats['memory_hits'] + stats['memory_misses']}")
 

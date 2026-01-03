@@ -875,7 +875,9 @@ def get_service_key(service: str) -> Optional[str]:
 
     # Check if it's a known service
     if service not in SERVICE_ENV_VARS:
-        logger.warning(f"Unknown service: {service}. Known services: {list(SERVICE_ENV_VARS.keys())}")
+        logger.warning(
+            f"Unknown service: {service}. Known services: {list(SERVICE_ENV_VARS.keys())}"
+        )
         return None
 
     global _manager

@@ -306,8 +306,14 @@ class TestChainFactoryPatterns:
         @chain("testing:router", description="Language router")
         def router_factory():
             return RunnableBranch(
-                (lambda x: x.get("lang") == "python", RunnableLambda(lambda x: {"linter": "pylint"})),
-                (lambda x: x.get("lang") == "javascript", RunnableLambda(lambda x: {"linter": "eslint"})),
+                (
+                    lambda x: x.get("lang") == "python",
+                    RunnableLambda(lambda x: {"linter": "pylint"}),
+                ),
+                (
+                    lambda x: x.get("lang") == "javascript",
+                    RunnableLambda(lambda x: {"linter": "eslint"}),
+                ),
                 default=RunnableLambda(lambda x: {"linter": "generic"}),
             )
 
@@ -385,7 +391,7 @@ class TestYAMLWorkflowChainReferences:
         assert handler.startswith(CHAIN_HANDLER_PREFIX)
 
         # Extract chain name from handler
-        chain_name = handler[len(CHAIN_HANDLER_PREFIX):]
+        chain_name = handler[len(CHAIN_HANDLER_PREFIX) :]
         assert chain_name == "coding:analyze_imports"
 
         # Verify the chain can be created
@@ -399,20 +405,17 @@ class TestYAMLWorkflowChainReferences:
     @pytest.mark.asyncio
     async def test_chain_registry_integration_for_workflow_handler(self):
         """Chain registry correctly resolves chains for workflow handlers."""
+
         # Register chains that would be referenced from YAML workflows
         @chain("dataanalysis:preprocess")
         def preprocess_factory():
-            return RunnableLambda(lambda x: {
-                "preprocessed": True,
-                "rows": len(x.get("data", []))
-            })
+            return RunnableLambda(lambda x: {"preprocessed": True, "rows": len(x.get("data", []))})
 
         @chain("dataanalysis:analyze")
         def analyze_factory():
-            return RunnableLambda(lambda x: {
-                "analyzed": True,
-                "result": f"Analyzed {x.get('rows', 0)} rows"
-            })
+            return RunnableLambda(
+                lambda x: {"analyzed": True, "result": f"Analyzed {x.get('rows', 0)} rows"}
+            )
 
         # Simulate what the workflow executor does when resolving chain handlers
         registry = get_chain_registry()
@@ -448,27 +451,29 @@ class TestYAMLWorkflowChainReferences:
     @pytest.mark.asyncio
     async def test_workflow_style_chain_composition(self):
         """Chains can be composed in workflow-like patterns."""
+
         # Register chains that simulate a workflow pipeline
         @chain("research:gather")
         def gather_factory():
-            return RunnableLambda(lambda x: {
-                **x,
-                "sources": ["source1", "source2", "source3"]
-            })
+            return RunnableLambda(lambda x: {**x, "sources": ["source1", "source2", "source3"]})
 
         @chain("research:filter")
         def filter_factory():
-            return RunnableLambda(lambda x: {
-                **x,
-                "filtered_sources": [s for s in x.get("sources", []) if "1" in s or "2" in s]
-            })
+            return RunnableLambda(
+                lambda x: {
+                    **x,
+                    "filtered_sources": [s for s in x.get("sources", []) if "1" in s or "2" in s],
+                }
+            )
 
         @chain("research:summarize")
         def summarize_factory():
-            return RunnableLambda(lambda x: {
-                "summary": f"Found {len(x.get('filtered_sources', []))} relevant sources",
-                "sources": x.get("filtered_sources", [])
-            })
+            return RunnableLambda(
+                lambda x: {
+                    "summary": f"Found {len(x.get('filtered_sources', []))} relevant sources",
+                    "sources": x.get("filtered_sources", []),
+                }
+            )
 
         # Create a workflow-like chain by composing registered chains
         gather = create_chain("research:gather")
@@ -930,8 +935,7 @@ class TestConcurrentChainAccess:
 
         # Register from multiple threads
         threads = [
-            threading.Thread(target=register_chains, args=(f"thread{t}", 20))
-            for t in range(3)
+            threading.Thread(target=register_chains, args=(f"thread{t}", 20)) for t in range(3)
         ]
 
         for t in threads:
@@ -944,8 +948,7 @@ class TestConcurrentChainAccess:
         # Should have registered 60 chains
         registry = get_chain_registry()
         concurrent_factories = [
-            name for name in registry.list_factories()
-            if name.startswith("concurrent:")
+            name for name in registry.list_factories() if name.startswith("concurrent:")
         ]
         assert len(concurrent_factories) == 60
 
@@ -967,6 +970,7 @@ class TestChainErrorHandling:
         def failing_chain():
             def fail(x):
                 raise ValueError("Intentional failure")
+
             return RunnableLambda(fail)
 
         runnable = create_chain("errors:failing")
@@ -1024,6 +1028,7 @@ class TestChainBindingAndConfiguration:
                     "result": x.get("value", 0) * x.get("multiplier", 1),
                     "offset": x.get("offset", 0),
                 }
+
             return RunnableLambda(process)
 
         runnable = create_chain("binding:configurable")

@@ -101,7 +101,7 @@ async def example_pipeline_ensemble():
         context={"project": "victor", "language": "python"},
     )
 
-    print(f"\nExecution result:")
+    print("\nExecution result:")
     print(f"  Status: {result.status.value}")
     print(f"  Agents completed: {len(result.agent_results)}")
     for ar in result.agent_results:
@@ -132,7 +132,7 @@ async def example_parallel_ensemble():
 
     result = await parallel.execute("Analyze the authentication module")
 
-    print(f"Parallel execution completed:")
+    print("Parallel execution completed:")
     print(f"  Status: {result.status.value}")
     print(f"  Results: {result.final_output}")
 
@@ -255,7 +255,7 @@ async def example_entity_graph():
 
     # Get statistics
     stats = await graph.get_stats()
-    print(f"\nGraph stats:")
+    print("\nGraph stats:")
     print(f"  Entities: {stats.entity_count}")
     print(f"  Relations: {stats.relation_count}")
 

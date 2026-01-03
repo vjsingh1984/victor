@@ -1167,11 +1167,9 @@ class WorkflowExecutor:
             if node.handler:
                 # Check if this is a chain reference (e.g., "chain:coding:analyze")
                 if node.handler.startswith(CHAIN_HANDLER_PREFIX):
-                    chain_name = node.handler[len(CHAIN_HANDLER_PREFIX):]
+                    chain_name = node.handler[len(CHAIN_HANDLER_PREFIX) :]
                     logger.debug(f"Executing chain '{chain_name}' for node {node.id}")
-                    return await self._execute_chain_handler(
-                        node, context, chain_name, start_time
-                    )
+                    return await self._execute_chain_handler(node, context, chain_name, start_time)
 
                 handler = get_compute_handler(node.handler)
                 if handler:
@@ -1448,9 +1446,7 @@ class WorkflowExecutor:
                     result = await chain_obj(**input_params)
                 else:
                     loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(
-                        None, lambda: chain_obj(**input_params)
-                    )
+                    result = await loop.run_in_executor(None, lambda: chain_obj(**input_params))
             else:
                 # Chain is not callable - treat as static data
                 result = chain_obj

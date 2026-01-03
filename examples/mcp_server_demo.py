@@ -62,7 +62,7 @@ async def demo_server():
     server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
 
     print(f"✓ Server created: {server.name} v{server.version}")
-    print(f"  Capabilities:")
+    print("  Capabilities:")
     print(f"    - Tools: {server.info.capabilities.tools}")
     print(f"    - Resources: {server.info.capabilities.resources}")
 

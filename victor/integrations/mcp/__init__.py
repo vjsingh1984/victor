@@ -28,7 +28,7 @@ Components:
 from victor.integrations.mcp.client import MCPClient
 from victor.integrations.mcp.protocol import MCPMessage, MCPResource, MCPTool
 from victor.integrations.mcp.registry import MCPRegistry, MCPServerConfig, ServerStatus
-from victor.integrations.mcp.server import MCPServer
+from victor.integrations.mcp.server import MCPServer, create_mcp_server_from_orchestrator
 
 __all__ = [
     "MCPServer",
@@ -39,4 +39,5 @@ __all__ = [
     "MCPMessage",
     "MCPTool",
     "MCPResource",
+    "create_mcp_server_from_orchestrator",
 ]

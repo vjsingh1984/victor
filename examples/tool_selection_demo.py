@@ -36,7 +36,7 @@ async def main():
     print("🔧 Initializing tool registry...")
     registry = ToolRegistry()
 
-    # Register core tools (filesystem, bash, git, etc.)
+    # Register core tools (filesystem, shell, git, etc.)
     from victor.tools.filesystem import read, write, ls
     from victor.tools.bash import shell_readonly
     from victor.tools.git_tool import git
@@ -117,12 +117,12 @@ async def main():
     print("📊 Performance Characteristics")
     print("=" * 60)
     print()
-    print(f"  Model: all-MiniLM-L12-v2")
-    print(f"  Dimension: 384")
-    print(f"  Memory footprint: ~120MB")
-    print(f"  Embedding generation: ~8ms per query")
-    print(f"  Tool selection: Sub-second for 31 tools")
-    print(f"  Cache: Embeddings cached to disk")
+    print("  Model: all-MiniLM-L12-v2")
+    print("  Dimension: 384")
+    print("  Memory footprint: ~120MB")
+    print("  Embedding generation: ~8ms per query")
+    print("  Tool selection: Sub-second for 31 tools")
+    print("  Cache: Embeddings cached to disk")
     print()
 
     print("=" * 60)

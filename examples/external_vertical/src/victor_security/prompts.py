@@ -26,14 +26,12 @@ These contributions help the AI understand how to approach security-specific tas
 while maintaining consistency with the Victor framework.
 """
 
-from typing import Dict, Optional
 
-from victor.core.verticals.protocols import PromptContributorProtocol
 from victor.core.vertical_types import TaskTypeHint
-
+from victor.core.verticals.protocols import PromptContributorProtocol
 
 # Security-specific task type hints
-SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+SECURITY_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     "vulnerability_scan": TaskTypeHint(
         task_type="vulnerability_scan",
         hint="""[SECURITY SCAN] Comprehensive vulnerability assessment:
@@ -43,18 +41,18 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 4. Check OWASP Top 10 vulnerability categories
 5. Document findings with severity ratings and remediation steps""",
         tool_budget=25,
-        priority_tools=["bash", "grep", "read", "code_search"],
+        priority_tools=["shell", "code_search", "read"],
     ),
     "secret_detection": TaskTypeHint(
         task_type="secret_detection",
         hint="""[SECRET DETECTION] Find exposed credentials and secrets:
-1. Use grep patterns for common secret formats (API keys, passwords, tokens)
+1. Use code_search patterns for common secret formats (API keys, passwords, tokens)
 2. Run gitleaks or similar tool for comprehensive detection
 3. Check .env files, config files, and package manifests
 4. Review git history for accidentally committed secrets
 5. Classify by type and recommend rotation procedures""",
         tool_budget=15,
-        priority_tools=["grep", "bash", "read"],
+        priority_tools=["code_search", "shell", "read"],
     ),
     "dependency_audit": TaskTypeHint(
         task_type="dependency_audit",
@@ -65,7 +63,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 4. Check for available patches or updates
 5. Recommend upgrade path with breaking change analysis""",
         tool_budget=20,
-        priority_tools=["bash", "read", "grep"],
+        priority_tools=["shell", "read", "code_search"],
     ),
     "code_review": TaskTypeHint(
         task_type="code_review",
@@ -77,7 +75,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Look for injection vulnerabilities (SQL, XSS, command)
 6. Assess session management and state handling""",
         tool_budget=30,
-        priority_tools=["read", "grep", "code_search", "overview"],
+        priority_tools=["read", "code_search", "overview"],
     ),
     "config_security": TaskTypeHint(
         task_type="config_security",
@@ -88,7 +86,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 4. Verify secrets management (no plaintext, proper rotation)
 5. Check for security misconfigurations and defaults""",
         tool_budget=20,
-        priority_tools=["read", "grep", "bash"],
+        priority_tools=["read", "code_search", "shell"],
     ),
     "compliance_check": TaskTypeHint(
         task_type="compliance_check",
@@ -100,7 +98,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Review access control implementations
 6. Document compliance gaps with remediation priority""",
         tool_budget=35,
-        priority_tools=["read", "grep", "bash", "overview"],
+        priority_tools=["read", "code_search", "shell", "overview"],
     ),
     "incident_response": TaskTypeHint(
         task_type="incident_response",
@@ -112,7 +110,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Document timeline of events
 6. Recommend immediate containment actions""",
         tool_budget=25,
-        priority_tools=["read", "grep", "bash"],
+        priority_tools=["read", "code_search", "shell"],
     ),
     # Default fallback for general security tasks
     "general": TaskTypeHint(
@@ -125,7 +123,7 @@ SECURITY_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
 5. Recommend specific remediation steps
 6. Reference relevant security standards (CWE, OWASP)""",
         tool_budget=15,
-        priority_tools=["read", "grep", "bash", "overview"],
+        priority_tools=["read", "code_search", "shell", "overview"],
     ),
 }
 
@@ -149,7 +147,7 @@ class SecurityPromptContributor(PromptContributorProtocol):
         section = contributor.get_system_prompt_section()
     """
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Return security-specific task type hints.
 
         Returns:
@@ -234,7 +232,7 @@ For each finding:
         """
         return 5
 
-    def get_context_hints(self, task_type: Optional[str] = None) -> Optional[str]:
+    def get_context_hints(self, task_type: str | None = None) -> str | None:
         """Return contextual hints based on detected task type.
 
         This method can be used to get specific hints when the task type

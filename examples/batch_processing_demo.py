@@ -118,7 +118,6 @@ async def demo_batch_search():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-
         print("\n1️⃣ Search for 'TODO' comments across all files...")
         result = await batch(
             operation="search",
@@ -164,7 +163,6 @@ async def demo_batch_replace():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
 
         print("\n1️⃣ DRY RUN: Preview replacing 'print' with 'logger.info'...")
         result = await batch(
@@ -227,7 +225,6 @@ async def demo_batch_analyze():
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
 
-
         print("\n1️⃣ Analyze all Python files...")
         result = await batch(
             operation="analyze",
@@ -257,7 +254,6 @@ async def demo_list_files():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
 
         print("\n1️⃣ List all Python files...")
         result = await batch(
@@ -289,7 +285,6 @@ async def demo_real_world_workflow():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         setup_demo_files(temp_path)
-
 
         print("\n1️⃣ STEP 1: Find all print statements...")
         result = await batch(

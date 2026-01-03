@@ -316,7 +316,9 @@ def _set_service_key(service_name: str, use_keyring: bool):
 
     if set_service_key(service_name, key.strip(), use_keyring=use_keyring):
         location = "system keyring" if use_keyring else str(DEFAULT_KEYS_FILE)
-        console.print(f"[green]✓[/] API key for service [cyan]{service_name}[/] saved to {location}")
+        console.print(
+            f"[green]✓[/] API key for service [cyan]{service_name}[/] saved to {location}"
+        )
     else:
         console.print("[red]Failed to save API key")
         raise typer.Exit(1)
@@ -397,5 +399,9 @@ def _list_services():
     if not configured:
         console.print()
         console.print("[yellow]No service API keys configured.[/]")
-        console.print("  [cyan]victor keys --set-service finnhub --keyring[/]  Store Finnhub key in keyring")
-        console.print("  [cyan]victor keys --set-service fred --keyring[/]     Store FRED key in keyring")
+        console.print(
+            "  [cyan]victor keys --set-service finnhub --keyring[/]  Store Finnhub key in keyring"
+        )
+        console.print(
+            "  [cyan]victor keys --set-service fred --keyring[/]     Store FRED key in keyring"
+        )

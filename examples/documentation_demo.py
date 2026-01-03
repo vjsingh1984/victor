@@ -202,7 +202,7 @@ class UserManager:
         if result["success"]:
             print(result.get("formatted_report", ""))
             api_result = result.get("results", {}).get("api", {})
-            print(f"\nGenerated documentation preview:")
+            print("\nGenerated documentation preview:")
             print(api_result.get("preview", ""))
 
 

@@ -59,7 +59,7 @@ async def main():
     print(f"📦 Vector Store: {config.vector_store}")
     print(f"🤖 Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})")
     print(f"📁 Storage: {config.persist_directory}")
-    print(f"🌐 Network Required: NO (100% offline)")
+    print("🌐 Network Required: NO (100% offline)")
     print()
 
     # Initialize provider

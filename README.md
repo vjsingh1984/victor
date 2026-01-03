@@ -9,7 +9,7 @@
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-15500%2B%20passing-brightgreen.svg)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-16000%2B%20passing-brightgreen.svg)](#project-status)
 
 [Quick Start](#quick-start) | [Features](#features) | [Providers](#provider-comparison) | [Documentation](#documentation)
 
@@ -77,7 +77,7 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 | Vendor Lock-in | Single provider | 21 providers |
 | Data Privacy | Cloud-only | Air-gapped mode |
 | Domain Expertise | Generic | 5 specialized verticals |
-| Tool Access | Limited | 45 cost-aware tools |
+| Tool Access | Limited | 55 cost-aware tools |
 | Protocol Support | Proprietary | MCP client + server |
 
 ---
@@ -105,13 +105,13 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 ### Domain Verticals
 
-| Vertical | Tools | Specialization |
+| Vertical | Focus | Specialization |
 |----------|:-----:|----------------|
-| **Coding** | 30 | Multi-file refactoring, AST ops, test gen |
-| **Research** | 9 | Web search, citations, fact synthesis |
-| **DevOps** | 13 | Docker, Terraform, CI/CD |
-| **Data Analysis** | 11 | Pandas, visualization, statistics |
-| **RAG** | 10 | Document ingestion, vector search |
+| **Coding** | Core | Multi-file refactoring, AST ops, test gen |
+| **Research** | Web | Web search, citations, fact synthesis |
+| **DevOps** | Ops | Docker, Terraform, CI/CD |
+| **Data Analysis** | Data | Pandas, visualization, statistics |
+| **RAG** | Docs | Document ingestion, vector search |
 
 ### Tool System
 
@@ -153,7 +153,7 @@ flowchart TB
 
     subgraph Core
         Orch[Orchestrator]
-        Prov[25+ Providers]
+        Prov[21 Providers]
         Tools[55 Tools]
         Vert[5 Verticals]
     end
@@ -227,7 +227,7 @@ flowchart TB
 | VS Code Extension | Beta |
 | MCP Support | Stable |
 
-> **Note**: 11,100+ passing tests. See [ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) for improvement plans.
+> **Note**: 16,000+ passing tests. See [ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) for improvement plans.
 
 ---
 

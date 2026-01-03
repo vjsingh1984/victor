@@ -125,16 +125,16 @@
 
     <!-- Stats -->
     <g transform="translate(100, 75)">
-      <text x="0" y="20" fill="#6366f1" font-size="24" font-weight="700">3,000+</text>
-      <text x="80" y="20" fill="#a1a1aa" font-size="12">Tests</text>
+      <text x="0" y="20" fill="#6366f1" font-size="24" font-weight="700">16K+</text>
+      <text x="60" y="20" fill="#a1a1aa" font-size="12">Tests</text>
     </g>
-    <g transform="translate(250, 75)">
-      <text x="0" y="20" fill="#8b5cf6" font-size="24" font-weight="700">232</text>
-      <text x="50" y="20" fill="#a1a1aa" font-size="12">Modules</text>
+    <g transform="translate(230, 75)">
+      <text x="0" y="20" fill="#8b5cf6" font-size="24" font-weight="700">280+</text>
+      <text x="55" y="20" fill="#a1a1aa" font-size="12">Modules</text>
     </g>
-    <g transform="translate(400, 75)">
-      <text x="0" y="20" fill="#06b6d4" font-size="24" font-weight="700">30K+</text>
-      <text x="60" y="20" fill="#a1a1aa" font-size="12">Lines of Code</text>
+    <g transform="translate(380, 75)">
+      <text x="0" y="20" fill="#06b6d4" font-size="24" font-weight="700">280K+</text>
+      <text x="70" y="20" fill="#a1a1aa" font-size="12">Lines of Code</text>
     </g>
     <g transform="translate(570, 75)">
       <text x="0" y="20" fill="#10b981" font-size="24" font-weight="700">Docker</text>

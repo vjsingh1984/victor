@@ -13,7 +13,7 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 | [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 21 LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
 | [Tool Catalog](TOOL_CATALOG.md) | All 55 available tools |
-| [Verticals](VERTICALS.md) | 4 domain-specific assistant templates |
+| [Verticals](VERTICALS.md) | 5 domain-specific assistant templates |
 | [Framework Migration](FRAMEWORK_MIGRATION.md) | Migrating to Framework API |
 | [Releasing](RELEASING.md) | Release process for maintainers |
 

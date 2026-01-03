@@ -509,10 +509,7 @@ class ToolTierRegistry:
             Dictionary representation of all entries
         """
         with self._registry_lock:
-            return {
-                name: entry.to_dict()
-                for name, entry in self._entries.items()
-            }
+            return {name: entry.to_dict() for name, entry in self._entries.items()}
 
 
 # Convenience function for module-level access

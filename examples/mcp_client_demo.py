@@ -62,10 +62,10 @@ async def demo_client():
         print("  python examples/mcp_server_demo.py --stdio")
         return
 
-    print(f"✓ Connected to server")
+    print("✓ Connected to server")
     if client.server_info:
         print(f"  Server: {client.server_info.name} v{client.server_info.version}")
-        print(f"  Capabilities:")
+        print("  Capabilities:")
         print(f"    - Tools: {client.server_info.capabilities.tools}")
         print(f"    - Resources: {client.server_info.capabilities.resources}")
 
@@ -108,7 +108,7 @@ async def demo_client():
     print("\nExample 1: List directory")
     result = await client.call_tool("ls", path=".")
     if result.success:
-        print(f"✓ Tool call succeeded")
+        print("✓ Tool call succeeded")
         output = str(result.result)[:200]
         print(f"  Output (preview): {output}...")
     else:
@@ -119,7 +119,7 @@ async def demo_client():
         print("\nExample 2: Read file")
         result = await client.call_tool("read", path="README.md")
         if result.success:
-            print(f"✓ Tool call succeeded")
+            print("✓ Tool call succeeded")
             output = str(result.result)[:200]
             print(f"  Content (preview): {output}...")
         else:
@@ -133,11 +133,11 @@ async def demo_client():
         print(f"\nReading: {first_resource.name}")
         content = await client.read_resource(first_resource.uri)
         if content:
-            print(f"✓ Resource read successfully")
+            print("✓ Resource read successfully")
             preview = content[:200]
             print(f"  Content (preview): {preview}...")
         else:
-            print(f"✗ Failed to read resource")
+            print("✗ Failed to read resource")
 
     # Show client status
     print("\n8️⃣ Client Status")

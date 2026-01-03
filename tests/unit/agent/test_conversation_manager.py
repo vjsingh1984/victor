@@ -398,9 +398,7 @@ class TestConversationManagerWithStore:
 
     def test_get_memory_context_with_store(self, manager_with_store, mock_store):
         """Test get_memory_context delegates to store."""
-        mock_store.get_context_messages.return_value = [
-            {"role": "user", "content": "Hello"}
-        ]
+        mock_store.get_context_messages.return_value = [{"role": "user", "content": "Hello"}]
 
         context = manager_with_store.get_memory_context(max_tokens=1000)
 

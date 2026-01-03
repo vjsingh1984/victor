@@ -92,7 +92,7 @@ async def demo_generate_requirements():
 
         if result["success"]:
             print(f"✓ {result.get('message', 'Requirements generated')}")
-            print(f"\nPreview of generated file:")
+            print("\nPreview of generated file:")
             content = output_file.read_text()
             lines = content.split("\n")[:10]
             for line in lines:

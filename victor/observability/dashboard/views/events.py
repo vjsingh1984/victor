@@ -88,9 +88,7 @@ class EventLogWidget(RichLog):
         category_name = event.category.value.upper() if event.category else "UNKNOWN"
 
         # Main event line
-        self.write(
-            f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.name}[/]"
-        )
+        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.name}[/]")
 
         # Optional data preview
         if self._show_data and event.data:
@@ -175,7 +173,7 @@ class EventTableWidget(DataTable):
 
         # Remove old events if over limit
         if len(self._events) > self._max_rows:
-            self._events = self._events[-self._max_rows:]
+            self._events = self._events[-self._max_rows :]
             self._rebuild_table()
         else:
             self._add_row(event)

@@ -618,6 +618,7 @@ def persona(
         # Later, create the persona:
         p = create_persona_spec("coding:expert_reviewer")
     """
+
     def decorator(func: F) -> F:
         # Parse vertical from name if present
         vertical = None

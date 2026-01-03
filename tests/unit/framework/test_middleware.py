@@ -654,15 +654,11 @@ class TestOutputValidationMiddleware:
         )
 
         # Applicable tool - should validate
-        result = await middleware.before_tool_call(
-            "write_json", {"content": '{"valid": true}'}
-        )
+        result = await middleware.before_tool_call("write_json", {"content": '{"valid": true}'})
         assert result.metadata.get("validation_performed") is True
 
         # Non-applicable tool - should skip
-        result = await middleware.before_tool_call(
-            "other_tool", {"content": "not json"}
-        )
+        result = await middleware.before_tool_call("other_tool", {"content": "not json"})
         assert middleware.get_applicable_tools() == {"write_json"}
 
     @pytest.mark.asyncio

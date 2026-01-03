@@ -110,9 +110,7 @@ class EventLogView(RichLog):
         color = category_colors.get(event.category, "white")
         category_name = event.category.value.upper() if event.category else "UNKNOWN"
 
-        self.write(
-            f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.name}"
-        )
+        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.name}")
 
         # Show key data fields for certain events
         if event.category == EventCategory.TOOL and event.data:
@@ -200,11 +198,7 @@ class ToolExecutionView(DataTable):
             calls = stats["calls"]
             avg_time = stats["total_time"] / calls if calls > 0 else 0
             success_rate = (stats["successes"] / calls * 100) if calls > 0 else 0
-            last_called = (
-                stats["last_called"].strftime("%H:%M:%S")
-                if stats["last_called"]
-                else "-"
-            )
+            last_called = stats["last_called"].strftime("%H:%M:%S") if stats["last_called"] else "-"
             self.add_row(
                 tool_name,
                 str(calls),

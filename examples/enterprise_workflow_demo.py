@@ -104,12 +104,12 @@ def calculate_total(items: list) -> float:
     test_module = temp_file.stem
     test_file = temp_file.with_name(f"test_{test_module}.py")
     test_file.write_text(
-        f'''import {test_module}
+        f"""import {test_module}
 
 def test_calculate_total():
     items = [{{"price": 10, "quantity": 2}}, {{"price": 5, "quantity": 1}}]
     assert {test_module}.calculate_total(items) == 25
-'''
+"""
     )
 
     print("Running pytest...")

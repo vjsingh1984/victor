@@ -184,11 +184,7 @@ class ToolStatsWidget(DataTable):
                 min_max = "-"
 
             # Format last called
-            last_called = (
-                stats.last_called.strftime("%H:%M:%S")
-                if stats.last_called
-                else "-"
-            )
+            last_called = stats.last_called.strftime("%H:%M:%S") if stats.last_called else "-"
 
             self.add_row(
                 tool_name,
@@ -254,9 +250,7 @@ class ToolHistoryWidget(RichLog):
 
         if event.name.endswith(".start"):
             # Tool start
-            self.write(
-                f"[dim]{timestamp}[/] [cyan]{tool_name}[/] [yellow]STARTED[/]"
-            )
+            self.write(f"[dim]{timestamp}[/] [cyan]{tool_name}[/] [yellow]STARTED[/]")
 
             # Show arguments preview
             args = data.get("arguments", {})
@@ -272,9 +266,7 @@ class ToolHistoryWidget(RichLog):
             status = "[green]SUCCESS[/]" if success else "[red]FAILED[/]"
             duration_str = f" ({duration_ms:.0f}ms)" if duration_ms else ""
 
-            self.write(
-                f"[dim]{timestamp}[/] [cyan]{tool_name}[/] {status}{duration_str}"
-            )
+            self.write(f"[dim]{timestamp}[/] [cyan]{tool_name}[/] {status}{duration_str}")
 
             # Show result preview or error
             if not success:
@@ -363,23 +355,29 @@ class ToolDetailPanel(Container):
             lines.append(f"  Max: {stats.max_duration_ms:.0f}ms")
 
         if stats.last_called:
-            lines.extend([
-                "",
-                f"[bold]Last Called:[/] {stats.last_called.strftime('%Y-%m-%d %H:%M:%S')}",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"[bold]Last Called:[/] {stats.last_called.strftime('%Y-%m-%d %H:%M:%S')}",
+                ]
+            )
 
         if stats.last_result:
-            lines.extend([
-                "",
-                "[bold]Last Result:[/]",
-                f"  [dim]{stats.last_result}[/]",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "[bold]Last Result:[/]",
+                    f"  [dim]{stats.last_result}[/]",
+                ]
+            )
 
         if stats.error_messages:
-            lines.extend([
-                "",
-                f"[bold red]Recent Errors ({len(stats.error_messages)}):[/]",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"[bold red]Recent Errors ({len(stats.error_messages)}):[/]",
+                ]
+            )
             for error in stats.error_messages[-3:]:
                 lines.append(f"  [red]- {error[:60]}[/]")
 

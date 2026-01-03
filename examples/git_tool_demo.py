@@ -139,7 +139,7 @@ if __name__ == "__main__":
             print("-" * 70)
             result = await git(operation="branch", branch="feature/add-tests")
             if result["success"]:
-                print(f"Created/switched to branch: feature/add-tests")
+                print("Created/switched to branch: feature/add-tests")
                 print(result["output"])
             else:
                 print(f"Error: {result['error']}")

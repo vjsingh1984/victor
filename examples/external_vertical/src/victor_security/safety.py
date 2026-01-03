@@ -34,10 +34,8 @@ Pattern Categories:
 - LOW: Informational notice
 """
 
-from typing import Dict, List
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
-
 
 # Risk level constants for clarity
 CRITICAL = "CRITICAL"
@@ -70,7 +68,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
                 print(f"Warning: {pattern.description}")
     """
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         r"""Return security-specific bash command patterns.
 
         These patterns detect dangerous commands that could:
@@ -221,7 +219,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
             ),
         ]
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Return patterns for sensitive file operations.
 
         Security analysis may encounter sensitive files that should
@@ -277,7 +275,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
             ),
         ]
 
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
+    def get_tool_restrictions(self) -> dict[str, list[str]]:
         """Get tool-specific argument restrictions.
 
         Returns restrictions on specific tool arguments that could
@@ -318,7 +316,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
         """
         return "security"
 
-    def get_blocked_operations(self) -> List[str]:
+    def get_blocked_operations(self) -> list[str]:
         """Return operations that should be completely blocked.
 
         These operations are never appropriate in a security analysis context.
@@ -333,7 +331,7 @@ class SecuritySafetyExtension(SafetyExtensionProtocol):
             "delete_logs",  # Never tamper with audit trails
         ]
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Return safety reminders for security operations.
 
         Returns:

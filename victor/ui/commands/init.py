@@ -120,9 +120,7 @@ def init(
     interactive: bool = typer.Option(
         True, "--interactive/--no-interactive", "-I", help="Use interactive wizard for scoping"
     ),
-    local: bool = typer.Option(
-        False, "--local", help="Add a local profile preset (Ollama)"
-    ),
+    local: bool = typer.Option(False, "--local", help="Add a local profile preset (Ollama)"),
     airgapped: bool = typer.Option(
         False, "--airgapped", help="Enable air-gapped mode for this repo"
     ),
@@ -423,13 +421,13 @@ providers:
                 if Confirm.ask("[cyan]Show a 2-minute first-run guide?[/]", default=True):
                     console.print("\n[bold]First Run Guide[/]")
                     console.print("1) Start chat: [cyan]victor chat[/]")
-                    console.print("2) Try a repo overview: \"Summarize this repo and list risky areas.\"")
                     console.print(
-                        "3) Try a one-shot: [cyan]victor \"write tests for src/utils.py\"[/]"
+                        '2) Try a repo overview: "Summarize this repo and list risky areas."'
                     )
                     console.print(
-                        "4) Switch models in [cyan]~/.victor/profiles.yaml[/]"
+                        '3) Try a one-shot: [cyan]victor "write tests for src/utils.py"[/]'
                     )
+                    console.print("4) Switch models in [cyan]~/.victor/profiles.yaml[/]")
                     console.print("See [cyan]docs/guides/FIRST_RUN.md[/] for more.")
 
         except Exception as e:
