@@ -603,7 +603,7 @@ class TestComplexWorkflows:
         from victor.classification import PatternMatcher, TaskType
         from victor.agent.task_completion import TaskCompletionDetector
 
-        prompt = f"""
+        prompt = """
 Fix the bug in buggy.py:
 
 The divide function doesn't handle division by zero.

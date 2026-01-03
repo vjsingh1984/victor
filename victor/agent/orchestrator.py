@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
+    from victor.agent.protocols import ToolAccessContext
     from victor.evaluation.protocol import TokenUsage
 
     # Factory-created components (type hints only)
@@ -3657,7 +3658,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 chunk = StreamChunk(
                     content="Network error. Check connection.\n"
                 )
-            except Exception as e:
+            except Exception:
                 logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
                     content="Unable to generate final summary due to iteration limit.\n"

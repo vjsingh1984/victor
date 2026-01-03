@@ -25,17 +25,15 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from victor.tools.database_tool import DatabaseTool
-from victor.tools.docker_tool import DockerTool
-from victor.tools.http_tool import http_request, http_test
+from victor.tools.database_tool import database
+from victor.tools.docker_tool import docker
+from victor.tools.http_tool import http
 
 
 async def demo_database_tool():
     """Demo database tool capabilities."""
     print("\n🗄️  Database Tool Demo")
     print("=" * 70)
-
-    db_tool = DatabaseTool(allow_modifications=True)
 
     # Create temp SQLite database
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
@@ -44,54 +42,75 @@ async def demo_database_tool():
     try:
         # Connect
         print("\n1️⃣ Connecting to SQLite database...")
-        result = await db_tool.execute(operation="connect", db_type="sqlite", database=db_path)
-        print(result.output if result.success else f"Error: {result.error}")
+        result = await database(action="connect", db_type="sqlite", database=db_path)
+        if result.get("success"):
+            print(result.get("message", "Connected"))
+        else:
+            print(f"Error: {result.get('error')}")
 
-        if not result.success:
+        if not result.get("success"):
             return
 
         # Extract connection ID
-        conn_id = result.output.split("Connection ID: ")[1].strip()
+        conn_id = result.get("connection_id")
 
         # Create table
         print("\n2️⃣ Creating table...")
-        result = await db_tool.execute(
-            operation="query",
+        result = await database(
+            action="query",
             connection_id=conn_id,
             sql="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)",
         )
-        print(result.output if result.success else f"Error: {result.error}")
+        if result.get("success"):
+            print("Table created")
+        else:
+            print(f"Error: {result.get('error')}")
 
         # Insert data
         print("\n3️⃣ Inserting data...")
-        result = await db_tool.execute(
-            operation="query",
+        result = await database(
+            action="query",
             connection_id=conn_id,
             sql="INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com'), ('Bob', 'bob@example.com')",
         )
-        print(result.output if result.success else f"Error: {result.error}")
+        if result.get("success"):
+            print("Inserted rows")
+        else:
+            print(f"Error: {result.get('error')}")
 
         # Query data
         print("\n4️⃣ Querying data...")
-        result = await db_tool.execute(
-            operation="query", connection_id=conn_id, sql="SELECT * FROM users"
+        result = await database(
+            action="query", connection_id=conn_id, sql="SELECT * FROM users"
         )
-        print(result.output if result.success else f"Error: {result.error}")
+        if result.get("success"):
+            print(f"Rows: {result.get('rows', [])}")
+        else:
+            print(f"Error: {result.get('error')}")
 
         # List tables
         print("\n5️⃣ Listing tables...")
-        result = await db_tool.execute(operation="tables", connection_id=conn_id)
-        print(result.output if result.success else f"Error: {result.error}")
+        result = await database(action="tables", connection_id=conn_id)
+        if result.get("success"):
+            print(f"Tables: {result.get('tables', [])}")
+        else:
+            print(f"Error: {result.get('error')}")
 
         # Describe table
         print("\n6️⃣ Describing table structure...")
-        result = await db_tool.execute(operation="describe", connection_id=conn_id, table="users")
-        print(result.output if result.success else f"Error: {result.error}")
+        result = await database(action="describe", connection_id=conn_id, table="users")
+        if result.get("success"):
+            print(f"Columns: {result.get('columns', [])}")
+        else:
+            print(f"Error: {result.get('error')}")
 
         # Disconnect
         print("\n7️⃣ Disconnecting...")
-        result = await db_tool.execute(operation="disconnect", connection_id=conn_id)
-        print(result.output if result.success else f"Error: {result.error}")
+        result = await database(action="disconnect", connection_id=conn_id)
+        if result.get("success"):
+            print(result.get("message", "Disconnected"))
+        else:
+            print(f"Error: {result.get('error')}")
 
     finally:
         # Cleanup
@@ -110,43 +129,45 @@ async def demo_docker_tool():
     print("\n\n🐳 Docker Tool Demo")
     print("=" * 70)
 
-    docker_tool = DockerTool()
-
     # List images
     print("\n1️⃣ Listing Docker images...")
-    result = await docker_tool.execute(operation="images")
-    if result.success:
-        print(result.output[:500] + "..." if len(result.output) > 500 else result.output)
+    result = await docker(operation="images")
+    if result.get("success"):
+        output = result.get("output", "")
+        print(output[:500] + "..." if len(output) > 500 else output)
     else:
-        print(f"Error: {result.error}")
-        if "not found" in result.error:
+        print(f"Error: {result.get('error')}")
+        if "not found" in str(result.get("error", "")):
             print("\nNote: Docker CLI not installed or not in PATH")
             print("Install Docker to use this tool")
             return
 
     # List containers
     print("\n2️⃣ Listing running containers...")
-    result = await docker_tool.execute(operation="ps")
-    if result.success:
-        print(result.output[:500] + "..." if len(result.output) > 500 else result.output)
+    result = await docker(operation="ps")
+    if result.get("success"):
+        output = result.get("output", "")
+        print(output[:500] + "..." if len(output) > 500 else output)
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # List all containers (including stopped)
     print("\n3️⃣ Listing all containers...")
-    result = await docker_tool.execute(operation="ps", all=True)
-    if result.success:
-        print(result.output[:500] + "..." if len(result.output) > 500 else result.output)
+    result = await docker(operation="ps", options={"all": True})
+    if result.get("success"):
+        output = result.get("output", "")
+        print(output[:500] + "..." if len(output) > 500 else output)
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     # List networks
     print("\n4️⃣ Listing Docker networks...")
-    result = await docker_tool.execute(operation="networks")
-    if result.success:
-        print(result.output[:500] + "..." if len(result.output) > 500 else result.output)
+    result = await docker(operation="networks")
+    if result.get("success"):
+        output = result.get("output", "")
+        print(output[:500] + "..." if len(output) > 500 else output)
     else:
-        print(f"Error: {result.error}")
+        print(f"Error: {result.get('error')}")
 
     print("\n✅ Docker Tool Features:")
     print("  ✓ Container management (list, start, stop, remove)")
@@ -163,8 +184,11 @@ async def demo_http_tool():
 
     # Simple GET request
     print("\n1️⃣ GET request to GitHub API...")
-    result = await http_request(
-        method="GET", url="https://api.github.com/users/octocat", timeout=15
+    result = await http(
+        method="GET",
+        url="https://api.github.com/users/octocat",
+        mode="request",
+        timeout=15,
     )
     if result.get("success"):
         print(f"Status: {result['status_code']}")
@@ -175,9 +199,10 @@ async def demo_http_tool():
 
     # GET with query parameters
     print("\n2️⃣ GET with query parameters...")
-    result = await http_request(
+    result = await http(
         method="GET",
         url="https://api.github.com/search/repositories",
+        mode="request",
         params={"q": "language:python", "sort": "stars", "per_page": 3},
         timeout=15,
     )
@@ -191,8 +216,12 @@ async def demo_http_tool():
 
     # API testing with validation
     print("\n3️⃣ API testing with validation...")
-    result = await http_test(
-        method="GET", url="https://api.github.com", expected_status=200, timeout=15
+    result = await http(
+        method="GET",
+        url="https://api.github.com",
+        mode="test",
+        expected_status=200,
+        timeout=15,
     )
     if result.get("success"):
         print(f"Test passed: {result['all_passed']}")
@@ -203,9 +232,10 @@ async def demo_http_tool():
 
     # POST request (httpbin echo)
     print("\n4️⃣ POST request with JSON body...")
-    result = await http_request(
+    result = await http(
         method="POST",
         url="https://httpbin.org/post",
+        mode="request",
         headers={"Content-Type": "application/json"},
         json={"key": "value", "test": True},
         timeout=15,

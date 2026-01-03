@@ -26,9 +26,8 @@ logging.basicConfig(
 # Enable DEBUG for victor providers to see safety filter details
 logging.getLogger("victor.providers").setLevel(logging.DEBUG)
 
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
-from victor.providers.google_provider import GoogleProvider
+from victor.framework.agent import Agent
+from victor.framework.events import EventType
 
 
 async def main():
@@ -43,16 +42,10 @@ async def main():
     print("🤖 Google Gemini Example\n")
     print("=" * 60)
 
-    # Create Gemini provider with safety filters disabled for code generation
-    # Available safety_level options: "block_none", "block_few", "block_some", "block_most"
-    provider = GoogleProvider(api_key=api_key, safety_level="block_none")
-
-    # Create settings and agent with Gemini Pro
-    settings = Settings()
-    agent = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
+    # Create agent with Gemini Pro
+    agent = await Agent.create(
         model="gemini-2.5-pro",  # Latest Gemini model
+        provider="google",
         temperature=0.9,
     )
 
@@ -80,7 +73,7 @@ async def main():
     - Auth: JWT
     """
 
-    response = await agent.chat(
+    response = await agent.run(
         f"Here are requirements:\n\n{long_context}\n\n"
         "What are the main technical challenges and how would you solve them?"
     )
@@ -89,9 +82,9 @@ async def main():
     # Example 2: Code generation
     print("\n\n💻 Example 2: Code Generation")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Write a Python class for a LRU Cache with O(1) get and put operations. "
         "Include type hints and docstrings."
     )
@@ -100,22 +93,22 @@ async def main():
     # Example 3: Streaming
     print("\n\n🌊 Example 3: Streaming Response")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
     print("Gemini: ", end="", flush=True)
-    async for chunk in agent.stream_chat(
+    async for event in agent.stream(
         "Explain the CAP theorem in distributed systems with examples."
     ):
-        if chunk.content:
-            print(chunk.content, end="", flush=True)
+        if event.type == EventType.CONTENT:
+            print(event.content, end="", flush=True)
     print()
 
     # Example 4: Analysis and comparison
     print("\n\n📊 Example 4: Analysis")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Compare these Python web frameworks: Django, FastAPI, Flask. "
         "When would you use each? Create a comparison table."
     )
@@ -124,16 +117,16 @@ async def main():
     # Example 5: Creative coding
     print("\n\n🎨 Example 5: Creative Coding")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Create an ASCII art generator function in Python. "
         "Make it fun and include emojis in the output!"
     )
     print(f"Gemini: {response.content}")
 
     # Clean up
-    await provider.close()
+    await agent.close()
 
     print("\n\n✅ Examples completed!")
     print("\n💡 Tip: Gemini excels at long context and multimodal tasks")

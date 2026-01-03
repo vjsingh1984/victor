@@ -29,13 +29,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from victor.tools.dependency_tool import (
-    dependency_list,
-    dependency_outdated,
-    dependency_security,
-    dependency_generate,
-    dependency_check,
-)
+from victor.tools.dependency_tool import dependency
 
 
 async def demo_list_packages():
@@ -44,7 +38,7 @@ async def demo_list_packages():
     print("=" * 70)
 
     print("\n1️⃣ List all installed packages...")
-    result = await dependency_list()
+    result = await dependency(action="list")
 
     if result["success"]:
         print(result.get("formatted_report", ""))
@@ -59,7 +53,7 @@ async def demo_check_outdated():
     print("=" * 70)
 
     print("\n1️⃣ Check for outdated packages...")
-    result = await dependency_outdated()
+    result = await dependency(action="outdated")
 
     if result["success"]:
         if result.get("message"):
@@ -76,7 +70,7 @@ async def demo_security_audit():
     print("=" * 70)
 
     print("\n1️⃣ Run security audit...")
-    result = await dependency_security()
+    result = await dependency(action="security")
 
     if result["success"]:
         print(result.get("formatted_report", ""))
@@ -94,7 +88,7 @@ async def demo_generate_requirements():
         output_file = temp_path / "requirements.txt"
 
         print("\n1️⃣ Generate requirements.txt (freeze format)...")
-        result = await dependency_generate(output=str(output_file))
+        result = await dependency(action="generate", output=str(output_file))
 
         if result["success"]:
             print(f"✓ {result.get('message', 'Requirements generated')}")
@@ -120,10 +114,10 @@ async def demo_check_requirements():
 
         # First generate a requirements file
         print("\n1️⃣ Generate requirements file first...")
-        await dependency_generate(output=str(req_file))
+        await dependency(action="generate", output=str(req_file))
 
         print("\n2️⃣ Check if requirements match installed...")
-        result = await dependency_check(requirements_file=str(req_file))
+        result = await dependency(action="check", requirements_file=str(req_file))
 
         if result["success"]:
             print(result.get("formatted_report", ""))

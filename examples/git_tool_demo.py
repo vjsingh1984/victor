@@ -32,7 +32,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from victor.tools.git_tool import git, git_analyze_conflicts
+from victor.tools.git_tool import git, conflicts
 
 
 def run_command(cmd: str, cwd: Path = None) -> str:
@@ -216,7 +216,7 @@ def test_main():
             # Test 13: Conflict analysis (no conflicts expected)
             print("\n1️⃣3️⃣ Conflict Analysis")
             print("-" * 70)
-            result = await git_analyze_conflicts()
+            result = await conflicts()
             if result["success"]:
                 print(result["output"])
             else:
@@ -236,7 +236,7 @@ def test_main():
             print("\n\n🤖 With AI Provider Available:")
             print("  • AI-generated commit messages from diff analysis (git_suggest_commit)")
             print("  • Auto-generated PR titles and descriptions (git_create_pr)")
-            print("  • Conflict resolution suggestions (git_analyze_conflicts)")
+            print("  • Conflict resolution suggestions (conflicts)")
 
             print("\n\n📚 API Examples:")
             print(

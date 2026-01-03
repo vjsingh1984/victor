@@ -225,7 +225,6 @@ class TaskCompletionDetector:
             "changes have been made",
             "file updated",
             "code updated",
-            "implementation complete",
             "the changes are",
             "i've updated",
             "i have updated",

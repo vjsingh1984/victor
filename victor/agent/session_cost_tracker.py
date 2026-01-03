@@ -273,8 +273,8 @@ class SessionCostTracker:
             f"{'=' * 50}",
             f"Requests: {summary['request_count']}",
             f"Duration: {summary['elapsed_seconds']:.1f}s",
-            f"",
-            f"Tokens:",
+            "",
+            "Tokens:",
             f"  Input:      {summary['tokens']['prompt']:,}",
             f"  Output:     {summary['tokens']['completion']:,}",
             f"  Cache Read: {summary['tokens']['cache_read']:,}",
@@ -284,8 +284,8 @@ class SessionCostTracker:
         if summary["cost_enabled"]:
             lines.extend(
                 [
-                    f"",
-                    f"Cost (USD):",
+                    "",
+                    "Cost (USD):",
                     f"  Input:  ${summary['cost']['input']:.4f}",
                     f"  Output: ${summary['cost']['output']:.4f}",
                     f"  Cache:  ${summary['cost']['cache']:.4f}",
@@ -293,7 +293,7 @@ class SessionCostTracker:
                 ]
             )
         else:
-            lines.extend([f"", f"Cost tracking not enabled for this provider"])
+            lines.extend(["", "Cost tracking not enabled for this provider"])
 
         return "\n".join(lines)
 

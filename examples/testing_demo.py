@@ -27,7 +27,7 @@ Usage:
 import asyncio
 import tempfile
 from pathlib import Path
-from victor.tools.testing_tool import run_tests
+from victor.tools.testing_tool import test
 
 
 def setup_demo_files(temp_dir: Path) -> tuple[Path, Path]:
@@ -128,7 +128,7 @@ async def demo_run_all_tests(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Running all tests in directory...")
-    result = await run_tests(path=str(temp_dir))
+    result = await test(path=str(temp_dir))
 
     if "error" in result:
         print(f"❌ Error: {result['error']}")
@@ -161,7 +161,7 @@ async def demo_run_specific_file(temp_dir: Path):
     test_file = temp_dir / "test_calc.py"
     print(f"\n1️⃣ Running tests in: {test_file.name}")
 
-    result = await run_tests(path=str(test_file))
+    result = await test(path=str(test_file))
 
     if "error" not in result:
         summary = result.get("summary", {})
@@ -174,7 +174,7 @@ async def demo_run_with_args(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Running only TestMath class with verbose output...")
-    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "TestMath", "-v"])
+    result = await test(path=str(temp_dir), pytest_args=["-k", "TestMath", "-v"])
 
     if "error" not in result:
         summary = result.get("summary", {})
@@ -190,7 +190,7 @@ async def demo_run_passing_only(temp_dir: Path):
     print("=" * 70)
 
     print("\n1️⃣ Excluding the intentionally failing test...")
-    result = await run_tests(path=str(temp_dir), pytest_args=["-k", "not failing_example"])
+    result = await test(path=str(temp_dir), pytest_args=["-k", "not failing_example"])
 
     if "error" not in result:
         summary = result.get("summary", {})

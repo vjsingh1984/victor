@@ -17,9 +17,8 @@
 import asyncio
 import os
 
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
-from victor.providers.xai_provider import XAIProvider
+from victor.framework.agent import Agent
+from victor.framework.events import EventType
 
 
 async def main():
@@ -34,14 +33,8 @@ async def main():
     print("🤖 xAI Grok Example\n")
     print("=" * 60)
 
-    # Create Grok provider
-    provider = XAIProvider(api_key=api_key)
-
-    # Create settings and agent
-    settings = Settings()
-    agent = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
+    agent = await Agent.create(
+        provider="xai",
         model="grok-beta",
         temperature=0.8,
     )
@@ -49,15 +42,15 @@ async def main():
     # Example 1: General question
     print("\n📝 Example 1: General Question")
     print("-" * 60)
-    response = await agent.chat("What makes Grok unique compared to other AI models?")
+    response = await agent.run("What makes Grok unique compared to other AI models?")
     print(f"Grok: {response.content}")
 
     # Example 2: Technical explanation
     print("\n\n💻 Example 2: Technical Explanation")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Explain the differences between REST and GraphQL APIs. " "Give a code example for each."
     )
     print(f"Grok: {response.content}")
@@ -65,22 +58,22 @@ async def main():
     # Example 3: Streaming response
     print("\n\n🌊 Example 3: Streaming Response")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
     print("Grok: ", end="", flush=True)
-    async for chunk in agent.stream_chat(
+    async for event in agent.stream(
         "Write a Python decorator that measures function execution time."
     ):
-        if chunk.content:
-            print(chunk.content, end="", flush=True)
+        if event.type == EventType.CONTENT:
+            print(event.content, end="", flush=True)
     print()
 
     # Example 4: Creative + Technical
     print("\n\n🎨 Example 4: Creative + Technical")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response = await agent.chat(
+    response = await agent.run(
         "Design a whimsical API for a virtual pet simulator. "
         "Include 5 endpoints with fun names and descriptions."
     )
@@ -89,20 +82,20 @@ async def main():
     # Example 5: Multi-turn debugging
     print("\n\n🐛 Example 5: Multi-turn Debugging")
     print("-" * 60)
-    agent.reset_conversation()
+    await agent.reset()
 
-    response1 = await agent.chat(
+    response1 = await agent.run(
         "I'm getting a 'list index out of range' error in Python. What could cause this?"
     )
     print(f"User: I'm getting a 'list index out of range' error in Python. What could cause this?")
     print(f"Grok: {response1.content[:200]}...")
 
-    response2 = await agent.chat("The error happens when I do: result = my_list[len(my_list)]")
+    response2 = await agent.run("The error happens when I do: result = my_list[len(my_list)]")
     print(f"\nUser: The error happens when I do: result = my_list[len(my_list)]")
     print(f"Grok: {response2.content}")
 
     # Clean up
-    await provider.close()
+    await agent.close()
 
     print("\n\n✅ Examples completed!")
 

@@ -1520,7 +1520,6 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
     def get_capabilities(self) -> ToolCallingCapabilities:
         """Get capabilities for DeepSeek models."""
-        has_native = self._has_native_support()
         is_reasoner = self._is_reasoner_model()
 
         # Load from YAML config with model pattern matching

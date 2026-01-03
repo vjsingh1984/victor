@@ -19,14 +19,28 @@
 
 ## Quick Start
 
+**60-second quickstart (no API key):**
 ```bash
-# 1. Install
-pip install victor-ai
+# 1. Install (recommended)
+pipx install victor-ai
 
-# 2. Initialize and run
+# Or:
+# pip install victor-ai
+
+# 2. Local model
+ollama pull qwen2.5-coder:7b
+
+# 3. Initialize and chat
 victor init
 victor chat
 ```
+
+**One-shot:**
+```bash
+victor "refactor this file for clarity"
+```
+
+See `docs/QUICKSTART_60S.md` for a concise walkthrough.
 
 ```mermaid
 flowchart LR
@@ -40,7 +54,7 @@ flowchart LR
 <summary><b>Local Model (Free, Private)</b></summary>
 
 ```bash
-ollama pull qwen2.5-coder:32b
+ollama pull qwen2.5-coder:7b
 victor chat
 ```
 </details>
@@ -195,6 +209,7 @@ flowchart TB
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing |
 | [Tool Catalog](docs/TOOL_CATALOG.md) | All 55 tools |
 | [Provider Setup](docs/guides/PROVIDER_SETUP.md) | Provider config |
+| [Local Models](docs/guides/LOCAL_MODELS.md) | Ollama, LM Studio, vLLM, llama.cpp |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Workflow DSL](docs/guides/WORKFLOW_DSL.md) | StateGraph guide |
 

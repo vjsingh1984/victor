@@ -8,6 +8,8 @@ Comprehensive documentation for Victor - Enterprise-Ready AI Coding Assistant.
 |----------|-------------|
 | [Installation](guides/INSTALLATION.md) | Complete installation guide |
 | [Quick Start](guides/QUICKSTART.md) | First steps with Victor |
+| [First Run](guides/FIRST_RUN.md) | 2-minute onboarding walkthrough |
+| [Local Models](guides/LOCAL_MODELS.md) | Local setup presets and tips |
 | [Provider Setup](guides/PROVIDER_SETUP.md) | Configure 21 LLM providers |
 | [User Guide](USER_GUIDE.md) | Complete usage guide |
 | [Tool Catalog](TOOL_CATALOG.md) | All 55 available tools |
@@ -84,6 +86,7 @@ docs/
 
 ### Providers & Models
 - [Provider Setup](guides/PROVIDER_SETUP.md) - Configure 21 providers
+- [Local Models](guides/LOCAL_MODELS.md) - Ollama, LM Studio, vLLM, llama.cpp
 - [Model Comparison](MODEL_COMPARISON.md) - Tested Ollama benchmarks
 - [Provider Reference](reference/PROVIDERS.md) - API reference
 - [Tool Calling](reference/TOOL_CALLING.md) - How tool calling works

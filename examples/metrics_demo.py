@@ -22,7 +22,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from victor.tools.metrics_tool import analyze_metrics
+from victor.tools.metrics_tool import metrics
 
 
 async def main():
@@ -64,7 +64,7 @@ def moderate_function(values):
 
         print("\n📊 Complexity Analysis")
         print("=" * 70)
-        result = await analyze_metrics(
+        result = await metrics(
             path=str(file_path),
             metrics=["complexity"],
         )
@@ -75,7 +75,7 @@ def moderate_function(values):
 
         print("\n\n📈 Maintainability Index")
         print("=" * 70)
-        result = await analyze_metrics(
+        result = await metrics(
             path=str(file_path),
             metrics=["maintainability"],
         )
@@ -86,7 +86,7 @@ def moderate_function(values):
 
         print("\n\n💰 Technical Debt Analysis")
         print("=" * 70)
-        result = await analyze_metrics(
+        result = await metrics(
             path=str(file_path),
             metrics=["debt"],
         )
@@ -97,7 +97,7 @@ def moderate_function(values):
 
         print("\n\n📋 Comprehensive Analysis")
         print("=" * 70)
-        result = await analyze_metrics(
+        result = await metrics(
             path=str(file_path),
             metrics=["all"],
         )

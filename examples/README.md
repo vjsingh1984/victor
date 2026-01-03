@@ -18,6 +18,16 @@ export XAI_API_KEY="xai-..."
 python examples/simple_chat.py
 ```
 
+## Ready Workflows (CLI)
+
+Fast one-command workflows are in `examples/workflows/`:
+
+```bash
+bash examples/workflows/refactor.sh src/app.py
+bash examples/workflows/review.sh src/app.py
+bash examples/workflows/tests.sh src/app.py
+```
+
 ## Examples by Category
 
 ### Getting Started
