@@ -443,6 +443,8 @@ class ComputeNode(WorkflowNode):
     handler: Optional[str] = None  # Custom handler name for extensibility
     fail_fast: bool = True
     parallel: bool = False
+    # Execution target: "in-process", "subprocess", "docker"
+    execution_target: str = "in-process"
 
     @property
     def node_type(self) -> NodeType:
@@ -464,6 +466,7 @@ class ComputeNode(WorkflowNode):
                 "handler": self.handler,
                 "fail_fast": self.fail_fast,
                 "parallel": self.parallel,
+                "execution_target": self.execution_target,
             }
         )
         return d

@@ -273,6 +273,23 @@ class WorkflowVisualizer:
                     metadata["handler"] = node.handler
                 if node.tools:
                     metadata["tools"] = node.tools[:3]  # First 3 tools
+                # Extract execution target
+                if hasattr(node, "execution_target") and node.execution_target:
+                    metadata["exec"] = node.execution_target
+                # Extract constraints for visualization
+                if hasattr(node, "constraints") and node.constraints:
+                    constraints = node.constraints
+                    blocked = []
+                    if hasattr(constraints, "llm_allowed") and not constraints.llm_allowed:
+                        blocked.append("llm")
+                    if hasattr(constraints, "network_allowed") and not constraints.network_allowed:
+                        blocked.append("network")
+                    if hasattr(constraints, "write_allowed") and not constraints.write_allowed:
+                        blocked.append("write")
+                    if blocked:
+                        metadata["blocked"] = blocked
+                if hasattr(node, "timeout") and node.timeout:
+                    metadata["timeout"] = node.timeout
             elif isinstance(node, ParallelNode):
                 metadata["parallel_nodes"] = node.parallel_nodes
                 metadata["join_strategy"] = node.join_strategy
@@ -619,11 +636,45 @@ class WorkflowVisualizer:
             label = node.name or node.id
             node_class = node.node_type.replace("Node", "").lower()
 
+            # Build enhanced label with type info
+            label_parts = [label]
+
+            # Add node type indicator
+            type_indicator = {
+                "agent": "🤖",
+                "compute": "⚙️",
+                "condition": "❓",
+                "parallel": "⫸",
+                "hitl": "👤",
+                "transform": "→",
+            }.get(node_class, "")
+
+            # Add metadata details for compute nodes
+            details = []
+            if node.metadata.get("exec"):
+                details.append(f"exec: {node.metadata['exec']}")
+            if node.metadata.get("handler"):
+                details.append(f"handler: {node.metadata['handler']}")
+            if node.metadata.get("blocked"):
+                details.append(f"blocked: [{', '.join(node.metadata['blocked'])}]")
+            if node.metadata.get("timeout"):
+                details.append(f"timeout: {node.metadata['timeout']}s")
+            if node.metadata.get("role"):
+                details.append(f"role: {node.metadata['role']}")
+
+            # Build multi-line label for D2
+            if details:
+                label = f"{type_indicator} {label}\\n({node_class})\\n{chr(10).join(details)}"
+            else:
+                label = f"{type_indicator} {label}\\n({node_class})"
+
             # D2 node definition with class
-            lines.append(f"{node.id}: {label} {{")
+            lines.append(f'{node.id}: "{label}" {{')
             lines.append(f"  class: {node_class}")
             if node.description:
-                lines.append(f'  tooltip: "{node.description}"')
+                # Escape quotes in description
+                desc = node.description.replace('"', '\\"')
+                lines.append(f'  tooltip: "{desc}"')
             lines.append("}")
 
         lines.append("")
@@ -650,8 +701,10 @@ class WorkflowVisualizer:
             # Replace non-alphanumeric with underscore
             return re.sub(r"[^a-zA-Z0-9_]", "_", s)
 
-        def escape_label(s: str) -> str:
+        def escape_label(s: Any) -> str:
             """Escape string for DOT label."""
+            if not isinstance(s, str):
+                s = str(s)
             return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
         lines = ["digraph workflow {"]
@@ -689,7 +742,23 @@ class WorkflowVisualizer:
             else:
                 extra = ", style=filled"
 
-            label = escape_label(node.name or node.id)
+            # Build enhanced label with type and metadata
+            label_lines = [escape_label(node.name or node.id)]
+            label_lines.append(f"({node.node_type.replace('Node', '').lower()})")
+
+            # Add metadata details
+            if node.metadata.get("exec"):
+                label_lines.append(f"exec: {node.metadata['exec']}")
+            if node.metadata.get("handler"):
+                label_lines.append(f"handler: {node.metadata['handler']}")
+            if node.metadata.get("blocked"):
+                label_lines.append(f"blocked: [{', '.join(node.metadata['blocked'])}]")
+            if node.metadata.get("timeout"):
+                label_lines.append(f"timeout: {node.metadata['timeout']}s")
+            if node.metadata.get("role"):
+                label_lines.append(f"role: {node.metadata['role']}")
+
+            label = "\\n".join(label_lines)
             lines.append(
                 f'    {node_id} [label="{label}", shape={shape}, '
                 f'fillcolor="{style.color}"{extra}]'
@@ -701,9 +770,13 @@ class WorkflowVisualizer:
         for edge in self._edges:
             src = sanitize_id(edge.source)
             tgt = sanitize_id(edge.target)
-            label_part = f', label="{escape_label(edge.label)}"' if edge.label else ""
-            style_part = ", style=dashed" if edge.conditional else ""
-            lines.append(f"    {src} -> {tgt} [{label_part}{style_part}]")
+            attrs = []
+            if edge.label:
+                attrs.append(f'label="{escape_label(edge.label)}"')
+            if edge.conditional:
+                attrs.append("style=dashed")
+            attr_str = ", ".join(attrs)
+            lines.append(f"    {src} -> {tgt} [{attr_str}]")
 
         lines.append("}")
 
