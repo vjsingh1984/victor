@@ -47,9 +47,9 @@ from victor.rag.assistant import RAGAssistant
 from victor.rag.document_store import (
     Document,
     DocumentChunk,
+    DocumentSearchResult,
     DocumentStore,
     DocumentStoreConfig,
-    SearchResult,
 )
 from victor.rag.chunker import DocumentChunker, ChunkingConfig
 from victor.rag.prompts import RAGPromptContributor
@@ -70,9 +70,9 @@ __all__ = [
     # Document store
     "Document",
     "DocumentChunk",
+    "DocumentSearchResult",
     "DocumentStore",
     "DocumentStoreConfig",
-    "SearchResult",
     # Chunking
     "DocumentChunker",
     "ChunkingConfig",

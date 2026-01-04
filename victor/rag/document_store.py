@@ -24,7 +24,7 @@ This module provides a complete document storage solution using LanceDB:
 Design:
     - Document: Source document with metadata
     - DocumentChunk: Indexed chunk with embedding
-    - SearchResult: Search result with score and context
+    - DocumentSearchResult: Search result with score and context
 
 Example:
     store = DocumentStore(path=".victor/rag")
@@ -144,10 +144,6 @@ class DocumentSearchResult:
     def doc_id(self) -> str:
         """Convenience property for document ID."""
         return self.chunk.doc_id
-
-
-# Backward compatibility alias
-SearchResult = DocumentSearchResult
 
 
 @dataclass
@@ -428,7 +424,7 @@ class DocumentStore:
         filter_doc_ids: Optional[List[str]] = None,
         filter_metadata: Optional[Dict[str, Any]] = None,
         use_hybrid: Optional[bool] = None,
-    ) -> List[SearchResult]:
+    ) -> List[DocumentSearchResult]:
         """Search for relevant chunks.
 
         Args:
@@ -501,7 +497,7 @@ class DocumentStore:
 
             results = await asyncio.to_thread(do_vector_search)
 
-        # Convert to SearchResult
+        # Convert to DocumentSearchResult
         import json
 
         search_results = []
@@ -538,7 +534,7 @@ class DocumentStore:
 
             score = 1.0 - row.get("_distance", 0.5)  # Convert distance to similarity
             search_results.append(
-                SearchResult(
+                DocumentSearchResult(
                     chunk=chunk,
                     score=score,
                     doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
@@ -559,7 +555,7 @@ class DocumentStore:
         k: int,
         filter_doc_ids: Optional[List[str]] = None,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[DocumentSearchResult]:
         """In-memory search fallback when LanceDB is not available."""
         if not hasattr(self, "_memory_chunks"):
             return []
@@ -600,7 +596,7 @@ class DocumentStore:
 
             score = cosine_similarity(query_embedding, chunk.embedding)
             results.append(
-                SearchResult(
+                DocumentSearchResult(
                     chunk=chunk,
                     score=score,
                     doc_source=self._doc_index.get(chunk.doc_id, Document("", "", "")).source,
@@ -614,9 +610,9 @@ class DocumentStore:
     async def _rerank(
         self,
         query: str,
-        results: List[SearchResult],
+        results: List[DocumentSearchResult],
         k: int,
-    ) -> List[SearchResult]:
+    ) -> List[DocumentSearchResult]:
         """Rerank results using cross-encoder or simple scoring.
 
         This is a simple lexical reranking. For production, use a cross-encoder.
