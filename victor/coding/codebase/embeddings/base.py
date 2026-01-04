@@ -66,11 +66,11 @@ class EmbeddingConfig(BaseModel):
     )
 
 
-# Import canonical SearchResult from storage.vector_stores.base
-from victor.storage.vector_stores.base import EmbeddingSearchResult, SearchResult
+# Import canonical EmbeddingSearchResult from storage.vector_stores.base
+from victor.storage.vector_stores.base import EmbeddingSearchResult
 
-# Re-export for backward compatibility - both names work
-__all_search__ = ["EmbeddingSearchResult", "SearchResult"]
+# Public search result type for this module
+__all_search__ = ["EmbeddingSearchResult"]
 
 
 class BaseEmbeddingProvider(ABC):
@@ -169,7 +169,7 @@ class BaseEmbeddingProvider(ABC):
         query: str,
         limit: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for documents similar to query.
 
         Args:

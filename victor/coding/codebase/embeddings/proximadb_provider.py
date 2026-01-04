@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional
 from victor.coding.codebase.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
-    SearchResult,
+    EmbeddingSearchResult,
 )
 from victor.coding.codebase.embeddings.models import (
     BaseEmbeddingModel,
@@ -393,7 +393,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         query: str,
         limit: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -450,7 +450,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
                 score = 1.0 / (1.0 + distance) if distance >= 0 else 0.0
 
                 results.append(
-                    SearchResult(
+                    EmbeddingSearchResult(
                         file_path=metadata.get("file_path", ""),
                         symbol_name=metadata.get("symbol_name"),
                         content=metadata.get("content", ""),

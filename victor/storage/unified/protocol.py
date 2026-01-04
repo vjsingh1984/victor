@@ -236,9 +236,6 @@ class UnifiedSearchResult:
 
 
 # Backward compatibility alias
-SearchResult = UnifiedSearchResult
-
-
 # =============================================================================
 # PROTOCOLS - Dependency Inversion Principle
 # =============================================================================
@@ -435,7 +432,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         ...
 
     # Unified Search (hybrid by default)
-    async def search(self, params: SearchParams) -> List[SearchResult]:
+    async def search(self, params: SearchParams) -> List[UnifiedSearchResult]:
         """Unified search combining keyword, semantic, and graph.
 
         Algorithm:
@@ -452,7 +449,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         query: str,
         limit: int = 20,
         threshold: float = 0.25,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Pure semantic search (vector similarity)."""
         ...
 
@@ -461,7 +458,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         query: str,
         limit: int = 20,
         symbol_types: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Pure keyword search (FTS)."""
         ...
 
@@ -503,7 +500,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         limit: int = 10,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Find semantically similar symbols to given symbol."""
         ...
 
@@ -511,7 +508,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         similarity_threshold: float = 0.5,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Find symbols that might be affected by changes (graph + semantic)."""
         ...
 
@@ -546,7 +543,7 @@ __all__ = [
     # Search
     "SearchMode",
     "SearchParams",
-    "SearchResult",
+    "UnifiedSearchResult",
     # Protocols
     "VectorStoreProtocol",
     "GraphStoreProtocol",

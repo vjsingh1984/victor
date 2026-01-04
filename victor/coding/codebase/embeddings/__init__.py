@@ -22,7 +22,7 @@ from victor.storage.vector_stores import (
     BaseEmbeddingModel,
     EmbeddingConfig,
     EmbeddingModelConfig,
-    SearchResult,
+    EmbeddingSearchResult,
     # Embedding models
     SentenceTransformerModel,
     OllamaEmbeddingModel,
@@ -42,7 +42,7 @@ __all__ = [
     "BaseEmbeddingModel",
     "EmbeddingConfig",
     "EmbeddingModelConfig",
-    "SearchResult",
+    "EmbeddingSearchResult",
     # Embedding models (from victor-core)
     "SentenceTransformerModel",
     "OllamaEmbeddingModel",

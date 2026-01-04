@@ -41,7 +41,7 @@ except ImportError:
 from victor.coding.codebase.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
-    SearchResult,
+    EmbeddingSearchResult,
 )
 from victor.coding.codebase.embeddings.models import (
     BaseEmbeddingModel,
@@ -237,7 +237,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         query: str,
         limit: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -262,7 +262,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             include=["documents", "metadatas", "distances"],
         )
 
-        # Convert to SearchResult objects
+        # Convert to EmbeddingSearchResult objects
         search_results = []
         if results["ids"] and results["ids"][0]:
             for i in range(len(results["ids"][0])):
@@ -275,7 +275,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
                 score = 1.0 - distance
 
                 search_results.append(
-                    SearchResult(
+                    EmbeddingSearchResult(
                         file_path=metadata.get("file_path", ""),
                         symbol_name=metadata.get("symbol_name"),
                         content=content,

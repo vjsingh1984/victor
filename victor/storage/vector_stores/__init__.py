@@ -44,7 +44,7 @@ This is a core framework module available to all verticals, not just coding.
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
-    SearchResult,
+    EmbeddingSearchResult,
 )
 from victor.storage.vector_stores.models import (
     BaseEmbeddingModel,
@@ -63,7 +63,7 @@ __all__ = [
     "BaseEmbeddingModel",
     "EmbeddingConfig",
     "EmbeddingModelConfig",
-    "SearchResult",
+    "EmbeddingSearchResult",
     # Embedding models
     "SentenceTransformerModel",
     "OllamaEmbeddingModel",

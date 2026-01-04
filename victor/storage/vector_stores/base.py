@@ -81,10 +81,6 @@ class EmbeddingSearchResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-# Backward compatibility alias
-SearchResult = EmbeddingSearchResult
-
-
 class BaseEmbeddingProvider(ABC):
     """Abstract base class for vector store providers.
 
@@ -181,7 +177,7 @@ class BaseEmbeddingProvider(ABC):
         query: str,
         limit: int = 10,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for documents similar to query.
 
         Args:
