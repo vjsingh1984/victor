@@ -1146,7 +1146,7 @@ class TestWorkflowExecutorExtended:
     async def test_execute_parallel_node_all_strategy(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """Execute parallel node with 'all' join strategy returns SKIPPED without workflow in context."""
+        """Execute parallel node with 'all' join strategy executes all nodes."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
@@ -1169,18 +1169,20 @@ class TestWorkflowExecutorExtended:
 
         result = await executor.execute(workflow)
 
-        # Parallel node returns SKIPPED when child nodes can't be resolved
-        # (requires workflow reference in context.metadata which executor doesn't set)
+        # Parallel node executes child nodes and returns COMPLETED
+        # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == NodeStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_node_any_strategy(self, mock_orchestrator):
-        """Execute parallel node with 'any' join strategy returns SKIPPED without workflow in context."""
+    async def test_execute_parallel_node_any_strategy(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
+        """Execute parallel node with 'any' join strategy executes all nodes."""
         executor = WorkflowExecutor(mock_orchestrator)
 
         mock_sub_agents = MagicMock()
-        mock_sub_agents.spawn = AsyncMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
         workflow = WorkflowDefinition(
@@ -1200,9 +1202,10 @@ class TestWorkflowExecutorExtended:
 
         result = await executor.execute(workflow)
 
-        # Parallel node returns SKIPPED when child nodes can't be resolved
+        # Parallel node executes child nodes and returns COMPLETED
+        # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == NodeStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_parallel_node_no_nodes(self, mock_orchestrator):
@@ -1297,19 +1300,20 @@ class TestWorkflowExecutorExtended:
     async def test_build_agent_task_with_input_mapping(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """_build_agent_task includes input mapping in task."""
+        """_build_agent_task substitutes placeholders in goal using input mapping."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
+        # Goal uses {placeholder} syntax for template substitution
         workflow = WorkflowDefinition(
             name="test",
             nodes={
                 "start": AgentNode(
                     id="start",
                     name="Start",
-                    goal="Analyze these files",
+                    goal="Analyze files {files} in {mode} mode",
                     input_mapping={"files": "target_files", "mode": "analysis_mode"},
                 ),
             },
@@ -1324,19 +1328,20 @@ class TestWorkflowExecutorExtended:
             },
         )
 
-        # Check that task contains input mapping
+        # Check that task has placeholders substituted
         call_kwargs = mock_sub_agents.spawn.call_args[1]
         task = call_kwargs["task"]
-        assert "Analyze these files" in task
-        assert "files" in task
-        assert "main.py" in task or "['main.py'" in task
-        assert "mode" in task
+        assert "Analyze files" in task
+        # Placeholders are replaced with JSON-serialized values
+        assert "main.py" in task
+        assert "utils.py" in task
+        assert "full" in task
 
     @pytest.mark.asyncio
     async def test_build_agent_task_with_previous_outputs(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """_build_agent_task includes previous node outputs."""
+        """_build_agent_task uses goal with template substitution; previous outputs stored in context."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
@@ -1351,50 +1356,56 @@ class TestWorkflowExecutorExtended:
             start_node="first",
         )
 
-        await executor.execute(workflow)
+        result = await executor.execute(workflow)
 
-        # Second agent's task should include first agent's output
+        # Both agents should be called
         assert mock_sub_agents.spawn.call_count == 2
+
+        # Second agent's task is just the goal (template substitution only)
         second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
         task = second_call_kwargs["task"]
-        assert "Previous Results" in task or "Task completed successfully" in task
+        assert task == "Continue work"
+
+        # Previous outputs are stored in context, not appended to task
+        assert result.context.get("first") == "Task completed successfully"
 
     @pytest.mark.asyncio
-    async def test_build_agent_task_truncates_long_outputs(self, mock_orchestrator):
-        """_build_agent_task truncates long previous outputs."""
-        long_result = MagicMock()
-        long_result.success = True
-        long_result.summary = "x" * 500  # Long output
-        long_result.error = None
-        long_result.tool_calls_used = 5
+    async def test_build_agent_task_with_template_substitution(self, mock_orchestrator):
+        """_build_agent_task substitutes template placeholders from context."""
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.summary = "Analysis complete"
+        mock_result.error = None
+        mock_result.tool_calls_used = 5
 
-        short_result = MagicMock()
-        short_result.success = True
-        short_result.summary = "Short result"
-        short_result.error = None
-        short_result.tool_calls_used = 3
-
-        executor = WorkflowExecutor(MagicMock())
+        executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
-        mock_sub_agents.spawn = AsyncMock(side_effect=[long_result, short_result])
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_result)
         executor._sub_agents = mock_sub_agents
 
         workflow = WorkflowDefinition(
             name="test",
             nodes={
-                "first": AgentNode(id="first", name="First", next_nodes=["second"]),
-                "second": AgentNode(id="second", name="Second"),
+                "start": AgentNode(
+                    id="start",
+                    name="Start",
+                    goal="Process {item} with priority {level}",
+                    input_mapping={"item": "target_item", "level": "priority_level"},
+                ),
             },
-            start_node="first",
+            start_node="start",
         )
 
-        await executor.execute(workflow)
+        result = await executor.execute(
+            workflow,
+            {"target_item": "config.yaml", "priority_level": "high"},
+        )
 
-        # Second agent's task should have truncated output
-        second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
-        task = second_call_kwargs["task"]
-        # The long output should be truncated to 200 chars + "..."
-        assert "..." in task or len(task) < 700
+        # Task should have placeholders substituted
+        call_kwargs = mock_sub_agents.spawn.call_args[1]
+        task = call_kwargs["task"]
+        assert "Process config.yaml with priority high" == task
+        assert result.success is True
 
     @pytest.mark.asyncio
     async def test_execute_node_exception_handling(self, mock_orchestrator):
