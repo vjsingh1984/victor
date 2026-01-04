@@ -629,6 +629,39 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
+    def get_tool_graph(cls) -> Optional[Any]:
+        """Get tool execution graph for this vertical.
+
+        Override to provide a custom ToolExecutionGraph that defines
+        tool dependencies, transitions, and execution sequences.
+        The graph is registered with the global ToolGraphRegistry.
+
+        Returns:
+            ToolExecutionGraph instance or None (no graph registered)
+        """
+        return None
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for workflow execution.
+
+        Override to provide domain-specific handlers for workflow nodes.
+        These handlers are registered with the HandlerRegistry during
+        vertical integration, replacing the previous import-side-effect
+        registration pattern.
+
+        Example:
+            @classmethod
+            def get_handlers(cls) -> Dict[str, Any]:
+                from victor.coding.handlers import HANDLERS
+                return HANDLERS
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        return {}
+
+    @classmethod
     def get_tiered_tools(cls) -> Optional[Any]:
         """Get tiered tool configuration for intelligent selection.
 

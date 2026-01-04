@@ -32,4 +32,4 @@ victor "explain src/index.ts and suggest improvements"
 
 Edit `~/.victor/profiles.yaml` to change the provider or model.
 
-If you want a local-only setup with no API keys, follow `docs/QUICKSTART_60S.md`.
+If you want a local-only setup with no API keys, follow `../QUICKSTART_60S.md`.

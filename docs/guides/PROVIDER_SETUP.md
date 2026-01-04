@@ -78,6 +78,6 @@ Platforms:
 - Replicate
 
 ## Tips
-- Use `docs/API_KEYS_CONFIGURATION.md` for credential options.
+- Use `../API_KEYS_CONFIGURATION.md` for credential options.
 - If tool calling is inconsistent, try another model or switch to keyword tool selection.
-- For offline use, combine local models with `docs/embeddings/AIRGAPPED.md`.
+- For offline use, combine local models with `../embeddings/AIRGAPPED.md`.

@@ -44,7 +44,7 @@ victor chat --mode plan "Plan the auth refactor"
 ```
 
 ## Tools (What the Agent Can Do)
-Tools are enabled by your profile, mode, and permissions. See the full list in `docs/TOOL_CATALOG.md`.
+Tools are enabled by your profile, mode, and permissions. See the full list in `TOOL_CATALOG.md`.
 
 Examples:
 ```
@@ -54,8 +54,8 @@ Show git status and recent commits
 ```
 
 ## Workflows
-- CLI workflows: `examples/workflows/README.md`
-- YAML workflows: `docs/guides/WORKFLOW_DSL.md`
+- CLI workflows: `../examples/workflows/README.md`
+- YAML workflows: `guides/WORKFLOW_DSL.md`
 
 ## Troubleshooting
 - Ollama not reachable: `ollama serve`
@@ -63,6 +63,6 @@ Show git status and recent commits
 - API key issues: `victor keys --list`
 
 ## More Help
-- Quick Start: `docs/guides/QUICKSTART.md`
-- Provider setup: `docs/guides/PROVIDER_SETUP.md`
-- Examples: `examples/README.md`
+- Quick Start: `guides/QUICKSTART.md`
+- Provider setup: `guides/PROVIDER_SETUP.md`
+- Examples: `../examples/README.md`

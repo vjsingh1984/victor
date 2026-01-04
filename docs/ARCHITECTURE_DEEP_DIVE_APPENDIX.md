@@ -332,7 +332,7 @@ models:
 
 ## Evaluation System (v0.4.0)
 
-Victor includes a comprehensive evaluation harness for benchmarking against industry standards.
+Victor includes an evaluation harness for benchmarking tasks.
 
 ### Evaluation Components
 

@@ -134,6 +134,14 @@ def reset_singletons():
         except ImportError:
             pass
 
+        # Reset ProgressiveToolsRegistry singleton
+        try:
+            from victor.tools.progressive_registry import ProgressiveToolsRegistry
+
+            ProgressiveToolsRegistry.reset_instance()
+        except ImportError:
+            pass
+
     # Reset before test
     _reset_all()
 

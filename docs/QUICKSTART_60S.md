@@ -26,7 +26,7 @@ ollama pull qwen2.5-coder:7b
 victor init
 ```
 
-This creates `~/.victor/profiles.yaml` with a working local profile.
+This creates `~/.victor/profiles.yaml`; review it to pick a local model.
 
 ## 4) Chat
 
@@ -43,4 +43,4 @@ victor "write unit tests for src/utils.py"
 ## Troubleshooting
 
 - If `victor chat` cannot reach Ollama, verify `ollama serve` is running.
-- The default model is `qwen2.5-coder:7b` in `~/.victor/profiles.yaml`.
+- If you want a different model, update `~/.victor/profiles.yaml`.

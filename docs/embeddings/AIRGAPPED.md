@@ -20,4 +20,4 @@ Air-gapped mode runs Victor without external network calls by using local models
 
 ## Troubleshooting
 - Missing tools: try keyword or hybrid tool selection.
-- Tool calling format issues: see `docs/embeddings/TOOL_CALLING_FORMATS.md`.
+- Tool calling format issues: see `TOOL_CALLING_FORMATS.md`.

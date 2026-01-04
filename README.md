@@ -144,7 +144,7 @@ See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 |----------|-------------|
 | [User Guide](docs/USER_GUIDE.md) | Complete usage |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Contributing |
-| [Tool Catalog](docs/TOOL_CATALOG.md) | All 55 tools |
+| [Tool Catalog](docs/TOOL_CATALOG.md) | Tool list |
 | [Provider Setup](docs/guides/PROVIDER_SETUP.md) | Provider config |
 | [Local Models](docs/guides/LOCAL_MODELS.md) | Ollama, LM Studio, vLLM, llama.cpp |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |

@@ -1,6 +1,6 @@
 <div align="center">
 
-![Victor Banner](../assets/victor-banner.png)
+![Victor Banner](assets/victor-banner.png)
 
 # Victor Enterprise Evaluation
 
@@ -42,8 +42,8 @@ victor chat --provider ollama --model qwen2.5-coder:7b
 - Run Victor in a container or VM
 - Integrate with internal auth, logging, and CI
 
-See `docker/README.md` for container deployment basics.
-See `docs/ENTERPRISE_DEPLOYMENT.md` for the full deployment appendix.
+See `../docker/README.md` for container deployment basics.
+See `ENTERPRISE_DEPLOYMENT.md` for the full deployment appendix.
 
 ## Data & Security Notes
 - Local models keep prompts and outputs on your infrastructure.

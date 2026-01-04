@@ -394,5 +394,5 @@ This file is the single source of truth for what keys are supported.
 ## See Also
 
 - [Victor Configuration Guide](./DEVELOPER_GUIDE.md)
-- [Security Best Practices](./SECURITY.md)
+- [Security Best Practices](../SECURITY.md)
 - [API Keys Registry](../victor/config/api_keys_registry.yaml)

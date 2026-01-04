@@ -49,4 +49,4 @@ If you want to disable network tools:
 victor init --airgapped
 ```
 
-See `docs/embeddings/AIRGAPPED.md` for offline workflows.
+See `../embeddings/AIRGAPPED.md` for offline workflows.

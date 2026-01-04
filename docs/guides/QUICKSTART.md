@@ -1,12 +1,12 @@
 <div align="center">
 
-![Victor Banner](../../assets/victor-banner.png)
+![Victor Banner](../assets/victor-banner.png)
 
 # Quick Start
 
 </div>
 
-> For Docker, see `docker/README.md` and `docker/QUICKREF.md`.
+> For Docker, see `../../docker/README.md` and `../../docker/QUICKREF.md`.
 
 ## Prerequisites
 - Python 3.10+
@@ -56,7 +56,7 @@ victor "summarize this repo"
 - Import errors: reinstall with `pip install -e ".[dev]"` for local dev
 
 ## Next Steps
-- User Guide: `docs/USER_GUIDE.md`
-- Provider Setup: `docs/guides/PROVIDER_SETUP.md`
-- Local Models: `docs/guides/LOCAL_MODELS.md`
-- Examples: `examples/README.md`
+- User Guide: `../USER_GUIDE.md`
+- Provider Setup: `PROVIDER_SETUP.md`
+- Local Models: `LOCAL_MODELS.md`
+- Examples: `../../examples/README.md`

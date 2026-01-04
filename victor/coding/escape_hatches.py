@@ -255,6 +255,52 @@ def bugfix_priority(ctx: Dict[str, Any]) -> str:
     return "p3"
 
 
+def should_continue_fixing(ctx: Dict[str, Any]) -> str:
+    """Determine if agent should continue attempting fixes.
+
+    Multi-factor decision based on iteration count, error patterns, and progress.
+
+    Args:
+        ctx: Workflow context with keys:
+            - fix_iterations (int): Number of fix attempts made
+            - max_iterations (int): Maximum allowed iterations (default 5)
+            - progress_made (bool): Whether last iteration made progress
+            - test_results (dict): Current test results
+
+    Returns:
+        "continue_fixing", "escalate", or "submit_best_effort"
+    """
+    iterations = ctx.get("fix_iterations", 0)
+    max_iter = ctx.get("max_iterations", 5)
+    progress_made = ctx.get("progress_made", False)
+    test_results = ctx.get("test_results", {})
+
+    # Calculate pass rate
+    passed = test_results.get("passed", 0)
+    failed = test_results.get("failed", 0)
+    total = passed + failed
+    pass_rate = passed / total if total > 0 else 0
+
+    # Max iterations reached
+    if iterations >= max_iter:
+        logger.info(f"Max fix iterations ({max_iter}) reached, submitting best effort")
+        return "submit_best_effort"
+
+    # High pass rate achieved
+    if pass_rate >= 0.95:
+        return "submit_best_effort"
+
+    # Still making progress
+    if progress_made and iterations < max_iter:
+        return "continue_fixing"
+
+    # No progress after several attempts
+    if iterations >= 3 and not progress_made:
+        return "escalate"
+
+    return "continue_fixing"
+
+
 # =============================================================================
 # Transform Functions
 # =============================================================================
@@ -335,6 +381,7 @@ CONDITIONS = {
     "complexity_assessment": complexity_assessment,
     "tdd_cycle_status": tdd_cycle_status,
     "bugfix_priority": bugfix_priority,
+    "should_continue_fixing": should_continue_fixing,
 }
 
 # Transforms available in YAML workflows
@@ -352,6 +399,7 @@ __all__ = [
     "complexity_assessment",
     "tdd_cycle_status",
     "bugfix_priority",
+    "should_continue_fixing",
     # Transforms
     "merge_code_analysis",
     "format_implementation_plan",

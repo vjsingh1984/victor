@@ -427,20 +427,26 @@ class EvaluationHarness:
     def __init__(
         self,
         runners: Optional[dict[BenchmarkType, BaseBenchmarkRunner]] = None,
+        checkpoint_dir: Optional[Path] = None,
     ):
         """Initialize the harness.
 
         Args:
             runners: Dict mapping benchmark types to runners
+            checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
         """
         self._runners = runners or {}
         try:
             from victor.config.secure_paths import get_victor_dir
 
-            self._results_dir = get_victor_dir() / "evaluations"
+            victor_dir = get_victor_dir()
+            self._results_dir = victor_dir / "evaluations"
+            self._checkpoint_dir = checkpoint_dir or victor_dir / "checkpoints"
         except ImportError:
             self._results_dir = Path.home() / ".victor" / "evaluations"
+            self._checkpoint_dir = checkpoint_dir or Path.home() / ".victor" / "checkpoints"
         self._results_dir.mkdir(parents=True, exist_ok=True)
+        self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def register_runner(self, runner: BaseBenchmarkRunner) -> None:
         """Register a benchmark runner.
@@ -461,12 +467,139 @@ class EvaluationHarness:
         """
         return self._runners.get(benchmark_type)
 
+    def _get_checkpoint_path(self, config: EvaluationConfig) -> Path:
+        """Get checkpoint file path for a config.
+
+        Creates a unique checkpoint ID based on benchmark, model, and task config.
+        """
+        import hashlib
+
+        # Build unique ID from config
+        config_str = f"{config.benchmark.value}_{config.model}_{config.max_tasks}"
+        if config.task_ids:
+            config_str += "_" + "_".join(sorted(config.task_ids))
+        checkpoint_id = hashlib.md5(config_str.encode()).hexdigest()[:12]
+
+        return self._checkpoint_dir / f"checkpoint_{config.benchmark.value}_{checkpoint_id}.json"
+
+    def _save_checkpoint(
+        self,
+        checkpoint_path: Path,
+        config: EvaluationConfig,
+        completed_results: list[TaskResult],
+        remaining_task_ids: list[str],
+        start_time: datetime,
+    ) -> None:
+        """Save checkpoint to disk after each task completion."""
+        import json
+
+        checkpoint_data = {
+            "config": {
+                "benchmark": config.benchmark.value,
+                "model": config.model,
+                "max_tasks": config.max_tasks,
+                "timeout_per_task": config.timeout_per_task,
+                "max_turns": config.max_turns,
+                "parallel_tasks": config.parallel_tasks,
+            },
+            "start_time": start_time.isoformat(),
+            "completed_task_ids": [r.task_id for r in completed_results],
+            "remaining_task_ids": remaining_task_ids,
+            "results": [
+                {
+                    "task_id": r.task_id,
+                    "status": r.status.value,
+                    "tests_passed": r.tests_passed,
+                    "tests_failed": r.tests_failed,
+                    "tests_total": r.tests_total,
+                    "duration_seconds": r.duration_seconds,
+                    "tokens_used": r.tokens_used,
+                    "tokens_input": r.tokens_input,
+                    "tokens_output": r.tokens_output,
+                    "tool_calls": r.tool_calls,
+                    "turns": r.turns,
+                    "completion_score": r.completion_score,
+                    "error_message": r.error_message,
+                    "generated_code": r.generated_code,
+                }
+                for r in completed_results
+            ],
+        }
+
+        # Atomic write with temp file
+        temp_path = checkpoint_path.with_suffix(".tmp")
+        with open(temp_path, "w") as f:
+            json.dump(checkpoint_data, f, indent=2)
+        temp_path.rename(checkpoint_path)
+
+        logger.debug(f"Checkpoint saved: {len(completed_results)} tasks completed")
+
+    def _load_checkpoint(
+        self,
+        checkpoint_path: Path,
+    ) -> Optional[tuple[list[TaskResult], list[str], datetime]]:
+        """Load checkpoint from disk.
+
+        Returns:
+            Tuple of (completed_results, remaining_task_ids, start_time) or None
+        """
+        import json
+
+        if not checkpoint_path.exists():
+            return None
+
+        try:
+            with open(checkpoint_path) as f:
+                data = json.load(f)
+
+            # Reconstruct TaskResult objects
+            completed_results = []
+            for r in data.get("results", []):
+                result = TaskResult(
+                    task_id=r["task_id"],
+                    status=TaskStatus(r["status"]),
+                    tests_passed=r.get("tests_passed"),
+                    tests_failed=r.get("tests_failed"),
+                    tests_total=r.get("tests_total"),
+                    duration_seconds=r.get("duration_seconds"),
+                    tokens_used=r.get("tokens_used", 0),
+                    tokens_input=r.get("tokens_input", 0),
+                    tokens_output=r.get("tokens_output", 0),
+                    tool_calls=r.get("tool_calls", 0),
+                    turns=r.get("turns", 0),
+                    completion_score=r.get("completion_score"),
+                    error_message=r.get("error_message"),
+                    generated_code=r.get("generated_code"),
+                )
+                completed_results.append(result)
+
+            remaining_task_ids = data.get("remaining_task_ids", [])
+            start_time = datetime.fromisoformat(data["start_time"])
+
+            logger.info(
+                f"Loaded checkpoint: {len(completed_results)} completed, "
+                f"{len(remaining_task_ids)} remaining"
+            )
+
+            return completed_results, remaining_task_ids, start_time
+
+        except Exception as e:
+            logger.warning(f"Failed to load checkpoint: {e}")
+            return None
+
+    def _clear_checkpoint(self, checkpoint_path: Path) -> None:
+        """Remove checkpoint file after successful completion."""
+        if checkpoint_path.exists():
+            checkpoint_path.unlink()
+            logger.debug("Checkpoint cleared")
+
     async def run_evaluation(
         self,
         config: EvaluationConfig,
         agent_callback: Any,  # Callable that takes task and returns output
         progress_callback: Optional[Any] = None,  # Callable(task_idx, total, TaskResult)
         retry_callback: Optional[Any] = None,  # Callable for self-correction retries
+        resume: bool = False,  # Resume from checkpoint if available
     ) -> EvaluationResult:
         """Run a complete evaluation.
 
@@ -478,6 +611,7 @@ class EvaluationHarness:
             retry_callback: Optional callback for self-correction retries.
                            Signature: (task, previous_code, feedback_prompt) -> str
                            Required if config.enable_self_correction is True.
+            resume: If True, resume from checkpoint if one exists for this config
 
         Returns:
             EvaluationResult with all task results
@@ -501,15 +635,39 @@ class EvaluationHarness:
             metrics_collector = CorrectionMetricsCollector()
 
         result = EvaluationResult(config=config)
-        result.start_time = datetime.now()
+
+        # Check for checkpoint if resuming
+        checkpoint_path = self._get_checkpoint_path(config)
+        completed_results: list[TaskResult] = []
+        completed_task_ids: set[str] = set()
+
+        if resume:
+            checkpoint_data = self._load_checkpoint(checkpoint_path)
+            if checkpoint_data:
+                completed_results, remaining_ids, result.start_time = checkpoint_data
+                completed_task_ids = {r.task_id for r in completed_results}
+                logger.info(
+                    f"Resuming from checkpoint: {len(completed_results)} tasks already completed"
+                )
+            else:
+                result.start_time = datetime.now()
+                logger.info("No checkpoint found, starting fresh")
+        else:
+            result.start_time = datetime.now()
 
         # Load tasks
         tasks = await runner.load_tasks(config)
-        logger.info(f"Loaded {len(tasks)} tasks for {config.benchmark.value}")
+        total_tasks = len(tasks)
+        logger.info(f"Loaded {total_tasks} tasks for {config.benchmark.value}")
+
+        # Filter out already completed tasks
+        if completed_task_ids:
+            tasks = [t for t in tasks if t.task_id not in completed_task_ids]
+            logger.info(f"Resuming with {len(tasks)} remaining tasks")
 
         # Run tasks
         if config.parallel_tasks > 1:
-            results = await self._run_parallel(
+            new_results = await self._run_parallel(
                 tasks,
                 runner,
                 agent_callback,
@@ -517,9 +675,12 @@ class EvaluationHarness:
                 progress_callback,
                 retry_callback,
                 metrics_collector,
+                checkpoint_path=checkpoint_path,
+                completed_results=completed_results,
+                total_tasks=total_tasks,
             )
         else:
-            results = await self._run_sequential(
+            new_results = await self._run_sequential(
                 tasks,
                 runner,
                 agent_callback,
@@ -527,10 +688,17 @@ class EvaluationHarness:
                 progress_callback,
                 retry_callback,
                 metrics_collector,
+                checkpoint_path=checkpoint_path,
+                completed_results=completed_results,
+                total_tasks=total_tasks,
             )
 
-        result.task_results = results
+        # Combine completed results with new results
+        result.task_results = completed_results + new_results
         result.end_time = datetime.now()
+
+        # Clear checkpoint on successful completion
+        self._clear_checkpoint(checkpoint_path)
 
         # Add correction metrics to result
         if metrics_collector:
@@ -553,25 +721,44 @@ class EvaluationHarness:
         progress_callback: Optional[Any] = None,
         retry_callback: Optional[Any] = None,
         metrics_collector: Optional[Any] = None,
+        checkpoint_path: Optional[Path] = None,
+        completed_results: Optional[list[TaskResult]] = None,
+        total_tasks: Optional[int] = None,
     ) -> list[TaskResult]:
-        """Run tasks sequentially."""
+        """Run tasks sequentially with checkpoint support."""
         results = []
+        all_results = list(completed_results or [])
+        effective_total = total_tasks or len(tasks)
+        start_idx = len(all_results)
 
         for i, task in enumerate(tasks):
-            logger.info(f"Running task {i + 1}/{len(tasks)}: {task.task_id}")
+            effective_idx = start_idx + i
+            logger.info(f"Running task {effective_idx + 1}/{effective_total}: {task.task_id}")
 
             try:
                 task_result = await self._run_single_task(
                     task, runner, agent_callback, config, retry_callback, metrics_collector
                 )
                 results.append(task_result)
+                all_results.append(task_result)
 
                 status_str = "PASS" if task_result.is_success else "FAIL"
                 logger.info(f"  Result: {status_str}")
 
+                # Save checkpoint after each task
+                if checkpoint_path:
+                    remaining_ids = [t.task_id for t in tasks[i + 1 :]]
+                    self._save_checkpoint(
+                        checkpoint_path,
+                        config,
+                        all_results,
+                        remaining_ids,
+                        datetime.now(),
+                    )
+
                 # Call progress callback if provided
                 if progress_callback:
-                    progress_callback(i, len(tasks), task_result)
+                    progress_callback(effective_idx, effective_total, task_result)
 
             except Exception as e:
                 logger.error(f"  Error: {e}")
@@ -581,10 +768,22 @@ class EvaluationHarness:
                     error_message=str(e),
                 )
                 results.append(error_result)
+                all_results.append(error_result)
+
+                # Save checkpoint even on error
+                if checkpoint_path:
+                    remaining_ids = [t.task_id for t in tasks[i + 1 :]]
+                    self._save_checkpoint(
+                        checkpoint_path,
+                        config,
+                        all_results,
+                        remaining_ids,
+                        datetime.now(),
+                    )
 
                 # Call progress callback for errors too
                 if progress_callback:
-                    progress_callback(i, len(tasks), error_result)
+                    progress_callback(effective_idx, effective_total, error_result)
 
         return results
 
@@ -597,11 +796,18 @@ class EvaluationHarness:
         progress_callback: Optional[Any] = None,
         retry_callback: Optional[Any] = None,
         metrics_collector: Optional[Any] = None,
+        checkpoint_path: Optional[Path] = None,
+        completed_results: Optional[list[TaskResult]] = None,
+        total_tasks: Optional[int] = None,
     ) -> list[TaskResult]:
-        """Run tasks in parallel."""
+        """Run tasks in parallel with checkpoint support."""
         semaphore = asyncio.Semaphore(config.parallel_tasks)
-        completed_count = 0
         lock = asyncio.Lock()
+        all_results = list(completed_results or [])
+        new_results: list[TaskResult] = []
+        effective_total = total_tasks or len(tasks)
+        start_idx = len(all_results)
+        completed_count = 0
 
         async def run_with_semaphore(idx: int, task: BenchmarkTask) -> TaskResult:
             nonlocal completed_count
@@ -617,18 +823,32 @@ class EvaluationHarness:
                         error_message=str(e),
                     )
 
-                # Call progress callback with lock to ensure ordered output
-                if progress_callback:
-                    async with lock:
-                        completed_count += 1
-                        progress_callback(completed_count - 1, len(tasks), result)
+                # Save checkpoint and call progress callback with lock
+                async with lock:
+                    completed_count += 1
+                    new_results.append(result)
+                    all_results.append(result)
+
+                    # Save checkpoint after each completion
+                    if checkpoint_path:
+                        completed_ids = {r.task_id for r in all_results}
+                        remaining_ids = [t.task_id for t in tasks if t.task_id not in completed_ids]
+                        self._save_checkpoint(
+                            checkpoint_path,
+                            config,
+                            all_results,
+                            remaining_ids,
+                            datetime.now(),
+                        )
+
+                    if progress_callback:
+                        effective_idx = start_idx + completed_count - 1
+                        progress_callback(effective_idx, effective_total, result)
 
                 return result
 
-        results = await asyncio.gather(
-            *[run_with_semaphore(i, task) for i, task in enumerate(tasks)]
-        )
-        return list(results)
+        await asyncio.gather(*[run_with_semaphore(i, task) for i, task in enumerate(tasks)])
+        return new_results
 
     async def _run_single_task(
         self,

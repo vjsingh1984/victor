@@ -160,7 +160,7 @@ def supports_tools(self) -> bool:
 ### TD-006: Stubbed Features ✅ RESOLVED
 
 **Issue**: Features claimed in documentation but not implemented
-**Resolution**: Marked as "Experimental (Not Yet Implemented)" in `docs/guides/GRAPH_BACKENDS.md`
+**Resolution**: Features documented as "Experimental (Not Yet Implemented)"
 
 | Feature | Location | Status |
 |---------|----------|--------|

@@ -361,12 +361,12 @@ pytest -n auto
 
 ## Success Metrics
 
-- **Phase 1**: 40% coverage, core functionality tested
-- **Phase 2**: 70% coverage, all features tested
-- **Phase 3**: 85%+ coverage, comprehensive test suite
-- **CI/CD**: Automated testing on all PRs
-- **Quality**: No critical bugs in tested code
-- **Performance**: Tests complete in < 5 minutes
+- **Phase 1**: 40% coverage target, core functionality tested
+- **Phase 2**: 70% coverage target, key features tested
+- **Phase 3**: 85%+ coverage target, broader test suite
+- **CI/CD**: Automated testing on PRs (when configured)
+- **Quality**: Reduce critical bugs in tested code
+- **Performance**: Aim for fast test runs on CI
 
 ## Next Steps
 

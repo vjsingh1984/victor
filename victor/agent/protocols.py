@@ -281,26 +281,82 @@ class ToolPipelineProtocol(Protocol):
 
 @runtime_checkable
 class ToolExecutorProtocol(Protocol):
-    """Protocol for tool execution.
+    """Protocol for tool execution - DIP compliant.
 
-    Handles individual tool execution with validation and retry.
+    Handles individual tool execution with validation and context support.
+    This protocol enables dependency inversion by allowing consumers to
+    depend on the abstraction rather than concrete implementations.
+
+    The protocol provides:
+    - Synchronous and asynchronous execution methods
+    - Argument validation before execution
+    - Optional context passing for execution environment
+
+    Usage:
+        from victor.agent.protocols import ToolExecutorProtocol
+
+        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict) -> Any:
+            if executor.validate_arguments(tool, args):
+                return await executor.aexecute(tool, args)
+            raise ValueError(f"Invalid arguments for {tool}")
+
+        # Mock in tests
+        mock_executor = MagicMock(spec=ToolExecutorProtocol)
+        mock_executor.validate_arguments.return_value = True
     """
 
-    async def execute(
+    def execute(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
-        tool_call_id: Optional[str] = None,
+        context: Optional[Any] = None,
     ) -> Any:
-        """Execute a single tool.
+        """Execute a tool synchronously.
 
         Args:
             tool_name: Name of tool to execute
-            arguments: Tool arguments
-            tool_call_id: Optional identifier for the call
+            arguments: Tool arguments as dictionary
+            context: Optional execution context (e.g., workspace, session info)
 
         Returns:
-            Tool result
+            Tool execution result
+        """
+        ...
+
+    async def aexecute(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Any] = None,
+    ) -> Any:
+        """Execute a tool asynchronously.
+
+        Args:
+            tool_name: Name of tool to execute
+            arguments: Tool arguments as dictionary
+            context: Optional execution context (e.g., workspace, session info)
+
+        Returns:
+            Tool execution result
+        """
+        ...
+
+    def validate_arguments(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> bool:
+        """Validate tool arguments before execution.
+
+        Checks that the provided arguments match the tool's expected schema.
+        Should be called before execute() or aexecute() to ensure valid input.
+
+        Args:
+            tool_name: Name of tool to validate against
+            arguments: Arguments to validate
+
+        Returns:
+            True if arguments are valid for the tool, False otherwise
         """
         ...
 
@@ -2249,6 +2305,8 @@ __all__ = [
     "ToolCoordinatorProtocol",
     "StateCoordinatorProtocol",
     "PromptCoordinatorProtocol",
+    # Vertical storage protocol (DIP compliance)
+    "VerticalStorageProtocol",
 ]
 
 
@@ -2937,5 +2995,85 @@ class PromptCoordinatorProtocol(Protocol):
 
         Args:
             mode: "minimal" or "extended"
+        """
+        ...
+
+
+# =============================================================================
+# Vertical Storage Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class VerticalStorageProtocol(Protocol):
+    """Protocol for storing vertical-specific data in orchestrator.
+
+    This protocol addresses the DIP (Dependency Inversion Principle) violation
+    where FrameworkStepHandler uses private attribute fallbacks on the orchestrator
+    (e.g., _vertical_middleware_storage, _safety_patterns, _team_specs).
+
+    By defining this protocol, consumers can depend on an abstraction rather than
+    concrete implementation details, enabling:
+    - Proper dependency injection
+    - Easy testing via mock substitution
+    - Clear contracts for vertical data storage
+
+    Usage:
+        from victor.agent.protocols import VerticalStorageProtocol
+
+        def configure_vertical(storage: VerticalStorageProtocol) -> None:
+            storage.set_middleware(middleware_list)
+            storage.set_safety_patterns(patterns)
+            storage.set_team_specs(specs)
+
+        # Later retrieval
+        middleware = storage.get_middleware()
+    """
+
+    def set_middleware(self, middleware: List[Any]) -> None:
+        """Store middleware configuration.
+
+        Args:
+            middleware: List of MiddlewareProtocol implementations
+        """
+        ...
+
+    def get_middleware(self) -> List[Any]:
+        """Retrieve middleware configuration.
+
+        Returns:
+            List of middleware instances, or empty list if not set
+        """
+        ...
+
+    def set_safety_patterns(self, patterns: List[Any]) -> None:
+        """Store safety patterns.
+
+        Args:
+            patterns: List of SafetyPattern instances from vertical extensions
+        """
+        ...
+
+    def get_safety_patterns(self) -> List[Any]:
+        """Retrieve safety patterns.
+
+        Returns:
+            List of safety pattern instances, or empty list if not set
+        """
+        ...
+
+    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+        """Store team specifications.
+
+        Args:
+            specs: Dictionary mapping team names to TeamSpec instances
+        """
+        ...
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Retrieve team specifications.
+
+        Returns:
+            Dictionary of team specs, or empty dict if not set
         """
         ...

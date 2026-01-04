@@ -1,6 +1,6 @@
 <div align="center">
 
-![Victor Banner](../assets/victor-banner.png)
+![Victor Banner](assets/victor-banner.png)
 
 # Enterprise Deployment Appendix
 
@@ -311,10 +311,10 @@ flowchart TB
 
 ### Secret Detection
 
-Victor includes comprehensive secret scanning:
+Victor includes secret scanning:
 
 ```python
-# Detected patterns (12+):
+# Detected patterns include:
 - API keys (AWS, Azure, GCP, OpenAI, Anthropic)
 - Database credentials
 - Private keys (RSA, SSH)
@@ -604,30 +604,10 @@ alerts:
 
 ## Commercial Support
 
-For enterprise deployment assistance, we offer:
-
-### Implementation Packages
-
-**Starter Package** - $15,000
-- 2 weeks of implementation support
-- Infrastructure setup and configuration
-- Training for up to 20 developers
-- 30 days of email support
-
-**Enterprise Package** - $50,000
-- 6 weeks of full implementation
-- Custom integration development
-- Training for unlimited developers
-- On-site deployment assistance
-- 90 days of priority support
-- Architecture review and optimization
-
-**Managed Service** - Custom pricing
-- Fully managed Victor deployment
-- 24/7 monitoring and support
-- Automatic scaling and updates
-- SLA guarantees (99.9% uptime)
-- Dedicated account manager
+For enterprise deployment help, reach out and we can scope options such as:
+- Evaluation support and architecture review
+- Deployment planning and integration guidance
+- Training and enablement sessions
 
 ### Contact
 
@@ -638,7 +618,7 @@ For enterprise deployment assistance, we offer:
 - Company size and industry
 - Compliance requirements
 - Expected usage (number of developers)
-- Timeline and budget
+- Timeline and preferred scope
 
 We aim to respond within 2 business days for enterprise inquiries.
 

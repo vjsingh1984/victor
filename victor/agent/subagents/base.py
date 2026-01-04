@@ -51,7 +51,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+
+from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -183,16 +185,35 @@ class SubAgent:
     def __init__(
         self,
         config: SubAgentConfig,
-        parent_orchestrator: "AgentOrchestrator",
+        parent: Union["AgentOrchestrator", SubAgentContext],
     ):
-        """Initialize sub-agent with configuration and parent.
+        """Initialize sub-agent with configuration and parent context.
 
         Args:
             config: Sub-agent configuration
-            parent_orchestrator: Parent orchestrator that spawned this sub-agent
+            parent: Parent context providing settings, provider, model, and tools.
+                Can be either a full AgentOrchestrator (for backward compatibility)
+                or any object implementing the SubAgentContext protocol.
+
+        Note:
+            If a full AgentOrchestrator is passed, it will be automatically
+            adapted to SubAgentContext for ISP compliance. This maintains
+            backward compatibility with existing code while enabling cleaner
+            testing through protocol-based dependency injection.
         """
         self.config = config
-        self.parent = parent_orchestrator
+
+        # Auto-adapt full orchestrator to SubAgentContext for ISP compliance
+        # Check if it's already a SubAgentContext (including adapters)
+        if isinstance(parent, SubAgentContext):
+            self._context: SubAgentContext = parent
+        else:
+            # Wrap the orchestrator with the adapter
+            self._context = SubAgentContextAdapter(parent)
+
+        # Keep reference to parent for backward compatibility
+        # (some code may access self.parent directly)
+        self.parent = parent
         self.orchestrator: Optional["AgentOrchestrator"] = None
 
         logger.info(
@@ -207,7 +228,7 @@ class SubAgent:
         - Limited tool access (only allowed_tools)
         - Constrained budget and context
         - Role-specific system prompt
-        - Shared provider and settings from parent
+        - Shared provider and settings from parent context
 
         Returns:
             Constrained orchestrator instance
@@ -215,17 +236,17 @@ class SubAgent:
         from copy import deepcopy
         from victor.agent.orchestrator import AgentOrchestrator
 
-        # Copy settings from parent but apply constraints
-        settings = deepcopy(self.parent.settings)
+        # Copy settings from parent context but apply constraints
+        settings = deepcopy(self._context.settings)
         settings.tool_budget = self.config.tool_budget
         settings.max_context_chars = self.config.context_limit
 
         # Create new orchestrator instance with same provider
         orchestrator = AgentOrchestrator(
             settings=settings,
-            provider=self.parent.provider_name,
-            model=self.parent.model,
-            temperature=self.parent.temperature,
+            provider=self._context.provider_name,
+            model=self._context.model,
+            temperature=self._context.temperature,
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
@@ -253,9 +274,9 @@ class SubAgent:
         # Clear existing tool registrations
         orchestrator.tool_registry.clear()
 
-        # Register only allowed tools from parent
+        # Register only allowed tools from parent context
         for tool_name in self.config.allowed_tools:
-            tool = self.parent.tool_registry.get(tool_name)
+            tool = self._context.tool_registry.get(tool_name)
             if tool:
                 orchestrator.tool_registry.register(tool)
             else:

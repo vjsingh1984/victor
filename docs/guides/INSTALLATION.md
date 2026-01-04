@@ -47,4 +47,4 @@ pip uninstall victor-ai
 
 ## Help
 - Issues: https://github.com/vijayksingh/victor/issues
-- Docs index: `docs/README.md`
+- Docs index: `../README.md`

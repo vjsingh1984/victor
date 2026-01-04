@@ -45,6 +45,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -336,11 +337,13 @@ def coding_lsp(languages: Optional[List[str]] = None, **kwargs: Any) -> Callable
 # =============================================================================
 
 
-class CodingCapabilityProvider:
+class CodingCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
     """Provider for coding-specific capabilities.
 
     This class provides a structured way to access and apply
-    coding capabilities to an orchestrator.
+    coding capabilities to an orchestrator. It inherits from
+    BaseCapabilityProvider for consistent capability registration
+    and discovery across all verticals.
 
     Example:
         provider = CodingCapabilityProvider()
@@ -351,25 +354,74 @@ class CodingCapabilityProvider:
         # Apply specific capabilities
         provider.apply_git_safety(orchestrator)
         provider.apply_code_style(orchestrator, formatter="black")
+
+        # Use BaseCapabilityProvider interface
+        cap = provider.get_capability("git_safety")
+        if cap:
+            cap(orchestrator)
     """
 
     def __init__(self):
         """Initialize the capability provider."""
         self._applied: Set[str] = set()
+        # Map capability names to their handler functions
+        self._capabilities: Dict[str, Callable[..., None]] = {
+            "git_safety": configure_git_safety,
+            "code_style": configure_code_style,
+            "test_requirements": configure_test_requirements,
+            "language_server": configure_language_server,
+            "refactoring": configure_refactoring,
+        }
+        # Capability metadata for discovery
+        self._metadata: Dict[str, CapabilityMetadata] = {
+            "git_safety": CapabilityMetadata(
+                name="git_safety",
+                description="Git safety rules for preventing dangerous operations",
+                version="1.0",
+                tags=["safety", "git", "version-control"],
+            ),
+            "code_style": CapabilityMetadata(
+                name="code_style",
+                description="Code style and formatting configuration",
+                version="1.0",
+                tags=["style", "formatting", "linting"],
+            ),
+            "test_requirements": CapabilityMetadata(
+                name="test_requirements",
+                description="Test configuration and requirements",
+                version="1.0",
+                tags=["testing", "coverage", "quality"],
+            ),
+            "language_server": CapabilityMetadata(
+                name="language_server",
+                description="Language server protocol configuration",
+                version="1.0",
+                tags=["lsp", "ide", "code-intelligence"],
+            ),
+            "refactoring": CapabilityMetadata(
+                name="refactoring",
+                description="Refactoring tool configuration",
+                version="1.0",
+                dependencies=["language_server"],
+                tags=["refactoring", "code-transformation"],
+            ),
+        }
 
-    def list_capabilities(self) -> List[str]:
-        """List all available capability names.
+    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
+        """Return all registered capabilities.
 
         Returns:
-            List of capability names
+            Dictionary mapping capability names to handler functions.
         """
-        return [
-            "git_safety",
-            "code_style",
-            "test_requirements",
-            "language_server",
-            "refactoring",
-        ]
+        return self._capabilities.copy()
+
+    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+        """Return metadata for all registered capabilities.
+
+        Returns:
+            Dictionary mapping capability names to their metadata.
+        """
+        return self._metadata.copy()
 
     def apply_git_safety(
         self,
@@ -572,8 +624,9 @@ __all__ = [
     "configure_language_server",
     "configure_refactoring",
     "get_code_style",
-    # Provider class
+    # Provider class and base types
     "CodingCapabilityProvider",
+    "CapabilityMetadata",  # Re-exported from framework for convenience
     # Capability list for loader
     "CAPABILITIES",
     # Convenience functions

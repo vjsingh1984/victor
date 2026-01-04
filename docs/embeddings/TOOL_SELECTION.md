@@ -12,7 +12,7 @@ Victor can select tools by comparing embeddings of the user request to tool desc
 - Optional: cached tool embeddings for faster selection
 
 ## Strategy Options
-- keyword: always available, fast, deterministic
+- keyword: available without embeddings, fast, deterministic
 - semantic: embedding-based matching
 - hybrid: blends keyword and semantic
 - auto: chooses based on availability and settings

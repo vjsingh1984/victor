@@ -100,8 +100,7 @@ docs/
 ├── guides/                        # User guides
 │   ├── INSTALLATION.md            # Installation methods
 │   ├── PROVIDER_SETUP.md          # Provider configuration
-│   ├── QUICKSTART.md              # Getting started
-│   └── MCP_GUIDE.md               # MCP integration
+│   └── QUICKSTART.md              # Getting started
 │
 ├── reference/                     # Technical reference
 │   ├── PROVIDERS.md               # Provider details

@@ -258,4 +258,4 @@ class MyStageDetector:
 
 - [VERTICALS.md](./VERTICALS.md) - Domain-specific stage configurations
 - [Tool Catalog](./TOOL_CATALOG.md) - Complete tool reference
-- [API Reference](./API.md) - Framework API documentation
+- [Developer Guide](DEVELOPER_GUIDE.md) - Framework entrypoints and structure

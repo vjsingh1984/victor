@@ -232,6 +232,9 @@ def run_benchmark(
     timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    resume: bool = typer.Option(
+        False, "--resume", "-r", help="Resume from checkpoint if previous run was interrupted"
+    ),
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
@@ -372,7 +375,7 @@ def run_benchmark(
                     else:
                         # Setup on-the-fly (slower, but works without explicit setup)
                         console.print(
-                            f"  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
+                            "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
                         )
                         await workspace_manager.setup_repo_with_indexes(benchmark_task)
                         work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
@@ -441,11 +444,15 @@ def run_benchmark(
                 )
 
             # Run evaluation
-            progress.update(task, description="Running evaluation...")
+            if resume:
+                progress.update(task, description="Resuming evaluation...")
+            else:
+                progress.update(task, description="Running evaluation...")
             result = await harness.run_evaluation(
                 config=config,
                 agent_callback=agent_callback,
                 progress_callback=on_progress,
+                resume=resume,
             )
 
             return result

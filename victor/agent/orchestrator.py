@@ -221,6 +221,8 @@ from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.tool_names import ToolNames, TOOL_ALIASES
+from victor.tools.alias_resolver import get_alias_resolver
+from victor.tools.progressive_registry import get_progressive_registry
 from victor.storage.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.discovery import register_builtin_workflows
@@ -237,7 +239,8 @@ logger = logging.getLogger(__name__)
 # Tools with progressive parameters - different params = progress, not a loop
 # Format: tool_name -> list of param names that indicate progress
 # NOTE: Includes both canonical short names and legacy names for LLM compatibility
-PROGRESSIVE_TOOLS = {
+# NOTE: These values are registered with ProgressiveToolsRegistry for extensibility
+_PROGRESSIVE_TOOLS_CONFIG = {
     # Canonical short names
     "read": ["path", "offset", "limit"],
     "grep": ["query", "directory"],
@@ -260,6 +263,89 @@ PROGRESSIVE_TOOLS = {
     "web_summarize": ["query"],
     "web_fetch": ["url"],
 }
+
+
+def _register_progressive_tools() -> None:
+    """Register all progressive tools with the ProgressiveToolsRegistry.
+
+    This function is idempotent and can be called multiple times safely.
+    Tools are only registered if not already present in the registry.
+    """
+    registry = get_progressive_registry()
+    for tool_name, params in _PROGRESSIVE_TOOLS_CONFIG.items():
+        if not registry.is_progressive(tool_name):
+            # Convert list of param names to dict format expected by registry
+            progressive_params = dict.fromkeys(params, "any")
+            registry.register(tool_name, progressive_params)
+
+
+def _ensure_progressive_tools_registered() -> None:
+    """Ensure progressive tools are registered in the registry.
+
+    This is called lazily on first access to handle cases where
+    the registry singleton was reset (e.g., during testing).
+    """
+    registry = get_progressive_registry()
+    # Quick check if already registered by checking for one known tool
+    if not registry.is_progressive("read"):
+        _register_progressive_tools()
+
+
+# Register tools at module load time
+_register_progressive_tools()
+
+
+class _ProgressiveToolsProxy:
+    """Proxy class that delegates to ProgressiveToolsRegistry for backward compatibility.
+
+    This allows existing code using PROGRESSIVE_TOOLS dict-like access to continue working
+    while the actual data is managed by the registry.
+
+    The proxy ensures tools are re-registered if the registry was reset (e.g., during tests).
+    """
+
+    def __getitem__(self, key: str) -> List[str]:
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        config = registry.get_config(key)
+        if config is None:
+            raise KeyError(key)
+        return list(config.progressive_params.keys())
+
+    def __contains__(self, key: str) -> bool:
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        return registry.is_progressive(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        config = registry.get_config(key)
+        if config is None:
+            return default
+        return list(config.progressive_params.keys())
+
+    def keys(self) -> Set[str]:
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        return registry.list_progressive_tools()
+
+    def items(self):
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        for tool_name in registry.list_progressive_tools():
+            config = registry.get_config(tool_name)
+            if config:
+                yield tool_name, list(config.progressive_params.keys())
+
+    def __iter__(self):
+        _ensure_progressive_tools_registered()
+        registry = get_progressive_registry()
+        return iter(registry.list_progressive_tools())
+
+
+# Backward-compatible constant that delegates to the registry
+PROGRESSIVE_TOOLS = _ProgressiveToolsProxy()
 
 # Build set of all known tool names (canonical + aliases) for detection
 _ALL_TOOL_NAMES: Set[str] = set()
@@ -1997,6 +2083,82 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         self._vertical_safety_patterns = patterns
 
+    # =========================================================================
+    # VerticalStorageProtocol Implementation (DIP Compliance)
+    # These public methods implement VerticalStorageProtocol, providing a clean
+    # interface for vertical data storage and retrieval. This replaces direct
+    # private attribute access with protocol-compliant methods.
+    # =========================================================================
+
+    def set_middleware(self, middleware: List[Any]) -> None:
+        """Store middleware configuration.
+
+        Implements VerticalStorageProtocol.set_middleware().
+        Provides a clean public interface for setting vertical middleware,
+        replacing direct private attribute access.
+
+        Args:
+            middleware: List of MiddlewareProtocol implementations
+        """
+        self._vertical_middleware = middleware
+
+    def get_middleware(self) -> List[Any]:
+        """Retrieve middleware configuration.
+
+        Implements VerticalStorageProtocol.get_middleware().
+        Returns the list of middleware instances configured by vertical integration.
+
+        Returns:
+            List of middleware instances, or empty list if not set
+        """
+        return getattr(self, "_vertical_middleware", [])
+
+    def set_safety_patterns(self, patterns: List[Any]) -> None:
+        """Store safety patterns.
+
+        Implements VerticalStorageProtocol.set_safety_patterns().
+        Provides a clean public interface for setting vertical safety patterns,
+        replacing direct private attribute access.
+
+        Args:
+            patterns: List of SafetyPattern instances from vertical extensions
+        """
+        self._vertical_safety_patterns = patterns
+
+    def get_safety_patterns(self) -> List[Any]:
+        """Retrieve safety patterns.
+
+        Implements VerticalStorageProtocol.get_safety_patterns().
+        Returns the list of safety patterns configured by vertical integration.
+
+        Returns:
+            List of safety pattern instances, or empty list if not set
+        """
+        return getattr(self, "_vertical_safety_patterns", [])
+
+    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+        """Store team specifications.
+
+        Implements VerticalStorageProtocol.set_team_specs().
+        Provides a clean public interface for setting team specs,
+        replacing direct private attribute access.
+
+        Args:
+            specs: Dictionary mapping team names to TeamSpec instances
+        """
+        self._team_specs = specs
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Retrieve team specifications.
+
+        Implements VerticalStorageProtocol.get_team_specs().
+        Returns the dictionary of team specs configured by vertical integration.
+
+        Returns:
+            Dictionary of team specs, or empty dict if not set
+        """
+        return getattr(self, "_team_specs", {})
+
     @property
     def messages(self) -> List[Message]:
         """Get conversation messages (backward compatibility property).
@@ -3085,20 +3247,48 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         These map to 'shell' canonically, but in INITIAL stage only 'shell_readonly'
         may be enabled. This method resolves to whichever shell variant is available.
 
+        This method now delegates to ToolAliasResolver for extensibility while
+        maintaining backward compatibility with existing behavior.
+
         Args:
             tool_name: Original tool name (may be alias like 'run')
 
         Returns:
             The appropriate enabled shell tool name, or original if not a shell alias
         """
-        from victor.tools.tool_names import get_canonical_name, ToolNames
-
         # Shell-related aliases that should resolve intelligently
         # Also include shell_readonly so it can be upgraded to shell in BUILD mode
         shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
 
         if tool_name not in shell_aliases:
             return tool_name
+
+        # Get alias resolver and register shell aliases with our custom resolver
+        # We always register to ensure this orchestrator's resolver is used (handles
+        # multiple orchestrator instances correctly by updating the resolver reference)
+        resolver = get_alias_resolver()
+        resolver.register(
+            ToolNames.SHELL,
+            aliases=list(shell_aliases - {ToolNames.SHELL}),
+            resolver=self._shell_alias_resolver,
+        )
+
+        # Use the alias resolver - it will call our custom resolver
+        return resolver.resolve(tool_name, enabled_tools=[])
+
+    def _shell_alias_resolver(self, tool_name: str) -> str:
+        """Custom resolver for shell aliases that checks mode and tool availability.
+
+        This is registered with ToolAliasResolver to handle shell-related resolution.
+        It encapsulates the mode-aware logic for choosing between shell and shell_readonly.
+
+        Args:
+            tool_name: The shell-related tool name being resolved.
+
+        Returns:
+            The appropriate shell variant based on mode and tool availability.
+        """
+        from victor.tools.tool_names import get_canonical_name
 
         # Check mode controller for BUILD mode (allows all tools including shell)
         # Uses ModeAwareMixin for consistent access

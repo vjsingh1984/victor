@@ -41,26 +41,26 @@ from victor.framework.enrichment import (
     EnrichmentContext,
     EnrichmentPriority,
     EnrichmentType,
+    FilePatternMatcher,
+    DATA_PATTERNS,
+    KeywordClassifier,
+    ANALYSIS_TYPES,
 )
 
 logger = logging.getLogger(__name__)
 
+# Use framework pattern matcher with DATA_PATTERNS for file detection
+_file_pattern_matcher = FilePatternMatcher(DATA_PATTERNS)
 
-# Keywords that indicate specific analysis types
-ANALYSIS_TYPE_KEYWORDS = {
-    "correlation": ["correlation", "correlate", "relationship", "association"],
-    "regression": ["regression", "predict", "forecast", "trend"],
-    "clustering": ["cluster", "segment", "group", "categorize"],
-    "classification": ["classify", "categorize", "predict class", "label"],
-    "time_series": ["time series", "temporal", "seasonal", "trend analysis"],
-    "statistical_test": ["test", "hypothesis", "significance", "p-value"],
-    "visualization": ["plot", "chart", "graph", "visualize", "histogram"],
-    "profiling": ["profile", "describe", "summary", "statistics"],
-}
+# Use framework keyword classifier with ANALYSIS_TYPES for analysis type detection
+_analysis_classifier = KeywordClassifier(ANALYSIS_TYPES)
 
 
 def _detect_analysis_type(prompt: str) -> List[str]:
     """Detect the type of analysis requested from the prompt.
+
+    Uses the framework's KeywordClassifier with ANALYSIS_TYPES for consistent
+    keyword-based classification across verticals.
 
     Args:
         prompt: The prompt text to analyze
@@ -68,14 +68,7 @@ def _detect_analysis_type(prompt: str) -> List[str]:
     Returns:
         List of detected analysis types
     """
-    prompt_lower = prompt.lower()
-    detected = []
-
-    for analysis_type, keywords in ANALYSIS_TYPE_KEYWORDS.items():
-        if any(kw in prompt_lower for kw in keywords):
-            detected.append(analysis_type)
-
-    return detected
+    return _analysis_classifier.classify(prompt)
 
 
 def _extract_data_references(prompt: str) -> Dict[str, List[str]]:
@@ -152,7 +145,8 @@ class DataAnalysisEnrichmentStrategy:
         """Get enrichments for a data analysis prompt.
 
         Detects analysis type and provides relevant guidance,
-        schema context, and method recommendations.
+        schema context, and method recommendations. Uses framework utilities
+        for pattern matching and keyword classification.
 
         Args:
             prompt: The prompt to enrich
@@ -163,17 +157,28 @@ class DataAnalysisEnrichmentStrategy:
         """
         enrichments: List[ContextEnrichment] = []
 
-        # Detect analysis types
+        # Detect analysis types using framework KeywordClassifier
         analysis_types = _detect_analysis_type(prompt)
 
-        # Extract data references
+        # Extract data references from prompt text
         data_refs = _extract_data_references(prompt)
 
+        # Also categorize any files from context using framework FilePatternMatcher
+        data_file_categories: Dict[str, List[str]] = {}
+        if context.file_mentions:
+            data_file_categories = _file_pattern_matcher.match(context.file_mentions)
+
         try:
+            # Collect all data sources for schema lookup
+            all_data_files = data_refs["files"] + data_refs["tables"]
+            # Add categorized data files from context
+            for category, files in data_file_categories.items():
+                all_data_files.extend(files)
+
             # Add schema context if we have data references
-            if data_refs["files"] or data_refs["tables"]:
+            if all_data_files:
                 schema_enrichment = await self._enrich_from_schema(
-                    data_refs["files"] + data_refs["tables"]
+                    list(set(all_data_files))  # Deduplicate
                 )
                 if schema_enrichment:
                     enrichments.append(schema_enrichment)

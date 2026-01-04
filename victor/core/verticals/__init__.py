@@ -39,6 +39,21 @@ from victor.core.verticals.protocols import (
     WorkflowProviderProtocol,
     RLConfigProviderProtocol,
     TeamSpecProviderProtocol,
+    # ISP-Compliant Provider Protocols
+    MiddlewareProvider,
+    SafetyProvider,
+    WorkflowProvider,
+    TeamProvider,
+    RLProvider,
+    EnrichmentProvider,
+    ToolProvider,
+    HandlerProvider,
+    CapabilityProvider,
+    ModeConfigProvider,
+    PromptContributorProvider,
+    ToolDependencyProvider,
+    TieredToolConfigProvider,
+    ServiceProvider,
 )
 from victor.core.verticals.base_service_provider import (
     BaseVerticalServiceProvider,
@@ -67,6 +82,21 @@ __all__ = [
     "WorkflowProviderProtocol",
     "RLConfigProviderProtocol",
     "TeamSpecProviderProtocol",
+    # ISP-Compliant Provider Protocols
+    "MiddlewareProvider",
+    "SafetyProvider",
+    "WorkflowProvider",
+    "TeamProvider",
+    "RLProvider",
+    "EnrichmentProvider",
+    "ToolProvider",
+    "HandlerProvider",
+    "CapabilityProvider",
+    "ModeConfigProvider",
+    "PromptContributorProvider",
+    "ToolDependencyProvider",
+    "TieredToolConfigProvider",
+    "ServiceProvider",
     # Service providers
     "BaseVerticalServiceProvider",
     "VerticalServiceProviderFactory",
@@ -116,6 +146,13 @@ def _register_builtin_verticals() -> None:
         from victor.rag import RAGAssistant
 
         VerticalRegistry.register(RAGAssistant)
+    except ImportError:
+        pass
+
+    try:
+        from victor.benchmark import BenchmarkVertical
+
+        VerticalRegistry.register(BenchmarkVertical)
     except ImportError:
         pass
 
