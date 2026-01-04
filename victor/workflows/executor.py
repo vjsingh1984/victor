@@ -655,6 +655,7 @@ class WorkflowExecutor:
                 "execution_id": execution_id,
                 "workflow_name": workflow.name,
                 "thread_id": thread_id,
+                "workflow": workflow,  # Required for parallel node execution
             },
             temporal=temporal_context,
         )
@@ -952,33 +953,38 @@ class WorkflowExecutor:
     def _build_agent_task(self, node: AgentNode, context: WorkflowContext) -> str:
         """Build task string for an agent node.
 
+        Performs template substitution on node.goal using input_mapping values,
+        allowing YAML workflows to use {placeholder} syntax in goal templates.
+
         Args:
             node: Agent node
             context: Execution context
 
         Returns:
-            Task description for agent
+            Task description for agent with placeholders substituted
         """
-        lines = [node.goal]
+        import json
 
-        # Add mapped inputs from context
+        # Build substitution dict from input_mapping
+        substitutions = {}
         if node.input_mapping:
-            lines.append("\n## Context")
             for param, key in node.input_mapping.items():
                 value = context.get(key)
                 if value is not None:
-                    lines.append(f"- **{param}**: {value}")
+                    # Convert complex objects to string for template substitution
+                    if not isinstance(value, str):
+                        try:
+                            value = json.dumps(value, indent=2, default=str)
+                        except (TypeError, ValueError):
+                            value = str(value)
+                    substitutions[param] = value
 
-        # Add outputs from previous nodes
-        outputs = context.get_outputs()
-        if outputs:
-            lines.append("\n## Previous Results")
-            for output_key, output_value in outputs.items():
-                if isinstance(output_value, str) and len(output_value) > 200:
-                    output_value = output_value[:200] + "..."
-                lines.append(f"- **{output_key}**: {output_value}")
+        # Substitute placeholders in goal template (e.g., {symbol} -> "AAPL")
+        goal = node.goal
+        for key, value in substitutions.items():
+            goal = goal.replace(f"{{{key}}}", value)
 
-        return "\n".join(lines)
+        return goal
 
     async def _execute_condition_node(
         self,
