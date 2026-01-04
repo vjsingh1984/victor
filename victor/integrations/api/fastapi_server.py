@@ -164,9 +164,6 @@ class APISearchResult(BaseModel):
 
 
 # Backward compatibility alias
-SearchResult = APISearchResult
-
-
 class SearchResponse(BaseModel):
     """Search response payload."""
 
@@ -603,7 +600,7 @@ class VictorFastAPIServer:
                 if tool_result.success:
                     matches = tool_result.data.get("matches", [])
                     results = [
-                        SearchResult(
+                        APISearchResult(
                             file=r.get("file", ""),
                             line=r.get("line", 0),
                             content=r.get("content", ""),
@@ -646,7 +643,7 @@ class VictorFastAPIServer:
                         if match.get("type") == "match":
                             data = match.get("data", {})
                             results.append(
-                                SearchResult(
+                                APISearchResult(
                                     file=data.get("path", {}).get("text", ""),
                                     line=data.get("line_number", 0),
                                     content=data.get("lines", {}).get("text", "").strip(),

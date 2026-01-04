@@ -169,10 +169,6 @@ class ClientStreamChunk:
         }
 
 
-# Backward compatibility alias
-StreamChunk = ClientStreamChunk
-
-
 @dataclass
 class CodeSearchResult:
     """Result from a code search operation.
@@ -205,10 +201,6 @@ class CodeSearchResult:
             score=data["score"],
             context=data.get("context", ""),
         )
-
-
-# Backward compatibility alias
-SearchResult = CodeSearchResult
 
 
 @dataclass
@@ -274,7 +266,7 @@ class VictorProtocol(ABC):
         ...
 
     @abstractmethod
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response.
 
         Args:
@@ -295,7 +287,9 @@ class VictorProtocol(ABC):
     # =========================================================================
 
     @abstractmethod
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[SearchResult]:
+    async def semantic_search(
+        self, query: str, max_results: int = 10
+    ) -> list[CodeSearchResult]:
         """Search code by semantic meaning.
 
         Args:
@@ -314,7 +308,7 @@ class VictorProtocol(ABC):
         regex: bool = False,
         case_sensitive: bool = False,
         file_pattern: str | None = None,
-    ) -> list[SearchResult]:
+    ) -> list[CodeSearchResult]:
         """Search code by pattern.
 
         Args:
