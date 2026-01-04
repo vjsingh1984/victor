@@ -5,6 +5,61 @@
 # - Paper discovery and screening
 # - Data extraction and synthesis
 # - Professional review output
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for academic database searches)                         │
+# │   - Write access (for literature review output)                             │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - search_general: Google Scholar, Semantic Scholar, CrossRef APIs         │
+# │   - search_preprints: arXiv, bioRxiv/medRxiv, SSRN access                   │
+# │   - search_grey_lit: Thesis repositories, conference proceedings            │
+# │   - web_fetch: PDF downloads and content extraction                         │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ min_papers_threshold: 10 (minimum for comprehensive review)                 │
+# │ citation_style: APA (default for academic work)                             │
+# │ date_range: last 10 years (adjustable via requirements)                     │
+# │ quality_threshold: 0.6 (minimum methodological rigor score)                 │
+# │ hitl_timeout: 600s (10 min for search expansion decisions)                  │
+# │ review_max_tokens: 10000 (comprehensive literature review length)           │
+# │ duplicate_threshold: 0.85 (title similarity for deduplication)              │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - format_citations: Template-based bibliography formatting                 │
+# │     (Rules: Apply citation style patterns to metadata fields)               │
+# │   - deduplicate_results: String similarity on titles/DOIs                   │
+# │     (Algorithm: Fuzzy matching, exact DOI comparison)                       │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - define_scope: DESIGNING research methodology and criteria               │
+# │   - search_*: INTERPRETING search results for relevance                     │
+# │   - title_abstract_screening: JUDGING paper inclusion/exclusion             │
+# │   - full_text_review: EVALUATING methodology and quality                    │
+# │   - data_extraction: EXTRACTING key findings with interpretation            │
+# │   - synthesis: INTEGRATING themes across multiple papers                    │
+# │   - generate_review: WRITING academic prose with proper structure           │
+# │                                                                              │
+# │ Literature review is expert analysis - most steps require LLM:              │
+# │   - Defining research questions and inclusion criteria                      │
+# │   - Screening papers for relevance (beyond keyword matching)                │
+# │   - Evaluating methodological quality of studies                            │
+# │   - Synthesizing findings into coherent thematic analysis                   │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   literature_review:
@@ -129,6 +184,16 @@ workflows:
           protocol: review_protocol
         output: grey_lit
 
+      # TRANSFORM: Deduplication uses deterministic string matching
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Fuzzy title matching (Levenshtein) + exact DOI comparison
+      # Threshold: 0.85 similarity for title matches
+      # Priority: Keep paper with most complete metadata when duplicates found
+      #
+      # WHY TRANSFORM (not agent): Pure algorithmic operation:
+      #   - String comparison doesn't need semantic understanding
+      #   - DOI matching is exact equality check
+      #   - No judgment on "which paper is better" (just dedup)
       - id: deduplicate_results
         type: transform
         name: "Deduplicate Results"
@@ -307,6 +372,21 @@ workflows:
         output: synthesis
         next: [format_citations]
 
+      # COMPUTE: Citation formatting is deterministic template application
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Map paper metadata to citation style templates
+      # Styles supported: APA, MLA, Chicago, Harvard, IEEE, Vancouver
+      # Input: Reviewed papers with full bibliographic metadata
+      # Output: Formatted bibliography ready for inclusion
+      #
+      # WHY COMPUTE: No interpretation needed - mechanical text formatting:
+      #   - Author name order: Last, First vs. First Last
+      #   - Date placement: after author vs. at end
+      #   - Italics/quotes: for titles based on style rules
+      #   - All rules are codified, no judgment required
+      #
+      # Execution: in-process (Python string templates)
+      # BLOCKED: [llm, write] - read-only formatting operation
       - id: format_citations
         type: compute
         name: "Format Citations"
@@ -315,9 +395,8 @@ workflows:
           references: $ctx.reviewed_papers
           style: $ctx.citation_style
         output: bibliography
-        constraints:
-          llm_allowed: false
-          timeout: 60
+        constraints: [llm, write]
+        timeout: 60
         next: [review_synthesis]
 
       - id: review_synthesis

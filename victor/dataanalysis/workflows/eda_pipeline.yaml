@@ -8,6 +8,62 @@
 # 5. Human-in-the-loop gates
 # 6. Error recovery paths
 # 7. Hybrid ComputeNode + AgentNode execution
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python with pandas/numpy/matplotlib/seaborn)           │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - pandas, numpy for data operations                                       │
+# │   - matplotlib, seaborn, plotly for visualizations                          │
+# │   - scipy for statistical tests                                             │
+# │   - scikit-learn for anomaly detection (isolation_forest)                   │
+# │                                                                              │
+# │ Docker execution:                                                            │
+# │   - Image: victor-dataanalysis:latest                                       │
+# │   - Build: docker build -f docker/Dockerfile.dataanalysis -t victor-da .    │
+# │   - Useful for: Large datasets, reproducibility, GPU acceleration           │
+# │                                                                              │
+# │ Subprocess execution:                                                        │
+# │   - For visualization nodes to isolate matplotlib backend                   │
+# │   - Prevents memory leaks from repeated plot generation                     │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ quality_threshold: 0.8 (data quality score to skip cleanup)                 │
+# │ cleanup_attempts_max: 3 (retry limit for data cleanup loop)                 │
+# │ correlation_method: pearson (alternative: spearman, kendall)                │
+# │ histogram_bins: 50 (default binning for distributions)                      │
+# │ anomaly_contamination: 0.05 (expected outlier ratio)                        │
+# │ revision_limit: 3 (max human revision cycles)                               │
+# │ hitl_timeout: 900s (15 min human review timeout)                            │
+# │ output_format: png (alternative: svg, pdf, html)                            │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - load_data: File I/O (pd.read_csv/parquet/json)                          │
+# │   - validate: Boolean checks (isna, duplicated, dtypes)                     │
+# │   - basic_stats: df.describe(), df.info()                                   │
+# │   - correlations: df.corr() - Pearson/Spearman matrix                       │
+# │   - distributions: np.histogram(), kernel density estimation                 │
+# │   - anomaly_detection: IsolationForest.fit_predict()                        │
+# │   - visualization: matplotlib/seaborn render operations                      │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - data_cleanup: Deciding WHICH imputation strategy to use                 │
+# │   - analyze: Interpreting what correlations MEAN                            │
+# │   - deep_dive: Investigating WHY patterns exist                             │
+# │   - refine_analysis: Incorporating human domain knowledge                   │
+# │   - revision_loop: Understanding revision feedback                           │
+# │   - report: Writing coherent narrative from statistics                       │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   eda_pipeline:
@@ -17,6 +73,31 @@ workflows:
       version: "2.0"
       author: "victor"
       vertical: dataanalysis
+
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    services:
+      # Project database for tracking analysis history
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      # Temporary output directory for charts/visualizations
+      output_workspace:
+        type: filesystem
+        config:
+          path: $ctx.output_dir
+          auto_cleanup: false        # Preserve outputs for review
+          max_size_gb: 5
+        lifecycle:
+          start: auto
+          cleanup: preserve          # Keep visualizations
 
     batch_config:
       batch_size: 5
@@ -34,6 +115,16 @@ workflows:
       # PATTERN 1: Sequential Tool Chaining
       # Load -> Validate -> Process
       # =====================================================================
+      # COMPUTE: File I/O is deterministic parsing
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pandas file readers (read_csv, read_parquet, read_json)
+      # Format auto-detection based on extension or explicit format param.
+      #
+      # WHY NOT AGENT: File parsing is mechanical - no judgment about WHAT
+      # to load or HOW to interpret it. Schema inference is algorithmic.
+      #
+      # Execution: in-process (pandas)
+      # Constraints: Filesystem read only, no network
       - id: load_data
         type: compute
         name: "Load Dataset"
@@ -44,10 +135,25 @@ workflows:
         output: raw_data
         constraints:
           llm_allowed: false
+          filesystem_allowed: true     # Read input file
+          network_allowed: false       # No remote data sources
+          write_allowed: false         # Read-only operation
           max_cost_tier: FREE
           timeout: 30
         next: [validate]
 
+      # COMPUTE: Validation is boolean checks with clear pass/fail
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pandas type/null checks:
+      #   - check_dtypes: pd.api.types.is_*_dtype() per column
+      #   - check_missing: df.isna().sum() with threshold
+      #   - check_duplicates: df.duplicated().sum()
+      #
+      # WHY NOT AGENT: All checks return True/False based on configured
+      # thresholds. No interpretation needed - just arithmetic comparisons.
+      #
+      # Execution: in-process (pure pandas, no external deps)
+      # Constraints: Operates on in-memory data, no I/O
       - id: validate
         type: compute
         name: "Validate Data Quality"
@@ -61,6 +167,9 @@ workflows:
         output: validation_result
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
           max_cost_tier: FREE
           timeout: 60
         next: [check_quality]
@@ -103,6 +212,17 @@ workflows:
       # PATTERN 3: Agent Loop (Retry with Refinement)
       # Re-validate after cleanup, loop back if still failing
       # =====================================================================
+      # COMPUTE: Re-validation uses same algorithms as initial validation
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Same pandas checks as validate node
+      # Used to determine if cleanup was successful - pure comparison.
+      #
+      # WHY NOT AGENT: Checking if cleanup worked is arithmetic:
+      #   old_missing_count > new_missing_count? True/False.
+      # No judgment about WHAT to do next (that's the condition node).
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory only
       - id: validate_cleanup
         type: compute
         name: "Re-validate Cleaned Data"
@@ -115,6 +235,9 @@ workflows:
         output: cleanup_validation
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
           timeout: 30
         next: [cleanup_loop_check]
 
@@ -138,6 +261,17 @@ workflows:
         join_strategy: all
         next: [aggregate_stats]
 
+      # COMPUTE: Basic statistics are aggregation formulas
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.describe() which computes:
+      #   count, mean, std, min, 25%, 50%, 75%, max per numeric column
+      # Plus: df.nunique(), df.mode() for categoricals
+      #
+      # WHY NOT AGENT: These are mathematical definitions, not interpretations.
+      # Mean is sum/count - no judgment involved.
+      #
+      # Execution: in-process (pure numpy/pandas)
+      # Constraints: Pure computation, no I/O
       - id: basic_stats
         type: compute
         name: "Basic Statistics"
@@ -147,9 +281,24 @@ workflows:
         output: statistics
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
           max_cost_tier: FREE
           timeout: 60
 
+      # COMPUTE: Correlation is a mathematical formula
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.corr(method='pearson|spearman|kendall')
+      #   Pearson: cov(X,Y) / (std(X) * std(Y))
+      #   Spearman: Pearson on ranked values
+      #   Kendall: Concordant/discordant pair ratio
+      #
+      # WHY NOT AGENT: Computing correlation coefficients is pure math.
+      # INTERPRETING what r=0.85 means requires an agent.
+      #
+      # Execution: in-process (numpy linear algebra)
+      # Constraints: CPU-bound, may benefit from threading for large matrices
       - id: correlations
         type: compute
         name: "Correlation Matrix"
@@ -161,8 +310,22 @@ workflows:
         output: correlation_matrix
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
           timeout: 60
 
+      # COMPUTE: Distributions are histogram binning algorithms
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: np.histogram(data, bins) per numeric column
+      # Plus: scipy.stats.gaussian_kde() for density estimation
+      # Bin edges determined by Sturges/Freedman-Diaconis/fixed count
+      #
+      # WHY NOT AGENT: Counting values in bins is arithmetic.
+      # DESCRIBING the distribution shape requires an agent.
+      #
+      # Execution: in-process (numpy/scipy)
+      # Constraints: Pure computation
       - id: distributions
         type: compute
         name: "Distribution Analysis"
@@ -173,8 +336,27 @@ workflows:
         output: distribution_data
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
           timeout: 60
 
+      # COMPUTE: Anomaly detection is unsupervised ML algorithm
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: IsolationForest from scikit-learn
+      #   Builds ensemble of random trees
+      #   Anomaly score = average path length to isolate point
+      #   Points isolated quickly (short paths) are anomalies
+      #   contamination param sets expected outlier fraction
+      #
+      # WHY NOT AGENT: Algorithm outputs anomaly scores mathematically.
+      # DECIDING what to do with anomalies requires an agent.
+      #
+      # Execution: in-process (scikit-learn)
+      #   For large datasets (>1M rows), consider subprocess or docker
+      #   to isolate memory and enable early termination
+      #
+      # Constraints: CPU-intensive, benefits from multi-core
       - id: anomaly_detection
         type: compute
         name: "Detect Anomalies"
@@ -186,6 +368,9 @@ workflows:
         output: anomalies
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure ML computation
+          write_allowed: false         # No outputs
           timeout: 120
 
       # =====================================================================
@@ -321,6 +506,23 @@ workflows:
         join_strategy: all
         next: [review]
 
+      # COMPUTE: Chart generation is deterministic rendering
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: matplotlib/seaborn rendering with fixed parameters:
+      #   - Box plots: plt.boxplot() with IQR whiskers
+      #   - Histograms: plt.hist() with configured bins
+      #   - Bar charts: plt.bar() for categorical summaries
+      #   - Scatter: plt.scatter() for numeric relationships
+      #
+      # WHY NOT AGENT: Chart rendering is mechanical - given data and
+      # chart type, output is deterministic. CHOOSING which charts
+      # to create might need an agent, but rendering doesn't.
+      #
+      # Execution: subprocess RECOMMENDED to isolate matplotlib backend
+      #   Prevents memory leaks from repeated figure creation
+      #   Also allows parallel rendering without GIL contention
+      #
+      # Constraints: Write to output directory
       - id: summary_charts
         type: compute
         name: "Summary Charts"
@@ -331,9 +533,24 @@ workflows:
           output_dir: $ctx.output_dir
         output: chart_paths
         constraints:
-          write_allowed: true
+          llm_allowed: false
+          filesystem_allowed: true     # Write output files
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG files
           timeout: 120
 
+      # COMPUTE: Heatmap is a matrix colormap render
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: seaborn.heatmap(corr_matrix)
+      #   Color scale: diverging (blue-white-red) centered at 0
+      #   Annotations: correlation values in cells
+      #   Clustering: optional hierarchical for reordering
+      #
+      # WHY NOT AGENT: Heatmap rendering from a matrix is deterministic.
+      # The correlation matrix is already computed - this just draws it.
+      #
+      # Execution: subprocess (same matplotlib isolation reasoning)
+      # Constraints: Write output file
       - id: correlation_heatmap
         type: compute
         name: "Correlation Heatmap"
@@ -343,9 +560,25 @@ workflows:
           output_path: $ctx.output_dir
         output: heatmap_path
         constraints:
-          write_allowed: true
+          llm_allowed: false
+          filesystem_allowed: true     # Write output file
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG file
           timeout: 60
 
+      # COMPUTE: Anomaly visualization is scatter plot rendering
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: plt.scatter() with color coding:
+      #   - Normal points: one color
+      #   - Anomalies: highlighted color/marker
+      #   - May include decision boundary for IsolationForest
+      #
+      # WHY NOT AGENT: Given anomaly labels and data, rendering is
+      # deterministic. No judgment about WHICH points are anomalies -
+      # that was already computed by the anomaly_detection node.
+      #
+      # Execution: subprocess (matplotlib isolation)
+      # Constraints: Write output files
       - id: anomaly_plots
         type: compute
         name: "Anomaly Visualizations"
@@ -356,7 +589,10 @@ workflows:
           output_dir: $ctx.output_dir
         output: anomaly_chart_paths
         constraints:
-          write_allowed: true
+          llm_allowed: false
+          filesystem_allowed: true     # Write output files
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG files
           timeout: 90
 
       # =====================================================================
@@ -477,6 +713,9 @@ workflows:
   # =========================================================================
   # Lightweight EDA - Quick Analysis Mode
   # =========================================================================
+  # Fast-path workflow for initial data exploration.
+  # Execution: in-process only (no docker overhead)
+  # Use case: CI pipelines, quick checks, prototyping
   eda_quick:
     description: "Quick EDA with minimal LLM usage"
 
@@ -484,6 +723,15 @@ workflows:
       vertical: dataanalysis
 
     nodes:
+      # COMPUTE: Quick stats runs minimal pandas operations
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.describe() + df.shape + df.dtypes
+      # Much lighter than full EDA - no anomaly detection, no correlations
+      #
+      # WHY NOT AGENT: describe() is a fixed statistical summary.
+      #
+      # Execution: in-process (pandas only)
+      # Constraints: Read file, pure computation
       - id: quick_stats
         type: compute
         name: "Quick Statistics"
@@ -494,6 +742,9 @@ workflows:
         output: stats
         constraints:
           llm_allowed: false
+          filesystem_allowed: true     # Read data file
+          network_allowed: false       # Local only
+          write_allowed: false         # No outputs
           max_cost_tier: FREE
           timeout: 45
         next: [quick_check]
@@ -506,6 +757,16 @@ workflows:
           "true": sample_analysis
           "false": full_quick_analysis
 
+      # COMPUTE: Sampling is random selection algorithm
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.sample(n=sample_size, random_state=42)
+      # Deterministic with fixed seed, then runs describe() on sample
+      #
+      # WHY NOT AGENT: Random sampling is algorithmic (RNG with seed).
+      # Deciding WHETHER to sample is the condition node's job.
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory operation
       - id: sample_analysis
         type: compute
         name: "Sample-based Analysis"
@@ -515,9 +776,19 @@ workflows:
         output: sampled_stats
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
           timeout: 30
         next: [quick_insights]
 
+      # COMPUTE: Full analysis on small datasets
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Same as quick_stats but on full data (no sampling)
+      # Used when row_count <= 10000 (manageable size)
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory operation
       - id: full_quick_analysis
         type: compute
         name: "Full Quick Analysis"
@@ -525,6 +796,9 @@ workflows:
         output: full_stats
         constraints:
           llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
           timeout: 60
         next: [quick_insights]
 

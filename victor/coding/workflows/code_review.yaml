@@ -6,6 +6,58 @@
 # - Best practices verification
 # - Performance review
 # - Documentation check
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + subprocess (external tools)                  │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - Linters: ruff, flake8, eslint (language-dependent)                      │
+# │   - Type checkers: mypy, pyright, tsc                                       │
+# │   - Security: bandit, semgrep, trivy                                        │
+# │   - Complexity: radon, lizard                                               │
+# │                                                                              │
+# │ Tool installation varies by project - use project's tool config             │
+# │ (pyproject.toml, package.json, .tool-versions)                              │
+# │                                                                              │
+# │ Docker: Useful for CI pipelines with pre-installed tool versions            │
+# │   - Image: victor-codereview:latest                                         │
+# │   - Build: docker build -f docker/Dockerfile.codereview -t victor-cr .      │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ diff_command: git diff HEAD~1 (or git diff main...HEAD)                     │
+# │ lint_command: ruff check . (or project-specific)                            │
+# │ type_check_command: mypy . (or project-specific)                            │
+# │ security_scan_command: bandit -r . (or semgrep, trivy)                      │
+# │ complexity_command: radon cc . -a -nc (or lizard)                           │
+# │ test_command: pytest (or project-specific)                                  │
+# │ hitl_timeout: 900s (15 min for human reviews)                               │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - gather_changes: git diff/log commands (subprocess)                      │
+# │   - lint_check: ruff/eslint subprocess execution                            │
+# │   - type_check: mypy/tsc subprocess execution                               │
+# │   - security_scan: bandit/semgrep subprocess execution                      │
+# │   - complexity_analysis: radon/lizard subprocess execution                  │
+# │   - verify_fixes: pytest/test runner subprocess execution                   │
+# │   All tool outputs are deterministic based on code - no LLM needed.         │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - ai_review: INTERPRETING results and finding logic issues                │
+# │   - categorize_findings: PRIORITIZING issues by severity                    │
+# │   - apply_fixes: WRITING code to fix issues                                 │
+# │   - approve_with_comments: SUMMARIZING and WRITING review                   │
+# │   All require judgment, interpretation, or creative writing.                │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   code_review:
@@ -16,10 +68,34 @@ workflows:
       author: "victor"
       vertical: coding
 
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    services:
+      # Project database for tracking review history
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
     nodes:
       # =====================================================================
       # Stage 1: Gather Changes
       # =====================================================================
+      # COMPUTE: git diff/log are subprocess commands with deterministic output
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: subprocess.run(["git", "diff", ...])
+      # Output is text diff - no interpretation, just capture.
+      #
+      # WHY NOT AGENT: git commands are mechanical - they output text.
+      # No reasoning about WHAT changed - that's the agent's job later.
+      #
+      # Execution: subprocess (git CLI)
+      # BLOCKED: [llm, write] - read-only git operation
       - id: gather_changes
         type: compute
         name: "Gather Code Changes"
@@ -28,9 +104,8 @@ workflows:
           command: $ctx.diff_command
           base_branch: $ctx.base_branch
         output: changes
-        constraints:
-          llm_allowed: false
-          timeout: 60
+        constraints: [llm, write]
+        timeout: 60
         next: [check_changes]
 
       - id: check_changes
@@ -58,6 +133,14 @@ workflows:
         join_strategy: all
         next: [aggregate_results]
 
+      # COMPUTE: Linters are subprocess tools with rule-based output
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: ruff/flake8/eslint apply AST rules to code
+      # Output is structured: file:line:col: code message
+      # Rules are configured in pyproject.toml/.eslintrc - no LLM.
+      #
+      # Execution: subprocess (ruff, flake8, eslint)
+      # BLOCKED: [llm, write] - read-only analysis
       - id: lint_check
         type: compute
         name: "Run Linters"
@@ -67,10 +150,16 @@ workflows:
             - $ctx.lint_command
             - $ctx.format_check_command
         output: lint_results
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        constraints: [llm, write]
+        timeout: 180
 
+      # COMPUTE: Type checkers are static analysis tools
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: mypy/pyright perform type inference and checking
+      # Output is structured errors - deterministic for given code + config.
+      #
+      # Execution: subprocess (mypy, pyright, tsc)
+      # BLOCKED: [llm, write] - read-only analysis
       - id: type_check
         type: compute
         name: "Run Type Checker"
@@ -78,10 +167,17 @@ workflows:
         inputs:
           command: $ctx.type_check_command
         output: type_results
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        constraints: [llm, write]
+        timeout: 180
 
+      # COMPUTE: Security scanners apply pattern-based detection
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: bandit/semgrep apply security rules to AST
+      # SAST (Static Application Security Testing) - no runtime.
+      # Output: vulnerability type, severity, line number.
+      #
+      # Execution: subprocess (bandit, semgrep, trivy)
+      # BLOCKED: [llm, write] - read-only analysis
       - id: security_scan
         type: compute
         name: "Security Analysis"
@@ -90,10 +186,17 @@ workflows:
           commands:
             - $ctx.security_scan_command
         output: security_results
-        constraints:
-          llm_allowed: false
-          timeout: 300
+        constraints: [llm, write]
+        timeout: 300
 
+      # COMPUTE: Complexity analysis uses AST metrics
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: radon/lizard compute cyclomatic complexity (CC)
+      # CC = edges - nodes + 2p (McCabe formula) - pure graph theory.
+      # Also: Halstead metrics, maintainability index.
+      #
+      # Execution: subprocess (radon, lizard)
+      # BLOCKED: [llm, write] - read-only analysis
       - id: complexity_analysis
         type: compute
         name: "Complexity Analysis"
@@ -101,9 +204,8 @@ workflows:
         inputs:
           command: $ctx.complexity_command
         output: complexity_results
-        constraints:
-          llm_allowed: false
-          timeout: 120
+        constraints: [llm, write]
+        timeout: 120
 
       # =====================================================================
       # Stage 3: Aggregate and AI Review
@@ -289,6 +391,14 @@ workflows:
         output: applied_fixes
         next: [verify_fixes]
 
+      # COMPUTE: Test runner verifies fixes with pass/fail output
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pytest/jest runs test suite
+      # Output is structured: passed, failed, skipped counts + failures.
+      # No interpretation - just run tests and capture results.
+      #
+      # Execution: subprocess (pytest, jest, go test)
+      # BLOCKED: [llm] - tests need write for temp files, network for fixtures
       - id: verify_fixes
         type: compute
         name: "Verify Fixes"
@@ -296,9 +406,8 @@ workflows:
         inputs:
           command: $ctx.test_command
         output: fix_verification
-        constraints:
-          llm_allowed: false
-          timeout: 300
+        constraints: [llm]
+        timeout: 300
         next: [check_fix_success]
 
       - id: check_fix_success
@@ -405,6 +514,9 @@ workflows:
   # =========================================================================
   # Quick Review - Lightweight Check
   # =========================================================================
+  # Fast-path workflow for small PRs (< 100 lines changed)
+  # Uses haiku model for speed, minimal tool budget
+  # Execution: in-process + subprocess (git)
   quick_review:
     description: "Quick code review for small changes"
 
@@ -412,14 +524,15 @@ workflows:
       vertical: coding
 
     nodes:
+      # COMPUTE: git diff is deterministic subprocess
+      # BLOCKED: [llm, write] - read-only git operation
       - id: gather
         type: compute
         name: "Gather Changes"
         tools: [shell]
         output: changes
-        constraints:
-          llm_allowed: false
-          timeout: 30
+        constraints: [llm, write]
+        timeout: 30
         next: [review]
 
       - id: review
@@ -458,3 +571,238 @@ workflows:
         name: "Approved"
         transform: |
           status = "approved"
+
+
+  # =========================================================================
+  # PR Review - Pull Request Review Workflow
+  # =========================================================================
+  # Full PR review with impact analysis and dependency checking
+  # Execution: in-process + subprocess (git, gh CLI)
+  pr_review:
+    description: "Pull request review with impact analysis and test coverage"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: coding
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Fetch PR Changes
+      # =====================================================================
+      # COMPUTE: git/gh commands are subprocess with structured output
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: git log, git diff, gh pr view subprocess calls
+      # Handler aggregates: commits, diff stats, PR metadata
+      # All deterministic based on PR state.
+      #
+      # Execution: subprocess (git, gh CLI)
+      # BLOCKED: [llm, write] - read-only git/GitHub operations
+      - id: fetch_pr
+        type: compute
+        name: "Fetch PR Changes"
+        handler: git_pr_fetcher
+        tools: [shell, read]
+        inputs:
+          pr_number: $ctx.pr_number
+          base_branch: $ctx.base_branch
+          fetch_metadata: true
+          fetch_diff: true
+          fetch_commits: true
+        output: pr_changes
+        constraints: [llm, write]
+        timeout: 120
+        next: [analyze_impact]
+
+      # =====================================================================
+      # Stage 2: Analyze Impact
+      # =====================================================================
+      - id: analyze_impact
+        type: agent
+        name: "Analyze Impact"
+        role: researcher
+        goal: |
+          Analyze the impact of changes on the codebase:
+
+          1. **Scope Analysis**
+             - What parts of the codebase are affected?
+             - Are there breaking changes?
+             - How many files/functions are modified?
+
+          2. **Dependency Analysis**
+             - What depends on the modified code?
+             - Could changes break existing functionality?
+             - Are there circular dependencies introduced?
+
+          3. **Risk Assessment**
+             - Identify high-risk changes
+             - Check for potential regressions
+             - Flag changes to critical paths
+
+          Changes to analyze: {pr_changes}
+        tool_budget: 20
+        tools: [read, grep, code_search, references, symbols]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          changes: pr_changes
+        output: impact_analysis
+        next: [check_tests]
+
+      # =====================================================================
+      # Stage 3: Check Tests
+      # =====================================================================
+      - id: check_tests
+        type: agent
+        name: "Check Test Coverage"
+        role: reviewer
+        goal: |
+          Check test coverage for the changes:
+
+          1. **Existing Tests**
+             - Are there tests covering the modified code?
+             - Do the tests pass with the changes?
+             - Is coverage adequate?
+
+          2. **New Tests**
+             - Were tests added for new functionality?
+             - Do new tests follow project conventions?
+             - Are edge cases covered?
+
+          3. **Test Quality**
+             - Are tests meaningful (not just coverage padding)?
+             - Do tests verify correct behavior?
+             - Are there integration tests if needed?
+        tool_budget: 15
+        tools: [shell, read, grep]
+        llm_config:
+          temperature: 0.3
+        output: test_results
+        next: [generate_review]
+
+      # =====================================================================
+      # Stage 4: Generate Review
+      # =====================================================================
+      - id: generate_review
+        type: agent
+        name: "Generate Review"
+        role: planner
+        goal: |
+          Generate actionable review comments for the pull request.
+
+          Based on the analysis:
+          - Impact Analysis: {impact_analysis}
+          - Test Results: {test_results}
+
+          Structure your review as:
+
+          ## Summary
+          Brief overview of what this PR does and its quality.
+
+          ## Strengths
+          - What's done well
+
+          ## Issues to Address
+          - **Critical**: Must fix before merge
+          - **Major**: Should fix
+          - **Minor**: Nice to have
+
+          ## Specific Comments
+          For each issue, provide:
+          - File and line reference
+          - Clear description of the issue
+          - Suggested fix or approach
+
+          ## Verdict
+          - Approve / Request Changes / Needs Discussion
+        tool_budget: 10
+        tools: [read]
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          changes: pr_changes
+          impact: impact_analysis
+          tests: test_results
+        output: review_comments
+        next: [check_verdict]
+
+      # =====================================================================
+      # Stage 5: Verdict Decision
+      # =====================================================================
+      - id: check_verdict
+        type: condition
+        name: "Check Review Verdict"
+        condition: "review_verdict"
+        branches:
+          "approved": pr_approved
+          "changes_requested": pr_changes_requested
+          "needs_discussion": pr_needs_discussion
+
+      - id: pr_approved
+        type: hitl
+        name: "PR Approved"
+        hitl_type: approval
+        prompt: |
+          ## Pull Request Review: Approved
+
+          **Summary:** {review_summary}
+
+          **Impact:** {impact_summary}
+
+          **Test Coverage:** {test_summary}
+
+          ---
+          The PR looks good to merge. Do you want to proceed?
+        context_keys:
+          - review_summary
+          - impact_summary
+          - test_summary
+        choices:
+          - "Approve and Merge"
+          - "Review More"
+        timeout: 600
+        fallback: continue
+        next: [complete_approved]
+
+      - id: pr_changes_requested
+        type: hitl
+        name: "Changes Requested"
+        hitl_type: approval
+        prompt: |
+          ## Pull Request Review: Changes Requested
+
+          **Issues Found:**
+          {review_comments}
+
+          **Impact Concerns:**
+          {impact_concerns}
+
+          ---
+          Please address the issues before the PR can be merged.
+        context_keys:
+          - review_comments
+          - impact_concerns
+        timeout: 600
+        fallback: continue
+        next: [complete_changes]
+
+      - id: pr_needs_discussion
+        type: transform
+        name: "Needs Discussion"
+        transform: |
+          status = "needs_discussion"
+          action = "Schedule review meeting"
+
+      - id: complete_approved
+        type: transform
+        name: "PR Approved"
+        transform: |
+          status = "approved"
+          can_merge = true
+
+      - id: complete_changes
+        type: transform
+        name: "Changes Requested"
+        transform: |
+          status = "changes_requested"
+          can_merge = false

@@ -5,6 +5,57 @@
 # - Information extraction and synthesis
 # - Citation management
 # - Report generation
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for web searches and fetches)                           │
+# │   - Write access (for report output)                                        │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - web_search: External search APIs (Google, Bing)                         │
+# │   - web_fetch: HTTP requests to extract content from URLs                   │
+# │   - Academic searches require access to scholar sites                       │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ coverage_threshold: 0.7 (70% topic coverage before synthesis)               │
+# │ citation_format: APA (default, supports MLA, Chicago, IEEE)                 │
+# │ max_search_queries: 10 per source type                                      │
+# │ source_quality_threshold: 0.6 (minimum credibility score)                   │
+# │ hitl_timeout: 600s (10 min for gap decisions)                               │
+# │ report_max_tokens: 8000 (final report length limit)                         │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - generate_citations: Text formatting with citation templates              │
+# │     (Rules: APA/MLA/Chicago patterns applied to structured source data)     │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - understand_query: INTERPRETING research question semantics              │
+# │   - create_search_plan: PLANNING multi-step search strategy                 │
+# │   - web_search/academic_search/code_search: EVALUATING search results       │
+# │   - validate_sources: JUDGING credibility and bias                          │
+# │   - gap_analysis: ANALYZING what's missing from research                    │
+# │   - synthesize: INTEGRATING findings into coherent narrative                │
+# │   - generate_report: WRITING professional research document                 │
+# │                                                                              │
+# │ Research is inherently knowledge work - most steps require LLM:             │
+# │   - Understanding query intent and nuance                                   │
+# │   - Evaluating source quality and relevance                                 │
+# │   - Synthesizing information across multiple sources                        │
+# │   - Writing cohesive reports with proper attribution                        │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   deep_research:
@@ -210,18 +261,30 @@ workflows:
         output: synthesis
         next: [generate_citations]
 
+      # COMPUTE: Citation formatting is template-based text manipulation
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Apply citation style rules to structured source metadata
+      # Formats: APA, MLA, Chicago, IEEE - each has deterministic patterns
+      # Input: Source objects with author, year, title, URL, publisher, etc.
+      # Output: Formatted citation strings in requested style
+      #
+      # WHY COMPUTE: No semantic understanding needed - pure pattern matching:
+      #   - APA: Author, A. A. (Year). Title. Publisher.
+      #   - MLA: Author. "Title." Publisher, Year.
+      #   - Rules are mechanical, not interpretive
+      #
+      # Execution: in-process (Python string formatting)
+      # BLOCKED: [llm, write] - read-only formatting, no network needed
       - id: generate_citations
         type: compute
         name: "Generate Citations"
-        handler: sequential_tools
-        tools: [shell]
+        handler: citation_formatter
         inputs:
           sources: $ctx.validated_sources
           format: $ctx.citation_format
         output: citations
-        constraints:
-          llm_allowed: false
-          timeout: 60
+        constraints: [llm, write]
+        timeout: 60
         next: [review_synthesis]
 
       - id: review_synthesis

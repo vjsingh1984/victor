@@ -5,6 +5,60 @@
 # - Multi-source evidence gathering
 # - Evidence evaluation
 # - Verdict generation with confidence
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for evidence gathering from multiple sources)           │
+# │   - Write access (for fact-check report output)                             │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - primary_sources: Government sites, official company pages               │
+# │   - fact_check_sites: Snopes, PolitiFact, Reuters Fact Check                │
+# │   - news_archives: Major news outlets, AP/Reuters wire services             │
+# │   - web_fetch: Retrieve full content from sources                           │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ source_credibility_threshold: 0.6 (minimum acceptable credibility)          │
+# │ confidence_levels: high (>0.85), medium (0.6-0.85), low (<0.6)              │
+# │ verdict_categories: TRUE, MOSTLY TRUE, MIXED, MOSTLY FALSE, FALSE, UNVERIF. │
+# │ hitl_timeout: 600s (10 min for additional source decisions)                 │
+# │ review_timeout: 900s (15 min for verdict review)                            │
+# │ report_max_tokens: 6000 (fact-check report length)                          │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes: NONE in this workflow                                         │
+# │                                                                              │
+# │ AGENT nodes (ALL require LLM reasoning):                                     │
+# │   - parse_claims: IDENTIFYING verifiable vs. opinion statements             │
+# │   - primary_sources: EVALUATING government/official source relevance        │
+# │   - fact_check_sites: INTERPRETING existing fact-check verdicts             │
+# │   - news_archives: JUDGING original reporting vs. syndicated content        │
+# │   - evaluate_evidence: WEIGHING evidence quality and conflicts              │
+# │   - generate_verdicts: REASONING about truth with nuanced categories        │
+# │   - generate_report: WRITING clear explanations for non-experts             │
+# │                                                                              │
+# │ Fact-checking is inherently interpretive work requiring:                    │
+# │   - Understanding claim semantics and context                               │
+# │   - Evaluating source credibility and potential bias                        │
+# │   - Weighing conflicting evidence from multiple sources                     │
+# │   - Making nuanced verdicts (not just true/false)                           │
+# │   - Explaining reasoning in accessible language                             │
+# │                                                                              │
+# │ No purely mechanical steps exist - even "aggregate evidence" requires       │
+# │ semantic understanding of what each source actually says.                   │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   fact_check:
