@@ -115,7 +115,7 @@ class ClassificationResult:
     """
 
     # Primary classification
-    task_type: TaskType
+    task_type: ClassifierTaskType
     confidence: float  # 0.0 - 1.0
 
     # Detailed flags (backward compatible with _classify_task_keywords)
@@ -777,7 +777,7 @@ class UnifiedTaskClassifier:
         # Analyze recent history
         recent = history[-max_history:]
         context_signals = []
-        history_types: Dict[TaskType, int] = {}
+        history_types: Dict[ClassifierTaskType, int] = {}
 
         for msg in recent:
             if msg.get("role") == "user":
@@ -894,14 +894,14 @@ class UnifiedTaskClassifier:
 
         return final_result
 
-    def _map_semantic_to_unified(self, semantic_type: Any) -> TaskType:
+    def _map_semantic_to_unified(self, semantic_type: Any) -> ClassifierTaskType:
         """Map semantic TaskType to unified ClassifierTaskType.
 
         Args:
             semantic_type: TaskType from embeddings.task_classifier
 
         Returns:
-            Unified TaskType
+            Unified ClassifierTaskType
         """
         # The semantic TaskType enum values
         type_map = {
