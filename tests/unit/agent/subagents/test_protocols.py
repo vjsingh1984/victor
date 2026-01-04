@@ -37,6 +37,10 @@ class TestSubAgentContextProtocol:
                 return {}
 
             @property
+            def provider(self) -> Any:
+                return MagicMock()
+
+            @property
             def provider_name(self) -> str:
                 return "test_provider"
 
@@ -101,9 +105,13 @@ class TestSubAgentContextAdapter:
         """Create a mock orchestrator with required attributes."""
         orchestrator = MagicMock()
         orchestrator.settings = MagicMock(tool_budget=30, max_context_chars=100000)
+        orchestrator.provider = MagicMock()
         orchestrator.provider_name = "anthropic"
         orchestrator.model = "claude-sonnet-4-20250514"
-        orchestrator.tool_registry = MagicMock()
+        # AgentOrchestrator uses both 'tools' and 'tool_registry' pointing to same object
+        tool_reg = MagicMock()
+        orchestrator.tools = tool_reg
+        orchestrator.tool_registry = tool_reg
         orchestrator.temperature = 0.7
         return orchestrator
 
@@ -390,6 +398,10 @@ class TestProtocolIntegration:
             @property
             def settings(self) -> Any:
                 return {"tool_budget": 20}
+
+            @property
+            def provider(self) -> Any:
+                return MagicMock()
 
             @property
             def provider_name(self) -> str:
