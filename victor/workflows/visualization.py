@@ -249,15 +249,36 @@ class WorkflowVisualizer:
             TransformNode,
         )
 
+        # Try to import HITLNode for enhanced metadata
+        try:
+            from victor.workflows.hitl import HITLNode
+            has_hitl = True
+        except ImportError:
+            HITLNode = None
+            has_hitl = False
+
         # Build nodes
         for node_id, node in self.workflow.nodes.items():
             node_type = type(node).__name__
             description = None
+            metadata: Dict[str, Any] = {}
 
             if isinstance(node, AgentNode):
                 description = (
                     node.goal[:50] + "..." if node.goal and len(node.goal) > 50 else node.goal
                 )
+                metadata["role"] = node.role
+            elif isinstance(node, ComputeNode):
+                if node.handler:
+                    metadata["handler"] = node.handler
+                if node.tools:
+                    metadata["tools"] = node.tools[:3]  # First 3 tools
+            elif isinstance(node, ParallelNode):
+                metadata["parallel_nodes"] = node.parallel_nodes
+                metadata["join_strategy"] = node.join_strategy
+            elif has_hitl and isinstance(node, HITLNode):
+                metadata["hitl_type"] = node.hitl_type.value
+                metadata["timeout"] = node.timeout
             elif hasattr(node, "description"):
                 desc = getattr(node, "description", None)
                 if desc:
@@ -269,7 +290,7 @@ class WorkflowVisualizer:
                     name=node.name or node_id,
                     node_type=node_type,
                     description=description,
-                    metadata={"role": getattr(node, "role", None)},
+                    metadata=metadata,
                 )
             )
 
@@ -285,6 +306,29 @@ class WorkflowVisualizer:
                                 target=target,
                                 label=branch,
                                 conditional=True,
+                            )
+                        )
+            elif isinstance(node, ParallelNode):
+                # Parallel fork edges (dashed to show parallel execution)
+                for parallel_target in node.parallel_nodes:
+                    if parallel_target in self.workflow.nodes:
+                        self._edges.append(
+                            DAGEdge(
+                                source=node_id,
+                                target=parallel_target,
+                                label="fork",
+                                conditional=False,
+                            )
+                        )
+                # Also add next_nodes for join
+                if node.next_nodes:
+                    for target in node.next_nodes:
+                        self._edges.append(
+                            DAGEdge(
+                                source=node_id,
+                                target=target,
+                                label="join",
+                                conditional=False,
                             )
                         )
             elif hasattr(node, "next_nodes") and node.next_nodes:

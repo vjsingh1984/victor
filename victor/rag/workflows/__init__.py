@@ -18,11 +18,38 @@ This package provides workflow definitions for common RAG tasks:
 - Document ingestion pipeline
 - Query processing (Search -> Retrieve -> Synthesize)
 - Index maintenance and optimization
+
+Uses YAML-first architecture with Python escape hatches for complex conditions
+and transforms that cannot be expressed in YAML.
+
+Example:
+    provider = RAGWorkflowProvider()
+
+    # Standard execution
+    executor = provider.create_executor(orchestrator)
+    result = await executor.execute(workflow, context)
+
+    # Streaming execution
+    async for chunk in provider.astream("rag_query", orchestrator, context):
+        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
+            print(f"Completed: {chunk.node_name}")
+
+Available workflows (all YAML-defined):
+- document_ingest: Document ingestion pipeline
+- incremental_update: Update existing index with new/modified documents
+- rag_query: Answer questions using retrieved context
+- conversation: Multi-turn RAG conversation
+- agentic_rag: RAG with agentic reasoning and tool use
+
+WorkflowBuilder-based workflows (for backwards compatibility):
+- ingest: Document ingestion pipeline (Parse -> Chunk -> Embed -> Store)
+- query: Query processing (Enhance -> Search -> Retrieve -> Synthesize)
+- maintenance: Index maintenance (Analyze -> Cleanup -> Optimize -> Report)
 """
 
 from typing import Dict, List, Optional, Tuple
 
-from victor.core.verticals.protocols import WorkflowProviderProtocol
+from victor.framework.workflows import BaseYAMLWorkflowProvider
 from victor.workflows.definition import (
     WorkflowBuilder,
     WorkflowDefinition,
@@ -175,69 +202,181 @@ def maintenance_workflow() -> WorkflowDefinition:
     )
 
 
-class RAGWorkflowProvider(WorkflowProviderProtocol):
+class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
     """Provides RAG-specific workflows.
 
-    Workflows:
+    Uses YAML-first architecture with Python escape hatches for complex
+    conditions and transforms that cannot be expressed in YAML.
+
+    Inherits from BaseYAMLWorkflowProvider which provides:
+    - YAML workflow loading and caching
+    - Escape hatches registration from victor.rag.escape_hatches
+    - Streaming execution via StreamingWorkflowExecutor
+    - Standard workflow execution
+
+    YAML Workflows (from workflows/*.yaml):
+    - document_ingest: Document ingestion with parsing, chunking, and embedding
+    - incremental_update: Update existing index with new/modified documents
+    - rag_query: Answer questions using retrieved context with citations
+    - conversation: Multi-turn RAG conversation with context persistence
+    - agentic_rag: RAG with agentic reasoning and tool use
+
+    WorkflowBuilder Workflows (backwards compatibility):
     - ingest: Document ingestion pipeline (Parse -> Chunk -> Embed -> Store)
     - query: Query processing (Enhance -> Search -> Retrieve -> Synthesize)
     - maintenance: Index maintenance (Analyze -> Cleanup -> Optimize -> Report)
+
+    Example:
+        provider = RAGWorkflowProvider()
+
+        # List available workflows
+        print(provider.get_workflow_names())
+
+        # Stream RAG query execution
+        async for chunk in provider.astream("rag_query", orchestrator, {}):
+            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
     """
 
     def __init__(self) -> None:
-        self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        """Initialize the RAG workflow provider."""
+        super().__init__()
+        # Cache for WorkflowBuilder-based workflows (backwards compatibility)
+        self._builder_workflows: Optional[Dict[str, WorkflowDefinition]] = None
 
-    def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
-        if self._workflows is None:
-            self._workflows = {
+    def _get_escape_hatches_module(self) -> str:
+        """Return the module path for RAG escape hatches.
+
+        Returns:
+            Module path string for CONDITIONS and TRANSFORMS dictionaries
+        """
+        return "victor.rag.escape_hatches"
+
+    def _load_builder_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Load WorkflowBuilder-based workflows for backwards compatibility."""
+        if self._builder_workflows is None:
+            self._builder_workflows = {
                 "ingest": ingest_workflow(),
                 "query": query_workflow(),
                 "maintenance": maintenance_workflow(),
             }
-        return self._workflows
+        return self._builder_workflows
 
     def get_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Get workflow definitions for this vertical."""
-        return self._load_workflows()
+        """Get all workflow definitions for this vertical.
 
-    def get_workflow(self, name: str) -> Optional[WorkflowDefinition]:
-        """Get a specific workflow by name."""
-        return self._load_workflows().get(name)
-
-    def get_workflow_names(self) -> List[str]:
-        """Get list of workflow names."""
-        return list(self._load_workflows().keys())
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatically triggered workflows.
+        Combines YAML-loaded workflows with WorkflowBuilder-based workflows.
 
         Returns:
-            List of (regex_pattern, workflow_name) tuples
+            Dict mapping workflow names to WorkflowDefinition instances
+        """
+        # Get YAML workflows from base class
+        yaml_workflows = super().get_workflows()
+
+        # Add WorkflowBuilder-based workflows for backwards compatibility
+        builder_workflows = self._load_builder_workflows()
+
+        # Combine both (YAML takes precedence if names conflict)
+        combined = {**builder_workflows, **yaml_workflows}
+        return combined
+
+    def get_workflow(self, name: str) -> Optional[WorkflowDefinition]:
+        """Get a specific workflow by name.
+
+        Checks both YAML and WorkflowBuilder-based workflows.
+
+        Args:
+            name: The workflow name to retrieve
+
+        Returns:
+            WorkflowDefinition if found, None otherwise
+        """
+        # First try YAML workflows from base class
+        workflow = super().get_workflow(name)
+        if workflow is not None:
+            return workflow
+
+        # Then try WorkflowBuilder-based workflows
+        return self._load_builder_workflows().get(name)
+
+    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+        """Get automatic workflow triggers based on query patterns.
+
+        Returns:
+            List of (regex_pattern, workflow_name) tuples for auto-triggering
         """
         return [
-            # Ingest triggers
-            (r"ingest\s+document", "ingest"),
-            (r"add\s+(to\s+)?knowledge", "ingest"),
-            (r"index\s+(new\s+)?document", "ingest"),
-            (r"import\s+file", "ingest"),
-            # Query triggers
-            (r"search\s+(for|the)\s+", "query"),
-            (r"find\s+(information|answer)", "query"),
-            (r"what\s+(does|is|are)", "query"),
-            (r"how\s+(do|does|to)", "query"),
-            # Maintenance triggers
+            # Ingest triggers (YAML workflow)
+            (r"ingest\s+document", "document_ingest"),
+            (r"add\s+(to\s+)?knowledge", "document_ingest"),
+            (r"index\s+(new\s+)?document", "document_ingest"),
+            (r"import\s+file", "document_ingest"),
+            # Incremental update triggers
+            (r"update\s+index", "incremental_update"),
+            (r"refresh\s+documents", "incremental_update"),
+            (r"sync\s+documents", "incremental_update"),
+            # Query triggers (YAML workflow)
+            (r"search\s+(for|the)\s+", "rag_query"),
+            (r"find\s+(information|answer)", "rag_query"),
+            (r"what\s+(does|is|are)", "rag_query"),
+            (r"how\s+(do|does|to)", "rag_query"),
+            # Conversation triggers
+            (r"chat\s+(about|with)", "conversation"),
+            (r"discuss\s+", "conversation"),
+            # Agentic RAG triggers
+            (r"deep\s+search", "agentic_rag"),
+            (r"research\s+", "agentic_rag"),
+            # Maintenance triggers (WorkflowBuilder workflow)
             (r"clean(up)?\s+index", "maintenance"),
             (r"optimize\s+(index|search)", "maintenance"),
             (r"maintenance", "maintenance"),
         ]
 
-    def __repr__(self) -> str:
-        return f"RAGWorkflowProvider(workflows={len(self._load_workflows())})"
+    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
+        """Get appropriate workflow for task type.
 
+        Args:
+            task_type: Type of task (e.g., "ingest", "query")
+
+        Returns:
+            Workflow name string or None if no mapping exists
+        """
+        mapping = {
+            # Ingestion
+            "ingest": "document_ingest",
+            "ingestion": "document_ingest",
+            "index": "document_ingest",
+            "update": "incremental_update",
+            "sync": "incremental_update",
+            # Query
+            "query": "rag_query",
+            "search": "rag_query",
+            "question": "rag_query",
+            "qa": "rag_query",
+            # Conversation
+            "conversation": "conversation",
+            "chat": "conversation",
+            "dialog": "conversation",
+            # Agentic
+            "research": "agentic_rag",
+            "deep_search": "agentic_rag",
+            "agentic": "agentic_rag",
+            # Maintenance
+            "maintenance": "maintenance",
+            "cleanup": "maintenance",
+            "optimize": "maintenance",
+        }
+        return mapping.get(task_type.lower())
+
+
+# Register RAG domain handlers when this module is loaded
+from victor.rag.handlers import register_handlers as _register_handlers
+
+_register_handlers()
 
 __all__ = [
-    # WorkflowBuilder-based workflows
+    # YAML-first workflow provider
     "RAGWorkflowProvider",
+    # WorkflowBuilder-based workflows (backwards compatibility)
     "ingest_workflow",
     "query_workflow",
     "maintenance_workflow",

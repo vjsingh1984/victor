@@ -17,6 +17,17 @@ mypy victor
 ```
 
 ## Add a Provider (LLM)
+
+```mermaid
+flowchart LR
+    A[Create Provider Class] --> B[Inherit BaseProvider]
+    B --> C[Implement chat/stream_chat]
+    C --> D[Implement supports_tools]
+    D --> E[Register in Registry]
+    E --> F[Add Tests]
+    F --> G[Update PROVIDERS.md]
+```
+
 1. Create a new provider in `victor/providers/`.
 2. Implement the base interface.
 3. Register it in the provider registry.
@@ -24,6 +35,16 @@ mypy victor
 5. Update `reference/PROVIDERS.md`.
 
 ## Add a Tool
+
+```mermaid
+flowchart LR
+    A[Create Tool Class] --> B[Define Parameters]
+    B --> C[Implement execute]
+    C --> D[Register in Registry]
+    D --> E[Add Tests]
+    E --> F[Generate Catalog]
+```
+
 1. Create a tool in `victor/tools/` (use the `@tool` decorator).
 2. Add tests under `tests/unit/tools/`.
 3. Regenerate the tool catalog if needed: `python scripts/generate_tool_catalog.py`.
@@ -31,6 +52,23 @@ mypy victor
 ## Add a Lazy Tool
 
 Use `LazyToolRunnable` to defer tool initialization until first use. This reduces startup time for applications with many tools.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LazyToolRunnable
+    participant Factory
+    participant Tool
+    Client->>LazyToolRunnable: run(inputs)
+    LazyToolRunnable->>LazyToolRunnable: Check initialized?
+    alt Not initialized
+        LazyToolRunnable->>Factory: Create tool
+        Factory->>Tool: Initialize
+        Tool-->>LazyToolRunnable: Instance
+    end
+    LazyToolRunnable->>Tool: Execute
+    Tool-->>Client: Result
+```
 
 ```python
 from victor.tools.composition import LazyToolRunnable
@@ -70,6 +108,14 @@ tools = (
 ## Add a Capability Provider
 
 Extend `BaseCapabilityProvider` to register capabilities for a vertical. Capabilities are type-safe and include metadata for discovery.
+
+```mermaid
+flowchart LR
+    A[Create Capability Class] --> B[Extend BaseCapabilityProvider]
+    B --> C[Implement get_capabilities]
+    C --> D[Define CapabilityMetadata]
+    D --> E[Register with Vertical]
+```
 
 ```python
 from typing import Dict
@@ -209,6 +255,39 @@ canonical = resolver.get_canonical("rg")  # Returns "grep"
 # Check registration and get aliases
 resolver.is_registered("bash")  # True
 resolver.get_aliases("shell")   # ["bash", "zsh", "sh"]
+```
+
+## Add a Vertical
+
+Create custom domain verticals for specialized use cases. Verticals bundle tools, system prompts, and optional workflows.
+
+```mermaid
+flowchart TD
+    A[Inherit VerticalBase] --> B[Define get_tools]
+    B --> C[Define get_system_prompt]
+    C --> D[Optional: Add Workflows]
+    D --> E[Optional: Add Handlers]
+    E --> F[Register via Entry Point]
+```
+
+1. Create a new vertical inheriting from `VerticalBase` in `victor/core/verticals/`.
+2. Implement `get_tools() -> List[str]` to specify which tools are available.
+3. Implement `get_system_prompt() -> str` for domain-specific instructions.
+4. Optionally add YAML workflows in `victor/{vertical}/workflows/`.
+5. Optionally add handlers in `victor/{vertical}/handlers.py`.
+6. For external verticals, register via entry points in `pyproject.toml`.
+
+```python
+from victor.core.verticals import VerticalBase
+
+class SecurityVertical(VerticalBase):
+    name = "security"
+
+    def get_tools(self) -> list[str]:
+        return ["static_analysis", "vulnerability_scan", "grep_codebase"]
+
+    def get_system_prompt(self) -> str:
+        return "You are a security analyst focused on identifying vulnerabilities..."
 ```
 
 ## Where to Look

@@ -241,13 +241,21 @@ You are being evaluated on:
     def get_workflow_provider(cls) -> Optional[Any]:
         """Get benchmark-specific workflow provider.
 
-        Currently returns None as benchmark workflows are defined
-        at the evaluation harness level rather than as reusable workflows.
+        Returns the BenchmarkWorkflowProvider which provides YAML-based workflows
+        for AI coding benchmarks:
+        - swe_bench: SWE-bench style issue resolution
+        - code_generation: HumanEval/MBPP function generation
+        - passk_generation: Multi-attempt pass@k evaluation
+        - live_code_bench: Live code execution benchmark
+        - big_code_bench: Large-scale code understanding
+        - aider_polyglot: Multi-language code modification
 
         Returns:
-            None (no workflow provider for benchmark vertical)
+            BenchmarkWorkflowProvider instance
         """
-        return None
+        from victor.benchmark.workflows import BenchmarkWorkflowProvider
+
+        return BenchmarkWorkflowProvider()
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional["ModeConfigProviderProtocol"]:

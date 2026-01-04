@@ -134,13 +134,19 @@ class TestRAGWorkflowProvider:
             assert not errors, f"Workflow '{name}' has validation errors: {errors}"
 
     def test_workflow_has_agents(self):
-        """Each workflow should have at least one agent node."""
+        """Each workflow should have at least one agent node (except utility workflows)."""
         from victor.rag.workflows import RAGWorkflowProvider
 
         provider = RAGWorkflowProvider()
         workflows = provider.get_workflows()
 
+        # Some workflows are utility/compute-only (no LLM agents)
+        utility_workflows = {"incremental_update"}
+
         for name, workflow in workflows.items():
+            if name in utility_workflows:
+                # Utility workflows may not have agent nodes
+                continue
             agent_count = workflow.get_agent_count()
             assert agent_count >= 1, f"Workflow '{name}' should have at least one agent"
 

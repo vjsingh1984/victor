@@ -54,6 +54,7 @@ from victor.rag.document_store import (
 from victor.rag.chunker import DocumentChunker, ChunkingConfig
 from victor.rag.prompts import RAGPromptContributor
 from victor.rag.mode_config import RAGModeConfigProvider
+from victor.rag.capabilities import RAGCapabilityProvider
 from victor.rag.tools import (
     RAGIngestTool,
     RAGSearchTool,
@@ -78,6 +79,7 @@ __all__ = [
     # Extensions
     "RAGPromptContributor",
     "RAGModeConfigProvider",
+    "RAGCapabilityProvider",
     # Tools
     "RAGIngestTool",
     "RAGSearchTool",

@@ -358,3 +358,21 @@ When creating configurations:
         from victor.devops.teams import DevOpsTeamSpecProvider
 
         return DevOpsTeamSpecProvider()
+
+    @classmethod
+    def get_capability_provider(cls) -> Optional[Any]:
+        """Get capability provider for DevOps vertical.
+
+        Provides capabilities for:
+        - deployment_safety: Safe deployment rules
+        - container_settings: Container configuration
+        - infrastructure_settings: IaC settings
+        - cicd_settings: CI/CD pipeline settings
+        - monitoring_settings: Observability configuration
+
+        Returns:
+            DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
+        """
+        from victor.devops.capabilities import DevOpsCapabilityProvider
+
+        return DevOpsCapabilityProvider()
