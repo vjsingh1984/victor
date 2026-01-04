@@ -648,6 +648,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Tool registry (via factory)
         self.tools = self._factory.create_tool_registry()
+        # Alias for backward compatibility - some code uses tool_registry instead of tools
+        self.tool_registry = self.tools
 
         # Initialize ToolRegistrar (via factory) - tool registration, plugins, MCP integration
         self.tool_registrar = self._factory.create_tool_registrar(

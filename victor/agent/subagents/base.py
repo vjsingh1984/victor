@@ -242,11 +242,13 @@ class SubAgent:
         settings.max_context_chars = self.config.context_limit
 
         # Create new orchestrator instance with same provider
+        # Use the actual provider object (not just the name) for proper initialization
         orchestrator = AgentOrchestrator(
             settings=settings,
-            provider=self._context.provider_name,
+            provider=self._context.provider,
             model=self._context.model,
             temperature=self._context.temperature,
+            provider_name=self._context.provider_name,
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
