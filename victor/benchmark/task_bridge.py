@@ -29,7 +29,7 @@ from victor.evaluation.protocol import (
     TaskResult as EvalTaskResult,
     TaskStatus,
 )
-from victor.framework.task import Task, TaskResult, TaskType
+from victor.framework.task import FrameworkTaskType, Task, TaskResult
 
 
 def benchmark_task_to_framework_task(
@@ -139,26 +139,26 @@ def framework_result_to_benchmark_result(
     )
 
 
-def _infer_task_type(benchmark_task: BenchmarkTask) -> TaskType:
-    """Infer framework TaskType from benchmark task characteristics."""
+def _infer_task_type(benchmark_task: BenchmarkTask) -> FrameworkTaskType:
+    """Infer framework FrameworkTaskType from benchmark task characteristics."""
     prompt_lower = benchmark_task.prompt.lower()
 
     # Check for explicit task type indicators
     if any(word in prompt_lower for word in ["fix", "bug", "error", "issue", "patch"]):
-        return TaskType.EDIT
+        return FrameworkTaskType.EDIT
     elif any(word in prompt_lower for word in ["add", "implement", "create", "new"]):
-        return TaskType.CREATE
+        return FrameworkTaskType.CREATE
     elif any(word in prompt_lower for word in ["refactor", "improve", "optimize"]):
-        return TaskType.EDIT
+        return FrameworkTaskType.EDIT
     elif any(word in prompt_lower for word in ["find", "search", "locate", "where"]):
-        return TaskType.SEARCH
+        return FrameworkTaskType.SEARCH
     elif any(word in prompt_lower for word in ["analyze", "review", "explain"]):
-        return TaskType.ANALYZE
+        return FrameworkTaskType.ANALYZE
     elif any(word in prompt_lower for word in ["run", "execute", "test"]):
-        return TaskType.EXECUTE
+        return FrameworkTaskType.EXECUTE
     else:
         # Default to EDIT for most benchmark tasks (SWE-bench, etc.)
-        return TaskType.EDIT
+        return FrameworkTaskType.EDIT
 
 
 def _estimate_tool_budget(benchmark_task: BenchmarkTask) -> Optional[int]:

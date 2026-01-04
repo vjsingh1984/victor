@@ -95,10 +95,6 @@ class ClassifierTaskType(Enum):
     DEFAULT = "default"  # Ambiguous or conversational
 
 
-# Backward compatibility alias
-TaskType = ClassifierTaskType
-
-
 @dataclass
 class KeywordMatch:
     """Details of a keyword match for debugging."""
@@ -152,8 +148,8 @@ class ClassificationResult:
             coarse_type = "default"
 
         return {
-            "is_action_task": self.is_action_task or self.task_type == TaskType.ACTION,
-            "is_analysis_task": self.is_analysis_task or self.task_type == TaskType.ANALYSIS,
+            "is_action_task": self.is_action_task or self.task_type == ClassifierTaskType.ACTION,
+            "is_analysis_task": self.is_analysis_task or self.task_type == ClassifierTaskType.ANALYSIS,
             "needs_execution": self.needs_execution,
             "coarse_task_type": coarse_type,
             # New fields (ignored by legacy code)
@@ -658,15 +654,15 @@ class UnifiedTaskClassifier:
 
         # Determine winner
         scores = {
-            TaskType.ACTION: action_score,
-            TaskType.GENERATION: gen_score,
-            TaskType.ANALYSIS: analysis_score,
-            TaskType.SEARCH: search_score,
-            TaskType.EDIT: edit_score,
+            ClassifierTaskType.ACTION: action_score,
+            ClassifierTaskType.GENERATION: gen_score,
+            ClassifierTaskType.ANALYSIS: analysis_score,
+            ClassifierTaskType.SEARCH: search_score,
+            ClassifierTaskType.EDIT: edit_score,
         }
 
         # Get best score
-        best_type = TaskType.DEFAULT
+        best_type = ClassifierTaskType.DEFAULT
         best_score = 0.0
         for task_type, score in scores.items():
             if score > best_score:
@@ -700,30 +696,30 @@ class UnifiedTaskClassifier:
                 combined_action_score = action_score + gen_score + edit_score
                 if combined_action_score >= analysis_score * 0.5:  # Action strong enough
                     if gen_score >= action_score and gen_score >= edit_score:
-                        best_type = TaskType.GENERATION
+                        best_type = ClassifierTaskType.GENERATION
                     elif edit_score >= action_score:
-                        best_type = TaskType.EDIT
+                        best_type = ClassifierTaskType.EDIT
                     else:
-                        best_type = TaskType.ACTION
+                        best_type = ClassifierTaskType.ACTION
                     confidence = min(confidence + 0.15, 0.95)
             else:
                 # Analysis appears last - it's the primary task
                 if analysis_score >= (action_score + gen_score + edit_score) * 0.5:
-                    best_type = TaskType.ANALYSIS
+                    best_type = ClassifierTaskType.ANALYSIS
                     confidence = min(confidence + 0.1, 0.95)
 
         # Determine tool budget based on type
         budget_map = {
-            TaskType.ANALYSIS: 200,
-            TaskType.ACTION: 50,
-            TaskType.GENERATION: 10,
-            TaskType.SEARCH: 30,
-            TaskType.EDIT: 40,
-            TaskType.DEFAULT: 20,
+            ClassifierTaskType.ANALYSIS: 200,
+            ClassifierTaskType.ACTION: 50,
+            ClassifierTaskType.GENERATION: 10,
+            ClassifierTaskType.SEARCH: 30,
+            ClassifierTaskType.EDIT: 40,
+            ClassifierTaskType.DEFAULT: 20,
         }
 
         # Temperature adjustment
-        temp_adjustment = 0.2 if best_type == TaskType.ANALYSIS else 0.0
+        temp_adjustment = 0.2 if best_type == ClassifierTaskType.ANALYSIS else 0.0
 
         # Determine boolean flags (any non-negated match counts)
         has_action = any(not m.negated for m in action_matches)
@@ -786,7 +782,7 @@ class UnifiedTaskClassifier:
         for msg in recent:
             if msg.get("role") == "user":
                 hist_result = self.classify(msg.get("content", ""))
-                if hist_result.task_type != TaskType.DEFAULT:
+                if hist_result.task_type != ClassifierTaskType.DEFAULT:
                     history_types[hist_result.task_type] = (
                         history_types.get(hist_result.task_type, 0) + 1
                     )
@@ -812,7 +808,7 @@ class UnifiedTaskClassifier:
                     result.context_boost = boost
                     result.source = "context"
                 # If current is DEFAULT but context is clear, consider switching
-                elif result.task_type == TaskType.DEFAULT and dominant_count >= 3:
+                elif result.task_type == ClassifierTaskType.DEFAULT and dominant_count >= 3:
                     result.task_type = dominant_type
                     result.confidence = 0.5 + (self._context_boost * dominant_count / max_history)
                     result.context_boost = result.confidence - 0.5
@@ -865,9 +861,9 @@ class UnifiedTaskClassifier:
             final_result = ClassificationResult(
                 task_type=semantic_type,
                 confidence=semantic_confidence,
-                is_action_task=semantic_type == TaskType.ACTION,
-                is_analysis_task=semantic_type == TaskType.ANALYSIS,
-                is_generation_task=semantic_type == TaskType.GENERATION,
+                is_action_task=semantic_type == ClassifierTaskType.ACTION,
+                is_analysis_task=semantic_type == ClassifierTaskType.ANALYSIS,
+                is_generation_task=semantic_type == ClassifierTaskType.GENERATION,
                 needs_execution=context_result.needs_execution,
                 source="semantic",
                 keyword_confidence=keyword_result.confidence,
@@ -899,7 +895,7 @@ class UnifiedTaskClassifier:
         return final_result
 
     def _map_semantic_to_unified(self, semantic_type: Any) -> TaskType:
-        """Map semantic TaskType to unified TaskType.
+        """Map semantic TaskType to unified ClassifierTaskType.
 
         Args:
             semantic_type: TaskType from embeddings.task_classifier
@@ -909,13 +905,13 @@ class UnifiedTaskClassifier:
         """
         # The semantic TaskType enum values
         type_map = {
-            "edit": TaskType.EDIT,
-            "search": TaskType.SEARCH,
-            "create": TaskType.GENERATION,
-            "analyze": TaskType.ANALYSIS,
-            "design": TaskType.ANALYSIS,  # Design is analysis-like
+            "edit": ClassifierTaskType.EDIT,
+            "search": ClassifierTaskType.SEARCH,
+            "create": ClassifierTaskType.GENERATION,
+            "analyze": ClassifierTaskType.ANALYSIS,
+            "design": ClassifierTaskType.ANALYSIS,  # Design is analysis-like
         }
-        return type_map.get(str(semantic_type.value).lower(), TaskType.DEFAULT)
+        return type_map.get(str(semantic_type.value).lower(), ClassifierTaskType.DEFAULT)
 
 
 # =============================================================================
