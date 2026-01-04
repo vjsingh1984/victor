@@ -47,8 +47,13 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 import re
 
 
-class QualityDimension(str, Enum):
-    """Dimensions of response quality."""
+class ProtocolQualityDimension(str, Enum):
+    """Protocol-level quality dimensions for response assessment.
+
+    Renamed from QualityDimension to be semantically distinct:
+    - ResponseQualityDimension (victor.agent.response_quality): LLM response quality
+    - ProtocolQualityDimension (here): Protocol-level quality (includes GROUNDING, SAFETY)
+    """
 
     GROUNDING = "grounding"
     COVERAGE = "coverage"
@@ -57,6 +62,10 @@ class QualityDimension(str, Enum):
     CONCISENESS = "conciseness"
     HELPFULNESS = "helpfulness"
     SAFETY = "safety"
+
+
+# Backward compatibility alias
+QualityDimension = ProtocolQualityDimension
 
 
 @dataclass
@@ -71,7 +80,7 @@ class DimensionScore:
         evidence: Supporting evidence
     """
 
-    dimension: QualityDimension
+    dimension: ProtocolQualityDimension
     score: float
     weight: float = 1.0
     reason: str = ""

@@ -100,7 +100,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHECKING, Union
 
 import yaml
 
@@ -110,8 +110,14 @@ import yaml
 # =============================================================================
 
 
-class NodeType(str, Enum):
-    """Valid node types for workflow definitions."""
+class YAMLNodeType(str, Enum):
+    """Valid node types for YAML workflow definitions.
+
+    Renamed from NodeType to be semantically distinct:
+    - YAMLNodeType (here): YAML loader validation nodes
+    - WorkflowNodeType (victor.workflows.definition): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - GraphNodeType (victor.workflows.graph_dsl): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    """
 
     AGENT = "agent"
     COMPUTE = "compute"
@@ -119,6 +125,10 @@ class NodeType(str, Enum):
     PARALLEL = "parallel"
     TRANSFORM = "transform"
     HITL = "hitl"
+
+
+# Backward compatibility alias
+NodeType = YAMLNodeType
 
 
 class ConstraintType(str, Enum):
@@ -1437,6 +1447,106 @@ def load_workflow_from_file(
 
     yaml_content = path.read_text()
     return load_workflow_from_yaml(yaml_content, workflow_name, config)
+
+
+def load_and_validate(
+    file_path: Union[str, Path],
+    workflow_name: Optional[str] = None,
+    config: Optional[YAMLWorkflowConfig] = None,
+    tool_registry: Optional[Any] = None,
+    strict: bool = True,
+) -> Tuple[Union[WorkflowDefinition, Dict[str, WorkflowDefinition]], "ToolValidationResult"]:
+    """Load workflow(s) from a YAML file and validate tool dependencies.
+
+    This function combines workflow loading with tool dependency validation,
+    ensuring all tools referenced in workflow nodes exist and are available
+    before workflow execution begins.
+
+    Args:
+        file_path: Path to YAML file
+        workflow_name: Optional specific workflow to load
+        config: Optional loader configuration
+        tool_registry: Tool registry for validation (if None, validation passes)
+        strict: If True, missing tools cause errors; if False, they cause warnings
+
+    Returns:
+        Tuple of (workflow(s), ToolValidationResult)
+
+    Raises:
+        YAMLWorkflowError: If file not found or YAML is invalid
+        ToolValidationError: If strict=True and tools are missing
+
+    Example:
+        from victor.workflows.yaml_loader import load_and_validate
+        from victor.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        workflow, validation = load_and_validate(
+            "my_workflow.yaml",
+            tool_registry=registry,
+            strict=True,
+        )
+
+        if not validation.valid:
+            print(f"Missing tools: {validation.missing_tools}")
+            for error in validation.errors:
+                print(f"  - {error}")
+    """
+    from victor.workflows.validation import (
+        ToolDependencyValidator,
+        ToolValidationResult,
+        validate_workflow_tools,
+    )
+
+    # Load the workflow(s)
+    workflows = load_workflow_from_file(file_path, workflow_name, config)
+
+    # Validate tool dependencies
+    if tool_registry is not None:
+        validator = ToolDependencyValidator(tool_registry, strict=strict)
+
+        if isinstance(workflows, dict):
+            # Multiple workflows - validate each
+            combined_result = ToolValidationResult()
+            for wf_name, workflow in workflows.items():
+                result = validator.validate(workflow)
+                combined_result.validated_tools.update(result.validated_tools)
+                combined_result.missing_tools.update(result.missing_tools)
+                for error in result.errors:
+                    combined_result.add_error(error)
+                for warning in result.warnings:
+                    combined_result.add_error(warning)
+            validation_result = combined_result
+        else:
+            # Single workflow
+            validation_result = validator.validate(workflows)
+
+        # Raise if strict and invalid
+        if strict and not validation_result.valid:
+            raise YAMLWorkflowError(
+                f"Tool validation failed: {validation_result.summary()}\n"
+                f"Missing tools: {validation_result.missing_tools}"
+            )
+    else:
+        # No registry - return valid result with all tools marked as validated
+        validation_result = ToolValidationResult()
+        if isinstance(workflows, dict):
+            for workflow in workflows.values():
+                for node in workflow.nodes.values():
+                    tools = getattr(node, "allowed_tools", None) or getattr(
+                        node, "tools", None
+                    )
+                    if tools:
+                        validation_result.validated_tools.update(tools)
+        else:
+            for node in workflows.nodes.values():
+                tools = getattr(node, "allowed_tools", None) or getattr(
+                    node, "tools", None
+                )
+                if tools:
+                    validation_result.validated_tools.update(tools)
+
+    return workflows, validation_result
 
 
 def load_workflows_from_directory(

@@ -42,7 +42,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import traceback
 from dataclasses import dataclass, field
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -51,6 +53,251 @@ if TYPE_CHECKING:
     from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Error Boundary for Compute Handlers
+# =============================================================================
+
+
+@dataclass
+class HandlerError:
+    """Detailed error information from handler execution.
+
+    Captures full context when a compute handler fails, enabling
+    better debugging and error classification for all verticals.
+
+    Attributes:
+        handler_name: Name of the handler that failed
+        node_id: ID of the workflow node
+        error_type: Classification of the error (timeout, validation, etc.)
+        message: Human-readable error message
+        traceback_str: Full traceback as string (for debugging)
+        context_snapshot: Context data at time of failure
+    """
+
+    handler_name: str
+    node_id: str
+    error_type: str
+    message: str
+    traceback_str: Optional[str] = None
+    context_snapshot: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary for logging/storage."""
+        return {
+            "handler_name": self.handler_name,
+            "node_id": self.node_id,
+            "error_type": self.error_type,
+            "message": self.message,
+            "traceback": self.traceback_str,
+        }
+
+
+class HandlerErrorBoundary:
+    """Error boundary wrapper for compute handlers.
+
+    Provides exception isolation, context preservation, and structured
+    error reporting for compute handler execution. All verticals
+    (including third-party plugins) benefit from consistent error handling.
+
+    Features:
+    - Exception isolation per handler
+    - Context state preservation on error
+    - Detailed error classification (timeout, validation, runtime)
+    - Structured error reporting with HandlerError
+
+    Example:
+        boundary = HandlerErrorBoundary()
+        result = await boundary.execute(
+            handler=my_handler,
+            handler_name="custom_compute",
+            node=compute_node,
+            context=ctx,
+            tool_registry=registry,
+        )
+
+        # With decorator
+        @with_error_boundary("my_handler")
+        async def my_handler(node, context, tool_registry):
+            ...
+    """
+
+    def __init__(self, preserve_context: bool = True):
+        """Initialize error boundary.
+
+        Args:
+            preserve_context: If True, snapshot context before execution
+        """
+        self.preserve_context = preserve_context
+
+    async def execute(
+        self,
+        handler: Callable,
+        handler_name: str,
+        node: "ComputeNode",
+        context: "WorkflowContext",
+        tool_registry: "ToolRegistry",
+    ) -> "NodeResult":
+        """Execute handler with error boundary protection.
+
+        Args:
+            handler: The compute handler to execute
+            handler_name: Name for error reporting
+            node: The ComputeNode being executed
+            context: Workflow execution context
+            tool_registry: Tool registry for tool execution
+
+        Returns:
+            NodeResult with execution outcome or error details
+        """
+        from victor.workflows.executor import NodeResult, NodeStatus
+
+        start_time = time.time()
+
+        # Snapshot context before execution (for debugging on failure)
+        context_snapshot = {}
+        if self.preserve_context:
+            try:
+                # Only snapshot primitive values to avoid issues
+                context_snapshot = {
+                    k: v
+                    for k, v in context.data.items()
+                    if isinstance(v, (str, int, float, bool, list, dict, type(None)))
+                }
+            except Exception:
+                pass
+
+        try:
+            result = await handler(node, context, tool_registry)
+            return result
+
+        except asyncio.TimeoutError as e:
+            error = HandlerError(
+                handler_name=handler_name,
+                node_id=node.id,
+                error_type="timeout",
+                message=str(e) or "Handler execution timed out",
+                context_snapshot=context_snapshot,
+            )
+            logger.error(f"Handler timeout: {handler_name} on node {node.id}")
+            return self._create_error_result(node, error, start_time)
+
+        except ValueError as e:
+            error = HandlerError(
+                handler_name=handler_name,
+                node_id=node.id,
+                error_type="validation",
+                message=str(e),
+                traceback_str=traceback.format_exc(),
+                context_snapshot=context_snapshot,
+            )
+            logger.error(f"Handler validation error: {handler_name}: {e}")
+            return self._create_error_result(node, error, start_time)
+
+        except KeyError as e:
+            error = HandlerError(
+                handler_name=handler_name,
+                node_id=node.id,
+                error_type="missing_key",
+                message=f"Missing required key: {e}",
+                traceback_str=traceback.format_exc(),
+                context_snapshot=context_snapshot,
+            )
+            logger.error(f"Handler missing key: {handler_name}: {e}")
+            return self._create_error_result(node, error, start_time)
+
+        except TypeError as e:
+            error = HandlerError(
+                handler_name=handler_name,
+                node_id=node.id,
+                error_type="type_error",
+                message=str(e),
+                traceback_str=traceback.format_exc(),
+                context_snapshot=context_snapshot,
+            )
+            logger.error(f"Handler type error: {handler_name}: {e}")
+            return self._create_error_result(node, error, start_time)
+
+        except Exception as e:
+            error = HandlerError(
+                handler_name=handler_name,
+                node_id=node.id,
+                error_type=type(e).__name__,
+                message=str(e),
+                traceback_str=traceback.format_exc(),
+                context_snapshot=context_snapshot,
+            )
+            logger.error(
+                f"Handler exception: {handler_name} on node {node.id}: {e}",
+                exc_info=True,
+            )
+            return self._create_error_result(node, error, start_time)
+
+    def _create_error_result(
+        self,
+        node: "ComputeNode",
+        error: HandlerError,
+        start_time: float,
+    ) -> "NodeResult":
+        """Create NodeResult from HandlerError.
+
+        Args:
+            node: The failed node
+            error: Error details
+            start_time: When execution started
+
+        Returns:
+            NodeResult with FAILED status and error details
+        """
+        from victor.workflows.executor import NodeResult, NodeStatus
+
+        return NodeResult(
+            node_id=node.id,
+            status=NodeStatus.FAILED,
+            error=f"Handler '{error.handler_name}' failed: {error.message}",
+            duration_seconds=time.time() - start_time,
+        )
+
+
+def with_error_boundary(handler_name: str):
+    """Decorator to wrap handler with error boundary.
+
+    Provides automatic error boundary wrapping for compute handlers,
+    ensuring consistent error handling across all verticals.
+
+    Args:
+        handler_name: Name for error reporting
+
+    Example:
+        @with_error_boundary("my_custom_handler")
+        async def my_handler(node, context, tool_registry):
+            # Handler implementation
+            ...
+
+        # Register with executor
+        register_compute_handler("my_custom", my_handler)
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(
+            node: "ComputeNode",
+            context: "WorkflowContext",
+            tool_registry: "ToolRegistry",
+        ) -> "NodeResult":
+            boundary = HandlerErrorBoundary()
+            return await boundary.execute(
+                handler=func,
+                handler_name=handler_name,
+                node=node,
+                context=context,
+                tool_registry=tool_registry,
+            )
+
+        return wrapper
+
+    return decorator
 
 
 @dataclass
@@ -757,6 +1004,10 @@ def list_framework_handlers() -> List[str]:
 
 
 __all__ = [
+    # Error boundary
+    "HandlerError",
+    "HandlerErrorBoundary",
+    "with_error_boundary",
     # Handler classes
     "ParallelToolsHandler",
     "SequentialToolsHandler",

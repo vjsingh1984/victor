@@ -66,15 +66,11 @@ class EmbeddingConfig(BaseModel):
     )
 
 
-class SearchResult(BaseModel):
-    """Result from semantic search."""
+# Import canonical SearchResult from storage.vector_stores.base
+from victor.storage.vector_stores.base import EmbeddingSearchResult, SearchResult
 
-    file_path: str = Field(description="Path to the file")
-    symbol_name: Optional[str] = Field(default=None, description="Symbol name if applicable")
-    content: str = Field(description="Content that matched")
-    score: float = Field(description="Relevance score (0-1, higher is better)")
-    line_number: Optional[int] = Field(default=None, description="Line number in file")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+# Re-export for backward compatibility - both names work
+__all_search__ = ["EmbeddingSearchResult", "SearchResult"]
 
 
 class BaseEmbeddingProvider(ABC):

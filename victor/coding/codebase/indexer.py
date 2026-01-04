@@ -878,8 +878,13 @@ class CodebaseFileHandler(FileSystemEventHandler):
 from pydantic import BaseModel, Field
 
 
-class Symbol(BaseModel):
-    """Represents a code symbol (function, class, variable).
+class IndexedSymbol(BaseModel):
+    """Code symbol stored in the codebase index.
+
+    Renamed from Symbol to be semantically distinct:
+    - IndexedSymbol (here): Pydantic model for index storage
+    - NativeSymbol (victor.native.protocols): Rust-extracted symbols (frozen)
+    - RefactorSymbol (victor.coding.refactor.protocol): Refactoring symbol
 
     Note: Body content is NOT stored here - read from file via line_number/end_line.
     This keeps the index lightweight while allowing full body retrieval on demand.
@@ -896,6 +901,10 @@ class Symbol(BaseModel):
     references: List[str] = Field(default_factory=list)  # Files that reference this symbol
     base_classes: List[str] = Field(default_factory=list)  # inheritance targets
     composition: List[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
+
+
+# Backward compatibility alias
+Symbol = IndexedSymbol
 
 
 class FileMetadata(BaseModel):

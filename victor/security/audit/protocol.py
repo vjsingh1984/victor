@@ -72,14 +72,25 @@ class AuditEventType(str, Enum):
     DATA_EXPORT = "data_export"
 
 
-class Severity(str, Enum):
-    """Event severity levels."""
+class AuditSeverity(str, Enum):
+    """Event severity levels for audit logging.
+
+    Renamed from Severity to be semantically distinct from other severity types:
+    - CVESeverity (victor.security.protocol): CVE/CVSS-based severity
+    - AuditSeverity (here): Audit event severity (like log levels)
+    - IaCSeverity: IaC issue severity
+    - ReviewSeverity: Code review severity
+    """
 
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
+
+# Backward compatibility alias
+Severity = AuditSeverity
 
 
 class ComplianceFramework(str, Enum):
@@ -101,7 +112,7 @@ class AuditEvent:
     event_id: str
     event_type: AuditEventType
     timestamp: datetime
-    severity: Severity
+    severity: AuditSeverity
     actor: str  # User or system identifier
     action: str  # Description of the action
     resource: str | None = None  # Resource affected (file path, tool name, etc.)
@@ -133,7 +144,7 @@ class AuditEvent:
             event_id=data["event_id"],
             event_type=AuditEventType(data["event_type"]),
             timestamp=datetime.fromisoformat(data["timestamp"]),
-            severity=Severity(data["severity"]),
+            severity=AuditSeverity(data["severity"]),
             actor=data["actor"],
             action=data["action"],
             resource=data.get("resource"),
@@ -296,7 +307,7 @@ class AuditLoggerProtocol(ABC):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         event_types: list[AuditEventType] | None = None,
-        severity: Severity | None = None,
+        severity: AuditSeverity | None = None,
         actor: str | None = None,
         limit: int = 100,
     ) -> list[AuditEvent]:

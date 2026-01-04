@@ -78,7 +78,8 @@ from victor.integrations.protocols.query_enhancement import (
     QueryEnhancementConfig,
 )
 
-from victor.integrations.protocols.lsp_types import (
+# LSP types are canonical in victor/protocols/lsp_types.py
+from victor.protocols.lsp_types import (
     # Enumerations
     DiagnosticSeverity,
     CompletionItemKind,

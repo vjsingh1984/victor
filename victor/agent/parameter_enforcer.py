@@ -77,13 +77,25 @@ class ParameterSpec:
 
 
 @dataclass
-class ValidationResult:
-    """Result of parameter validation."""
+class ParameterValidationResult:
+    """Result of parameter enforcement validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (victor.tools.base): Tool parameter validation
+    - ConfigValidationResult (victor.core.validation): Configuration validation
+    - ContentValidationResult (victor.framework.middleware): Content validation
+    - ParameterValidationResult (here): Parameter enforcement with missing_required
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation
+    """
 
     is_valid: bool
     missing_required: List[str] = field(default_factory=list)
     type_errors: Dict[str, str] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
+
+
+# Backward compatibility alias
+ValidationResult = ParameterValidationResult
 
 
 class ParameterEnforcer:

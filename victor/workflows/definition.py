@@ -68,12 +68,19 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentRole
+    from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
 
-class NodeType(Enum):
-    """Type of workflow node."""
+class WorkflowNodeType(Enum):
+    """Type of workflow definition node.
+
+    Renamed from NodeType to be semantically distinct:
+    - WorkflowNodeType (here): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - GraphNodeType (victor.workflows.graph_dsl): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    - YAMLNodeType (victor.workflows.yaml_loader): YAML loader validation nodes
+    """
 
     AGENT = "agent"  # Spawns an agent to execute
     COMPUTE = "compute"  # Direct tool execution without LLM (extensible)
@@ -85,6 +92,10 @@ class NodeType(Enum):
     END = "end"  # Terminal node
 
 
+# Backward compatibility alias
+NodeType = WorkflowNodeType
+
+
 @dataclass
 class WorkflowNode(ABC):
     """Base class for workflow nodes.
@@ -93,11 +104,15 @@ class WorkflowNode(ABC):
         id: Unique identifier for this node
         name: Human-readable name
         next_nodes: IDs of nodes to execute after this one
+        retry_policy: Optional retry policy for this node
+        circuit_breaker_enabled: Whether to enable circuit breaker for this node
     """
 
     id: str
     name: str
     next_nodes: List[str] = field(default_factory=list)
+    retry_policy: Optional["RetryPolicy"] = None
+    circuit_breaker_enabled: bool = False
 
     @property
     @abstractmethod
@@ -107,12 +122,21 @@ class WorkflowNode(ABC):
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node to dictionary."""
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "type": self.node_type.value,
             "next_nodes": self.next_nodes,
         }
+        if self.retry_policy:
+            result["retry_policy"] = {
+                "max_retries": self.retry_policy.max_retries,
+                "delay_seconds": self.retry_policy.delay_seconds,
+                "exponential_backoff": self.retry_policy.exponential_backoff,
+            }
+        if self.circuit_breaker_enabled:
+            result["circuit_breaker_enabled"] = True
+        return result
 
 
 @dataclass

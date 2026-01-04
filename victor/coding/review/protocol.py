@@ -23,13 +23,24 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-class Severity(Enum):
-    """Severity level for review findings."""
+class ReviewSeverity(Enum):
+    """Severity level for code review findings.
+
+    Renamed from Severity to be semantically distinct from other severity types:
+    - CVESeverity (victor.security.protocol): CVE/CVSS-based severity
+    - AuditSeverity: Audit event severity (like log levels)
+    - IaCSeverity: IaC issue severity
+    - ReviewSeverity (here): Code review severity
+    """
 
     ERROR = "error"  # Must fix, blocks merge
     WARNING = "warning"  # Should fix
     INFO = "info"  # Suggestion
     HINT = "hint"  # Nice to have
+
+
+# Backward compatibility alias
+Severity = ReviewSeverity
 
 
 class ReviewCategory(Enum):
@@ -69,7 +80,7 @@ class ReviewFinding:
 
     rule_id: str
     message: str
-    severity: Severity
+    severity: ReviewSeverity
     category: ReviewCategory
     location: SourceLocation
     code_snippet: str = ""
@@ -102,7 +113,7 @@ class ReviewRule:
     name: str
     description: str
     category: ReviewCategory
-    severity: Severity = Severity.WARNING
+    severity: ReviewSeverity = ReviewSeverity.WARNING
     enabled: bool = True
     parameters: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
@@ -146,15 +157,15 @@ class FileReview:
 
     @property
     def error_count(self) -> int:
-        return sum(1 for f in self.findings if f.severity == Severity.ERROR)
+        return sum(1 for f in self.findings if f.severity == ReviewSeverity.ERROR)
 
     @property
     def warning_count(self) -> int:
-        return sum(1 for f in self.findings if f.severity == Severity.WARNING)
+        return sum(1 for f in self.findings if f.severity == ReviewSeverity.WARNING)
 
     @property
     def info_count(self) -> int:
-        return sum(1 for f in self.findings if f.severity == Severity.INFO)
+        return sum(1 for f in self.findings if f.severity == ReviewSeverity.INFO)
 
 
 @dataclass
@@ -192,7 +203,7 @@ class ReviewResult:
 
     def get_findings_by_severity(
         self,
-        severity: Severity,
+        severity: ReviewSeverity,
     ) -> list[ReviewFinding]:
         """Get all findings for a severity level."""
         findings = []
@@ -206,7 +217,7 @@ class ReviewConfig:
     """Configuration for code review."""
 
     enabled_categories: list[ReviewCategory] = field(default_factory=lambda: list(ReviewCategory))
-    min_severity: Severity = Severity.INFO
+    min_severity: ReviewSeverity = ReviewSeverity.INFO
     fail_on_error: bool = True
     fail_on_warning: bool = False
     max_findings_per_file: int = 100
@@ -235,7 +246,7 @@ class SecurityIssue:
     """A security-related finding."""
 
     vulnerability_type: str
-    severity: Severity
+    severity: ReviewSeverity
     cwe_id: Optional[str] = None
     description: str = ""
     remediation: str = ""

@@ -32,8 +32,13 @@ if TYPE_CHECKING:
     from victor.workflows.streaming import WorkflowStreamChunk
 
 
-class NodeStatus(Enum):
-    """Status of a workflow node execution.
+class ProtocolNodeStatus(Enum):
+    """Status of a workflow protocol node execution.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - ProtocolNodeStatus (here): Workflow protocol node status
+    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
+    - ExecutorNodeStatus (victor.workflows.executor): Executor node status
 
     Attributes:
         PENDING: Node has not started execution.
@@ -48,6 +53,10 @@ class NodeStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+# Backward compatibility alias
+NodeStatus = ProtocolNodeStatus
 
 
 @dataclass

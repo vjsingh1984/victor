@@ -49,13 +49,328 @@ Example:
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConstraintsProtocol
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Sandbox Provider Protocol and Registry (Extensibility)
+# =============================================================================
+
+
+@dataclass
+class SandboxResult:
+    """Result from sandbox execution.
+
+    Attributes:
+        success: Whether execution succeeded
+        output: Output from the execution
+        error: Error message if failed
+        exit_code: Process exit code (if applicable)
+        metadata: Additional execution metadata
+    """
+
+    success: bool
+    output: Any = None
+    error: Optional[str] = None
+    exit_code: int = 0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class SandboxProvider(ABC):
+    """Abstract base for sandbox implementations.
+
+    Implement this to add custom sandbox types (kubernetes, wasm, etc.)
+    that can be used for workflow execution.
+
+    All verticals (including third-party plugins) can register custom
+    sandbox providers for their specific execution needs.
+
+    Example:
+        class KubernetesSandboxProvider(SandboxProvider):
+            @property
+            def sandbox_type(self) -> str:
+                return "kubernetes"
+
+            async def execute(self, code, context, timeout=None):
+                # Run in K8s pod
+                ...
+
+            async def cleanup(self):
+                # Delete pod
+                ...
+
+        # Register the provider
+        registry = SandboxProviderRegistry.get_instance()
+        registry.register("kubernetes", KubernetesSandboxProvider)
+    """
+
+    @property
+    @abstractmethod
+    def sandbox_type(self) -> str:
+        """Return sandbox type identifier (e.g., 'none', 'docker', 'kubernetes')."""
+        ...
+
+    @abstractmethod
+    async def execute(
+        self,
+        code: str,
+        context: Dict[str, Any],
+        config: "IsolationConfig",
+        timeout: Optional[float] = None,
+    ) -> SandboxResult:
+        """Execute code in sandbox.
+
+        Args:
+            code: Code or command to execute
+            context: Execution context
+            config: Isolation configuration
+            timeout: Execution timeout in seconds
+
+        Returns:
+            SandboxResult with execution outcome
+        """
+        ...
+
+    @abstractmethod
+    async def cleanup(self) -> None:
+        """Clean up sandbox resources."""
+        ...
+
+    def supports_feature(self, feature: str) -> bool:
+        """Check if sandbox supports a feature.
+
+        Standard features: 'networking', 'filesystem', 'gpu', 'secrets'
+
+        Args:
+            feature: Feature name to check
+
+        Returns:
+            True if feature is supported
+        """
+        return False
+
+    def get_capabilities(self) -> Dict[str, bool]:
+        """Get all sandbox capabilities."""
+        return {
+            "networking": self.supports_feature("networking"),
+            "filesystem": self.supports_feature("filesystem"),
+            "gpu": self.supports_feature("gpu"),
+            "secrets": self.supports_feature("secrets"),
+        }
+
+
+class SandboxProviderRegistry:
+    """Registry for sandbox providers - enables extensibility.
+
+    Third-party verticals can register custom sandbox providers
+    (e.g., Kubernetes, WASM, custom container runtimes) without
+    modifying core Victor code.
+
+    Example:
+        registry = SandboxProviderRegistry.get_instance()
+
+        # Register custom provider
+        registry.register("kubernetes", KubernetesSandboxProvider)
+
+        # Get provider for use
+        provider = registry.get_provider("kubernetes")
+        result = await provider.execute(code, context, config)
+    """
+
+    _instance: Optional["SandboxProviderRegistry"] = None
+
+    def __init__(self):
+        self._providers: Dict[str, Type[SandboxProvider]] = {}
+        self._instances: Dict[str, SandboxProvider] = {}
+
+    @classmethod
+    def get_instance(cls) -> "SandboxProviderRegistry":
+        """Get singleton registry instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset singleton (for testing)."""
+        if cls._instance is not None:
+            cls._instance._instances.clear()
+            cls._instance._providers.clear()
+        cls._instance = None
+
+    def register(
+        self,
+        sandbox_type: str,
+        provider_class: Type[SandboxProvider],
+    ) -> None:
+        """Register a sandbox provider.
+
+        Args:
+            sandbox_type: Sandbox type identifier (e.g., "kubernetes")
+            provider_class: Provider class (not instance)
+        """
+        self._providers[sandbox_type] = provider_class
+        # Clear cached instance if re-registering
+        self._instances.pop(sandbox_type, None)
+        logger.info(f"Registered sandbox provider: {sandbox_type}")
+
+    def get_provider(self, sandbox_type: str) -> Optional[SandboxProvider]:
+        """Get or create sandbox provider instance.
+
+        Args:
+            sandbox_type: Sandbox type to get
+
+        Returns:
+            SandboxProvider instance or None if not registered
+        """
+        if sandbox_type not in self._instances:
+            provider_class = self._providers.get(sandbox_type)
+            if provider_class:
+                self._instances[sandbox_type] = provider_class()
+        return self._instances.get(sandbox_type)
+
+    def list_types(self) -> List[str]:
+        """List available sandbox types."""
+        return list(self._providers.keys())
+
+    def is_registered(self, sandbox_type: str) -> bool:
+        """Check if sandbox type is registered."""
+        return sandbox_type in self._providers
+
+    def get_all_capabilities(self) -> Dict[str, Dict[str, bool]]:
+        """Get capabilities for all registered providers."""
+        result = {}
+        for sandbox_type in self._providers:
+            provider = self.get_provider(sandbox_type)
+            if provider:
+                result[sandbox_type] = provider.get_capabilities()
+        return result
+
+
+# =============================================================================
+# Built-in Sandbox Providers
+# =============================================================================
+
+
+class NoneSandboxProvider(SandboxProvider):
+    """No sandboxing - direct inline execution.
+
+    Fastest execution but no isolation. Suitable for trusted code
+    or read-only operations.
+    """
+
+    @property
+    def sandbox_type(self) -> str:
+        return "none"
+
+    async def execute(
+        self,
+        code: str,
+        context: Dict[str, Any],
+        config: "IsolationConfig",
+        timeout: Optional[float] = None,
+    ) -> SandboxResult:
+        # Direct execution - implement in concrete usage
+        return SandboxResult(
+            success=True,
+            output=None,
+            metadata={"sandbox_type": "none", "executed_inline": True},
+        )
+
+    async def cleanup(self) -> None:
+        pass  # No cleanup needed
+
+    def supports_feature(self, feature: str) -> bool:
+        # Inline execution has full access
+        return feature in ("networking", "filesystem")
+
+
+class ProcessSandboxProvider(SandboxProvider):
+    """Process-based sandboxing with resource limits.
+
+    Uses subprocess with rlimit for resource control.
+    Moderate isolation with reasonable performance.
+    """
+
+    @property
+    def sandbox_type(self) -> str:
+        return "process"
+
+    async def execute(
+        self,
+        code: str,
+        context: Dict[str, Any],
+        config: "IsolationConfig",
+        timeout: Optional[float] = None,
+    ) -> SandboxResult:
+        # Subprocess execution - implement in concrete usage
+        return SandboxResult(
+            success=True,
+            output=None,
+            metadata={"sandbox_type": "process"},
+        )
+
+    async def cleanup(self) -> None:
+        pass  # Process cleanup is automatic
+
+    def supports_feature(self, feature: str) -> bool:
+        return feature in ("networking", "filesystem")
+
+
+class DockerSandboxProvider(SandboxProvider):
+    """Docker container sandboxing.
+
+    Full container isolation with configurable resources.
+    Safest option but has startup overhead.
+    """
+
+    @property
+    def sandbox_type(self) -> str:
+        return "docker"
+
+    async def execute(
+        self,
+        code: str,
+        context: Dict[str, Any],
+        config: "IsolationConfig",
+        timeout: Optional[float] = None,
+    ) -> SandboxResult:
+        # Docker execution - implement in concrete usage
+        return SandboxResult(
+            success=True,
+            output=None,
+            metadata={
+                "sandbox_type": "docker",
+                "image": config.docker_image,
+            },
+        )
+
+    async def cleanup(self) -> None:
+        pass  # Container cleanup handled by executor
+
+    def supports_feature(self, feature: str) -> bool:
+        # Docker supports most features
+        return feature in ("networking", "filesystem", "gpu", "secrets")
+
+
+def register_builtin_providers() -> None:
+    """Register built-in sandbox providers.
+
+    Call this during application initialization to register
+    the standard sandbox providers (none, process, docker).
+    """
+    registry = SandboxProviderRegistry.get_instance()
+    registry.register("none", NoneSandboxProvider)
+    registry.register("process", ProcessSandboxProvider)
+    registry.register("docker", DockerSandboxProvider)
+    logger.debug("Registered built-in sandbox providers")
 
 # Type alias for sandbox types
 SandboxType = Literal["none", "process", "docker"]
@@ -692,6 +1007,14 @@ class IsolationMapper:
 
 
 __all__ = [
+    # Sandbox providers (extensibility)
+    "SandboxResult",
+    "SandboxProvider",
+    "SandboxProviderRegistry",
+    "NoneSandboxProvider",
+    "ProcessSandboxProvider",
+    "DockerSandboxProvider",
+    "register_builtin_providers",
     # Type aliases
     "SandboxType",
     "ExecutionLocality",

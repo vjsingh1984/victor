@@ -215,8 +215,12 @@ class SearchParams:
 
 
 @dataclass
-class SearchResult:
-    """Result from unified search."""
+class UnifiedSearchResult:
+    """Result from unified search with multi-signal scoring.
+
+    Combines semantic, keyword, and graph-based search signals.
+    Renamed from SearchResult to be semantically distinct from other search types.
+    """
 
     symbol: UnifiedSymbol
     score: float  # combined relevance score
@@ -229,6 +233,10 @@ class SearchResult:
 
     # Context
     matched_content: Optional[str] = None  # what matched the query
+
+
+# Backward compatibility alias
+SearchResult = UnifiedSearchResult
 
 
 # =============================================================================

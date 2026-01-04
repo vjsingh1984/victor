@@ -90,21 +90,11 @@ class ProviderCapabilities:
     requires_thinking_time: bool = False
 
 
-@dataclass
-class ToolCall:
-    """Normalized tool call representation.
+# Import canonical ToolCall from tool_calling module
+from victor.agent.tool_calling.base import ToolCall
 
-    Attributes:
-        id: Unique identifier for the tool call
-        name: Name of the tool to invoke
-        arguments: Dictionary of arguments for the tool
-        raw: Original raw tool call data from provider
-    """
-
-    id: str
-    name: str
-    arguments: dict
-    raw: Optional[Any] = None
+# Re-export for backward compatibility
+__all_exports__ = ["ToolCall"]
 
 
 @dataclass

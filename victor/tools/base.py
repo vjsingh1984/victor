@@ -48,8 +48,15 @@ from victor.tools.registry import Hook, HookError, ToolRegistry
 
 
 @dataclass
-class ValidationResult:
-    """Result of parameter validation.
+class ToolValidationResult:
+    """Result of tool parameter validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (here): Tool parameter validation with invalid_params
+    - ConfigValidationResult (victor.core.validation): Configuration validation with ValidationIssue list
+    - ContentValidationResult (victor.framework.middleware): Content validation with fixed_content
+    - ParameterValidationResult (victor.agent.parameter_enforcer): Parameter enforcement with missing_required
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation with syntax/imports
 
     Provides detailed information about validation failures including
     which parameters failed and why.
@@ -60,20 +67,24 @@ class ValidationResult:
     invalid_params: Dict[str, str] = field(default_factory=dict)
 
     def __bool__(self) -> bool:
-        """Allow using ValidationResult in boolean context."""
+        """Allow using ToolValidationResult in boolean context."""
         return self.valid
 
     @classmethod
-    def success(cls) -> "ValidationResult":
+    def success(cls) -> "ToolValidationResult":
         """Create a successful validation result."""
         return cls(valid=True)
 
     @classmethod
     def failure(
         cls, errors: List[str], invalid_params: Optional[Dict[str, str]] = None
-    ) -> "ValidationResult":
+    ) -> "ToolValidationResult":
         """Create a failed validation result."""
         return cls(valid=False, errors=errors, invalid_params=invalid_params or {})
+
+
+# Backward compatibility alias
+ValidationResult = ToolValidationResult
 
 
 class ToolParameter(BaseModel):

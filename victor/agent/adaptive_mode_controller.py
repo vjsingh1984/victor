@@ -83,14 +83,27 @@ _HISTORY_TABLE = Tables.RL_MODE_HISTORY
 _TASK_TABLE = Tables.RL_MODE_TASK
 
 
-class AgentMode(Enum):
-    """Agent operation modes."""
+class AdaptiveAgentMode(Enum):
+    """Extended agent operation modes for adaptive mode control.
+
+    This is an extension of the base AgentMode (victor.agent.mode_controller.AgentMode)
+    with additional modes (REVIEW, COMPLETE) for adaptive behavior tracking.
+
+    Renamed from AgentMode to be semantically distinct:
+    - AgentMode (victor.agent.mode_controller): Base 3 modes (BUILD, PLAN, EXPLORE)
+    - AdaptiveAgentMode: Extended 5 modes for adaptive control
+    - RLAgentMode: Extended 5 modes for RL state machine
+    """
 
     EXPLORE = "explore"  # Understanding codebase
     PLAN = "plan"  # Creating implementation plan
     BUILD = "build"  # Writing/modifying code
     REVIEW = "review"  # Reviewing changes
     COMPLETE = "complete"  # Task finished
+
+
+# Backward compatibility alias
+AgentMode = AdaptiveAgentMode
 
 
 class TransitionTrigger(Enum):

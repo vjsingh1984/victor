@@ -23,11 +23,18 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional
 
 
-class TaskType(Enum):
-    """Type of task being performed.
+class FrameworkTaskType(Enum):
+    """Framework-level task types for agent operation.
 
-    Task types help the agent optimize its approach and
-    can be used for analytics and debugging.
+    High-level types used by the framework Task class.
+    Uses auto() values for internal identity.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
     """
 
     CHAT = auto()
@@ -50,6 +57,10 @@ class TaskType(Enum):
 
     WORKFLOW = auto()
     """Multi-step coordinated workflow."""
+
+
+# Backward compatibility alias
+TaskType = FrameworkTaskType
 
 
 @dataclass

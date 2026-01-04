@@ -22,13 +22,8 @@ from enum import Enum
 from typing import AsyncIterator, Any
 from datetime import datetime
 
-
-class AgentMode(str, Enum):
-    """Agent operation modes."""
-
-    BUILD = "build"  # Full implementation - all tools available
-    PLAN = "plan"  # Read-only analysis mode
-    EXPLORE = "explore"  # Code navigation and understanding
+# Import canonical AgentMode from mode_controller
+from victor.agent.mode_controller import AgentMode
 
 
 @dataclass
@@ -60,9 +55,17 @@ class ChatMessage:
         )
 
 
+# Import canonical ToolCall for basic tool call representation
+from victor.agent.tool_calling.base import ToolCall
+
+
 @dataclass
-class ToolCall:
-    """A tool invocation by the agent."""
+class ToolInvocation:
+    """A tool invocation with its result.
+
+    Different from ToolCall - this pairs a tool call with its execution result.
+    Use ToolCall for the request, ToolInvocation for request+response pair.
+    """
 
     id: str
     name: str
@@ -78,7 +81,7 @@ class ToolCall:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolCall":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolInvocation":
         return cls(
             id=data["id"],
             name=data["name"],
@@ -142,8 +145,17 @@ class ChatResponse:
 
 
 @dataclass
-class StreamChunk:
-    """A chunk from a streaming response."""
+class ClientStreamChunk:
+    """A chunk from a streaming response for client protocols.
+
+    Used by CLI/TUI and IDE extension clients for streaming responses.
+
+    Renamed from StreamChunk to be semantically distinct from other streaming types:
+    - StreamChunk (victor.providers.base): Provider-level raw streaming
+    - OrchestratorStreamChunk: Orchestrator protocol with typed ChunkType
+    - TypedStreamChunk: Safe typed accessor with nested StreamDelta
+    - ClientStreamChunk: Protocol interface for clients (CLI/VS Code)
+    """
 
     content: str
     tool_call: ToolCall | None = None
@@ -157,9 +169,17 @@ class StreamChunk:
         }
 
 
+# Backward compatibility alias
+StreamChunk = ClientStreamChunk
+
+
 @dataclass
-class SearchResult:
-    """Result from a code search."""
+class CodeSearchResult:
+    """Result from a code search operation.
+
+    For line-level code search results with file context.
+    Renamed from SearchResult to be semantically distinct from other search types.
+    """
 
     file: str
     line: int
@@ -177,7 +197,7 @@ class SearchResult:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SearchResult":
+    def from_dict(cls, data: dict[str, Any]) -> "CodeSearchResult":
         return cls(
             file=data["file"],
             line=data["line"],
@@ -185,6 +205,10 @@ class SearchResult:
             score=data["score"],
             context=data.get("context", ""),
         )
+
+
+# Backward compatibility alias
+SearchResult = CodeSearchResult
 
 
 @dataclass

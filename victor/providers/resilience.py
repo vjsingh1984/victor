@@ -51,30 +51,12 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-
-class CircuitState(Enum):
-    """Circuit breaker states."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, reject requests
-    HALF_OPEN = "half_open"  # Testing recovery
-
-
-@dataclass
-class CircuitBreakerConfig:
-    """Configuration for circuit breaker.
-
-    Attributes:
-        failure_threshold: Number of failures before opening circuit
-        success_threshold: Successes needed to close from half-open
-        timeout_seconds: Time before transitioning from open to half-open
-        half_open_max_calls: Maximum calls allowed in half-open state
-    """
-
-    failure_threshold: int = 5
-    success_threshold: int = 3
-    timeout_seconds: float = 60.0
-    half_open_max_calls: int = 3
+# Import canonical types from circuit_breaker.py to avoid duplication
+from victor.providers.circuit_breaker import (
+    CircuitState,
+    CircuitBreakerConfig,
+    CircuitBreakerError as CanonicalCircuitBreakerError,
+)
 
 
 @dataclass
@@ -102,9 +84,15 @@ class CircuitOpenError(Exception):
         super().__init__(message)
 
 
-class CircuitBreaker:
+class ProviderCircuitBreaker:
     """
-    Circuit breaker pattern for provider resilience.
+    Circuit breaker optimized for provider resilience workflow.
+
+    Renamed from CircuitBreaker to be semantically distinct:
+    - CircuitBreaker (victor.providers.circuit_breaker): Standalone with decorator/context manager
+    - MultiCircuitBreaker (victor.agent.resilience): Manages multiple named circuits
+    - ObservableCircuitBreaker (victor.observability.resilience): Metrics/callback focused
+    - ProviderCircuitBreaker (here): ResilientProvider workflow with execute(), is_available
 
     States:
     - CLOSED: Normal operation, tracking failures
@@ -112,7 +100,7 @@ class CircuitBreaker:
     - HALF_OPEN: Testing if service recovered
 
     Usage:
-        cb = CircuitBreaker("anthropic")
+        cb = ProviderCircuitBreaker("anthropic")
 
         async def make_request():
             return await provider.chat(messages, model=model)
@@ -295,9 +283,18 @@ class CircuitBreaker:
         }
 
 
+# Backward compatibility alias
+CircuitBreaker = ProviderCircuitBreaker
+
+
 @dataclass
-class RetryConfig:
-    """Configuration for retry strategy.
+class ProviderRetryConfig:
+    """Configuration for provider retry strategy.
+
+    Renamed from RetryConfig to be semantically distinct:
+    - ProviderRetryConfig (here): Provider-specific with retryable_patterns
+    - AgentRetryConfig (victor.agent.resilience): Agent-specific with jitter flag
+    - ObservabilityRetryConfig (victor.observability.resilience): With BackoffStrategy
 
     Attributes:
         max_retries: Maximum number of retry attempts
@@ -335,6 +332,10 @@ class RetryConfig:
     )
 
 
+# Backward compatibility alias
+RetryConfig = ProviderRetryConfig
+
+
 class RetryExhaustedError(Exception):
     """Raised when all retry attempts are exhausted."""
 
@@ -344,9 +345,14 @@ class RetryExhaustedError(Exception):
         super().__init__(f"Max retries ({max_retries}) exhausted. Last error: {last_error}")
 
 
-class RetryStrategy:
+class ProviderRetryStrategy:
     """
-    Intelligent retry strategy with exponential backoff and jitter.
+    Intelligent provider retry strategy with exponential backoff and jitter.
+
+    Renamed from RetryStrategy to be semantically distinct:
+    - ProviderRetryStrategy (here): Concrete provider retry with execute()
+    - BaseRetryStrategy (victor.core.retry): Abstract base with should_retry(), get_delay()
+    - BatchRetryStrategy (victor.workflows.batch_executor): Enum for batch retry modes
 
     Features:
     - Exponential backoff with configurable base
@@ -355,7 +361,7 @@ class RetryStrategy:
     - Configurable retryable conditions
 
     Usage:
-        retry = RetryStrategy()
+        retry = ProviderRetryStrategy()
 
         async def make_request():
             return await provider.chat(messages, model=model)
@@ -516,6 +522,10 @@ class RetryStrategy:
         return None
 
 
+# Backward compatibility alias
+RetryStrategy = ProviderRetryStrategy
+
+
 class ProviderUnavailableError(Exception):
     """Raised when no providers are available."""
 
@@ -575,7 +585,7 @@ class ResilientProvider:
         self._provider_name = getattr(provider, "name", "unknown")
 
         # Create circuit breaker
-        self.circuit_breaker = CircuitBreaker(
+        self.circuit_breaker = ProviderCircuitBreaker(
             name=f"cb_{self._provider_name}",
             config=circuit_config,
         )
@@ -584,10 +594,10 @@ class ResilientProvider:
         self.retry_strategy = RetryStrategy(config=retry_config)
 
         # Create circuit breakers for fallbacks
-        self._fallback_circuits: Dict[str, CircuitBreaker] = {}
+        self._fallback_circuits: Dict[str, ProviderCircuitBreaker] = {}
         for fb in self.fallback_providers:
             fb_name = getattr(fb, "name", f"fallback_{len(self._fallback_circuits)}")
-            self._fallback_circuits[fb_name] = CircuitBreaker(
+            self._fallback_circuits[fb_name] = ProviderCircuitBreaker(
                 name=f"cb_{fb_name}",
                 config=circuit_config,
             )

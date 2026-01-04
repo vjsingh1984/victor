@@ -65,8 +65,18 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class TaskType(Enum):
-    """Unified task types combining fine-grained and coarse classifications."""
+class TrackerTaskType(Enum):
+    """Task types for unified task tracking with progress milestones.
+
+    Fine-grained types optimized for milestone-based progress tracking.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
+    """
 
     # Action tasks (modify/create files)
     EDIT = "edit"  # Modify existing files
@@ -81,6 +91,10 @@ class TaskType(Enum):
     # Other tasks
     DESIGN = "design"  # Conceptual/planning (no tools)
     GENERAL = "general"  # Ambiguous or mixed tasks
+
+
+# Backward compatibility alias
+TaskType = TrackerTaskType
 
 
 class Milestone(Enum):
@@ -102,8 +116,14 @@ class ConversationStage(Enum):
     VERIFYING = "verifying"
 
 
-class StopReason(Enum):
-    """Reason for stopping execution."""
+class TrackerStopReason(Enum):
+    """Reason for stopping task execution.
+
+    Renamed from StopReason to be semantically distinct:
+    - TrackerStopReason (here): Task tracker stop reasons (budget, loop, iterations)
+    - LoopStopRecommendation (victor.agent.loop_detector): Loop detection recommendation dataclass
+    - DebugStopReason (victor.observability.debug.protocol): Debugger stop reasons (breakpoint, step)
+    """
 
     NONE = "none"
     TOOL_BUDGET = "tool_budget"
@@ -111,6 +131,10 @@ class StopReason(Enum):
     MAX_ITERATIONS = "max_iterations"
     GOAL_FORCING = "goal_forcing"
     MANUAL_STOP = "manual_stop"
+
+
+# Backward compatibility alias
+StopReason = TrackerStopReason
 
 
 # Tools that indicate research activity

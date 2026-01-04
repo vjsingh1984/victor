@@ -66,8 +66,12 @@ class EmbeddingConfig(BaseModel):
     )
 
 
-class SearchResult(BaseModel):
-    """Result from semantic search."""
+class EmbeddingSearchResult(BaseModel):
+    """Result from embedding/vector semantic search.
+
+    For vector store search results based on embedding similarity.
+    Renamed from SearchResult to be semantically distinct from other search types.
+    """
 
     file_path: str = Field(description="Path to the file")
     symbol_name: Optional[str] = Field(default=None, description="Symbol name if applicable")
@@ -75,6 +79,10 @@ class SearchResult(BaseModel):
     score: float = Field(description="Relevance score (0-1, higher is better)")
     line_number: Optional[int] = Field(default=None, description="Line number in file")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+# Backward compatibility alias
+SearchResult = EmbeddingSearchResult
 
 
 class BaseEmbeddingProvider(ABC):

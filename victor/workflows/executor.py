@@ -39,6 +39,14 @@ from victor.workflows.definition import (
     WorkflowNode,
 )
 from victor.workflows.isolation import IsolationMapper
+from victor.workflows.resilience import (
+    CircuitBreaker,
+    CircuitBreakerRegistry,
+    CircuitState,
+    RetryExecutor,
+    retry_policy_to_strategy,
+    get_node_circuit_breaker,
+)
 
 # Chain handler prefix for referencing registered chains
 CHAIN_HANDLER_PREFIX = "chain:"
@@ -135,14 +143,24 @@ def list_compute_handlers() -> List[str]:
     return list(_compute_handlers.keys())
 
 
-class NodeStatus(Enum):
-    """Execution status of a workflow node."""
+class ExecutorNodeStatus(Enum):
+    """Execution status of a workflow executor node.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - ExecutorNodeStatus (here): Executor node status
+    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
+    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
+    """
 
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+# Backward compatibility alias
+NodeStatus = ExecutorNodeStatus
 
 
 @dataclass
@@ -832,6 +850,7 @@ class WorkflowExecutor:
 
         Checks cache for cacheable nodes before execution.
         Caches successful results for deterministic nodes.
+        Applies retry policy and circuit breaker when configured.
 
         Args:
             node: Node to execute
@@ -858,6 +877,105 @@ class WorkflowExecutor:
                     tool_calls_used=cached_result.tool_calls_used,
                 )
 
+        # Check circuit breaker if enabled
+        circuit_breaker = None
+        if getattr(node, "circuit_breaker_enabled", False):
+            circuit_breaker = get_node_circuit_breaker(node.id)
+            if not circuit_breaker.can_execute():
+                logger.warning(
+                    f"Circuit breaker OPEN for node '{node.id}', "
+                    f"state: {circuit_breaker.state.name}"
+                )
+                return NodeResult(
+                    node_id=node.id,
+                    status=NodeStatus.FAILED,
+                    error=f"Circuit breaker is {circuit_breaker.state.name}",
+                    duration_seconds=time.time() - start_time,
+                )
+
+        # Execute with or without retry policy
+        retry_policy = getattr(node, "retry_policy", None)
+        if retry_policy:
+            result = await self._execute_node_with_retry(
+                node, context, start_time, retry_policy
+            )
+        else:
+            result = await self._execute_node_inner(node, context, start_time)
+
+        # Update circuit breaker state
+        if circuit_breaker:
+            if result.success:
+                circuit_breaker.record_success()
+            else:
+                circuit_breaker.record_failure()
+
+        # Cache successful results for cacheable nodes
+        if self._cache is not None and result.success:
+            self._cache.set(node, context.data, result)
+
+        return result
+
+    async def _execute_node_with_retry(
+        self,
+        node: WorkflowNode,
+        context: WorkflowContext,
+        start_time: float,
+        retry_policy: "RetryPolicy",
+    ) -> NodeResult:
+        """Execute node with retry policy.
+
+        Args:
+            node: Node to execute
+            context: Execution context
+            start_time: Node start time
+            retry_policy: Retry policy to apply
+
+        Returns:
+            NodeResult with execution outcome
+        """
+        from victor.workflows.protocols import RetryPolicy as WorkflowRetryPolicy
+
+        strategy = retry_policy_to_strategy(retry_policy)
+        executor = RetryExecutor(strategy)
+
+        async def execute_func() -> NodeResult:
+            return await self._execute_node_inner(node, context, start_time)
+
+        retry_result = await executor.execute(execute_func)
+
+        if retry_result.success:
+            logger.debug(
+                f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)"
+            )
+            return retry_result.result
+        else:
+            logger.warning(
+                f"Node '{node.id}' failed after {retry_result.attempts} attempt(s): "
+                f"{retry_result.last_exception}"
+            )
+            return NodeResult(
+                node_id=node.id,
+                status=NodeStatus.FAILED,
+                error=str(retry_result.last_exception) if retry_result.last_exception else "Retry exhausted",
+                duration_seconds=time.time() - start_time,
+            )
+
+    async def _execute_node_inner(
+        self,
+        node: WorkflowNode,
+        context: WorkflowContext,
+        start_time: float,
+    ) -> NodeResult:
+        """Execute a single workflow node (inner logic).
+
+        Args:
+            node: Node to execute
+            context: Execution context
+            start_time: Node start time
+
+        Returns:
+            NodeResult with execution outcome
+        """
         try:
             if isinstance(node, AgentNode):
                 result = await self._execute_agent_node(node, context, start_time)
@@ -881,10 +999,6 @@ class WorkflowExecutor:
                     status=NodeStatus.SKIPPED,
                     duration_seconds=time.time() - start_time,
                 )
-
-            # Cache successful results for cacheable nodes
-            if self._cache is not None and result.success:
-                self._cache.set(node, context.data, result)
 
             return result
 

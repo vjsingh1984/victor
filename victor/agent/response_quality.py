@@ -52,8 +52,15 @@ from typing import Any, Callable, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-class QualityDimension(Enum):
-    """Dimensions of response quality."""
+class ResponseQualityDimension(Enum):
+    """Dimensions of LLM response quality.
+
+    This is the CANONICAL QualityDimension for response quality scoring.
+
+    Renamed from QualityDimension to be semantically distinct:
+    - ResponseQualityDimension (here): LLM response quality (7 dimensions)
+    - ProtocolQualityDimension (victor.protocols.quality): Protocol-level quality (7 different dimensions)
+    """
 
     RELEVANCE = "relevance"  # Addresses the query
     COMPLETENESS = "completeness"  # Covers all aspects
@@ -62,6 +69,10 @@ class QualityDimension(Enum):
     ACTIONABILITY = "actionability"  # Clear next steps
     COHERENCE = "coherence"  # Logical structure
     CODE_QUALITY = "code_quality"  # Code correctness
+
+
+# Backward compatibility alias
+QualityDimension = ResponseQualityDimension
 
 
 @dataclass
@@ -76,7 +87,7 @@ class DimensionScore:
         evidence: Evidence supporting the score
     """
 
-    dimension: QualityDimension
+    dimension: ResponseQualityDimension
     score: float
     weight: float = 1.0
     feedback: str = ""

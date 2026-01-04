@@ -31,19 +31,22 @@ States:
 - HALF_OPEN: Testing if service recovered
 
 Usage:
-    breaker = CircuitBreaker(
+    config = MultiCircuitBreakerConfig(
         failure_threshold=5,
         recovery_timeout=30.0,
         half_open_max_calls=3,
     )
+    breaker = MultiCircuitBreaker(config)
 
-    async with breaker.call("provider_name") as allowed:
-        if allowed:
+    if breaker.is_allowed("provider_name"):
+        try:
             result = await provider.chat(...)
             breaker.record_success("provider_name")
-        else:
-            # Fast fail, use fallback
-            result = await fallback_provider.chat(...)
+        except Exception as e:
+            breaker.record_failure("provider_name", e)
+    else:
+        # Fast fail, use fallback
+        result = await fallback_provider.chat(...)
 """
 
 import asyncio
@@ -51,20 +54,17 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+# Import canonical types from circuit_breaker.py to avoid duplication
+from victor.providers.circuit_breaker import (
+    CircuitState,
+    CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
+)
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-
-
-class CircuitState(Enum):
-    """Circuit breaker states."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, reject requests
-    HALF_OPEN = "half_open"  # Testing recovery
 
 
 @dataclass
@@ -91,8 +91,11 @@ class CircuitStats:
 
 
 @dataclass
-class CircuitBreakerConfig:
-    """Configuration for circuit breaker.
+class MultiCircuitBreakerConfig:
+    """Configuration for multi-circuit breaker.
+
+    This extends the canonical CircuitBreakerConfig with multi-circuit support.
+    Supports both `timeout_seconds` (canonical) and `recovery_timeout` (legacy).
 
     Attributes:
         failure_threshold: Failures before opening circuit
@@ -103,14 +106,29 @@ class CircuitBreakerConfig:
     """
 
     failure_threshold: int = 5
-    recovery_timeout: float = 30.0
+    recovery_timeout: float = 30.0  # Keep legacy name for backward compatibility
     half_open_max_calls: int = 3
     success_threshold: int = 2
     exclude_exceptions: tuple = (asyncio.CancelledError,)
 
+    @property
+    def timeout_seconds(self) -> float:
+        """Canonical alias for recovery_timeout."""
+        return self.recovery_timeout
 
-class CircuitBreaker:
-    """Circuit breaker for preventing cascading failures.
+
+# Alias for backward compatibility
+CircuitBreakerConfig = MultiCircuitBreakerConfig
+
+
+class MultiCircuitBreaker:
+    """Circuit breaker managing multiple named circuits.
+
+    Renamed from CircuitBreaker to be semantically distinct:
+    - CircuitBreaker (victor.providers.circuit_breaker): Standalone with decorator/context manager
+    - MultiCircuitBreaker (here): Manages multiple named circuits (Dict[str, CircuitStats])
+    - ObservableCircuitBreaker (victor.observability.resilience): Metrics/callback focused
+    - ProviderCircuitBreaker (victor.providers.resilience): ResilientProvider workflow
 
     Thread-safe implementation using asyncio locks.
     Supports multiple named circuits for different providers.
@@ -268,9 +286,18 @@ class CircuitBreaker:
         return {name: self.get_stats(name) for name in self._circuits}
 
 
+# Backward compatibility alias
+CircuitBreaker = MultiCircuitBreaker
+
+
 @dataclass
-class RetryConfig:
-    """Configuration for retry with exponential backoff.
+class AgentRetryConfig:
+    """Configuration for agent retry with exponential backoff.
+
+    Renamed from RetryConfig to be semantically distinct:
+    - AgentRetryConfig (here): Agent-specific with jitter flag
+    - ProviderRetryConfig (victor.providers.resilience): Provider-specific with retryable_patterns
+    - ObservabilityRetryConfig (victor.observability.resilience): With BackoffStrategy
 
     Attributes:
         max_retries: Maximum retry attempts
@@ -293,6 +320,10 @@ class RetryConfig:
         asyncio.TimeoutError,
     )
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
+
+
+# Backward compatibility alias
+RetryConfig = AgentRetryConfig
 
 
 class RetryHandler:
@@ -549,7 +580,7 @@ class ResilientExecutor:
             retry_handler: Retry handler instance
             rate_limiter: Rate limiter instance
         """
-        self.circuit_breaker = circuit_breaker or CircuitBreaker()
+        self.circuit_breaker = circuit_breaker or MultiCircuitBreaker()
         self.retry_handler = retry_handler or RetryHandler()
         self.rate_limiter = rate_limiter or RateLimiter()
 

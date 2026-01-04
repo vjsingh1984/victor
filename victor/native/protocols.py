@@ -55,8 +55,13 @@ class SymbolType(str, Enum):
 
 
 @dataclass(frozen=True)
-class Symbol:
-    """Represents a code symbol extracted from source.
+class NativeSymbol:
+    """Code symbol extracted from native (Rust) parser.
+
+    Renamed from Symbol to be semantically distinct:
+    - NativeSymbol (here): Rust-extracted symbols (frozen, hashable)
+    - IndexedSymbol (victor.coding.codebase.indexer): Pydantic model for index storage
+    - RefactorSymbol (victor.coding.refactor.protocol): Refactoring symbol with SourceLocation
 
     Attributes:
         name: Symbol name (e.g., "my_function")
@@ -82,6 +87,10 @@ class Symbol:
 
     def __hash__(self) -> int:
         return hash((self.name, self.type, self.line, self.parent))
+
+
+# Backward compatibility alias
+Symbol = NativeSymbol
 
 
 @dataclass

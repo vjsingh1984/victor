@@ -197,14 +197,24 @@ NodeFunc = Callable[[S], Union[S, Awaitable[S]]]
 RouterFunc = Callable[[S], str]
 
 
-class NodeType(str, Enum):
-    """Types of graph nodes."""
+class GraphNodeType(str, Enum):
+    """Types of graph DSL nodes.
+
+    Renamed from NodeType to be semantically distinct:
+    - GraphNodeType (here): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    - WorkflowNodeType (victor.workflows.definition): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - YAMLNodeType (victor.workflows.yaml_loader): YAML loader validation nodes
+    """
 
     FUNCTION = "function"  # Transform function
     AGENT = "agent"  # Agent execution
     CONDITIONAL = "conditional"  # Router/branch
     PARALLEL = "parallel"  # Parallel execution
     SUBGRAPH = "subgraph"  # Nested graph
+
+
+# Backward compatibility alias
+NodeType = GraphNodeType
 
 
 @dataclass

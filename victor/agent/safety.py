@@ -33,14 +33,25 @@ from victor.tools.metadata_registry import get_write_tools as registry_get_write
 logger = logging.getLogger(__name__)
 
 
-class RiskLevel(Enum):
-    """Risk level categorization for operations."""
+class OperationalRiskLevel(Enum):
+    """Risk level categorization for tool/command operations.
+
+    This is the CANONICAL RiskLevel for operational risk assessment.
+
+    Renamed from RiskLevel to be semantically distinct:
+    - OperationalRiskLevel (here): Tool/command risk with SAFE level (5 values)
+    - PatternRiskLevel (victor.safety.code_patterns): Code pattern risk (4 values)
+    """
 
     SAFE = "safe"  # No risk - read operations
     LOW = "low"  # Minor changes - single file edits
     MEDIUM = "medium"  # Moderate changes - multi-file operations
     HIGH = "high"  # Significant changes - deletions, overwrites
     CRITICAL = "critical"  # System-level destructive operations
+
+
+# Backward compatibility alias
+RiskLevel = OperationalRiskLevel
 
 
 class ApprovalMode(Enum):

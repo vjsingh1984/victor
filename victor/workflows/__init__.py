@@ -105,6 +105,7 @@ from victor.workflows.yaml_loader import (
     load_workflow_from_yaml,
     load_workflow_from_file,
     load_workflows_from_directory,
+    load_and_validate,
 )
 from victor.workflows.cache import (
     WorkflowCacheConfig,
@@ -390,6 +391,7 @@ __all__ = [
     "load_workflow_from_yaml",
     "load_workflow_from_file",
     "load_workflows_from_directory",
+    "load_and_validate",
     # Cache
     "WorkflowCacheConfig",
     "CacheEntry",

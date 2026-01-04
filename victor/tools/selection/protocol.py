@@ -81,14 +81,16 @@ class PerformanceProfile:
 
 
 @dataclass
-class ToolSelectionContext:
-    """Context for tool selection decisions.
+class CrossVerticalToolSelectionContext:
+    """Extended context for cross-vertical tool selection decisions.
+
+    Renamed from ToolSelectionContext to be semantically distinct:
+    - CrossVerticalToolSelectionContext (here): Extended cross-vertical selection
+    - AgentToolSelectionContext (victor.agent.protocols): Basic agent-level context
+    - VerticalToolSelectionContext (victor.core.verticals.protocols.tool_provider): Vertical-specific
 
     Provides comprehensive context for intelligent tool filtering,
     including conversation history, stage info, and task metadata.
-
-    This extends the basic ToolSelectionContext from victor.agent.protocols
-    with additional fields needed for cross-vertical selection.
 
     Attributes:
         prompt: Current user prompt/message
@@ -129,7 +131,7 @@ class ToolSelectionContext:
         cls,
         prompt: str,
         agent_context: Dict[str, Any],
-    ) -> "ToolSelectionContext":
+    ) -> "CrossVerticalToolSelectionContext":
         """Create from agent's internal context dictionary.
 
         Args:
@@ -156,6 +158,10 @@ class ToolSelectionContext:
             max_tools=agent_context.get("max_tools", 10),
             use_cost_aware=agent_context.get("use_cost_aware", False),
         )
+
+
+# Backward compatibility alias
+ToolSelectionContext = CrossVerticalToolSelectionContext
 
 
 @dataclass

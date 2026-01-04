@@ -112,8 +112,11 @@ class DocumentChunk:
 
 
 @dataclass
-class SearchResult:
-    """Search result with relevance score.
+class DocumentSearchResult:
+    """RAG document search result with relevance score.
+
+    For document/chunk-based RAG search results.
+    Renamed from SearchResult to be semantically distinct from other search types.
 
     Attributes:
         chunk: The matched chunk
@@ -141,6 +144,10 @@ class SearchResult:
     def doc_id(self) -> str:
         """Convenience property for document ID."""
         return self.chunk.doc_id
+
+
+# Backward compatibility alias
+SearchResult = DocumentSearchResult
 
 
 @dataclass

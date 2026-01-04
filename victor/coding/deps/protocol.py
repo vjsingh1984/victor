@@ -123,8 +123,13 @@ class Version:
 
 
 @dataclass
-class Dependency:
-    """A package dependency."""
+class PackageDependency:
+    """A package dependency for package management.
+
+    Renamed from Dependency to be semantically distinct:
+    - PackageDependency (here): Package management with version tracking
+    - SecurityDependency (victor.coding.security.protocol): Security scanning with CVE info
+    """
 
     name: str
     version_spec: str = ""  # Original version specification
@@ -151,6 +156,10 @@ class Dependency:
         if self.is_outdated:
             return self.latest_version
         return None
+
+
+# Backward compatibility alias
+Dependency = PackageDependency
 
 
 @dataclass

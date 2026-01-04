@@ -691,8 +691,12 @@ class GroundingIssue:
 
 
 @dataclass
-class VerificationResult:
-    """Result of grounding verification.
+class GroundingVerificationResult:
+    """Result of agent-level grounding verification.
+
+    Renamed from VerificationResult to be semantically distinct:
+    - GroundingVerificationResult (here): Agent grounding verification with issues/references
+    - ClaimVerificationResult (victor.protocols.grounding): Protocol-level claim verification
 
     Attributes:
         is_grounded: Whether response is sufficiently grounded
@@ -819,6 +823,10 @@ class VerificationResult:
             "Please correct the following issues:\n"
         )
         return header + "\n".join(feedback_parts)
+
+
+# Backward compatibility alias
+VerificationResult = GroundingVerificationResult
 
 
 @dataclass

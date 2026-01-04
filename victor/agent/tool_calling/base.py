@@ -146,11 +146,19 @@ class ToolCall:
     """Normalized tool call representation.
 
     All provider-specific formats are converted to this unified structure.
+    This is the canonical ToolCall class - import from here.
+
+    Attributes:
+        name: Name of the tool to invoke
+        arguments: Dictionary of arguments for the tool
+        id: Unique identifier for the tool call (for multi-turn)
+        raw: Original raw tool call data from provider (optional)
     """
 
     name: str
     arguments: Dict[str, Any]
     id: Optional[str] = None  # Tool call ID (for multi-turn)
+    raw: Optional[Any] = None  # Raw provider-specific data
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format."""
@@ -166,6 +174,7 @@ class ToolCall:
             name=data.get("name", ""),
             arguments=data.get("arguments", {}),
             id=data.get("id"),
+            raw=data.get("raw"),
         )
 
 

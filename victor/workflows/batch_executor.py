@@ -63,13 +63,23 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class RetryStrategy(Enum):
-    """Retry strategy for failed items."""
+class BatchRetryStrategy(Enum):
+    """Retry strategy for failed batch items.
+
+    Renamed from RetryStrategy to be semantically distinct:
+    - BatchRetryStrategy (here): Enum for batch retry modes
+    - BaseRetryStrategy (victor.core.retry): Abstract base with should_retry(), get_delay()
+    - ProviderRetryStrategy (victor.providers.resilience): Concrete provider retry with execute()
+    """
 
     NONE = "none"  # No retries
     IMMEDIATE = "immediate"  # Retry immediately
     END_OF_BATCH = "end_of_batch"  # Retry at end of batch
     EXPONENTIAL_BACKOFF = "exponential_backoff"  # Retry with backoff
+
+
+# Backward compatibility alias
+RetryStrategy = BatchRetryStrategy
 
 
 @dataclass

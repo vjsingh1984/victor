@@ -33,8 +33,12 @@ from victor.coding.deps.protocol import (
 logger = logging.getLogger(__name__)
 
 
-class BaseDependencyParser(ABC):
-    """Abstract base for dependency parsers.
+class BasePackageDependencyParser(ABC):
+    """Abstract base for package dependency parsers.
+
+    Renamed from BaseDependencyParser to be semantically distinct:
+    - BasePackageDependencyParser (here): Package management with PackageManager
+    - BaseSecurityDependencyParser (victor.coding.security.scanner): Security scanning with ecosystem
 
     Implements Strategy pattern for different file formats.
     """
@@ -68,6 +72,10 @@ class BaseDependencyParser(ABC):
         from fnmatch import fnmatch
 
         return any(fnmatch(path.name, pattern) for pattern in self.file_patterns)
+
+
+# Backward compatibility alias
+BaseDependencyParser = BasePackageDependencyParser
 
 
 class RequirementsTxtParser(BaseDependencyParser):

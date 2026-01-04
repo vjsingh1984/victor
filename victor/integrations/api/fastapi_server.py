@@ -150,8 +150,12 @@ class CodeSearchRequest(BaseModel):
         return v
 
 
-class SearchResult(BaseModel):
-    """Single search result."""
+class APISearchResult(BaseModel):
+    """Single search result for API responses.
+
+    For HTTP API search result serialization.
+    Renamed from SearchResult to be semantically distinct from other search types.
+    """
 
     file: str
     line: int
@@ -159,10 +163,14 @@ class SearchResult(BaseModel):
     score: float
 
 
+# Backward compatibility alias
+SearchResult = APISearchResult
+
+
 class SearchResponse(BaseModel):
     """Search response payload."""
 
-    results: List[SearchResult]
+    results: List[APISearchResult]
     error: Optional[str] = None
 
 

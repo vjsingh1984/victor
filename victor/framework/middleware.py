@@ -107,8 +107,15 @@ class ValidationIssue:
 
 
 @dataclass
-class ValidationResult:
+class ContentValidationResult:
     """Result of content validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (victor.tools.base): Tool parameter validation
+    - ConfigValidationResult (victor.core.validation): Configuration validation
+    - ContentValidationResult (here): Content validation with fixed_content
+    - ParameterValidationResult (victor.agent.parameter_enforcer): Parameter enforcement
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation
 
     Attributes:
         is_valid: Whether the content passed validation
@@ -140,6 +147,10 @@ class ValidationResult:
     def has_fix(self) -> bool:
         """Whether a fix is available."""
         return self.fixed_content is not None
+
+
+# Backward compatibility alias
+ValidationResult = ContentValidationResult
 
 
 @runtime_checkable

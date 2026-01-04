@@ -36,7 +36,15 @@ from victor.framework.task.protocols import TaskComplexity
 class TaskType(Enum):
     """Types of tasks that can be detected from prompts.
 
-    This is the canonical TaskType enum - other modules should import from here.
+    This is the CANONICAL TaskType enum for prompt classification.
+    Other modules should import from here.
+
+    Semantic Variants (all different purposes):
+    - TaskType (here): Canonical prompt classification with all task types
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
     """
 
     # Core task types

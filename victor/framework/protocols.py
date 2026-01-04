@@ -112,11 +112,17 @@ class ChunkType(str, Enum):
 
 
 @dataclass
-class StreamChunk:
+class OrchestratorStreamChunk:
     """Standardized streaming chunk format from orchestrator.
 
     This is the canonical format returned by OrchestratorProtocol.stream_chat().
     Framework code converts these to Event instances for user consumption.
+
+    Renamed from StreamChunk to be semantically distinct from other streaming types:
+    - StreamChunk (victor.providers.base): Provider-level raw streaming
+    - OrchestratorStreamChunk: Orchestrator protocol with typed ChunkType
+    - TypedStreamChunk: Safe typed accessor with nested StreamDelta
+    - ClientStreamChunk: Protocol interface for clients (CLI/VS Code)
 
     Attributes:
         chunk_type: Type of this chunk (see ChunkType enum)
@@ -143,6 +149,10 @@ class StreamChunk:
     new_stage: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     is_final: bool = False
+
+
+# Backward compatibility alias
+StreamChunk = OrchestratorStreamChunk
 
 
 # =============================================================================

@@ -56,8 +56,15 @@ class Language(Enum):
 
 
 @dataclass(frozen=True)
-class ValidationResult:
+class CodeValidationResult:
     """Immutable result of code validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (victor.tools.base): Tool parameter validation
+    - ConfigValidationResult (victor.core.validation): Configuration validation
+    - ContentValidationResult (victor.framework.middleware): Content validation
+    - ParameterValidationResult (victor.agent.parameter_enforcer): Parameter enforcement
+    - CodeValidationResult (here): Code validation with syntax/imports/language
 
     Attributes:
         valid: Overall validation passed
@@ -84,7 +91,7 @@ class ValidationResult:
     @classmethod
     def success(
         cls, language: Language = Language.UNKNOWN, used_ast: bool = False
-    ) -> "ValidationResult":
+    ) -> "CodeValidationResult":
         """Factory for successful validation."""
         return cls(valid=True, language=language, used_ast_validation=used_ast)
 
@@ -94,7 +101,7 @@ class ValidationResult:
         errors: list[str],
         language: Language = Language.UNKNOWN,
         syntax_error: Optional[str] = None,
-    ) -> "ValidationResult":
+    ) -> "CodeValidationResult":
         """Factory for failed validation."""
         return cls(
             valid=False,
@@ -104,9 +111,9 @@ class ValidationResult:
             syntax_error=syntax_error,
         )
 
-    def with_warnings(self, warnings: list[str]) -> "ValidationResult":
+    def with_warnings(self, warnings: list[str]) -> "CodeValidationResult":
         """Return new result with added warnings."""
-        return ValidationResult(
+        return CodeValidationResult(
             valid=self.valid,
             language=self.language,
             syntax_valid=self.syntax_valid,
@@ -117,6 +124,10 @@ class ValidationResult:
             syntax_error=self.syntax_error,
             used_ast_validation=self.used_ast_validation,
         )
+
+
+# Backward compatibility alias
+ValidationResult = CodeValidationResult
 
 
 @dataclass(frozen=True)

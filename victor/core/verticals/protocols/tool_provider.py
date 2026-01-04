@@ -48,10 +48,13 @@ from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
 
 
 @dataclass
-class ToolSelectionContext:
-    """Context for tool selection decisions.
+class VerticalToolSelectionContext:
+    """Vertical-specific context for tool selection decisions.
 
-    Provides all information needed for vertical-specific tool selection.
+    Renamed from ToolSelectionContext to be semantically distinct:
+    - VerticalToolSelectionContext (here): Vertical-specific selection context
+    - AgentToolSelectionContext (victor.agent.protocols): Basic agent-level context
+    - CrossVerticalToolSelectionContext (victor.tools.selection.protocol): Extended cross-vertical
 
     Attributes:
         task_type: Detected task type (e.g., "edit", "debug", "refactor")
@@ -68,6 +71,10 @@ class ToolSelectionContext:
     available_tools: Set[str] = field(default_factory=set)
     recent_tools: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# Backward compatibility alias
+ToolSelectionContext = VerticalToolSelectionContext
 
 
 @dataclass

@@ -103,8 +103,13 @@ class CVE:
 
 
 @dataclass
-class Dependency:
-    """A software dependency."""
+class SecurityDependency:
+    """A software dependency for security scanning.
+
+    Renamed from Dependency to be semantically distinct:
+    - SecurityDependency (here): Security scanning with ecosystem, license, package_url
+    - PackageDependency (victor.coding.deps.protocol): Package management with version tracking
+    """
 
     name: str
     version: str
@@ -117,6 +122,10 @@ class Dependency:
     def package_url(self) -> str:
         """Get Package URL (purl) format."""
         return f"pkg:{self.ecosystem}/{self.name}@{self.version}"
+
+
+# Backward compatibility alias
+Dependency = SecurityDependency
 
 
 @dataclass

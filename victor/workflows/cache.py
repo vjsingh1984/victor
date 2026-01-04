@@ -59,11 +59,217 @@ if TYPE_CHECKING:
     from victor.workflows.definition import (
         ConditionNode,
         TransformNode,
+        WorkflowDefinition,
         WorkflowNode,
     )
     from victor.workflows.executor import NodeResult
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Dependency Graph for Cascading Cache Invalidation
+# =============================================================================
+
+
+@dataclass
+class DependencyGraph:
+    """Tracks node dependencies for cascading cache invalidation.
+
+    When a node's output changes, all downstream nodes that depend on it
+    should also be invalidated. This graph tracks those relationships.
+
+    All verticals benefit from automatic dependency-aware invalidation
+    without needing to manually track which cache entries to clear.
+
+    Attributes:
+        dependents: Maps node_id -> set of nodes that depend on it (downstream)
+        dependencies: Maps node_id -> set of nodes it depends on (upstream)
+
+    Example:
+        # Build graph from workflow
+        graph = DependencyGraph.from_workflow(workflow)
+
+        # When node 'A' changes, find all affected nodes
+        cascade = graph.get_cascade_set('A')
+        # Returns {'B', 'C', 'D'} if B->A, C->B, D->C
+    """
+
+    dependents: Dict[str, Set[str]] = field(default_factory=dict)
+    dependencies: Dict[str, Set[str]] = field(default_factory=dict)
+
+    def add_dependency(self, node_id: str, depends_on: str) -> None:
+        """Record that node_id depends on depends_on.
+
+        Args:
+            node_id: The dependent node (downstream)
+            depends_on: The dependency node (upstream)
+        """
+        if node_id not in self.dependencies:
+            self.dependencies[node_id] = set()
+        self.dependencies[node_id].add(depends_on)
+
+        if depends_on not in self.dependents:
+            self.dependents[depends_on] = set()
+        self.dependents[depends_on].add(node_id)
+
+    def get_dependencies(self, node_id: str) -> Set[str]:
+        """Get nodes that this node depends on (upstream)."""
+        return self.dependencies.get(node_id, set())
+
+    def get_dependents(self, node_id: str) -> Set[str]:
+        """Get nodes that depend on this node (downstream)."""
+        return self.dependents.get(node_id, set())
+
+    def get_cascade_set(self, node_id: str) -> Set[str]:
+        """Get all nodes that should be invalidated when node_id changes.
+
+        Performs breadth-first traversal to find all downstream dependents.
+
+        Args:
+            node_id: The node that changed
+
+        Returns:
+            Set of all node IDs that should be invalidated
+        """
+        result: Set[str] = set()
+        to_process = list(self.dependents.get(node_id, set()))
+
+        while to_process:
+            current = to_process.pop(0)
+            if current not in result:
+                result.add(current)
+                # Add all dependents of this node too
+                to_process.extend(self.dependents.get(current, set()))
+
+        return result
+
+    def get_all_upstream(self, node_id: str) -> Set[str]:
+        """Get all upstream dependencies (transitive)."""
+        result: Set[str] = set()
+        to_process = list(self.dependencies.get(node_id, set()))
+
+        while to_process:
+            current = to_process.pop(0)
+            if current not in result:
+                result.add(current)
+                to_process.extend(self.dependencies.get(current, set()))
+
+        return result
+
+    @classmethod
+    def from_workflow(cls, workflow: "WorkflowDefinition") -> "DependencyGraph":
+        """Build dependency graph from workflow definition.
+
+        Analyzes next_nodes, branches, and parallel_nodes to determine
+        which nodes depend on which.
+
+        Args:
+            workflow: The workflow definition to analyze
+
+        Returns:
+            DependencyGraph with all node relationships
+        """
+        graph = cls()
+
+        for node_id, node in workflow.nodes.items():
+            # next_nodes: subsequent nodes depend on current node
+            next_nodes = getattr(node, "next_nodes", None) or []
+            for next_id in next_nodes:
+                graph.add_dependency(next_id, node_id)
+
+            # branches: branch targets depend on condition node
+            branches = getattr(node, "branches", None) or {}
+            for branch_target in branches.values():
+                if branch_target:
+                    graph.add_dependency(branch_target, node_id)
+
+            # parallel_nodes: don't depend on each other
+            # They're executed concurrently, not sequentially
+
+        return graph
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize for debugging/storage."""
+        return {
+            "dependents": {k: list(v) for k, v in self.dependents.items()},
+            "dependencies": {k: list(v) for k, v in self.dependencies.items()},
+        }
+
+
+class CascadingInvalidator:
+    """Handles cascading cache invalidation based on dependencies.
+
+    When a node's output changes, this class automatically invalidates
+    all cache entries for dependent nodes, ensuring consistency.
+
+    All verticals benefit from automatic cascading invalidation.
+
+    Example:
+        graph = DependencyGraph.from_workflow(workflow)
+        invalidator = CascadingInvalidator(cache, graph)
+
+        # When node 'A' output changes
+        count = invalidator.invalidate_with_cascade('A')
+        # Invalidates A and all downstream dependents
+    """
+
+    def __init__(self, cache: "WorkflowCache", graph: DependencyGraph):
+        """Initialize cascading invalidator.
+
+        Args:
+            cache: The workflow cache to invalidate
+            graph: Dependency graph for cascade calculation
+        """
+        self.cache = cache
+        self.graph = graph
+
+    def invalidate_with_cascade(self, node_id: str) -> int:
+        """Invalidate node and all dependent nodes.
+
+        Args:
+            node_id: The node that changed
+
+        Returns:
+            Total number of cache entries invalidated
+        """
+        # Get all nodes to invalidate
+        to_invalidate = {node_id} | self.graph.get_cascade_set(node_id)
+        total = 0
+
+        for nid in to_invalidate:
+            count = self.cache.invalidate(nid)
+            total += count
+            if count > 0:
+                logger.debug(f"Invalidated {count} cache entries for node {nid}")
+
+        if total > 0:
+            logger.info(
+                f"Cascade invalidation from '{node_id}': "
+                f"{len(to_invalidate)} nodes, {total} entries"
+            )
+
+        return total
+
+    def invalidate_upstream(self, node_id: str) -> int:
+        """Invalidate all upstream dependencies (and their dependents).
+
+        Use when a node's inputs have become invalid.
+
+        Args:
+            node_id: The node whose inputs are invalid
+
+        Returns:
+            Total entries invalidated
+        """
+        upstream = self.graph.get_all_upstream(node_id)
+        total = 0
+
+        for nid in upstream:
+            # For each upstream, invalidate it and its cascade
+            total += self.invalidate_with_cascade(nid)
+
+        return total
 
 
 @dataclass
@@ -288,6 +494,39 @@ class WorkflowCache:
                 logger.info(f"Invalidated {count} cache entries for node: {node_id}")
 
             return count
+
+    def set_dependency_graph(self, graph: DependencyGraph) -> None:
+        """Set dependency graph for cascading invalidation.
+
+        When a dependency graph is set, the cache gains the ability to
+        automatically invalidate all dependent cache entries when a
+        node's output changes.
+
+        Args:
+            graph: Dependency graph built from workflow definition
+        """
+        self._dependency_graph = graph
+        self._invalidator = CascadingInvalidator(self, graph)
+        logger.debug("Dependency graph set for cascading invalidation")
+
+    def invalidate_cascade(self, node_id: str) -> int:
+        """Invalidate node and all dependent nodes.
+
+        If a dependency graph has been set via `set_dependency_graph()`,
+        this method will invalidate the specified node and all nodes
+        that depend on it (cascading invalidation).
+
+        If no dependency graph is set, falls back to simple invalidation.
+
+        Args:
+            node_id: ID of the node whose output changed
+
+        Returns:
+            Total number of cache entries invalidated
+        """
+        if hasattr(self, "_invalidator") and self._invalidator is not None:
+            return self._invalidator.invalidate_with_cascade(node_id)
+        return self.invalidate(node_id)
 
     def clear(self) -> int:
         """Clear all cache entries.
@@ -517,10 +756,15 @@ def configure_workflow_cache(config: WorkflowCacheConfig) -> None:
 
 
 __all__ = [
+    # Dependency tracking
+    "DependencyGraph",
+    "CascadingInvalidator",
+    # Cache config and entries
     "WorkflowCacheConfig",
     "CacheEntry",
     "WorkflowCache",
     "WorkflowCacheManager",
+    # Global management
     "get_workflow_cache_manager",
     "configure_workflow_cache",
 ]

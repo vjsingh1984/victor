@@ -112,14 +112,24 @@ class EdgeType(Enum):
     CONDITIONAL = "conditional"
 
 
-class NodeStatus(Enum):
-    """Execution status of a node."""
+class FrameworkNodeStatus(Enum):
+    """Execution status of a framework graph node.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - FrameworkNodeStatus (here): Framework graph node status
+    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
+    - ExecutorNodeStatus (victor.workflows.executor): Executor node status
+    """
 
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+# Backward compatibility alias
+NodeStatus = FrameworkNodeStatus
 
 
 @runtime_checkable
@@ -226,8 +236,14 @@ class Node:
 
 
 @dataclass
-class Checkpoint:
-    """Checkpoint for workflow state persistence.
+class WorkflowCheckpoint:
+    """Checkpoint for workflow state persistence (StateGraph DSL).
+
+    Renamed from Checkpoint to be semantically distinct:
+    - GitCheckpoint (victor.agent.checkpoints): Git stash-based
+    - ExecutionCheckpoint (victor.agent.time_aware_executor): Time/progress tracking
+    - WorkflowCheckpoint (here): Workflow state with thread_id/node_id
+    - HITLCheckpoint (victor.framework.hitl): Human-in-the-loop pause/resume
 
     Attributes:
         checkpoint_id: Unique checkpoint identifier
@@ -257,7 +273,7 @@ class Checkpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Checkpoint":
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowCheckpoint":
         """Deserialize checkpoint from dictionary."""
         return cls(
             checkpoint_id=data["checkpoint_id"],
@@ -269,18 +285,22 @@ class Checkpoint:
         )
 
 
+# Backward compatibility alias
+Checkpoint = WorkflowCheckpoint
+
+
 class CheckpointerProtocol(Protocol):
     """Protocol for checkpoint persistence."""
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save a checkpoint."""
         ...
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint for thread."""
         ...
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         ...
 
@@ -292,20 +312,20 @@ class MemoryCheckpointer:
     """
 
     def __init__(self):
-        self._checkpoints: Dict[str, List[Checkpoint]] = {}
+        self._checkpoints: Dict[str, List[WorkflowCheckpoint]] = {}
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save checkpoint to memory."""
         if checkpoint.thread_id not in self._checkpoints:
             self._checkpoints[checkpoint.thread_id] = []
         self._checkpoints[checkpoint.thread_id].append(checkpoint)
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint."""
         checkpoints = self._checkpoints.get(thread_id, [])
         return checkpoints[-1] if checkpoints else None
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints."""
         return self._checkpoints.get(thread_id, [])
 

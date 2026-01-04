@@ -121,8 +121,13 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class ToolSelectionContext:
-    """Context for tool selection decisions.
+class AgentToolSelectionContext:
+    """Agent-level context for tool selection decisions.
+
+    Renamed from ToolSelectionContext to be semantically distinct:
+    - AgentToolSelectionContext (here): Basic agent-level context
+    - VerticalToolSelectionContext (victor.core.verticals.protocols.tool_provider): Vertical-specific
+    - CrossVerticalToolSelectionContext (victor.tools.selection.protocol): Extended cross-vertical
 
     Provides conversation history, stage info, and task metadata
     to tool selectors for intelligent tool filtering.
@@ -154,6 +159,10 @@ class ToolSelectionContext:
 
     # Additional metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# Backward compatibility alias
+ToolSelectionContext = AgentToolSelectionContext
 
 
 @dataclass

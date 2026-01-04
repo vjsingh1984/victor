@@ -74,8 +74,18 @@ CLASSIFICATION_CACHE_SIZE = 256  # Max cached classifications
 CLASSIFICATION_CACHE_TTL = 300  # 5 minutes TTL
 
 
-class TaskType(Enum):
-    """Unified task types with clear semantics."""
+class ClassifierTaskType(Enum):
+    """Task types for unified classification output.
+
+    Coarse-grained types for general task classification.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
+    """
 
     ANALYSIS = "analysis"  # Explore, review, understand codebase
     ACTION = "action"  # Execute, run, deploy
@@ -83,6 +93,10 @@ class TaskType(Enum):
     SEARCH = "search"  # Find, locate, grep
     EDIT = "edit"  # Modify, refactor, fix existing code
     DEFAULT = "default"  # Ambiguous or conversational
+
+
+# Backward compatibility alias
+TaskType = ClassifierTaskType
 
 
 @dataclass

@@ -69,13 +69,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class TaskType(Enum):
-    """Task type for configuring progress thresholds."""
+class LoopDetectorTaskType(Enum):
+    """Task types for loop detection threshold configuration.
+
+    Simplified types for configuring progress thresholds in loop detection.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
+    """
 
     DEFAULT = "default"
     ANALYSIS = "analysis"
     ACTION = "action"
     RESEARCH = "research"
+
+
+# Backward compatibility alias
+TaskType = LoopDetectorTaskType
 
 
 # Tools that indicate research activity
@@ -195,8 +209,13 @@ class ProgressConfig:
 
 
 @dataclass
-class StopReason:
-    """Reason why progress tracker recommends stopping.
+class LoopStopRecommendation:
+    """Recommendation from loop detector about whether to stop execution.
+
+    Renamed from StopReason to be semantically distinct:
+    - LoopStopRecommendation (here): Loop detection recommendation dataclass
+    - TrackerStopReason (victor.agent.unified_task_tracker): Task tracker stop reasons enum
+    - DebugStopReason (victor.observability.debug.protocol): Debugger stop reasons enum
 
     Attributes:
         should_stop: Whether execution should stop
@@ -209,6 +228,10 @@ class StopReason:
     reason: str
     details: Dict[str, Any] = field(default_factory=dict)
     is_warning: bool = False  # True for soft warnings before hard stop
+
+
+# Backward compatibility alias
+StopReason = LoopStopRecommendation
 
 
 class LoopDetector:

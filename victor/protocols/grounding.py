@@ -79,8 +79,12 @@ class GroundingClaim:
 
 
 @dataclass
-class VerificationResult:
-    """Result of verifying a grounding claim.
+class ClaimVerificationResult:
+    """Result of verifying a single grounding claim.
+
+    Renamed from VerificationResult to be semantically distinct:
+    - ClaimVerificationResult (here): Protocol-level single claim verification
+    - GroundingVerificationResult (victor.agent.grounding_verifier): Agent-level full verification
 
     Attributes:
         is_grounded: Whether the claim is verified as true
@@ -95,6 +99,10 @@ class VerificationResult:
     claim: Optional[GroundingClaim] = None
     evidence: Dict[str, Any] = field(default_factory=dict)
     reason: str = ""
+
+
+# Backward compatibility alias
+VerificationResult = ClaimVerificationResult
 
 
 @dataclass

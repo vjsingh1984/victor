@@ -68,13 +68,22 @@ class CodePatternCategory(Enum):
     FILESYSTEM = "filesystem"
 
 
-class RiskLevel(Enum):
-    """Risk levels for safety patterns."""
+class PatternRiskLevel(Enum):
+    """Risk levels for safety pattern detection.
+
+    Renamed from RiskLevel to be semantically distinct:
+    - OperationalRiskLevel (victor.agent.safety): Tool/command risk with SAFE level
+    - PatternRiskLevel (here): Code pattern risk detection (4 values, uppercase)
+    """
 
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
+
+
+# Backward compatibility alias
+RiskLevel = PatternRiskLevel
 
 
 # =============================================================================
@@ -375,8 +384,12 @@ SENSITIVE_FILE_PATTERNS: List[SafetyPattern] = [
 
 
 @dataclass
-class ScanResult:
-    """Result from scanning a command or file path.
+class SafetyScanResult:
+    """Result from safety pattern scanning.
+
+    Renamed from ScanResult to be semantically distinct:
+    - SafetyScanResult (here): Safety pattern matching results
+    - IaCScanResult (victor.iac.protocol): Infrastructure-as-Code scan results
 
     Attributes:
         matches: List of matched patterns
@@ -399,6 +412,10 @@ class ScanResult:
             self.has_critical = True
         elif level == "HIGH":
             self.has_high = True
+
+
+# Backward compatibility alias
+ScanResult = SafetyScanResult
 
 
 class CodePatternScanner:

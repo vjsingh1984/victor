@@ -42,8 +42,15 @@ class TimePhase(Enum):
 
 
 @dataclass
-class Checkpoint:
-    """Represents a progress checkpoint during execution."""
+class ExecutionCheckpoint:
+    """Progress checkpoint during time-aware execution.
+
+    Renamed from Checkpoint to be semantically distinct:
+    - GitCheckpoint (victor.agent.checkpoints): Git stash-based
+    - ExecutionCheckpoint (here): Time/progress tracking with phase
+    - WorkflowCheckpoint (victor.framework.graph): Workflow state persistence
+    - HITLCheckpoint (victor.framework.hitl): Human-in-the-loop pause/resume
+    """
 
     timestamp: float
     elapsed: float
@@ -53,13 +60,17 @@ class Checkpoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# Backward compatibility alias
+Checkpoint = ExecutionCheckpoint
+
+
 @dataclass
 class ExecutionBudget:
     """Tracks execution time budget and progress."""
 
     total_seconds: float
     start_time: float
-    checkpoints: List[Checkpoint] = field(default_factory=list)
+    checkpoints: List[ExecutionCheckpoint] = field(default_factory=list)
     phase_transitions: List[tuple] = field(default_factory=list)
     _last_phase: TimePhase = field(default=TimePhase.NORMAL)
 

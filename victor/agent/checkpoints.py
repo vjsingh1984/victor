@@ -65,8 +65,14 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Checkpoint:
-    """Represents a point-in-time snapshot of the working tree.
+class GitCheckpoint:
+    """Git stash-based checkpoint for working tree snapshots.
+
+    Renamed from Checkpoint to be semantically distinct:
+    - GitCheckpoint (here): Git stash-based with stash_ref/stash_message
+    - ExecutionCheckpoint (victor.agent.time_aware_executor): Progress tracking
+    - WorkflowCheckpoint (victor.framework.graph): Workflow state persistence
+    - HITLCheckpoint (victor.framework.hitl): Human-in-the-loop pause/resume
 
     Attributes:
         id: Unique checkpoint identifier (UUID)
@@ -81,6 +87,10 @@ class Checkpoint:
     description: str
     stash_ref: Optional[str]
     stash_message: str
+
+
+# Backward compatibility alias
+Checkpoint = GitCheckpoint
 
 
 class CheckpointError(Exception):

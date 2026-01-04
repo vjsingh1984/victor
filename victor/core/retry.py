@@ -93,8 +93,13 @@ class RetryContext:
         self.total_delay += delay
 
 
-class RetryStrategy(ABC):
+class BaseRetryStrategy(ABC):
     """Abstract base class for retry strategies.
+
+    Renamed from RetryStrategy to be semantically distinct:
+    - BaseRetryStrategy (here): Abstract base with should_retry(), get_delay() methods
+    - ProviderRetryStrategy (victor.providers.resilience): Concrete provider retry with execute()
+    - BatchRetryStrategy (victor.workflows.batch_executor): Enum for batch retry modes
 
     Implementations define when and how long to wait between retries.
     This provides a consistent interface for all retry logic in Victor.
@@ -146,6 +151,10 @@ class RetryStrategy(ABC):
         Args:
             context: Final retry context
         """
+
+
+# Backward compatibility alias
+RetryStrategy = BaseRetryStrategy
 
 
 class ExponentialBackoffStrategy(RetryStrategy):
@@ -349,6 +358,27 @@ class RetryExecutor:
             strategy: Retry strategy to use (default: ExponentialBackoffStrategy)
         """
         self.strategy = strategy or ExponentialBackoffStrategy()
+
+    async def execute(
+        self,
+        func: Callable[..., Awaitable[T]],
+        *args: Any,
+        **kwargs: Any,
+    ) -> "RetryResult":
+        """Execute an async function with retries.
+
+        This is an alias for execute_async for backward compatibility.
+        Use this when executing async functions in an async context.
+
+        Args:
+            func: Async function to execute
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            RetryResult with success status, result, and context
+        """
+        return await self.execute_async(func, *args, **kwargs)
 
     async def execute_async(
         self,

@@ -26,8 +26,18 @@ from typing import Any, Callable, Dict, List, Optional, Set
 logger = logging.getLogger(__name__)
 
 
-class AgentMode(Enum):
-    """Available agent modes."""
+class AgentMode(str, Enum):
+    """Available agent modes.
+
+    This is the CANONICAL AgentMode enum with 3 base modes.
+
+    Inherits from str to allow direct string comparison (e.g., AgentMode.BUILD == "build").
+
+    Semantic Variants (different modes for different purposes):
+    - AgentMode (here): Base 3 modes (BUILD, PLAN, EXPLORE) for core agent control
+    - RLAgentMode: Extended 5 modes for RL state machine (includes REVIEW, COMPLETE)
+    - AdaptiveAgentMode: Extended 5 modes for adaptive control
+    """
 
     BUILD = "build"
     PLAN = "plan"
@@ -35,8 +45,19 @@ class AgentMode(Enum):
 
 
 @dataclass
-class ModeConfig:
-    """Configuration for an agent mode."""
+class OperationalModeConfig:
+    """Rich configuration for operational agent modes (BUILD/PLAN/EXPLORE).
+
+    This provides detailed operational control including:
+    - Tool access control (allowed/disallowed tools)
+    - System prompt modifications
+    - Behavioral settings (confirmations, planning output)
+    - Sandbox restrictions
+
+    Renamed from ModeConfig to be semantically distinct:
+    - ModeConfig (victor.core.mode_config): Simple tool budget/iteration config
+    - OperationalModeConfig: Rich operational mode configuration
+    """
 
     name: str
     description: str
@@ -65,9 +86,13 @@ class ModeConfig:
     allow_sandbox_edits: bool = False
 
 
+# Backward compatibility alias
+ModeConfig = OperationalModeConfig
+
+
 # Default mode configurations
-MODE_CONFIGS: Dict[AgentMode, ModeConfig] = {
-    AgentMode.BUILD: ModeConfig(
+MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
+    AgentMode.BUILD: OperationalModeConfig(
         name="Build",
         description="Implementation mode for creating and modifying code",
         allow_all_tools=True,
@@ -108,7 +133,7 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
         },
         exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
     ),
-    AgentMode.PLAN: ModeConfig(
+    AgentMode.PLAN: OperationalModeConfig(
         name="Plan",
         description="Planning mode for analysis and strategy before implementation",
         allow_all_tools=False,
@@ -174,7 +199,7 @@ WORKFLOW:
         sandbox_dir=".victor/sandbox",
         allow_sandbox_edits=True,
     ),
-    AgentMode.EXPLORE: ModeConfig(
+    AgentMode.EXPLORE: OperationalModeConfig(
         name="Explore",
         description="Exploration mode for understanding code without modifications",
         allow_all_tools=False,

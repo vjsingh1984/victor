@@ -40,6 +40,7 @@ Related module:
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional, TypeVar, Awaitable
 from functools import wraps
@@ -57,6 +58,31 @@ class CircuitState(Enum):
     HALF_OPEN = "half_open"  # Testing recovery
 
 
+@dataclass
+class CircuitBreakerConfig:
+    """Configuration for circuit breaker.
+
+    This is the canonical configuration class for CircuitBreaker.
+    Use this instead of passing individual parameters for cleaner code.
+
+    Attributes:
+        failure_threshold: Number of failures before opening circuit
+        success_threshold: Successes needed to close from half-open
+        timeout_seconds: Seconds to wait before attempting recovery (open -> half-open)
+        half_open_max_calls: Maximum concurrent calls allowed in half-open state
+    """
+
+    failure_threshold: int = 5
+    success_threshold: int = 2
+    timeout_seconds: float = 30.0
+    half_open_max_calls: int = 3
+
+    @property
+    def recovery_timeout(self) -> float:
+        """Alias for timeout_seconds for backward compatibility."""
+        return self.timeout_seconds
+
+
 class CircuitBreakerError(Exception):
     """Raised when circuit is open and request is rejected."""
 
@@ -69,18 +95,26 @@ class CircuitBreakerError(Exception):
 class CircuitBreaker:
     """Circuit breaker for protecting against cascading failures.
 
-    Usage:
+    This is the canonical CircuitBreaker implementation for Victor.
+    All modules should import from here instead of defining their own.
+
+    Usage with parameters:
         breaker = CircuitBreaker(
             failure_threshold=5,
             recovery_timeout=30.0,
-            half_open_max_calls=3,
+            name="my_service",
         )
 
+    Usage with config:
+        config = CircuitBreakerConfig(failure_threshold=5, recovery_timeout=30.0)
+        breaker = CircuitBreaker.from_config("my_service", config)
+
+    As decorator:
         @breaker
         async def call_provider():
             return await provider.chat(...)
 
-        # Or manually:
+    As context manager:
         async with breaker:
             result = await provider.chat(...)
     """
@@ -93,6 +127,7 @@ class CircuitBreaker:
         success_threshold: int = 2,
         excluded_exceptions: Optional[tuple] = None,
         name: str = "default",
+        config: Optional[CircuitBreakerConfig] = None,
     ):
         """Initialize circuit breaker.
 
@@ -103,7 +138,15 @@ class CircuitBreaker:
             success_threshold: Successes needed in half-open to close circuit
             excluded_exceptions: Exceptions that don't count as failures
             name: Name for logging/identification
+            config: Optional config object (overrides individual parameters)
         """
+        # If config provided, use its values
+        if config is not None:
+            failure_threshold = config.failure_threshold
+            recovery_timeout = config.recovery_timeout
+            half_open_max_calls = config.half_open_max_calls
+            success_threshold = config.success_threshold
+
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.half_open_max_calls = half_open_max_calls
@@ -142,6 +185,46 @@ class CircuitBreaker:
     def is_open(self) -> bool:
         """Check if circuit is open (failing fast)."""
         return self.state == CircuitState.OPEN
+
+    def can_execute(self) -> bool:
+        """Check if execution is allowed based on current state.
+
+        This method is used by workflow executors to determine if a node
+        should attempt execution through this circuit breaker.
+
+        Returns:
+            True if execution is allowed (CLOSED, or HALF_OPEN with slots)
+            False if execution is blocked (OPEN, or HALF_OPEN at max calls)
+        """
+        state = self.state  # This may trigger OPEN -> HALF_OPEN
+
+        if state == CircuitState.CLOSED:
+            return True
+
+        if state == CircuitState.OPEN:
+            return False
+
+        # HALF_OPEN: check if we have available slots
+        if state == CircuitState.HALF_OPEN:
+            return self._half_open_calls < self.half_open_max_calls
+
+        return False
+
+    def record_success(self) -> None:
+        """Record a successful execution.
+
+        Call this after a successful operation to potentially
+        transition from HALF_OPEN back to CLOSED state.
+        """
+        self._record_success()
+
+    def record_failure(self) -> None:
+        """Record a failed execution.
+
+        Call this after a failed operation to potentially
+        transition to OPEN state.
+        """
+        self._record_failure()
 
     def _should_attempt_recovery(self) -> bool:
         """Check if enough time has passed to attempt recovery."""
@@ -304,6 +387,29 @@ class CircuitBreaker:
             "last_failure_time": self._last_failure_time,
             "state_changes": len(self._state_changes),
         }
+
+    @classmethod
+    def from_config(
+        cls,
+        name: str,
+        config: CircuitBreakerConfig,
+        excluded_exceptions: Optional[tuple] = None,
+    ) -> "CircuitBreaker":
+        """Create CircuitBreaker from config object.
+
+        Args:
+            name: Name for logging/identification
+            config: CircuitBreakerConfig with settings
+            excluded_exceptions: Optional exceptions that don't count as failures
+
+        Returns:
+            Configured CircuitBreaker instance
+        """
+        return cls(
+            name=name,
+            config=config,
+            excluded_exceptions=excluded_exceptions,
+        )
 
 
 class CircuitBreakerRegistry:

@@ -57,6 +57,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
 from victor.safety.types import SafetyPattern
+from victor.safety.code_patterns import PatternRiskLevel, RiskLevel  # Re-export for convenience
 
 
 # =============================================================================
@@ -76,13 +77,8 @@ class InfraPatternCategory(Enum):
     SECURITY = "security"
 
 
-class RiskLevel(Enum):
-    """Risk levels for safety patterns."""
-
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
+# RiskLevel imported from code_patterns.py (PatternRiskLevel)
+# Backward compatibility: RiskLevel is available via import above
 
 
 # =============================================================================

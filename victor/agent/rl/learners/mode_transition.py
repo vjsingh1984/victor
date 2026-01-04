@@ -38,14 +38,26 @@ from victor.core.schema import Tables
 logger = logging.getLogger(__name__)
 
 
-class AgentMode(Enum):
-    """Agent operation modes (mirrors AdaptiveModeController.AgentMode)."""
+class RLAgentMode(Enum):
+    """Extended agent operation modes for RL-based mode transitions.
+
+    This is an extension of the base AgentMode (victor.agent.mode_controller.AgentMode)
+    with additional modes (REVIEW, COMPLETE) for reinforcement learning state tracking.
+
+    Renamed from AgentMode to be semantically distinct:
+    - AgentMode (victor.agent.mode_controller): Base 3 modes (BUILD, PLAN, EXPLORE)
+    - RLAgentMode: Extended 5 modes for RL state machine
+    """
 
     EXPLORE = "explore"
     PLAN = "plan"
     BUILD = "build"
     REVIEW = "review"
     COMPLETE = "complete"
+
+
+# Backward compatibility alias
+AgentMode = RLAgentMode
 
 
 class ModeTransitionLearner(BaseLearner):
