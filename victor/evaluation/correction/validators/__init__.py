@@ -13,17 +13,17 @@ To add a new language validator:
 Example:
     # rust_validator.py
     from ..base import BaseCodeValidator
-    from ..types import Language, ValidationResult
+    from ..types import Language, CodeValidationResult
 
     class RustCodeValidator(BaseCodeValidator):
         @property
         def supported_languages(self) -> set[Language]:
             return {Language.RUST}
 
-        def validate(self, code: str) -> ValidationResult:
+        def validate(self, code: str) -> CodeValidationResult:
             ...
 
-        def fix(self, code: str, validation: ValidationResult) -> str:
+        def fix(self, code: str, validation: CodeValidationResult) -> str:
             ...
 """
 

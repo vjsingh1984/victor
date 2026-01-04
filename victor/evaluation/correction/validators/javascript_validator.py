@@ -16,7 +16,7 @@ import re
 from typing import Optional
 
 from ..base import BaseCodeValidator, ValidatorCapabilities
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class JavaScriptCodeValidator(BaseCodeValidator):
@@ -160,14 +160,14 @@ class JavaScriptCodeValidator(BaseCodeValidator):
         """Handles both JavaScript and TypeScript."""
         return {Language.JAVASCRIPT, Language.TYPESCRIPT}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Validate JavaScript/TypeScript code using pattern analysis.
 
         Args:
             code: JS/TS source code
 
         Returns:
-            ValidationResult with validation info
+            CodeValidationResult with validation info
         """
         errors: list[str] = []
         warnings: list[str] = []
@@ -179,7 +179,7 @@ class JavaScriptCodeValidator(BaseCodeValidator):
         # 1. Basic structure validation
         bracket_error = self._check_brackets(code)
         if bracket_error:
-            return ValidationResult.failure(
+            return CodeValidationResult.failure(
                 errors=[bracket_error],
                 language=language,
                 syntax_error=bracket_error,
@@ -208,7 +208,7 @@ class JavaScriptCodeValidator(BaseCodeValidator):
             ts_errors = self._check_typescript_syntax(code)
             errors.extend(ts_errors)
 
-        return ValidationResult(
+        return CodeValidationResult(
             valid=len(errors) == 0,
             language=language,
             syntax_valid=len([e for e in errors if "syntax" in e.lower()]) == 0,
@@ -218,7 +218,7 @@ class JavaScriptCodeValidator(BaseCodeValidator):
             used_ast_validation=False,
         )
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Auto-fix JavaScript/TypeScript issues.
 
         Args:

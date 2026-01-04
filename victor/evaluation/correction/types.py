@@ -126,10 +126,6 @@ class CodeValidationResult:
         )
 
 
-# Backward compatibility alias
-ValidationResult = CodeValidationResult
-
-
 @dataclass(frozen=True)
 class CorrectionFeedback:
     """Structured feedback for code correction.

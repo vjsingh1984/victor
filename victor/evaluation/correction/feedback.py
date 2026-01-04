@@ -11,7 +11,7 @@ Design Pattern: Builder Pattern (builds complex feedback objects)
 
 from typing import Optional
 
-from .types import CorrectionFeedback, Language, ValidationResult
+from .types import CorrectionFeedback, Language, CodeValidationResult
 
 
 class FeedbackGenerator:
@@ -22,7 +22,7 @@ class FeedbackGenerator:
     - Test failures (stdout/stderr)
     - Static analysis results
 
-    Language-agnostic design - works with any ValidationResult.
+    Language-agnostic design - works with any CodeValidationResult.
 
     Usage:
         generator = FeedbackGenerator()
@@ -44,7 +44,7 @@ class FeedbackGenerator:
     def generate(
         self,
         code: str,
-        validation: Optional[ValidationResult] = None,
+        validation: Optional[CodeValidationResult] = None,
         test_stdout: Optional[str] = None,
         test_stderr: Optional[str] = None,
         test_passed: Optional[int] = None,
@@ -79,7 +79,7 @@ class FeedbackGenerator:
             test_feedback=test_feedback,
         )
 
-    def _build_syntax_feedback(self, validation: Optional[ValidationResult]) -> Optional[str]:
+    def _build_syntax_feedback(self, validation: Optional[CodeValidationResult]) -> Optional[str]:
         """Build syntax error feedback."""
         if not validation or validation.syntax_valid:
             return None
@@ -89,7 +89,7 @@ class FeedbackGenerator:
             "Please fix the syntax and ensure the code is valid."
         )
 
-    def _build_import_feedback(self, validation: Optional[ValidationResult]) -> Optional[str]:
+    def _build_import_feedback(self, validation: Optional[CodeValidationResult]) -> Optional[str]:
         """Build import issue feedback."""
         if not validation or validation.imports_valid:
             return None

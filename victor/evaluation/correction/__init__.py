@@ -86,18 +86,18 @@ Adding New Language Validators:
     # 1. Create validators/rust_validator.py
 
     from ..base import BaseCodeValidator
-    from ..types import Language, ValidationResult
+    from ..types import Language, CodeValidationResult
 
     class RustCodeValidator(BaseCodeValidator):
         @property
         def supported_languages(self) -> set[Language]:
             return {Language.RUST}
 
-        def validate(self, code: str) -> ValidationResult:
+        def validate(self, code: str) -> CodeValidationResult:
             # Rust-specific validation
             ...
 
-        def fix(self, code: str, validation: ValidationResult) -> str:
+        def fix(self, code: str, validation: CodeValidationResult) -> str:
             # Rust-specific fixes
             ...
 
@@ -107,7 +107,7 @@ Adding New Language Validators:
 # Core types
 from .types import (
     Language,
-    ValidationResult,
+    CodeValidationResult,
     CorrectionFeedback,
 )
 
@@ -163,7 +163,7 @@ from .validators import (
 __all__ = [
     # Types
     "Language",
-    "ValidationResult",
+    "CodeValidationResult",
     "CorrectionFeedback",
     # Base
     "BaseCodeValidator",

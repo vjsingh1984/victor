@@ -17,7 +17,7 @@ import re
 from typing import Optional
 
 from ..base import BaseCodeValidator, ValidatorCapabilities
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class RustCodeValidator(BaseCodeValidator):
@@ -184,14 +184,14 @@ class RustCodeValidator(BaseCodeValidator):
         """Handles Rust language."""
         return {Language.RUST}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Validate Rust code using pattern analysis.
 
         Args:
             code: Rust source code
 
         Returns:
-            ValidationResult with validation info
+            CodeValidationResult with validation info
         """
         errors: list[str] = []
         warnings: list[str] = []
@@ -200,7 +200,7 @@ class RustCodeValidator(BaseCodeValidator):
         # 1. Check bracket/brace matching
         bracket_error = self._check_brackets(code)
         if bracket_error:
-            return ValidationResult.failure(
+            return CodeValidationResult.failure(
                 errors=[bracket_error],
                 language=Language.RUST,
                 syntax_error=bracket_error,
@@ -229,7 +229,7 @@ class RustCodeValidator(BaseCodeValidator):
         lifetime_issues = self._check_lifetimes(code)
         warnings.extend(lifetime_issues)
 
-        return ValidationResult(
+        return CodeValidationResult(
             valid=len(errors) == 0,
             language=Language.RUST,
             syntax_valid=len([e for e in errors if "syntax" in e.lower()]) == 0,
@@ -240,7 +240,7 @@ class RustCodeValidator(BaseCodeValidator):
             used_ast_validation=False,
         )
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Auto-fix Rust-specific issues.
 
         Args:

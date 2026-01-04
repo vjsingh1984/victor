@@ -17,7 +17,7 @@ import re
 from typing import Optional
 
 from ..base import BaseCodeValidator, ValidatorCapabilities
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class GoCodeValidator(BaseCodeValidator):
@@ -174,14 +174,14 @@ class GoCodeValidator(BaseCodeValidator):
         """Handles Go language."""
         return {Language.GO}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Validate Go code using pattern analysis.
 
         Args:
             code: Go source code
 
         Returns:
-            ValidationResult with validation info
+            CodeValidationResult with validation info
         """
         errors: list[str] = []
         warnings: list[str] = []
@@ -195,7 +195,7 @@ class GoCodeValidator(BaseCodeValidator):
         # 2. Check bracket/brace matching
         bracket_error = self._check_brackets(code)
         if bracket_error:
-            return ValidationResult.failure(
+            return CodeValidationResult.failure(
                 errors=[bracket_error],
                 language=Language.GO,
                 syntax_error=bracket_error,
@@ -219,7 +219,7 @@ class GoCodeValidator(BaseCodeValidator):
         func_errors = self._check_function_structure(code)
         warnings.extend(func_errors)
 
-        return ValidationResult(
+        return CodeValidationResult(
             valid=len(errors) == 0,
             language=Language.GO,
             syntax_valid=len([e for e in errors if "syntax" in e.lower()]) == 0,
@@ -230,7 +230,7 @@ class GoCodeValidator(BaseCodeValidator):
             used_ast_validation=False,
         )
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Auto-fix Go-specific issues.
 
         Args:

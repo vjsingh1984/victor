@@ -27,7 +27,7 @@ from .feedback import (
     get_prompt_builder,
 )
 from .registry import CodeValidatorRegistry, get_registry
-from .types import CorrectionFeedback, Language, ValidationResult
+from .types import CorrectionFeedback, Language, CodeValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ class SelfCorrector:
         code: str,
         language: Optional[Language] = None,
         filename: Optional[str] = None,
-    ) -> tuple[str, ValidationResult]:
+    ) -> tuple[str, CodeValidationResult]:
         """Validate code and optionally apply fixes.
 
         Args:
@@ -163,7 +163,7 @@ class SelfCorrector:
     def should_retry(
         self,
         iteration: int,
-        validation: ValidationResult,
+        validation: CodeValidationResult,
         test_passed: Optional[int] = None,
         test_total: Optional[int] = None,
     ) -> bool:
@@ -199,7 +199,7 @@ class SelfCorrector:
     def generate_feedback(
         self,
         code: str,
-        validation: ValidationResult,
+        validation: CodeValidationResult,
         test_stdout: Optional[str] = None,
         test_stderr: Optional[str] = None,
         test_passed: Optional[int] = None,
