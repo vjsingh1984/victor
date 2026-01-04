@@ -86,10 +86,6 @@ class OperationalModeConfig:
     allow_sandbox_edits: bool = False
 
 
-# Backward compatibility alias
-ModeConfig = OperationalModeConfig
-
-
 # Default mode configurations
 MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
     AgentMode.BUILD: OperationalModeConfig(
@@ -288,7 +284,7 @@ class AgentModeController:
         return self._current_mode
 
     @property
-    def config(self) -> ModeConfig:
+    def config(self) -> OperationalModeConfig:
         """Get the current mode configuration."""
         return MODE_CONFIGS[self._current_mode]
 

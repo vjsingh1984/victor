@@ -94,10 +94,6 @@ class ParameterValidationResult:
     warnings: List[str] = field(default_factory=list)
 
 
-# Backward compatibility alias
-ValidationResult = ParameterValidationResult
-
-
 class ParameterEnforcer:
     """
     Enforces parameter requirements for tool execution.
@@ -116,7 +112,7 @@ class ParameterEnforcer:
         self.specs = {spec.name: spec for spec in parameter_specs}
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-    def validate(self, args: Dict[str, Any]) -> ValidationResult:
+    def validate(self, args: Dict[str, Any]) -> ParameterValidationResult:
         """
         Validate arguments against parameter specifications.
 
@@ -124,7 +120,7 @@ class ParameterEnforcer:
             args: The arguments to validate
 
         Returns:
-            ValidationResult with validation status and any errors
+            ParameterValidationResult with validation status and any errors
         """
         missing_required = []
         type_errors = {}
@@ -137,7 +133,7 @@ class ParameterEnforcer:
 
         is_valid = len(missing_required) == 0 and len(type_errors) == 0
 
-        return ValidationResult(
+        return ParameterValidationResult(
             is_valid=is_valid,
             missing_required=missing_required,
             type_errors=type_errors,
