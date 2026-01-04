@@ -235,10 +235,20 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         inner = self._get_inner()
         if inner is None:
             # Return a minimal "no issues" result
-            from victor.agent.code_correction_middleware import CorrectionResult, ValidationResult
+            from victor.agent.code_correction_middleware import CorrectionResult
+            from victor.evaluation.correction import CodeValidationResult, Language
 
             return CorrectionResult(
-                validation=ValidationResult(valid=True, errors=[]),
+                original_code="",
+                corrected_code="",
+                validation=CodeValidationResult(
+                    valid=True,
+                    language=Language.UNKNOWN,
+                    syntax_valid=True,
+                    imports_valid=True,
+                    errors=(),
+                    warnings=(),
+                ),
                 was_corrected=False,
             )
         return inner.validate_and_fix(tool_name, arguments)

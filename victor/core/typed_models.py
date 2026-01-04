@@ -195,10 +195,6 @@ class TypedStreamChunk:
         return self.delta.tool_calls is not None and len(self.delta.tool_calls) > 0
 
 
-# Backward compatibility alias
-StreamChunk = TypedStreamChunk
-
-
 # =============================================================================
 # Agent Component Models
 # =============================================================================
@@ -346,7 +342,7 @@ __all__ = [
     "ProviderUsage",
     "ProviderMessage",
     "StreamDelta",
-    "StreamChunk",
+    "TypedStreamChunk",
     # Agent models
     "AgentInfo",
     # Metrics models

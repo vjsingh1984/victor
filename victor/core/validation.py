@@ -26,7 +26,7 @@ Design Patterns:
 Example:
     from victor.core.validation import (
         ConfigValidator,
-        ValidationResult,
+        ConfigValidationResult,
         ProviderConfigSchema,
         ToolConfigSchema,
     )
@@ -192,10 +192,6 @@ class ConfigValidationResult:
                 for i in self.issues
             ],
         }
-
-
-# Backward compatibility alias
-ValidationResult = ConfigValidationResult
 
 
 # =============================================================================
@@ -1028,7 +1024,6 @@ __all__ = [
     "ValidationSeverity",
     "ValidationIssue",
     "ConfigValidationResult",
-    "ValidationResult",  # Backward compat alias
     # Rules
     "ValidationRule",
     "RegexRule",
