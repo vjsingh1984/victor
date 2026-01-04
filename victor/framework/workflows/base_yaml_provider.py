@@ -51,10 +51,21 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
+
+
+class _MinimalOrchestrator:
+    """Minimal orchestrator mock for compute-only workflow execution.
+
+    This class provides the minimal interface required by WorkflowExecutor
+    for workflows that only contain compute nodes (no agent nodes).
+    Agent nodes require a full orchestrator with LLM capabilities.
+    """
+
+    pass
 
 
 class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
@@ -375,6 +386,77 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         executor = self.create_streaming_executor(orchestrator)
         async for chunk in executor.astream(workflow, context or {}):
             yield chunk
+
+    async def run_workflow(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
+    ) -> "WorkflowResult":
+        """Execute a YAML workflow directly without requiring a full orchestrator.
+
+        This method is designed for compute-only workflows that use registered
+        handlers. For workflows with agent nodes, use create_executor() with
+        a proper orchestrator or astream().
+
+        The workflow DAG is executed with:
+        - Compute nodes: Invoke registered handlers
+        - Parallel nodes: Execute child nodes concurrently
+        - Condition nodes: Evaluate escape hatches for branching
+        - Transform nodes: Apply data transformations
+
+        Note: Agent nodes will fail with this method. Use astream() or
+        create_executor() with a proper orchestrator for workflows
+        containing agent nodes.
+
+        Args:
+            workflow_name: Name of the YAML workflow to execute
+            context: Initial context data (e.g., {"symbol": "AAPL"})
+            timeout: Optional overall timeout in seconds (default: 300)
+
+        Returns:
+            WorkflowResult with execution outcome and outputs
+
+        Raises:
+            ValueError: If workflow_name is not found
+
+        Example:
+            provider = InvestmentWorkflowProvider()
+            result = await provider.run_workflow(
+                "comprehensive",
+                {"symbol": "AAPL"}
+            )
+            if result.success:
+                synthesis = result.context.get("synthesis")
+                print(f"Recommendation: {synthesis.get('recommendation')}")
+        """
+        from victor.workflows.executor import WorkflowExecutor
+        from victor.tools.registry import ToolRegistry
+
+        workflow = self.get_workflow(workflow_name)
+        if not workflow:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        # Create minimal orchestrator for compute-only workflows
+        # Agent nodes would fail with this mock, but compute handlers work fine
+        orchestrator = _MinimalOrchestrator()
+
+        # Create tool registry for handlers that need it
+        tool_registry = ToolRegistry()
+
+        # Create executor with minimal orchestrator and explicit tool registry
+        executor = WorkflowExecutor(
+            orchestrator,
+            tool_registry=tool_registry,
+            default_timeout=timeout or 300.0,
+        )
+
+        # Execute workflow with initial context
+        return await executor.execute(
+            workflow,
+            initial_context=context or {},
+            timeout=timeout,
+        )
 
     def __repr__(self) -> str:
         """Return a string representation of this provider."""
