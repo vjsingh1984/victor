@@ -53,8 +53,8 @@ from victor.framework.protocols import (
     ConversationStateProtocol,
     MessagesProtocol,
     OrchestratorProtocol,
+    OrchestratorStreamChunk,
     ProviderProtocol,
-    StreamChunk,
     StreamingProtocol,
     SystemPromptProtocol,
     ToolsProtocol,
@@ -85,7 +85,7 @@ from victor.framework.events import (
     tool_result_event,
 )
 from victor.framework.state import Stage, State, StateHooks, StateObserver
-from victor.framework.task import Task, TaskResult, TaskType
+from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
 
@@ -699,7 +699,7 @@ __all__ = (
         "ChatSession",
         # Task
         "TaskResult",
-        "TaskType",
+        "FrameworkTaskType",
         # Tools
         "ToolSet",
         "ToolCategory",
@@ -716,7 +716,7 @@ __all__ = (
         "SystemPromptProtocol",
         "MessagesProtocol",
         "StreamingProtocol",
-        "StreamChunk",
+        "OrchestratorStreamChunk",
         "ChunkType",
         "verify_protocol_conformance",
         # Events

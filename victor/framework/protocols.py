@@ -151,10 +151,6 @@ class OrchestratorStreamChunk:
     is_final: bool = False
 
 
-# Backward compatibility alias
-StreamChunk = OrchestratorStreamChunk
-
-
 # =============================================================================
 # Component Protocols
 # =============================================================================
@@ -517,25 +513,25 @@ class OrchestratorProtocol(Protocol):
         message: str,
         *,
         context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[OrchestratorStreamChunk]:
         """Stream a chat response with standardized chunks.
 
         This is the primary method for interactive chat. Returns an
-        async iterator yielding StreamChunk instances.
+        async iterator yielding OrchestratorStreamChunk instances.
 
         Args:
             message: User message to process
             context: Optional additional context
 
         Yields:
-            StreamChunk instances representing response fragments
+            OrchestratorStreamChunk instances representing response fragments
 
         Raises:
             ProviderError: If LLM call fails
             ToolError: If tool execution fails critically
         """
         ...
-        yield StreamChunk()  # type: ignore (protocol stub)
+        yield OrchestratorStreamChunk()  # type: ignore (protocol stub)
 
     async def chat(
         self,

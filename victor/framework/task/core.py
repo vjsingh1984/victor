@@ -10,7 +10,7 @@ Example:
     # Advanced usage - use Task for more control
     task = Task(
         prompt="Refactor the auth module",
-        type=TaskType.EDIT,
+        type=FrameworkTaskType.EDIT,
         files=["src/auth.py"],
         constraints={"no_delete": True}
     )
@@ -59,10 +59,6 @@ class FrameworkTaskType(Enum):
     """Multi-step coordinated workflow."""
 
 
-# Backward compatibility alias
-TaskType = FrameworkTaskType
-
-
 @dataclass
 class Task:
     """Definition of a task for the agent.
@@ -89,14 +85,14 @@ class Task:
         # Advanced - explicit Task for more control
         task = Task(
             prompt="Refactor the auth module",
-            type=TaskType.EDIT,
+            type=FrameworkTaskType.EDIT,
             files=["src/auth.py", "src/auth_utils.py"],
             constraints={"preserve_api": True}
         )
     """
 
     prompt: str
-    type: TaskType = TaskType.CHAT
+    type: FrameworkTaskType = FrameworkTaskType.CHAT
     files: List[str] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     constraints: Dict[str, Any] = field(default_factory=dict)
