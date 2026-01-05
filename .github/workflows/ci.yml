@@ -117,7 +117,8 @@ jobs:
       - name: Fail if archive/victor-legacy is modified
         if: github.event_name == 'pull_request'
         run: |
-          if git diff --name-only origin/main...HEAD | grep -q '^archive/victor-legacy/'; then
+          BASE_BRANCH="${{ github.base_ref }}"
+          if git diff --name-only origin/${BASE_BRANCH}...HEAD | grep -q '^archive/victor-legacy/'; then
             echo "Changes under archive/victor-legacy/ are not allowed. Move edits to active package."
             exit 1
           fi
