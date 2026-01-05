@@ -771,6 +771,33 @@ class VictorFastAPIServer:
                 logger.exception("List providers error")
                 return JSONResponse({"providers": [], "error": str(e)})
 
+        @app.get("/capabilities", tags=["Configuration"])
+        async def get_capabilities(
+            vertical: Optional[str] = Query(None, description="Filter by vertical")
+        ) -> JSONResponse:
+            """Discover all Victor capabilities.
+
+            Returns aggregated information about tools, verticals, personas,
+            teams, workflows, and other discoverable features.
+            """
+            try:
+                from victor.ui.commands.capabilities import get_capability_discovery
+
+                discovery = get_capability_discovery()
+
+                if vertical:
+                    manifest = discovery.discover_by_vertical(vertical)
+                    return JSONResponse(manifest)
+                else:
+                    manifest = discovery.discover_all()
+                    return JSONResponse(manifest.to_dict())
+
+            except Exception as e:
+                logger.exception("Capabilities discovery error")
+                return JSONResponse(
+                    {"error": str(e), "capabilities": {}}, status_code=500
+                )
+
         # Tools
         @app.get("/tools", tags=["Tools"])
         async def list_tools() -> JSONResponse:
