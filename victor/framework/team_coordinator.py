@@ -49,69 +49,23 @@ from typing import Any, Dict, List, Optional
 
 from victor.framework.agent_protocols import (
     AgentCapability,
-    AgentMessage,
     ITeamCoordinator,
     ITeamMember,
+)
+from victor.teams import (
+    AgentMessage,
+    MemberResult,
     MessageType,
     TeamFormation,
+    TeamResult,
 )
 
 
 # =============================================================================
-# Result Dataclasses
+# MemberResult and TeamResult - imported from victor.teams
 # =============================================================================
-
-
-@dataclass
-class MemberResult:
-    """Result from a single team member's execution.
-
-    Attributes:
-        member_id: ID of the member that produced this result
-        success: Whether the member completed successfully
-        output: The output produced by the member
-        error: Error message if not successful
-        metadata: Additional execution metadata
-
-    Example:
-        result = MemberResult(
-            member_id="researcher_001",
-            success=True,
-            output="Found 5 authentication patterns in the codebase.",
-        )
-    """
-
-    member_id: str
-    success: bool
-    output: str
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class TeamResult:
-    """Result from team task execution.
-
-    Attributes:
-        success: Whether the team completed the task successfully
-        member_results: Results from each team member
-        final_output: The final consolidated output
-        error: Error message if not successful
-        metadata: Additional execution metadata
-
-    Example:
-        team_result = TeamResult(
-            success=True,
-            member_results={"researcher": result1, "executor": result2},
-            final_output="Feature implemented successfully.",
-        )
-    """
-
-    success: bool
-    member_results: Dict[str, MemberResult]
-    final_output: str = ""
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+# NOTE: MemberResult and TeamResult are now imported from victor.teams.
+# The canonical definitions live in victor.teams.types.
 
 
 # =============================================================================

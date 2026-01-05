@@ -27,10 +27,12 @@ import pytest
 
 from victor.framework.agent_protocols import (
     AgentCapability,
-    AgentMessage,
     IAgentPersona,
     IAgentRole,
     ITeamMember,
+)
+from victor.teams import (
+    AgentMessage,
     MessageType,
     TeamFormation,
 )
@@ -578,13 +580,13 @@ class TestMemberResult:
 
     def test_member_result_exists(self):
         """MemberResult should be importable."""
-        from victor.framework.team_coordinator import MemberResult
+        from victor.teams import MemberResult
 
         assert MemberResult is not None
 
     def test_member_result_creation(self):
         """MemberResult should be creatable with required fields."""
-        from victor.framework.team_coordinator import MemberResult
+        from victor.teams import MemberResult
 
         result = MemberResult(
             member_id="agent1",
@@ -598,7 +600,7 @@ class TestMemberResult:
 
     def test_member_result_with_error(self):
         """MemberResult should support error field."""
-        from victor.framework.team_coordinator import MemberResult
+        from victor.teams import MemberResult
 
         result = MemberResult(
             member_id="agent1",
@@ -616,13 +618,13 @@ class TestTeamResult:
 
     def test_team_result_exists(self):
         """TeamResult should be importable."""
-        from victor.framework.team_coordinator import TeamResult
+        from victor.teams import TeamResult
 
         assert TeamResult is not None
 
     def test_team_result_creation(self):
         """TeamResult should be creatable with required fields."""
-        from victor.framework.team_coordinator import MemberResult, TeamResult
+        from victor.teams import MemberResult, TeamResult, TeamFormation
 
         member_result = MemberResult(
             member_id="agent1",
@@ -634,6 +636,7 @@ class TestTeamResult:
             success=True,
             member_results={"agent1": member_result},
             final_output="Team completed",
+            formation=TeamFormation.SEQUENTIAL,
         )
 
         assert team_result.success is True
@@ -673,12 +676,12 @@ class TestModuleExports:
 
     def test_exports_member_result(self):
         """team_coordinator should export MemberResult."""
-        from victor.framework.team_coordinator import MemberResult
+        from victor.teams import MemberResult
 
         assert MemberResult is not None
 
     def test_exports_team_result(self):
         """team_coordinator should export TeamResult."""
-        from victor.framework.team_coordinator import TeamResult
+        from victor.teams import TeamResult
 
         assert TeamResult is not None

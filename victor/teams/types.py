@@ -197,6 +197,19 @@ class MemberResult:
     duration_seconds: float = 0.0
     discoveries: List[str] = field(default_factory=list)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "member_id": self.member_id,
+            "success": self.success,
+            "output": self.output,
+            "error": self.error,
+            "metadata": self.metadata,
+            "tool_calls_used": self.tool_calls_used,
+            "duration_seconds": self.duration_seconds,
+            "discoveries": self.discoveries,
+        }
+
 
 @dataclass
 class TeamResult:
@@ -227,6 +240,22 @@ class TeamResult:
     consensus_achieved: Optional[bool] = None
     consensus_rounds: Optional[int] = None
     error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "success": self.success,
+            "final_output": self.final_output,
+            "member_results": {
+                k: v.to_dict() for k, v in self.member_results.items()
+            },
+            "formation": self.formation.value,
+            "total_tool_calls": self.total_tool_calls,
+            "total_duration": self.total_duration,
+            "consensus_achieved": self.consensus_achieved,
+            "consensus_rounds": self.consensus_rounds,
+            "error": self.error,
+        }
 
 
 # Type aliases for backward compatibility

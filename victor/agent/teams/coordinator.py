@@ -59,19 +59,22 @@ from victor.agent.subagents.orchestrator import (
     SubAgentOrchestrator,
     SubAgentTask,
 )
-from victor.agent.teams.communication import (
-    AgentMessage,
+# Import canonical types from victor.teams
+from victor.teams import (
+    TeamFormation,
     MessageType,
+    MemberResult,
+    TeamResult,
+)
+from victor.agent.teams.communication import (
+    AgentMessage,  # Local AgentMessage for TeamMessageBus compatibility
     TeamMessageBus,
     TeamSharedMemory,
 )
 from victor.agent.teams.team import (
-    MemberResult,
     MemberStatus,
     TeamConfig,
-    TeamFormation,
     TeamMember,
-    TeamResult,
 )
 
 if TYPE_CHECKING:
@@ -295,7 +298,7 @@ class TeamCoordinator:
                 member_results={},
                 total_tool_calls=0,
                 total_duration=duration_seconds,
-                formation_used=config.formation,
+                formation=config.formation,
             )
 
         finally:
@@ -500,7 +503,7 @@ class TeamCoordinator:
             total_duration=time.time() - execution.start_time,
             communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
             shared_context=execution.shared_memory.get_all(),
-            formation_used=TeamFormation.SEQUENTIAL,
+            formation=TeamFormation.SEQUENTIAL,
         )
 
     async def _execute_parallel(
@@ -577,7 +580,7 @@ class TeamCoordinator:
             total_tool_calls=fan_out_result.total_tool_calls,
             total_duration=fan_out_result.total_duration,
             shared_context=execution.shared_memory.get_all(),
-            formation_used=TeamFormation.PARALLEL,
+            formation=TeamFormation.PARALLEL,
         )
 
     async def _execute_hierarchical(
@@ -633,7 +636,7 @@ Output your plan in a structured format."""
                 member_results=member_results,
                 total_tool_calls=total_tool_calls,
                 total_duration=time.time() - execution.start_time,
-                formation_used=TeamFormation.HIERARCHICAL,
+                formation=TeamFormation.HIERARCHICAL,
             )
 
         execution.member_statuses[manager.id] = MemberStatus.DELEGATING
@@ -717,7 +720,7 @@ Synthesize these reports into a final comprehensive result that addresses the or
             total_tool_calls=total_tool_calls,
             total_duration=time.time() - execution.start_time,
             shared_context=execution.shared_memory.get_all(),
-            formation_used=TeamFormation.HIERARCHICAL,
+            formation=TeamFormation.HIERARCHICAL,
         )
 
     async def _execute_pipeline(
@@ -816,7 +819,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             total_duration=time.time() - execution.start_time,
             communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
             shared_context=execution.shared_memory.get_all(),
-            formation_used=TeamFormation.PIPELINE,
+            formation=TeamFormation.PIPELINE,
         )
 
     async def _execute_member(

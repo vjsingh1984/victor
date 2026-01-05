@@ -19,17 +19,18 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.teams import (
-    TeamFormation,
     TeamMember,
     TeamConfig,
-    TeamResult,
     TeamCoordinator,
-    MessageType,
-    AgentMessage,
     TeamMessageBus,
     TeamSharedMemory,
 )
-from victor.agent.teams.team import MemberResult, MemberStatus
+from victor.agent.teams.team import MemberStatus
+# Use canonical types from victor.teams
+from victor.teams import TeamFormation, MemberResult, TeamResult
+# Use local AgentMessage from communication.py for TeamMessageBus tests
+# (the local type has from_agent/to_agent/type field names)
+from victor.agent.teams.communication import AgentMessage, MessageType
 from victor.agent.subagents import SubAgentRole
 
 
@@ -42,11 +43,12 @@ class TestTeamFormation:
         assert TeamFormation.PARALLEL.value == "parallel"
         assert TeamFormation.HIERARCHICAL.value == "hierarchical"
         assert TeamFormation.PIPELINE.value == "pipeline"
+        assert TeamFormation.CONSENSUS.value == "consensus"
 
     def test_formations_are_iterable(self):
-        """All formations can be iterated."""
+        """All formations can be iterated (5 formations including CONSENSUS)."""
         formations = list(TeamFormation)
-        assert len(formations) == 4
+        assert len(formations) == 5
 
 
 class TestMemberStatus:
@@ -293,12 +295,14 @@ class TestTeamResult:
             success=True,
             final_output="Team completed!",
             member_results={"test": member_result},
+            formation=TeamFormation.SEQUENTIAL,
             total_tool_calls=5,
             total_duration=10.0,
         )
         assert result.success is True
         assert result.final_output == "Team completed!"
         assert len(result.member_results) == 1
+        assert result.formation == TeamFormation.SEQUENTIAL
 
     def test_to_dict(self):
         """to_dict serializes correctly."""
@@ -313,6 +317,7 @@ class TestTeamResult:
             success=True,
             final_output="Done",
             member_results={"test": member_result},
+            formation=TeamFormation.PARALLEL,
             total_tool_calls=5,
             total_duration=10.0,
         )
@@ -321,6 +326,7 @@ class TestTeamResult:
         assert d["success"] is True
         assert d["total_tool_calls"] == 5
         assert "test" in d["member_results"]
+        assert d["formation"] == "parallel"
 
 
 class TestMessageType:

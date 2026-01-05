@@ -1533,7 +1533,7 @@ class TestAgentCreateTeam:
         """create_team should use specified formation."""
         from victor.framework.agent import Agent
         from victor.framework.teams import TeamMemberSpec
-        from victor.agent.teams.team import TeamFormation
+        from victor.teams import TeamFormation
 
         mock_orchestrator = MagicMock()
         mock_team = MagicMock()
@@ -1562,7 +1562,7 @@ class TestAgentCreateTeam:
         """create_team should default to SEQUENTIAL formation."""
         from victor.framework.agent import Agent
         from victor.framework.teams import TeamMemberSpec
-        from victor.agent.teams.team import TeamFormation
+        from victor.teams import TeamFormation
 
         mock_orchestrator = MagicMock()
         mock_team = MagicMock()

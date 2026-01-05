@@ -27,7 +27,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from victor.agent.teams.team import TeamFormation, TeamConfig, TeamResult
+# Import canonical types from victor.teams
+from victor.teams import TeamFormation, TeamResult
+# Import local TeamConfig which has module-specific fields
+from victor.agent.teams.team import TeamConfig
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,7 @@ class TeamMetrics:
         return cls(
             team_id=team_id,
             task_category=task_category,
-            formation=result.formation_used,
+            formation=result.formation,
             member_count=len(config.members),
             role_distribution=role_distribution,
             total_tool_budget=config.total_tool_budget,

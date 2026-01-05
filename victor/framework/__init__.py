@@ -406,21 +406,28 @@ except ImportError:
     _METRICS_EXPORTS = []
 
 # Teams (Phase 4 - Multi-Agent Teams Exposure)
+# NOTE: Canonical team types (TeamFormation, MemberResult, TeamResult, etc.)
+# are now imported from victor.teams. Framework-specific types remain in
+# victor.framework.teams.
 try:
+    from victor.teams import (
+        MemberResult,
+        TeamFormation,
+        TeamResult,
+    )
     from victor.framework.teams import (
         AgentTeam,
-        MemberResult,
-        TeamConfig,
         TeamEvent,
         TeamEventType,
-        TeamFormation,
-        TeamMember,
         TeamMemberSpec,
-        TeamResult,
         member_complete_event,
         member_start_event,
         team_complete_event,
         team_start_event,
+    )
+    from victor.agent.teams.team import (
+        TeamConfig,
+        TeamMember,
     )
 
     _TEAMS_EXPORTS = [

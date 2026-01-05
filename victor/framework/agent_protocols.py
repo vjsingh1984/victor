@@ -26,6 +26,9 @@ orchestration in Victor. It provides:
 - ITeamCoordinator: Protocol for team coordination
 - TeamFormation: Enum for team organization patterns
 
+NOTE: Types MessageType, AgentMessage, and TeamFormation are now imported from
+victor.teams.types. This module re-exports them for backward compatibility.
+
 Example:
     from victor.framework.agent_protocols import (
         AgentCapability,
@@ -57,9 +60,16 @@ from typing import (
     runtime_checkable,
 )
 
+# Import canonical types from victor.teams and re-export for backward compatibility
+from victor.teams.types import (
+    AgentMessage,
+    MessageType,
+    TeamFormation,
+)
+
 
 # =============================================================================
-# Agent Capability Enum
+# Agent Capability Enum (defined locally, not part of teams.types)
 # =============================================================================
 
 
@@ -102,109 +112,11 @@ class AgentCapability(str, Enum):
 
 
 # =============================================================================
-# Message Types Enum
+# MessageType, AgentMessage, TeamFormation - imported from victor.teams.types
 # =============================================================================
-
-
-class MessageType(str, Enum):
-    """Types of messages exchanged between agents.
-
-    These message types enable structured inter-agent communication
-    with clear semantics for each message category.
-
-    Attributes:
-        TASK: A task assignment from one agent to another
-        RESULT: The result of a completed task
-        QUERY: A question or information request
-        FEEDBACK: Feedback on work performed
-        DELEGATION: A delegated task from manager to worker
-    """
-
-    TASK = "task"
-    """A task assignment from one agent to another."""
-
-    RESULT = "result"
-    """The result of a completed task."""
-
-    QUERY = "query"
-    """A question or information request."""
-
-    FEEDBACK = "feedback"
-    """Feedback on work performed."""
-
-    DELEGATION = "delegation"
-    """A delegated task from manager to worker."""
-
-
-# =============================================================================
-# Agent Message Dataclass
-# =============================================================================
-
-
-@dataclass
-class AgentMessage:
-    """A message exchanged between agents.
-
-    AgentMessage provides structured communication between team members,
-    enabling coordination, delegation, and feedback loops.
-
-    Attributes:
-        sender_id: ID of the agent sending the message
-        recipient_id: ID of the intended recipient agent
-        content: The message content
-        message_type: Type of message (TASK, RESULT, QUERY, etc.)
-        metadata: Additional context for the message
-
-    Example:
-        msg = AgentMessage(
-            sender_id="manager_001",
-            recipient_id="researcher_001",
-            content="Analyze the authentication module",
-            message_type=MessageType.TASK,
-            metadata={"priority": "high", "deadline": "2h"},
-        )
-    """
-
-    sender_id: str
-    recipient_id: str
-    content: str
-    message_type: MessageType
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-# =============================================================================
-# Team Formation Enum
-# =============================================================================
-
-
-class TeamFormation(str, Enum):
-    """Team organization patterns for multi-agent coordination.
-
-    These formations determine how agents coordinate to complete tasks,
-    inspired by CrewAI's team patterns.
-
-    Attributes:
-        SEQUENTIAL: Agents work in order, each passing output to the next
-        PARALLEL: Agents work simultaneously on different aspects
-        HIERARCHICAL: Manager delegates and coordinates worker agents
-        PIPELINE: Agents form a processing pipeline with defined stages
-        CONSENSUS: All agents must agree before proceeding
-    """
-
-    SEQUENTIAL = "sequential"
-    """Agents work in order, each passing output to the next."""
-
-    PARALLEL = "parallel"
-    """Agents work simultaneously on different aspects."""
-
-    HIERARCHICAL = "hierarchical"
-    """Manager delegates and coordinates worker agents."""
-
-    PIPELINE = "pipeline"
-    """Agents form a processing pipeline with defined stages."""
-
-    CONSENSUS = "consensus"
-    """All agents must agree before proceeding."""
+# NOTE: These types are now imported from victor.teams.types at the top of this
+# file and re-exported for backward compatibility. The canonical definitions
+# live in victor.teams.types.
 
 
 # =============================================================================

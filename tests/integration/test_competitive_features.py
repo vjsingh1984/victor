@@ -165,7 +165,7 @@ class TestCrewAIParity:
         patterns (sequential, parallel, hierarchical, pipeline).
         """
         from victor.framework.teams import TeamMemberSpec
-        from victor.agent.teams.team import TeamFormation, TeamConfig, TeamMember
+        from victor.teams import TeamFormation, TeamConfig, TeamMember
         from victor.agent.subagents.base import SubAgentRole
 
         # Given team member specifications
@@ -258,7 +258,7 @@ class TestCrewAIParity:
         Verifies that the message bus infrastructure enables
         inter-agent communication.
         """
-        from victor.agent.teams.communication import (
+        from victor.teams import (
             TeamMessageBus,
             AgentMessage,
             MessageType,

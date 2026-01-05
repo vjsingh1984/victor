@@ -35,7 +35,7 @@ print(result.final_output)
 Agents execute one after another, each receiving the previous agent's output.
 
 ```python
-from victor.agent.teams import TeamConfig, TeamFormation
+from victor.teams import TeamConfig, TeamFormation, TeamMember
 
 config = TeamConfig(
     name="review_pipeline",
@@ -157,7 +157,7 @@ security_expert = PersonaTraits(
 Create team members with rich context:
 
 ```python
-from victor.agent.teams import TeamMember, MemoryConfig
+from victor.teams import TeamMember, MemoryConfig
 
 researcher = TeamMember(
     id="researcher",
@@ -237,7 +237,7 @@ from victor.coding.teams import REFACTORING_TEAM
 Agents can send messages to each other:
 
 ```python
-from victor.agent.teams import AgentMessage, MessageType
+from victor.teams import AgentMessage, MessageType
 
 # Send a message
 message = AgentMessage(
@@ -284,7 +284,7 @@ memories = await team.recall("authentication patterns")
 Monitor team execution in real-time:
 
 ```python
-from victor.agent.teams import TeamCoordinator
+from victor.teams import TeamCoordinator
 
 coordinator = TeamCoordinator(orchestrator)
 

@@ -62,7 +62,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.teams.team import TeamConfig, TeamFormation
+    from victor.teams import TeamConfig, TeamFormation
 
 
 class TeamSuggestionAction(str, Enum):

@@ -22,7 +22,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.subagents.base import SubAgentRole
-from victor.agent.teams.team import TeamFormation, TeamMember, TeamConfig
+from victor.agent.teams.team import TeamMember, TeamConfig
+from victor.teams import TeamFormation
 from victor.framework.teams import (
     AgentTeam,
     TeamMemberSpec,

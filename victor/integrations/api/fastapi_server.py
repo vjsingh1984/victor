@@ -2427,7 +2427,7 @@ Respond with just the command to run."""
             # Start team execution in background
             async def execute_team():
                 try:
-                    from victor.agent.teams import (
+                    from victor.teams import (
                         TeamConfig,
                         TeamMember,
                         TeamFormation,

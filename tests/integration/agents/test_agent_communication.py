@@ -41,8 +41,8 @@ from victor.framework.agent_protocols import (
     MessageType,
     TeamFormation,
 )
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
-from victor.agent.teams.communication import (
+from victor.teams import (
+    FrameworkTeamCoordinator,
     AgentMessage as TeamAgentMessage,
     MessageType as TeamMessageType,
     TeamMessageBus,

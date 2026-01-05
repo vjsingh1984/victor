@@ -49,7 +49,7 @@ from victor.framework.agent_roles import (
     get_role,
 )
 from victor.framework.personas import Persona, get_persona
-from victor.framework.team_coordinator import (
+from victor.teams import (
     FrameworkTeamCoordinator,
     MemberResult,
     TeamResult,
