@@ -1122,5 +1122,32 @@ except ImportError:
 if _STAGE_MANAGER_EXPORTS:
     __all__ = list(__all__) + _STAGE_MANAGER_EXPORTS
 
+# Workflow Engine (High-level workflow execution facade)
+try:
+    from victor.framework.workflow_engine import (
+        ExecutionResult as WorkflowExecutionResult,
+        WorkflowEngine,
+        WorkflowEngineConfig,
+        WorkflowEngineProtocol,
+        WorkflowEvent,
+        create_workflow_engine,
+        run_graph_workflow,
+        run_yaml_workflow,
+    )
+
+    _WORKFLOW_ENGINE_EXPORTS = [
+        "WorkflowExecutionResult",
+        "WorkflowEngine",
+        "WorkflowEngineConfig",
+        "WorkflowEngineProtocol",
+        "WorkflowEvent",
+        "create_workflow_engine",
+        "run_graph_workflow",
+        "run_yaml_workflow",
+    ]
+    __all__ = list(__all__) + _WORKFLOW_ENGINE_EXPORTS
+except ImportError:
+    _WORKFLOW_ENGINE_EXPORTS = []
+
 # Version of the framework API
 __version__ = "0.4.0"
