@@ -4644,6 +4644,87 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return True, None
 
+    async def _run_iteration_pre_checks(
+        self,
+        stream_ctx: StreamingChatContext,
+        user_message: str,
+    ) -> AsyncIterator[StreamChunk]:
+        """Run all pre-iteration checks using coordinator.
+
+        Combines cancellation, compaction, time limit, and iteration checks.
+        Yields any notification chunks and handles early termination.
+
+        Args:
+            stream_ctx: The streaming context.
+            user_message: The user's message (for compaction).
+
+        Yields:
+            StreamChunk notifications from checks.
+
+        Note:
+            Sets stream_ctx.force_completion if time limit reached.
+            Caller should check stream_ctx after this method.
+        """
+        # 1. Cancellation check
+        cancellation_chunk = self._handle_cancellation(stream_ctx.last_quality_score)
+        if cancellation_chunk:
+            yield cancellation_chunk
+            stream_ctx.force_completion = True
+            return
+
+        # 2. Compaction (skip if background compaction active)
+        if not self._context_manager.is_background_compaction_running:
+            compaction_chunk = self._handle_compaction(user_message)
+            if compaction_chunk:
+                yield compaction_chunk
+
+        # 3. Time limit check via handler
+        time_limit_chunk = self._check_time_limit_with_handler(stream_ctx)
+        if time_limit_chunk:
+            yield time_limit_chunk
+            # Handler already set stream_ctx.force_completion = True
+
+        # 4. Increment iteration
+        stream_ctx.increment_iteration()
+
+        # 5. Inject grounding feedback if pending
+        if stream_ctx.pending_grounding_feedback:
+            logger.info("Injecting pending grounding feedback as system message")
+            self.add_message("system", stream_ctx.pending_grounding_feedback)
+            stream_ctx.pending_grounding_feedback = ""
+
+    def _log_iteration_debug(
+        self,
+        stream_ctx: StreamingChatContext,
+        max_total_iterations: int,
+    ) -> None:
+        """Log iteration debug information.
+
+        Args:
+            stream_ctx: The streaming context.
+            max_total_iterations: Maximum iterations allowed.
+        """
+        unique_resources = self.unified_tracker.unique_resources
+        logger.debug(
+            f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
+            f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
+            f"unique_resources={len(unique_resources)}, "
+            f"force_completion={stream_ctx.force_completion}"
+        )
+
+        self.debug_logger.log_iteration_start(
+            stream_ctx.total_iterations,
+            tool_calls=self.tool_calls_used,
+            files_read=len(unique_resources),
+        )
+        self.debug_logger.log_limits(
+            tool_budget=self.tool_budget,
+            tool_calls_used=self.tool_calls_used,
+            max_iterations=max_total_iterations,
+            current_iteration=stream_ctx.total_iterations,
+            is_analysis_task=stream_ctx.is_analysis_task,
+        )
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5097,59 +5178,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Aliases removed: last_quality_score, substantial_content_threshold
 
         while True:
-            cancellation_chunk = self._handle_cancellation(stream_ctx.last_quality_score)
-            if cancellation_chunk:
-                yield cancellation_chunk
+            # === PRE-ITERATION CHECKS (via coordinator helper) ===
+            # Handles: cancellation, compaction, time limit, iteration increment, grounding feedback
+            cancelled = False
+            async for pre_chunk in self._run_iteration_pre_checks(stream_ctx, user_message):
+                yield pre_chunk
+                # Check if cancellation occurred (force_completion set with empty content)
+                if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
+                    cancelled = True
+            if cancelled:
                 return
 
-            # PERF: Skip sync compaction if background compaction is active
-            # Background compaction handles context management asynchronously
-            if not self._context_manager.is_background_compaction_running:
-                compaction_chunk = self._handle_compaction(user_message)
-                if compaction_chunk:
-                    yield compaction_chunk
+            # Log iteration debug info
+            self._log_iteration_debug(stream_ctx, max_total_iterations)
 
-            # Context state is maintained directly - no sync needed
-            # force_completion and total_accumulated_chars are accessed via stream_ctx
-
-            # Check session time limit using handler delegation (testable)
-            time_limit_chunk = self._check_time_limit_with_handler(stream_ctx)
-            if time_limit_chunk:
-                yield time_limit_chunk
-                # Handler already set stream_ctx.force_completion = True
-                # Force the model to summarize (handler already added message)
-
-            # Increment iteration count using context method (single source of truth)
-            stream_ctx.increment_iteration()
-
-            # Inject grounding feedback if pending from previous iteration
-            if stream_ctx.pending_grounding_feedback:
-                logger.info("Injecting pending grounding feedback as system message")
-                self.add_message("system", stream_ctx.pending_grounding_feedback)
-                stream_ctx.pending_grounding_feedback = ""  # Clear after injection
-
-            unique_resources = self.unified_tracker.unique_resources
-            logger.debug(
-                f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
-                f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}, "
-                f"unique_resources={len(unique_resources)}, "
-                f"force_completion={stream_ctx.force_completion}"
-            )
-
-            # Use debug logger for incremental tracking
-            self.debug_logger.log_iteration_start(
-                stream_ctx.total_iterations,
-                tool_calls=self.tool_calls_used,
-                files_read=len(unique_resources),
-            )
-            self.debug_logger.log_limits(
-                tool_budget=self.tool_budget,
-                tool_calls_used=self.tool_calls_used,
-                max_iterations=max_total_iterations,
-                current_iteration=stream_ctx.total_iterations,
-                is_analysis_task=stream_ctx.is_analysis_task,
-            )
-
+            # === CONTEXT AND ITERATION LIMIT CHECKS ===
             max_context = self._get_max_context_chars()
             handled, iter_chunk = await self._handle_context_and_iteration_limits(
                 user_message,
@@ -5945,7 +5988,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Force final response after too many consecutive tool calls without output
                 # This prevents endless tool call loops
                 # Sync unique_resources to context for progress check
-                stream_ctx.unique_resources = unique_resources
+                stream_ctx.unique_resources = self.unified_tracker.unique_resources
 
                 # Check progress using handler delegation - will set force_completion if stuck
                 self._check_progress_with_handler(stream_ctx)
