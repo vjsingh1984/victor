@@ -92,8 +92,6 @@ class WorkflowNodeType(Enum):
     END = "end"  # Terminal node
 
 
-# Backward compatibility alias
-NodeType = WorkflowNodeType
 
 
 @dataclass
@@ -116,7 +114,7 @@ class WorkflowNode(ABC):
 
     @property
     @abstractmethod
-    def node_type(self) -> NodeType:
+    def node_type(self) -> WorkflowNodeType:
         """The type of this node."""
         pass
 
@@ -162,8 +160,8 @@ class AgentNode(WorkflowNode):
     llm_config: Optional[Dict[str, Any]] = None
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.AGENT
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.AGENT
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -194,8 +192,8 @@ class ConditionNode(WorkflowNode):
     branches: Dict[str, str] = field(default_factory=dict)
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.CONDITION
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.CONDITION
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -226,8 +224,8 @@ class ParallelNode(WorkflowNode):
     join_strategy: str = "all"  # all, any, merge
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.PARALLEL
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.PARALLEL
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -251,8 +249,8 @@ class TransformNode(WorkflowNode):
     transform: Callable[[Dict[str, Any]], Dict[str, Any]] = field(default=lambda ctx: ctx)
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.TRANSFORM
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.TRANSFORM
 
 
 class ConstraintsProtocol(ABC):
@@ -471,8 +469,8 @@ class ComputeNode(WorkflowNode):
     execution_target: str = "in-process"
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.COMPUTE
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.COMPUTE
 
     @property
     def timeout(self) -> float:
@@ -1178,7 +1176,7 @@ def get_registered_workflows() -> Dict[str, Callable[[], WorkflowDefinition]]:
 
 __all__ = [
     # Node types
-    "NodeType",
+    "WorkflowNodeType",
     "WorkflowNode",
     "AgentNode",
     "ComputeNode",

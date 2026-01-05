@@ -61,7 +61,7 @@ from victor.workflows.definition import (
 )
 from victor.workflows.executor import (
     NodeResult,
-    NodeStatus,
+    ExecutorNodeStatus,
     WorkflowContext,
     WorkflowExecutor,
     WorkflowResult,
@@ -507,7 +507,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
                 workflow_name=workflow.name,
                 node_id=node_id,
                 node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
-                success=result.status == NodeStatus.COMPLETED,
+                success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
 
@@ -566,7 +566,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,

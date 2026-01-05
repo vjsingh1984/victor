@@ -80,7 +80,7 @@ class ComputeHandler(Protocol):
             features = {k: context.get(k) for k in node.input_mapping.values()}
             decision = policy.predict(features)
             context.set(node.output_key, decision)
-            return NodeResult(node.id, NodeStatus.COMPLETED, output=decision)
+            return NodeResult(node.id, ExecutorNodeStatus.COMPLETED, output=decision)
 
         register_compute_handler("rl_decision", rl_decision_handler)
     """
@@ -159,8 +159,6 @@ class ExecutorNodeStatus(Enum):
     SKIPPED = "skipped"
 
 
-# Backward compatibility alias
-NodeStatus = ExecutorNodeStatus
 
 
 @dataclass
@@ -177,7 +175,7 @@ class NodeResult:
     """
 
     node_id: str
-    status: NodeStatus
+    status: ExecutorNodeStatus
     output: Optional[Any] = None
     error: Optional[str] = None
     duration_seconds: float = 0.0
@@ -186,7 +184,7 @@ class NodeResult:
     @property
     def success(self) -> bool:
         """Check if node completed successfully."""
-        return self.status == NodeStatus.COMPLETED
+        return self.status == ExecutorNodeStatus.COMPLETED
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
@@ -349,7 +347,7 @@ class WorkflowContext:
 
     def has_failures(self) -> bool:
         """Check if any nodes failed."""
-        return any(r.status == NodeStatus.FAILED for r in self.node_results.values())
+        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
 
     def get_outputs(self) -> Dict[str, Any]:
         """Get all successful node outputs."""
@@ -801,12 +799,12 @@ class WorkflowExecutor:
                 workflow_name=workflow.name,
                 node_id=node_id,
                 node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
-                success=result.status == NodeStatus.COMPLETED,
+                success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
 
             # If failed, stop unless configured to continue
-            if result.status == NodeStatus.FAILED:
+            if result.status == ExecutorNodeStatus.FAILED:
                 if not workflow.metadata.get("continue_on_failure", False):
                     logger.warning(f"Stopping workflow due to node failure: {node_id}")
                     break
@@ -888,7 +886,7 @@ class WorkflowExecutor:
                 )
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error=f"Circuit breaker is {circuit_breaker.state.name}",
                     duration_seconds=time.time() - start_time,
                 )
@@ -955,7 +953,7 @@ class WorkflowExecutor:
             )
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(retry_result.last_exception) if retry_result.last_exception else "Retry exhausted",
                 duration_seconds=time.time() - start_time,
             )
@@ -996,7 +994,7 @@ class WorkflowExecutor:
                 # Unknown node type - skip
                 result = NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.SKIPPED,
+                    status=ExecutorNodeStatus.SKIPPED,
                     duration_seconds=time.time() - start_time,
                 )
 
@@ -1006,7 +1004,7 @@ class WorkflowExecutor:
             logger.error(f"Node '{node.id}' failed: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -1057,7 +1055,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,
@@ -1122,7 +1120,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"branch": branch, "next_node": next_node},
                 duration_seconds=time.time() - start_time,
             )
@@ -1130,7 +1128,7 @@ class WorkflowExecutor:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Condition evaluation failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1167,7 +1165,7 @@ class WorkflowExecutor:
         if not parallel_nodes:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.SKIPPED,
+                status=ExecutorNodeStatus.SKIPPED,
                 duration_seconds=time.time() - start_time,
             )
 
@@ -1188,7 +1186,7 @@ class WorkflowExecutor:
                 node_results.append(
                     NodeResult(
                         node_id="unknown",
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         error=str(r),
                     )
                 )
@@ -1208,7 +1206,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
             output={"results": [r.output for r in node_results if r.output]},
             duration_seconds=time.time() - start_time,
             tool_calls_used=total_tools,
@@ -1236,7 +1234,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=new_data,
                 duration_seconds=time.time() - start_time,
             )
@@ -1244,7 +1242,7 @@ class WorkflowExecutor:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Transform failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1319,7 +1317,7 @@ class WorkflowExecutor:
             if not allowed_tools and node.tools:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="All tools blocked by constraints",
                     duration_seconds=time.time() - start_time,
                 )
@@ -1370,7 +1368,7 @@ class WorkflowExecutor:
                     if tool_calls_used > constraints.max_tool_calls:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1382,7 +1380,7 @@ class WorkflowExecutor:
                     elif node.fail_fast:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Tool '{tool_name}' failed: {result.error}",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1394,7 +1392,7 @@ class WorkflowExecutor:
                     if tool_calls_used >= constraints.max_tool_calls:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1419,7 +1417,7 @@ class WorkflowExecutor:
                         elif node.fail_fast:
                             return NodeResult(
                                 node_id=node.id,
-                                status=NodeStatus.FAILED,
+                                status=ExecutorNodeStatus.FAILED,
                                 error=f"Tool '{tool_name}' failed: {result.error}",
                                 output=outputs,
                                 duration_seconds=time.time() - start_time,
@@ -1430,7 +1428,7 @@ class WorkflowExecutor:
                         if node.fail_fast:
                             return NodeResult(
                                 node_id=node.id,
-                                status=NodeStatus.FAILED,
+                                status=ExecutorNodeStatus.FAILED,
                                 error=f"Tool '{tool_name}' timed out after {constraints.timeout}s",
                                 output=outputs,
                                 duration_seconds=time.time() - start_time,
@@ -1443,7 +1441,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=outputs,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=tool_calls_used,
@@ -1453,7 +1451,7 @@ class WorkflowExecutor:
             logger.error(f"ComputeNode '{node.id}' failed: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Compute failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1540,7 +1538,7 @@ class WorkflowExecutor:
                 logger.error(f"Chain '{chain_name}' not found in registry")
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error=f"Chain '{chain_name}' not found in ChainRegistry",
                     duration_seconds=time.time() - start_time,
                 )
@@ -1579,7 +1577,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=result,
                 duration_seconds=time.time() - start_time,
             )
@@ -1588,7 +1586,7 @@ class WorkflowExecutor:
             logger.error(f"Chain execution failed for node {node.id}: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Chain execution failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1761,7 +1759,7 @@ class WorkflowExecutor:
 
 __all__ = [
     # Core types
-    "NodeStatus",
+    "ExecutorNodeStatus",
     "NodeResult",
     "WorkflowContext",
     "WorkflowResult",

@@ -55,8 +55,6 @@ class ProtocolNodeStatus(Enum):
     SKIPPED = "skipped"
 
 
-# Backward compatibility alias
-NodeStatus = ProtocolNodeStatus
 
 
 @dataclass
@@ -87,7 +85,7 @@ class NodeResult:
         metadata: Additional metadata about the execution.
     """
 
-    status: NodeStatus
+    status: ProtocolNodeStatus
     output: Any = None
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -122,7 +120,7 @@ class IWorkflowNode(Protocol):
             ) -> NodeResult:
                 # Process state and return result
                 return NodeResult(
-                    status=NodeStatus.COMPLETED,
+                    status=ProtocolNodeStatus.COMPLETED,
                     output={"processed": True}
                 )
     """

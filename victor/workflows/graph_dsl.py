@@ -213,8 +213,6 @@ class GraphNodeType(str, Enum):
     SUBGRAPH = "subgraph"  # Nested graph
 
 
-# Backward compatibility alias
-NodeType = GraphNodeType
 
 
 @dataclass
@@ -230,7 +228,7 @@ class GraphNode(Generic[S]):
 
     name: str
     func: Optional[NodeFunc[S]] = None
-    node_type: NodeType = NodeType.FUNCTION
+    node_type: GraphNodeType = GraphNodeType.FUNCTION
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     # For agent nodes
@@ -339,7 +337,7 @@ class StateGraph(Generic[S]):
         name: str,
         func: Optional[NodeFunc[S]] = None,
         *,
-        node_type: NodeType = NodeType.FUNCTION,
+        node_type: GraphNodeType = GraphNodeType.FUNCTION,
         **kwargs: Any,
     ) -> "StateGraph[S]":
         """Add a node to the graph.
@@ -416,7 +414,7 @@ class StateGraph(Generic[S]):
         node = GraphNode(
             name=name,
             func=None,
-            node_type=NodeType.AGENT,
+            node_type=GraphNodeType.AGENT,
             agent_role=role,
             agent_goal=goal,
             tool_budget=tool_budget,
@@ -657,7 +655,7 @@ class StateGraph(Generic[S]):
         node = GraphNode(
             name=name,
             func=None,
-            node_type=NodeType.PARALLEL,
+            node_type=GraphNodeType.PARALLEL,
             metadata={
                 "parallel_nodes": parallel,
                 "join_strategy": join_strategy,
@@ -815,7 +813,7 @@ class StateGraph(Generic[S]):
         Returns:
             Appropriate WorkflowNode subclass
         """
-        if graph_node.node_type == NodeType.AGENT:
+        if graph_node.node_type == GraphNodeType.AGENT:
             return AgentNode(
                 id=graph_node.name,
                 name=graph_node.name,
@@ -827,7 +825,7 @@ class StateGraph(Generic[S]):
                 next_nodes=[],
             )
 
-        elif graph_node.node_type == NodeType.PARALLEL:
+        elif graph_node.node_type == GraphNodeType.PARALLEL:
             return ParallelNode(
                 id=graph_node.name,
                 name=graph_node.name,
@@ -913,7 +911,7 @@ __all__ = [
     "State",
     "StateGraph",
     "GraphNode",
-    "NodeType",
+    "GraphNodeType",
     # Type variables
     "S",
     "NodeFunc",

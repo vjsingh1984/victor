@@ -19,7 +19,7 @@ WITHOUT duplicating any implementations. It re-exports existing components and a
 thin adapter functions to bridge workflow protocols with core retry strategies.
 
 Architecture:
-    workflow.RetryPolicy -> adapter -> core.RetryStrategy -> core.RetryExecutor
+    workflow.RetryPolicy -> adapter -> core.BaseRetryStrategy -> core.RetryExecutor
     workflow nodes -> CircuitBreakerRegistry -> providers.CircuitBreaker
 
 Design Pattern: Facade + Adapter
@@ -44,7 +44,7 @@ Example:
         node_retry_strategy,
     )
 
-    # Convert workflow RetryPolicy to core RetryStrategy
+    # Convert workflow RetryPolicy to core BaseRetryStrategy
     from victor.workflows.protocols import RetryPolicy
     policy = RetryPolicy(max_retries=5, delay_seconds=2.0)
     strategy = retry_policy_to_strategy(policy)
@@ -76,6 +76,7 @@ from victor.providers.circuit_breaker import (
 # Re-export Retry Components (from core - no duplication)
 # =============================================================================
 from victor.core.retry import (
+    BaseRetryStrategy,
     ExponentialBackoffStrategy,
     FixedDelayStrategy,
     LinearBackoffStrategy,
@@ -84,7 +85,6 @@ from victor.core.retry import (
     RetryExecutor,
     RetryOutcome,
     RetryResult,
-    RetryStrategy,
     with_retry,
     with_retry_sync,
 )
@@ -98,17 +98,17 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-def retry_policy_to_strategy(policy: "RetryPolicy") -> RetryStrategy:
-    """Convert workflow RetryPolicy to core RetryStrategy.
+def retry_policy_to_strategy(policy: "RetryPolicy") -> BaseRetryStrategy:
+    """Convert workflow RetryPolicy to core BaseRetryStrategy.
 
     This adapter bridges the workflow protocol (RetryPolicy dataclass)
-    with the core retry infrastructure (RetryStrategy ABC).
+    with the core retry infrastructure (BaseRetryStrategy ABC).
 
     Args:
         policy: Workflow RetryPolicy from protocols.py
 
     Returns:
-        Configured RetryStrategy matching the policy settings
+        Configured BaseRetryStrategy matching the policy settings
 
     Example:
         from victor.workflows.protocols import RetryPolicy
@@ -137,7 +137,7 @@ def node_retry_strategy(
     max_retries: int = 3,
     delay_seconds: float = 1.0,
     exponential: bool = True,
-) -> RetryStrategy:
+) -> BaseRetryStrategy:
     """Create retry strategy optimized for workflow node execution.
 
     Pre-configured strategy for workflow nodes with sensible defaults
@@ -149,7 +149,7 @@ def node_retry_strategy(
         exponential: Use exponential backoff (True) or fixed delay (False)
 
     Returns:
-        Configured RetryStrategy
+        Configured BaseRetryStrategy
     """
     if exponential:
         return ExponentialBackoffStrategy(
@@ -206,7 +206,7 @@ __all__ = [
     "RetryExecutor",
     "RetryOutcome",
     "RetryResult",
-    "RetryStrategy",
+    "BaseRetryStrategy",
     "with_retry",
     "with_retry_sync",
     # Workflow-specific adapters

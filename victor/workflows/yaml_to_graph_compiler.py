@@ -70,7 +70,6 @@ from typing import (
 from victor.framework.graph import (
     END,
     START,
-    Checkpoint,
     CheckpointerProtocol,
     CompiledGraph,
     Edge,
@@ -85,12 +84,12 @@ from victor.workflows.definition import (
     AgentNode,
     ComputeNode,
     ConditionNode,
-    NodeType,
     ParallelNode,
     TaskConstraints,
     TransformNode,
     WorkflowDefinition,
     WorkflowNode,
+    WorkflowNodeType,
 )
 
 if TYPE_CHECKING:
@@ -822,7 +821,7 @@ class YAMLToStateGraphCompiler:
         interrupt_before = []
         if config.interrupt_on_hitl:
             for node_id, node in workflow.nodes.items():
-                if node.node_type == NodeType.HITL:
+                if node.node_type == WorkflowNodeType.HITL:
                     interrupt_before.append(node_id)
 
         # Build checkpointer

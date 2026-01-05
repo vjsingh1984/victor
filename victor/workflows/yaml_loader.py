@@ -127,8 +127,6 @@ class YAMLNodeType(str, Enum):
     HITL = "hitl"
 
 
-# Backward compatibility alias
-NodeType = YAMLNodeType
 
 
 class ConstraintType(str, Enum):
@@ -617,20 +615,22 @@ class BatchConfigYAML:
 
     def to_batch_config(self) -> "BatchConfig":
         """Convert to BatchConfig for executor."""
-        from victor.workflows.batch_executor import BatchConfig, RetryStrategy
+        from victor.workflows.batch_executor import BatchConfig, BatchRetryStrategy
 
         strategy_map = {
-            "none": RetryStrategy.NONE,
-            "immediate": RetryStrategy.IMMEDIATE,
-            "end_of_batch": RetryStrategy.END_OF_BATCH,
-            "exponential_backoff": RetryStrategy.EXPONENTIAL_BACKOFF,
+            "none": BatchRetryStrategy.NONE,
+            "immediate": BatchRetryStrategy.IMMEDIATE,
+            "end_of_batch": BatchRetryStrategy.END_OF_BATCH,
+            "exponential_backoff": BatchRetryStrategy.EXPONENTIAL_BACKOFF,
         }
 
         return BatchConfig(
             batch_size=self.batch_size,
             max_concurrent=self.max_concurrent,
             delay_seconds=self.delay_seconds,
-            retry_strategy=strategy_map.get(self.retry_strategy, RetryStrategy.END_OF_BATCH),
+            retry_strategy=strategy_map.get(
+                self.retry_strategy, BatchRetryStrategy.END_OF_BATCH
+            ),
             max_retries=self.max_retries,
             retry_delay_seconds=self.retry_delay_seconds,
             timeout_per_item=self.timeout_per_item,
@@ -1256,23 +1256,23 @@ def _parse_node(
     This reduces YAML verbosity for the most common agentic workflows.
     """
     # Default to 'agent' if type not specified - makes common case concise
-    node_type_str = node_data.get("type", NodeType.AGENT.value)
+    node_type_str = node_data.get("type", YAMLNodeType.AGENT.value)
 
     # Use enum for matching to avoid string typos
-    if node_type_str == NodeType.AGENT.value:
+    if node_type_str == YAMLNodeType.AGENT.value:
         return _parse_agent_node(node_data)
-    elif node_type_str == NodeType.COMPUTE.value:
+    elif node_type_str == YAMLNodeType.COMPUTE.value:
         return _parse_compute_node(node_data)
-    elif node_type_str == NodeType.CONDITION.value:
+    elif node_type_str == YAMLNodeType.CONDITION.value:
         return _parse_condition_node(node_data, config)
-    elif node_type_str == NodeType.PARALLEL.value:
+    elif node_type_str == YAMLNodeType.PARALLEL.value:
         return _parse_parallel_node(node_data)
-    elif node_type_str == NodeType.TRANSFORM.value:
+    elif node_type_str == YAMLNodeType.TRANSFORM.value:
         return _parse_transform_node(node_data, config)
-    elif node_type_str == NodeType.HITL.value:
+    elif node_type_str == YAMLNodeType.HITL.value:
         return _parse_hitl_node(node_data)
     else:
-        valid_types = [t.value for t in NodeType]
+        valid_types = [t.value for t in YAMLNodeType]
         raise YAMLWorkflowError(
             f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}"
         )
@@ -1822,7 +1822,7 @@ def parse_workflow_args(
 
 __all__ = [
     # Enums for controlled values
-    "NodeType",
+    "YAMLNodeType",
     "ConstraintType",
     "JoinStrategy",
     "HITLType",

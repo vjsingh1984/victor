@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.workflows.protocols import (
-    NodeStatus,
+    ProtocolNodeStatus,
     RetryPolicy,
     NodeResult,
     IWorkflowNode,
@@ -68,7 +68,7 @@ class WorkflowNode:
         async def process_data(state, context=None):
             processed = transform(state["data"])
             return NodeResult(
-                status=NodeStatus.COMPLETED,
+                status=ProtocolNodeStatus.COMPLETED,
                 output={"data": processed}
             )
 

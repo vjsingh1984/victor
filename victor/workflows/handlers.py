@@ -50,7 +50,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with execution outcome or error details
         """
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -250,11 +250,11 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with FAILED status and error details
         """
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.FAILED,
+            status=ExecutorNodeStatus.FAILED,
             error=f"Handler '{error.handler_name}' failed: {error.message}",
             duration_seconds=time.time() - start_time,
         )
@@ -330,7 +330,7 @@ class ParallelToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
         semaphore = asyncio.Semaphore(self.max_concurrent)
@@ -392,7 +392,7 @@ class ParallelToolsHandler:
         if errors and node.fail_fast:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 output=outputs,
                 error="; ".join(errors),
                 duration_seconds=time.time() - start_time,
@@ -401,7 +401,7 @@ class ParallelToolsHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=outputs,
             error="; ".join(errors) if errors else None,
             duration_seconds=time.time() - start_time,
@@ -456,7 +456,7 @@ class SequentialToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
         outputs: Dict[str, Any] = {}
@@ -470,7 +470,7 @@ class SequentialToolsHandler:
                 if self.stop_on_error:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         output=outputs,
                         error=f"Tool '{tool_name}' blocked by constraints",
                         duration_seconds=time.time() - start_time,
@@ -503,7 +503,7 @@ class SequentialToolsHandler:
                 elif self.stop_on_error:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         output=outputs,
                         error=f"Tool '{tool_name}' failed: {result.error}",
                         duration_seconds=time.time() - start_time,
@@ -514,7 +514,7 @@ class SequentialToolsHandler:
                 if self.stop_on_error:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         output=outputs,
                         error=f"Tool '{tool_name}' timed out",
                         duration_seconds=time.time() - start_time,
@@ -525,7 +525,7 @@ class SequentialToolsHandler:
                 if self.stop_on_error:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         output=outputs,
                         error=f"Tool '{tool_name}' error: {e}",
                         duration_seconds=time.time() - start_time,
@@ -538,7 +538,7 @@ class SequentialToolsHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=outputs,
             duration_seconds=time.time() - start_time,
             tool_calls_used=tool_calls_used,
@@ -596,7 +596,7 @@ class RetryBackoffHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
         outputs: Dict[str, Any] = {}
@@ -653,7 +653,7 @@ class RetryBackoffHandler:
             if not success and node.fail_fast:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     output=outputs,
                     error=f"Tool '{tool_name}' failed after {self.max_retries} retries: {last_error}",
                     duration_seconds=time.time() - start_time,
@@ -666,7 +666,7 @@ class RetryBackoffHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=outputs,
             duration_seconds=time.time() - start_time,
             tool_calls_used=tool_calls_used,
@@ -737,7 +737,7 @@ class DataTransformHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -755,7 +755,7 @@ class DataTransformHandler:
         if data is None:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No 'data' input provided for transform",
                 duration_seconds=time.time() - start_time,
             )
@@ -769,7 +769,7 @@ class DataTransformHandler:
                 except Exception as e:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         error=f"Transform '{op_name}' failed: {e}",
                         duration_seconds=time.time() - start_time,
                     )
@@ -782,7 +782,7 @@ class DataTransformHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=result,
             duration_seconds=time.time() - start_time,
         )
@@ -882,7 +882,7 @@ class ConditionalBranchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -896,7 +896,7 @@ class ConditionalBranchHandler:
         if not condition_expr:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No 'condition' input provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -909,7 +909,7 @@ class ConditionalBranchHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"result": result, "condition": condition_expr},
                 duration_seconds=time.time() - start_time,
             )
@@ -917,7 +917,7 @@ class ConditionalBranchHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Condition evaluation failed: {e}",
                 duration_seconds=time.time() - start_time,
             )

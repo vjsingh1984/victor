@@ -54,7 +54,7 @@ Example (YAML):
 
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.definition import (
-    NodeType,
+    WorkflowNodeType,
     WorkflowNode,
     AgentNode,
     ConditionNode,
@@ -71,7 +71,7 @@ from victor.workflows.registry import (
     get_global_registry,
 )
 from victor.workflows.executor import (
-    NodeStatus,
+    ExecutorNodeStatus,
     NodeResult,
     WorkflowContext,
     WorkflowResult,
@@ -85,8 +85,8 @@ from victor.workflows.protocols import (
     ICheckpointStore,
     IWorkflowExecutor,
     IStreamingWorkflowExecutor,
-    # Re-export NodeStatus and NodeResult from protocols for graph API users
-    NodeStatus as GraphNodeStatus,
+    # Re-export ProtocolNodeStatus and NodeResult from protocols for graph API users
+    ProtocolNodeStatus as GraphNodeStatus,
     NodeResult as GraphNodeResult,
 )
 from victor.workflows.streaming import (
@@ -119,7 +119,7 @@ from victor.workflows.graph_dsl import (
     State,
     StateGraph,
     GraphNode,
-    NodeType as GraphNodeType,
+    GraphNodeType,
     NodeFunc,
     RouterFunc,
     Compilable,
@@ -181,7 +181,7 @@ from victor.workflows.handlers import (
     register_framework_handlers,
 )
 from victor.workflows.batch_executor import (
-    RetryStrategy,
+    BatchRetryStrategy,
     BatchConfig,
     BatchItemResult,
     BatchProgress,
@@ -303,7 +303,7 @@ __all__ = [
     # Base
     "BaseWorkflow",
     # Node types
-    "NodeType",
+    "WorkflowNodeType",
     "WorkflowNode",
     "AgentNode",
     "ComputeNode",
@@ -326,7 +326,7 @@ __all__ = [
     "WorkflowRegistry",
     "get_global_registry",
     # Executor
-    "NodeStatus",
+    "ExecutorNodeStatus",
     "NodeResult",
     "WorkflowContext",
     "WorkflowResult",
@@ -362,7 +362,7 @@ __all__ = [
     "SandboxedExecutor",
     "get_sandboxed_executor",
     # Batch Execution
-    "RetryStrategy",
+    "BatchRetryStrategy",
     "BatchConfig",
     "BatchItemResult",
     "BatchProgress",
