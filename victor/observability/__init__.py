@@ -102,7 +102,7 @@ from victor.observability.resilience import (
     LinearBackoff,
     RateLimiter,
     ResiliencePolicy,
-    RetryConfig,
+    ObservabilityRetryConfig,
     retry_with_backoff,
     with_timeout,
 )
@@ -177,7 +177,7 @@ __all__ = [
     "LinearBackoff",
     "ConstantBackoff",
     "DecorrelatedJitterBackoff",
-    "RetryConfig",
+    "ObservabilityRetryConfig",
     "retry_with_backoff",
     "CircuitBreaker",
     "CircuitBreakerError",

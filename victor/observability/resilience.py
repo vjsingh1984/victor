@@ -190,8 +190,6 @@ class ObservabilityRetryConfig:
     on_retry: Optional[Callable[[int, Exception, float], None]] = None
 
 
-# Backward compatibility alias
-RetryConfig = ObservabilityRetryConfig
 
 
 def retry_with_backoff(
@@ -795,7 +793,7 @@ class ResiliencePolicy:
     Example:
         policy = ResiliencePolicy(
             circuit_breaker=ObservableCircuitBreaker(failure_threshold=5),
-            retry_config=RetryConfig(max_retries=3),
+            retry_config=ObservabilityRetryConfig(max_retries=3),
             bulkhead=Bulkhead(max_concurrent=10),
             timeout=5.0,
         )
@@ -808,7 +806,7 @@ class ResiliencePolicy:
     def __init__(
         self,
         circuit_breaker: Optional[CircuitBreaker] = None,
-        retry_config: Optional[RetryConfig] = None,
+        retry_config: Optional[ObservabilityRetryConfig] = None,
         bulkhead: Optional[Bulkhead] = None,
         rate_limiter: Optional[RateLimiter] = None,
         timeout: Optional[float] = None,

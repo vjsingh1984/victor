@@ -332,8 +332,6 @@ class ProviderRetryConfig:
     )
 
 
-# Backward compatibility alias
-RetryConfig = ProviderRetryConfig
 
 
 class RetryExhaustedError(Exception):
@@ -369,19 +367,19 @@ class ProviderRetryStrategy:
         result = await retry.execute(make_request)
     """
 
-    def __init__(self, config: Optional[RetryConfig] = None):
+    def __init__(self, config: Optional[ProviderRetryConfig] = None):
         """Initialize retry strategy.
 
         Args:
             config: Retry configuration
         """
-        self.config = config or RetryConfig()
+        self.config = config or ProviderRetryConfig()
         self._compiled_patterns = [
             re.compile(p, re.IGNORECASE) for p in self.config.retryable_patterns
         ]
 
         logger.debug(
-            f"RetryStrategy initialized. "
+            f"ProviderRetryStrategy initialized. "
             f"Max retries: {self.config.max_retries}, "
             f"Base delay: {self.config.base_delay_seconds}s"
         )
@@ -522,8 +520,6 @@ class ProviderRetryStrategy:
         return None
 
 
-# Backward compatibility alias
-RetryStrategy = ProviderRetryStrategy
 
 
 class ProviderUnavailableError(Exception):
@@ -564,7 +560,7 @@ class ResilientProvider:
         self,
         provider: Any,
         circuit_config: Optional[CircuitBreakerConfig] = None,
-        retry_config: Optional[RetryConfig] = None,
+        retry_config: Optional[ProviderRetryConfig] = None,
         fallback_providers: Optional[List[Any]] = None,
         request_timeout: float = 120.0,
     ):
@@ -591,7 +587,7 @@ class ResilientProvider:
         )
 
         # Create retry strategy
-        self.retry_strategy = RetryStrategy(config=retry_config)
+        self.retry_strategy = ProviderRetryStrategy(config=retry_config)
 
         # Create circuit breakers for fallbacks
         self._fallback_circuits: Dict[str, ProviderCircuitBreaker] = {}
