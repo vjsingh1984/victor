@@ -212,7 +212,7 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
         if CacheType.CONVERSATION in targets:
             import asyncio
             from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
 
             try:
                 console.print("  [dim]Rebuilding conversation embeddings...[/]")

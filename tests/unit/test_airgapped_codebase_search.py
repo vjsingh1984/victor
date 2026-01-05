@@ -132,7 +132,7 @@ class TestUnifiedEmbeddingModel:
         """Test that unified model handles batch embeddings efficiently via EmbeddingService."""
         from unittest.mock import AsyncMock
 
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         # Reset singleton to ensure clean state
         EmbeddingService.reset_instance()

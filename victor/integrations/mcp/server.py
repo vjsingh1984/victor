@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
 from victor.integrations.mcp.protocol import (
+    MCP_PROTOCOL_VERSION,
     MCPCapabilities,
     MCPMessage,
     MCPMessageType,
@@ -70,10 +71,10 @@ class MCPServer:
             name=name,
             version=version,
             capabilities=MCPCapabilities(
-                tools=True,
-                resources=True,
-                prompts=False,
-                sampling=False,
+                tools={},  # Empty object means supported
+                resources={},  # Empty object means supported
+                prompts=None,  # None means not supported (omitted from output)
+                sampling=None,  # None means not supported (omitted from output)
             ),
         )
 
@@ -213,6 +214,7 @@ class MCPServer:
         return self._create_response(
             msg_id,
             {
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "serverInfo": self.info.model_dump(),
                 "capabilities": self.info.capabilities.model_dump(),
             },

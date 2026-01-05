@@ -3731,7 +3731,7 @@ class TestIntentClassifierModule:
 
     def test_intent_type_exists(self, orchestrator):
         """Test IntentType can be imported from embeddings."""
-        from victor.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType
 
         # IntentType should have CONTINUATION enum value
         assert hasattr(IntentType, "CONTINUATION") or True  # May not exist

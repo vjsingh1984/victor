@@ -246,7 +246,7 @@ class CompletionProviderRegistry:
             if path.name.startswith("_"):
                 continue
 
-            module_name = f"victor.completion.providers.{path.stem}"
+            module_name = f"victor.processing.completion.providers.{path.stem}"
             try:
                 module = importlib.import_module(module_name)
 

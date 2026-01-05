@@ -378,7 +378,7 @@ class TeamMember:
             return False
 
         try:
-            from victor.memory.unified import MemoryType
+            from victor.storage.memory.unified import MemoryType
 
             full_metadata = {"member_id": self.id, "member_name": self.name}
             if self.expertise:

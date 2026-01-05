@@ -63,7 +63,7 @@ class TestSentenceTransformersEmbedding:
     @pytest.mark.asyncio
     async def test_default_provider_is_sentence_transformers(self):
         """Test that default provider is sentence-transformers."""
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         selector = SemanticToolSelector()
         assert selector.embedding_provider == "sentence-transformers"
@@ -74,7 +74,7 @@ class TestSentenceTransformersEmbedding:
     @pytest.mark.asyncio
     async def test_sentence_transformer_lazy_loading(self, temp_cache_dir):
         """Test that sentence-transformers model is loaded lazily via EmbeddingService."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         # Reset the singleton to ensure clean state
         EmbeddingService.reset_instance()
@@ -141,7 +141,7 @@ class TestSentenceTransformersEmbedding:
     @pytest.mark.asyncio
     async def test_async_execution_in_thread_pool(self, temp_cache_dir):
         """Test that embedding runs async via EmbeddingService (non-blocking)."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 

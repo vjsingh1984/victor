@@ -283,7 +283,7 @@ class TestCumulativeInterventionTracking:
     def test_no_intervention_on_low_count(self):
         """Should not trigger intervention nudge when cumulative count is low."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType
 
         strategy = ContinuationStrategy()
 

@@ -97,12 +97,16 @@ class TestMCPServerInit:
         assert server.tool_registry is not None
 
     def test_server_info(self):
-        """Test server info is set correctly."""
+        """Test server info is set correctly.
+
+        Per MCP spec, capabilities are objects (not booleans).
+        Use supports_* properties to check if capability is enabled.
+        """
         server = MCPServer()
         assert server.info.name == "Victor MCP Server"
-        assert server.info.capabilities.tools is True
-        assert server.info.capabilities.resources is True
-        assert server.info.capabilities.prompts is False
+        assert server.info.capabilities.supports_tools is True
+        assert server.info.capabilities.supports_resources is True
+        assert server.info.capabilities.supports_prompts is False
 
 
 class TestMCPServerRegisterResource:

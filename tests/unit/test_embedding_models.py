@@ -238,7 +238,7 @@ class TestSentenceTransformerModel:
     @pytest.mark.asyncio
     async def test_initialize_success(self, sentence_transformer_config):
         """Test successful initialization via EmbeddingService."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         # Reset singleton to ensure clean state
         EmbeddingService.reset_instance()
@@ -267,7 +267,7 @@ class TestSentenceTransformerModel:
         Note: Import error now happens inside EmbeddingService when it tries
         to load sentence-transformers. We test that the model handles this.
         """
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         model = SentenceTransformerModel(sentence_transformer_config)
 

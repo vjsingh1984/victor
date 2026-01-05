@@ -35,7 +35,7 @@ from victor.tools.base import ToolRegistry
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.config.settings import Settings
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 

@@ -1612,3 +1612,54 @@ class EventBus:
             ExporterConfig or None if not configured
         """
         return self._exporter_configs.get(id(exporter))
+
+    def emit_lifecycle_event(
+        self,
+        event_type: str,
+        data: Optional[Dict[str, Any]] = None,
+        priority: EventPriority = EventPriority.NORMAL,
+    ) -> None:
+        """Emit lifecycle events (graph_started, workflow_completed, etc.).
+
+        Lifecycle events track the start/end of major operations like
+        workflow executions, graph traversals, and session management.
+
+        Args:
+            event_type: Type of lifecycle event (e.g., "graph_started",
+                "workflow_completed", "session_started").
+            data: Optional event payload with additional context.
+            priority: Event priority (default NORMAL).
+
+        Example:
+            bus.emit_lifecycle_event("workflow_started", {
+                "workflow_id": "deep_research",
+                "inputs": {"query": "AI trends"},
+            })
+        """
+        self.publish(
+            VictorEvent(
+                category=EventCategory.LIFECYCLE,
+                name=event_type,
+                priority=priority,
+                data=data or {},
+            )
+        )
+
+
+def get_event_bus() -> EventBus:
+    """Factory function for DIP-compliant EventBus access.
+
+    This function provides a Dependency Inversion Principle (DIP) compliant
+    way to access the EventBus singleton. Use this instead of directly
+    calling EventBus.get_instance() for better testability and loose coupling.
+
+    Returns:
+        The singleton EventBus instance.
+
+    Example:
+        from victor.observability.event_bus import get_event_bus
+
+        bus = get_event_bus()
+        bus.publish(VictorEvent(...))
+    """
+    return EventBus.get_instance()

@@ -38,6 +38,7 @@ from victor.config.timeouts import McpTimeouts
 if TYPE_CHECKING:
     from victor.integrations.mcp.sandbox import SandboxConfig, SandboxedProcess
 from victor.integrations.mcp.protocol import (
+    MCP_PROTOCOL_VERSION,
     MCPClientInfo,
     MCPMessage,
     MCPMessageType,
@@ -273,10 +274,11 @@ class MCPClient:
         if not self.process:
             return False
 
-        # Send initialize message
+        # Send initialize message with protocol version (required by MCP spec)
         response = await self._send_request(
             MCPMessageType.INITIALIZE,
             {
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "clientInfo": self.client_info.model_dump(),
                 "capabilities": self.client_info.capabilities.model_dump(),
             },

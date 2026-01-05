@@ -32,7 +32,7 @@ from victor.config.orchestrator_constants import (
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.agent.conversation_memory import ConversationStore
 
 

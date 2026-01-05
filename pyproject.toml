@@ -481,7 +481,7 @@ files = ["victor"]
 [[tool.mypy.overrides]]
 module = [
     "victor.config.*",
-    "victor.cache.*",
+    "victor.storage.cache.*",
 ]
 disallow_untyped_defs = true
 warn_return_any = true

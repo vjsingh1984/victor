@@ -44,7 +44,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, cast
 import yaml
 
 # Import canonical TaskType from task_classifier (single source of truth)
-from victor.embeddings.task_classifier import TaskType
+from victor.storage.embeddings.task_classifier import TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -445,7 +445,7 @@ class TaskMilestoneMonitor:
         # Lazy initialization of classifier (use singleton to avoid duplicate loading)
         if self._use_semantic:
             try:
-                from victor.embeddings.task_classifier import TaskTypeClassifier
+                from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
                 self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:

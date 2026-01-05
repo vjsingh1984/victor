@@ -30,7 +30,7 @@ Supported formats:
 - Reference Encoded (40-70% savings for repetitive data)
 
 Usage:
-    from victor.serialization import AdaptiveSerializer, SerializationContext
+    from victor.processing.serialization import AdaptiveSerializer, SerializationContext
 
     # Create serializer with context
     serializer = AdaptiveSerializer()
@@ -48,7 +48,7 @@ Usage:
     result = serializer.serialize(data, context, format_override=SerializationFormat.TOON)
 
     # Quick serialization with convenience function
-    from victor.serialization import serialize
+    from victor.processing.serialization import serialize
     result = serialize(data, provider="anthropic", model="claude-sonnet-4-20250514")
 """
 

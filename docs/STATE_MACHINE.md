@@ -102,7 +102,7 @@ print(agent.state.stage)  # Stage.COMPLETION
 ### Direct State Machine Access
 
 ```python
-from victor.state import (
+from victor.storage.state import (
     ConversationStateMachine,
     ConversationStage,
     STAGE_KEYWORDS,
@@ -168,7 +168,7 @@ sm = ConversationStateMachine(hooks=manager)
 For custom workflows, use the generic `StateMachine`:
 
 ```python
-from victor.state import StateMachine, StateConfig
+from victor.storage.state import StateMachine, StateConfig
 
 # Define custom workflow
 config = StateConfig(
@@ -197,7 +197,7 @@ machine.transition_to("REVIEW")
 ### Built-in Validators
 
 ```python
-from victor.state import StateMachine, StateConfig
+from victor.storage.state import StateMachine, StateConfig
 
 config = StateConfig(
     stages=["A", "B", "C"],
@@ -211,7 +211,7 @@ config = StateConfig(
 ### Custom Validators
 
 ```python
-from victor.state.protocols import TransitionValidatorProtocol
+from victor.storage.state.protocols import TransitionValidatorProtocol
 
 class RequireMinToolsValidator:
     """Require minimum tool calls before completion."""
@@ -231,7 +231,7 @@ machine = StateMachine(config, validators=[RequireMinToolsValidator()])
 The state machine system uses protocols for extensibility:
 
 ```python
-from victor.state.protocols import (
+from victor.storage.state.protocols import (
     StateProtocol,           # Core state machine interface
     StageDetectorProtocol,   # Stage detection from context
     TransitionValidatorProtocol,  # Validate transitions

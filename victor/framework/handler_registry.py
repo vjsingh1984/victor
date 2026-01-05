@@ -27,11 +27,18 @@ Example:
 
     # List handlers by vertical
     coding_handlers = registry.list_by_vertical("coding")
+
+    # Sync with executor's global handlers
+    registry.sync_with_executor()
+
+    # Auto-discover handlers from a vertical
+    count = registry.discover_from_vertical("coding")
 """
 
+import importlib
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +234,133 @@ class HandlerRegistry:
             count += 1
         return count
 
+    def sync_with_executor(
+        self,
+        *,
+        direction: str = "bidirectional",
+        replace: bool = False,
+    ) -> Tuple[int, int]:
+        """Bridge to workflows/executor.py global handler dict.
+
+        Synchronizes handlers between this registry and the executor's
+        global _compute_handlers dictionary. This enables handlers
+        registered via either mechanism to be available everywhere.
+
+        Args:
+            direction: Sync direction:
+                - "to_executor": Push registry handlers to executor
+                - "from_executor": Pull executor handlers to registry
+                - "bidirectional": Both directions (default)
+            replace: If True, replace existing handlers during sync
+
+        Returns:
+            Tuple of (handlers_pushed, handlers_pulled)
+
+        Example:
+            registry = get_handler_registry()
+            registry.register("my_handler", handler, vertical="coding")
+
+            # Sync to make handler available in executor
+            pushed, pulled = registry.sync_with_executor()
+        """
+        from victor.workflows.executor import (
+            _compute_handlers,
+            register_compute_handler,
+            get_compute_handler,
+        )
+
+        pushed = 0
+        pulled = 0
+
+        # Push registry handlers to executor
+        if direction in ("to_executor", "bidirectional"):
+            for name, entry in self._handlers.items():
+                existing = get_compute_handler(name)
+                if existing is None or replace:
+                    register_compute_handler(name, entry.handler)
+                    pushed += 1
+                    logger.debug(f"Pushed handler to executor: {name}")
+
+        # Pull executor handlers to registry
+        if direction in ("from_executor", "bidirectional"):
+            for name, handler in _compute_handlers.items():
+                if not self.has(name) or replace:
+                    # We don't know the vertical for executor handlers
+                    self.register(name, handler, vertical=None, replace=replace)
+                    pulled += 1
+                    logger.debug(f"Pulled handler from executor: {name}")
+
+        logger.debug(f"Sync complete: pushed={pushed}, pulled={pulled}")
+        return (pushed, pulled)
+
+    def discover_from_vertical(
+        self,
+        vertical_name: str,
+        *,
+        replace: bool = False,
+        sync_to_executor: bool = True,
+    ) -> int:
+        """Auto-discover and register handlers from a vertical module.
+
+        Attempts to import victor.{vertical_name}.handlers and register
+        all handlers from its HANDLERS dictionary.
+
+        Args:
+            vertical_name: Name of the vertical (e.g., "coding", "research")
+            replace: If True, replace existing handlers
+            sync_to_executor: If True, sync new handlers to executor
+
+        Returns:
+            Number of handlers registered
+
+        Raises:
+            ImportError: If the handlers module cannot be imported
+
+        Example:
+            registry = get_handler_registry()
+
+            # Discover and register handlers from coding vertical
+            count = registry.discover_from_vertical("coding")
+            print(f"Registered {count} handlers")
+        """
+        module_path = f"victor.{vertical_name}.handlers"
+
+        try:
+            module = importlib.import_module(module_path)
+        except ImportError as e:
+            logger.warning(f"Could not import handlers from {module_path}: {e}")
+            raise
+
+        handlers_dict = getattr(module, "HANDLERS", None)
+        if handlers_dict is None:
+            logger.warning(f"No HANDLERS dict found in {module_path}")
+            return 0
+
+        count = self.register_from_vertical(
+            vertical_name=vertical_name,
+            handlers=handlers_dict,
+            replace=replace,
+        )
+
+        # Optionally sync to executor
+        if sync_to_executor and count > 0:
+            self.sync_with_executor(direction="to_executor", replace=replace)
+
+        logger.info(f"Discovered {count} handlers from {module_path}")
+        return count
+
+    def list_verticals(self) -> List[str]:
+        """List all verticals with registered handlers.
+
+        Returns:
+            List of unique vertical names
+        """
+        verticals = set()
+        for entry in self._handlers.values():
+            if entry.vertical:
+                verticals.add(entry.vertical)
+        return list(verticals)
+
 
 # Module-level convenience functions
 def get_handler_registry() -> HandlerRegistry:
@@ -279,10 +413,56 @@ def get_handler(name: str) -> Optional[Any]:
     return get_handler_registry().get(name)
 
 
+def sync_handlers_with_executor(
+    *,
+    direction: str = "bidirectional",
+    replace: bool = False,
+) -> Tuple[int, int]:
+    """Sync global handler registry with executor.
+
+    Convenience function for `get_handler_registry().sync_with_executor(...)`.
+
+    Args:
+        direction: Sync direction ("to_executor", "from_executor", "bidirectional")
+        replace: If True, replace existing handlers
+
+    Returns:
+        Tuple of (handlers_pushed, handlers_pulled)
+    """
+    return get_handler_registry().sync_with_executor(direction=direction, replace=replace)
+
+
+def discover_handlers_from_vertical(
+    vertical_name: str,
+    *,
+    replace: bool = False,
+    sync_to_executor: bool = True,
+) -> int:
+    """Discover and register handlers from a vertical.
+
+    Convenience function for `get_handler_registry().discover_from_vertical(...)`.
+
+    Args:
+        vertical_name: Name of the vertical
+        replace: If True, replace existing handlers
+        sync_to_executor: If True, sync to executor after discovery
+
+    Returns:
+        Number of handlers registered
+    """
+    return get_handler_registry().discover_from_vertical(
+        vertical_name=vertical_name,
+        replace=replace,
+        sync_to_executor=sync_to_executor,
+    )
+
+
 __all__ = [
     "HandlerEntry",
     "HandlerRegistry",
     "get_handler_registry",
     "register_handler",
     "get_handler",
+    "sync_handlers_with_executor",
+    "discover_handlers_from_vertical",
 ]

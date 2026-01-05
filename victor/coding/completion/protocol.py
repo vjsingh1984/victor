@@ -4,13 +4,13 @@
 """Completion protocol types - re-exported from canonical location.
 
 This module re-exports all completion protocol types from the canonical
-source at victor.completion.protocol for backward compatibility.
+source at victor.processing.completion.protocol for backward compatibility.
 
-All new code should import directly from victor.completion.protocol.
+All new code should import directly from victor.processing.completion.protocol.
 """
 
 # Re-export everything from canonical location
-from victor.completion.protocol import (
+from victor.processing.completion.protocol import (
     # LSP base types (originally from victor.protocols.lsp_types)
     Position,
     Range,

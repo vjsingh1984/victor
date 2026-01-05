@@ -29,7 +29,7 @@ Design Patterns:
 - Strategy Pattern: Pluggable stage detection
 
 Example:
-    from victor.state import ConversationStateMachine, ConversationStage
+    from victor.storage.state import ConversationStateMachine, ConversationStage
 
     # Create state machine
     machine = ConversationStateMachine()
@@ -44,7 +44,7 @@ Example:
     tools = machine.get_stage_tools()
 
 Standalone Usage (without full agent):
-    from victor.state import StateMachine, StateConfig
+    from victor.storage.state import StateMachine, StateConfig
 
     # Define custom stages
     config = StateConfig(

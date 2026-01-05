@@ -117,7 +117,7 @@ class TestDatabaseTool:
 **Example: MCP Protocol**
 ```python
 import pytest
-from victor.mcp.protocol import MCPMessage, MCPMessageType
+from victor.integrations.mcp.protocol import MCPMessage, MCPMessageType
 
 
 class TestMCPProtocol:

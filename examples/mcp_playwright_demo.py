@@ -126,7 +126,7 @@ def get_playwright_command(transport: str = "npx") -> List[str]:
             "--rm",
             "-v",
             "/tmp/playwright-screenshots:/screenshots",
-            "anthropic/mcp-server-playwright:latest",
+            "mcp/playwright:latest",
         ]
     elif transport == "global":
         return ["mcp-server-playwright"]
@@ -134,7 +134,7 @@ def get_playwright_command(transport: str = "npx") -> List[str]:
         raise ValueError(f"Unknown transport: {transport}")
 
 
-async def demo_playwright_connection():
+async def demo_playwright_connection(transport_override: str = None):
     """Demo basic connection to Playwright MCP server."""
     print("=" * 70)
     print("Playwright MCP Server Demo - Basic Connection")
@@ -151,8 +151,8 @@ async def demo_playwright_connection():
         print("  2. Install Docker: https://docs.docker.com/get-docker/")
         return
 
-    # Prefer npx over Docker
-    transport = "npx" if has_npx else "docker"
+    # Use override if provided, otherwise prefer npx over Docker
+    transport = transport_override if transport_override else ("npx" if has_npx else "docker")
     print(f"\nUsing transport: {transport}")
 
     try:
@@ -241,7 +241,7 @@ async def demo_playwright_connection():
         print("   Disconnected from server.")
 
 
-async def demo_playwright_screenshot():
+async def demo_playwright_screenshot(transport_override: str = None):
     """Demo taking screenshots with Playwright MCP server."""
     print("\n" + "=" * 70)
     print("Playwright MCP Server Demo - Screenshot Capture")
@@ -257,7 +257,7 @@ async def demo_playwright_screenshot():
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = "npx" if check_npx_available() else "docker"
+    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -284,7 +284,7 @@ async def demo_playwright_screenshot():
         print("\n2. Navigating to example.com...")
         print("-" * 70)
 
-        navigate_tool = next((t for t in ["navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
         if navigate_tool:
             result = await client.call_tool(navigate_tool, url="https://example.com")
             if result.success:
@@ -300,7 +300,7 @@ async def demo_playwright_screenshot():
         print("\n3. Taking screenshot...")
         print("-" * 70)
 
-        screenshot_tool = next((t for t in ["screenshot", "playwright_screenshot", "take_screenshot"] if t in tool_names), None)
+        screenshot_tool = next((t for t in ["browser_take_screenshot", "screenshot", "playwright_screenshot", "take_screenshot"] if t in tool_names), None)
         if screenshot_tool:
             result = await client.call_tool(screenshot_tool)
             if result.success:
@@ -335,9 +335,10 @@ async def demo_playwright_screenshot():
         print("\n4. Getting page info...")
         print("-" * 70)
 
-        evaluate_tool = next((t for t in ["evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
+        evaluate_tool = next((t for t in ["browser_evaluate", "evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
         if evaluate_tool:
-            result = await client.call_tool(evaluate_tool, script="document.title")
+            # browser_evaluate expects 'function' parameter with arrow function syntax
+            result = await client.call_tool(evaluate_tool, function="() => document.title")
             if result.success:
                 print(f"   Page title: {result.result}")
             else:
@@ -351,7 +352,7 @@ async def demo_playwright_screenshot():
         print("\n   Disconnected.")
 
 
-async def demo_playwright_navigation():
+async def demo_playwright_navigation(transport_override: str = None):
     """Demo web navigation with Playwright MCP server."""
     print("\n" + "=" * 70)
     print("Playwright MCP Server Demo - Web Navigation")
@@ -367,7 +368,7 @@ async def demo_playwright_navigation():
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = "npx" if check_npx_available() else "docker"
+    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -393,7 +394,7 @@ async def demo_playwright_navigation():
         print("-" * 70)
 
         # Navigate to page
-        navigate_tool = next((t for t in ["navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
         if navigate_tool:
             print("   Navigating to https://httpbin.org/html...")
             result = await client.call_tool(navigate_tool, url="https://httpbin.org/html")
@@ -407,10 +408,11 @@ async def demo_playwright_navigation():
         print("\n3. Getting page content...")
         print("-" * 70)
 
-        content_tool = next((t for t in ["get_content", "playwright_content", "page_content", "evaluate"] if t in tool_names), None)
+        content_tool = next((t for t in ["browser_evaluate", "get_content", "playwright_content", "page_content", "evaluate"] if t in tool_names), None)
         if content_tool:
-            if content_tool == "evaluate":
-                result = await client.call_tool(content_tool, script="document.body.innerText")
+            if content_tool in ("evaluate", "browser_evaluate"):
+                # browser_evaluate needs arrow function syntax
+                result = await client.call_tool(content_tool, function="() => document.body.innerText")
             else:
                 result = await client.call_tool(content_tool)
 
@@ -442,7 +444,7 @@ async def demo_playwright_navigation():
         print("\n   Disconnected.")
 
 
-async def demo_playwright_scraping():
+async def demo_playwright_scraping(transport_override: str = None):
     """Demo web scraping with Playwright MCP server."""
     print("\n" + "=" * 70)
     print("Playwright MCP Server Demo - Web Scraping")
@@ -458,7 +460,7 @@ async def demo_playwright_scraping():
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = "npx" if check_npx_available() else "docker"
+    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -483,7 +485,7 @@ async def demo_playwright_scraping():
         print("\n2. Navigating to target page...")
         print("-" * 70)
 
-        navigate_tool = next((t for t in ["navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
         if navigate_tool:
             # Use httpbin.org/json for structured data
             result = await client.call_tool(navigate_tool, url="https://httpbin.org/json")
@@ -497,11 +499,11 @@ async def demo_playwright_scraping():
         print("\n3. Extracting JSON data...")
         print("-" * 70)
 
-        evaluate_tool = next((t for t in ["evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
+        evaluate_tool = next((t for t in ["browser_evaluate", "evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
         if evaluate_tool:
             result = await client.call_tool(
                 evaluate_tool,
-                script="document.body.innerText"
+                function="() => document.body.innerText"
             )
             if result.success:
                 print("   Extracted data:")
@@ -522,12 +524,7 @@ async def demo_playwright_scraping():
                 # Extract titles
                 result = await client.call_tool(
                     evaluate_tool,
-                    script="""
-                        Array.from(document.querySelectorAll('.titleline > a'))
-                            .slice(0, 5)
-                            .map(a => a.innerText)
-                            .join('\\n')
-                    """
+                    function="""() => Array.from(document.querySelectorAll('.titleline > a')).slice(0, 5).map(a => a.innerText).join('\\n')"""
                 )
                 if result.success:
                     print("\n   Top 5 stories:")
@@ -727,16 +724,16 @@ Examples:
         return
 
     if args.demo in ("connection", "all"):
-        await demo_playwright_connection()
+        await demo_playwright_connection(args.transport)
 
     if args.demo in ("screenshot", "all"):
-        await demo_playwright_screenshot()
+        await demo_playwright_screenshot(args.transport)
 
     if args.demo in ("navigate", "all"):
-        await demo_playwright_navigation()
+        await demo_playwright_navigation(args.transport)
 
     if args.demo in ("scrape", "all"):
-        await demo_playwright_scraping()
+        await demo_playwright_scraping(args.transport)
 
     if args.demo == "connection":
         show_integration_examples()

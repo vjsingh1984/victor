@@ -34,7 +34,7 @@ Storage location: {project}/.victor/embeddings/conversations/
 
 Usage:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
     embedding_service = EmbeddingService.get_instance()
     store = ConversationEmbeddingStore(embedding_service, sqlite_db_path)
@@ -66,7 +66,7 @@ except ImportError:
     LANCEDB_AVAILABLE = False
 
 if TYPE_CHECKING:
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -617,7 +617,7 @@ async def get_conversation_embedding_store(
 
     if _embedding_store is None:
         if embedding_service is None:
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
 
             embedding_service = EmbeddingService.get_instance()
 

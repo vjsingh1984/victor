@@ -16,7 +16,7 @@
 
 from pathlib import Path
 
-from victor.completion.protocol import (
+from victor.processing.completion.protocol import (
     CompletionCapabilities,
     CompletionContext,
     CompletionItem,

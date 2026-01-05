@@ -27,15 +27,15 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from victor.embeddings.collections import CollectionItem, StaticEmbeddingCollection
-from victor.embeddings.intent_classifier import (
+from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.intent_classifier import (
     COMPLETION_PHRASES,
     CONTINUATION_PHRASES,
     IntentClassifier,
     IntentResult,
     IntentType,
 )
-from victor.embeddings.service import EmbeddingService
+from victor.storage.embeddings.service import EmbeddingService
 
 
 # ============================================================================

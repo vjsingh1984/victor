@@ -1124,10 +1124,22 @@ class VerticalRegistry:
         return list(cls._registry.keys())
 
     @classmethod
-    def clear(cls) -> None:
-        """Clear all registered verticals (for testing)."""
+    def clear(cls, *, reregister_builtins: bool = True) -> None:
+        """Clear all registered verticals (for testing).
+
+        Args:
+            reregister_builtins: If True (default), re-register built-in verticals
+                after clearing. This prevents test pollution where clearing in one
+                test affects other tests that expect built-ins to be available.
+        """
         cls._registry.clear()
         cls._external_discovered = False
+
+        if reregister_builtins:
+            # Re-register built-in verticals to prevent test pollution
+            from victor.core.verticals import _register_builtin_verticals
+
+            _register_builtin_verticals()
 
     @classmethod
     def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:

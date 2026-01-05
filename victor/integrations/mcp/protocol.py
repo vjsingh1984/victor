@@ -98,12 +98,42 @@ class MCPMessage(BaseModel):
 
 
 class MCPCapabilities(BaseModel):
-    """MCP server/client capabilities."""
+    """MCP server/client capabilities.
 
-    tools: bool = Field(default=True, description="Supports tools")
-    resources: bool = Field(default=True, description="Supports resources")
-    prompts: bool = Field(default=False, description="Supports prompts")
-    sampling: bool = Field(default=False, description="Supports sampling")
+    Per MCP spec, capabilities are represented as objects (not booleans).
+    If a capability is supported, include it as an empty object {} or with config.
+    If not supported, omit it (None excludes from serialization).
+    """
+
+    tools: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Tools capability")
+    resources: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Resources capability")
+    prompts: Optional[Dict[str, Any]] = Field(default=None, description="Prompts capability")
+    sampling: Optional[Dict[str, Any]] = Field(default=None, description="Sampling capability")
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        """Override to exclude None values by default."""
+        kwargs.setdefault("exclude_none", True)
+        return super().model_dump(**kwargs)
+
+    @property
+    def supports_tools(self) -> bool:
+        """Check if tools capability is enabled."""
+        return self.tools is not None
+
+    @property
+    def supports_resources(self) -> bool:
+        """Check if resources capability is enabled."""
+        return self.resources is not None
+
+    @property
+    def supports_prompts(self) -> bool:
+        """Check if prompts capability is enabled."""
+        return self.prompts is not None
+
+    @property
+    def supports_sampling(self) -> bool:
+        """Check if sampling capability is enabled."""
+        return self.sampling is not None
 
 
 class MCPServerInfo(BaseModel):
@@ -120,6 +150,10 @@ class MCPClientInfo(BaseModel):
     name: str = Field(description="Client name")
     version: str = Field(description="Client version")
     capabilities: MCPCapabilities = Field(default_factory=MCPCapabilities)
+
+
+# MCP Protocol version - required by the spec
+MCP_PROTOCOL_VERSION = "2024-11-05"
 
 
 class MCPToolCallResult(BaseModel):

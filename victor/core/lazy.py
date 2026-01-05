@@ -33,7 +33,7 @@ Usage Examples:
 
     # deferred_import
     classifier = deferred_import(
-        'victor.embeddings.task_classifier',
+        'victor.storage.embeddings.task_classifier',
         'TaskTypeClassifier',
         call_method='get_instance'
     )
@@ -131,7 +131,7 @@ def deferred_import(
     to runtime instead of module load time.
 
     Args:
-        module_path: Full module path (e.g., 'victor.embeddings.task_classifier')
+        module_path: Full module path (e.g., 'victor.storage.embeddings.task_classifier')
         class_name: Name of the class to import (e.g., 'TaskTypeClassifier')
         fallback: Value to return if import/instantiation fails
         call_method: Optional method to call on the class (e.g., 'get_instance')
@@ -145,7 +145,7 @@ def deferred_import(
     Example:
         # Import and call get_instance()
         classifier = deferred_import(
-            'victor.embeddings.task_classifier',
+            'victor.storage.embeddings.task_classifier',
             'TaskTypeClassifier',
             call_method='get_instance'
         )

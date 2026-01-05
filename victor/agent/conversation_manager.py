@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from victor.agent.conversation_memory import ConversationStore, ConversationSession
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.config.settings import Settings
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.providers.base import Message
 
 
@@ -537,7 +537,7 @@ class ConversationManager:
 
             # Get or create embedding service
             if self._embedding_service is None:
-                from victor.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import EmbeddingService
 
                 self._embedding_service = EmbeddingService.get_instance()
 

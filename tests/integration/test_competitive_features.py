@@ -271,9 +271,9 @@ class TestCrewAIParity:
 
         # When agents send and receive messages
         test_message = AgentMessage(
-            type=MessageType.REQUEST,  # Use REQUEST type for task-like messages
-            from_agent="agent_a",
-            to_agent="agent_b",
+            message_type=MessageType.REQUEST,  # Use REQUEST type for task-like messages
+            sender_id="agent_a",
+            recipient_id="agent_b",
             content="Test message",
         )
 

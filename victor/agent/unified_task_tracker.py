@@ -1524,8 +1524,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Detected TrackerTaskType
         """
-        from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
-        from victor.embeddings.task_classifier import TaskTypeClassifier
+        from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
+        from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
         # Use the singleton classifier instance
         classifier = TaskTypeClassifier.get_instance()
@@ -1779,8 +1779,8 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, Track
         Tuple of (tracker, detected_task_type)
     """
     # Import here to avoid circular dependency
-    from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
-    from victor.embeddings.task_classifier import classify_task_type
+    from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
+    from victor.storage.embeddings.task_classifier import classify_task_type
 
     # Classify the message
     classifier_type = classify_task_type(message)

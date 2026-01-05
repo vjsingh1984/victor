@@ -15,12 +15,16 @@
 """Unit tests for HandlerRegistry."""
 
 import pytest
+from unittest.mock import MagicMock, patch
+
 from victor.framework.handler_registry import (
     HandlerEntry,
     HandlerRegistry,
     get_handler_registry,
     register_handler,
     get_handler,
+    sync_handlers_with_executor,
+    discover_handlers_from_vertical,
 )
 
 
@@ -257,3 +261,213 @@ class TestModuleLevelFunctions:
         result = get_handler("nonexistent")
 
         assert result is None
+
+
+class TestHandlerRegistryEnhancements:
+    """Tests for enhanced HandlerRegistry methods."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registries(self):
+        """Reset singleton and executor handlers before each test."""
+        HandlerRegistry.reset_instance()
+        # Clear executor handlers
+        from victor.workflows import executor
+
+        executor._compute_handlers.clear()
+        yield
+        HandlerRegistry.reset_instance()
+        executor._compute_handlers.clear()
+
+    def test_list_verticals(self):
+        """Test list_verticals returns unique vertical names."""
+        registry = HandlerRegistry()
+
+        registry.register("h1", lambda: None, vertical="coding")
+        registry.register("h2", lambda: None, vertical="coding")
+        registry.register("h3", lambda: None, vertical="research")
+        registry.register("h4", lambda: None)  # No vertical
+
+        verticals = registry.list_verticals()
+
+        assert set(verticals) == {"coding", "research"}
+
+    def test_list_verticals_empty(self):
+        """Test list_verticals with no registered handlers."""
+        registry = HandlerRegistry()
+
+        verticals = registry.list_verticals()
+
+        assert verticals == []
+
+    def test_sync_with_executor_to_executor(self):
+        """Test syncing handlers to executor."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        handler = lambda: "test"
+        registry.register("test_handler", handler, vertical="coding")
+
+        pushed, pulled = registry.sync_with_executor(direction="to_executor")
+
+        assert pushed == 1
+        assert pulled == 0
+        assert executor.get_compute_handler("test_handler") is handler
+
+    def test_sync_with_executor_from_executor(self):
+        """Test syncing handlers from executor."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        handler = lambda: "from_executor"
+        executor.register_compute_handler("executor_handler", handler)
+
+        pushed, pulled = registry.sync_with_executor(direction="from_executor")
+
+        assert pushed == 0
+        assert pulled == 1
+        assert registry.get("executor_handler") is handler
+
+    def test_sync_with_executor_bidirectional(self):
+        """Test bidirectional sync."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        reg_handler = lambda: "registry"
+        exec_handler = lambda: "executor"
+
+        registry.register("reg_handler", reg_handler)
+        executor.register_compute_handler("exec_handler", exec_handler)
+
+        pushed, pulled = registry.sync_with_executor(direction="bidirectional")
+
+        assert pushed == 1
+        assert pulled == 1
+        assert executor.get_compute_handler("reg_handler") is reg_handler
+        assert registry.get("exec_handler") is exec_handler
+
+    def test_sync_with_executor_no_replace_existing(self):
+        """Test sync does not replace existing handlers by default."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        old_handler = lambda: "old"
+        new_handler = lambda: "new"
+
+        # Register in both
+        registry.register("shared", old_handler)
+        executor.register_compute_handler("shared", old_handler)
+
+        # Now add conflicting handler to registry
+        registry.unregister("shared")
+        registry.register("shared", new_handler)
+
+        # Sync without replace
+        pushed, pulled = registry.sync_with_executor(direction="to_executor")
+
+        # Should not push because executor already has it
+        assert pushed == 0
+
+    def test_sync_with_executor_with_replace(self):
+        """Test sync replaces existing handlers when replace=True."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        old_handler = lambda: "old"
+        new_handler = lambda: "new"
+
+        executor.register_compute_handler("shared", old_handler)
+        registry.register("shared", new_handler)
+
+        pushed, pulled = registry.sync_with_executor(
+            direction="to_executor",
+            replace=True,
+        )
+
+        assert pushed == 1
+        assert executor.get_compute_handler("shared") is new_handler
+
+    def test_discover_from_vertical_coding(self):
+        """Test discovering handlers from coding vertical."""
+        registry = HandlerRegistry()
+
+        count = registry.discover_from_vertical("coding", sync_to_executor=False)
+
+        # coding/handlers.py has HANDLERS dict
+        assert count > 0
+        assert "code_validation" in registry.list_handlers()
+        assert "test_runner" in registry.list_handlers()
+
+    def test_discover_from_vertical_research(self):
+        """Test discovering handlers from research vertical."""
+        registry = HandlerRegistry()
+
+        count = registry.discover_from_vertical("research", sync_to_executor=False)
+
+        # research/handlers.py has HANDLERS dict
+        assert count > 0
+        assert "web_scraper" in registry.list_handlers()
+
+    def test_discover_from_vertical_syncs_to_executor(self):
+        """Test discover syncs to executor by default."""
+        from victor.workflows import executor
+
+        registry = HandlerRegistry()
+
+        registry.discover_from_vertical("coding", sync_to_executor=True)
+
+        # Should be in executor
+        assert executor.get_compute_handler("code_validation") is not None
+
+    def test_discover_from_vertical_invalid_raises(self):
+        """Test discover raises for invalid vertical."""
+        registry = HandlerRegistry()
+
+        with pytest.raises(ImportError):
+            registry.discover_from_vertical("nonexistent_vertical_xyz")
+
+    def test_discover_from_vertical_sets_vertical_metadata(self):
+        """Test discover sets vertical metadata on entries."""
+        registry = HandlerRegistry()
+
+        registry.discover_from_vertical("coding", sync_to_executor=False)
+
+        entry = registry.get_entry("code_validation")
+        assert entry.vertical == "coding"
+
+
+class TestModuleLevelEnhancedFunctions:
+    """Tests for module-level enhanced convenience functions."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registries(self):
+        """Reset singleton and executor before each test."""
+        HandlerRegistry.reset_instance()
+        from victor.workflows import executor
+
+        executor._compute_handlers.clear()
+        yield
+        HandlerRegistry.reset_instance()
+        executor._compute_handlers.clear()
+
+    def test_sync_handlers_with_executor_function(self):
+        """Test sync_handlers_with_executor convenience function."""
+        from victor.workflows import executor
+
+        register_handler("test_h", lambda: None)
+
+        pushed, pulled = sync_handlers_with_executor(direction="to_executor")
+
+        assert pushed == 1
+        assert executor.get_compute_handler("test_h") is not None
+
+    def test_discover_handlers_from_vertical_function(self):
+        """Test discover_handlers_from_vertical convenience function."""
+        count = discover_handlers_from_vertical("coding", sync_to_executor=False)
+
+        assert count > 0
+        assert get_handler("code_validation") is not None

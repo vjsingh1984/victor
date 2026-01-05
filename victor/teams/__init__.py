@@ -91,6 +91,9 @@ from victor.framework.team_coordinator import FrameworkTeamCoordinator
 # Communication infrastructure (from agent.teams)
 from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
 
+# Team configuration types (from agent.teams)
+from victor.agent.teams.team import TeamConfig, TeamMember
+
 # Mixins
 from victor.teams.mixins import ObservabilityMixin, RLMixin
 
@@ -165,6 +168,9 @@ __all__ = [
     # Communication
     "TeamMessageBus",
     "TeamSharedMemory",
+    # Team configuration
+    "TeamConfig",
+    "TeamMember",
     # Mixins
     "ObservabilityMixin",
     "RLMixin",

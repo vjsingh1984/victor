@@ -250,6 +250,56 @@ def strip_common_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     return None, ""
 
 
+def restore_absolute_path(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+    """Restore leading slash for Unix absolute paths.
+
+    LLMs sometimes drop the leading '/' from absolute paths. This normalizer
+    detects paths that look like they should be absolute and restores the slash.
+
+    Common Unix root directories that indicate an absolute path:
+    - var/ (system variable data)
+    - tmp/ (temporary files)
+    - home/ (user home directories)
+    - usr/ (user programs)
+    - etc/ (configuration)
+    - opt/ (optional software)
+    - private/ (macOS private directory containing /var, /tmp, etc.)
+
+    Args:
+        path: Path to check
+        cwd: Current working directory (unused but required by normalizer signature)
+
+    Returns:
+        Tuple of (normalized_path with leading /, description) or (None, "")
+    """
+    # Skip if already absolute or home-relative
+    if path.startswith("/") or path.startswith("~"):
+        return None, ""
+
+    # Common Unix root directories that indicate the path should be absolute
+    UNIX_ROOT_PREFIXES = (
+        "var/",
+        "tmp/",
+        "home/",
+        "usr/",
+        "etc/",
+        "opt/",
+        "private/",  # macOS: /private/var, /private/tmp
+        "Users/",  # macOS user directories
+        "Library/",  # macOS Library
+        "System/",  # macOS System
+        "Applications/",  # macOS Applications
+    )
+
+    if path.startswith(UNIX_ROOT_PREFIXES):
+        absolute_path = "/" + path
+        # Verify the absolute path exists before suggesting it
+        if Path(absolute_path).exists():
+            return absolute_path, "restored_absolute_path"
+
+    return None, ""
+
+
 def normalize_separators(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     """Normalize path separators and trailing slashes.
 
@@ -326,6 +376,7 @@ class PathResolver(IPathResolver):
         if not self.normalizers:
             self.normalizers = [
                 normalize_separators,
+                restore_absolute_path,  # Handle LLMs dropping leading /
                 strip_cwd_prefix,
                 strip_first_component,
                 strip_common_prefix,

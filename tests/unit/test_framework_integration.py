@@ -185,10 +185,11 @@ class TestVerticalRegistry:
 
     @pytest.fixture(autouse=True)
     def clear_registry(self):
-        """Clear registry before each test."""
-        VerticalRegistry.clear()
+        """Clear registry before each test (without built-ins for isolated testing)."""
+        VerticalRegistry.clear(reregister_builtins=False)
         yield
-        VerticalRegistry.clear()
+        # Re-register built-ins on teardown to avoid polluting other tests
+        VerticalRegistry.clear(reregister_builtins=True)
 
     def test_register_and_get_vertical(self):
         """Test registering and retrieving a vertical."""
@@ -400,10 +401,11 @@ class TestAgentVerticalIntegration:
     def reset_state(self):
         """Reset global state before each test."""
         EventBus.reset_instance()
-        VerticalRegistry.clear()
+        VerticalRegistry.clear(reregister_builtins=False)
         yield
         EventBus.reset_instance()
-        VerticalRegistry.clear()
+        # Re-register built-ins on teardown to avoid polluting other tests
+        VerticalRegistry.clear(reregister_builtins=True)
 
     def test_vertical_config_extraction(self):
         """Test that vertical config is properly extracted."""
@@ -517,10 +519,11 @@ class TestEndToEndFrameworkFlow:
     def reset_state(self):
         """Reset all global state."""
         EventBus.reset_instance()
-        VerticalRegistry.clear()
+        VerticalRegistry.clear(reregister_builtins=False)
         yield
         EventBus.reset_instance()
-        VerticalRegistry.clear()
+        # Re-register built-ins on teardown to avoid polluting other tests
+        VerticalRegistry.clear(reregister_builtins=True)
 
     def test_complete_vertical_observability_flow(self):
         """Test complete flow from vertical config to event emission."""

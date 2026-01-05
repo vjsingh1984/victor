@@ -2261,7 +2261,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return
 
         try:
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
             import victor.agent.conversation_embedding_store as ces_module
 
             # Get the shared embedding service
@@ -6541,7 +6541,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Signal shutdown to EmbeddingService singleton
         # This prevents post-shutdown embedding operations
         try:
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
 
             if EmbeddingService._instance is not None:
                 EmbeddingService._instance.shutdown()

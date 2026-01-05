@@ -1115,7 +1115,7 @@ class PromptCorpusRegistry:
         """
         if self._embedding_model is None:
             try:
-                from victor.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import EmbeddingService
 
                 self._embedding_model = EmbeddingService.get_instance()
                 logger.info(

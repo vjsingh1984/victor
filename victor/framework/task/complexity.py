@@ -381,7 +381,7 @@ class TaskComplexityService:
         """Lazy-load the semantic classifier."""
         if self._semantic_classifier is None and self.use_semantic:
             try:
-                from victor.embeddings.task_classifier import TaskTypeClassifier
+                from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
                 self._semantic_classifier = TaskTypeClassifier.get_instance(
                     threshold=self.semantic_threshold

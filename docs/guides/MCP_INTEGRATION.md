@@ -28,7 +28,7 @@ External clients can now connect and use Victor's tools.
 ### Connect to External MCP Server
 
 ```python
-from victor.mcp import MCPClient
+from victor.integrations.mcp import MCPClient
 
 # Connect to an MCP server
 client = MCPClient("http://localhost:3000")
@@ -48,7 +48,7 @@ result = await client.call_tool("search", {"query": "authentication"})
 ### Configuration
 
 ```python
-from victor.mcp import MCPServer, MCPServerConfig
+from victor.integrations.mcp import MCPServer, MCPServerConfig
 
 config = MCPServerConfig(
     host="0.0.0.0",
@@ -95,7 +95,7 @@ await server.start()
 ### Connecting to Servers
 
 ```python
-from victor.mcp import MCPClient, MCPClientConfig
+from victor.integrations.mcp import MCPClient, MCPClientConfig
 
 config = MCPClientConfig(
     url="http://localhost:3000",
@@ -144,7 +144,7 @@ else:
 Manage multiple MCP connections:
 
 ```python
-from victor.mcp import MCPRegistry, get_mcp_registry
+from victor.integrations.mcp import MCPRegistry, get_mcp_registry
 
 registry = get_mcp_registry()
 
@@ -176,7 +176,7 @@ for name, info in registry.list_all():
 Use external MCP tools within Victor agents:
 
 ```python
-from victor.mcp import MCPBridgeTool
+from victor.integrations.mcp import MCPBridgeTool
 
 # Create bridge to external tools
 bridge = MCPBridgeTool(
@@ -198,7 +198,7 @@ result = await agent.run("Search for authentication bugs")
 Run untrusted MCP tools in isolation:
 
 ```python
-from victor.mcp import MCPSandbox, SandboxConfig
+from victor.integrations.mcp import MCPSandbox, SandboxConfig
 
 config = SandboxConfig(
     timeout=30.0,
@@ -233,7 +233,7 @@ result = await sandbox.execute(
 Convert between tool formats:
 
 ```python
-from victor.mcp import ProtocolAdapter
+from victor.integrations.mcp import ProtocolAdapter
 
 adapter = ProtocolAdapter()
 
@@ -267,7 +267,7 @@ client = MCPClient(
 ### OAuth Authentication
 
 ```python
-from victor.mcp import OAuthConfig
+from victor.integrations.mcp import OAuthConfig
 
 oauth = OAuthConfig(
     client_id="your-client-id",

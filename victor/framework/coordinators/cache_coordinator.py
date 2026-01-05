@@ -14,15 +14,16 @@
 
 """Cache Coordinator.
 
-Handles workflow caching configuration and management, including both
-result caching (for executed workflow outputs) and definition caching
-(for parsed YAML workflow definitions).
+Handles workflow caching configuration and management, including:
+- Result caching (for executed workflow outputs)
+- Definition caching (for parsed YAML workflow definitions)
+- Graph caching (for compiled StateGraph instances)
 
 Features:
 - Enable/disable result caching with configurable TTL
 - Clear workflow caches
 - Get cache statistics
-- Integration with WorkflowCacheManager and WorkflowDefinitionCache
+- Integration with WorkflowCacheManager, WorkflowDefinitionCache, and CompiledGraphCache
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from victor.framework.graph_cache import CompiledGraphCache
     from victor.workflows.cache import WorkflowCacheManager, WorkflowDefinitionCache
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ class CacheCoordinator:
     Provides a unified interface for managing workflow caches, including:
     - Result caching (executed workflow outputs)
     - Definition caching (parsed YAML workflow definitions)
+    - Graph caching (compiled StateGraph instances)
     - Cache configuration (enable/disable, TTL)
     - Cache statistics and monitoring
 
@@ -68,15 +71,18 @@ class CacheCoordinator:
         self,
         cache_manager: Optional["WorkflowCacheManager"] = None,
         definition_cache: Optional["WorkflowDefinitionCache"] = None,
+        graph_cache: Optional["CompiledGraphCache"] = None,
     ) -> None:
         """Initialize the cache coordinator.
 
         Args:
             cache_manager: Optional WorkflowCacheManager for result caching
             definition_cache: Optional WorkflowDefinitionCache for definition caching
+            graph_cache: Optional CompiledGraphCache for compiled graph caching
         """
         self._cache_manager = cache_manager
         self._definition_cache = definition_cache
+        self._graph_cache = graph_cache
         self._caching_enabled = True
         self._cache_ttl_seconds = 3600
 
@@ -106,6 +112,14 @@ class CacheCoordinator:
             self._definition_cache = get_workflow_definition_cache()
         return self._definition_cache
 
+    def _get_graph_cache(self) -> "CompiledGraphCache":
+        """Get or create compiled graph cache."""
+        if self._graph_cache is None:
+            from victor.framework.graph_cache import get_compiled_graph_cache
+
+            self._graph_cache = get_compiled_graph_cache()
+        return self._graph_cache
+
     def enable_caching(self, ttl_seconds: int = 3600) -> None:
         """Enable result caching.
 
@@ -131,7 +145,7 @@ class CacheCoordinator:
     def clear_cache(self) -> int:
         """Clear all cached results.
 
-        Clears both result caches and definition caches.
+        Clears result caches, definition caches, and graph caches.
 
         Returns:
             Total number of entries cleared
@@ -140,14 +154,21 @@ class CacheCoordinator:
 
         # Clear result caches
         if self._cache_manager:
-            total_cleared += self._cache_manager.clear_all()
-            logger.debug(f"Cleared {total_cleared} result cache entries")
+            result_cleared = self._cache_manager.clear_all()
+            total_cleared += result_cleared
+            logger.debug(f"Cleared {result_cleared} result cache entries")
 
         # Clear definition cache
         if self._definition_cache:
             def_cleared = self._definition_cache.clear()
             total_cleared += def_cleared
             logger.debug(f"Cleared {def_cleared} definition cache entries")
+
+        # Clear graph cache
+        if self._graph_cache:
+            graph_cleared = self._graph_cache.invalidate_all()
+            total_cleared += graph_cleared
+            logger.debug(f"Cleared {graph_cleared} graph cache entries")
 
         logger.info(f"Cleared {total_cleared} total workflow cache entries")
         return total_cleared
@@ -170,8 +191,8 @@ class CacheCoordinator:
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
 
-        Returns comprehensive statistics for both result caching
-        and definition caching.
+        Returns comprehensive statistics for result caching,
+        definition caching, and graph caching.
 
         Returns:
             Dictionary with cache statistics:
@@ -179,12 +200,14 @@ class CacheCoordinator:
             - ttl_seconds: Current TTL setting
             - result_caches: Stats per workflow
             - definition_cache: Definition cache stats
+            - graph_cache: Compiled graph cache stats
         """
         stats: Dict[str, Any] = {
             "enabled": self._caching_enabled,
             "ttl_seconds": self._cache_ttl_seconds,
             "result_caches": {},
             "definition_cache": {},
+            "graph_cache": {},
         }
 
         # Get result cache stats
@@ -194,6 +217,10 @@ class CacheCoordinator:
         # Get definition cache stats
         if self._definition_cache:
             stats["definition_cache"] = self._definition_cache.get_stats()
+
+        # Get graph cache stats
+        if self._graph_cache:
+            stats["graph_cache"] = self._graph_cache.get_stats()
 
         return stats
 
@@ -217,6 +244,16 @@ class CacheCoordinator:
             return self._definition_cache.get_stats()
         return {}
 
+    def get_graph_cache_stats(self) -> Dict[str, Any]:
+        """Get compiled graph cache statistics.
+
+        Returns:
+            Dictionary with graph cache stats
+        """
+        if self._graph_cache:
+            return self._graph_cache.get_stats()
+        return {}
+
     def set_cache_manager(self, cache_manager: "WorkflowCacheManager") -> None:
         """Set custom cache manager.
 
@@ -232,6 +269,14 @@ class CacheCoordinator:
             definition_cache: WorkflowDefinitionCache instance
         """
         self._definition_cache = definition_cache
+
+    def set_graph_cache(self, graph_cache: "CompiledGraphCache") -> None:
+        """Set custom compiled graph cache.
+
+        Args:
+            graph_cache: CompiledGraphCache instance
+        """
+        self._graph_cache = graph_cache
 
 
 __all__ = ["CacheCoordinator"]

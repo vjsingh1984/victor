@@ -52,7 +52,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.embeddings.task_classifier import TaskTypeClassifier
+    from victor.storage.embeddings.task_classifier import TaskTypeClassifier
     from victor.agent.task_analyzer import TaskAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -509,7 +509,7 @@ class UnifiedTaskClassifier:
         """Get semantic classifier, loading lazily."""
         if self._semantic_classifier is None and self._enable_semantic:
             try:
-                from victor.embeddings.task_classifier import TaskTypeClassifier
+                from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
                 self._semantic_classifier = TaskTypeClassifier.get_instance()
             except (ImportError, Exception) as e:

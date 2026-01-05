@@ -124,7 +124,7 @@ class TestAgentMessage:
             recipient_id="agent2",
             content="Hello",
             message_type=MessageType.RESULT,
-            metadata={"key": "value"},
+            data={"key": "value"},
         )
 
         assert msg.metadata == {"key": "value"}

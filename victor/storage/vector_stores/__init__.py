@@ -19,7 +19,7 @@ multiple backend and embedding model options:
 
 Example:
     ```python
-    from victor.vector_stores import EmbeddingConfig, EmbeddingRegistry
+    from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
 
     # Production: Local embeddings + LanceDB
     config = EmbeddingConfig(

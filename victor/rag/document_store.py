@@ -640,7 +640,7 @@ class DocumentStore:
         try:
             from sentence_transformers import SentenceTransformer
 
-            from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+            from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
             if not hasattr(self, "_model"):
                 # Use the same BGE model as core embedding service

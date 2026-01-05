@@ -29,7 +29,7 @@ Provides multi-tier memory architecture with unified coordinator:
    - Protocol-based adapter pattern
 
 Example - Entity Memory:
-    from victor.memory import EntityMemory, EntityType, CompositeExtractor
+    from victor.storage.memory import EntityMemory, EntityType, CompositeExtractor
 
     # Create memory with extraction
     memory = EntityMemory()
@@ -47,7 +47,7 @@ Example - Entity Memory:
     related = await memory.get_related("ent_abc123")
 
 Example - Unified Memory Coordinator:
-    from victor.memory import (
+    from victor.storage.memory import (
         get_memory_coordinator,
         EntityMemoryAdapter,
         ConversationMemoryAdapter,

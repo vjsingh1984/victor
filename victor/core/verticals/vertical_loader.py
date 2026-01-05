@@ -57,16 +57,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Built-in vertical mappings
-BUILTIN_VERTICALS: Dict[str, str] = {
-    "coding": "victor.coding.CodingAssistant",
-    "research": "victor.research.ResearchAssistant",
-    "devops": "victor.devops.DevOpsAssistant",
-    "data_analysis": "victor.dataanalysis.DataAnalysisAssistant",
-    "rag": "victor.rag.RAGAssistant",
-}
-
-
 class VerticalLoader:
     """Loader for dynamic vertical activation and management.
 
@@ -107,9 +97,8 @@ class VerticalLoader:
         """Load and activate a vertical by name.
 
         Searches for verticals in this order:
-        1. Global VerticalRegistry
-        2. Built-in vertical mappings
-        3. Entry point plugins (victor.verticals group)
+        1. Global VerticalRegistry (includes built-ins registered on import)
+        2. Entry point plugins (victor.verticals group)
 
         Args:
             name: Vertical name (e.g., "coding", "research")
@@ -120,52 +109,20 @@ class VerticalLoader:
         Raises:
             ValueError: If vertical not found
         """
-        # First check the registry
+        # Query VerticalRegistry (includes built-ins registered on import)
         vertical = VerticalRegistry.get(name)
 
+        # Try entry points as fallback
         if vertical is None:
-            # Try to import from built-in mappings
-            vertical = self._import_builtin(name)
-
-        if vertical is None:
-            # Try to load from entry points (plugins)
             vertical = self._import_from_entrypoint(name)
 
+        # Error with available names
         if vertical is None:
             available = self._get_available_names()
             raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
         self._activate(vertical)
         return vertical
-
-    def _import_builtin(self, name: str) -> Optional[Type[VerticalBase]]:
-        """Import a built-in vertical by name.
-
-        Args:
-            name: Vertical name
-
-        Returns:
-            Vertical class or None
-        """
-        if name not in BUILTIN_VERTICALS:
-            return None
-
-        module_path = BUILTIN_VERTICALS[name]
-        module_name, class_name = module_path.rsplit(".", 1)
-
-        try:
-            import importlib
-
-            module = importlib.import_module(module_name)
-            vertical_class = getattr(module, class_name)
-
-            # Register it for future lookups
-            VerticalRegistry.register(vertical_class)
-
-            return vertical_class
-        except (ImportError, AttributeError) as e:
-            logger.warning("Failed to import vertical '%s': %s", name, e)
-            return None
 
     def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
         """Import a vertical from entry points.
@@ -340,15 +297,13 @@ class VerticalLoader:
         """Get list of available vertical names.
 
         Includes:
-        - Registered verticals
-        - Built-in verticals
+        - Registered verticals (includes built-ins registered on import)
         - Entry point plugin verticals
 
         Returns:
             List of vertical names
         """
         names = set(VerticalRegistry.list_names())
-        names.update(BUILTIN_VERTICALS.keys())
         # Include entry point discovered verticals
         names.update(self.discover_verticals().keys())
         return sorted(names)
@@ -506,5 +461,4 @@ __all__ = [
     "get_vertical_extensions",
     "discover_vertical_plugins",
     "discover_tool_plugins",
-    "BUILTIN_VERTICALS",
 ]

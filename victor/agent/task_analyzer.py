@@ -33,8 +33,8 @@ from victor.agent.unified_classifier import (
 )
 
 if TYPE_CHECKING:
-    from victor.embeddings.task_classifier import TaskType
-    from victor.embeddings.intent_classifier import IntentType
+    from victor.storage.embeddings.task_classifier import TaskType
+    from victor.storage.embeddings.intent_classifier import IntentType
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 
@@ -163,7 +163,7 @@ class TaskAnalyzer:
     def task_classifier(self) -> Optional[TaskClassifierProtocol]:
         if self._task_classifier is None:
             try:
-                from victor.embeddings.task_classifier import TaskTypeClassifier
+                from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
                 self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:
@@ -174,7 +174,7 @@ class TaskAnalyzer:
     def intent_classifier(self) -> Optional[IntentClassifierProtocol]:
         if self._intent_classifier is None:
             try:
-                from victor.embeddings.intent_classifier import IntentClassifier
+                from victor.storage.embeddings.intent_classifier import IntentClassifier
 
                 self._intent_classifier = IntentClassifier.get_instance()
             except ImportError:

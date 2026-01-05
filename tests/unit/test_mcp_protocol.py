@@ -94,15 +94,29 @@ class TestMCPModels:
         assert info.version == "1.0.0"
 
     def test_mcp_capabilities(self):
-        """Test MCPCapabilities model."""
+        """Test MCPCapabilities model.
+
+        Per MCP spec, capabilities are represented as objects (not booleans).
+        If a capability is supported, include it as {} or with config.
+        If not supported, set to None (excluded from serialization).
+        """
         caps = MCPCapabilities(
-            tools=True,
-            resources=True,
-            prompts=False,
+            tools={},  # Empty object = supported
+            resources={},  # Empty object = supported
+            prompts=None,  # None = not supported (omitted)
         )
-        assert caps.tools is True
-        assert caps.resources is True
-        assert caps.prompts is False
+        assert caps.tools == {}
+        assert caps.resources == {}
+        assert caps.prompts is None
+        assert caps.supports_tools is True
+        assert caps.supports_resources is True
+        assert caps.supports_prompts is False
+
+        # Test model_dump excludes None values
+        dumped = caps.model_dump()
+        assert "tools" in dumped
+        assert "resources" in dumped
+        assert "prompts" not in dumped  # None values excluded
 
     def test_mcp_client_info(self):
         """Test MCPClientInfo model."""

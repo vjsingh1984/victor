@@ -660,7 +660,7 @@ class SemanticMatchValidator(AgenticValidator):
         """Lazily load embedding service."""
         if self._embedding_service is None:
             try:
-                from victor.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import EmbeddingService
 
                 self._embedding_service = EmbeddingService.get_instance()
             except ImportError:

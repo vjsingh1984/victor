@@ -117,7 +117,7 @@ class TaskCoordinator:
             Tuple of (task_classification, complexity_tool_budget)
         """
         from victor.agent.prompt_builder import get_task_type_hint
-        from victor.embeddings.task_classifier import TaskTypeClassifier
+        from victor.storage.embeddings.task_classifier import TaskTypeClassifier
         from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 
         # Get granular task type for more specific hints
