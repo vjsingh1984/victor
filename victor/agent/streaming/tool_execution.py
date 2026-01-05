@@ -488,7 +488,7 @@ def create_tool_execution_handler(
     Returns:
         Configured ToolExecutionHandler.
     """
-    from victor.agent.tool_messages import get_tool_status_message
+    from victor.agent.orchestrator_utils import get_tool_status_message
 
     return ToolExecutionHandler(
         recovery_coordinator=orchestrator._recovery_coordinator,
