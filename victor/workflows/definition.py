@@ -92,8 +92,6 @@ class WorkflowNodeType(Enum):
     END = "end"  # Terminal node
 
 
-
-
 @dataclass
 class WorkflowNode(ABC):
     """Base class for workflow nodes.

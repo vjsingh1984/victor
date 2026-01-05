@@ -485,7 +485,9 @@ class RunTestsHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
+            status = (
+                ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
+            )
 
             return NodeResult(
                 node_id=node.id,

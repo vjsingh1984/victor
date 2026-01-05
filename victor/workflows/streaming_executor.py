@@ -65,6 +65,7 @@ from victor.workflows.executor import (
     WorkflowExecutor,
     WorkflowResult,
 )
+
 # Import canonical streaming types from streaming.py (DRY - Phase 5 consolidation)
 from victor.workflows.streaming import (
     WorkflowEventType,

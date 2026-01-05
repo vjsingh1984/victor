@@ -178,8 +178,6 @@ class HITLCheckpoint:
     created_at: float = field(default_factory=time.time)
 
 
-
-
 class HITLController:
     """Controller for Human-in-the-Loop interactions.
 

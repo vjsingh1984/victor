@@ -48,6 +48,7 @@ from enum import Enum
 if TYPE_CHECKING:
     from victor.agent.tool_calling.base import ToolCall
 
+
 class ToolCallFormat(Enum):
     """Tool call format variants across providers."""
 

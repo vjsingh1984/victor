@@ -157,11 +157,13 @@ class TestParseConstraints:
 
     def test_dict_format_legacy_support(self):
         """Dict format still works for backwards compatibility."""
-        constraints = _parse_constraints({
-            "llm_allowed": True,
-            "network_allowed": False,
-            "write_allowed": True,
-        })
+        constraints = _parse_constraints(
+            {
+                "llm_allowed": True,
+                "network_allowed": False,
+                "write_allowed": True,
+            }
+        )
         assert constraints.llm_allowed is True
         assert constraints.network_allowed is False
         assert constraints.write_allowed is True

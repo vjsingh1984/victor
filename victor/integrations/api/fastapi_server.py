@@ -794,9 +794,7 @@ class VictorFastAPIServer:
 
             except Exception as e:
                 logger.exception("Capabilities discovery error")
-                return JSONResponse(
-                    {"error": str(e), "capabilities": {}}, status_code=500
-                )
+                return JSONResponse({"error": str(e), "capabilities": {}}, status_code=500)
 
         # Tools
         @app.get("/tools", tags=["Tools"])

@@ -84,6 +84,7 @@ DEFAULT_PID_FILE = Path.home() / ".victor" / "scheduler.pid"
 def _get_scheduler():
     """Get the global scheduler instance."""
     from victor.workflows.scheduler import get_scheduler
+
     return get_scheduler()
 
 
@@ -149,7 +150,9 @@ def _start_foreground(
     if schedules:
         console.print(f"[dim]Loaded {len(schedules)} scheduled workflow(s)[/]")
     else:
-        console.print("[yellow]No scheduled workflows registered. Use 'victor scheduler add' to add schedules.[/]")
+        console.print(
+            "[yellow]No scheduled workflows registered. Use 'victor scheduler add' to add schedules.[/]"
+        )
 
     console.print(f"[dim]Check interval: {check_interval}s[/]")
     console.print("[dim]Press Ctrl+C to stop[/]")
@@ -283,15 +286,19 @@ def status(
 
     # Status panel
     if daemon_running:
-        console.print(Panel(
-            f"[green]Running[/] (PID {daemon_pid})",
-            title="Scheduler Status",
-        ))
+        console.print(
+            Panel(
+                f"[green]Running[/] (PID {daemon_pid})",
+                title="Scheduler Status",
+            )
+        )
     else:
-        console.print(Panel(
-            "[yellow]Not running[/]",
-            title="Scheduler Status",
-        ))
+        console.print(
+            Panel(
+                "[yellow]Not running[/]",
+                title="Scheduler Status",
+            )
+        )
 
     # Show upcoming executions
     scheduler = _get_scheduler()
@@ -304,7 +311,9 @@ def status(
         table.add_column("Cron", style="dim")
         table.add_column("Enabled")
 
-        for s in sorted(schedules, key=lambda x: x.next_run or datetime.max.replace(tzinfo=timezone.utc)):
+        for s in sorted(
+            schedules, key=lambda x: x.next_run or datetime.max.replace(tzinfo=timezone.utc)
+        ):
             next_run = s.next_run.strftime("%Y-%m-%d %H:%M:%S") if s.next_run else "N/A"
             enabled = "[green]Yes[/]" if s.enabled else "[red]No[/]"
             table.add_row(

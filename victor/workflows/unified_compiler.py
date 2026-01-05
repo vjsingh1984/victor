@@ -333,8 +333,7 @@ class NodeExecutorFactory:
                         except asyncio.TimeoutError:
                             duration = time.time() - start_time
                             error_msg = (
-                                f"Agent node '{node.id}' timed out after "
-                                f"{timeout_seconds}s"
+                                f"Agent node '{node.id}' timed out after " f"{timeout_seconds}s"
                             )
                             logger.warning(error_msg)
                             state["_error"] = error_msg
@@ -424,9 +423,7 @@ class NodeExecutorFactory:
 
             async def execute_agent_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to agent execution."""
-                result = await retry_executor.execute_async(
-                    lambda: execute_agent(state)
-                )
+                result = await retry_executor.execute_async(lambda: execute_agent(state))
                 if result.success:
                     return result.result
                 else:
@@ -434,7 +431,9 @@ class NodeExecutorFactory:
                     state = dict(state)
                     state["_retry_exhausted"] = True
                     state["_retry_attempts"] = result.attempts
-                    state["_error"] = f"Agent node '{node.id}' failed after {result.attempts} attempts"
+                    state["_error"] = (
+                        f"Agent node '{node.id}' failed after {result.attempts} attempts"
+                    )
                     if emitter and hasattr(emitter, "emit_node_error"):
                         emitter.emit_node_error(
                             node.id,
@@ -506,9 +505,7 @@ class NodeExecutorFactory:
                         output = result.output if result else None
                         tool_calls_used = result.tool_calls_used if result else 0
                     else:
-                        logger.warning(
-                            f"Handler '{node.handler}' not found for node '{node.id}'"
-                        )
+                        logger.warning(f"Handler '{node.handler}' not found for node '{node.id}'")
                         output = {"error": f"Handler '{node.handler}' not found"}
                 else:
                     # Execute tools directly
@@ -617,9 +614,7 @@ class NodeExecutorFactory:
 
             async def execute_compute_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to compute execution."""
-                result = await retry_executor.execute_async(
-                    lambda: execute_compute(state)
-                )
+                result = await retry_executor.execute_async(lambda: execute_compute(state))
                 if result.success:
                     return result.result
                 else:
@@ -627,7 +622,9 @@ class NodeExecutorFactory:
                     state = dict(state)
                     state["_retry_exhausted"] = True
                     state["_retry_attempts"] = result.attempts
-                    state["_error"] = f"Compute node '{node.id}' failed after {result.attempts} attempts"
+                    state["_error"] = (
+                        f"Compute node '{node.id}' failed after {result.attempts} attempts"
+                    )
                     if emitter and hasattr(emitter, "emit_node_error"):
                         emitter.emit_node_error(
                             node.id,
@@ -702,9 +699,7 @@ class NodeExecutorFactory:
             try:
                 if child_executors:
                     # Execute all child nodes in true parallel with asyncio.gather
-                    async def run_child(
-                        child_node: "WorkflowNode", executor: Callable
-                    ) -> tuple:
+                    async def run_child(child_node: "WorkflowNode", executor: Callable) -> tuple:
                         child_state = copy.deepcopy(state)
                         try:
                             result_state = await executor(child_state)
@@ -713,10 +708,7 @@ class NodeExecutorFactory:
                             return (child_node.id, False, str(e))
 
                     # Create tasks for all children
-                    tasks = [
-                        run_child(child, executor)
-                        for child, executor in child_executors
-                    ]
+                    tasks = [run_child(child, executor) for child, executor in child_executors]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
 
                     # Process results
@@ -744,15 +736,13 @@ class NodeExecutorFactory:
                 # Apply join strategy
                 if node.join_strategy == "all":
                     all_success = all(
-                        r.get("success", False)
-                        for r in state["_parallel_results"].values()
+                        r.get("success", False) for r in state["_parallel_results"].values()
                     )
                     if not all_success:
                         state["_error"] = "Not all parallel nodes succeeded"
                 elif node.join_strategy == "any":
                     any_success = any(
-                        r.get("success", False)
-                        for r in state["_parallel_results"].values()
+                        r.get("success", False) for r in state["_parallel_results"].values()
                     )
                     if not any_success:
                         state["_error"] = "No parallel nodes succeeded"
@@ -1190,12 +1180,8 @@ class UnifiedWorkflowCompiler:
         transform_registry: Optional[Dict[str, Callable[..., Any]]],
     ) -> int:
         """Compute hash for cache key based on registries."""
-        condition_names = (
-            tuple(sorted(condition_registry.keys())) if condition_registry else ()
-        )
-        transform_names = (
-            tuple(sorted(transform_registry.keys())) if transform_registry else ()
-        )
+        condition_names = tuple(sorted(condition_registry.keys())) if condition_registry else ()
+        transform_names = tuple(sorted(transform_registry.keys())) if transform_registry else ()
         return hash((condition_names, transform_names))
 
     # =========================================================================

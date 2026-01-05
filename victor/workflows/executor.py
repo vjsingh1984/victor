@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
     from victor.workflows.services import ServiceRegistry, ServiceConfig
+    from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +158,6 @@ class ExecutorNodeStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
-
-
 
 
 @dataclass
@@ -894,9 +893,7 @@ class WorkflowExecutor:
         # Execute with or without retry policy
         retry_policy = getattr(node, "retry_policy", None)
         if retry_policy:
-            result = await self._execute_node_with_retry(
-                node, context, start_time, retry_policy
-            )
+            result = await self._execute_node_with_retry(node, context, start_time, retry_policy)
         else:
             result = await self._execute_node_inner(node, context, start_time)
 
@@ -942,9 +939,7 @@ class WorkflowExecutor:
         retry_result = await executor.execute(execute_func)
 
         if retry_result.success:
-            logger.debug(
-                f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)"
-            )
+            logger.debug(f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)")
             return retry_result.result
         else:
             logger.warning(
@@ -954,7 +949,11 @@ class WorkflowExecutor:
             return NodeResult(
                 node_id=node.id,
                 status=ExecutorNodeStatus.FAILED,
-                error=str(retry_result.last_exception) if retry_result.last_exception else "Retry exhausted",
+                error=(
+                    str(retry_result.last_exception)
+                    if retry_result.last_exception
+                    else "Retry exhausted"
+                ),
                 duration_seconds=time.time() - start_time,
             )
 

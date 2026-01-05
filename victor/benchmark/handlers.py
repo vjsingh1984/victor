@@ -137,7 +137,9 @@ class TestRunnerHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
+            status = (
+                ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
+            )
 
             return NodeResult(
                 node_id=node.id,
@@ -372,7 +374,9 @@ class LiveExecutorHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -550,7 +554,11 @@ class PolyglotVerifierHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = ExecutorNodeStatus.COMPLETED if output["syntax_valid"] else ExecutorNodeStatus.FAILED
+            status = (
+                ExecutorNodeStatus.COMPLETED
+                if output["syntax_valid"]
+                else ExecutorNodeStatus.FAILED
+            )
 
             return NodeResult(
                 node_id=node.id,
@@ -874,7 +882,9 @@ class SyntaxCheckHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if output["valid"] else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if output["valid"] else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 duration_seconds=time.time() - start_time,
             )

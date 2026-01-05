@@ -485,12 +485,14 @@ class TestMCPProtocolHandling:
 
         server = MCPServer(name="test", version="1.0.0", tool_registry=ToolRegistry())
 
-        response = await server.handle_message({
-            "jsonrpc": "2.0",
-            "id": "1",
-            "method": "initialize",
-            "params": {"protocolVersion": "2024-11-05"}
-        })
+        response = await server.handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "initialize",
+                "params": {"protocolVersion": "2024-11-05"},
+            }
+        )
 
         assert response["id"] == "1"
         assert "result" in response
@@ -518,12 +520,9 @@ class TestMCPProtocolHandling:
         server = MCPServer(name="test", version="1.0.0", tool_registry=registry)
         server.initialized = True
 
-        response = await server.handle_message({
-            "jsonrpc": "2.0",
-            "id": "2",
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await server.handle_message(
+            {"jsonrpc": "2.0", "id": "2", "method": "tools/list", "params": {}}
+        )
 
         assert response["id"] == "2"
         assert "result" in response
@@ -540,12 +539,9 @@ class TestMCPProtocolHandling:
         server = MCPServer(tool_registry=ToolRegistry())
         server.initialized = True
 
-        response = await server.handle_message({
-            "jsonrpc": "2.0",
-            "id": "3",
-            "method": "ping",
-            "params": {}
-        })
+        response = await server.handle_message(
+            {"jsonrpc": "2.0", "id": "3", "method": "ping", "params": {}}
+        )
 
         assert response["id"] == "3"
         assert "result" in response
@@ -559,12 +555,9 @@ class TestMCPProtocolHandling:
         server = MCPServer(tool_registry=ToolRegistry())
         # Don't initialize
 
-        response = await server.handle_message({
-            "jsonrpc": "2.0",
-            "id": "4",
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await server.handle_message(
+            {"jsonrpc": "2.0", "id": "4", "method": "tools/list", "params": {}}
+        )
 
         assert response["id"] == "4"
         assert "error" in response

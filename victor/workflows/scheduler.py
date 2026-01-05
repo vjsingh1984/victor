@@ -539,9 +539,7 @@ class WorkflowScheduler:
         now = datetime.now(timezone.utc)
 
         with self._lock:
-            due_schedules = [
-                s for s in self._schedules.values() if s.should_run(now)
-            ]
+            due_schedules = [s for s in self._schedules.values() if s.should_run(now)]
 
         for schedule in due_schedules:
             asyncio.create_task(self._execute_workflow(schedule))
@@ -591,15 +589,17 @@ class WorkflowScheduler:
             schedule.mark_completed()
 
             # Record execution history
-            self._execution_history.append({
-                "execution_id": execution_id,
-                "workflow_name": schedule.workflow_name,
-                "schedule_id": schedule.schedule_id,
-                "start_time": start_time,
-                "end_time": datetime.now(timezone.utc),
-                "success": success,
-                "error": error_msg,
-            })
+            self._execution_history.append(
+                {
+                    "execution_id": execution_id,
+                    "workflow_name": schedule.workflow_name,
+                    "schedule_id": schedule.schedule_id,
+                    "start_time": start_time,
+                    "end_time": datetime.now(timezone.utc),
+                    "success": success,
+                    "error": error_msg,
+                }
+            )
 
             # Keep last 1000 executions
             if len(self._execution_history) > 1000:
@@ -621,8 +621,7 @@ class WorkflowScheduler:
 
         if not schedule.workflow_path:
             raise ValueError(
-                f"No workflow_path specified for scheduled workflow: "
-                f"{schedule.workflow_name}"
+                f"No workflow_path specified for scheduled workflow: " f"{schedule.workflow_name}"
             )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)

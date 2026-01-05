@@ -153,8 +153,6 @@ class BaseRetryStrategy(ABC):
         """
 
 
-
-
 class ExponentialBackoffStrategy(BaseRetryStrategy):
     """Exponential backoff with optional jitter.
 

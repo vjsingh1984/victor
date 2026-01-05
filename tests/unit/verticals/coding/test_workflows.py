@@ -38,8 +38,6 @@ def feature_implementation_workflow(provider):
     return provider.get_workflow("feature_implementation")
 
 
-
-
 @pytest.fixture
 def bug_fix_workflow(provider):
     """Get bug fix workflow."""
@@ -188,8 +186,10 @@ class TestQuickFixWorkflow:
         full = bug_fix_workflow
 
         # Quick workflow should have fewer steps or lower budget
-        assert quick.get_agent_count() <= full.get_agent_count() or \
-               quick.get_total_budget() <= full.get_total_budget()
+        assert (
+            quick.get_agent_count() <= full.get_agent_count()
+            or quick.get_total_budget() <= full.get_total_budget()
+        )
 
 
 class TestBugFixWorkflow:

@@ -102,7 +102,9 @@ class VectorSearchHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 error=result.error if not result.success else None,
                 duration_seconds=time.time() - start_time,

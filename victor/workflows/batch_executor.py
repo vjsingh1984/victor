@@ -78,8 +78,6 @@ class BatchRetryStrategy(Enum):
     EXPONENTIAL_BACKOFF = "exponential_backoff"  # Retry with backoff
 
 
-
-
 @dataclass
 class BatchConfig:
     """Configuration for batch execution.
@@ -110,7 +108,9 @@ class BatchConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "BatchConfig":
         """Create config from dictionary (e.g., from YAML metadata)."""
         retry_str = data.get("retry_strategy", "end_of_batch")
-        retry_strategy = BatchRetryStrategy(retry_str) if retry_str else BatchRetryStrategy.END_OF_BATCH
+        retry_strategy = (
+            BatchRetryStrategy(retry_str) if retry_str else BatchRetryStrategy.END_OF_BATCH
+        )
 
         return cls(
             batch_size=data.get("batch_size", 5),

@@ -217,8 +217,6 @@ class GraphNodeType(str, Enum):
     SUBGRAPH = "subgraph"  # Nested graph
 
 
-
-
 @dataclass
 class GraphNode(Generic[S]):
     """A node in the state graph.
@@ -436,7 +434,7 @@ class WorkflowGraph(Generic[S]):
         logger.debug(f"Added agent node '{name}' (role={role}) to graph '{self.name}'")
         return self
 
-    def add_edge(self, from_node: str, to_node: str) -> "StateGraph[S]":
+    def add_edge(self, from_node: str, to_node: str) -> "WorkflowGraph[S]":
         """Add an edge between nodes.
 
         Args:
@@ -513,7 +511,7 @@ class WorkflowGraph(Generic[S]):
         logger.debug(f"Added conditional edges from '{from_node}': {list(routes.keys())}")
         return self
 
-    def set_entry_point(self, node: str) -> "StateGraph[S]":
+    def set_entry_point(self, node: str) -> "WorkflowGraph[S]":
         """Set the entry point (start node) for the graph.
 
         Args:
@@ -533,7 +531,7 @@ class WorkflowGraph(Generic[S]):
         logger.debug(f"Set entry point: {node}")
         return self
 
-    def set_finish_point(self, node: str) -> "StateGraph[S]":
+    def set_finish_point(self, node: str) -> "WorkflowGraph[S]":
         """Set a finish point (end node) for the graph.
 
         Multiple finish points can be set.
@@ -570,7 +568,7 @@ class WorkflowGraph(Generic[S]):
             raise ValueError(f"Node '{name}' not found")
         return self._nodes[name]
 
-    def chain(self, *nodes: str) -> "StateGraph[S]":
+    def chain(self, *nodes: str) -> "WorkflowGraph[S]":
         """Chain multiple nodes in sequence.
 
         Convenience method for creating linear flows.
@@ -675,7 +673,7 @@ class WorkflowGraph(Generic[S]):
 
         return self
 
-    def set_metadata(self, key: str, value: Any) -> "StateGraph[S]":
+    def set_metadata(self, key: str, value: Any) -> "WorkflowGraph[S]":
         """Set graph metadata.
 
         Args:
@@ -937,7 +935,7 @@ __all__ = [
     # Core classes
     "State",
     "WorkflowGraph",
-    "StateGraph",  # Deprecated alias - emits warning on use
+    "StateGraph",  # noqa: F822 - Deprecated alias handled by __getattr__
     "GraphNode",
     "GraphNodeType",
     # Type variables

@@ -87,38 +87,32 @@ class ChunkGeneratorProtocol(Protocol):
 
     def generate_content_chunk(
         self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> StreamChunk:
-        ...
+    ) -> StreamChunk: ...
 
-    def generate_final_marker_chunk(self) -> StreamChunk:
-        ...
+    def generate_final_marker_chunk(self) -> StreamChunk: ...
 
     def generate_metrics_chunk(
         self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
-    ) -> StreamChunk:
-        ...
+    ) -> StreamChunk: ...
 
     def format_completion_metrics(
         self,
         ctx: StreamingChatContext,
         elapsed_time: float,
         cost_str: Optional[str] = None,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 class SanitizerProtocol(Protocol):
     """Protocol for content sanitization."""
 
-    def sanitize(self, content: str) -> str:
-        ...
+    def sanitize(self, content: str) -> str: ...
 
 
 class MessageAdderProtocol(Protocol):
     """Protocol for adding messages to conversation."""
 
-    def add_message(self, role: str, content: str) -> None:
-        ...
+    def add_message(self, role: str, content: str) -> None: ...
 
 
 class ProviderProtocol(Protocol):
@@ -131,8 +125,7 @@ class ProviderProtocol(Protocol):
         temperature: float,
         max_tokens: int,
         tools: Optional[List[Any]] = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 # =============================================================================
@@ -343,9 +336,7 @@ class ContinuationHandler:
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
             if sanitized:
-                result.add_chunk(
-                    self._chunk_generator.generate_content_chunk(sanitized)
-                )
+                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
 
         # Add final marker
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
@@ -467,9 +458,7 @@ class ContinuationHandler:
                 sanitized = self._sanitizer.sanitize(response.content)
                 if sanitized:
                     self._message_adder.add_message("assistant", sanitized)
-                    result.add_chunk(
-                        self._chunk_generator.generate_content_chunk(sanitized)
-                    )
+                    result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
 
             # Finalize metrics
             if self._finalize_metrics:
@@ -485,9 +474,7 @@ class ContinuationHandler:
                 metrics_line = self._chunk_generator.format_completion_metrics(
                     stream_ctx, elapsed_time, cost_str
                 )
-                result.add_chunk(
-                    self._chunk_generator.generate_metrics_chunk(metrics_line)
-                )
+                result.add_chunk(self._chunk_generator.generate_metrics_chunk(metrics_line))
 
             result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
 
@@ -599,9 +586,7 @@ class ContinuationHandler:
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
             if sanitized:
-                result.add_chunk(
-                    self._chunk_generator.generate_content_chunk(sanitized)
-                )
+                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
 
         # Finalize and display metrics
         if self._finalize_metrics:
@@ -617,9 +602,7 @@ class ContinuationHandler:
             metrics_line = self._chunk_generator.format_completion_metrics(
                 stream_ctx, elapsed_time, cost_str
             )
-            result.add_chunk(
-                self._chunk_generator.generate_metrics_chunk(metrics_line)
-            )
+            result.add_chunk(self._chunk_generator.generate_metrics_chunk(metrics_line))
 
         # Record outcome for Q-learning
         if self._record_outcome:

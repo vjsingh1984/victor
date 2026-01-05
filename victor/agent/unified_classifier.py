@@ -149,7 +149,8 @@ class ClassificationResult:
 
         return {
             "is_action_task": self.is_action_task or self.task_type == ClassifierTaskType.ACTION,
-            "is_analysis_task": self.is_analysis_task or self.task_type == ClassifierTaskType.ANALYSIS,
+            "is_analysis_task": self.is_analysis_task
+            or self.task_type == ClassifierTaskType.ANALYSIS,
             "needs_execution": self.needs_execution,
             "coarse_task_type": coarse_type,
             # New fields (ignored by legacy code)

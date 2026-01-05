@@ -157,6 +157,7 @@ def _load_escape_hatches(vertical: Optional[str]) -> tuple[Set[str], Set[str]]:
         # Import the escape_hatches module for the vertical
         module_name = f"victor.{vertical}.escape_hatches"
         import importlib
+
         module = importlib.import_module(module_name)
 
         if hasattr(module, "CONDITIONS"):
@@ -183,6 +184,7 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
         try:
             module_name = f"victor.{vertical}.handlers"
             import importlib
+
             module = importlib.import_module(module_name)
 
             if hasattr(module, "register_handlers"):
@@ -195,6 +197,7 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
     # Get all registered handlers from executor
     try:
         from victor.workflows.executor import list_compute_handlers
+
         handlers.update(list_compute_handlers())
     except ImportError:
         pass
@@ -239,8 +242,12 @@ def _validate_escape_hatches_and_handlers(
 
     # Names that indicate simple/inline conditions (not escape hatch references)
     simple_condition_names = {
-        "<lambda>", "truthy_condition", "condition", "in_condition",
-        "literal_transform", "ref_transform",
+        "<lambda>",
+        "truthy_condition",
+        "condition",
+        "in_condition",
+        "literal_transform",
+        "ref_transform",
     }
 
     for node_id, node in workflow.nodes.items():
@@ -260,7 +267,11 @@ def _validate_escape_hatches_and_handlers(
         # Check transform nodes for escape hatch references
         if isinstance(node, TransformNode):
             transform_name = getattr(node.transform, "__name__", None)
-            if transform_name and transform_name not in {"<lambda>", "literal_transform", "ref_transform"}:
+            if transform_name and transform_name not in {
+                "<lambda>",
+                "literal_transform",
+                "ref_transform",
+            }:
                 used_transforms.add(transform_name)
                 if transforms and transform_name not in transforms:
                     warnings.append(
@@ -560,8 +571,10 @@ def render_workflow(
             ParallelNode,
             TransformNode,
         )
+
         try:
             from victor.workflows.hitl import HITLNode
+
             has_hitl = True
         except ImportError:
             HITLNode = None

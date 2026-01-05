@@ -140,9 +140,7 @@ class TestToolValidationResult:
     def test_summary_invalid(self):
         """Summary should indicate invalid state."""
         result = ToolValidationResult()
-        result.add_error(
-            ToolValidationError("n1", "t1", "missing", "test", "error")
-        )
+        result.add_error(ToolValidationError("n1", "t1", "missing", "test", "error"))
         result.missing_tools.add("t1")
         summary = result.summary()
         assert "Invalid" in summary

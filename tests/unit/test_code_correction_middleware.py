@@ -440,7 +440,9 @@ class TestCorrectionResult:
 
     def test_correction_result_creation(self):
         """Test creating a CorrectionResult."""
-        validation = CodeValidationResult(valid=True, language=Language.PYTHON, errors=(), warnings=())
+        validation = CodeValidationResult(
+            valid=True, language=Language.PYTHON, errors=(), warnings=()
+        )
         result = CorrectionResult(
             original_code="original",
             corrected_code="corrected",

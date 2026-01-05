@@ -56,8 +56,6 @@ class ProtocolNodeStatus(Enum):
     SKIPPED = "skipped"
 
 
-
-
 @dataclass
 class RetryPolicy:
     """Configuration for node retry behavior.

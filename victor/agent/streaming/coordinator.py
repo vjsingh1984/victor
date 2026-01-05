@@ -78,9 +78,7 @@ logger = logging.getLogger(__name__)
 class LoopDetectorProtocol(Protocol):
     """Protocol for loop detection."""
 
-    def check_stop(
-        self, tool_calls: List[Dict[str, Any]], content: str
-    ) -> tuple[bool, str, str]:
+    def check_stop(self, tool_calls: List[Dict[str, Any]], content: str) -> tuple[bool, str, str]:
         """Check if loop should stop.
 
         Returns:
@@ -244,9 +242,7 @@ class IterationCoordinator:
             IterationResult if additional action needed, None otherwise.
         """
         # Check budget warning
-        budget_result = self._handler.check_tool_budget(
-            ctx, self._config.budget_warning_threshold
-        )
+        budget_result = self._handler.check_tool_budget(ctx, self._config.budget_warning_threshold)
         if budget_result is not None:
             return budget_result
 
@@ -278,9 +274,7 @@ class IterationCoordinator:
         if self._loop_detector is None:
             return False, None
 
-        should_stop, stop_reason, stop_hint = self._loop_detector.check_stop(
-            tool_calls, content
-        )
+        should_stop, stop_reason, stop_hint = self._loop_detector.check_stop(tool_calls, content)
 
         if should_stop:
             logger.warning(f"Loop detected: {stop_reason} - {stop_hint}")
@@ -431,9 +425,7 @@ class IterationCoordinator:
         # Natural completion: substantial content without tools
         if has_content and ctx.has_substantial_content():
             # Let the handler decide
-            result = self._handler.check_natural_completion(
-                ctx, has_tool_calls, content_length
-            )
+            result = self._handler.check_natural_completion(ctx, has_tool_calls, content_length)
             if result is not None:
                 return result
 

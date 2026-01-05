@@ -301,9 +301,7 @@ class StageManager:
 
         # Apply config to machine
         self._machine.TRANSITION_COOLDOWN_SECONDS = self._config.transition_cooldown
-        self._machine.BACKWARD_TRANSITION_THRESHOLD = (
-            self._config.backward_confidence_threshold
-        )
+        self._machine.BACKWARD_TRANSITION_THRESHOLD = self._config.backward_confidence_threshold
 
         # Build custom stage tool mapping
         self._custom_stage_tools: Dict[str, Set[str]] = {
@@ -555,9 +553,7 @@ class StageManager:
             transition_cooldown=config_data.get("transition_cooldown", 2.0),
             stage_tool_boost=config_data.get("stage_tool_boost", 0.15),
             adjacent_tool_boost=config_data.get("adjacent_tool_boost", 0.08),
-            backward_confidence_threshold=config_data.get(
-                "backward_confidence_threshold", 0.85
-            ),
+            backward_confidence_threshold=config_data.get("backward_confidence_threshold", 0.85),
         )
 
         manager = cls(config=config, custom_stages=custom_stages)
@@ -567,9 +563,7 @@ class StageManager:
             manager._machine = ConversationStateMachine.from_dict(data["machine"])
             # Re-apply config
             manager._machine.TRANSITION_COOLDOWN_SECONDS = config.transition_cooldown
-            manager._machine.BACKWARD_TRANSITION_THRESHOLD = (
-                config.backward_confidence_threshold
-            )
+            manager._machine.BACKWARD_TRANSITION_THRESHOLD = config.backward_confidence_threshold
 
         return manager
 

@@ -165,7 +165,9 @@ class TestAgenticExecutionTrace:
     def test_to_dict(self):
         """Test to_dict serialization method."""
         calls = [
-            EvalToolCall(name="file_read", arguments={"path": "a.py"}, result="content", success=True),
+            EvalToolCall(
+                name="file_read", arguments={"path": "a.py"}, result="content", success=True
+            ),
         ]
         edits = [
             FileEdit(path="a.py", action="modify", before_content="old", after_content="new"),

@@ -24,6 +24,7 @@ from victor.protocols.provider_adapter import (
     get_provider_adapter,
     register_provider_adapter,
 )
+
 # Grounding
 from victor.protocols.grounding import (
     AggregatedVerificationResult,
@@ -36,6 +37,7 @@ from victor.protocols.grounding import (
     SymbolReferenceStrategy,
     VerificationResult,
 )
+
 # Quality
 from victor.protocols.quality import (
     BaseQualityAssessor,
@@ -47,6 +49,7 @@ from victor.protocols.quality import (
     QualityScore,
     SimpleQualityAssessor,
 )
+
 # Mode Awareness
 from victor.protocols.mode_aware import (
     IModeController,
@@ -54,6 +57,7 @@ from victor.protocols.mode_aware import (
     ModeInfo,
     create_mode_aware_mixin,
 )
+
 # Path Resolution
 from victor.protocols.path_resolver import (
     IPathResolver,
@@ -61,6 +65,7 @@ from victor.protocols.path_resolver import (
     PathResolver,
     create_path_resolver,
 )
+
 # LSP Types - Enumerations
 from victor.protocols.lsp_types import (
     DiagnosticSeverity,

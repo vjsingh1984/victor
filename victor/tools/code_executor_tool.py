@@ -161,10 +161,11 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
 
                     # Check if it's a python-slim based sandbox container
                     image_tags = container.image.tags
-                    is_python_slim = any(
-                        "python" in tag and "slim" in tag
-                        for tag in image_tags
-                    ) if image_tags else False
+                    is_python_slim = (
+                        any("python" in tag and "slim" in tag for tag in image_tags)
+                        if image_tags
+                        else False
+                    )
 
                     # Also check for untagged python images (dangling)
                     if not image_tags:
@@ -218,6 +219,7 @@ def _signal_cleanup_handler(signum, frame):
         elif _original_sigterm_handler == signal.SIG_DFL:
             # Exit with the signal for default behavior
             import sys
+
             sys.exit(128 + signum)
 
 
@@ -231,6 +233,7 @@ def _register_signal_handlers():
     try:
         # Only register in main thread
         import threading
+
         if threading.current_thread() is not threading.main_thread():
             logger.debug("Not registering signal handlers (not main thread)")
             return

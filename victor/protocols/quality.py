@@ -64,8 +64,6 @@ class ProtocolQualityDimension(str, Enum):
     SAFETY = "safety"
 
 
-
-
 @dataclass
 class DimensionScore:
     """Score for a single quality dimension.

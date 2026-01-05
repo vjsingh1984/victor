@@ -127,8 +127,6 @@ class YAMLNodeType(str, Enum):
     HITL = "hitl"
 
 
-
-
 class ConstraintType(str, Enum):
     """Valid constraint types for blocking resources.
 
@@ -240,6 +238,7 @@ def _interpolate_env_vars(value: Any) -> Any:
 if TYPE_CHECKING:
     from victor.workflows.batch_executor import BatchConfig
     from victor.workflows.services.definition import ServiceConfig
+    from victor.workflows.validation.tool_validator import ToolValidationResult
 
 from victor.workflows.definition import (
     AgentNode,
@@ -628,9 +627,7 @@ class BatchConfigYAML:
             batch_size=self.batch_size,
             max_concurrent=self.max_concurrent,
             delay_seconds=self.delay_seconds,
-            retry_strategy=strategy_map.get(
-                self.retry_strategy, BatchRetryStrategy.END_OF_BATCH
-            ),
+            retry_strategy=strategy_map.get(self.retry_strategy, BatchRetryStrategy.END_OF_BATCH),
             max_retries=self.max_retries,
             retry_delay_seconds=self.retry_delay_seconds,
             timeout_per_item=self.timeout_per_item,
@@ -1097,8 +1094,7 @@ def _parse_constraints(constraints_data: Any, timeout: float = 60.0) -> TaskCons
         else:
             valid_values = [c.value for c in ConstraintType]
             raise YAMLWorkflowError(
-                f"Invalid constraint string: '{constraints_data}'. "
-                f"Valid values: {valid_values}"
+                f"Invalid constraint string: '{constraints_data}'. " f"Valid values: {valid_values}"
             )
 
     # Handle list format (compact)
@@ -1216,8 +1212,7 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
     except ValueError:
         valid_targets = [t.value for t in ExecutionTarget]
         raise YAMLWorkflowError(
-            f"Invalid execution_target '{exec_target_str}'. "
-            f"Valid values: {valid_targets}"
+            f"Invalid execution_target '{exec_target_str}'. " f"Valid values: {valid_targets}"
         )
 
     return ComputeNode(
@@ -1277,9 +1272,7 @@ def _parse_node(
         return _parse_hitl_node(node_data)
     else:
         valid_types = [t.value for t in YAMLNodeType]
-        raise YAMLWorkflowError(
-            f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}"
-        )
+        raise YAMLWorkflowError(f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}")
 
 
 def load_workflow_from_dict(
@@ -1378,16 +1371,8 @@ def load_workflow_from_dict(
         or data.get("default_node_timeout")
         or data.get("default_node_timeout_seconds")
     )
-    max_iterations = (
-        execution_settings.get("max_iterations")
-        or data.get("max_iterations")
-        or 25
-    )
-    max_retries = (
-        execution_settings.get("max_retries")
-        or data.get("max_retries")
-        or 0
-    )
+    max_iterations = execution_settings.get("max_iterations") or data.get("max_iterations") or 25
+    max_retries = execution_settings.get("max_retries") or data.get("max_retries") or 0
 
     # Parse schedule configuration if present
     schedule_data = data.get("schedule")
@@ -1585,16 +1570,12 @@ def load_and_validate(
         if isinstance(workflows, dict):
             for workflow in workflows.values():
                 for node in workflow.nodes.values():
-                    tools = getattr(node, "allowed_tools", None) or getattr(
-                        node, "tools", None
-                    )
+                    tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
                     if tools:
                         validation_result.validated_tools.update(tools)
         else:
             for node in workflows.nodes.values():
-                tools = getattr(node, "allowed_tools", None) or getattr(
-                    node, "tools", None
-                )
+                tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
                 if tools:
                     validation_result.validated_tools.update(tools)
 

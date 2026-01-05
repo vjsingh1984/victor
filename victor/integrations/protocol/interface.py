@@ -254,9 +254,7 @@ class VictorProtocol(ABC):
     # =========================================================================
 
     @abstractmethod
-    async def semantic_search(
-        self, query: str, max_results: int = 10
-    ) -> list[CodeSearchResult]:
+    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning.
 
         Args:

@@ -193,8 +193,6 @@ class ObservabilityRetryConfig:
     on_retry: Optional[Callable[[int, Exception, float], None]] = None
 
 
-
-
 def retry_with_backoff(
     max_retries: int = 3,
     base_delay: float = 1.0,

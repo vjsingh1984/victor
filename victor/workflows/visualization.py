@@ -252,6 +252,7 @@ class WorkflowVisualizer:
         # Try to import HITLNode for enhanced metadata
         try:
             from victor.workflows.hitl import HITLNode
+
             has_hitl = True
         except ImportError:
             HITLNode = None
@@ -635,9 +636,6 @@ class WorkflowVisualizer:
         for node in self._nodes:
             label = node.name or node.id
             node_class = node.node_type.replace("Node", "").lower()
-
-            # Build enhanced label with type info
-            label_parts = [label]
 
             # Add node type indicator
             type_indicator = {

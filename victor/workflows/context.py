@@ -57,7 +57,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.workflows.executor import NodeResult, TemporalContext
+    from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +321,9 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
     for node_id, result in ctx.node_results.items():
         node_results[node_id] = {
             "node_id": result.node_id,
-            "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+            "status": (
+                result.status.value if hasattr(result.status, "value") else str(result.status)
+            ),
             "success": result.success,
             "output": result.output,
             "error": result.error,
@@ -384,7 +386,11 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
             try:
                 status = ExecutorNodeStatus(status_str)
             except ValueError:
-                status = ExecutorNodeStatus.COMPLETED if result.get("success", True) else ExecutorNodeStatus.FAILED
+                status = (
+                    ExecutorNodeStatus.COMPLETED
+                    if result.get("success", True)
+                    else ExecutorNodeStatus.FAILED
+                )
 
             node_results[node_id] = NodeResult(
                 node_id=node_id,
@@ -431,8 +437,14 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     """
     # Extract system fields and user data
     system_keys = {
-        "_workflow_id", "_current_node", "_node_results", "_error",
-        "_iteration", "_parallel_results", "_hitl_pending", "_hitl_response",
+        "_workflow_id",
+        "_current_node",
+        "_node_results",
+        "_error",
+        "_iteration",
+        "_parallel_results",
+        "_hitl_pending",
+        "_hitl_response",
     }
 
     # User data is everything not in system keys

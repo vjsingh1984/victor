@@ -101,7 +101,9 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in critical_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == OperationalRiskLevel.CRITICAL, f"'{cmd}' should be CRITICAL but got {level}"
+            assert (
+                level == OperationalRiskLevel.CRITICAL
+            ), f"'{cmd}' should be CRITICAL but got {level}"
             assert any(
                 expected_detail.lower() in d.lower() for d in details
             ), f"Expected '{expected_detail}' in {details}"
@@ -117,7 +119,9 @@ class TestSafetyChecker:
         ]
         for file_path in sensitive_files:
             level, details = checker.check_file_operation("write", file_path)
-            assert level == OperationalRiskLevel.HIGH, f"'{file_path}' should be HIGH risk but got {level}"
+            assert (
+                level == OperationalRiskLevel.HIGH
+            ), f"'{file_path}' should be HIGH risk but got {level}"
 
     def test_check_file_operation_delete(self):
         """Delete operations should be HIGH risk."""

@@ -95,9 +95,7 @@ class ModeConfig:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"tool_budget must be an integer: {e}")
         if not (1 <= self.tool_budget <= 500):
-            raise ValueError(
-                f"tool_budget must be between 1 and 500, got {self.tool_budget}"
-            )
+            raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
@@ -106,9 +104,7 @@ class ModeConfig:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"max_iterations must be an integer: {e}")
         if not (1 <= self.max_iterations <= 500):
-            raise ValueError(
-                f"max_iterations must be between 1 and 500, got {self.max_iterations}"
-            )
+            raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate exploration_multiplier (0.1-10.0)
         if not isinstance(self.exploration_multiplier, (int, float)):
@@ -187,9 +183,7 @@ class ModeDefinition:
         if not isinstance(self.name, str):
             raise ValueError("name must be a string")
         if not (1 <= len(self.name) <= 50):
-            raise ValueError(
-                f"name must be between 1 and 50 characters, got {len(self.name)}"
-            )
+            raise ValueError(f"name must be between 1 and 50 characters, got {len(self.name)}")
 
         # Validate tool_budget (1-500)
         if not isinstance(self.tool_budget, int):
@@ -198,9 +192,7 @@ class ModeDefinition:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"tool_budget must be an integer: {e}")
         if not (1 <= self.tool_budget <= 500):
-            raise ValueError(
-                f"tool_budget must be between 1 and 500, got {self.tool_budget}"
-            )
+            raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
@@ -209,9 +201,7 @@ class ModeDefinition:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"max_iterations must be an integer: {e}")
         if not (1 <= self.max_iterations <= 500):
-            raise ValueError(
-                f"max_iterations must be between 1 and 500, got {self.max_iterations}"
-            )
+            raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate temperature (0.0-2.0)
         if not isinstance(self.temperature, (int, float)):
@@ -220,17 +210,13 @@ class ModeDefinition:
             except (TypeError, ValueError) as e:
                 raise ValueError(f"temperature must be numeric: {e}")
         if not (0.0 <= self.temperature <= 2.0):
-            raise ValueError(
-                f"temperature must be between 0.0 and 2.0, got {self.temperature}"
-            )
+            raise ValueError(f"temperature must be between 0.0 and 2.0, got {self.temperature}")
 
         # Validate description (max 500 chars)
         if not isinstance(self.description, str):
             self.description = str(self.description)
         if len(self.description) > 500:
-            logger.warning(
-                f"description exceeds 500 chars ({len(self.description)}), truncating"
-            )
+            logger.warning(f"description exceeds 500 chars ({len(self.description)}), truncating")
             self.description = self.description[:500]
 
         # Validate exploration_multiplier (0.1-10.0)

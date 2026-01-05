@@ -389,8 +389,6 @@ class FrameworkNodeStatus(Enum):
     SKIPPED = "skipped"
 
 
-
-
 @runtime_checkable
 class StateProtocol(Protocol):
     """Protocol for state objects.
@@ -542,8 +540,6 @@ class WorkflowCheckpoint:
             timestamp=data["timestamp"],
             metadata=data.get("metadata", {}),
         )
-
-
 
 
 class CheckpointerProtocol(Protocol):

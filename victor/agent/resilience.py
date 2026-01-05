@@ -327,8 +327,6 @@ class AgentRetryConfig:
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
 
 
-
-
 class RetryHandler:
     """Retry handler with exponential backoff.
 

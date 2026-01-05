@@ -320,10 +320,7 @@ class WorkflowGraphCompiler(Generic[S]):
                 edges[from_node] = []
 
             # Convert routes, replacing END markers
-            converted_routes = {
-                k: (END if v == graph.END else v)
-                for k, v in routes.items()
-            }
+            converted_routes = {k: (END if v == graph.END else v) for k, v in routes.items()}
 
             # Create state-aware router
             state_type = graph.state_type
@@ -336,6 +333,7 @@ class WorkflowGraphCompiler(Generic[S]):
                     else:
                         typed_state = st(**state) if isinstance(state, dict) else state
                     return r(typed_state)
+
                 return wrapped_router
 
             edges[from_node].append(
@@ -377,9 +375,7 @@ class WorkflowGraphCompiler(Generic[S]):
         """
         # Check if using NodeRunner
         if self._config.use_node_runners and self._config.runner_registry:
-            runner = self._config.runner_registry.get_runner(
-                graph_node.node_type.value
-            )
+            runner = self._config.runner_registry.get_runner(graph_node.node_type.value)
             if runner:
                 node_config = self._extract_node_config(graph_node, GraphNodeType)
                 emitter = self._config.emitter if self._config.enable_observability else None
@@ -391,6 +387,7 @@ class WorkflowGraphCompiler(Generic[S]):
             # No-op node
             async def noop(state: Any) -> Any:
                 return state
+
             return noop
 
         # Create wrapper that handles dict <-> typed state conversion
@@ -418,6 +415,7 @@ class WorkflowGraphCompiler(Generic[S]):
             elif hasattr(result, "__dataclass_fields__"):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
+
                 return asdict(result)
             elif isinstance(result, dict):
                 return result
@@ -448,20 +446,26 @@ class WorkflowGraphCompiler(Generic[S]):
 
         # Add type-specific config
         if graph_node.node_type == GraphNodeType.AGENT:
-            config.update({
-                "role": graph_node.agent_role or "executor",
-                "goal": graph_node.agent_goal or "",
-                "tool_budget": graph_node.agent_tool_budget or 10,
-            })
+            config.update(
+                {
+                    "role": graph_node.agent_role or "executor",
+                    "goal": graph_node.agent_goal or "",
+                    "tool_budget": graph_node.agent_tool_budget or 10,
+                }
+            )
         elif graph_node.node_type == GraphNodeType.COMPUTE:
-            config.update({
-                "handler": graph_node.compute_handler,
-                "tools": graph_node.compute_tools or [],
-            })
+            config.update(
+                {
+                    "handler": graph_node.compute_handler,
+                    "tools": graph_node.compute_tools or [],
+                }
+            )
         elif graph_node.node_type == GraphNodeType.TRANSFORM:
-            config.update({
-                "transform": graph_node.func,
-            })
+            config.update(
+                {
+                    "transform": graph_node.func,
+                }
+            )
 
         return config
 
@@ -667,22 +671,28 @@ class WorkflowDefinitionCompiler:
         }
 
         if isinstance(workflow_node, DefAgentNode):
-            config.update({
-                "role": workflow_node.role,
-                "goal": workflow_node.goal,
-                "tool_budget": workflow_node.tool_budget,
-                "allowed_tools": workflow_node.allowed_tools,
-                "output_key": workflow_node.output_key,
-            })
+            config.update(
+                {
+                    "role": workflow_node.role,
+                    "goal": workflow_node.goal,
+                    "tool_budget": workflow_node.tool_budget,
+                    "allowed_tools": workflow_node.allowed_tools,
+                    "output_key": workflow_node.output_key,
+                }
+            )
         elif isinstance(workflow_node, DefComputeNode):
-            config.update({
-                "handler": workflow_node.handler,
-                "tools": workflow_node.tools,
-            })
+            config.update(
+                {
+                    "handler": workflow_node.handler,
+                    "tools": workflow_node.tools,
+                }
+            )
         elif isinstance(workflow_node, DefTransformNode):
-            config.update({
-                "transform": workflow_node.transform,
-            })
+            config.update(
+                {
+                    "transform": workflow_node.transform,
+                }
+            )
 
         return config
 

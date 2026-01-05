@@ -305,11 +305,18 @@ class DefaultRoleToolProvider:
 
     # Role-specific default tools (coding-focused for backward compat)
     ROLE_TOOLS: Dict[str, List[str]] = {
-        "researcher": ["read", "ls", "grep", "search", "code_search",
-                       "semantic_code_search", "web_search", "web_fetch"],
+        "researcher": [
+            "read",
+            "ls",
+            "grep",
+            "search",
+            "code_search",
+            "semantic_code_search",
+            "web_search",
+            "web_fetch",
+        ],
         "planner": ["read", "ls", "grep", "search", "plan_files"],
-        "executor": ["read", "write", "edit", "ls", "grep", "search",
-                     "shell", "test", "git"],
+        "executor": ["read", "write", "edit", "ls", "grep", "search", "shell", "test", "git"],
         "reviewer": ["read", "ls", "grep", "search", "git", "test", "shell"],
         "tester": ["read", "write", "ls", "grep", "search", "test", "shell"],
     }

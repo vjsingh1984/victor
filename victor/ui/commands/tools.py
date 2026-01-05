@@ -298,9 +298,11 @@ def cleanup_containers(
                         continue
 
                     image_tags = container.image.tags
-                    is_python_slim = any(
-                        "python" in tag and "slim" in tag for tag in image_tags
-                    ) if image_tags else False
+                    is_python_slim = (
+                        any("python" in tag and "slim" in tag for tag in image_tags)
+                        if image_tags
+                        else False
+                    )
 
                     if not image_tags:
                         cmd = container.attrs.get("Config", {}).get("Cmd", [])
@@ -402,7 +404,9 @@ def cleanup_images(
             table.add_row(img.short_id, f"{size_mb:.1f} MB", created)
 
         console.print(table)
-        console.print(f"\n[bold]Found {len(dangling)} dangling image(s) ({total_size:.1f} MB total).[/]")
+        console.print(
+            f"\n[bold]Found {len(dangling)} dangling image(s) ({total_size:.1f} MB total).[/]"
+        )
 
         if dry_run:
             console.print("[dim]Dry run - no images removed.[/]")

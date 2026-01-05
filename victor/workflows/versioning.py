@@ -171,8 +171,7 @@ class WorkflowVersion:
             True if compatible
         """
         return self.major == other.major and (
-            self.minor > other.minor
-            or (self.minor == other.minor and self.patch >= other.patch)
+            self.minor > other.minor or (self.minor == other.minor and self.patch >= other.patch)
         )
 
     def bump_major(self) -> "WorkflowVersion":
@@ -311,9 +310,7 @@ class WorkflowMigration:
             )
 
         if self.breaking and self.from_version.major == self.to_version.major:
-            errors.append(
-                "Breaking changes should bump major version"
-            )
+            errors.append("Breaking changes should bump major version")
 
         return errors
 
@@ -424,9 +421,7 @@ class WorkflowVersionRegistry:
 
             version_key = str(workflow.version)
             if version_key in self._versions[workflow.name]:
-                logger.warning(
-                    f"Overwriting existing version: {workflow.version_id}"
-                )
+                logger.warning(f"Overwriting existing version: {workflow.version_id}")
 
             self._versions[workflow.name][version_key] = workflow
             logger.info(f"Registered workflow version: {workflow.version_id}")
@@ -614,9 +609,7 @@ class WorkflowVersionRegistry:
         path = self.get_migration_path(name, from_v, to_v)
 
         if not path:
-            logger.warning(
-                f"No migration path found: {name} {from_version} -> {to_version}"
-            )
+            logger.warning(f"No migration path found: {name} {from_version} -> {to_version}")
             return state, []
 
         result = dict(state)
@@ -722,21 +715,25 @@ def parse_migrations_from_yaml(
         steps = []
         for change in mig_data.get("changes", []):
             step_type = MigrationType(change.get("type", "custom"))
-            steps.append(MigrationStep(
-                type=step_type,
-                node_id=change.get("node_id") or change.get("old_id"),
-                old_value=change.get("old_value") or change.get("old_id"),
-                new_value=change.get("new_value") or change.get("new_id"),
-                description=change.get("description", ""),
-            ))
+            steps.append(
+                MigrationStep(
+                    type=step_type,
+                    node_id=change.get("node_id") or change.get("old_id"),
+                    old_value=change.get("old_value") or change.get("old_id"),
+                    new_value=change.get("new_value") or change.get("new_id"),
+                    description=change.get("description", ""),
+                )
+            )
 
-        migrations.append(WorkflowMigration(
-            from_version=WorkflowVersion.parse(from_str),
-            to_version=WorkflowVersion.parse(to_str),
-            steps=steps,
-            description=mig_data.get("description", ""),
-            breaking=mig_data.get("breaking", False),
-        ))
+        migrations.append(
+            WorkflowMigration(
+                from_version=WorkflowVersion.parse(from_str),
+                to_version=WorkflowVersion.parse(to_str),
+                steps=steps,
+                description=mig_data.get("description", ""),
+                breaking=mig_data.get("breaking", False),
+            )
+        )
 
     return migrations
 

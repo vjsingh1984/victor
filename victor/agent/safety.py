@@ -50,8 +50,6 @@ class OperationalRiskLevel(Enum):
     CRITICAL = "critical"  # System-level destructive operations
 
 
-
-
 class ApprovalMode(Enum):
     """Mode for write operation approval.
 

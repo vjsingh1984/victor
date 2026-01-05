@@ -673,9 +673,7 @@ class ModeDefinitionSchema(BaseModel):
         if self.allowed_tools and self.disallowed_tools:
             overlap = self.allowed_tools & self.disallowed_tools
             if overlap:
-                raise ValueError(
-                    f"Tools cannot be both allowed and disallowed: {overlap}"
-                )
+                raise ValueError(f"Tools cannot be both allowed and disallowed: {overlap}")
         return self
 
     @field_validator("allowed_tools", "disallowed_tools", mode="before")

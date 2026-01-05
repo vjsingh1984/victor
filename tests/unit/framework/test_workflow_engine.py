@@ -246,7 +246,7 @@ class TestWorkflowEngineExecution:
     async def test_execute_definition_with_mock(self, engine):
         """Test executing a mocked WorkflowDefinition."""
         # Mock the executor
-        with patch.object(engine, '_get_executor') as mock_get_executor:
+        with patch.object(engine, "_get_executor") as mock_get_executor:
             mock_executor = MagicMock()
             mock_result = MagicMock()
             mock_result.success = True

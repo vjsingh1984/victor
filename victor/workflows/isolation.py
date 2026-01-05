@@ -372,6 +372,7 @@ def register_builtin_providers() -> None:
     registry.register("docker", DockerSandboxProvider)
     logger.debug("Registered built-in sandbox providers")
 
+
 # Type alias for sandbox types
 SandboxType = Literal["none", "process", "docker"]
 

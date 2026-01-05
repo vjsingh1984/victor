@@ -71,8 +71,6 @@ class ResponseQualityDimension(Enum):
     CODE_QUALITY = "code_quality"  # Code correctness
 
 
-
-
 @dataclass
 class DimensionScore:
     """Score for a single quality dimension.

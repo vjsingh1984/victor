@@ -332,8 +332,6 @@ class ProviderRetryConfig:
     )
 
 
-
-
 class RetryExhaustedError(Exception):
     """Raised when all retry attempts are exhausted."""
 
@@ -518,8 +516,6 @@ class ProviderRetryStrategy:
                     continue
 
         return None
-
-
 
 
 class ProviderUnavailableError(Exception):

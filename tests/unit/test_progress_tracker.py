@@ -580,7 +580,10 @@ class TestTaskClassifierIntegration:
     def test_create_tracker_from_complex_classification(self):
         """Test creating tracker from COMPLEX task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
-        from victor.agent.loop_detector import create_tracker_from_classification, LoopDetectorTaskType
+        from victor.agent.loop_detector import (
+            create_tracker_from_classification,
+            LoopDetectorTaskType,
+        )
 
         classifier = ComplexityClassifier()
         classification = classifier.classify("generate a new feature")
@@ -595,7 +598,10 @@ class TestTaskClassifierIntegration:
     def test_create_tracker_from_generation_classification(self):
         """Test creating tracker from GENERATION task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
-        from victor.agent.loop_detector import create_tracker_from_classification, LoopDetectorTaskType
+        from victor.agent.loop_detector import (
+            create_tracker_from_classification,
+            LoopDetectorTaskType,
+        )
 
         classifier = ComplexityClassifier()
         classification = classifier.classify("write a function to add numbers")

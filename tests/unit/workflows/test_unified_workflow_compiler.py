@@ -414,7 +414,9 @@ class TestCompilationWithCaching:
     """Tests for compilation caching behavior."""
 
     @pytest.mark.asyncio
-    async def test_compile_with_caching_enabled(self, yaml_workflow_file: Path, reset_workflow_caches):
+    async def test_compile_with_caching_enabled(
+        self, yaml_workflow_file: Path, reset_workflow_caches
+    ):
         """Test that compilation uses definition cache when enabled."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -451,13 +453,16 @@ class TestCompilationWithCaching:
         assert stats.get("definition_cache", {}).get("hits", 0) >= 2
 
     @pytest.mark.asyncio
-    async def test_compile_cache_invalidation_on_file_change(self, tmp_path: Path, reset_workflow_caches):
+    async def test_compile_cache_invalidation_on_file_change(
+        self, tmp_path: Path, reset_workflow_caches
+    ):
         """Test that cache is invalidated when source file changes."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         # Create initial YAML file
         yaml_file = tmp_path / "workflow.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
@@ -465,7 +470,8 @@ workflows:
         type: transform
         transform: "result = 'v1'"
         next: []
-""")
+"""
+        )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
@@ -476,7 +482,8 @@ workflows:
         time.sleep(0.1)
 
         # Modify the file
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
@@ -484,7 +491,8 @@ workflows:
         type: transform
         transform: "result = 'v2'"
         next: []
-""")
+"""
+        )
 
         # Re-compile - should detect file change and recompile
         compiled2 = compiler.compile_yaml(yaml_file, workflow_name="test")
@@ -967,7 +975,9 @@ class TestCachingIntegration:
     """Tests for caching integration with the compiler."""
 
     @pytest.mark.asyncio
-    async def test_definition_cache_integration(self, yaml_workflow_file: Path, reset_workflow_caches):
+    async def test_definition_cache_integration(
+        self, yaml_workflow_file: Path, reset_workflow_caches
+    ):
         """Test that WorkflowDefinitionCache is properly integrated."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -1037,7 +1047,8 @@ class TestCachingIntegration:
 
         # Create YAML file
         yaml_file = tmp_path / "cascade_test.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
@@ -1045,7 +1056,8 @@ workflows:
         type: transform
         transform: "result = 'done'"
         next: []
-""")
+"""
+        )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
@@ -1074,13 +1086,15 @@ class TestErrorHandling:
 
         # Create invalid YAML file
         yaml_file = tmp_path / "invalid.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
       - id: broken
         type: [this is not valid yaml
-""")
+"""
+        )
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1096,7 +1110,8 @@ workflows:
         from victor.workflows.yaml_loader import YAMLWorkflowError
 
         yaml_file = tmp_path / "missing_node.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
@@ -1104,7 +1119,8 @@ workflows:
         type: transform
         transform: "result = 'done'"
         next: [nonexistent_node]
-""")
+"""
+        )
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1120,7 +1136,8 @@ workflows:
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         yaml_file = tmp_path / "circular.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   test:
     nodes:
@@ -1136,7 +1153,8 @@ workflows:
         type: transform
         transform: "c = 3"
         next: [node_a]
-""")
+"""
+        )
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1203,7 +1221,9 @@ class TestObservability:
     """Tests for observability event emission during compilation and execution."""
 
     @pytest.mark.asyncio
-    async def test_compilation_produces_valid_graph(self, yaml_workflow_file: Path, reset_workflow_caches):
+    async def test_compilation_produces_valid_graph(
+        self, yaml_workflow_file: Path, reset_workflow_caches
+    ):
         """Test that compilation produces a graph that can emit schema."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -1216,7 +1236,9 @@ class TestObservability:
         assert isinstance(schema, dict)
 
     @pytest.mark.asyncio
-    async def test_cached_compiled_graph_metadata(self, yaml_workflow_file: Path, reset_workflow_caches):
+    async def test_cached_compiled_graph_metadata(
+        self, yaml_workflow_file: Path, reset_workflow_caches
+    ):
         """Test that CachedCompiledGraph includes observability metadata."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -1256,11 +1278,7 @@ class TestAPIConsistency:
         assert compiled1.compiled_graph is not None
 
         # Method 2: From WorkflowDefinition - returns CachedCompiledGraph
-        workflow_def = (
-            WorkflowBuilder("api_test")
-            .add_transform("step", lambda ctx: ctx)
-            .build()
-        )
+        workflow_def = WorkflowBuilder("api_test").add_transform("step", lambda ctx: ctx).build()
         compiled2 = compiler.compile_definition(workflow_def)
         assert isinstance(compiled2, CachedCompiledGraph)
         assert compiled2.compiled_graph is not None
@@ -1461,7 +1479,9 @@ class TestCachedCompiledGraph:
     """Tests for CachedCompiledGraph wrapper class."""
 
     @pytest.mark.asyncio
-    async def test_cached_graph_wrapper_properties(self, yaml_workflow_file: Path, reset_workflow_caches):
+    async def test_cached_graph_wrapper_properties(
+        self, yaml_workflow_file: Path, reset_workflow_caches
+    ):
         """Test CachedCompiledGraph wrapper has correct properties."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
 

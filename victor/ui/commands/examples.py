@@ -174,12 +174,12 @@ def _discover_examples(
     return examples
 
 
-def _find_example_by_name(
-    examples_dir: Path, name: str
-) -> Optional[Tuple[str, str, str, Path]]:
+def _find_example_by_name(examples_dir: Path, name: str) -> Optional[Tuple[str, str, str, Path]]:
     """Find a specific example by name (supports partial matching)."""
     examples = _discover_examples(examples_dir)
-    name_lower = name.lower().replace("_", "").replace("-", "").replace(".py", "").replace(".yaml", "")
+    name_lower = (
+        name.lower().replace("_", "").replace("-", "").replace(".py", "").replace(".yaml", "")
+    )
 
     # First try exact match
     for example in examples:

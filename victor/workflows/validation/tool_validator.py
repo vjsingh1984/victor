@@ -216,9 +216,7 @@ class ToolDependencyValidator:
         if self._available_tools is None:
             if self.tool_registry:
                 tools = self.tool_registry.list_tools(only_enabled=True)
-                self._available_tools = {
-                    getattr(t, "name", str(t)) for t in tools
-                }
+                self._available_tools = {getattr(t, "name", str(t)) for t in tools}
             else:
                 self._available_tools = set()
         return self._available_tools

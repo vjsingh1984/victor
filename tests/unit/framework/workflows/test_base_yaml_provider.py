@@ -184,9 +184,7 @@ class TestCompileWorkflow:
 class TestDeprecationWarnings:
     """Tests for deprecation warnings on legacy methods."""
 
-    def test_create_executor_emits_deprecation_warning(
-        self, test_provider, mock_orchestrator
-    ):
+    def test_create_executor_emits_deprecation_warning(self, test_provider, mock_orchestrator):
         """Test that create_executor emits a deprecation warning."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -195,9 +193,7 @@ class TestDeprecationWarnings:
             # Check that a deprecation warning was issued
             assert len(w) >= 1
             assert any(issubclass(warning.category, DeprecationWarning) for warning in w)
-            assert any(
-                "create_executor()" in str(warning.message) for warning in w
-            )
+            assert any("create_executor()" in str(warning.message) for warning in w)
 
     def test_create_streaming_executor_emits_deprecation_warning(
         self, test_provider, mock_orchestrator
@@ -210,9 +206,7 @@ class TestDeprecationWarnings:
             # Check that a deprecation warning was issued
             assert len(w) >= 1
             assert any(issubclass(warning.category, DeprecationWarning) for warning in w)
-            assert any(
-                "create_streaming_executor()" in str(warning.message) for warning in w
-            )
+            assert any("create_streaming_executor()" in str(warning.message) for warning in w)
 
     @pytest.mark.asyncio
     async def test_run_workflow_emits_deprecation_warning(self, test_provider):
@@ -228,14 +222,10 @@ class TestDeprecationWarnings:
             # Check that a deprecation warning was issued
             assert len(w) >= 1
             assert any(issubclass(warning.category, DeprecationWarning) for warning in w)
-            assert any(
-                "run_workflow()" in str(warning.message) for warning in w
-            )
+            assert any("run_workflow()" in str(warning.message) for warning in w)
 
     @pytest.mark.asyncio
-    async def test_astream_emits_deprecation_warning(
-        self, test_provider, mock_orchestrator
-    ):
+    async def test_astream_emits_deprecation_warning(self, test_provider, mock_orchestrator):
         """Test that astream emits a deprecation warning."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -251,9 +241,7 @@ class TestDeprecationWarnings:
             # Check that a deprecation warning was issued
             assert len(w) >= 1
             assert any(issubclass(warning.category, DeprecationWarning) for warning in w)
-            assert any(
-                "astream()" in str(warning.message) for warning in w
-            )
+            assert any("astream()" in str(warning.message) for warning in w)
 
 
 # =============================================================================

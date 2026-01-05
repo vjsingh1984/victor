@@ -553,9 +553,7 @@ class RestartPolicyEnforcer:
 
         try:
             # Increment restart count
-            self._restart_counts[service_name] = (
-                self._restart_counts.get(service_name, 0) + 1
-            )
+            self._restart_counts[service_name] = self._restart_counts.get(service_name, 0) + 1
 
             # Stop if still running
             if entry.handle and entry.handle.state == ServiceState.HEALTHY:

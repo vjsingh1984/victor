@@ -89,8 +89,6 @@ class GitCheckpoint:
     stash_message: str
 
 
-
-
 class CheckpointError(Exception):
     """Base exception for checkpoint operations."""
 
@@ -304,7 +302,9 @@ class CheckpointManager:
                         break
 
             if not stash_ref:
-                raise CheckpointNotFoundError(f"GitCheckpoint {checkpoint_id} not found in stash list")
+                raise CheckpointNotFoundError(
+                    f"GitCheckpoint {checkpoint_id} not found in stash list"
+                )
 
             # Reset working tree to clean state
             self._run_git_command(["reset", "--hard"])

@@ -127,7 +127,9 @@ class ContainerOpsHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -219,7 +221,9 @@ class TerraformHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=tool_calls,
@@ -312,7 +316,11 @@ class MLOpsHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if result.get("success") else ExecutorNodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED
+                    if result.get("success")
+                    else ExecutorNodeStatus.FAILED
+                ),
                 output=result,
                 duration_seconds=time.time() - start_time,
                 error=result.get("error"),

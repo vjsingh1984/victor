@@ -4616,8 +4616,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             StreamChunk if iteration should be skipped, None otherwise.
         """
-        coordinator = self._get_iteration_coordinator()
-
         # Use handler's handle_iteration_start which combines all pre-checks
         result = self._streaming_handler.handle_iteration_start(stream_ctx)
         if result is not None:
@@ -4861,15 +4859,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
 
             # Create temporary message list with recent context
-            recent_messages = (
-                self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-            )
+            recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
             recovery_messages = recent_messages + [Message(role="user", content=prompt)]
 
             # Check if tools should be enabled
-            use_tools = self._streaming_handler.should_use_tools_for_recovery(
-                stream_ctx, attempt
-            )
+            use_tools = self._streaming_handler.should_use_tools_for_recovery(stream_ctx, attempt)
             recovery_tools = tools if use_tools else None
 
             try:
@@ -4892,14 +4886,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     return True, response.tool_calls, None
 
                 if response and response.content:
-                    logger.debug(
-                        f"Recovery attempt {attempt}: got {len(response.content)} chars"
-                    )
+                    logger.debug(f"Recovery attempt {attempt}: got {len(response.content)} chars")
 
                     # Try to extract tool calls from text
-                    tool_calls = self._try_extract_tool_calls_from_text(
-                        response.content, prompt
-                    )
+                    tool_calls = self._try_extract_tool_calls_from_text(response.content, prompt)
                     if tool_calls:
                         return True, tool_calls, None
 
@@ -4945,9 +4935,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 extract_tool_calls_from_text,
             )
 
-            valid_tool_names = {
-                t.name for t in self.tools.list_tools(only_enabled=True)
-            }
+            valid_tool_names = {t.name for t in self.tools.list_tools(only_enabled=True)}
             extraction_result = extract_tool_calls_from_text(
                 content, valid_tool_names=valid_tool_names
             )
@@ -4992,9 +4980,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if "rate_limit" in exc_str.lower() or "429" in exc_str:
             import re
 
-            wait_match = re.search(
-                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
-            )
+            wait_match = re.search(r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I)
             if wait_match:
                 wait_time = float(wait_match.group(1))
                 logger.info(f"Rate limited. Waiting {wait_time:.1f}s before retry...")
@@ -5720,7 +5706,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                     # Create intent classification handler lazily (reused across iterations)
                     if not hasattr(self, "_intent_classification_handler"):
-                        self._intent_classification_handler = create_intent_classification_handler(self)
+                        self._intent_classification_handler = create_intent_classification_handler(
+                            self
+                        )
 
                     # Ensure tracking variables are initialized
                     if not hasattr(self, "_continuation_prompts"):
@@ -5736,12 +5724,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     tracking_state = create_tracking_state(self)
 
                     # Delegate to IntentClassificationHandler
-                    intent_result = self._intent_classification_handler.classify_and_determine_action(
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
-                        content_length=content_length,
-                        mentioned_tools=mentioned_tools_detected,
-                        tracking_state=tracking_state,
+                    intent_result = (
+                        self._intent_classification_handler.classify_and_determine_action(
+                            stream_ctx=stream_ctx,
+                            full_content=full_content,
+                            content_length=content_length,
+                            mentioned_tools=mentioned_tools_detected,
+                            tracking_state=tracking_state,
+                        )
                     )
 
                     # Yield chunks from handler (content yielded to UI)
@@ -5753,15 +5743,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         full_content = ""
 
                     # Apply state updates back to orchestrator
-                    force_finalize_used = tracking_state.force_finalize and intent_result.action == "finish"
-                    apply_tracking_state_updates(self, intent_result.state_updates, force_finalize_used)
+                    force_finalize_used = (
+                        tracking_state.force_finalize and intent_result.action == "finish"
+                    )
+                    apply_tracking_state_updates(
+                        self, intent_result.state_updates, force_finalize_used
+                    )
 
                     # Get action result for ContinuationHandler
                     action_result = intent_result.action_result
                     action = intent_result.action
 
                     # Log the action
-                    logger.info(f"Continuation action: {action} - {action_result.get('reason', 'unknown')}")
+                    logger.info(
+                        f"Continuation action: {action} - {action_result.get('reason', 'unknown')}"
+                    )
 
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
                     # Delegated to ContinuationHandler for testability and SRP compliance.

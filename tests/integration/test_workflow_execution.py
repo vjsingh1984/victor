@@ -93,7 +93,9 @@ class TestWorkflowExecution:
         assert result.success
         assert result.workflow_name == "test_linear"
         assert len(result.context.node_results) == 3
-        assert all(r.status == ExecutorNodeStatus.COMPLETED for r in result.context.node_results.values())
+        assert all(
+            r.status == ExecutorNodeStatus.COMPLETED for r in result.context.node_results.values()
+        )
 
     @pytest.mark.asyncio
     async def test_workflow_with_condition(self, mock_orchestrator, mock_subagent_result):

@@ -122,9 +122,9 @@ def retry_policy_to_strategy(policy: "RetryPolicy") -> BaseRetryStrategy:
             max_delay=policy.delay_seconds * 32,  # Cap at ~32x base
             multiplier=2.0,
             jitter=0.1,
-            retryable_exceptions=set(policy.retry_on_exceptions)
-            if policy.retry_on_exceptions
-            else None,
+            retryable_exceptions=(
+                set(policy.retry_on_exceptions) if policy.retry_on_exceptions else None
+            ),
         )
     else:
         return FixedDelayStrategy(

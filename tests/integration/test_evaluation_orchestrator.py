@@ -325,7 +325,9 @@ class TestEvaluationOrchestrator:
                     turns=3,
                     tool_calls=[
                         EvalToolCall(name="file_read", arguments={"path": "test.py"}, success=True),
-                        EvalToolCall(name="file_write", arguments={"path": "test.py"}, success=True),
+                        EvalToolCall(
+                            name="file_write", arguments={"path": "test.py"}, success=True
+                        ),
                     ],
                     file_edits=[
                         FileEdit(path="test.py", action="modify", after_content="new content"),

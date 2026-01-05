@@ -60,8 +60,6 @@ class ExecutionCheckpoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-
-
 @dataclass
 class ExecutionBudget:
     """Tracks execution time budget and progress."""

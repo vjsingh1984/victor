@@ -267,13 +267,17 @@ class YAMLWorkflowCoordinator:
 
                 # Handle polymorphic result types (LSP compliance)
                 if hasattr(result, "state"):
-                    final_state = result.state if isinstance(result.state, dict) else {"result": result.state}
+                    final_state = (
+                        result.state if isinstance(result.state, dict) else {"result": result.state}
+                    )
                     nodes_executed = getattr(result, "node_history", [])
                     success = getattr(result, "success", True)
                     error = getattr(result, "error", None)
                 elif isinstance(result, dict):
                     final_state = result
-                    nodes_executed = result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
+                    nodes_executed = (
+                        result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
+                    )
                     success = True
                     error = None
                 else:

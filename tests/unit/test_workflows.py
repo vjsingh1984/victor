@@ -711,9 +711,13 @@ class TestWorkflowContext:
     def test_get_outputs(self):
         """get_outputs returns successful outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output"))
+        ctx.add_result(
+            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output")
+        )
         ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
-        ctx.add_result(NodeResult(node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output"))
+        ctx.add_result(
+            NodeResult(node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output")
+        )
 
         outputs = ctx.get_outputs()
         assert outputs == {"a": "A output", "c": "C output"}
@@ -1562,7 +1566,9 @@ class TestWorkflowResultExtended:
     def test_to_dict_includes_outputs(self):
         """to_dict includes node outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A"))
+        ctx.add_result(
+            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A")
+        )
 
         result = WorkflowResult(
             workflow_name="test",

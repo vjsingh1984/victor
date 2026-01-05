@@ -899,9 +899,7 @@ class WorkflowDefinitionCache:
         path_str = str(path.resolve())
 
         with self._lock:
-            keys_to_delete = [
-                k for k in self._cache.keys() if path_str in k  # Key contains path
-            ]
+            keys_to_delete = [k for k in self._cache.keys() if path_str in k]  # Key contains path
 
             for key in keys_to_delete:
                 del self._cache[key]

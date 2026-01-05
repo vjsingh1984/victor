@@ -311,8 +311,15 @@ class TestStandardStageDefinitions:
         assert isinstance(stages, dict)
 
         # Should have all standard coding stages
-        expected = ["initial", "planning", "reading", "analysis",
-                    "execution", "verification", "completion"]
+        expected = [
+            "initial",
+            "planning",
+            "reading",
+            "analysis",
+            "execution",
+            "verification",
+            "completion",
+        ]
         for stage_name in expected:
             assert stage_name in stages
             assert isinstance(stages[stage_name], StageDefinition)
@@ -328,8 +335,14 @@ class TestStandardStageDefinitions:
         assert isinstance(stages, dict)
 
         # Should have data analysis specific stages
-        expected = ["initial", "data_loading", "data_cleaning",
-                    "analysis", "visualization", "completion"]
+        expected = [
+            "initial",
+            "data_loading",
+            "data_cleaning",
+            "analysis",
+            "visualization",
+            "completion",
+        ]
         for stage_name in expected:
             assert stage_name in stages
 

@@ -348,6 +348,7 @@ class SandboxedExecutor:
 
         # Generate a unique container name for cleanup tracking
         import uuid
+
         container_name = f"victor-sandbox-{uuid.uuid4().hex[:12]}"
 
         # Build docker run command
@@ -456,7 +457,11 @@ class SandboxedExecutor:
         try:
             # First try to stop gracefully with short timeout
             stop_process = await asyncio.create_subprocess_exec(
-                "docker", "stop", "-t", "2", container_name,
+                "docker",
+                "stop",
+                "-t",
+                "2",
+                container_name,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -467,7 +472,10 @@ class SandboxedExecutor:
         try:
             # Force remove if still exists
             rm_process = await asyncio.create_subprocess_exec(
-                "docker", "rm", "-f", container_name,
+                "docker",
+                "rm",
+                "-f",
+                container_name,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
