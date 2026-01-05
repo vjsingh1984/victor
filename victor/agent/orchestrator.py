@@ -232,15 +232,21 @@ from victor.agent.streaming import (
     CoordinatorConfig,
     ContinuationHandler,
     ContinuationResult,
+    IntentClassificationHandler,
+    IntentClassificationResult,
     IterationCoordinator,
     StreamingChatContext,
     StreamingChatHandler,
     ToolExecutionHandler,
     ToolExecutionResult,
+    TrackingState,
+    apply_tracking_state_updates,
     create_continuation_handler,
     create_coordinator,
+    create_intent_classification_handler,
     create_stream_context,
     create_tool_execution_handler,
+    create_tracking_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -5707,172 +5713,55 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
                 if not tool_calls:
-                    # CRITICAL FIX: Yield content to UI immediately when there are no tool calls
-                    # This ensures the user sees the model's response even if the loop continues
-                    # for intent classification and action decisions
-                    # Save content for intent classification before yielding
-                    content_for_intent = full_content or ""
-                    if full_content:
-                        sanitized = self.sanitizer.sanitize(full_content)
-                        if sanitized:
-                            logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
-                            yield self._chunk_generator.generate_content_chunk(sanitized)
-                            # Track accumulated content - use context method for consistency
-                            stream_ctx.accumulate_content(sanitized)
-                            logger.debug(
-                                f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
-                            )
-                            # Clear full_content to prevent duplicate output later
-                            full_content = ""
+                    # === INTENT CLASSIFICATION (P0 SRP refactor) ===
+                    # Delegated to IntentClassificationHandler for testability and SRP compliance.
+                    # The handler manages content yielding, intent classification (with caching),
+                    # response loop detection, and continuation action determination.
 
-                    # Check if model intended to continue but didn't make a tool call
-                    # Use semantic intent classification to determine continuation action
-                    # NOTE: Use the LAST portion of the response for intent classification
-                    # because asking_input patterns like "Would you like me to..." typically
-                    # appear at the END of a long response
-                    intent_text = content_for_intent
-                    if len(intent_text) > 500:
-                        intent_text = intent_text[-500:]
+                    # Create intent classification handler lazily (reused across iterations)
+                    if not hasattr(self, "_intent_classification_handler"):
+                        self._intent_classification_handler = create_intent_classification_handler(self)
 
-                    # Check intent cache (50-80% reduction in embedding calls)
-                    # Initialize cache if needed
-                    if not hasattr(self, "_intent_cache"):
-                        self._intent_cache: Dict[int, Any] = {}
-
-                    intent_cache_key = hash(intent_text)
-                    if intent_cache_key in self._intent_cache:
-                        intent_result = self._intent_cache[intent_cache_key]
-                        logger.debug(f"Intent classification (cached): {intent_result.intent.name}")
-                    else:
-                        intent_result = self.intent_classifier.classify_intent_sync(intent_text)
-                        # Cache the result (limit cache size to prevent memory bloat)
-                        if len(self._intent_cache) < 100:
-                            self._intent_cache[intent_cache_key] = intent_result
-                        logger.debug(
-                            f"Intent classification: {intent_result.intent.name} "
-                            f"(confidence={intent_result.confidence:.3f}, "
-                            f"text_len={len(intent_text)}, "
-                            f"top_matches={intent_result.top_matches[:3]})"
-                        )
-
-                    # Initialize tracking variables
+                    # Ensure tracking variables are initialized
                     if not hasattr(self, "_continuation_prompts"):
                         self._continuation_prompts = 0
                     if not hasattr(self, "_asking_input_prompts"):
                         self._asking_input_prompts = 0
                     if not hasattr(self, "_consecutive_blocked_attempts"):
                         self._consecutive_blocked_attempts = 0
-                    # Cumulative counter NEVER resets - tracks total interventions across session
                     if not hasattr(self, "_cumulative_prompt_interventions"):
                         self._cumulative_prompt_interventions = 0
-                    # Intent classification cache (50-80% reduction in embedding calls)
-                    if not hasattr(self, "_intent_cache"):
-                        self._intent_cache: Dict[int, Any] = {}
 
-                    # Check for response loop using UnifiedTaskTracker
-                    # (detects when model keeps responding with similar text without tool calls)
-                    is_repeated_response = self.unified_tracker.check_response_loop(
-                        full_content or ""
-                    )
+                    # Create tracking state from orchestrator
+                    tracking_state = create_tracking_state(self)
 
-                    # Use ContinuationStrategy to determine what action to take
-                    # Delegated to extracted component (Phase 2E)
-                    one_shot_mode = getattr(self.settings, "one_shot_mode", False)
-                    strategy = ContinuationStrategy()
-
-                    # Build task completion signals for early termination detection
-                    # Include cycle detection info from conversation state
-                    cycle_count = 0
-                    if hasattr(self, "conversation_state") and self.conversation_state:
-                        try:
-                            state_summary = self.conversation_state.get_state_summary()
-                            if isinstance(state_summary, dict):
-                                cycle_count = state_summary.get("transition_count", 0)
-                                # Also check stage visit counts for cycling detection
-                                if hasattr(self.conversation_state, "_history"):
-                                    history = self.conversation_state._history
-                                    if hasattr(history, "get_max_visit_count"):
-                                        cycle_count = max(
-                                            cycle_count, history.get_max_visit_count()
-                                        )
-                        except Exception:
-                            pass  # Don't fail on state access errors
-
-                    task_completion_signals = {
-                        "required_files": self._required_files,
-                        "read_files": self._read_files_session,
-                        "required_outputs": self._required_outputs,
-                        "all_files_read": (
-                            len(self._required_files) > 0
-                            and self._read_files_session.issuperset(set(self._required_files))
-                        ),
-                        "cycle_count": cycle_count,
-                        "synthesis_nudge_count": getattr(self, "_synthesis_nudge_count", 0),
-                        # Cumulative counter - tracks total prompt interventions across session
-                        "cumulative_prompt_interventions": self._cumulative_prompt_interventions,
-                    }
-
-                    action_result = strategy.determine_continuation_action(
-                        intent_result=intent_result,
-                        is_analysis_task=stream_ctx.is_analysis_task,
-                        is_action_task=stream_ctx.is_action_task,
-                        content_length=content_length,
+                    # Delegate to IntentClassificationHandler
+                    intent_result = self._intent_classification_handler.classify_and_determine_action(
+                        stream_ctx=stream_ctx,
                         full_content=full_content,
-                        continuation_prompts=self._continuation_prompts,
-                        asking_input_prompts=self._asking_input_prompts,
-                        one_shot_mode=one_shot_mode,
-                        mentioned_tools=mentioned_tools_detected,  # Pass hallucinated tool mentions
-                        # Context from orchestrator
-                        max_prompts_summary_requested=getattr(
-                            self, "_max_prompts_summary_requested", False
-                        ),
-                        settings=self.settings,
-                        rl_coordinator=self._rl_coordinator,
-                        provider_name=self.provider.name,
-                        model=self.model,
-                        tool_budget=self.tool_budget,
-                        unified_tracker_config=self.unified_tracker.config,
-                        task_completion_signals=task_completion_signals,
+                        content_length=content_length,
+                        mentioned_tools=mentioned_tools_detected,
+                        tracking_state=tracking_state,
                     )
 
-                    # Apply state updates from action result
-                    if "continuation_prompts" in action_result.get("updates", {}):
-                        self._continuation_prompts = action_result["updates"][
-                            "continuation_prompts"
-                        ]
-                    if "asking_input_prompts" in action_result.get("updates", {}):
-                        self._asking_input_prompts = action_result["updates"][
-                            "asking_input_prompts"
-                        ]
-                    if "synthesis_nudge_count" in action_result.get("updates", {}):
-                        self._synthesis_nudge_count = action_result["updates"][
-                            "synthesis_nudge_count"
-                        ]
-                    if action_result.get("set_final_summary_requested"):
-                        self._final_summary_requested = True
-                    if action_result.get("set_max_prompts_summary_requested"):
-                        self._max_prompts_summary_requested = True
+                    # Yield chunks from handler (content yielded to UI)
+                    for chunk in intent_result.chunks:
+                        yield chunk
 
-                    action = action_result["action"]
+                    # Clear full_content if handler yielded it
+                    if intent_result.content_cleared:
+                        full_content = ""
 
-                    # Override: If repeated response detected, force completion to prevent loop
-                    if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
-                        action = "finish"
-                        logger.info(
-                            f"Continuation action: {action} - "
-                            "Overriding to finish due to repeated response"
-                        )
-                    # Override: If force_finalize set from grounding failure, stop continuation
-                    elif getattr(self, "_force_finalize", False):
-                        action = "finish"
-                        logger.info(
-                            f"Continuation action: {action} - "
-                            "Overriding to finish due to grounding failure limit"
-                        )
-                        # Reset the flag after using it
-                        self._force_finalize = False
-                    else:
-                        logger.info(f"Continuation action: {action} - {action_result['reason']}")
+                    # Apply state updates back to orchestrator
+                    force_finalize_used = tracking_state.force_finalize and intent_result.action == "finish"
+                    apply_tracking_state_updates(self, intent_result.state_updates, force_finalize_used)
+
+                    # Get action result for ContinuationHandler
+                    action_result = intent_result.action_result
+                    action = intent_result.action
+
+                    # Log the action
+                    logger.info(f"Continuation action: {action} - {action_result.get('reason', 'unknown')}")
 
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
                     # Delegated to ContinuationHandler for testability and SRP compliance.

@@ -42,6 +42,14 @@ from victor.agent.streaming.tool_execution import (
     ToolExecutionResult,
     create_tool_execution_handler,
 )
+from victor.agent.streaming.intent_classification import (
+    IntentClassificationHandler,
+    IntentClassificationResult,
+    TrackingState,
+    create_intent_classification_handler,
+    create_tracking_state,
+    apply_tracking_state_updates,
+)
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationResult, IterationAction
 
@@ -54,10 +62,16 @@ __all__ = [
     "ContinuationResult",
     "ToolExecutionHandler",
     "ToolExecutionResult",
+    "IntentClassificationHandler",
+    "IntentClassificationResult",
+    "TrackingState",
     "IterationResult",
     "IterationAction",
     "create_stream_context",
     "create_coordinator",
     "create_continuation_handler",
     "create_tool_execution_handler",
+    "create_intent_classification_handler",
+    "create_tracking_state",
+    "apply_tracking_state_updates",
 ]
