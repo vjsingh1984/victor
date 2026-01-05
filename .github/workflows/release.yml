@@ -418,12 +418,12 @@ jobs:
 
           ### Using pip (recommended)
           \`\`\`bash
-          pip install victor==${{ steps.version.outputs.VERSION }}
+          pip install victor-ai==${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ### Using pipx (isolated environment)
           \`\`\`bash
-          pipx install victor==${{ steps.version.outputs.VERSION }}
+          pipx install victor-ai==${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ### Using Homebrew (macOS/Linux)

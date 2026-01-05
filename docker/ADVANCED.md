@@ -508,11 +508,11 @@ jobs:
 
 ```bash
 # Tag and push
-docker tag victor-ai username/victor:latest
-docker tag victor-ai username/victor:v1.0
+docker tag victor-ai vjsingh1984/victor-ai:latest
+docker tag victor-ai vjsingh1984/victor-ai:v1.0
 
-docker push username/victor:latest
-docker push username/victor:v1.0
+docker push vjsingh1984/victor-ai:latest
+docker push vjsingh1984/victor-ai:v1.0
 ```
 
 ## License

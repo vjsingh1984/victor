@@ -347,7 +347,7 @@ All code execution happens in isolated Docker containers:
 # docker-compose.yml
 services:
   victor-sandbox:
-    image: victor:latest
+    image: vjsingh1984/victor-ai:latest
     security_opt:
       - no-new-privileges:true
     read_only: true

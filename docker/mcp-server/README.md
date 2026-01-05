@@ -8,26 +8,26 @@ This directory contains Docker configuration for running Victor as an MCP (Model
 
 ```bash
 # From project root
-docker build -t victor-ai/mcp-server -f docker/mcp-server/Dockerfile .
+docker build -t vjsingh1984/victor-ai:mcp-server -f docker/mcp-server/Dockerfile .
 ```
 
 ### Run Container
 
 ```bash
 # Basic usage (stdio mode for Claude Desktop)
-docker run -it --rm -v $(pwd):/workspace victor-ai/mcp-server
+docker run -it --rm -v $(pwd):/workspace vjsingh1984/victor-ai:mcp-server
 
 # With specific tools
 docker run -it --rm \
   -e VICTOR_MCP_TOOLS=read,write,ls,git \
   -v $(pwd):/workspace \
-  victor-ai/mcp-server
+  vjsingh1984/victor-ai:mcp-server
 
 # With specific vertical
 docker run -it --rm \
   -e VICTOR_MCP_VERTICALS=coding \
   -v $(pwd):/workspace \
-  victor-ai/mcp-server
+  vjsingh1984/victor-ai:mcp-server
 ```
 
 ### Docker Compose
@@ -63,7 +63,7 @@ Add to your Claude Desktop configuration file:
       "args": [
         "run", "-i", "--rm",
         "-v", "/Users/YOUR_USERNAME:/workspace",
-        "victor-ai/mcp-server:latest"
+        "vjsingh1984/victor-ai:mcp-server"
       ],
       "env": {}
     }
@@ -100,7 +100,7 @@ Add to your Claude Desktop configuration file:
 
 1. **Mount workspace read-only** for untrusted environments:
    ```bash
-   docker run -it --rm -v $(pwd):/workspace:ro victor-ai/mcp-server
+   docker run -it --rm -v $(pwd):/workspace:ro vjsingh1984/victor-ai:mcp-server
    ```
 
 2. **Docker socket access** is required for Docker tools:
@@ -108,7 +108,7 @@ Add to your Claude Desktop configuration file:
    docker run -it --rm \
      -v /var/run/docker.sock:/var/run/docker.sock \
      -v $(pwd):/workspace \
-     victor-ai/mcp-server
+     vjsingh1984/victor-ai:mcp-server
    ```
 
 3. **Sandbox mode** adds additional restrictions:
@@ -116,7 +116,7 @@ Add to your Claude Desktop configuration file:
    docker run -it --rm \
      -e VICTOR_SANDBOX_MODE=true \
      -v $(pwd):/workspace \
-     victor-ai/mcp-server
+     vjsingh1984/victor-ai:mcp-server
    ```
 
 ## See Also

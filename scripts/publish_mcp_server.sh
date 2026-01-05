@@ -31,8 +31,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Default values
-DOCKER_IMAGE="victor-ai/mcp-server"
-DOCKER_TAG="latest"
+DOCKER_IMAGE="vjsingh1984/victor-ai"
+DOCKER_TAG="mcp-server"
 LOG_LEVEL="${VICTOR_MCP_LOG_LEVEL:-WARNING}"
 
 # Print colored message

@@ -23,8 +23,8 @@ pip install -e ".[dev]"
 
 ## Docker
 ```bash
-docker pull vjsingh1984/victor:latest
-docker run -it --rm -v $(pwd):/workspace -v ~/.victor:/home/victor/.victor vjsingh1984/victor:latest victor chat
+docker pull vjsingh1984/victor-ai:latest
+docker run -it --rm -v $(pwd):/workspace -v ~/.victor:/home/victor/.victor vjsingh1984/victor-ai:latest victor chat
 ```
 
 ## Post-Install

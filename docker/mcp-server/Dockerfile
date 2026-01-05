@@ -5,24 +5,24 @@
 # Exposes Victor's 55+ tools via Model Context Protocol
 #
 # Build:
-#   docker build -t victor-mcp-server -f docker/mcp-server/Dockerfile .
+#   docker build -t vjsingh1984/victor-ai:mcp-server -f docker/mcp-server/Dockerfile .
 #
 # Run (stdio mode for Claude Desktop):
-#   docker run -it --rm -v $(pwd):/workspace victor-mcp-server
+#   docker run -it --rm -v $(pwd):/workspace vjsingh1984/victor-ai:mcp-server
 #
 # Run with specific tools:
-#   docker run -it --rm -e VICTOR_MCP_TOOLS=read,write,ls victor-mcp-server
+#   docker run -it --rm -e VICTOR_MCP_TOOLS=read,write,ls vjsingh1984/victor-ai:mcp-server
 #
 # Run with specific vertical:
-#   docker run -it --rm -e VICTOR_MCP_VERTICALS=coding victor-mcp-server
+#   docker run -it --rm -e VICTOR_MCP_VERTICALS=coding vjsingh1984/victor-ai:mcp-server
 
 FROM python:3.12-slim
 
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL description="Victor MCP Server - Exposes Victor's tools via Model Context Protocol"
 LABEL version="1.0.0"
-LABEL org.opencontainers.image.source="https://github.com/victor-ai/victor"
-LABEL org.opencontainers.image.documentation="https://github.com/victor-ai/victor/blob/main/docs/guides/VICTOR_AS_MCP_SERVER.md"
+LABEL org.opencontainers.image.source="https://github.com/vjsingh1984/victor"
+LABEL org.opencontainers.image.documentation="https://github.com/vjsingh1984/victor/blob/main/docs/guides/VICTOR_AS_MCP_SERVER.md"
 
 # Install system dependencies
 # - git: for git tools

@@ -31,21 +31,21 @@ This Docker image includes **pre-downloaded embedding models** for 100% offline 
 
 ```bash
 # Build Docker image with embedded model
-docker build -t victor:airgapped .
+docker build -t vjsingh1984/victor-ai:airgapped .
 ```
 
 ### Test Air-gapped Setup
 
 ```bash
 # Run air-gapped test
-docker run --rm victor:airgapped bash /app/docker/scripts/test_airgapped.sh
+docker run --rm vjsingh1984/victor-ai:airgapped bash /app/docker/scripts/test_airgapped.sh
 ```
 
 ### Run Air-gapped Demo
 
 ```bash
 # Run codebase search demo (100% offline)
-docker run --rm victor:airgapped python3 /app/examples/airgapped_codebase_search.py
+docker run --rm vjsingh1984/victor-ai:airgapped python3 /app/examples/airgapped_codebase_search.py
 ```
 
 See full documentation in this file for more details.

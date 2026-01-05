@@ -28,7 +28,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/mcp-server/Dockerfile
-    image: victor-ai/mcp-server:latest
+    image: vjsingh1984/victor-ai:mcp-server
     container_name: victor-mcp-server
     stdin_open: true
     tty: true
@@ -58,7 +58,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/mcp-server/Dockerfile
-    image: victor-ai/mcp-server:latest
+    image: vjsingh1984/victor-ai:mcp-server
     container_name: victor-mcp-coding
     stdin_open: true
     tty: true
@@ -80,7 +80,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/mcp-server/Dockerfile
-    image: victor-ai/mcp-server:latest
+    image: vjsingh1984/victor-ai:mcp-server
     container_name: victor-mcp-safe
     stdin_open: true
     tty: true
@@ -105,7 +105,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/mcp-server/Dockerfile
-    image: victor-ai/mcp-server:latest
+    image: vjsingh1984/victor-ai:mcp-server
     container_name: victor-mcp-devops
     stdin_open: true
     tty: true
@@ -129,7 +129,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/mcp-server/Dockerfile
-    image: victor-ai/mcp-server:latest
+    image: vjsingh1984/victor-ai:mcp-server
     container_name: victor-mcp-full
     stdin_open: true
     tty: true

@@ -164,7 +164,7 @@ See `docs/guides/WORKFLOW_SCHEDULER.md` for complete documentation.
 |--------|---------|
 | pip | `pip install victor-ai` |
 | pipx | `pipx install victor-ai` |
-| Docker | `docker pull vjsingh1984/victor` |
+| Docker | `docker pull vjsingh1984/victor-ai` |
 | Source | `pip install -e ".[dev]"` |
 
 ---
