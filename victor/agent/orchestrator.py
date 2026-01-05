@@ -4725,6 +4725,95 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             is_analysis_task=stream_ctx.is_analysis_task,
         )
 
+    async def _handle_budget_exhausted(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> AsyncIterator[StreamChunk]:
+        """Handle budget exhaustion by generating final summary.
+
+        Args:
+            stream_ctx: The streaming context.
+
+        Yields:
+            StreamChunk notifications and final content.
+        """
+        # Yield budget exhausted chunks
+        for chunk in self._chunk_generator.get_budget_exhausted_chunks(stream_ctx):
+            yield chunk
+
+        # Try to generate final summary
+        try:
+            self.add_message(
+                "system",
+                "Tool budget reached. Provide a brief summary of what you found based on "
+                "the information gathered. Do NOT attempt any more tool calls.",
+            )
+            response = await self.provider.chat(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=None,
+            )
+            if response and response.content:
+                sanitized = self.sanitizer.sanitize(response.content)
+                if sanitized:
+                    yield self._chunk_generator.generate_content_chunk(sanitized, suffix="\n")
+        except Exception as e:
+            logger.warning(f"Failed to generate final summary: {e}")
+            yield self._chunk_generator.generate_budget_error_chunk()
+
+        # Finalize metrics
+        final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
+        elapsed_time = (
+            final_metrics.total_duration if final_metrics else time.time() - stream_ctx.start_time
+        )
+        ttft = final_metrics.time_to_first_token if final_metrics else None
+        cost_str = None
+        if self.settings.show_cost_metrics and final_metrics:
+            cost_str = final_metrics.format_cost()
+        metrics_line = self._chunk_generator.format_budget_exhausted_metrics(
+            stream_ctx, elapsed_time, ttft, cost_str
+        )
+
+        # Record Q-learning outcome
+        self._record_intelligent_outcome(
+            success=True,
+            quality_score=stream_ctx.last_quality_score,
+            user_satisfied=True,
+            completed=True,
+        )
+        yield self._chunk_generator.generate_metrics_chunk(metrics_line, is_final=True, prefix="\n")
+
+    async def _handle_force_final_response(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> AsyncIterator[StreamChunk]:
+        """Force a final response without tools.
+
+        Args:
+            stream_ctx: The streaming context.
+
+        Yields:
+            StreamChunk with final content.
+        """
+        try:
+            response = await self.provider.chat(
+                messages=self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=None,  # No tools - force text response
+            )
+            if response and response.content:
+                sanitized = self.sanitizer.sanitize(response.content)
+                if sanitized:
+                    self.add_message("assistant", sanitized)
+                    yield self._chunk_generator.generate_content_chunk(sanitized)
+        except Exception as e:
+            logger.warning(f"Error forcing final response: {e}")
+            yield self._chunk_generator.generate_force_response_error_chunk()
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5930,59 +6019,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     yield budget_warning
 
                 if remaining <= 0:
-                    # Use handler delegation for budget exhausted chunks (testable)
-                    for chunk in self._chunk_generator.get_budget_exhausted_chunks(stream_ctx):
-                        yield chunk
-                    try:
-                        self.add_message(
-                            "system",
-                            "Tool budget reached. Provide a brief summary of what you found based on "
-                            "the information gathered. Do NOT attempt any more tool calls.",
-                        )
-                        response = await self.provider.chat(
-                            messages=self.messages,
-                            model=self.model,
-                            temperature=self.temperature,
-                            max_tokens=self.max_tokens,
-                            tools=None,
-                        )
-                        if response and response.content:
-                            sanitized = self.sanitizer.sanitize(response.content)
-                            if sanitized:
-                                yield self._chunk_generator.generate_content_chunk(
-                                    sanitized, suffix="\n"
-                                )
-                    except Exception as e:
-                        logger.warning(f"Failed to generate final summary: {e}")
-                        # Use handler delegation for budget error chunk (testable)
-                        yield self._chunk_generator.generate_budget_error_chunk()
-
-                    # Finalize and display performance metrics using handler delegation
-                    # Pass cumulative_usage for accurate token counts from provider API
-                    final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
-                    elapsed_time = (
-                        final_metrics.total_duration
-                        if final_metrics
-                        else time.time() - stream_ctx.start_time
-                    )
-                    ttft = final_metrics.time_to_first_token if final_metrics else None
-                    # Include cost if show_cost_metrics is enabled
-                    cost_str = None
-                    if self.settings.show_cost_metrics and final_metrics:
-                        cost_str = final_metrics.format_cost()
-                    metrics_line = self._chunk_generator.format_budget_exhausted_metrics(
-                        stream_ctx, elapsed_time, ttft, cost_str
-                    )
-                    # Record outcome for Q-learning (budget reached = partial success)
-                    self._record_intelligent_outcome(
-                        success=True,  # We provided a summary
-                        quality_score=stream_ctx.last_quality_score,
-                        user_satisfied=True,
-                        completed=True,
-                    )
-                    yield self._chunk_generator.generate_metrics_chunk(
-                        metrics_line, is_final=True, prefix="\n"
-                    )
+                    # === BUDGET EXHAUSTED (via coordinator helper) ===
+                    async for budget_chunk in self._handle_budget_exhausted(stream_ctx):
+                        yield budget_chunk
                     return
 
                 # Force final response after too many consecutive tool calls without output
@@ -5998,25 +6037,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 force_chunk = self._handle_force_completion_with_handler(stream_ctx)
                 if force_chunk:
                     yield force_chunk
-
-                    # Force a final response by calling provider WITHOUT tools
-                    try:
-                        response = await self.provider.chat(
-                            messages=self.messages,
-                            model=self.model,
-                            temperature=self.temperature,
-                            max_tokens=self.max_tokens,
-                            tools=None,  # No tools - force text response
-                        )
-                        if response and response.content:
-                            sanitized = self.sanitizer.sanitize(response.content)
-                            if sanitized:
-                                self.add_message("assistant", sanitized)
-                                yield self._chunk_generator.generate_content_chunk(sanitized)
-                    except Exception as e:
-                        logger.warning(f"Error forcing final response: {e}")
-                        # Use handler delegation for force response error chunk (testable)
-                        yield self._chunk_generator.generate_force_response_error_chunk()
+                    # === FORCE FINAL RESPONSE (via coordinator helper) ===
+                    async for final_chunk in self._handle_force_final_response(stream_ctx):
+                        yield final_chunk
                     return  # Exit the loop after forcing final response
 
                 # Guard against None tool_calls (can happen when model response has no tool calls
