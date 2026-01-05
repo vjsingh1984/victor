@@ -407,8 +407,225 @@ if stats.queue_depth > 8000:
 2. Check endpoint configuration
 3. Verify service name is set
 
+## Protocol-Based Event System (v0.4.1+)
+
+Victor v0.4.1 introduces a protocol-based event system that enables distributed messaging across agents. This system runs alongside the existing EventBus and provides:
+
+- **Swappable backends**: In-memory, SQLite, Kafka, Redis (via plugins)
+- **Delivery guarantees**: AT_MOST_ONCE, AT_LEAST_ONCE, EXACTLY_ONCE
+- **Pattern matching**: Wildcard subscriptions (`tool.*`, `*.error`)
+- **Decoupled concerns**: Separate buses for observability vs. agent communication
+
+### Architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    IEventBackend Protocol                       │
+├────────────────────────────────────────────────────────────────┤
+│  InMemoryEventBackend  │  SQLiteEventBackend  │  KafkaBackend  │
+│  (default, in-process) │  (persistent, file)  │  (distributed) │
+└────────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┴─────────────────────┐
+        ▼                                           ▼
+┌──────────────────┐                     ┌──────────────────────┐
+│ ObservabilityBus │                     │   AgentMessageBus    │
+│ High-throughput  │                     │ Delivery guarantees  │
+│ Lossy OK         │                     │ Agent-to-agent       │
+└──────────────────┘                     └──────────────────────┘
+```
+
+### Quick Start
+
+```python
+from victor.core.events import (
+    ObservabilityBus,
+    AgentMessageBus,
+    Event,
+)
+
+# Observability events (high volume, lossy OK)
+obs_bus = ObservabilityBus()
+await obs_bus.connect()
+await obs_bus.emit("metric.latency", {"value": 42.5, "unit": "ms"})
+
+# Agent communication (delivery guarantees)
+agent_bus = AgentMessageBus()
+await agent_bus.connect()
+await agent_bus.send(
+    "task.assigned",
+    {"action": "analyze", "file": "main.py"},
+    to_agent="researcher",
+    from_agent="coordinator",
+)
+```
+
+### Backend Types
+
+| Backend | Use Case | Delivery | Persistence |
+|---------|----------|----------|-------------|
+| `IN_MEMORY` | Default, testing | AT_MOST_ONCE | No |
+| `DATABASE` | SQLite, small deployments | AT_LEAST_ONCE | Yes |
+| `KAFKA` | High-throughput distributed | EXACTLY_ONCE | Yes |
+| `REDIS` | Fast streams | AT_LEAST_ONCE | Optional |
+| `SQS` | AWS serverless | AT_LEAST_ONCE | Yes |
+| `RABBITMQ` | Traditional MQ | AT_LEAST_ONCE | Yes |
+
+### SQLite Backend (Lightweight Persistence)
+
+For single-instance deployments that need persistence:
+
+```python
+from victor.core.events.backends_lightweight import (
+    SQLiteEventBackend,
+    register_lightweight_backends,
+)
+
+# Register with factory
+register_lightweight_backends()
+
+# Or use directly
+backend = SQLiteEventBackend("events.db")
+await backend.connect()
+
+# Events persist across restarts
+await backend.publish(Event(topic="task.created", data={"id": "123"}))
+
+# Cleanup old events
+deleted = backend.cleanup_old_events(max_age_seconds=86400)  # 24 hours
+```
+
+### Pattern Matching
+
+Subscribe to events using wildcard patterns:
+
+```python
+async def handler(event: Event):
+    print(f"Received: {event.topic}")
+
+# Match all tool events
+await backend.subscribe("tool.*", handler)  # tool.start, tool.end, tool.error
+
+# Match all error events
+await backend.subscribe("*.error", handler)  # tool.error, agent.error
+
+# Match specific hierarchy
+await backend.subscribe("agent.*.task", handler)  # agent.researcher.task
+```
+
+### ObservabilityBus vs AgentMessageBus
+
+| Aspect | ObservabilityBus | AgentMessageBus |
+|--------|------------------|-----------------|
+| Purpose | Telemetry, metrics | Agent coordination |
+| Delivery | AT_MOST_ONCE (lossy OK) | AT_LEAST_ONCE |
+| Volume | High throughput | Lower, reliable |
+| Source | System components | Agent IDs |
+| Routing | Broadcast | Targeted or broadcast |
+
+### Bridging Legacy EventBus
+
+Adapters enable gradual migration:
+
+```python
+from victor.observability.event_bus import EventBus
+from victor.core.events import ObservabilityBus
+from victor.core.events.adapter import EventBusAdapter
+
+# Bridge existing code to new backend
+legacy_bus = EventBus.get_instance()
+new_bus = ObservabilityBus()
+await new_bus.connect()
+
+adapter = EventBusAdapter(legacy_bus, new_bus)
+adapter.enable_forwarding()
+
+# Legacy events now flow to new backend
+legacy_bus.emit_tool_start("read", {"file": "test.py"})
+```
+
+### Creating Custom Backends
+
+Implement the `IEventBackend` protocol:
+
+```python
+from victor.core.events import IEventBackend, Event, BackendType
+
+class MyBackend:
+    @property
+    def backend_type(self) -> BackendType:
+        return BackendType.CUSTOM
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
+
+    async def connect(self) -> None:
+        self._connected = True
+
+    async def disconnect(self) -> None:
+        self._connected = False
+
+    async def health_check(self) -> bool:
+        return self._connected
+
+    async def publish(self, event: Event) -> bool:
+        # Your implementation
+        return True
+
+    async def subscribe(self, pattern: str, handler) -> SubscriptionHandle:
+        # Your implementation
+        pass
+```
+
+Register with the factory:
+
+```python
+from victor.core.events import register_backend_factory, BackendType
+
+register_backend_factory(BackendType.CUSTOM, lambda config: MyBackend())
+```
+
+### Delivery Guarantees
+
+```python
+from victor.core.events import Event, DeliveryGuarantee
+
+# Fire-and-forget (default for observability)
+event = Event(
+    topic="metric.cpu",
+    data={"value": 42},
+    delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
+)
+
+# Reliable delivery (for agent tasks)
+event = Event(
+    topic="task.assigned",
+    data={"agent": "researcher"},
+    delivery_guarantee=DeliveryGuarantee.AT_LEAST_ONCE,
+)
+```
+
+### Best Practices
+
+1. **Use ObservabilityBus for metrics/telemetry** - High volume, lossy OK
+2. **Use AgentMessageBus for coordination** - Delivery guarantees matter
+3. **Choose appropriate backend**:
+   - Development: IN_MEMORY (default)
+   - Single-instance production: SQLite
+   - Distributed: Kafka or Redis
+4. **Set correlation IDs** for distributed tracing:
+   ```python
+   Event(topic="task", data={...}, correlation_id=trace_id)
+   ```
+5. **Clean up old events** in persistent backends:
+   ```python
+   backend.cleanup_old_events(max_age_seconds=86400)
+   ```
+
 ## Related Resources
 
 - [Workflow DSL Guide](WORKFLOW_DSL.md) - Workflow observability
 - [Workflow Scheduler Guide](WORKFLOW_SCHEDULER.md) - Scheduled workflow monitoring
+- [Multi-Agent Teams Guide](MULTI_AGENT_TEAMS.md) - Team coordination
 - [User Guide](../USER_GUIDE.md) - General usage
