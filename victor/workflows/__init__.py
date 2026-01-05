@@ -295,6 +295,17 @@ from victor.workflows.hitl_api import (
     create_hitl_app,
     run_hitl_server,
 )
+from victor.workflows.context import (
+    ExecutionContext,
+    create_execution_context,
+    ExecutionContextWrapper,
+    from_workflow_context,
+    to_workflow_context,
+    from_compiler_workflow_state,
+    to_compiler_workflow_state,
+    from_adapter_workflow_state,
+    to_adapter_workflow_state,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -513,4 +524,14 @@ __all__ = [
     "register_transport",
     "get_transport",
     "list_available_transports",
+    # Unified Execution Context
+    "ExecutionContext",
+    "create_execution_context",
+    "ExecutionContextWrapper",
+    "from_workflow_context",
+    "to_workflow_context",
+    "from_compiler_workflow_state",
+    "to_compiler_workflow_state",
+    "from_adapter_workflow_state",
+    "to_adapter_workflow_state",
 ]

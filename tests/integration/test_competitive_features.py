@@ -115,7 +115,7 @@ class TestLangGraphParity:
         assert any("entry" in e.lower() for e in errors)
 
         # Test 2: Unreachable node should be detected
-        graph_unreachable = StateGraph(ValidationState, name="unreachable_test")
+        graph_unreachable = WorkflowGraph(ValidationState, name="unreachable_test")
         graph_unreachable.add_node("a", lambda s: s)
         graph_unreachable.add_node("b", lambda s: s)
         graph_unreachable.add_node("c", lambda s: s)  # c is unreachable
