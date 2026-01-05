@@ -114,12 +114,16 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Fail if archive/victor-legacy is modified
+      - name: Fail if archive/victor-legacy is modified (additions only)
         if: github.event_name == 'pull_request'
         run: |
           BASE_BRANCH="${{ github.base_ref }}"
-          if git diff --name-only origin/${BASE_BRANCH}...HEAD | grep -q '^archive/victor-legacy/'; then
-            echo "Changes under archive/victor-legacy/ are not allowed. Move edits to active package."
+          # Only fail on additions or modifications, allow deletions (cleanup)
+          ADDED_OR_MODIFIED=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^archive/victor-legacy/' || true)
+          if [ -n "$ADDED_OR_MODIFIED" ]; then
+            echo "Additions/modifications under archive/victor-legacy/ are not allowed."
+            echo "Found: $ADDED_OR_MODIFIED"
+            echo "Move edits to active package."
             exit 1
           fi
 
