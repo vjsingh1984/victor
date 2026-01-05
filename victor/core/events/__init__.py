@@ -124,6 +124,14 @@ except ImportError:
     SQLiteEventBackend = None  # type: ignore
     register_lightweight_backends = None  # type: ignore
 
+# Adapters for bridging with existing systems
+from victor.core.events.adapter import (
+    victor_event_to_event,
+    event_to_victor_event,
+    EventBusAdapter,
+    TeamMessageBusAdapter,
+)
+
 __all__ = [
     # Taxonomy - Core enum
     "UnifiedEventType",
@@ -164,4 +172,9 @@ __all__ = [
     # Lightweight backends (optional)
     "SQLiteEventBackend",
     "register_lightweight_backends",
+    # Adapters for bridging
+    "victor_event_to_event",
+    "event_to_victor_event",
+    "EventBusAdapter",
+    "TeamMessageBusAdapter",
 ]
