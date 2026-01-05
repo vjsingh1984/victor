@@ -260,7 +260,6 @@ SEMANTIC_RENAMES: Dict[str, Dict[str, str]] = {
         "victor.security.audit.protocol": "AuditSeverity",
         "victor.iac.protocol": "IaCSeverity",
         "victor.coding.review.protocol": "ReviewSeverity",
-        "victor.coding.security.protocol": "(duplicate of victor.security.protocol)",
     },
     "RiskLevel": {
         # Each variant has different values for different domains
@@ -298,15 +297,11 @@ SEMANTIC_RENAMES: Dict[str, Dict[str, str]] = {
         # Different semantics for security vs package management
         "victor.security.protocol": "SecurityDependency (ecosystem, license, package_url)",
         "victor.deps.protocol": "PackageDependency (version tracking)",
-        "victor.coding.security.protocol": "SecurityDependency (duplicate)",
-        "victor.coding.deps.protocol": "PackageDependency (duplicate)",
     },
     "BaseDependencyParser": {
         # Different interface for security vs package management
         "victor.security.scanner": "BaseSecurityDependencyParser (ecosystem property)",
         "victor.deps.parsers": "BasePackageDependencyParser (PackageManager enum)",
-        "victor.coding.security.scanner": "BaseSecurityDependencyParser (duplicate)",
-        "victor.coding.deps.parsers": "BasePackageDependencyParser (duplicate)",
     },
     "RetryConfig": {
         # Different attributes for different retry domains
@@ -382,16 +377,6 @@ MODULE_DUPLICATIONS = {
         "canonical": "victor.safety",
         "duplicates": ["victor.security.safety"],
         "note": "Near-identical modules with different import paths",
-    },
-    "security_protocols": {
-        "canonical": "victor.security",
-        "duplicates": ["victor.coding.security"],
-        "note": "Nearly identical protocol.py files",
-    },
-    "dependency_parsing": {
-        "canonical": "victor.deps",
-        "duplicates": ["victor.coding.deps"],
-        "note": "Dependency parser duplications",
     },
 }
 

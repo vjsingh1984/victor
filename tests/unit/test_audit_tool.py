@@ -21,7 +21,7 @@ from datetime import datetime
 
 from victor.tools.audit_tool import AuditTool
 from victor.tools.base import CostTier
-from victor.audit import (
+from victor.security.audit import (
     AuditEvent,
     AuditEventType,
     AuditReport,
