@@ -263,6 +263,33 @@ class ContextManager:
         """Get the model identifier."""
         return self._model
 
+    @property
+    def is_background_compaction_running(self) -> bool:
+        """Check if background compaction is currently active.
+
+        Returns:
+            True if background compaction task is running.
+        """
+        if self._context_compactor is None:
+            return False
+        return getattr(self._context_compactor, "_async_running", False)
+
+    async def start_background_compaction(self, interval_seconds: float = 30.0) -> None:
+        """Start background compaction task.
+
+        Args:
+            interval_seconds: How often to check for compaction (default 30s).
+        """
+        if self._context_compactor is None:
+            return
+        await self._context_compactor.start_background_compaction(interval_seconds)
+
+    async def stop_background_compaction(self) -> None:
+        """Stop background compaction task."""
+        if self._context_compactor is None:
+            return
+        await self._context_compactor.stop_background_compaction()
+
 
 def create_context_manager(
     provider_name: str,

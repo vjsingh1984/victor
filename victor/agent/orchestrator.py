@@ -3918,6 +3918,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
             self._sequence_tracker.clear_history()
 
+        # PERF: Start background compaction for async context management
+        # This runs compaction checks periodically without blocking the main loop
+        if self._context_manager and hasattr(self._context_manager, "start_background_compaction"):
+            await self._context_manager.start_background_compaction(interval_seconds=15.0)
+
         # Local aliases for frequently-used values
         max_total_iterations = self.unified_tracker.config.get("max_total_iterations", 50)
         total_iterations = 0
@@ -3964,23 +3969,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Intelligent pipeline pre-request hook: get Q-learning recommendations
         # This enables RL-based mode transitions and optimal tool budget selection
-        intelligent_context = await self._prepare_intelligent_request(
-            task=user_message,
-            task_type=unified_task_type.value,
+        # PERF: Start as background task to run in parallel with sync work below
+        intelligent_task = asyncio.create_task(
+            self._prepare_intelligent_request(
+                task=user_message,
+                task_type=unified_task_type.value,
+            )
         )
-        if intelligent_context:
-            # Inject optimized system prompt if provided
-            if intelligent_context.get("system_prompt_addition"):
-                self.add_message("system", intelligent_context["system_prompt_addition"])
-                logger.debug("Injected intelligent pipeline optimized prompt")
 
         # Get exploration iterations from unified tracker (replaces TASK_CONFIGS lookup)
         max_exploration_iterations = self.unified_tracker.max_exploration_iterations
 
         # Task prep: hints, complexity, reminders
+        # This runs while intelligent_task executes in background
         task_classification, complexity_tool_budget = self._prepare_task(
             user_message, unified_task_type
         )
+
+        # PERF: Await intelligent request after sync work completes
+        intelligent_context = await intelligent_task
+        if intelligent_context:
+            # Inject optimized system prompt if provided
+            if intelligent_context.get("system_prompt_addition"):
+                self.add_message("system", intelligent_context["system_prompt_addition"])
+                logger.debug("Injected intelligent pipeline optimized prompt")
 
         return (
             stream_metrics,
@@ -5006,9 +5018,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 yield cancellation_chunk
                 return
 
-            compaction_chunk = self._handle_compaction(user_message)
-            if compaction_chunk:
-                yield compaction_chunk
+            # PERF: Skip sync compaction if background compaction is active
+            # Background compaction handles context management asynchronously
+            if not self._context_manager.is_background_compaction_running:
+                compaction_chunk = self._handle_compaction(user_message)
+                if compaction_chunk:
+                    yield compaction_chunk
 
             # Context state is maintained directly - no sync needed
             # force_completion and total_accumulated_chars are accessed via stream_ctx
