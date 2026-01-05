@@ -18,7 +18,7 @@ These tests verify:
 - Workflow interruption creating checkpoints
 - Resume from checkpoint with context restoration
 - Multiple interrupt points in a single workflow
-- Checkpoint persistence and retrieval
+- HITLCheckpoint persistence and retrieval
 """
 
 import asyncio
@@ -27,13 +27,13 @@ from typing import Dict, Any, List
 
 from victor.framework.hitl import (
     HITLController,
-    Checkpoint,
+    HITLCheckpoint,
     ApprovalStatus,
 )
 
 
 # =============================================================================
-# Checkpoint Creation Tests
+# HITLCheckpoint Creation Tests
 # =============================================================================
 
 
@@ -115,7 +115,7 @@ class TestWorkflowInterruptionCreatesCheckpoints:
 
 
 # =============================================================================
-# Resume from Checkpoint Tests
+# Resume from HITLCheckpoint Tests
 # =============================================================================
 
 
@@ -329,7 +329,7 @@ class TestMultipleInterruptPointsInWorkflow:
 
 
 # =============================================================================
-# Checkpoint Persistence and Retrieval Tests
+# HITLCheckpoint Persistence and Retrieval Tests
 # =============================================================================
 
 
@@ -352,7 +352,7 @@ class TestCheckpointPersistenceAndRetrieval:
         assert controller.is_paused is True  # Still paused
 
     def test_checkpoint_context_immutable_after_creation(self):
-        """Checkpoint context should not be affected by external modifications."""
+        """HITLCheckpoint context should not be affected by external modifications."""
         controller = HITLController()
 
         original_context = {"items": ["a", "b"], "value": 10}
@@ -399,7 +399,7 @@ class TestCheckpointPersistenceAndRetrieval:
         assert controller.get_checkpoint_context(cp3)["checkpoint"] == 3
 
     def test_checkpoint_with_large_context(self):
-        """Checkpoint should handle large context data."""
+        """HITLCheckpoint should handle large context data."""
         controller = HITLController()
 
         large_context = {
@@ -511,7 +511,7 @@ class TestInterruptResumeWithApprovalRequests:
 
     @pytest.mark.asyncio
     async def test_checkpoint_can_store_pending_approval_info(self):
-        """Checkpoint can store information about pending approvals."""
+        """HITLCheckpoint can store information about pending approvals."""
         controller = HITLController()
 
         # Create an approval request

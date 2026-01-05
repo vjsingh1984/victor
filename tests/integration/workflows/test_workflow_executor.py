@@ -43,7 +43,7 @@ from victor.workflows.executor import (
     WorkflowContext,
     WorkflowResult,
     NodeResult,
-    NodeStatus,
+    ExecutorNodeStatus,
 )
 
 
@@ -316,9 +316,9 @@ class TestWorkflowExecutorE2E:
         for node_id, node_result in result.context.node_results.items():
             assert isinstance(node_result, NodeResult)
             assert node_result.status in [
-                NodeStatus.COMPLETED,
-                NodeStatus.FAILED,
-                NodeStatus.SKIPPED,
+                ExecutorNodeStatus.COMPLETED,
+                ExecutorNodeStatus.FAILED,
+                ExecutorNodeStatus.SKIPPED,
             ]
 
     async def test_execute_tracks_duration(self, mock_orchestrator, simple_workflow):
@@ -488,7 +488,7 @@ class TestErrorHandlingAndRetry:
 
         # Error should be captured
         failed_results = [
-            r for r in result.context.node_results.values() if r.status == NodeStatus.FAILED
+            r for r in result.context.node_results.values() if r.status == ExecutorNodeStatus.FAILED
         ]
         assert len(failed_results) > 0
 

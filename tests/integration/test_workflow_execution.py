@@ -34,7 +34,7 @@ from victor.workflows import (
     WorkflowDefinition,
     WorkflowExecutor,
     WorkflowResult,
-    NodeStatus,
+    ExecutorNodeStatus,
     load_workflow_from_yaml,
 )
 
@@ -82,7 +82,7 @@ class TestWorkflowExecution:
         async def mock_execute(node, context, start_time):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=mock_subagent_result.output,
                 tool_calls_used=5,
             )
@@ -93,7 +93,7 @@ class TestWorkflowExecution:
         assert result.success
         assert result.workflow_name == "test_linear"
         assert len(result.context.node_results) == 3
-        assert all(r.status == NodeStatus.COMPLETED for r in result.context.node_results.values())
+        assert all(r.status == ExecutorNodeStatus.COMPLETED for r in result.context.node_results.values())
 
     @pytest.mark.asyncio
     async def test_workflow_with_condition(self, mock_orchestrator, mock_subagent_result):
@@ -118,7 +118,7 @@ class TestWorkflowExecution:
         async def mock_execute(node, context, start_time):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="Fixed!",
                 tool_calls_used=3,
             )
@@ -155,7 +155,7 @@ class TestWorkflowExecution:
         async def mock_execute(node, context, start_time):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="Done",
                 tool_calls_used=2,
             )
@@ -191,7 +191,7 @@ class TestWorkflowExecution:
         async def mock_execute(node, context, start_time):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="Result",
                 tool_calls_used=3,
             )
@@ -221,7 +221,7 @@ class TestWorkflowExecution:
             await asyncio.sleep(5)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="Done",
                 tool_calls_used=1,
             )
@@ -254,7 +254,7 @@ class TestWorkflowExecution:
                 context.set("research", "Research findings")
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.COMPLETED,
+                    status=ExecutorNodeStatus.COMPLETED,
                     output="Research done",
                     tool_calls_used=5,
                 )
@@ -264,7 +264,7 @@ class TestWorkflowExecution:
                 assert research == "Research findings"
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.COMPLETED,
+                    status=ExecutorNodeStatus.COMPLETED,
                     output=f"Used: {research}",
                     tool_calls_used=3,
                 )
@@ -301,7 +301,7 @@ workflows:
         async def mock_execute(node, context, start_time):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="YAML workflow done",
                 tool_calls_used=5,
             )
@@ -332,7 +332,7 @@ workflows:
             context.set(node.output_key, output)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=output,
                 tool_calls_used=2,
             )
