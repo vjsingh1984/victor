@@ -44,6 +44,7 @@ import pytest
 IS_CI = os.environ.get("CI", "false").lower() == "true"
 IS_GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS", "false").lower() == "true"
 
+
 # Check for required dependencies
 def _check_fastapi_available() -> bool:
     """Check if FastAPI and its test dependencies are available."""
@@ -70,9 +71,7 @@ FASTAPI_AVAILABLE = _check_fastapi_available()
 WEBSOCKET_AVAILABLE = _check_websocket_available()
 
 # Skip conditions
-skip_if_no_fastapi = pytest.mark.skipif(
-    not FASTAPI_AVAILABLE, reason="FastAPI not available"
-)
+skip_if_no_fastapi = pytest.mark.skipif(not FASTAPI_AVAILABLE, reason="FastAPI not available")
 
 skip_if_ci_no_websocket = pytest.mark.skipif(
     IS_CI and not WEBSOCKET_AVAILABLE,

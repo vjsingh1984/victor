@@ -205,9 +205,7 @@ class TestEventBridgeFiltering:
         ]
 
         for type_name in expected_types:
-            assert hasattr(
-                BridgeEventType, type_name
-            ), f"Missing event type: {type_name}"
+            assert hasattr(BridgeEventType, type_name), f"Missing event type: {type_name}"
 
 
 if __name__ == "__main__":
