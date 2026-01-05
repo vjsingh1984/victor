@@ -1060,6 +1060,34 @@ try:
 except ImportError:
     pass
 
+# Stage Manager (Framework-level stage management)
+try:
+    from victor.framework.stage_manager import (
+        StageDefinition,
+        StageManager,
+        StageManagerConfig,
+        StageManagerProtocol,
+        StageTransition,
+        create_stage_manager,
+        get_coding_stages,
+        get_data_analysis_stages,
+        get_research_stages,
+    )
+
+    _STAGE_MANAGER_EXPORTS = [
+        "StageDefinition",
+        "StageManager",
+        "StageManagerConfig",
+        "StageManagerProtocol",
+        "StageTransition",
+        "create_stage_manager",
+        "get_coding_stages",
+        "get_data_analysis_stages",
+        "get_research_stages",
+    ]
+except ImportError:
+    _STAGE_MANAGER_EXPORTS = []
+
 # LSP Protocols (Cross-vertical language intelligence)
 try:
     from victor.framework.lsp_protocols import (
@@ -1089,6 +1117,10 @@ try:
     __all__ = list(__all__) + _LSP_PROTOCOLS_EXPORTS
 except ImportError:
     pass
+
+# Add Stage Manager exports
+if _STAGE_MANAGER_EXPORTS:
+    __all__ = list(__all__) + _STAGE_MANAGER_EXPORTS
 
 # Version of the framework API
 __version__ = "0.4.0"
