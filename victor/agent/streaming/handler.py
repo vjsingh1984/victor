@@ -1233,6 +1233,108 @@ class StreamingChatHandler:
         """
         return StreamChunk(content="Unable to generate final summary. Please try a simpler query.")
 
+    def handle_iteration_start(
+        self,
+        ctx: StreamingChatContext,
+    ) -> Optional[IterationResult]:
+        """Handle the start of an iteration.
+
+        Performs all pre-iteration checks in priority order.
+
+        Args:
+            ctx: The streaming context.
+
+        Returns:
+            IterationResult if iteration should be skipped/stopped.
+        """
+        # Time limit check
+        time_result = self.check_time_limit(ctx)
+        if time_result is not None:
+            return time_result
+
+        # Iteration limit check
+        iter_result = self.check_iteration_limit(ctx)
+        if iter_result is not None:
+            return iter_result
+
+        # Force completion check
+        force_result = self.check_force_completion(ctx)
+        if force_result is not None:
+            return force_result
+
+        return None
+
+    def handle_iteration_end(
+        self,
+        ctx: StreamingChatContext,
+        result: IterationResult,
+        stop_reason_value: str = "",
+        stop_hint: str = "",
+    ) -> Optional[IterationResult]:
+        """Handle the end of an iteration.
+
+        Performs all post-iteration checks and determines continuation.
+
+        Args:
+            ctx: The streaming context.
+            result: The iteration result.
+            stop_reason_value: Optional stop reason from loop detection.
+            stop_hint: Optional stop hint from loop detection.
+
+        Returns:
+            IterationResult if additional action needed.
+        """
+        # Handle force completion with warning
+        if ctx.force_completion:
+            force_result = self.handle_force_completion(ctx, stop_reason_value, stop_hint)
+            if force_result is not None:
+                return force_result
+
+        # Budget warning check
+        budget_result = self.check_tool_budget(ctx)
+        if budget_result is not None:
+            return budget_result
+
+        return None
+
+    def handle_continuation(
+        self,
+        ctx: StreamingChatContext,
+        has_tool_calls: bool,
+        has_content: bool,
+    ) -> Optional[IterationResult]:
+        """Determine if loop should continue based on response.
+
+        This method encapsulates the continuation decision logic.
+
+        Args:
+            ctx: The streaming context.
+            has_tool_calls: Whether response has tool calls.
+            has_content: Whether response has content.
+
+        Returns:
+            IterationResult if loop should stop, None to continue.
+        """
+        # With tool calls, continue to execute them
+        if has_tool_calls:
+            return None
+
+        # Force completion triggers break
+        if ctx.force_completion:
+            if has_content:
+                return create_break_result()
+            # No content - will trigger recovery
+
+        # Check for natural completion
+        if has_content and ctx.has_substantial_content():
+            return self.check_natural_completion(ctx, has_tool_calls, len(ctx.context_msg))
+
+        # Handle empty response
+        if not has_content:
+            return self.handle_empty_response(ctx)
+
+        return None
+
     def generate_final_marker_chunk(self) -> StreamChunk:
         """Generate an empty final marker chunk.
 

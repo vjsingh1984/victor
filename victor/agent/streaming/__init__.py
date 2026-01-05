@@ -20,17 +20,26 @@ providing better testability and separation of concerns.
 Components:
 - StreamingChatContext: Dataclass holding all state for a streaming session
 - StreamingChatHandler: Main handler for streaming chat iterations
+- IterationCoordinator: Loop control and decision coordination
 - IterationResult: Result of a single iteration in the streaming loop
 """
 
 from victor.agent.streaming.context import StreamingChatContext, create_stream_context
+from victor.agent.streaming.coordinator import (
+    CoordinatorConfig,
+    IterationCoordinator,
+    create_coordinator,
+)
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationResult, IterationAction
 
 __all__ = [
     "StreamingChatContext",
     "StreamingChatHandler",
+    "IterationCoordinator",
+    "CoordinatorConfig",
     "IterationResult",
     "IterationAction",
     "create_stream_context",
+    "create_coordinator",
 ]
