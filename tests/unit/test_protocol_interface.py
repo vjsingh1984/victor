@@ -24,6 +24,7 @@ from victor.integrations.protocol.interface import (
     ChatResponse,
     ClientStreamChunk,
     ToolCall,
+    ToolInvocation,
     ToolResult,
     UndoRedoResult,
     VictorProtocol,
@@ -128,40 +129,118 @@ class TestToolResult:
 
 
 class TestToolCall:
-    """Tests for ToolCall dataclass."""
+    """Tests for canonical ToolCall dataclass (without result).
 
-    def test_creation_without_result(self):
-        """Test tool call without result."""
+    ToolCall is the canonical tool call representation from victor.agent.tool_calling.base.
+    It represents a tool invocation request without the result. For call+result pairs,
+    use ToolInvocation instead.
+    """
+
+    def test_creation(self):
+        """Test tool call creation."""
         call = ToolCall(
-            id="call_123",
             name="read_file",
             arguments={"path": "/test.py"},
+            id="call_123",
         )
         assert call.id == "call_123"
         assert call.name == "read_file"
         assert call.arguments["path"] == "/test.py"
-        assert call.result is None
+
+    def test_creation_minimal(self):
+        """Test tool call with minimal fields."""
+        call = ToolCall(
+            name="simple_tool",
+            arguments={},
+        )
+        assert call.name == "simple_tool"
+        assert call.arguments == {}
+        assert call.id is None
+
+    def test_to_dict(self):
+        """Test to_dict serialization."""
+        call = ToolCall(
+            name="write_file",
+            arguments={"path": "/test.py", "content": "hello"},
+            id="call_123",
+        )
+        d = call.to_dict()
+        assert d["id"] == "call_123"
+        assert d["name"] == "write_file"
+        assert d["arguments"]["path"] == "/test.py"
+
+    def test_to_dict_without_id(self):
+        """Test to_dict without id."""
+        call = ToolCall(
+            name="execute",
+            arguments={"cmd": "ls"},
+        )
+        d = call.to_dict()
+        assert d["name"] == "execute"
+        assert "id" not in d or d.get("id") is None
+
+    def test_from_dict(self):
+        """Test from_dict deserialization."""
+        data = {
+            "id": "call_789",
+            "name": "search",
+            "arguments": {"query": "hello"},
+        }
+        call = ToolCall.from_dict(data)
+        assert call.id == "call_789"
+        assert call.name == "search"
+        assert call.arguments["query"] == "hello"
+
+    def test_from_dict_minimal(self):
+        """Test from_dict with minimal data."""
+        data = {
+            "name": "simple",
+            "arguments": {},
+        }
+        call = ToolCall.from_dict(data)
+        assert call.name == "simple"
+        assert call.id is None
+
+
+class TestToolInvocation:
+    """Tests for ToolInvocation dataclass (call with result).
+
+    ToolInvocation pairs a tool call with its execution result.
+    Use this for representing completed tool executions.
+    """
+
+    def test_creation_without_result(self):
+        """Test invocation without result."""
+        invocation = ToolInvocation(
+            id="call_123",
+            name="read_file",
+            arguments={"path": "/test.py"},
+        )
+        assert invocation.id == "call_123"
+        assert invocation.name == "read_file"
+        assert invocation.arguments["path"] == "/test.py"
+        assert invocation.result is None
 
     def test_creation_with_result(self):
-        """Test tool call with result."""
+        """Test invocation with result."""
         result = ToolResult(success=True, output="Content")
-        call = ToolCall(
+        invocation = ToolInvocation(
             id="call_123",
             name="read_file",
             arguments={"path": "/test.py"},
             result=result,
         )
-        assert call.result is not None
-        assert call.result.success is True
+        assert invocation.result is not None
+        assert invocation.result.success is True
 
     def test_to_dict_without_result(self):
         """Test to_dict without result."""
-        call = ToolCall(
+        invocation = ToolInvocation(
             id="call_123",
             name="write_file",
             arguments={"path": "/test.py", "content": "hello"},
         )
-        d = call.to_dict()
+        d = invocation.to_dict()
         assert d["id"] == "call_123"
         assert d["name"] == "write_file"
         assert d["arguments"]["path"] == "/test.py"
@@ -170,13 +249,13 @@ class TestToolCall:
     def test_to_dict_with_result(self):
         """Test to_dict with result."""
         result = ToolResult(success=True, output="Done")
-        call = ToolCall(
+        invocation = ToolInvocation(
             id="call_456",
             name="execute",
             arguments={"cmd": "ls"},
             result=result,
         )
-        d = call.to_dict()
+        d = invocation.to_dict()
         assert d["result"] is not None
         assert d["result"]["success"] is True
 
@@ -187,10 +266,10 @@ class TestToolCall:
             "name": "search",
             "arguments": {"query": "hello"},
         }
-        call = ToolCall.from_dict(data)
-        assert call.id == "call_789"
-        assert call.name == "search"
-        assert call.result is None
+        invocation = ToolInvocation.from_dict(data)
+        assert invocation.id == "call_789"
+        assert invocation.name == "search"
+        assert invocation.result is None
 
     def test_from_dict_with_result(self):
         """Test from_dict with result."""
@@ -205,9 +284,9 @@ class TestToolCall:
                 "metadata": {},
             },
         }
-        call = ToolCall.from_dict(data)
-        assert call.result is not None
-        assert call.result.output == "Found 3 matches"
+        invocation = ToolInvocation.from_dict(data)
+        assert invocation.result is not None
+        assert invocation.result.output == "Found 3 matches"
 
 
 # =============================================================================
@@ -228,7 +307,7 @@ class TestChatMessage:
 
     def test_creation_with_tool_calls(self):
         """Test chat message with tool calls."""
-        call = ToolCall("call_1", "read_file", {"path": "/test.py"})
+        call = ToolCall(name="read_file", arguments={"path": "/test.py"}, id="call_1")
         msg = ChatMessage(
             role="assistant",
             content="I'll read that file.",
@@ -248,7 +327,7 @@ class TestChatMessage:
 
     def test_to_dict_with_tool_calls(self):
         """Test to_dict with tool calls."""
-        call = ToolCall("call_1", "search", {"query": "test"})
+        call = ToolCall(name="search", arguments={"query": "test"}, id="call_1")
         msg = ChatMessage(
             role="assistant",
             content="Searching...",
@@ -313,7 +392,7 @@ class TestChatResponse:
 
     def test_creation_with_tool_calls(self):
         """Test chat response with tool calls."""
-        call = ToolCall("call_1", "write", {"content": "test"})
+        call = ToolCall(name="write", arguments={"content": "test"}, id="call_1")
         resp = ChatResponse(
             content="Writing file...",
             tool_calls=[call],
@@ -385,7 +464,7 @@ class TestClientStreamChunk:
 
     def test_creation_with_tool_call(self):
         """Test stream chunk with tool call."""
-        call = ToolCall("call_1", "search", {"q": "test"})
+        call = ToolCall(name="search", arguments={"q": "test"}, id="call_1")
         chunk = ClientStreamChunk(content="", tool_call=call)
         assert chunk.tool_call is not None
         assert chunk.tool_call.name == "search"
@@ -405,7 +484,7 @@ class TestClientStreamChunk:
 
     def test_to_dict_with_tool_call(self):
         """Test to_dict with tool call."""
-        call = ToolCall("c1", "run", {"cmd": "ls"})
+        call = ToolCall(name="run", arguments={"cmd": "ls"}, id="c1")
         chunk = ClientStreamChunk(content="", tool_call=call)
         d = chunk.to_dict()
         assert d["tool_call"] is not None
