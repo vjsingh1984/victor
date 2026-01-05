@@ -128,8 +128,6 @@ class FrameworkNodeStatus(Enum):
     SKIPPED = "skipped"
 
 
-# Backward compatibility alias
-NodeStatus = FrameworkNodeStatus
 
 
 @runtime_checkable
@@ -237,7 +235,7 @@ class Node:
 
 @dataclass
 class WorkflowCheckpoint:
-    """Checkpoint for workflow state persistence (StateGraph DSL).
+    """WorkflowCheckpoint for workflow state persistence (StateGraph DSL).
 
     Renamed from Checkpoint to be semantically distinct:
     - GitCheckpoint (victor.agent.checkpoints): Git stash-based
@@ -285,8 +283,6 @@ class WorkflowCheckpoint:
         )
 
 
-# Backward compatibility alias
-Checkpoint = WorkflowCheckpoint
 
 
 class CheckpointerProtocol(Protocol):
@@ -354,7 +350,7 @@ class RLCheckpointerAdapter:
             self._store = get_checkpoint_store()
         return self._store
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save checkpoint using RL checkpoint store."""
         store = self._get_store()
         # Convert to PolicyCheckpoint format
@@ -369,14 +365,14 @@ class RLCheckpointerAdapter:
             metadata=checkpoint.metadata,
         )
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint from RL checkpoint store."""
         store = self._get_store()
         policy_cp = store.get_latest_checkpoint(f"{self.learner_name}_{thread_id}")
         if not policy_cp:
             return None
 
-        return Checkpoint(
+        return WorkflowCheckpoint(
             checkpoint_id=policy_cp.version,
             thread_id=thread_id,
             node_id=policy_cp.state.get("node_id", ""),
@@ -385,13 +381,13 @@ class RLCheckpointerAdapter:
             metadata=policy_cp.metadata,
         )
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         store = self._get_store()
         policy_cps = store.list_checkpoints(f"{self.learner_name}_{thread_id}")
 
         return [
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id=cp.version,
                 thread_id=thread_id,
                 node_id=cp.state.get("node_id", ""),
@@ -588,7 +584,7 @@ class CompiledGraph(Generic[StateType]):
                 else:
                     state = await node.execute(state)
 
-                # Checkpoint after execution
+                # WorkflowCheckpoint after execution
                 if exec_config.checkpointer:
                     await self._save_checkpoint(
                         exec_config.checkpointer, thread_id, current_node, state
@@ -684,7 +680,7 @@ class CompiledGraph(Generic[StateType]):
             node_id: Current node ID
             state: Current state
         """
-        checkpoint = Checkpoint(
+        checkpoint = WorkflowCheckpoint(
             checkpoint_id=uuid.uuid4().hex,
             thread_id=thread_id,
             node_id=node_id,
@@ -1059,12 +1055,12 @@ __all__ = [
     "Node",
     "Edge",
     "EdgeType",
-    "NodeStatus",
+    "FrameworkNodeStatus",
     # Execution
     "ExecutionResult",
     "GraphConfig",
     # Checkpointing
-    "Checkpoint",
+    "WorkflowCheckpoint",
     "CheckpointerProtocol",
     "MemoryCheckpointer",
     "RLCheckpointerAdapter",  # Uses existing RL CheckpointStore
