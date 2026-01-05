@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class CodeValidationHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
         tool_calls = 0
@@ -96,7 +96,7 @@ class CodeValidationHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=output,
             duration_seconds=time.time() - start_time,
             tool_calls_used=tool_calls,
@@ -153,7 +153,7 @@ class TestRunnerHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -184,7 +184,7 @@ class TestRunnerHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+                status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -192,7 +192,7 @@ class TestRunnerHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )

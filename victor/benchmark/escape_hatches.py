@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +442,7 @@ class RunTestsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -453,7 +453,7 @@ class RunTestsHandler:
         if not test_file:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No test file specified",
                 duration_seconds=time.time() - start_time,
             )
@@ -485,7 +485,7 @@ class RunTestsHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = NodeStatus.COMPLETED if output["success"] else NodeStatus.FAILED
+            status = ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
 
             return NodeResult(
                 node_id=node.id,
@@ -498,7 +498,7 @@ class RunTestsHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -561,7 +561,7 @@ class ValidatePatchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -571,7 +571,7 @@ class ValidatePatchHandler:
         if not patch:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No patch provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -583,7 +583,7 @@ class ValidatePatchHandler:
             context.set(output_key, validation_result)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 output=validation_result,
                 error=validation_result.get("error", "Invalid patch"),
                 duration_seconds=time.time() - start_time,
@@ -612,7 +612,7 @@ class ValidatePatchHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=validation_result,
             duration_seconds=time.time() - start_time,
             tool_calls_used=1 if target_file else 0,

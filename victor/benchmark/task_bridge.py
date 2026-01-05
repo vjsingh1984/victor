@@ -140,7 +140,7 @@ def framework_result_to_benchmark_result(
 
 
 def _infer_task_type(benchmark_task: BenchmarkTask) -> FrameworkTaskType:
-    """Infer framework FrameworkTaskType from benchmark task characteristics."""
+    """Infer FrameworkTaskType from benchmark task characteristics."""
     prompt_lower = benchmark_task.prompt.lower()
 
     # Check for explicit task type indicators

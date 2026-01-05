@@ -52,7 +52,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class TestRunnerHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -103,7 +103,7 @@ class TestRunnerHandler:
         if not test_command and not test_file:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No test file or command specified",
                 duration_seconds=time.time() - start_time,
             )
@@ -137,7 +137,7 @@ class TestRunnerHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = NodeStatus.COMPLETED if output["success"] else NodeStatus.FAILED
+            status = ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
 
             return NodeResult(
                 node_id=node.id,
@@ -150,7 +150,7 @@ class TestRunnerHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -226,7 +226,7 @@ class EnvironmentSetupHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -269,7 +269,7 @@ class EnvironmentSetupHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -279,7 +279,7 @@ class EnvironmentSetupHandler:
             output["error"] = str(e)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 output=output,
                 duration_seconds=time.time() - start_time,
@@ -315,7 +315,7 @@ class LiveExecutorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -331,7 +331,7 @@ class LiveExecutorHandler:
         if not code:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No code provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -372,7 +372,7 @@ class LiveExecutorHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if output["success"] else NodeStatus.FAILED,
+                status=ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED,
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -381,7 +381,7 @@ class LiveExecutorHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -432,7 +432,7 @@ class LanguageDetectorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -445,7 +445,7 @@ class LanguageDetectorHandler:
         if not files:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No files provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -472,7 +472,7 @@ class LanguageDetectorHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=output,
             duration_seconds=time.time() - start_time,
         )
@@ -504,7 +504,7 @@ class PolyglotVerifierHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -550,7 +550,7 @@ class PolyglotVerifierHandler:
             output_key = node.output_key or node.id
             context.set(output_key, output)
 
-            status = NodeStatus.COMPLETED if output["syntax_valid"] else NodeStatus.FAILED
+            status = ExecutorNodeStatus.COMPLETED if output["syntax_valid"] else ExecutorNodeStatus.FAILED
 
             return NodeResult(
                 node_id=node.id,
@@ -563,7 +563,7 @@ class PolyglotVerifierHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -596,7 +596,7 @@ class MultiSolutionValidatorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -673,7 +673,7 @@ class MultiSolutionValidatorHandler:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output=output,
             duration_seconds=time.time() - start_time,
             tool_calls_used=len(solutions),
@@ -706,7 +706,7 @@ class CodeTesterHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -722,7 +722,7 @@ class CodeTesterHandler:
         if not code:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No code provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -758,7 +758,7 @@ class CodeTesterHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if success else NodeStatus.FAILED,
+                status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -767,7 +767,7 @@ class CodeTesterHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -798,7 +798,7 @@ class SyntaxCheckHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -812,7 +812,7 @@ class SyntaxCheckHandler:
         if not code:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="No code provided",
                 duration_seconds=time.time() - start_time,
             )
@@ -874,7 +874,7 @@ class SyntaxCheckHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if output["valid"] else NodeStatus.FAILED,
+                status=ExecutorNodeStatus.COMPLETED if output["valid"] else ExecutorNodeStatus.FAILED,
                 output=output,
                 duration_seconds=time.time() - start_time,
             )
@@ -883,7 +883,7 @@ class SyntaxCheckHandler:
             output["errors"].append({"message": str(e)})
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 output=output,
                 duration_seconds=time.time() - start_time,

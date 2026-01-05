@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class VectorSearchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -102,7 +102,7 @@ class VectorSearchHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+                status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
                 output=output,
                 error=result.error if not result.success else None,
                 duration_seconds=time.time() - start_time,
@@ -111,7 +111,7 @@ class VectorSearchHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -141,7 +141,7 @@ class ChunkProcessorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -170,14 +170,14 @@ class ChunkProcessorHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=output,
                 duration_seconds=time.time() - start_time,
             )
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
