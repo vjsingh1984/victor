@@ -240,6 +240,50 @@ class ContextManager:
 
         return chunk
 
+    async def handle_compaction_async(self, user_message: str) -> Optional["StreamChunk"]:
+        """Perform proactive compaction asynchronously if enabled.
+
+        Non-blocking version of handle_compaction for use in async hot paths.
+
+        Args:
+            user_message: Current user message for semantic relevance.
+
+        Returns:
+            StreamChunk with compaction notification if compaction occurred,
+            None otherwise.
+        """
+        if self._context_compactor is None:
+            return None
+
+        compaction_action = await self._context_compactor.check_and_compact_async(
+            current_query=user_message
+        )
+        if not compaction_action.action_taken:
+            return None
+
+        logger.info(
+            f"Proactive compaction (async): {compaction_action.trigger.value}, "
+            f"removed {compaction_action.messages_removed} messages, "
+            f"freed {compaction_action.chars_freed:,} chars"
+        )
+
+        # Import here to avoid circular dependency
+        from victor.providers.base import StreamChunk
+
+        chunk: Optional[StreamChunk] = None
+        if compaction_action.messages_removed > 0:
+            chunk = StreamChunk(
+                content=(
+                    f"\n[context] Proactively compacted history "
+                    f"({compaction_action.messages_removed} messages, "
+                    f"{compaction_action.chars_freed:,} chars freed).\n"
+                )
+            )
+            # Inject context reminder about compacted content
+            self._conversation_controller.inject_compaction_context()
+
+        return chunk
+
     def get_context_metrics(self) -> "ContextMetrics":
         """Get detailed context metrics.
 

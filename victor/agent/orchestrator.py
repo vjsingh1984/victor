@@ -3739,12 +3739,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             is_final=True,
         )
 
-    def _handle_compaction(self, user_message: str) -> Optional[StreamChunk]:
-        """Perform proactive compaction if enabled.
+    async def _handle_compaction_async(self, user_message: str) -> Optional[StreamChunk]:
+        """Perform proactive compaction asynchronously if enabled.
 
+        Non-blocking version for async hot paths.
         Delegates to ContextManager (TD-002 refactoring).
         """
-        return self._context_manager.handle_compaction(user_message)
+        return await self._context_manager.handle_compaction_async(user_message)
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -4674,7 +4675,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # 2. Compaction (skip if background compaction active)
         if not self._context_manager.is_background_compaction_running:
-            compaction_chunk = self._handle_compaction(user_message)
+            compaction_chunk = await self._handle_compaction_async(user_message)
             if compaction_chunk:
                 yield compaction_chunk
 
