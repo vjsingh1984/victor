@@ -379,15 +379,33 @@ class WorkflowEngine:
 
         try:
             # Execute the graph directly
-            final_state = await graph.invoke(initial_state or {})
+            result = await graph.invoke(initial_state or {})
 
             duration = time.time() - start_time
 
+            # Handle polymorphic return type (LSP compliance)
+            # CompiledGraph.invoke() returns ExecutionResult with .state attribute
+            # Some graphs may return state dict directly for backward compatibility
+            if hasattr(result, "state"):
+                final_state = result.state
+                nodes_executed = getattr(result, "node_history", [])
+                success = getattr(result, "success", True)
+                error = getattr(result, "error", None)
+            else:
+                # Backward compatibility: result is the final state dict
+                final_state = result
+                nodes_executed = []
+                success = True
+                error = None
+
             return ExecutionResult(
-                success=True,
+                success=success,
                 final_state=final_state,
-                nodes_executed=list(graph._execution_order) if hasattr(graph, '_execution_order') else [],
+                nodes_executed=nodes_executed if nodes_executed else (
+                    list(graph._execution_order) if hasattr(graph, '_execution_order') else []
+                ),
                 duration_seconds=duration,
+                error=error,
             )
 
         except Exception as e:
