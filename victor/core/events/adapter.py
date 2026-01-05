@@ -45,6 +45,7 @@ from victor.core.events.protocols import Event, DeliveryGuarantee
 if TYPE_CHECKING:
     from victor.observability.event_bus import EventBus, VictorEvent, EventCategory
     from victor.core.events.backends import ObservabilityBus, AgentMessageBus
+    from victor.agent.teams.communication import TeamMessageBus
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +165,7 @@ class EventBusAdapter:
 
         if self._forward_to_new:
             # Subscribe to all legacy events
-            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(
-                self._on_legacy_event
-            )
+            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(self._on_legacy_event)
 
         self._enabled = True
         logger.debug("EventBusAdapter forwarding enabled")
@@ -196,12 +195,14 @@ class EventBusAdapter:
 
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(self._new_backend.emit(
-                    event.topic,
-                    event.data,
-                    source=event.source,
-                    correlation_id=event.correlation_id,
-                ))
+                loop.create_task(
+                    self._new_backend.emit(
+                        event.topic,
+                        event.data,
+                        source=event.source,
+                        correlation_id=event.correlation_id,
+                    )
+                )
             except RuntimeError:
                 # No running loop, skip forwarding
                 pass
