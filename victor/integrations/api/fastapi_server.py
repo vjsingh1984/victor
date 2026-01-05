@@ -50,7 +50,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
-from victor.observability.event_bus import get_event_bus
+from victor.observability.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -401,7 +401,7 @@ class VictorFastAPIServer:
         logger.info(f"Starting Victor FastAPI server on {self.host}:{self.port}")
 
         # Initialize EventBridge for real-time event streaming
-        event_bus = get_event_bus()
+        event_bus = EventBus.get_instance()
         self._event_bridge = EventBridge(event_bus)
         self._event_bridge.start()
         logger.info("EventBridge started for real-time event streaming")
