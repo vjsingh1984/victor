@@ -19,6 +19,7 @@ by the adapter layer, ensuring proper normalization across different LLM provide
 """
 
 import pytest
+from victor.agent.tool_calling.base import ToolCall
 from victor.protocols.provider_adapter import (
     BaseProviderAdapter,
     DeepSeekAdapter,
@@ -42,7 +43,6 @@ from victor.protocols.provider_adapter import (
     ReplicateAdapter,
     OpenRouterAdapter,
     ProviderCapabilities,
-    ToolCall,
     ToolCallFormat,
     get_provider_adapter,
     register_provider_adapter,
