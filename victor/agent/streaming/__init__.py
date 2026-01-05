@@ -21,6 +21,8 @@ Components:
 - StreamingChatContext: Dataclass holding all state for a streaming session
 - StreamingChatHandler: Main handler for streaming chat iterations
 - IterationCoordinator: Loop control and decision coordination
+- ContinuationHandler: Handles continuation action execution (P0 SRP refactor)
+- ToolExecutionHandler: Handles tool execution phase (P0 SRP refactor)
 - IterationResult: Result of a single iteration in the streaming loop
 """
 
@@ -30,6 +32,16 @@ from victor.agent.streaming.coordinator import (
     IterationCoordinator,
     create_coordinator,
 )
+from victor.agent.streaming.continuation import (
+    ContinuationHandler,
+    ContinuationResult,
+    create_continuation_handler,
+)
+from victor.agent.streaming.tool_execution import (
+    ToolExecutionHandler,
+    ToolExecutionResult,
+    create_tool_execution_handler,
+)
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationResult, IterationAction
 
@@ -38,8 +50,14 @@ __all__ = [
     "StreamingChatHandler",
     "IterationCoordinator",
     "CoordinatorConfig",
+    "ContinuationHandler",
+    "ContinuationResult",
+    "ToolExecutionHandler",
+    "ToolExecutionResult",
     "IterationResult",
     "IterationAction",
     "create_stream_context",
     "create_coordinator",
+    "create_continuation_handler",
+    "create_tool_execution_handler",
 ]

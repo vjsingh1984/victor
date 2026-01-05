@@ -230,11 +230,17 @@ from victor.workflows.discovery import register_builtin_workflows
 # Streaming submodule - extracted for testability
 from victor.agent.streaming import (
     CoordinatorConfig,
+    ContinuationHandler,
+    ContinuationResult,
     IterationCoordinator,
     StreamingChatContext,
     StreamingChatHandler,
+    ToolExecutionHandler,
+    ToolExecutionResult,
+    create_continuation_handler,
     create_coordinator,
     create_stream_context,
+    create_tool_execution_handler,
 )
 
 logger = logging.getLogger(__name__)
@@ -5868,296 +5874,74 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     else:
                         logger.info(f"Continuation action: {action} - {action_result['reason']}")
 
-                    skip_rest = False
+                    # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
+                    # Delegated to ContinuationHandler for testability and SRP compliance.
+                    # The handler processes actions like prompt_tool_call, request_summary,
+                    # execute_extracted_tool, force_tool_execution, finish, etc.
 
-                    # Handle action: continue_asking_input
-                    if action == "continue_asking_input":
-                        self.add_message("user", action_result["message"])
-                        skip_rest = True
+                    # Create continuation handler lazily (reused across iterations)
+                    if not hasattr(self, "_continuation_handler"):
+                        self._continuation_handler = create_continuation_handler(self)
 
-                    # Handle action: return_to_user
-                    elif action == "return_to_user":
-                        # Yield the accumulated content before returning
-                        if full_content:
-                            sanitized = self.sanitizer.sanitize(full_content)
-                            if sanitized:
-                                yield self._chunk_generator.generate_content_chunk(sanitized)
-                        yield self._chunk_generator.generate_final_marker_chunk()
-                        return
+                    # Update action in action_result if it was overridden
+                    action_result["action"] = action
 
-                    # Handle action: prompt_tool_call
-                    # NOTE: Use "user" role instead of "system" because many models
-                    # (especially Qwen, Ollama local models) don't handle mid-conversation
-                    # system messages well - they expect system messages only at the start.
-                    # Using "user" role ensures the continuation prompt is processed correctly.
-                    elif action == "prompt_tool_call":
-                        self.add_message("user", action_result["message"])
-                        self.unified_tracker.increment_turn()
-                        # Increment cumulative counter (never resets) for synthesis nudge detection
-                        self._cumulative_prompt_interventions += 1
-                        skip_rest = True
-
-                    # Handle action: continue_with_synthesis_hint
-                    # Gentle nudge when all required files read but output not produced
-                    # Allows continued exploration but reminds model to synthesize
-                    elif action == "continue_with_synthesis_hint":
-                        self.add_message("user", action_result["message"])
-                        # Update synthesis nudge count in unified tracker
-                        if "synthesis_nudge_count" in action_result.get("updates", {}):
-                            if hasattr(self.unified_tracker, "synthesis_nudge_count"):
-                                self.unified_tracker.synthesis_nudge_count = action_result[
-                                    "updates"
-                                ]["synthesis_nudge_count"]
-                        skip_rest = True
-
-                    # Handle action: request_summary
-                    elif action == "request_summary":
-                        # If summary was already requested once and model still hasn't provided it,
-                        # FORCE completion by disabling tools and getting final response
-                        if getattr(self, "_summary_request_count", 0) >= 1:
-                            logger.warning(
-                                "Model ignored previous summary request - forcing final response with tools disabled"
-                            )
-                            try:
-                                response = await self.provider.chat(
-                                    messages=self.messages
-                                    + [
-                                        Message(
-                                            role="user",
-                                            content="CRITICAL: Provide your FINAL ANALYSIS NOW. "
-                                            "Do NOT mention any more tools or files. "
-                                            "Summarize what you found from the 20 tool calls you already executed.",
-                                        )
-                                    ],
-                                    model=self.model,
-                                    temperature=self.temperature,
-                                    max_tokens=self.max_tokens,
-                                    tools=None,  # DISABLE tools to force text response
-                                )
-                                if response and response.content:
-                                    sanitized = self.sanitizer.sanitize(response.content)
-                                    if sanitized:
-                                        self.add_message("assistant", sanitized)
-                                        yield self._chunk_generator.generate_content_chunk(
-                                            sanitized
-                                        )
-
-                                # Finalize and display metrics, then exit
-                                final_metrics = self._finalize_stream_metrics(
-                                    stream_ctx.cumulative_usage
-                                )
-                                elapsed_time = (
-                                    final_metrics.total_duration
-                                    if final_metrics
-                                    else time.time() - stream_ctx.start_time
-                                )
-                                # Include cost if show_cost_metrics is enabled
-                                cost_str = None
-                                if self.settings.show_cost_metrics and final_metrics:
-                                    cost_str = final_metrics.format_cost()
-                                metrics_line = self._chunk_generator.format_completion_metrics(
-                                    stream_ctx, elapsed_time, cost_str
-                                )
-                                yield self._chunk_generator.generate_metrics_chunk(metrics_line)
-                                yield self._chunk_generator.generate_final_marker_chunk()
-                                return
-                            except Exception as e:
-                                logger.warning(f"Error forcing final response: {e}")
-                                # Fall through to normal handling
-
-                        # First summary request - track it
-                        self._summary_request_count = getattr(self, "_summary_request_count", 0) + 1
-                        self.add_message("user", action_result["message"])
-                        skip_rest = True
-
-                    # Handle action: request_completion
-                    elif action == "request_completion":
-                        self.add_message("user", action_result["message"])
-                        skip_rest = True
-
-                    # Handle action: execute_extracted_tool (auto-execute extracted tool call)
-                    # When model mentions tools but doesn't call them, and we can extract
-                    # the intended call from text, execute it directly
-                    elif action == "execute_extracted_tool":
-                        extracted_call = action_result.get("extracted_call")
-                        if extracted_call:
-                            logger.info(
-                                f"Executing extracted tool call: {extracted_call.tool_name} "
-                                f"(confidence: {extracted_call.confidence:.2f})"
-                            )
-                            # Execute the extracted tool call
-                            async for chunk in self._execute_extracted_tool_call(
-                                stream_ctx, extracted_call
-                            ):
-                                yield chunk
-                        skip_rest = True
-
-                    # Handle action: force_tool_execution (for hallucinated tool mentions)
-                    # Uses handler delegation for testable attempt tracking and message injection
-                    elif action == "force_tool_execution":
-                        mentioned_tools = action_result.get("mentioned_tools", [])
-                        force_message = action_result.get("message")
-                        self._handle_force_tool_execution_with_handler(
-                            stream_ctx, mentioned_tools, force_message
-                        )
-                        skip_rest = True
-
-                    if skip_rest:
-                        pass
-                    else:
-                        # Handle action: finish - No more tool calls requested
-                        # Yield the accumulated content to the UI (was missing!)
-                        if full_content:
-                            sanitized = self.sanitizer.sanitize(full_content)
-                            if sanitized:
-                                yield self._chunk_generator.generate_content_chunk(sanitized)
-
-                        # Finalize and display performance metrics using handler delegation
-                        # Pass cumulative_usage for accurate token counts from provider API
-                        final_metrics = self._finalize_stream_metrics(stream_ctx.cumulative_usage)
-                        elapsed_time = (
-                            final_metrics.total_duration
-                            if final_metrics
-                            else time.time() - stream_ctx.start_time
-                        )
-                        # Include cost if show_cost_metrics is enabled
-                        cost_str = None
-                        if self.settings.show_cost_metrics and final_metrics:
-                            cost_str = final_metrics.format_cost()
-                        metrics_line = self._chunk_generator.format_completion_metrics(
-                            stream_ctx, elapsed_time, cost_str
-                        )
-                        yield self._chunk_generator.generate_metrics_chunk(metrics_line)
-                        # Record outcome for Q-learning (normal completion = success)
-                        self._record_intelligent_outcome(
-                            success=True,
-                            quality_score=stream_ctx.last_quality_score,
-                            user_satisfied=True,
-                            completed=True,
-                        )
-                        yield self._chunk_generator.generate_final_marker_chunk()
-                        return
-
-                # Tool execution section - runs regardless of loop warning
-                logger.debug(
-                    f"Entering tool execution: tool_calls={len(tool_calls) if tool_calls else 0}, "
-                    f"tool_calls_used={self.tool_calls_used}/{self.tool_budget}"
-                )
-
-                # Sync tool tracking to context for handler methods
-                stream_ctx.tool_calls_used = self.tool_calls_used
-                stream_ctx.tool_budget = self.tool_budget
-
-                remaining = stream_ctx.get_remaining_budget()
-
-                # Warn when approaching budget limit via recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                warning_threshold = getattr(
-                    self.settings, "tool_call_budget_warning_threshold", 250
-                )
-                budget_warning = self._recovery_coordinator.check_tool_budget(
-                    recovery_ctx, warning_threshold
-                )
-                if budget_warning:
-                    yield budget_warning
-
-                if remaining <= 0:
-                    # === BUDGET EXHAUSTED (via coordinator helper) ===
-                    async for budget_chunk in self._handle_budget_exhausted(stream_ctx):
-                        yield budget_chunk
-                    return
-
-                # Force final response after too many consecutive tool calls without output
-                # This prevents endless tool call loops
-                # Sync unique_resources to context for progress check
-                stream_ctx.unique_resources = self.unified_tracker.unique_resources
-
-                # Check progress using handler delegation - will set force_completion if stuck
-                self._check_progress_with_handler(stream_ctx)
-
-                # Force completion if too many low-output iterations or research calls
-                # Use handler delegation for message generation (testable)
-                force_chunk = self._handle_force_completion_with_handler(stream_ctx)
-                if force_chunk:
-                    yield force_chunk
-                    # === FORCE FINAL RESPONSE (via coordinator helper) ===
-                    async for final_chunk in self._handle_force_final_response(stream_ctx):
-                        yield final_chunk
-                    return  # Exit the loop after forcing final response
-
-                # Guard against None tool_calls (can happen when model response has no tool calls
-                # but continuation logic decided to continue the loop)
-                # Truncate to remaining budget via recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                remaining = stream_ctx.get_remaining_budget()
-                tool_calls, _ = self._recovery_coordinator.truncate_tool_calls(
-                    recovery_ctx, tool_calls or [], remaining
-                )
-
-                # Filter out tool calls that are blocked via recovery coordinator
-                filtered_tool_calls, blocked_chunks, blocked_count = (
-                    self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
-                )
-                for chunk in blocked_chunks:
-                    yield chunk
-
-                # Initialize variables that may not be set if no tool calls
-                tool_name = None
-                tool_results = []
-
-                # Check if we should force completion due to excessive blocking
-                # via recovery coordinator directly
-                all_blocked = blocked_count > 0 and not filtered_tool_calls
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                threshold_result = self._recovery_coordinator.check_blocked_threshold(
-                    recovery_ctx, all_blocked
-                )
-                if threshold_result:
-                    chunk, should_clear = threshold_result
-                    yield chunk
-                    if should_clear:
-                        filtered_tool_calls = []
-
-                tool_calls = filtered_tool_calls
-
-                for tool_call in tool_calls:
-                    tool_name = tool_call.get("name", "tool")
-                    tool_args = tool_call.get("arguments", {})
-                    # Generate user-friendly status message with relevant context
-                    status_msg = get_tool_status_message(tool_name, tool_args)
-                    # Emit structured tool_start event using handler delegation (testable)
-                    yield self._chunk_generator.generate_tool_start_chunk(
-                        tool_name, tool_args, status_msg
+                    # Delegate to ContinuationHandler
+                    continuation_result = await self._continuation_handler.handle_action(
+                        action_result=action_result,
+                        stream_ctx=stream_ctx,
+                        full_content=full_content,
                     )
 
-                tool_results = await self._handle_tool_calls(tool_calls)
-                # CRITICAL FIX: Increment tool_calls_used counter to prevent infinite loops
-                self.tool_calls_used += len(tool_calls)
-
-                # Generate tool result and preview chunks using handler delegation
-                for result in tool_results:
-                    tool_name = result.get("name", "tool")
-                    for chunk in self._chunk_generator.generate_tool_result_chunks(result):
+                    # Yield chunks from handler
+                    for chunk in continuation_result.chunks:
                         yield chunk
 
-                # Use handler delegation for thinking status chunk (testable)
-                yield self._chunk_generator.generate_thinking_status_chunk()
+                    # Apply state updates from handler
+                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
+                        self._cumulative_prompt_interventions = continuation_result.state_updates[
+                            "cumulative_prompt_interventions"
+                        ]
 
-                # Update reminder manager state and inject consolidated reminder if needed
-                # This replaces the previous per-tool-call evidence injection with smart throttling
-                self.reminder_manager.update_state(
-                    observed_files=set(self.observed_files) if self.observed_files else set(),
-                    executed_tool=tool_name,
-                    tool_calls=self.tool_calls_used,
+                    # Check control flags
+                    if continuation_result.should_return:
+                        return
+                    # If should_skip_rest, continue to tool execution section
+                    # (which will be a no-op since tool_calls is empty)
+
+                # === TOOL EXECUTION PHASE (P0 SRP refactor) ===
+                # Delegated to ToolExecutionHandler for testability and SRP compliance.
+                # The handler manages budget checks, filtering, execution, and result generation.
+
+                # Create tool execution handler lazily (reused across iterations)
+                if not hasattr(self, "_tool_execution_handler"):
+                    self._tool_execution_handler = create_tool_execution_handler(self)
+
+                # Update observed files for reminder tracking
+                self._tool_execution_handler.update_observed_files(
+                    set(self.observed_files) if self.observed_files else set()
                 )
 
-                # Get consolidated reminder (only returns content when injection is due)
-                reminder = self.reminder_manager.get_consolidated_reminder()
-                if reminder:
-                    self.add_message("system", reminder)
+                # Delegate to ToolExecutionHandler
+                tool_exec_result = await self._tool_execution_handler.execute_tools(
+                    stream_ctx=stream_ctx,
+                    tool_calls=tool_calls,
+                    user_message=user_message,
+                    full_content=full_content,
+                    tool_calls_used=self.tool_calls_used,
+                    tool_budget=self.tool_budget,
+                )
 
-                # Update context message for next iteration (uses helper method)
-                stream_ctx.update_context_message(full_content or user_message)
+                # Yield chunks from handler
+                for chunk in tool_exec_result.chunks:
+                    yield chunk
+
+                # Update tool calls counter
+                self.tool_calls_used += tool_exec_result.tool_calls_executed
+
+                # Check control flags
+                if tool_exec_result.should_return:
+                    return
 
     async def _execute_tool_with_retry(
         self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
