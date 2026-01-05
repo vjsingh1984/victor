@@ -16,15 +16,17 @@
 A tool for executing Python code in a secure, stateful Docker container.
 
 Features:
-- Proper context manager support for automatic cleanup
+- Proper context manager support for automatic cleanup (sync and async)
 - Container labeling for cleanup identification
 - atexit handler for cleanup on Python exit
+- Signal handlers for cleanup on SIGINT/SIGTERM
 - Container reuse within session
 """
 
 import atexit
 import io
 import logging
+import signal
 import tarfile
 import os
 from pathlib import Path
@@ -56,6 +58,9 @@ SANDBOX_CONTAINER_VALUE = "code-executor"
 # Global registry of active sandbox instances for cleanup
 _active_sandboxes: weakref.WeakSet = weakref.WeakSet()
 _cleanup_registered = False
+_signal_handlers_registered = False
+_original_sigint_handler = None
+_original_sigterm_handler = None
 
 
 def cleanup_all_sandboxes() -> int:
@@ -74,11 +79,43 @@ def cleanup_all_sandboxes() -> int:
     return cleaned
 
 
-def cleanup_orphaned_containers() -> int:
+def startup_cleanup(include_unlabeled: bool = True) -> int:
+    """Clean up any orphaned containers from previous sessions at startup.
+
+    This should be called during Victor initialization to ensure no
+    stale containers are left running from crashed or interrupted sessions.
+
+    Args:
+        include_unlabeled: If True, also removes unlabeled legacy containers
+            matching the sandbox profile (python-slim with sleep infinity).
+            Default True for thorough cleanup.
+
+    Returns:
+        Number of containers cleaned up
+
+    Example:
+        # In application startup code:
+        from victor.tools.code_executor_tool import startup_cleanup
+        cleaned = startup_cleanup()
+        if cleaned > 0:
+            logger.info(f"Cleaned up {cleaned} orphaned sandbox containers")
+    """
+    cleaned = cleanup_orphaned_containers(include_unlabeled=include_unlabeled)
+    if cleaned > 0:
+        logger.info(f"Startup cleanup: removed {cleaned} orphaned sandbox container(s)")
+    return cleaned
+
+
+def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
     """Clean up any orphaned Victor sandbox containers.
 
     This finds and removes any containers labeled as Victor sandboxes
     that may have been left behind from previous sessions.
+
+    Args:
+        include_unlabeled: If True, also removes python:*-slim containers
+            running 'sleep infinity' that lack labels. Use for cleaning up
+            legacy containers from before labeling was implemented.
 
     Returns:
         Number of containers cleaned up
@@ -88,11 +125,13 @@ def cleanup_orphaned_containers() -> int:
 
     try:
         client = docker.from_env()
+        cleaned = 0
+
+        # First, clean up labeled containers
         containers = client.containers.list(
             all=True,
             filters={"label": f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"},
         )
-        cleaned = 0
         for container in containers:
             try:
                 logger.info(f"Removing orphaned sandbox container: {container.short_id}")
@@ -100,10 +139,115 @@ def cleanup_orphaned_containers() -> int:
                 cleaned += 1
             except Exception as e:
                 logger.warning(f"Failed to remove container {container.short_id}: {e}")
+
+        # Optionally clean up unlabeled legacy containers
+        if include_unlabeled:
+            # Find containers with 'sleep infinity' command on python images
+            # Exclude kubernetes infrastructure containers (not Docker's random names like kind_hugle)
+            k8s_name_patterns = (
+                "k8s_",  # Kubernetes pods
+                "kube-",  # Kubernetes components
+                "kind-",  # kind infrastructure (hyphen, not underscore)
+                "minikube",
+                "desktop-",  # Docker Desktop k8s
+            )
+            all_containers = client.containers.list(all=True)
+            for container in all_containers:
+                try:
+                    # Skip kubernetes infrastructure containers
+                    container_name = container.name.lower()
+                    if any(container_name.startswith(p) for p in k8s_name_patterns):
+                        continue
+
+                    # Check if it's a python-slim based sandbox container
+                    image_tags = container.image.tags
+                    is_python_slim = any(
+                        "python" in tag and "slim" in tag
+                        for tag in image_tags
+                    ) if image_tags else False
+
+                    # Also check for untagged python images (dangling)
+                    if not image_tags:
+                        # Container might be from old python image
+                        # Check if command is 'sleep infinity'
+                        cmd = container.attrs.get("Config", {}).get("Cmd", [])
+                        if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
+                            is_python_slim = True
+
+                    # If it's a python-slim container with sleep infinity command
+                    if is_python_slim:
+                        cmd = container.attrs.get("Config", {}).get("Cmd", [])
+                        if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
+                            logger.info(
+                                f"Removing unlabeled sandbox container: {container.short_id}"
+                            )
+                            container.remove(force=True)
+                            cleaned += 1
+                except Exception as e:
+                    logger.debug(f"Skipping container check: {e}")
+
         return cleaned
     except Exception as e:
         logger.warning(f"Failed to cleanup orphaned containers: {e}")
         return 0
+
+
+def _signal_cleanup_handler(signum, frame):
+    """Signal handler that cleans up containers before exiting.
+
+    This ensures containers are cleaned up even when the process
+    is terminated via SIGINT (Ctrl+C) or SIGTERM.
+    """
+    global _original_sigint_handler, _original_sigterm_handler
+
+    logger.info(f"Received signal {signum}, cleaning up sandbox containers...")
+    cleaned = cleanup_all_sandboxes()
+    if cleaned > 0:
+        logger.info(f"Cleaned up {cleaned} sandbox container(s)")
+
+    # Call the original handler if it exists
+    if signum == signal.SIGINT and _original_sigint_handler:
+        if callable(_original_sigint_handler):
+            _original_sigint_handler(signum, frame)
+        elif _original_sigint_handler == signal.SIG_DFL:
+            # Re-raise KeyboardInterrupt for default behavior
+            raise KeyboardInterrupt
+    elif signum == signal.SIGTERM and _original_sigterm_handler:
+        if callable(_original_sigterm_handler):
+            _original_sigterm_handler(signum, frame)
+        elif _original_sigterm_handler == signal.SIG_DFL:
+            # Exit with the signal for default behavior
+            import sys
+            sys.exit(128 + signum)
+
+
+def _register_signal_handlers():
+    """Register signal handlers for cleanup on SIGINT/SIGTERM."""
+    global _signal_handlers_registered, _original_sigint_handler, _original_sigterm_handler
+
+    if _signal_handlers_registered:
+        return
+
+    try:
+        # Only register in main thread
+        import threading
+        if threading.current_thread() is not threading.main_thread():
+            logger.debug("Not registering signal handlers (not main thread)")
+            return
+
+        # Save original handlers
+        _original_sigint_handler = signal.getsignal(signal.SIGINT)
+        _original_sigterm_handler = signal.getsignal(signal.SIGTERM)
+
+        # Install our handlers
+        signal.signal(signal.SIGINT, _signal_cleanup_handler)
+        signal.signal(signal.SIGTERM, _signal_cleanup_handler)
+
+        _signal_handlers_registered = True
+        logger.debug("Signal handlers registered for sandbox cleanup")
+    except (ValueError, OSError) as e:
+        # Can fail in some environments (e.g., non-main thread, Windows service)
+        logger.debug(f"Could not register signal handlers: {e}")
 
 
 def _register_atexit_cleanup():
@@ -112,6 +256,8 @@ def _register_atexit_cleanup():
     if not _cleanup_registered:
         atexit.register(cleanup_all_sandboxes)
         _cleanup_registered = True
+        # Also register signal handlers for graceful termination
+        _register_signal_handlers()
 
 
 class CodeSandbox:
@@ -165,6 +311,15 @@ class CodeSandbox:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - stop and cleanup the container."""
+        self.stop()
+
+    async def __aenter__(self) -> "CodeSandbox":
+        """Async context manager entry - start the container."""
+        self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - stop and cleanup the container."""
         self.stop()
 
     def start(self) -> None:

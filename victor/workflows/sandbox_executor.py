@@ -338,11 +338,24 @@ class SandboxedExecutor:
         Returns:
             ExecutionResult
         """
+        from victor.tools.code_executor_tool import (
+            SANDBOX_CONTAINER_LABEL,
+            SANDBOX_CONTAINER_VALUE,
+        )
+
         limits = isolation.resource_limits or ResourceLimits()
         image = isolation.docker_image or self._default_image
 
+        # Generate a unique container name for cleanup tracking
+        import uuid
+        container_name = f"victor-sandbox-{uuid.uuid4().hex[:12]}"
+
         # Build docker run command
-        docker_cmd = ["docker", "run", "--rm"]
+        # Note: Using --rm flag ensures container is removed after exit
+        docker_cmd = ["docker", "run", "--rm", "--name", container_name]
+
+        # Add label for identification during cleanup
+        docker_cmd.extend(["--label", f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"])
 
         # Resource limits
         docker_cmd.extend(
@@ -385,6 +398,7 @@ class SandboxedExecutor:
         docker_cmd.append(image)
         docker_cmd.extend(command)
 
+        process = None
         try:
             process = await asyncio.create_subprocess_exec(
                 *docker_cmd,
@@ -407,6 +421,9 @@ class SandboxedExecutor:
             )
 
         except asyncio.TimeoutError:
+            # On timeout, we need to force-kill the container
+            logger.warning(f"Docker execution timed out, killing container {container_name}")
+            await self._force_kill_container(container_name)
             return ExecutionResult(
                 success=False,
                 error=f"Docker execution timed out after {limits.timeout_seconds}s",
@@ -414,11 +431,49 @@ class SandboxedExecutor:
             )
         except Exception as e:
             logger.error(f"Docker execution failed: {e}")
+            # Also try to clean up on any exception
+            await self._force_kill_container(container_name)
             return ExecutionResult(
                 success=False,
                 error=str(e),
                 sandbox_type="docker",
             )
+        finally:
+            # Ensure process is terminated if still running
+            if process and process.returncode is None:
+                try:
+                    process.kill()
+                    await process.wait()
+                except Exception:
+                    pass
+
+    async def _force_kill_container(self, container_name: str) -> None:
+        """Force-kill a Docker container by name.
+
+        Args:
+            container_name: Name of the container to kill
+        """
+        try:
+            # First try to stop gracefully with short timeout
+            stop_process = await asyncio.create_subprocess_exec(
+                "docker", "stop", "-t", "2", container_name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(stop_process.wait(), timeout=5)
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+        try:
+            # Force remove if still exists
+            rm_process = await asyncio.create_subprocess_exec(
+                "docker", "rm", "-f", container_name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(rm_process.wait(), timeout=5)
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.debug(f"Could not remove container {container_name}: {e}")
 
 
 # Global executor instance

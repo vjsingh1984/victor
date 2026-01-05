@@ -363,7 +363,7 @@ docker-compose run --rm victor victor --profile fast "Your prompt"
 ./docker-quickstart.sh
 
 # Save image
-docker save -o victor-image.tar $(docker images -q codingagent-victor)
+docker save -o victor-image.tar $(docker images -q victor-ai)
 docker save -o ollama-image.tar ollama/ollama:latest
 
 # Export volumes
@@ -431,7 +431,7 @@ print(f'Embedding provider: {s.embedding_provider}')
 
 ```bash
 # Scan image for vulnerabilities
-docker scan codingagent-victor
+docker scan victor-ai
 
 # Run as read-only (except volumes)
 docker-compose run --rm --read-only victor victor main "Test"
@@ -463,7 +463,7 @@ docker-compose down
 docker-compose down -v
 
 # Remove images
-docker rmi $(docker images -q codingagent-victor)
+docker rmi $(docker images -q victor-ai)
 
 # Clean build cache
 docker builder prune
@@ -508,8 +508,8 @@ jobs:
 
 ```bash
 # Tag and push
-docker tag codingagent-victor username/victor:latest
-docker tag codingagent-victor username/victor:v1.0
+docker tag victor-ai username/victor:latest
+docker tag victor-ai username/victor:v1.0
 
 docker push username/victor:latest
 docker push username/victor:v1.0

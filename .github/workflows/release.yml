@@ -252,8 +252,8 @@ jobs:
           context: .
           push: false
           tags: |
-            vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-            vjsingh1984/victor:latest
+            vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+            vjsingh1984/victor-ai:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           outputs: type=docker,dest=/tmp/victor-docker.tar
@@ -353,8 +353,8 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker push vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-          docker push vjsingh1984/victor:latest
+          docker push vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+          docker push vjsingh1984/victor-ai:latest
 
   # ==========================================================================
   # Generate checksums for all artifacts
@@ -433,8 +433,8 @@ jobs:
 
           ### Using Docker
           \`\`\`bash
-          docker pull vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-          docker run -it --rm vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
+          docker pull vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+          docker run -it --rm vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ## Platform Binaries
