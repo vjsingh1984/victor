@@ -167,6 +167,13 @@ class AgentMessage:
         """Check if this is a reply to another message."""
         return self.reply_to is not None
 
+    def to_context_string(self) -> str:
+        """Format message for inclusion in agent context."""
+        header = f"[{self.message_type.value.upper()}] {self.sender_id}"
+        if self.recipient_id:
+            header += f" → {self.recipient_id}"
+        return f"{header}: {self.content}"
+
 
 @dataclass
 class MemberResult:

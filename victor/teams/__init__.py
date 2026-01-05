@@ -85,6 +85,12 @@ from victor.teams.protocols import (
 # Coordinator
 from victor.teams.unified_coordinator import UnifiedTeamCoordinator
 
+# Framework coordinator (for testing/lightweight usage)
+from victor.framework.team_coordinator import FrameworkTeamCoordinator
+
+# Communication infrastructure (from agent.teams)
+from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+
 # Mixins
 from victor.teams.mixins import ObservabilityMixin, RLMixin
 
@@ -155,6 +161,10 @@ __all__ = [
     "IEnhancedTeamCoordinator",
     # Coordinators
     "UnifiedTeamCoordinator",
+    "FrameworkTeamCoordinator",
+    # Communication
+    "TeamMessageBus",
+    "TeamSharedMemory",
     # Mixins
     "ObservabilityMixin",
     "RLMixin",

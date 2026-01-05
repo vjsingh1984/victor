@@ -462,7 +462,7 @@ class FrameworkTeamCoordinator:
                 recipient_id=member.id,
                 content=message.content,
                 message_type=message.message_type,
-                metadata=message.metadata.copy(),
+                data=message.data.copy(),
             )
 
             response = await member.receive_message(member_message)
