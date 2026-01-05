@@ -1,0 +1,154 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+# Victor MCP Server - Docker Compose Configuration
+#
+# Run Victor as an MCP server for integration with Claude Desktop
+# and other MCP-compatible clients.
+#
+# Usage:
+#   # Start MCP server
+#   docker-compose up -d
+#
+#   # View logs
+#   docker-compose logs -f
+#
+#   # Stop server
+#   docker-compose down
+#
+#   # Start with specific profile
+#   docker-compose --profile full up -d
+
+version: "3.8"
+
+services:
+  # Main Victor MCP Server
+  # Runs in stdio mode for MCP client connections
+  victor-mcp:
+    build:
+      context: ../..
+      dockerfile: docker/mcp-server/Dockerfile
+    image: victor-ai/mcp-server:latest
+    container_name: victor-mcp-server
+    stdin_open: true
+    tty: true
+    volumes:
+      # Mount workspace for file operations
+      - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
+      # Persist Victor configuration
+      - victor-config:/home/victor/.victor
+    environment:
+      # Tools to expose (empty = all tools)
+      - VICTOR_MCP_TOOLS=${VICTOR_MCP_TOOLS:-}
+      # Verticals to expose (coding,devops,rag,dataanalysis,research)
+      - VICTOR_MCP_VERTICALS=${VICTOR_MCP_VERTICALS:-}
+      # Logging level
+      - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-WARNING}
+      # Sandbox mode for security
+      - VICTOR_SANDBOX_MODE=${VICTOR_SANDBOX_MODE:-false}
+      # Air-gapped mode (no network tools)
+      - VICTOR_AIRGAPPED_MODE=${VICTOR_AIRGAPPED_MODE:-false}
+    restart: unless-stopped
+    networks:
+      - victor-network
+
+  # Victor MCP Server - Coding Vertical Only
+  # Use this for code-focused operations
+  victor-mcp-coding:
+    build:
+      context: ../..
+      dockerfile: docker/mcp-server/Dockerfile
+    image: victor-ai/mcp-server:latest
+    container_name: victor-mcp-coding
+    stdin_open: true
+    tty: true
+    profiles:
+      - coding
+    volumes:
+      - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
+      - victor-config:/home/victor/.victor
+    environment:
+      - VICTOR_MCP_VERTICALS=coding
+      - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-WARNING}
+    restart: unless-stopped
+    networks:
+      - victor-network
+
+  # Victor MCP Server - Safe Mode
+  # Exposes only read-only tools (no write, bash, or destructive operations)
+  victor-mcp-safe:
+    build:
+      context: ../..
+      dockerfile: docker/mcp-server/Dockerfile
+    image: victor-ai/mcp-server:latest
+    container_name: victor-mcp-safe
+    stdin_open: true
+    tty: true
+    profiles:
+      - safe
+    volumes:
+      # Read-only workspace for safety
+      - ${VICTOR_WORKSPACE:-../../}:/workspace:ro
+      - victor-config:/home/victor/.victor
+    environment:
+      # Only expose safe, read-only tools
+      - VICTOR_MCP_TOOLS=read,ls,grep,find_files,code_search,git,architecture_summary
+      - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-WARNING}
+      - VICTOR_SANDBOX_MODE=true
+    restart: unless-stopped
+    networks:
+      - victor-network
+
+  # Victor MCP Server - DevOps Vertical
+  # Use for infrastructure and deployment operations
+  victor-mcp-devops:
+    build:
+      context: ../..
+      dockerfile: docker/mcp-server/Dockerfile
+    image: victor-ai/mcp-server:latest
+    container_name: victor-mcp-devops
+    stdin_open: true
+    tty: true
+    profiles:
+      - devops
+    volumes:
+      - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
+      - victor-config:/home/victor/.victor
+      # Mount Docker socket for Docker tools
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - VICTOR_MCP_VERTICALS=devops
+      - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-WARNING}
+    restart: unless-stopped
+    networks:
+      - victor-network
+
+  # Victor MCP Server - Full Stack
+  # All tools, all verticals, with Docker access
+  victor-mcp-full:
+    build:
+      context: ../..
+      dockerfile: docker/mcp-server/Dockerfile
+    image: victor-ai/mcp-server:latest
+    container_name: victor-mcp-full
+    stdin_open: true
+    tty: true
+    profiles:
+      - full
+    volumes:
+      - ${VICTOR_WORKSPACE:-../../}:/workspace:rw
+      - victor-config:/home/victor/.victor
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - VICTOR_MCP_LOG_LEVEL=${VICTOR_MCP_LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    networks:
+      - victor-network
+
+networks:
+  victor-network:
+    driver: bridge
+
+volumes:
+  victor-config:
+    driver: local
