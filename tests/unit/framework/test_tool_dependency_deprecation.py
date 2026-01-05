@@ -33,7 +33,8 @@ class TestDeprecatedConstantDescriptor:
 
     def test_creates_descriptor_with_correct_attributes(self):
         """Test descriptor initialization stores attributes correctly."""
-        loader = lambda: "test_value"
+        def loader():
+            return "test_value"
 
         descriptor = DeprecatedConstantDescriptor(
             constant_name="TEST_CONSTANT",
@@ -50,7 +51,8 @@ class TestDeprecatedConstantDescriptor:
 
     def test_get_emits_warning_on_first_access(self):
         """Test that deprecation warning is emitted on first access."""
-        loader = lambda: "test_value"
+        def loader():
+            return "test_value"
 
         descriptor = DeprecatedConstantDescriptor(
             constant_name="MY_CONSTANT",
@@ -73,7 +75,8 @@ class TestDeprecatedConstantDescriptor:
 
     def test_get_only_warns_once(self):
         """Test that warning is only emitted once."""
-        loader = lambda: "test_value"
+        def loader():
+            return "test_value"
 
         descriptor = DeprecatedConstantDescriptor(
             constant_name="MY_CONSTANT",
@@ -128,7 +131,8 @@ class TestDeprecatedConstantDescriptor:
     def test_get_returns_loaded_value(self):
         """Test that get returns the loaded value."""
         expected = {"dependencies": ["tool1", "tool2"]}
-        loader = lambda: expected
+        def loader():
+            return expected
 
         descriptor = DeprecatedConstantDescriptor(
             constant_name="MY_CONSTANT",
@@ -182,6 +186,7 @@ class TestDeprecatedConstantDescriptor:
 
     def test_loader_exception_propagates(self):
         """Test that loader exceptions propagate correctly."""
+
         def failing_loader():
             raise ValueError("Load failed")
 

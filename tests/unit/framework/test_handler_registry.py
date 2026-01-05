@@ -305,7 +305,9 @@ class TestHandlerRegistryEnhancements:
 
         registry = HandlerRegistry()
 
-        handler = lambda: "test"
+        def handler():
+            return "test"
+
         registry.register("test_handler", handler, vertical="coding")
 
         pushed, pulled = registry.sync_with_executor(direction="to_executor")
@@ -320,7 +322,9 @@ class TestHandlerRegistryEnhancements:
 
         registry = HandlerRegistry()
 
-        handler = lambda: "from_executor"
+        def handler():
+            return "from_executor"
+
         executor.register_compute_handler("executor_handler", handler)
 
         pushed, pulled = registry.sync_with_executor(direction="from_executor")
@@ -335,8 +339,11 @@ class TestHandlerRegistryEnhancements:
 
         registry = HandlerRegistry()
 
-        reg_handler = lambda: "registry"
-        exec_handler = lambda: "executor"
+        def reg_handler():
+            return "registry"
+
+        def exec_handler():
+            return "executor"
 
         registry.register("reg_handler", reg_handler)
         executor.register_compute_handler("exec_handler", exec_handler)
@@ -354,8 +361,11 @@ class TestHandlerRegistryEnhancements:
 
         registry = HandlerRegistry()
 
-        old_handler = lambda: "old"
-        new_handler = lambda: "new"
+        def old_handler():
+            return "old"
+
+        def new_handler():
+            return "new"
 
         # Register in both
         registry.register("shared", old_handler)
@@ -377,8 +387,11 @@ class TestHandlerRegistryEnhancements:
 
         registry = HandlerRegistry()
 
-        old_handler = lambda: "old"
-        new_handler = lambda: "new"
+        def old_handler():
+            return "old"
+
+        def new_handler():
+            return "new"
 
         executor.register_compute_handler("shared", old_handler)
         registry.register("shared", new_handler)
