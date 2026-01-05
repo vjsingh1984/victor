@@ -112,6 +112,18 @@ from victor.core.events.backends import (
     register_backend_factory,
 )
 
+# Lightweight backends (optional import - may not be needed in all contexts)
+try:
+    from victor.core.events.backends_lightweight import (
+        SQLiteEventBackend,
+        register_lightweight_backends,
+    )
+    _LIGHTWEIGHT_AVAILABLE = True
+except ImportError:
+    _LIGHTWEIGHT_AVAILABLE = False
+    SQLiteEventBackend = None  # type: ignore
+    register_lightweight_backends = None  # type: ignore
+
 __all__ = [
     # Taxonomy - Core enum
     "UnifiedEventType",
@@ -149,4 +161,7 @@ __all__ = [
     # Protocol-based - Factory
     "create_event_backend",
     "register_backend_factory",
+    # Lightweight backends (optional)
+    "SQLiteEventBackend",
+    "register_lightweight_backends",
 ]
