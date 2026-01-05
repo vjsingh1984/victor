@@ -26,14 +26,12 @@ and transforms that cannot be expressed in YAML.
 Example:
     provider = ResearchWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("deep_research", {"query": "AI trends"})
 
-    # Streaming execution
-    async for chunk in provider.astream("deep_research", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("deep_research", context):
+        print(f"Completed: {node_id}")
 
 Available workflows (all YAML-defined):
 - deep_research: Comprehensive research with source validation
@@ -56,10 +54,9 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
     conditions and transforms that cannot be expressed in YAML.
 
     Inherits from BaseYAMLWorkflowProvider which provides:
-    - YAML workflow loading and caching
-    - Escape hatches registration from victor.research.escape_hatches
-    - Streaming execution via StreamingWorkflowExecutor
-    - Standard workflow execution
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable long-running research
 
     Example:
         provider = ResearchWorkflowProvider()
@@ -67,9 +64,12 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream research execution
-        async for chunk in provider.astream("deep_research", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("deep_research", {"query": "AI"})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("deep_research", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

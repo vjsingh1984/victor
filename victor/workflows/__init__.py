@@ -336,6 +336,10 @@ from victor.workflows.observability import (
     create_emitter,
     create_logging_observer,
 )
+from victor.workflows.unified_compiler import (
+    UnifiedWorkflowCompiler,
+    create_unified_compiler,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -589,4 +593,7 @@ __all__ = [
     "ObservabilityEmitter",
     "create_emitter",
     "create_logging_observer",
+    # Unified Compiler (Consistent Compilation and Caching)
+    "UnifiedWorkflowCompiler",
+    "create_unified_compiler",
 ]

@@ -149,6 +149,7 @@ class AgentNode(WorkflowNode):
         input_mapping: Map context keys to agent inputs
         output_key: Key to store agent output in context
         llm_config: Optional LLM configuration (temperature, model_hint, etc.)
+        timeout_seconds: Maximum execution time in seconds (None = no timeout)
     """
 
     role: str = "executor"
@@ -158,6 +159,7 @@ class AgentNode(WorkflowNode):
     input_mapping: Dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
     llm_config: Optional[Dict[str, Any]] = None
+    timeout_seconds: Optional[float] = None
 
     @property
     def node_type(self) -> WorkflowNodeType:
@@ -174,6 +176,7 @@ class AgentNode(WorkflowNode):
                 "input_mapping": self.input_mapping,
                 "output_key": self.output_key,
                 "llm_config": self.llm_config,
+                "timeout_seconds": self.timeout_seconds,
             }
         )
         return d
@@ -506,6 +509,10 @@ class WorkflowDefinition:
         nodes: All nodes in the workflow
         start_node: ID of the entry point node
         metadata: Additional workflow metadata
+        max_execution_timeout_seconds: Overall workflow timeout (None = no limit)
+        default_node_timeout_seconds: Default timeout for nodes (None = no default)
+        max_iterations: Maximum workflow iterations/cycles (default: 25)
+        max_retries: Maximum retries for the entire workflow (default: 0)
     """
 
     name: str
@@ -513,6 +520,10 @@ class WorkflowDefinition:
     nodes: Dict[str, WorkflowNode] = field(default_factory=dict)
     start_node: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    max_execution_timeout_seconds: Optional[float] = None
+    default_node_timeout_seconds: Optional[float] = None
+    max_iterations: int = 25
+    max_retries: int = 0
 
     def __post_init__(self):
         """Validate workflow structure."""
@@ -612,6 +623,10 @@ class WorkflowDefinition:
             "start_node": self.start_node,
             "nodes": {nid: node.to_dict() for nid, node in self.nodes.items()},
             "metadata": self.metadata,
+            "max_execution_timeout_seconds": self.max_execution_timeout_seconds,
+            "default_node_timeout_seconds": self.default_node_timeout_seconds,
+            "max_iterations": self.max_iterations,
+            "max_retries": self.max_retries,
         }
 
     def get_agent_count(self) -> int:

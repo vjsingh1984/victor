@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Command-line interface for Victor - Enterprise-Ready AI Coding Assistant."""
+"""Command-line interface for Victor - Open-source AI coding assistant."""
 
 import typer
 from rich.console import Console
@@ -37,11 +37,12 @@ from victor.ui.commands.serve import serve_app
 from victor.ui.commands.test_provider import test_provider_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
+from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
     name="victor",
-    help="Victor - Enterprise-Ready AI Coding Assistant.",
+    help="Victor - Open-source AI coding assistant with multi-provider support.",
     add_completion=False,
 )
 
@@ -64,6 +65,7 @@ app.add_typer(serve_app)
 app.add_typer(test_provider_app)
 app.add_typer(tools_app)
 app.add_typer(scaffold_app)
+app.add_typer(scheduler_app)
 app.add_typer(workflow_app)
 
 console = Console()
@@ -88,7 +90,7 @@ def callback(
         help="Show version and exit",
     ),
 ) -> None:
-    """Victor - Enterprise-Ready AI Coding Assistant."""
+    """Victor - Open-source AI coding assistant with multi-provider support."""
     if ctx.invoked_subcommand is None:
         _run_default_interactive()
 

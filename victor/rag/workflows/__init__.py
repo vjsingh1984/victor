@@ -28,14 +28,12 @@ Available workflows (all YAML-defined):
 Example:
     provider = RAGWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("rag_query", {"query": "How does X work?"})
 
-    # Streaming execution
-    async for chunk in provider.astream("rag_query", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("rag_query", context):
+        print(f"Completed: {node_id}")
 
 Usage:
     from victor.rag.workflows import RAGWorkflowProvider
@@ -45,12 +43,11 @@ Usage:
     # List available workflows
     print(provider.get_workflow_names())
 
-    # Get a specific workflow
+    # Get a specific workflow definition
     workflow = provider.get_workflow("rag_query")
 
-    # Stream workflow execution
-    async for chunk in provider.astream("rag_query", orchestrator, {}):
-        print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+    # Execute with caching
+    result = await provider.run_compiled_workflow("rag_query", {"query": "..."})
 """
 
 from typing import List, Optional, Tuple
@@ -65,10 +62,9 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
     conditions and transforms that cannot be expressed in YAML.
 
     Inherits from BaseYAMLWorkflowProvider which provides:
-    - YAML workflow loading and caching
-    - Escape hatches registration from victor.rag.escape_hatches
-    - Streaming execution via StreamingWorkflowExecutor
-    - Standard workflow execution
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable document ingestion
 
     Available Workflows (all YAML-defined):
     - document_ingest: Document ingestion with parsing, chunking, and embedding
@@ -84,9 +80,12 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream RAG query execution
-        async for chunk in provider.astream("rag_query", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("rag_query", {"query": "..."})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("rag_query", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

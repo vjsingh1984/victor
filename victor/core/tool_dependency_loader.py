@@ -556,6 +556,94 @@ def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
     return create_tool_dependency_provider(yaml_path)
 
 
+# Mapping of vertical names to their canonicalization settings
+# Some verticals disable canonicalization to preserve distinct tool names
+_VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
+    "coding": True,
+    "devops": False,  # Preserves distinct 'grep' vs 'code_search'
+    "research": False,  # Preserves original tool names from ToolNames constants
+    "rag": True,
+    "dataanalysis": False,  # Preserves 'code_search' as distinct from 'grep'
+}
+
+
+def create_vertical_tool_dependency_provider(
+    vertical: str,
+    canonicalize: Optional[bool] = None,
+) -> YAMLToolDependencyProvider:
+    """Factory function to create tool dependency providers for verticals.
+
+    Consolidates vertical-specific tool dependency provider creation into
+    a single factory function, reducing code duplication. This replaces the
+    need for individual wrapper classes like CodingToolDependencyProvider,
+    DevOpsToolDependencyProvider, etc.
+
+    Args:
+        vertical: Vertical name (coding, devops, research, rag, dataanalysis)
+        canonicalize: Whether to canonicalize tool names. If None, uses the
+            vertical's default setting (some verticals disable canonicalization
+            to preserve distinct tool names like 'grep' vs 'code_search').
+
+    Returns:
+        Configured YAMLToolDependencyProvider for the vertical
+
+    Raises:
+        ValueError: If vertical is not recognized
+
+    Example:
+        # Create provider for coding vertical
+        provider = create_vertical_tool_dependency_provider("coding")
+        deps = provider.get_dependencies()
+
+        # Create provider with explicit canonicalization setting
+        provider = create_vertical_tool_dependency_provider("devops", canonicalize=False)
+
+        # Get recommended sequence for edit task
+        sequence = provider.get_recommended_sequence("edit")
+
+    Note:
+        This factory is the preferred way to create vertical providers for new code.
+        The individual wrapper classes (e.g., CodingToolDependencyProvider) are
+        maintained for backward compatibility but delegate to this factory internally.
+    """
+    # Map verticals to their tool dependency YAML files
+    yaml_paths = {
+        "coding": Path(__file__).parent.parent / "coding" / "tool_dependencies.yaml",
+        "devops": Path(__file__).parent.parent / "devops" / "tool_dependencies.yaml",
+        "research": Path(__file__).parent.parent / "research" / "tool_dependencies.yaml",
+        "rag": Path(__file__).parent.parent / "rag" / "tool_dependencies.yaml",
+        "dataanalysis": Path(__file__).parent.parent / "dataanalysis" / "tool_dependencies.yaml",
+    }
+
+    if vertical not in yaml_paths:
+        available = ", ".join(sorted(yaml_paths.keys()))
+        raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
+
+    yaml_path = yaml_paths[vertical]
+
+    # Check if YAML exists, fall back to empty provider if not
+    if not yaml_path.exists():
+        logger.warning(
+            f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}"
+        )
+        # Return provider with minimal config - just vertical name and empty default sequence
+        # This allows the system to function even without YAML files
+        minimal_yaml = f"""
+vertical: {vertical}
+default_sequence:
+  - read
+"""
+        loader = ToolDependencyLoader(canonicalize=canonicalize or True)
+        config = loader.load_from_string(minimal_yaml)
+        return YAMLToolDependencyProvider.__new__(YAMLToolDependencyProvider)
+
+    # Determine canonicalization setting
+    if canonicalize is None:
+        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
+
+    return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)
+
+
 __all__ = [
     "ToolDependencyLoader",
     "ToolDependencyLoadError",
@@ -563,4 +651,5 @@ __all__ = [
     "load_tool_dependency_yaml",
     "create_tool_dependency_provider",
     "get_cached_provider",
+    "create_vertical_tool_dependency_provider",
 ]

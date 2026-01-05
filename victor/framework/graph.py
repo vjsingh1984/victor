@@ -105,6 +105,267 @@ END = "__end__"
 START = "__start__"
 
 
+class CopyOnWriteState(Generic[StateType]):
+    """Copy-on-write wrapper for workflow state.
+
+    Delays deep copy of state until the first mutation, reducing overhead
+    for read-heavy workflows where nodes often only read state.
+
+    This optimization is particularly effective for:
+    - Workflows with many conditional branches that only read state
+    - Nodes that check conditions without modifying state
+    - Large state objects where deep copy is expensive
+
+    Example:
+        # Wrap original state
+        cow_state = CopyOnWriteState(original_state)
+
+        # Reading doesn't copy
+        value = cow_state["key"]  # No copy
+
+        # Writing triggers copy
+        cow_state["key"] = "new_value"  # Deep copy happens here
+
+        # Get the final state
+        final_state = cow_state.get_state()
+
+    Performance characteristics:
+        - Read operations: O(1), no copy overhead
+        - First write: O(n) deep copy where n is state size
+        - Subsequent writes: O(1), no additional copy
+
+    Thread safety:
+        This class is NOT thread-safe. Each thread should have its own
+        CopyOnWriteState wrapper if concurrent access is needed.
+    """
+
+    __slots__ = ("_source", "_copy", "_modified")
+
+    def __init__(self, source: StateType):
+        """Initialize with source state.
+
+        Args:
+            source: Original state dictionary (not copied until mutation)
+        """
+        self._source: StateType = source
+        self._copy: Optional[StateType] = None
+        self._modified: bool = False
+
+    def _ensure_copy(self) -> StateType:
+        """Ensure we have a mutable copy of the state.
+
+        Returns:
+            The mutable copy of the state
+        """
+        if not self._modified:
+            self._copy = copy.deepcopy(self._source)
+            self._modified = True
+        return self._copy  # type: ignore
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item without copying.
+
+        Args:
+            key: Key to look up
+
+        Returns:
+            Value associated with key
+
+        Raises:
+            KeyError: If key is not found
+        """
+        if self._modified:
+            return self._copy[key]  # type: ignore
+        return self._source[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item, triggering copy on first mutation.
+
+        Args:
+            key: Key to set
+            value: Value to associate with key
+        """
+        self._ensure_copy()[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        """Delete item, triggering copy on first mutation.
+
+        Args:
+            key: Key to delete
+
+        Raises:
+            KeyError: If key is not found
+        """
+        del self._ensure_copy()[key]
+
+    def __contains__(self, key: object) -> bool:
+        """Check if key exists without copying.
+
+        Args:
+            key: Key to check
+
+        Returns:
+            True if key exists, False otherwise
+        """
+        if self._modified:
+            return key in self._copy  # type: ignore
+        return key in self._source
+
+    def __len__(self) -> int:
+        """Get length without copying.
+
+        Returns:
+            Number of items in state
+        """
+        if self._modified:
+            return len(self._copy)  # type: ignore
+        return len(self._source)
+
+    def __iter__(self):
+        """Iterate over keys without copying.
+
+        Yields:
+            Keys from the state
+        """
+        if self._modified:
+            return iter(self._copy)  # type: ignore
+        return iter(self._source)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get with default without copying.
+
+        Args:
+            key: Key to look up
+            default: Value to return if key not found
+
+        Returns:
+            Value associated with key, or default
+        """
+        if self._modified:
+            return self._copy.get(key, default)  # type: ignore
+        return self._source.get(key, default)
+
+    def keys(self):
+        """Get keys without copying.
+
+        Returns:
+            View of keys in the state
+        """
+        if self._modified:
+            return self._copy.keys()  # type: ignore
+        return self._source.keys()
+
+    def values(self):
+        """Get values without copying.
+
+        Returns:
+            View of values in the state
+        """
+        if self._modified:
+            return self._copy.values()  # type: ignore
+        return self._source.values()
+
+    def items(self):
+        """Get items without copying.
+
+        Returns:
+            View of (key, value) pairs in the state
+        """
+        if self._modified:
+            return self._copy.items()  # type: ignore
+        return self._source.items()
+
+    def update(self, other: Dict[str, Any]) -> None:
+        """Update state, triggering copy.
+
+        Args:
+            other: Dictionary of items to update
+        """
+        self._ensure_copy().update(other)
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        """Set default value, may trigger copy.
+
+        If key is not present, sets it to default (triggering copy).
+        If key is present, returns its value without copying.
+
+        Args:
+            key: Key to look up or set
+            default: Value to set if key not found
+
+        Returns:
+            Value associated with key (existing or default)
+        """
+        if key not in self:
+            self._ensure_copy()[key] = default
+            return default
+        return self[key]
+
+    def pop(self, key: str, *args: Any) -> Any:
+        """Pop item, triggering copy.
+
+        Args:
+            key: Key to pop
+            *args: Optional default value
+
+        Returns:
+            Value associated with key
+
+        Raises:
+            KeyError: If key is not found and no default provided
+        """
+        return self._ensure_copy().pop(key, *args)
+
+    def copy(self) -> Dict[str, Any]:
+        """Create a shallow copy of the current state.
+
+        Returns:
+            Shallow copy of the state dictionary
+        """
+        if self._modified:
+            return self._copy.copy()  # type: ignore
+        return self._source.copy()  # type: ignore
+
+    def get_state(self) -> StateType:
+        """Get the final state.
+
+        Returns the modified copy if mutations occurred,
+        otherwise returns the original source.
+
+        Returns:
+            The current state (modified copy or original source)
+        """
+        if self._modified:
+            return self._copy  # type: ignore
+        return self._source
+
+    @property
+    def was_modified(self) -> bool:
+        """Check if state was modified (copy was made).
+
+        Returns:
+            True if any mutation occurred, False otherwise
+        """
+        return self._modified
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to regular dictionary.
+
+        Returns:
+            Dictionary copy of the current state
+        """
+        return dict(self.get_state())
+
+    def __repr__(self) -> str:
+        """String representation for debugging.
+
+        Returns:
+            Debug string showing modification status
+        """
+        status = "modified" if self._modified else "unmodified"
+        return f"CopyOnWriteState({status}, keys={list(self.keys())})"
+
+
 class EdgeType(Enum):
     """Types of edges in the graph."""
 
@@ -410,6 +671,7 @@ class GraphConfig:
         recursion_limit: Maximum recursion depth
         interrupt_before: Nodes to interrupt before execution
         interrupt_after: Nodes to interrupt after execution
+        use_copy_on_write: Enable copy-on-write state optimization (default: None uses settings)
     """
 
     max_iterations: int = 25
@@ -418,6 +680,7 @@ class GraphConfig:
     recursion_limit: int = 100
     interrupt_before: List[str] = field(default_factory=list)
     interrupt_after: List[str] = field(default_factory=list)
+    use_copy_on_write: Optional[bool] = None  # None = use settings default
 
 
 @dataclass
@@ -471,6 +734,29 @@ class CompiledGraph(Generic[StateType]):
         self._state_schema = state_schema
         self._config = config or GraphConfig()
 
+    def _should_use_cow(self, exec_config: GraphConfig) -> bool:
+        """Determine if copy-on-write should be used.
+
+        Args:
+            exec_config: Execution configuration
+
+        Returns:
+            True if COW should be enabled
+        """
+        # Explicit config takes precedence
+        if exec_config.use_copy_on_write is not None:
+            return exec_config.use_copy_on_write
+
+        # Fall back to settings
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            return settings.stategraph_copy_on_write_enabled
+        except Exception:
+            # Default to True if settings can't be loaded
+            return True
+
     async def invoke(
         self,
         input_state: StateType,
@@ -490,6 +776,7 @@ class CompiledGraph(Generic[StateType]):
         """
         exec_config = config or self._config
         thread_id = thread_id or uuid.uuid4().hex
+        use_cow = self._should_use_cow(exec_config)
 
         # Check for checkpoint to resume from
         if exec_config.checkpointer:
@@ -568,21 +855,51 @@ class CompiledGraph(Generic[StateType]):
                 logger.debug(f"Executing node: {current_node}")
                 node_history.append(current_node)
 
-                # Execute with timeout
-                if exec_config.timeout:
-                    remaining = exec_config.timeout - (time.time() - start_time)
-                    if remaining <= 0:
-                        return ExecutionResult(
-                            state=state,
-                            success=False,
-                            error="Execution timeout",
-                            iterations=iterations,
-                            duration=time.time() - start_time,
-                            node_history=node_history,
+                # Execute with timeout, optionally using copy-on-write
+                if use_cow:
+                    # Wrap state in COW wrapper for efficient read-heavy nodes
+                    cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
+                    if exec_config.timeout:
+                        remaining = exec_config.timeout - (time.time() - start_time)
+                        if remaining <= 0:
+                            return ExecutionResult(
+                                state=state,
+                                success=False,
+                                error="Execution timeout",
+                                iterations=iterations,
+                                duration=time.time() - start_time,
+                                node_history=node_history,
+                            )
+                        result = await asyncio.wait_for(
+                            node.execute(cow_state), timeout=remaining  # type: ignore
                         )
-                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                    else:
+                        result = await node.execute(cow_state)  # type: ignore
+
+                    # Extract final state from COW wrapper or result
+                    if isinstance(result, CopyOnWriteState):
+                        state = result.get_state()
+                    elif isinstance(result, dict):
+                        state = result
+                    else:
+                        # Node returned something else, use COW state
+                        state = cow_state.get_state()
                 else:
-                    state = await node.execute(state)
+                    # Traditional deep copy approach
+                    if exec_config.timeout:
+                        remaining = exec_config.timeout - (time.time() - start_time)
+                        if remaining <= 0:
+                            return ExecutionResult(
+                                state=state,
+                                success=False,
+                                error="Execution timeout",
+                                iterations=iterations,
+                                duration=time.time() - start_time,
+                                node_history=node_history,
+                            )
+                        state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                    else:
+                        state = await node.execute(state)
 
                 # WorkflowCheckpoint after execution
                 if exec_config.checkpointer:
@@ -1056,6 +1373,8 @@ __all__ = [
     "Edge",
     "EdgeType",
     "FrameworkNodeStatus",
+    # State management
+    "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     # Execution
     "ExecutionResult",
     "GraphConfig",

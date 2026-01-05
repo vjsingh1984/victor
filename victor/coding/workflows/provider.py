@@ -30,14 +30,12 @@ Escape hatches for complex conditions/transforms are in:
 Example:
     provider = CodingWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
 
-    # Streaming execution
-    async for chunk in provider.astream("code_review", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("code_review", context):
+        print(f"Completed: {node_id}")
 
 Available workflows (all YAML-defined):
 - feature_implementation: Full feature implementation workflow
@@ -66,10 +64,9 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
     conditions and transforms that cannot be expressed in YAML.
 
     Inherits from BaseYAMLWorkflowProvider which provides:
-    - YAML workflow loading and caching
-    - Escape hatches registration from victor.coding.escape_hatches
-    - Streaming execution via StreamingWorkflowExecutor
-    - Standard workflow execution
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable code reviews and TDD cycles
 
     Example:
         provider = CodingWorkflowProvider()
@@ -77,9 +74,12 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream workflow execution
-        async for chunk in provider.astream("code_review", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("code_review", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

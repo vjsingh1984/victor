@@ -17,10 +17,18 @@
 This module provides a unified facade over the workflow execution system,
 promoting workflow capabilities from victor/workflows/ to the framework layer.
 
-Design Pattern: Facade + Builder
-================================
+Design Pattern: Facade + Coordinator
+====================================
 WorkflowEngine provides a simplified interface to the complex workflow
-subsystem, hiding the complexity of executors, HITL, caching, and streaming.
+subsystem by delegating to focused coordinators that each handle a single
+domain (SRP compliance).
+
+Architecture:
+    WorkflowEngine (Facade)
+    ├── YAMLWorkflowCoordinator     # execute_yaml(), stream_yaml()
+    ├── GraphExecutionCoordinator   # execute_graph(), stream_graph()
+    ├── HITLCoordinator             # execute_with_hitl()
+    └── CacheCoordinator            # enable_caching(), clear_cache()
 
 Key Features:
 - Create workflows from Python code or YAML
@@ -73,6 +81,12 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph, StateGraph
+    from victor.framework.coordinators import (
+        YAMLWorkflowCoordinator,
+        GraphExecutionCoordinator,
+        HITLCoordinator,
+        CacheCoordinator,
+    )
     from victor.workflows.executor import WorkflowExecutor, WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
@@ -86,6 +100,7 @@ if TYPE_CHECKING:
         WorkflowDefinitionCompiler,
         CompilerConfig,
     )
+    from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +268,13 @@ class WorkflowEngine:
         self._cache_manager = cache_manager
         self._runner_registry = runner_registry
 
-        # Lazy-loaded executors
+        # Lazy-loaded coordinators (SRP split)
+        self._yaml_coordinator: Optional["YAMLWorkflowCoordinator"] = None
+        self._graph_coordinator: Optional["GraphExecutionCoordinator"] = None
+        self._hitl_coordinator: Optional["HITLCoordinator"] = None
+        self._cache_coordinator: Optional["CacheCoordinator"] = None
+
+        # Lazy-loaded executors (for backward compatibility)
         self._executor: Optional["WorkflowExecutor"] = None
         self._streaming_executor: Optional["StreamingWorkflowExecutor"] = None
         self._hitl_executor: Optional["HITLExecutor"] = None
@@ -261,6 +282,9 @@ class WorkflowEngine:
         # Lazy-loaded compilers
         self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
         self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
+
+        # Lazy-loaded unified compiler for consistent compilation and caching
+        self._unified_compiler: Optional["UnifiedWorkflowCompiler"] = None
 
     @property
     def config(self) -> WorkflowEngineConfig:
@@ -278,9 +302,13 @@ class WorkflowEngine:
         workflow_name: Optional[str] = None,
         condition_registry: Optional[Dict[str, Callable]] = None,
         transform_registry: Optional[Dict[str, Callable]] = None,
+        use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> ExecutionResult:
         """Execute a workflow from YAML file.
+
+        Uses UnifiedWorkflowCompiler for consistent compilation and caching,
+        then executes via CompiledGraph.invoke().
 
         Args:
             yaml_path: Path to YAML workflow file.
@@ -288,73 +316,84 @@ class WorkflowEngine:
             workflow_name: Specific workflow to load from file.
             condition_registry: Custom condition functions.
             transform_registry: Custom transform functions.
+            use_unified_compiler: Whether to use unified compiler (default True).
+                Set to False for backward compatibility with coordinator.
             **kwargs: Additional execution parameters.
 
         Returns:
             ExecutionResult with final state and metadata.
         """
         import time
-        from victor.workflows.yaml_loader import (
-            load_workflow_from_file,
-            YAMLWorkflowConfig,
-        )
-        from victor.workflows.executor import WorkflowExecutor, WorkflowContext
 
-        start_time = time.time()
-        nodes_executed: List[str] = []
-        hitl_requests: List[Dict[str, Any]] = []
+        if use_unified_compiler:
+            # Use unified compiler for consistent compilation and caching
+            start_time = time.time()
+            try:
+                compiler = self._get_unified_compiler()
+                compiled = compiler.compile_yaml(
+                    Path(yaml_path),
+                    workflow_name=workflow_name,
+                    condition_registry=condition_registry,
+                    transform_registry=transform_registry,
+                )
 
-        try:
-            # Create config with registries
-            config = YAMLWorkflowConfig(
-                condition_registry=condition_registry or {},
-                transform_registry=transform_registry or {},
-            )
+                # Extract thread_id from kwargs if provided for checkpointing
+                thread_id = kwargs.pop("thread_id", None)
 
-            # Load workflow from YAML
-            result = load_workflow_from_file(
-                str(yaml_path),
+                # Execute via CompiledGraph.invoke()
+                result = await compiled.invoke(
+                    initial_state or {},
+                    thread_id=thread_id,
+                    **kwargs,
+                )
+                duration = time.time() - start_time
+
+                # Handle polymorphic result types (LSP compliance)
+                # Result can be ExecutionResult object or dict
+                if hasattr(result, "state"):
+                    # ExecutionResult from graph.py
+                    final_state = result.state if isinstance(result.state, dict) else {"result": result.state}
+                    nodes_executed = getattr(result, "node_history", [])
+                    success = getattr(result, "success", True)
+                    error = getattr(result, "error", None)
+                elif isinstance(result, dict):
+                    # Direct dict result
+                    final_state = result
+                    nodes_executed = result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
+                    success = True
+                    error = None
+                else:
+                    # Fallback for other result types
+                    final_state = {"result": result}
+                    nodes_executed = []
+                    success = True
+                    error = None
+
+                return ExecutionResult(
+                    success=success,
+                    final_state=final_state,
+                    nodes_executed=nodes_executed,
+                    duration_seconds=duration,
+                    error=error,
+                )
+
+            except Exception as e:
+                logger.error(f"YAML workflow execution failed: {e}")
+                return ExecutionResult(
+                    success=False,
+                    error=str(e),
+                    duration_seconds=time.time() - start_time,
+                )
+        else:
+            # Fall back to coordinator for backward compatibility
+            coordinator = self._get_yaml_coordinator()
+            return await coordinator.execute(
+                yaml_path=yaml_path,
+                initial_state=initial_state,
                 workflow_name=workflow_name,
-                config=config,
-            )
-
-            # Handle dict or single workflow result
-            if isinstance(result, dict):
-                if not result:
-                    raise ValueError(f"No workflows found in {yaml_path}")
-                workflow_def = next(iter(result.values()))
-            else:
-                workflow_def = result
-
-            # Create executor
-            executor = self._get_executor()
-
-            # Create context
-            context = WorkflowContext(
-                workflow=workflow_def,
-                initial_state=initial_state or {},
-            )
-
-            # Execute
-            result = await executor.execute(context)
-
-            duration = time.time() - start_time
-
-            return ExecutionResult(
-                success=result.success,
-                final_state=result.final_state,
-                nodes_executed=result.nodes_executed,
-                duration_seconds=duration,
-                error=result.error if not result.success else None,
-                hitl_requests=hitl_requests,
-            )
-
-        except Exception as e:
-            logger.error(f"Workflow execution failed: {e}")
-            return ExecutionResult(
-                success=False,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
+                condition_registry=condition_registry,
+                transform_registry=transform_registry,
+                **kwargs,
             )
 
     async def execute_graph(
@@ -365,6 +404,9 @@ class WorkflowEngine:
     ) -> ExecutionResult:
         """Execute a compiled StateGraph.
 
+        Delegates to GraphExecutionCoordinator for SRP-compliant execution
+        with LSP-compliant polymorphic result handling.
+
         Args:
             graph: Compiled StateGraph to execute.
             initial_state: Initial workflow state.
@@ -373,48 +415,12 @@ class WorkflowEngine:
         Returns:
             ExecutionResult with final state and metadata.
         """
-        import time
-
-        start_time = time.time()
-
-        try:
-            # Execute the graph directly
-            result = await graph.invoke(initial_state or {})
-
-            duration = time.time() - start_time
-
-            # Handle polymorphic return type (LSP compliance)
-            # CompiledGraph.invoke() returns ExecutionResult with .state attribute
-            # Some graphs may return state dict directly for backward compatibility
-            if hasattr(result, "state"):
-                final_state = result.state
-                nodes_executed = getattr(result, "node_history", [])
-                success = getattr(result, "success", True)
-                error = getattr(result, "error", None)
-            else:
-                # Backward compatibility: result is the final state dict
-                final_state = result
-                nodes_executed = []
-                success = True
-                error = None
-
-            return ExecutionResult(
-                success=success,
-                final_state=final_state,
-                nodes_executed=nodes_executed if nodes_executed else (
-                    list(graph._execution_order) if hasattr(graph, '_execution_order') else []
-                ),
-                duration_seconds=duration,
-                error=error,
-            )
-
-        except Exception as e:
-            logger.error(f"Graph execution failed: {e}")
-            return ExecutionResult(
-                success=False,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        coordinator = self._get_graph_coordinator()
+        return await coordinator.execute(
+            graph=graph,
+            initial_state=initial_state,
+            **kwargs,
+        )
 
     async def execute_definition(
         self,
@@ -470,6 +476,7 @@ class WorkflowEngine:
     ) -> ExecutionResult:
         """Execute a WorkflowGraph via CompiledGraph (unified execution path).
 
+        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
         This method compiles a WorkflowGraph to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine, providing a
         unified execution path for all workflow types.
@@ -497,59 +504,13 @@ class WorkflowEngine:
 
             result = await engine.execute_workflow_graph(graph, {"value": 42})
         """
-        import time
-        from victor.workflows.graph_compiler import (
-            WorkflowGraphCompiler,
-            CompilerConfig,
+        coordinator = self._get_graph_coordinator()
+        return await coordinator.execute_workflow_graph(
+            graph=graph,
+            initial_state=initial_state,
+            use_node_runners=use_node_runners,
+            **kwargs,
         )
-
-        start_time = time.time()
-
-        try:
-            # Configure compiler
-            compiler_config = CompilerConfig(
-                use_node_runners=use_node_runners and self._runner_registry is not None,
-                runner_registry=self._runner_registry,
-                validate_before_compile=True,
-            )
-
-            # Compile WorkflowGraph to CompiledGraph
-            compiler = WorkflowGraphCompiler(compiler_config)
-            compiled = compiler.compile(graph)
-
-            # Execute via CompiledGraph.invoke()
-            result = await compiled.invoke(initial_state or {})
-
-            duration = time.time() - start_time
-
-            # Extract execution info from result
-            if hasattr(result, "state"):
-                final_state = result.state
-                nodes_executed = getattr(result, "node_history", [])
-                success = getattr(result, "success", True)
-                error = getattr(result, "error", None)
-            else:
-                # Result is the final state dict
-                final_state = result
-                nodes_executed = []
-                success = True
-                error = None
-
-            return ExecutionResult(
-                success=success,
-                final_state=final_state,
-                nodes_executed=nodes_executed,
-                duration_seconds=duration,
-                error=error,
-            )
-
-        except Exception as e:
-            logger.error(f"WorkflowGraph execution failed: {e}")
-            return ExecutionResult(
-                success=False,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
 
     async def execute_definition_compiled(
         self,
@@ -559,6 +520,7 @@ class WorkflowEngine:
     ) -> ExecutionResult:
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
 
+        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
         This method compiles a WorkflowDefinition to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine.
 
@@ -570,48 +532,12 @@ class WorkflowEngine:
         Returns:
             ExecutionResult with final state and metadata.
         """
-        import time
-        from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
-
-        start_time = time.time()
-
-        try:
-            # Compile WorkflowDefinition to CompiledGraph
-            compiler = WorkflowDefinitionCompiler(self._runner_registry)
-            compiled = compiler.compile(workflow)
-
-            # Execute via CompiledGraph.invoke()
-            result = await compiled.invoke(initial_state or {})
-
-            duration = time.time() - start_time
-
-            # Extract execution info from result
-            if hasattr(result, "state"):
-                final_state = result.state
-                nodes_executed = getattr(result, "node_history", [])
-                success = getattr(result, "success", True)
-                error = getattr(result, "error", None)
-            else:
-                final_state = result
-                nodes_executed = []
-                success = True
-                error = None
-
-            return ExecutionResult(
-                success=success,
-                final_state=final_state,
-                nodes_executed=nodes_executed,
-                duration_seconds=duration,
-                error=error,
-            )
-
-        except Exception as e:
-            logger.error(f"WorkflowDefinition compiled execution failed: {e}")
-            return ExecutionResult(
-                success=False,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        coordinator = self._get_graph_coordinator()
+        return await coordinator.execute_definition_compiled(
+            workflow=workflow,
+            initial_state=initial_state,
+            **kwargs,
+        )
 
     def set_runner_registry(self, registry: "NodeRunnerRegistry") -> None:
         """Set the NodeRunner registry for unified execution.
@@ -623,6 +549,12 @@ class WorkflowEngine:
         # Reset compilers to use new registry
         self._graph_compiler = None
         self._definition_compiler = None
+        # Reset unified compiler to use new registry
+        if self._unified_compiler is not None:
+            self._unified_compiler.set_runner_registry(registry)
+        # Update graph coordinator if it exists
+        if self._graph_coordinator is not None:
+            self._graph_coordinator.set_runner_registry(registry)
 
     # =========================================================================
     # Streaming Methods
@@ -635,9 +567,13 @@ class WorkflowEngine:
         workflow_name: Optional[str] = None,
         condition_registry: Optional[Dict[str, Callable]] = None,
         transform_registry: Optional[Dict[str, Callable]] = None,
+        use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from YAML workflow execution.
+
+        Uses UnifiedWorkflowCompiler for consistent compilation and caching,
+        then streams via CompiledGraph.stream().
 
         Args:
             yaml_path: Path to YAML workflow file.
@@ -645,68 +581,67 @@ class WorkflowEngine:
             workflow_name: Specific workflow to load from file.
             condition_registry: Custom condition functions.
             transform_registry: Custom transform functions.
+            use_unified_compiler: Whether to use unified compiler (default True).
+                Set to False for backward compatibility with coordinator.
             **kwargs: Additional execution parameters.
 
         Yields:
             WorkflowEvent for each execution step.
         """
         import time
-        from victor.workflows.yaml_loader import (
-            load_workflow_from_file,
-            YAMLWorkflowConfig,
-        )
-        from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-        from victor.workflows.streaming import WorkflowStreamContext
 
-        try:
-            # Create config with registries
-            config = YAMLWorkflowConfig(
-                condition_registry=condition_registry or {},
-                transform_registry=transform_registry or {},
-            )
-
-            # Load workflow
-            result = load_workflow_from_file(
-                str(yaml_path),
-                workflow_name=workflow_name,
-                config=config,
-            )
-
-            # Handle dict or single workflow result
-            if isinstance(result, dict):
-                if not result:
-                    raise ValueError(f"No workflows found in {yaml_path}")
-                workflow_def = next(iter(result.values()))
-            else:
-                workflow_def = result
-
-            # Create streaming executor
-            executor = self._get_streaming_executor()
-
-            # Create stream context
-            context = WorkflowStreamContext(
-                workflow=workflow_def,
-                initial_state=initial_state or {},
-            )
-
-            # Stream execution
-            async for chunk in executor.stream(context):
-                yield WorkflowEvent(
-                    event_type=chunk.event_type.value if hasattr(chunk.event_type, 'value') else str(chunk.event_type),
-                    node_id=chunk.node_id or "",
-                    timestamp=time.time(),
-                    data={"content": chunk.content} if chunk.content else {},
-                    state_snapshot=chunk.state_snapshot,
+        if use_unified_compiler:
+            # Use unified compiler for consistent compilation and caching
+            try:
+                compiler = self._get_unified_compiler()
+                compiled = compiler.compile_yaml(
+                    Path(yaml_path),
+                    workflow_name=workflow_name,
+                    condition_registry=condition_registry,
+                    transform_registry=transform_registry,
                 )
 
-        except Exception as e:
-            logger.error(f"Streaming workflow failed: {e}")
-            yield WorkflowEvent(
-                event_type="error",
-                node_id="",
-                timestamp=time.time(),
-                data={"error": str(e)},
-            )
+                # Stream via CompiledGraph.stream()
+                async for event in compiled.stream(initial_state or {}, **kwargs):
+                    # Convert CompiledGraph events to WorkflowEvent format
+                    if isinstance(event, dict):
+                        yield WorkflowEvent(
+                            event_type=event.get("event_type", "state_update"),
+                            node_id=event.get("node_id", ""),
+                            timestamp=time.time(),
+                            data=event.get("data", {}),
+                            state_snapshot=event.get("state", None),
+                        )
+                    else:
+                        # Assume it's already a compatible event type
+                        yield WorkflowEvent(
+                            event_type=getattr(event, "event_type", "state_update"),
+                            node_id=getattr(event, "node_id", ""),
+                            timestamp=time.time(),
+                            data=getattr(event, "data", {}),
+                            state_snapshot=getattr(event, "state", None),
+                        )
+
+            except Exception as e:
+                logger.error(f"Streaming YAML workflow failed: {e}")
+                yield WorkflowEvent(
+                    event_type="error",
+                    node_id="",
+                    timestamp=time.time(),
+                    data={"error": str(e)},
+                )
+        else:
+            # Fall back to coordinator for backward compatibility
+            coordinator = self._get_yaml_coordinator()
+            async for event in coordinator.stream(
+                yaml_path=yaml_path,
+                initial_state=initial_state,
+                workflow_name=workflow_name,
+                condition_registry=condition_registry,
+                transform_registry=transform_registry,
+                **kwargs,
+            ):
+                yield event
 
     async def stream_graph(
         self,
@@ -716,6 +651,8 @@ class WorkflowEngine:
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from StateGraph execution.
 
+        Delegates to GraphExecutionCoordinator for SRP-compliant streaming.
+
         Args:
             graph: Compiled StateGraph to execute.
             initial_state: Initial workflow state.
@@ -724,36 +661,13 @@ class WorkflowEngine:
         Yields:
             WorkflowEvent for each execution step.
         """
-        import time
-
-        try:
-            # Use the graph's stream method if available
-            if hasattr(graph, 'stream'):
-                async for node_id, state in graph.stream(initial_state or {}):
-                    yield WorkflowEvent(
-                        event_type="node_complete",
-                        node_id=node_id,
-                        timestamp=time.time(),
-                        state_snapshot=state,
-                    )
-            else:
-                # Fallback to invoke
-                final_state = await graph.invoke(initial_state or {})
-                yield WorkflowEvent(
-                    event_type="complete",
-                    node_id="",
-                    timestamp=time.time(),
-                    state_snapshot=final_state,
-                )
-
-        except Exception as e:
-            logger.error(f"Graph streaming failed: {e}")
-            yield WorkflowEvent(
-                event_type="error",
-                node_id="",
-                timestamp=time.time(),
-                data={"error": str(e)},
-            )
+        coordinator = self._get_graph_coordinator()
+        async for event in coordinator.stream(
+            graph=graph,
+            initial_state=initial_state,
+            **kwargs,
+        ):
+            yield event
 
     # =========================================================================
     # HITL Integration
@@ -766,8 +680,10 @@ class WorkflowEngine:
             handler: HITLHandler for approval nodes.
         """
         self._hitl_handler = handler
-        # Reset executor to use new handler
+        # Reset executor and coordinator to use new handler
         self._hitl_executor = None
+        if self._hitl_coordinator is not None:
+            self._hitl_coordinator.set_handler(handler)
 
     async def execute_with_hitl(
         self,
@@ -778,6 +694,8 @@ class WorkflowEngine:
     ) -> ExecutionResult:
         """Execute workflow with HITL approval nodes.
 
+        Delegates to HITLCoordinator for SRP-compliant execution.
+
         Args:
             yaml_path: Path to YAML workflow file.
             initial_state: Initial workflow state.
@@ -787,46 +705,13 @@ class WorkflowEngine:
         Returns:
             ExecutionResult with HITL request history.
         """
-        from victor.workflows.yaml_loader import load_workflow_from_file
-        from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
-        import time
-
-        start_time = time.time()
-        hitl_requests: List[Dict[str, Any]] = []
-
-        try:
-            # Load workflow
-            workflow_def = load_workflow_from_file(str(yaml_path))
-
-            # Create HITL handler
-            handler = self._hitl_handler or DefaultHITLHandler()
-
-            # Create HITL executor
-            executor = HITLExecutor(
-                workflow=workflow_def,
-                handler=handler,
-            )
-
-            # Execute with HITL
-            result = await executor.execute(initial_state or {})
-
-            duration = time.time() - start_time
-
-            return ExecutionResult(
-                success=result.success,
-                final_state=result.final_state,
-                nodes_executed=result.nodes_executed,
-                duration_seconds=duration,
-                hitl_requests=hitl_requests,
-            )
-
-        except Exception as e:
-            logger.error(f"HITL workflow failed: {e}")
-            return ExecutionResult(
-                success=False,
-                error=str(e),
-                duration_seconds=time.time() - start_time,
-            )
+        coordinator = self._get_hitl_coordinator()
+        return await coordinator.execute(
+            yaml_path=yaml_path,
+            initial_state=initial_state,
+            approval_callback=approval_callback,
+            **kwargs,
+        )
 
     # =========================================================================
     # Caching
@@ -835,29 +720,153 @@ class WorkflowEngine:
     def enable_caching(self, ttl_seconds: int = 3600) -> None:
         """Enable result caching.
 
+        Delegates to CacheCoordinator for SRP-compliant cache management.
+
         Args:
             ttl_seconds: Cache time-to-live.
         """
         self._config.enable_caching = True
         self._config.cache_ttl_seconds = ttl_seconds
+        coordinator = self._get_cache_coordinator()
+        coordinator.enable_caching(ttl_seconds=ttl_seconds)
 
     def disable_caching(self) -> None:
-        """Disable result caching."""
+        """Disable result caching.
+
+        Delegates to CacheCoordinator for SRP-compliant cache management.
+        """
         self._config.enable_caching = False
+        coordinator = self._get_cache_coordinator()
+        coordinator.disable_caching()
 
     def clear_cache(self) -> None:
-        """Clear all cached results."""
+        """Clear all cached results.
+
+        Delegates to CacheCoordinator for SRP-compliant cache management.
+        """
+        coordinator = self._get_cache_coordinator()
+        coordinator.clear_cache()
+        # Also clear the cache manager directly for backward compatibility
         if self._cache_manager:
-            self._cache_manager.clear()
+            self._cache_manager.clear_all()
+
+    def clear_workflow_cache(self) -> int:
+        """Clear all workflow caches via unified compiler.
+
+        Clears both definition cache (parsed YAML workflows) and
+        execution cache (workflow results).
+
+        Returns:
+            Total number of cache entries cleared.
+        """
+        compiler = self._get_unified_compiler()
+        return compiler.clear_cache()
+
+    def get_workflow_cache_stats(self) -> Dict[str, Any]:
+        """Get workflow cache statistics.
+
+        Returns comprehensive cache statistics including:
+        - definition_cache: Stats for parsed workflow definitions
+        - execution_cache: Stats for workflow execution results
+        - caching_enabled: Whether caching is currently enabled
+
+        Returns:
+            Dictionary with cache statistics.
+        """
+        compiler = self._get_unified_compiler()
+        return compiler.get_cache_stats()
+
+    def invalidate_yaml_cache(self, yaml_path: Union[str, Path]) -> int:
+        """Invalidate cached definitions for a specific YAML file.
+
+        Use this when a YAML file has been modified and the cache
+        should be refreshed.
+
+        Args:
+            yaml_path: Path to YAML file to invalidate.
+
+        Returns:
+            Number of cache entries invalidated.
+        """
+        compiler = self._get_unified_compiler()
+        return compiler.invalidate_yaml(yaml_path)
 
     # =========================================================================
-    # Helpers
+    # Coordinator Getters (SRP Split)
+    # =========================================================================
+
+    def _get_yaml_coordinator(self) -> "YAMLWorkflowCoordinator":
+        """Get or create YAML workflow coordinator."""
+        if self._yaml_coordinator is None:
+            from victor.framework.coordinators import YAMLWorkflowCoordinator
+
+            self._yaml_coordinator = YAMLWorkflowCoordinator()
+        return self._yaml_coordinator
+
+    def _get_graph_coordinator(self) -> "GraphExecutionCoordinator":
+        """Get or create graph execution coordinator."""
+        if self._graph_coordinator is None:
+            from victor.framework.coordinators import GraphExecutionCoordinator
+
+            self._graph_coordinator = GraphExecutionCoordinator(
+                runner_registry=self._runner_registry
+            )
+        return self._graph_coordinator
+
+    def _get_hitl_coordinator(self) -> "HITLCoordinator":
+        """Get or create HITL coordinator."""
+        if self._hitl_coordinator is None:
+            from victor.framework.coordinators import HITLCoordinator
+
+            self._hitl_coordinator = HITLCoordinator(
+                handler=self._hitl_handler,
+                timeout_seconds=self._config.hitl_timeout_seconds,
+            )
+        return self._hitl_coordinator
+
+    def _get_cache_coordinator(self) -> "CacheCoordinator":
+        """Get or create cache coordinator."""
+        if self._cache_coordinator is None:
+            from victor.framework.coordinators import CacheCoordinator
+
+            self._cache_coordinator = CacheCoordinator(
+                cache_manager=self._cache_manager,
+            )
+        return self._cache_coordinator
+
+    def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
+        """Get or create the unified compiler.
+
+        The unified compiler provides consistent compilation and caching
+        across all workflow types (YAML, WorkflowGraph, WorkflowDefinition).
+
+        Returns:
+            UnifiedWorkflowCompiler instance with shared caches.
+        """
+        if self._unified_compiler is None:
+            from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+            from victor.workflows.cache import (
+                get_workflow_definition_cache,
+                get_workflow_cache_manager,
+            )
+
+            self._unified_compiler = UnifiedWorkflowCompiler(
+                definition_cache=get_workflow_definition_cache(),
+                execution_cache=get_workflow_cache_manager(),
+                runner_registry=self._runner_registry,
+                enable_caching=self._config.enable_caching,
+            )
+        return self._unified_compiler
+
+    # =========================================================================
+    # Helpers (for backward compatibility)
     # =========================================================================
 
     def _get_executor(self) -> "WorkflowExecutor":
         """Get or create workflow executor."""
         if self._executor is None:
             from victor.workflows.executor import WorkflowExecutor
+
             self._executor = WorkflowExecutor()
         return self._executor
 
@@ -865,6 +874,7 @@ class WorkflowEngine:
         """Get or create streaming executor."""
         if self._streaming_executor is None:
             from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+
             self._streaming_executor = StreamingWorkflowExecutor()
         return self._streaming_executor
 

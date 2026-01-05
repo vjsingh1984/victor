@@ -1107,3 +1107,179 @@ default_sequence:
         dep = config.dependencies[0]
         assert dep.tool_name == "my-tool_v2"
         assert "another.tool" in dep.depends_on
+
+
+# =============================================================================
+# Tests for create_vertical_tool_dependency_provider Factory
+# =============================================================================
+
+
+class TestCreateVerticalToolDependencyProvider:
+    """Tests for create_vertical_tool_dependency_provider() factory function."""
+
+    def test_create_coding_provider(self):
+        """Factory should create provider for coding vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("coding")
+
+        assert isinstance(provider, YAMLToolDependencyProvider)
+        assert provider.vertical == "coding"
+
+    def test_create_devops_provider(self):
+        """Factory should create provider for devops vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("devops")
+
+        assert isinstance(provider, YAMLToolDependencyProvider)
+        assert provider.vertical == "devops"
+
+    def test_create_research_provider(self):
+        """Factory should create provider for research vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("research")
+
+        assert isinstance(provider, YAMLToolDependencyProvider)
+        assert provider.vertical == "research"
+
+    def test_create_rag_provider(self):
+        """Factory should create provider for rag vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("rag")
+
+        assert isinstance(provider, YAMLToolDependencyProvider)
+        assert provider.vertical == "rag"
+
+    def test_create_dataanalysis_provider(self):
+        """Factory should create provider for dataanalysis vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("dataanalysis")
+
+        assert isinstance(provider, YAMLToolDependencyProvider)
+        assert provider.vertical == "data_analysis"
+
+    def test_unknown_vertical_raises_error(self):
+        """Factory should raise ValueError for unknown vertical."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        with pytest.raises(ValueError) as exc_info:
+            create_vertical_tool_dependency_provider("unknown_vertical")
+
+        assert "Unknown vertical 'unknown_vertical'" in str(exc_info.value)
+        assert "Available:" in str(exc_info.value)
+
+    def test_error_message_lists_available_verticals(self):
+        """Error message should list all available verticals."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        with pytest.raises(ValueError) as exc_info:
+            create_vertical_tool_dependency_provider("invalid")
+
+        error_msg = str(exc_info.value)
+        assert "coding" in error_msg
+        assert "devops" in error_msg
+        assert "research" in error_msg
+        assert "rag" in error_msg
+        assert "dataanalysis" in error_msg
+
+    def test_explicit_canonicalize_true(self):
+        """Factory should respect explicit canonicalize=True."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        # DevOps defaults to canonicalize=False, but we override
+        provider = create_vertical_tool_dependency_provider("devops", canonicalize=True)
+
+        assert provider._canonicalize is True
+
+    def test_explicit_canonicalize_false(self):
+        """Factory should respect explicit canonicalize=False."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        # Coding defaults to canonicalize=True, but we override
+        provider = create_vertical_tool_dependency_provider("coding", canonicalize=False)
+
+        assert provider._canonicalize is False
+
+    def test_default_canonicalize_for_coding(self):
+        """Coding vertical should default to canonicalize=True."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("coding")
+
+        assert provider._canonicalize is True
+
+    def test_default_canonicalize_for_devops(self):
+        """DevOps vertical should default to canonicalize=False."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("devops")
+
+        assert provider._canonicalize is False
+
+    def test_provider_has_dependencies(self):
+        """Created provider should have dependencies from YAML."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("coding")
+        deps = provider.get_dependencies()
+
+        assert len(deps) > 0
+
+    def test_provider_has_sequences(self):
+        """Created provider should have sequences from YAML."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("coding")
+        sequences = provider.get_tool_sequences()
+
+        assert len(sequences) > 0
+
+    def test_provider_has_required_tools(self):
+        """Created provider should have required tools from YAML."""
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        provider = create_vertical_tool_dependency_provider("coding")
+        required = provider.get_required_tools()
+
+        assert len(required) > 0
+        assert "read" in required
+
+    def test_equivalent_to_wrapper_class(self):
+        """Factory should produce equivalent results to wrapper classes."""
+        import warnings
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.coding.tool_dependencies import CodingToolDependencyProvider
+
+        factory_provider = create_vertical_tool_dependency_provider("coding")
+
+        # Wrapper class now emits deprecation warning
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            wrapper_provider = CodingToolDependencyProvider()
+
+        # Both should have same required tools
+        assert factory_provider.get_required_tools() == wrapper_provider.get_required_tools()
+
+        # Both should have same optional tools
+        assert factory_provider.get_optional_tools() == wrapper_provider.get_optional_tools()
+
+        # Both should have same vertical
+        assert factory_provider.vertical == wrapper_provider.vertical
+
+    def test_wrapper_class_emits_deprecation_warning(self):
+        """Wrapper classes should emit deprecation warning."""
+        import warnings
+        from victor.coding.tool_dependencies import CodingToolDependencyProvider
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            CodingToolDependencyProvider()
+
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "CodingToolDependencyProvider is deprecated" in str(w[0].message)
+            assert "create_vertical_tool_dependency_provider" in str(w[0].message)

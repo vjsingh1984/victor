@@ -43,6 +43,10 @@ _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 class ResearchToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for research vertical.
 
+    .. deprecated::
+        Use ``create_vertical_tool_dependency_provider('research')`` instead.
+        This class is maintained for backward compatibility.
+
     Extends YAMLToolDependencyProvider to load research-specific tool
     relationships from tool_dependencies.yaml.
 
@@ -54,13 +58,33 @@ class ResearchToolDependencyProvider(YAMLToolDependencyProvider):
 
     Uses tool names from ToolNames constants for consistency.
 
+    Example:
+        # Preferred (new code):
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        provider = create_vertical_tool_dependency_provider("research")
+
+        # Deprecated (backward compatible):
+        provider = ResearchToolDependencyProvider()
+
     Note: canonicalize=False is used to preserve the original tool names
     as defined in the YAML (e.g., code_search vs grep). The tool names
     in the YAML match the ToolNames constants used in the original Python.
     """
 
     def __init__(self):
-        """Initialize the provider from YAML configuration."""
+        """Initialize the provider from YAML configuration.
+
+        .. deprecated::
+            Use ``create_vertical_tool_dependency_provider('research')`` instead.
+        """
+        import warnings
+
+        warnings.warn(
+            "ResearchToolDependencyProvider is deprecated. "
+            "Use create_vertical_tool_dependency_provider('research') instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             yaml_path=_YAML_PATH,
             canonicalize=False,  # Preserve original tool names from ToolNames constants

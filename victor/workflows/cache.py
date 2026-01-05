@@ -51,6 +51,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from cachetools import TTLCache  # type: ignore[import-untyped]
@@ -728,6 +729,243 @@ class WorkflowCacheManager:
             return {name: cache.get_stats() for name, cache in self._caches.items()}
 
 
+# =============================================================================
+# Workflow Definition Cache (P1 - Scalability)
+# =============================================================================
+
+
+@dataclass
+class DefinitionCacheConfig:
+    """Configuration for workflow definition caching.
+
+    Attributes:
+        enabled: Whether caching is enabled
+        ttl_seconds: Time-to-live for cache entries
+        max_entries: Maximum cached definitions
+    """
+
+    enabled: bool = True
+    ttl_seconds: int = 3600
+    max_entries: int = 100
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> "DefinitionCacheConfig":
+        """Create config from Settings instance."""
+        return cls(
+            enabled=getattr(settings, "workflow_definition_cache_enabled", True),
+            ttl_seconds=getattr(settings, "workflow_definition_cache_ttl", 3600),
+            max_entries=getattr(settings, "workflow_definition_cache_max_entries", 100),
+        )
+
+
+class WorkflowDefinitionCache:
+    """TTL + mtime-based cache for parsed WorkflowDefinitions.
+
+    Caches parsed YAML workflow definitions to avoid redundant parsing.
+    Invalidation is based on both TTL and file modification time.
+
+    Example:
+        cache = WorkflowDefinitionCache(config)
+
+        # Check cache
+        definition = cache.get(path, workflow_name, config_hash)
+        if definition is None:
+            # Parse YAML and cache
+            definition = parse_workflow(path, workflow_name)
+            cache.put(path, workflow_name, config_hash, definition)
+    """
+
+    def __init__(self, config: Optional[DefinitionCacheConfig] = None):
+        """Initialize the definition cache.
+
+        Args:
+            config: Cache configuration
+        """
+        self._config = config or DefinitionCacheConfig()
+        self._lock = threading.RLock()
+
+        if self._config.enabled:
+            self._cache: Optional[TTLCache] = TTLCache(
+                maxsize=self._config.max_entries,
+                ttl=self._config.ttl_seconds,
+            )
+            logger.info(
+                f"Workflow definition cache initialized: max_entries={self._config.max_entries}, "
+                f"ttl={self._config.ttl_seconds}s"
+            )
+        else:
+            self._cache = None
+            logger.debug("Workflow definition cache disabled")
+
+        # Statistics
+        self._stats = {"hits": 0, "misses": 0, "invalidations": 0}
+
+    def _make_key(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+        mtime: float,
+    ) -> str:
+        """Generate cache key.
+
+        Key includes file path, workflow name, config hash, and mtime
+        to ensure cache invalidation on any change.
+        """
+        key_data = f"{path.resolve()}:{workflow_name}:{config_hash}:{mtime}"
+        return hashlib.sha256(key_data.encode()).hexdigest()
+
+    def get(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+    ) -> Optional["WorkflowDefinition"]:
+        """Get cached workflow definition.
+
+        Args:
+            path: Path to YAML file
+            workflow_name: Name of workflow in YAML
+            config_hash: Hash of workflow config for cache key
+
+        Returns:
+            Cached WorkflowDefinition or None if not found/stale
+        """
+        if not self._config.enabled or self._cache is None:
+            return None
+
+        try:
+            mtime = path.stat().st_mtime
+        except (OSError, FileNotFoundError):
+            return None
+
+        key = self._make_key(path, workflow_name, config_hash, mtime)
+
+        with self._lock:
+            result = self._cache.get(key)
+            if result is not None:
+                self._stats["hits"] += 1
+                logger.debug(f"Definition cache hit: {workflow_name}")
+                return result
+
+            self._stats["misses"] += 1
+            return None
+
+    def put(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+        definition: "WorkflowDefinition",
+    ) -> bool:
+        """Cache a workflow definition.
+
+        Args:
+            path: Path to YAML file
+            workflow_name: Name of workflow
+            config_hash: Hash of workflow config
+            definition: Parsed WorkflowDefinition to cache
+
+        Returns:
+            True if cached successfully
+        """
+        if not self._config.enabled or self._cache is None:
+            return False
+
+        try:
+            mtime = path.stat().st_mtime
+        except (OSError, FileNotFoundError):
+            return False
+
+        key = self._make_key(path, workflow_name, config_hash, mtime)
+
+        with self._lock:
+            self._cache[key] = definition
+            logger.debug(f"Definition cached: {workflow_name}")
+            return True
+
+    def invalidate(self, path: Path) -> int:
+        """Invalidate all cached definitions for a file path.
+
+        Args:
+            path: Path to invalidate
+
+        Returns:
+            Number of entries invalidated
+        """
+        if not self._config.enabled or self._cache is None:
+            return 0
+
+        path_str = str(path.resolve())
+
+        with self._lock:
+            keys_to_delete = [
+                k for k in self._cache.keys() if path_str in k  # Key contains path
+            ]
+
+            for key in keys_to_delete:
+                del self._cache[key]
+
+            count = len(keys_to_delete)
+            if count > 0:
+                self._stats["invalidations"] += count
+                logger.info(f"Invalidated {count} definition cache entries for: {path}")
+
+            return count
+
+    def clear(self) -> int:
+        """Clear all cached definitions.
+
+        Returns:
+            Number of entries cleared
+        """
+        if not self._config.enabled or self._cache is None:
+            return 0
+
+        with self._lock:
+            count = len(self._cache)
+            self._cache.clear()
+            logger.info(f"Cleared {count} definition cache entries")
+            return count
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        with self._lock:
+            stats = self._stats.copy()
+            total = stats["hits"] + stats["misses"]
+            stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
+            stats["size"] = len(self._cache) if self._cache else 0
+            stats["enabled"] = self._config.enabled
+            return stats
+
+
+# Global definition cache instance
+_global_definition_cache: Optional[WorkflowDefinitionCache] = None
+
+
+def get_workflow_definition_cache() -> WorkflowDefinitionCache:
+    """Get the global workflow definition cache.
+
+    Returns:
+        Global WorkflowDefinitionCache instance
+    """
+    global _global_definition_cache
+    if _global_definition_cache is None:
+        _global_definition_cache = WorkflowDefinitionCache()
+    return _global_definition_cache
+
+
+def configure_workflow_definition_cache(config: DefinitionCacheConfig) -> None:
+    """Configure the global workflow definition cache.
+
+    Args:
+        config: Configuration to apply
+    """
+    global _global_definition_cache
+    _global_definition_cache = WorkflowDefinitionCache(config)
+    logger.info(f"Workflow definition cache configured: enabled={config.enabled}")
+
+
 # Global cache manager instance
 _global_cache_manager: Optional[WorkflowCacheManager] = None
 
@@ -767,4 +1005,9 @@ __all__ = [
     # Global management
     "get_workflow_cache_manager",
     "configure_workflow_cache",
+    # Definition cache
+    "DefinitionCacheConfig",
+    "WorkflowDefinitionCache",
+    "get_workflow_definition_cache",
+    "configure_workflow_definition_cache",
 ]

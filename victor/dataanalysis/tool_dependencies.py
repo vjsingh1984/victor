@@ -51,6 +51,10 @@ _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for data analysis vertical.
 
+    .. deprecated::
+        Use ``create_vertical_tool_dependency_provider('dataanalysis')`` instead.
+        This class is maintained for backward compatibility.
+
     Loads configuration from YAML file (tool_dependencies.yaml) using the
     YAMLToolDependencyProvider base class.
 
@@ -61,6 +65,11 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
     - Statistical analysis patterns
 
     Example:
+        # Preferred (new code):
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        provider = create_vertical_tool_dependency_provider("dataanalysis")
+
+        # Deprecated (backward compatible):
         >>> provider = DataAnalysisToolDependencyProvider()
         >>> provider.vertical
         'data_analysis'
@@ -74,7 +83,16 @@ class DataAnalysisToolDependencyProvider(YAMLToolDependencyProvider):
         Note: canonicalize=False to preserve distinct tool names like 'code_search'
         which would otherwise be mapped to 'grep' by the alias system. The DataAnalysis
         vertical uses both 'grep' (keyword) and 'code_search' (semantic) as separate tools.
+
+        .. deprecated::
+            Use ``create_vertical_tool_dependency_provider('dataanalysis')`` instead.
         """
+        warnings.warn(
+            "DataAnalysisToolDependencyProvider is deprecated. "
+            "Use create_vertical_tool_dependency_provider('dataanalysis') instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             yaml_path=_YAML_PATH,
             canonicalize=False,  # Preserve 'code_search' as distinct from 'grep'

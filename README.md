@@ -100,6 +100,64 @@ See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 
 ---
 
+## Workflow Capabilities
+
+Victor includes a YAML-based workflow system with scheduling and versioning.
+
+### What's Included
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| YAML Workflow DSL | Stable | Agent, compute, condition, parallel nodes |
+| Cron Scheduling | Stable | Standard cron syntax, aliases (@daily, @hourly) |
+| Execution Limits | Stable | Timeouts, retries, iteration limits |
+| Workflow Versioning | Stable | Semver, migrations, deprecation |
+| CLI Management | Stable | `victor scheduler add/list/remove` |
+
+### Quick Example
+
+```yaml
+# my_workflow.yaml
+workflows:
+  daily_analysis:
+    schedule:
+      cron: "0 9 * * *"
+    execution:
+      max_timeout_seconds: 3600
+    nodes:
+      - id: analyze
+        type: agent
+        role: analyst
+        goal: "Analyze daily metrics"
+        timeout: 300
+        next: []
+```
+
+```bash
+victor scheduler add daily_analysis --cron "0 9 * * *"
+victor scheduler start
+```
+
+### Honest Limitations
+
+The built-in scheduler is designed for **single-instance deployments**:
+
+- No distributed execution (one scheduler process only)
+- In-memory state (no persistence across restarts without YAML reload)
+- No web dashboard (CLI only)
+- No DAG-style dependencies between workflows
+
+**For production at scale**, use:
+- **Airflow**: Complex DAGs, web UI, distributed workers
+- **Temporal.io**: Microservices, durable execution
+- **AWS Step Functions**: Serverless, AWS-native
+
+Victor's scheduler is ideal for: dev environments, single-server deployments, and simple recurring tasks where an external orchestrator is overkill.
+
+See `docs/guides/WORKFLOW_SCHEDULER.md` for complete documentation.
+
+---
+
 ## Installation
 
 | Method | Command |
@@ -124,6 +182,9 @@ See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 | `victor keys --set X` | Configure API key |
 | `victor workflow validate <path>` | Validate YAML workflow file |
 | `victor workflow render <path>` | Render workflow as diagram (SVG/PNG/ASCII) |
+| `victor scheduler start` | Start workflow scheduler daemon |
+| `victor scheduler add <name>` | Add scheduled workflow |
+| `victor scheduler list` | List scheduled workflows |
 | `victor vertical create <name>` | Scaffold new vertical structure |
 | `victor vertical list` | List available verticals |
 | `victor dashboard` | Launch observability dashboard |
@@ -149,6 +210,7 @@ See `docs/ARCHITECTURE_DEEP_DIVE.md` for system internals.
 | [Local Models](docs/guides/LOCAL_MODELS.md) | Ollama, LM Studio, vLLM, llama.cpp |
 | [Air-Gapped Mode](docs/embeddings/AIRGAPPED.md) | Offline operation |
 | [Workflow DSL](docs/guides/WORKFLOW_DSL.md) | StateGraph guide |
+| [Workflow Scheduling](docs/guides/WORKFLOW_SCHEDULER.md) | Cron, versioning, limits |
 
 ---
 

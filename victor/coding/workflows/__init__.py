@@ -36,12 +36,12 @@ Usage:
     # List available workflows
     print(provider.get_workflow_names())
 
-    # Get a specific workflow
-    workflow = provider.get_workflow("feature_implementation")
+    # Execute with caching (recommended - uses UnifiedWorkflowCompiler)
+    result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
 
-    # Stream workflow execution
-    async for chunk in provider.astream("code_review", orchestrator, {}):
-        print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+    # Stream with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("code_review", {}):
+        print(f"Completed: {node_id}")
 
 This package also provides LCEL-composed tool chains for fine-grained
 code operations (explore, analyze, edit, refactor, etc.).

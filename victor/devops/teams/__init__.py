@@ -33,13 +33,25 @@ enabling cross-vertical team discovery via:
     from victor.framework.team_registry import get_team_registry
     registry = get_team_registry()
     devops_teams = registry.find_by_vertical("devops")
+
+DEPRECATION NOTICE:
+    DevOpsTeamSpec is deprecated and will be removed in a future version.
+    Use TeamSpec from victor.framework.team_schema instead:
+
+        from victor.framework.team_schema import TeamSpec
+
+    DevOpsTeamSpec is maintained for backwards compatibility.
 """
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
+
+# Import canonical TeamSpec for type compatibility
+from victor.framework.team_schema import TeamSpec as CanonicalTeamSpec
 
 
 @dataclass
@@ -154,6 +166,11 @@ DEVOPS_ROLES: Dict[str, DevOpsRoleConfig] = {
 class DevOpsTeamSpec:
     """Specification for a DevOps team.
 
+    .. deprecated::
+        DevOpsTeamSpec is deprecated. Use TeamSpec from
+        victor.framework.team_schema instead. DevOpsTeamSpec is maintained
+        for backwards compatibility but will be removed in a future version.
+
     Attributes:
         name: Team name
         description: Team description
@@ -169,6 +186,31 @@ class DevOpsTeamSpec:
     members: List[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
+
+    def __post_init__(self):
+        """Emit deprecation warning on instantiation."""
+        warnings.warn(
+            "DevOpsTeamSpec is deprecated. Use TeamSpec from "
+            "victor.framework.team_schema instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    def to_canonical_team_spec(self) -> CanonicalTeamSpec:
+        """Convert to canonical TeamSpec from victor.framework.team_schema.
+
+        Returns:
+            CanonicalTeamSpec instance with vertical set to "devops"
+        """
+        return CanonicalTeamSpec(
+            name=self.name,
+            description=self.description,
+            vertical="devops",
+            formation=self.formation,
+            members=self.members,
+            total_tool_budget=self.total_tool_budget,
+            max_iterations=self.max_iterations,
+        )
 
 
 # Pre-defined team specifications with rich personas

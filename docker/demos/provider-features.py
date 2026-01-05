@@ -260,7 +260,7 @@ All demonstrations completed successfully! Victor is fully operational in Docker
 
 ---
 
-**Victor** - Enterprise-Ready AI Coding Assistant
+**Victor** - Open-source AI coding assistant
 """
 
     report_file.write_text(report)
@@ -272,7 +272,7 @@ async def main():
     console.print(
         Panel.fit(
             "[bold magenta]Victor[/bold magenta]\n"
-            "[cyan]Enterprise-Ready AI Coding Assistant[/cyan]\n"
+            "[cyan]Open-source AI coding assistant[/cyan]\n"
             "[dim]Docker Demo Suite[/dim]",
             border_style="magenta",
         )

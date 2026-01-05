@@ -26,14 +26,12 @@ and transforms that cannot be expressed in YAML.
 Example:
     provider = BenchmarkWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("swe_bench", {"task_id": "test-1"})
 
-    # Streaming execution
-    async for chunk in provider.astream("swe_bench", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("swe_bench", context):
+        print(f"Completed: {node_id}")
 
 Available workflows (all YAML-defined):
 - swe_bench: SWE-bench style issue resolution workflow
@@ -59,10 +57,9 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
     conditions and transforms that cannot be expressed in YAML.
 
     Inherits from BaseYAMLWorkflowProvider which provides:
-    - YAML workflow loading and caching
-    - Escape hatches registration from victor.benchmark.escape_hatches
-    - Streaming execution via StreamingWorkflowExecutor
-    - Standard workflow execution
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable benchmark runs
 
     Example:
         provider = BenchmarkWorkflowProvider()
@@ -70,9 +67,12 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream benchmark execution
-        async for chunk in provider.astream("swe_bench", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("swe_bench", {"task_id": "1"})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("swe_bench", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
@@ -51,9 +52,11 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    from victor.framework.graph import ExecutionResult
     from victor.workflows.executor import WorkflowExecutor, WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+    from victor.workflows.unified_compiler import CachedCompiledGraph, UnifiedWorkflowCompiler
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 
@@ -110,6 +113,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         """Initialize the workflow provider with lazy loading support."""
         self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
         self._config: Optional["YAMLWorkflowConfig"] = None
+        self._compiler: Optional["UnifiedWorkflowCompiler"] = None
 
     @abstractmethod
     def _get_escape_hatches_module(self) -> str:
@@ -316,11 +320,168 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         """
         return None
 
+    # =========================================================================
+    # UnifiedWorkflowCompiler Integration (Recommended Pattern)
+    # =========================================================================
+
+    def get_compiler(self) -> "UnifiedWorkflowCompiler":
+        """Get or create the unified compiler with caching.
+
+        Returns the UnifiedWorkflowCompiler instance for this provider,
+        creating it lazily on first access. The compiler provides consistent
+        caching across all workflow compilations.
+
+        Returns:
+            UnifiedWorkflowCompiler configured with escape hatches
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            compiler = provider.get_compiler()
+            stats = compiler.get_cache_stats()
+        """
+        if self._compiler is None:
+            from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+            self._compiler = UnifiedWorkflowCompiler(enable_caching=True)
+        return self._compiler
+
+    def _get_workflow_path(self, workflow_name: str) -> Path:
+        """Get the path to a specific workflow YAML file.
+
+        Args:
+            workflow_name: Name of the workflow
+
+        Returns:
+            Path to the workflow YAML file
+
+        Raises:
+            ValueError: If workflow not found
+        """
+        workflows_dir = self._get_workflows_directory()
+
+        # Try exact filename match first
+        exact_path = workflows_dir / f"{workflow_name}.yaml"
+        if exact_path.exists():
+            return exact_path
+
+        # Try finding in loaded workflows
+        workflow = self.get_workflow(workflow_name)
+        if workflow is None:
+            raise ValueError(f"Workflow not found: {workflow_name}")
+
+        # Default to workflows directory with .yaml extension
+        return workflows_dir / f"{workflow_name}.yaml"
+
+    def compile_workflow(self, workflow_name: str) -> "CachedCompiledGraph":
+        """Compile a workflow using the unified compiler.
+
+        This is the recommended method for compiling workflows. It uses
+        the UnifiedWorkflowCompiler for consistent caching behavior.
+
+        Args:
+            workflow_name: Name of the workflow to compile
+
+        Returns:
+            CachedCompiledGraph ready for execution with invoke() and stream()
+
+        Raises:
+            ValueError: If workflow not found
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            compiled = provider.compile_workflow("deep_research")
+            result = await compiled.invoke({"query": "AI trends"})
+        """
+        conditions, transforms = self._load_escape_hatches()
+        workflow_path = self._get_workflow_path(workflow_name)
+
+        return self.get_compiler().compile_yaml(
+            workflow_path,
+            workflow_name,
+            condition_registry=conditions,
+            transform_registry=transforms,
+        )
+
+    async def run_compiled_workflow(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        thread_id: Optional[str] = None,
+    ) -> "ExecutionResult":
+        """Execute a workflow using the unified compiler.
+
+        This method compiles the workflow using the UnifiedWorkflowCompiler
+        and executes it. Results benefit from consistent caching.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            context: Initial context data for the workflow
+            thread_id: Thread ID for checkpointing
+
+        Returns:
+            ExecutionResult with final state
+
+        Raises:
+            ValueError: If workflow not found
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            result = await provider.run_compiled_workflow(
+                "fact_check",
+                {"claim": "The Earth is round"}
+            )
+            print(result.state)
+        """
+        compiled = self.compile_workflow(workflow_name)
+        return await compiled.invoke(context or {}, thread_id=thread_id)
+
+    async def stream_compiled_workflow(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        thread_id: Optional[str] = None,
+    ) -> AsyncIterator[tuple]:
+        """Stream workflow execution using the unified compiler.
+
+        This method compiles the workflow using the UnifiedWorkflowCompiler
+        and streams its execution. Yields (node_id, state) tuples after
+        each node completes.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            context: Initial context data for the workflow
+            thread_id: Thread ID for checkpointing
+
+        Yields:
+            Tuple of (node_id, state) after each node execution
+
+        Raises:
+            ValueError: If workflow not found
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            async for node_id, state in provider.stream_compiled_workflow(
+                "deep_research",
+                {"query": "AI trends"}
+            ):
+                print(f"Completed: {node_id}")
+        """
+        compiled = self.compile_workflow(workflow_name)
+        async for node_id, state in compiled.stream(context or {}, thread_id=thread_id):
+            yield node_id, state
+
+    # =========================================================================
+    # Legacy Executor Methods (Deprecated)
+    # =========================================================================
+
     def create_executor(
         self,
         orchestrator: "AgentOrchestrator",
     ) -> "WorkflowExecutor":
         """Create a standard workflow executor.
+
+        .. deprecated::
+            Use compile_workflow() and invoke() instead for consistent caching.
 
         Args:
             orchestrator: Agent orchestrator instance for LLM interactions
@@ -328,6 +489,12 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         Returns:
             WorkflowExecutor configured for this orchestrator
         """
+        warnings.warn(
+            "create_executor() is deprecated. Use compile_workflow() and invoke() "
+            "for consistent caching via UnifiedWorkflowCompiler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.workflows.executor import WorkflowExecutor
 
         return WorkflowExecutor(orchestrator)
@@ -338,12 +505,21 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
     ) -> "StreamingWorkflowExecutor":
         """Create a streaming workflow executor.
 
+        .. deprecated::
+            Use compile_workflow() and stream() instead for consistent caching.
+
         Args:
             orchestrator: Agent orchestrator instance for LLM interactions
 
         Returns:
             StreamingWorkflowExecutor for real-time progress streaming
         """
+        warnings.warn(
+            "create_streaming_executor() is deprecated. Use compile_workflow() and stream() "
+            "for consistent caching via UnifiedWorkflowCompiler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 
         return StreamingWorkflowExecutor(orchestrator)
@@ -355,6 +531,9 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         context: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator["WorkflowStreamChunk"]:
         """Stream workflow execution with real-time events.
+
+        .. deprecated::
+            Use stream_compiled_workflow() instead for consistent caching.
 
         Convenience method that creates a streaming executor and
         streams the specified workflow. Yields progress events
@@ -379,11 +558,20 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                 elif chunk.event_type == WorkflowEventType.NODE_COMPLETE:
                     print(f"Completed: {chunk.node_name}")
         """
+        warnings.warn(
+            "astream() is deprecated. Use stream_compiled_workflow() "
+            "for consistent caching via UnifiedWorkflowCompiler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         workflow = self.get_workflow(workflow_name)
         if not workflow:
             raise ValueError(f"Unknown workflow: {workflow_name}")
 
-        executor = self.create_streaming_executor(orchestrator)
+        # Suppress deprecation warning for internal call
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            executor = self.create_streaming_executor(orchestrator)
         async for chunk in executor.astream(workflow, context or {}):
             yield chunk
 
@@ -394,6 +582,9 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         timeout: Optional[float] = None,
     ) -> "WorkflowResult":
         """Execute a YAML workflow directly without requiring a full orchestrator.
+
+        .. deprecated::
+            Use run_compiled_workflow() instead for consistent caching.
 
         This method is designed for compute-only workflows that use registered
         handlers. For workflows with agent nodes, use create_executor() with
@@ -430,6 +621,12 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                 synthesis = result.context.get("synthesis")
                 print(f"Recommendation: {synthesis.get('recommendation')}")
         """
+        warnings.warn(
+            "run_workflow() is deprecated. Use run_compiled_workflow() "
+            "for consistent caching via UnifiedWorkflowCompiler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.workflows.executor import WorkflowExecutor
         from victor.tools.registry import ToolRegistry
 

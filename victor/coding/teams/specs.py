@@ -20,8 +20,17 @@ and code review.
 
 This module uses the framework's multi-agent types (TeamTemplate, TeamSpec,
 TeamMember) while providing domain-specific team configurations for coding tasks.
+
+DEPRECATION NOTICE:
+    CodingTeamSpec is deprecated and will be removed in a future version.
+    Use TeamSpec from victor.framework.team_schema instead:
+
+        from victor.framework.team_schema import TeamSpec
+
+    CodingTeamSpec is maintained for backwards compatibility.
 """
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
@@ -38,6 +47,9 @@ from victor.framework.multi_agent import (
     CommunicationStyle,
     ExpertiseLevel,
 )
+
+# Import canonical TeamSpec for type compatibility
+from victor.framework.team_schema import TeamSpec as CanonicalTeamSpec
 
 
 @dataclass
@@ -179,6 +191,11 @@ _FORMATION_TO_TOPOLOGY: Dict[TeamFormation, TeamTopology] = {
 class CodingTeamSpec:
     """Specification for a coding team.
 
+    .. deprecated::
+        CodingTeamSpec is deprecated. Use TeamSpec from
+        victor.framework.team_schema instead. CodingTeamSpec is maintained
+        for backwards compatibility but will be removed in a future version.
+
     This class provides backward-compatible team specifications while
     supporting conversion to the framework's TeamTemplate and TeamSpec types.
 
@@ -197,6 +214,31 @@ class CodingTeamSpec:
     members: List[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
+
+    def __post_init__(self):
+        """Emit deprecation warning on instantiation."""
+        warnings.warn(
+            "CodingTeamSpec is deprecated. Use TeamSpec from "
+            "victor.framework.team_schema instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    def to_canonical_team_spec(self) -> CanonicalTeamSpec:
+        """Convert to canonical TeamSpec from victor.framework.team_schema.
+
+        Returns:
+            CanonicalTeamSpec instance with vertical set to "coding"
+        """
+        return CanonicalTeamSpec(
+            name=self.name,
+            description=self.description,
+            vertical="coding",
+            formation=self.formation,
+            members=self.members,
+            total_tool_budget=self.total_tool_budget,
+            max_iterations=self.max_iterations,
+        )
 
     def to_team_template(self) -> TeamTemplate:
         """Convert to framework TeamTemplate.

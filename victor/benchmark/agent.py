@@ -359,25 +359,30 @@ class BenchmarkAgent:
             context = self._build_workflow_context(task, workspace_path)
 
             # Execute workflow with streaming for progress tracking
+            # Uses the new UnifiedWorkflowCompiler-based streaming API
             final_context: Dict[str, Any] = {}
             try:
 
                 async def execute_workflow():
                     nonlocal final_context
-                    async for chunk in provider.astream(workflow_name, orchestrator, context):
-                        # Track progress
-                        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-                            logger.debug(f"Completed node: {chunk.node_name}")
-                            trace.turns += 1
-                        elif chunk.event_type == WorkflowEventType.TOOL_CALL:
-                            trace.tool_calls.append(
-                                {
-                                    "name": getattr(chunk, "tool_name", "unknown"),
-                                    "timestamp": time.time(),
-                                }
-                            )
-                        elif chunk.event_type == WorkflowEventType.WORKFLOW_COMPLETE:
-                            final_context = chunk.context or {}
+                    # Use new unified compiler streaming API
+                    async for node_id, state in provider.stream_compiled_workflow(
+                        workflow_name, context
+                    ):
+                        # Each yield represents a completed node
+                        logger.debug(f"Completed node: {node_id}")
+                        trace.turns += 1
+                        # Track tool calls from state if available
+                        if "_tool_calls" in state:
+                            for tool_call in state.get("_tool_calls", []):
+                                trace.tool_calls.append(
+                                    {
+                                        "name": tool_call.get("name", "unknown"),
+                                        "timestamp": time.time(),
+                                    }
+                                )
+                        # Keep latest state as final context
+                        final_context = state
 
                 await asyncio.wait_for(
                     execute_workflow(),

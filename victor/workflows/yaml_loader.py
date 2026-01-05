@@ -943,6 +943,9 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
     if llm_config_data:
         llm_config = LLMConfig.from_dict(llm_config_data).to_dict()
 
+    # Parse timeout (supports both 'timeout' and 'timeout_seconds' keys)
+    timeout_seconds = node_data.get("timeout_seconds") or node_data.get("timeout")
+
     return AgentNode(
         id=node_id,
         name=node_data.get("name", node_id),
@@ -953,6 +956,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
         input_mapping=node_data.get("input_mapping", {}),
         output_key=node_data.get("output", node_id),
         llm_config=llm_config,
+        timeout_seconds=timeout_seconds,
         next_nodes=node_data.get("next", []),
     )
 
@@ -1359,12 +1363,60 @@ def load_workflow_from_dict(
         metadata["services"] = services
         logger.debug(f"Parsed {len(services)} services for workflow '{name}'")
 
+    # Parse workflow-level execution settings
+    # These can be specified at workflow level or in metadata
+    execution_settings = data.get("execution", {}) or {}
+    max_execution_timeout = (
+        execution_settings.get("timeout")
+        or execution_settings.get("max_execution_timeout_seconds")
+        or data.get("timeout")
+        or data.get("max_execution_timeout_seconds")
+    )
+    default_node_timeout = (
+        execution_settings.get("default_node_timeout")
+        or execution_settings.get("default_node_timeout_seconds")
+        or data.get("default_node_timeout")
+        or data.get("default_node_timeout_seconds")
+    )
+    max_iterations = (
+        execution_settings.get("max_iterations")
+        or data.get("max_iterations")
+        or 25
+    )
+    max_retries = (
+        execution_settings.get("max_retries")
+        or data.get("max_retries")
+        or 0
+    )
+
+    # Parse schedule configuration if present
+    schedule_data = data.get("schedule")
+    if schedule_data:
+        schedule_config = {
+            "cron": schedule_data.get("cron"),
+            "timezone": schedule_data.get("timezone", "UTC"),
+            "catchup": schedule_data.get("catchup", False),
+            "start_date": schedule_data.get("start_date"),
+            "end_date": schedule_data.get("end_date"),
+            "max_active_runs": schedule_data.get("max_active_runs", 1),
+            "enabled": schedule_data.get("enabled", True),
+        }
+        # Also support interval syntax
+        if schedule_data.get("interval"):
+            schedule_config["interval"] = schedule_data["interval"]
+        metadata["schedule"] = schedule_config
+        logger.debug(f"Parsed schedule for workflow '{name}': {schedule_config.get('cron')}")
+
     workflow = WorkflowDefinition(
         name=name,
         description=data.get("description", ""),
         nodes=nodes,
         start_node=start_node,
         metadata=metadata,
+        max_execution_timeout_seconds=max_execution_timeout,
+        default_node_timeout_seconds=default_node_timeout,
+        max_iterations=max_iterations,
+        max_retries=max_retries,
     )
 
     # Validate

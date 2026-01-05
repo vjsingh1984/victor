@@ -1150,4 +1150,4 @@ except ImportError:
     _WORKFLOW_ENGINE_EXPORTS = []
 
 # Version of the framework API
-__version__ = "0.4.0"
+__version__ = "0.4.1"

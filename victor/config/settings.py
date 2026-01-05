@@ -648,6 +648,32 @@ class Settings(BaseSettings):
     hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
 
     # ==========================================================================
+    # Workflow Definition Cache (P1 Scalability)
+    # ==========================================================================
+    # Caches parsed YAML workflow definitions to avoid redundant parsing.
+    # Uses TTL + file mtime invalidation for freshness.
+    workflow_definition_cache_enabled: bool = True
+    workflow_definition_cache_ttl: int = 3600  # seconds
+    workflow_definition_cache_max_entries: int = 100
+
+    # ==========================================================================
+    # StateGraph Copy-on-Write (P2 Scalability)
+    # ==========================================================================
+    # Enables copy-on-write state management for StateGraph workflows.
+    # Delays deep copy of state until the first mutation, reducing overhead
+    # for read-heavy workflows where nodes often only read state.
+    #
+    # Benefits:
+    # - Reduced memory allocations for read-only nodes
+    # - Lower CPU overhead from avoided deep copies
+    # - Better performance for large state objects
+    #
+    # Trade-offs:
+    # - Slightly more complex debugging (state may be shared until mutation)
+    # - First mutation incurs full deep copy cost
+    stategraph_copy_on_write_enabled: bool = True
+
+    # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
     # ==========================================================================
     # Controls automatic prompt enrichment with contextual information.
@@ -827,6 +853,19 @@ class Settings(BaseSettings):
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output
+
+    # ==========================================================================
+    # EventBus Configuration (P1 Scalability)
+    # ==========================================================================
+    # Centralized configuration for EventBus backpressure, sampling, and batching.
+    # Can be overridden via environment variables (e.g., EVENTBUS_QUEUE_MAXSIZE=20000)
+    eventbus_queue_maxsize: int = 10000
+    eventbus_backpressure_strategy: str = "drop_oldest"  # drop_oldest, drop_newest, block, reject
+    eventbus_sampling_enabled: bool = False
+    eventbus_sampling_default_rate: float = 1.0  # 1.0 = all events pass through
+    eventbus_batching_enabled: bool = False
+    eventbus_batch_size: int = 100
+    eventbus_batch_flush_interval_ms: float = 1000.0
 
     # Analytics
     analytics_enabled: bool = True
