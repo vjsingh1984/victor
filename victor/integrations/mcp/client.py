@@ -353,7 +353,27 @@ class MCPClient:
         )
 
         if response and "result" in response:
-            return MCPToolCallResult(**response["result"])
+            result_data = response["result"]
+            # Standard MCP format per modelcontextprotocol.io specification:
+            # {"content": [{"type": "text", "text": "..."}], "isError": false}
+            content_blocks = result_data.get("content", [])
+            text_parts = []
+            for block in content_blocks:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+                elif isinstance(block, dict) and block.get("type") == "image":
+                    # Handle image content blocks
+                    text_parts.append(f"[image: {block.get('mimeType', 'image')}]")
+                elif isinstance(block, str):
+                    text_parts.append(block)
+            combined_result = "\n".join(text_parts) if text_parts else str(result_data)
+            is_error = result_data.get("isError", False)
+            return MCPToolCallResult(
+                tool_name=tool_name,
+                success=not is_error,
+                result=combined_result,
+                error=combined_result if is_error else None,
+            )
         elif response and "error" in response:
             error = response["error"]
             return MCPToolCallResult(

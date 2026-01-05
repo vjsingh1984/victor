@@ -261,14 +261,22 @@ class MCPServer:
             context: Dict[str, Any] = {}
             result = await self.tool_registry.execute(tool_name, context, **tool_args)
 
-            tool_result = MCPToolCallResult(
-                tool_name=tool_name,
-                success=result.success,
-                result=result.output if result.success else None,
-                error=result.error if not result.success else None,
-            )
+            # Return standard MCP format per modelcontextprotocol.io specification:
+            # {"content": [{"type": "text", "text": "..."}], "isError": false}
+            if result.success:
+                output_text = str(result.output) if result.output is not None else ""
+                response_data = {
+                    "content": [{"type": "text", "text": output_text}],
+                    "isError": False,
+                }
+            else:
+                error_text = str(result.error) if result.error else "Unknown error"
+                response_data = {
+                    "content": [{"type": "text", "text": error_text}],
+                    "isError": True,
+                }
 
-            return self._create_response(msg_id, tool_result.model_dump())
+            return self._create_response(msg_id, response_data)
 
         except Exception as e:
             return self._create_error(msg_id, -32603, f"Tool execution error: {str(e)}")

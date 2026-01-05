@@ -251,7 +251,12 @@ class TestMCPServerHandleMessage:
             )
 
             assert "result" in response
-            assert response["result"]["success"] is True
+            # Standard MCP format: {"content": [...], "isError": false}
+            assert response["result"]["isError"] is False
+            assert "content" in response["result"]
+            assert len(response["result"]["content"]) > 0
+            assert response["result"]["content"][0]["type"] == "text"
+            assert response["result"]["content"][0]["text"] == "Done"
 
     @pytest.mark.asyncio
     async def test_handle_call_tool_missing_name(self):
