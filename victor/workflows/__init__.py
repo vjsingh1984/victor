@@ -117,7 +117,8 @@ from victor.workflows.cache import (
 )
 from victor.workflows.graph_dsl import (
     State,
-    StateGraph,
+    WorkflowGraph,  # Typed workflow graph DSL (compiles to WorkflowDefinition)
+    StateGraph,  # Deprecated alias for WorkflowGraph
     GraphNode,
     GraphNodeType,
     NodeFunc,
@@ -130,7 +131,7 @@ from victor.workflows.graph import (
     WorkflowNode as GraphWorkflowNode,
     WorkflowEdge,
     ConditionalEdge,
-    WorkflowGraph,
+    BasicWorkflowGraph,  # Basic graph container
     DuplicateNodeError,
     InvalidEdgeError,
     GraphValidationError,
@@ -399,9 +400,10 @@ __all__ = [
     "WorkflowCacheManager",
     "get_workflow_cache_manager",
     "configure_workflow_cache",
-    # StateGraph DSL
+    # WorkflowGraph DSL (compiles to WorkflowDefinition)
     "State",
-    "StateGraph",
+    "WorkflowGraph",  # Typed workflow graph DSL
+    "StateGraph",  # Deprecated alias for WorkflowGraph
     "GraphNode",
     "GraphNodeType",
     "NodeFunc",
@@ -409,11 +411,11 @@ __all__ = [
     "Compilable",
     "create_graph",
     "compile_graph",
-    # Graph implementation (LangGraph-like API)
+    # Graph implementation (basic graph container)
     "GraphWorkflowNode",
     "WorkflowEdge",
     "ConditionalEdge",
-    "WorkflowGraph",
+    "BasicWorkflowGraph",  # Basic graph container (renamed from WorkflowGraph)
     "DuplicateNodeError",
     "InvalidEdgeError",
     "GraphValidationError",

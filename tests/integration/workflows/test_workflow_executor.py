@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.workflows.graph_dsl import StateGraph, State
+from victor.workflows.graph_dsl import WorkflowGraph, State
 from victor.workflows.definition import (
     WorkflowBuilder,
     WorkflowDefinition,

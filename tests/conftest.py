@@ -235,11 +235,11 @@ def auto_mock_docker_for_orchestrator(request):
 def empty_workflow_graph():
     """Empty StateGraph workflow for testing.
 
-    Creates an empty StateGraph instance that can be populated with
+    Creates an empty WorkflowGraph instance that can be populated with
     nodes and edges for testing workflow building logic.
     """
     from dataclasses import dataclass
-    from victor.workflows.graph_dsl import StateGraph, State
+    from victor.workflows.graph_dsl import WorkflowGraph, State
 
     @dataclass
     class TestState(State):
@@ -247,7 +247,7 @@ def empty_workflow_graph():
 
         value: str = ""
 
-    return StateGraph(TestState, name="test_workflow")
+    return WorkflowGraph(TestState, name="test_workflow")
 
 
 @pytest.fixture
@@ -258,7 +258,7 @@ def linear_workflow_graph():
     be used to test sequential execution patterns.
     """
     from dataclasses import dataclass
-    from victor.workflows.graph_dsl import StateGraph, State
+    from victor.workflows.graph_dsl import WorkflowGraph, State
 
     @dataclass
     class LinearState(State):
@@ -282,7 +282,7 @@ def linear_workflow_graph():
         state.value += "->c"
         return state
 
-    graph = StateGraph(LinearState, name="linear")
+    graph = WorkflowGraph(LinearState, name="linear")
     graph.add_node("a", handler_a)
     graph.add_node("b", handler_b)
     graph.add_node("c", handler_c)
@@ -301,7 +301,7 @@ def branching_workflow_graph():
     branches based on state, useful for testing conditional routing.
     """
     from dataclasses import dataclass
-    from victor.workflows.graph_dsl import StateGraph, State
+    from victor.workflows.graph_dsl import WorkflowGraph, State
 
     @dataclass
     class BranchState(State):
@@ -313,7 +313,7 @@ def branching_workflow_graph():
     def router(state: BranchState) -> str:
         return state.branch
 
-    graph = StateGraph(BranchState, name="branching")
+    graph = WorkflowGraph(BranchState, name="branching")
     graph.add_node("start", lambda s: s)
     graph.add_node("branch_a", lambda s: s)
     graph.add_node("branch_b", lambda s: s)

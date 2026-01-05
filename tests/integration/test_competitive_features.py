@@ -97,14 +97,14 @@ class TestLangGraphParity:
         in workflow definitions, such as missing entry/finish points.
         """
         from dataclasses import dataclass
-        from victor.workflows.graph_dsl import StateGraph, State
+        from victor.workflows.graph_dsl import WorkflowGraph, State
 
         @dataclass
         class ValidationState(State):
             value: str = ""
 
         # Test 1: Graph without entry point should fail validation
-        graph_no_entry = StateGraph(ValidationState, name="no_entry_test")
+        graph_no_entry = WorkflowGraph(ValidationState, name="no_entry_test")
         graph_no_entry.add_node("a", lambda s: s)
         graph_no_entry.add_node("b", lambda s: s)
         graph_no_entry.add_edge("a", "b")

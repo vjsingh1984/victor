@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
-from victor.workflows.graph_dsl import StateGraph, State
+from victor.workflows.graph_dsl import WorkflowGraph, State
 from victor.workflows.definition import WorkflowBuilder, TransformNode
 from victor.workflows.executor import (
     WorkflowExecutor,
