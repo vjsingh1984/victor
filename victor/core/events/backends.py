@@ -267,7 +267,6 @@ class InMemoryEventBackend:
         )
 
         # Bind unsubscribe method
-        original_unsubscribe = handle.unsubscribe
 
         async def bound_unsubscribe() -> None:
             await self.unsubscribe(handle)
@@ -312,15 +311,14 @@ class InMemoryEventBackend:
                 # Get matching subscriptions
                 with self._lock:
                     subscriptions = [
-                        s for s in self._subscriptions.values()
+                        s
+                        for s in self._subscriptions.values()
                         if s.is_active and event.matches_pattern(s.pattern)
                     ]
 
                 # Dispatch to handlers concurrently
                 for subscription in subscriptions:
-                    task = asyncio.create_task(
-                        self._safe_call_handler(subscription.handler, event)
-                    )
+                    task = asyncio.create_task(self._safe_call_handler(subscription.handler, event))
                     self._pending_tasks.add(task)
                     task.add_done_callback(self._pending_tasks.discard)
 
@@ -416,8 +414,7 @@ def create_event_backend(
     # Default to InMemory for unregistered types
     if selected_type != BackendType.IN_MEMORY:
         logger.warning(
-            f"Backend type '{selected_type.value}' not registered, "
-            f"falling back to IN_MEMORY"
+            f"Backend type '{selected_type.value}' not registered, " f"falling back to IN_MEMORY"
         )
 
     return InMemoryEventBackend(config)
