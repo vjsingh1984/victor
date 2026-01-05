@@ -114,6 +114,21 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 | **Data Analysis** | Pandas, statistics, visualization | Data processing tools |
 | **Research** | Web search, citations, synthesis | Research workflows |
 
+### Provider-Agnostic Context Management
+
+Victor maintains conversation context **independent of the LLM provider**, enabling:
+
+| Feature | Description |
+|---------|-------------|
+| **Unified Conversation History** | Same context works across Anthropic, OpenAI, DeepSeek, Ollama, or any provider |
+| **Mid-Conversation Provider Switching** | Switch from Claude to GPT-4 to local Qwen without losing context |
+| **Stateless Model Support** | Works with models that don't maintain session state (most open-source models) |
+| **Context Windowing** | Smart truncation to fit each model's context limits |
+| **Summarization** | Automatic summarization for long conversations |
+| **State Checkpoints** | Save/restore conversation state across sessions |
+
+**This is the core USP**: Start a conversation with Claude, continue with DeepSeek for cost savings, then switch to a local model for sensitive code - all in one session. Victor injects the full conversation context to each model transparently.
+
 ### Discover Capabilities Programmatically
 
 ```bash
