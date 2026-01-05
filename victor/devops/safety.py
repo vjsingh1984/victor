@@ -18,7 +18,7 @@ This module provides DevOps-specific safety patterns for infrastructure
 operations including Kubernetes, Docker, Terraform, and cloud providers.
 
 This module now delegates to the core safety infrastructure at
-victor.safety.infrastructure for pattern scanning, while maintaining
+victor.security.safety.infrastructure for pattern scanning, while maintaining
 backward compatibility for existing interfaces.
 """
 
@@ -118,7 +118,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
     def get_credential_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting credentials.
 
-        Uses patterns from victor.safety.secrets for comprehensive detection.
+        Uses patterns from victor.security.safety.secrets for comprehensive detection.
 
         Returns:
             Dict of credential_type -> regex_pattern.

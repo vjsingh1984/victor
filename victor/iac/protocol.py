@@ -188,7 +188,7 @@ class IaCScanResult:
 
     Renamed from ScanResult to be semantically distinct:
     - IaCScanResult (here): Infrastructure-as-Code scan results
-    - SafetyScanResult (victor.safety.code_patterns): Safety pattern matching results
+    - SafetyScanResult (victor.security.safety.code_patterns): Safety pattern matching results
     """
 
     configs: list[IaCConfig]

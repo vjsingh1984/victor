@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for victor.safety.registry module."""
+"""Tests for victor.security.safety.registry module."""
 
 import pytest
 

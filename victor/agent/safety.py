@@ -40,7 +40,7 @@ class OperationalRiskLevel(Enum):
 
     Renamed from RiskLevel to be semantically distinct:
     - OperationalRiskLevel (here): Tool/command risk with SAFE level (5 values)
-    - PatternRiskLevel (victor.safety.code_patterns): Code pattern risk (4 values)
+    - PatternRiskLevel (victor.security.safety.code_patterns): Code pattern risk (4 values)
     """
 
     SAFE = "safe"  # No risk - read operations

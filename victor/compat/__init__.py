@@ -101,7 +101,7 @@ Severity variants (all different semantics):
 
 RiskLevel variants (all different semantics):
     - OperationalRiskLevel (victor.agent.safety): Tool/command operational risk (5 values including SAFE)
-    - PatternRiskLevel (victor.safety.code_patterns): Code pattern detection risk (4 uppercase values)
+    - PatternRiskLevel (victor.security.safety.code_patterns): Code pattern detection risk (4 uppercase values)
 
 QualityDimension variants (all different semantics):
     - ResponseQualityDimension (victor.agent.response_quality): LLM response quality (7 dimensions incl. CODE_QUALITY)
@@ -174,7 +174,7 @@ Symbol variants (all different semantics):
     - RefactorSymbol (victor.coding.refactor.protocol): Refactoring symbol with SourceLocation
 
 ScanResult variants (all different semantics):
-    - SafetyScanResult (victor.safety.code_patterns): Safety pattern matching results
+    - SafetyScanResult (victor.security.safety.code_patterns): Safety pattern matching results
     - IaCScanResult (victor.iac.protocol): Infrastructure-as-Code scan results
 
 RecoveryAction variants (all different semantics):
@@ -264,8 +264,8 @@ SEMANTIC_RENAMES: Dict[str, Dict[str, str]] = {
     "RiskLevel": {
         # Each variant has different values for different domains
         "victor.agent.safety": "OperationalRiskLevel (5 values incl. SAFE)",
-        "victor.safety.code_patterns": "PatternRiskLevel (4 uppercase values)",
-        "victor.safety.infrastructure": "(imports from code_patterns)",
+        "victor.security.safety.code_patterns": "PatternRiskLevel (4 uppercase values)",
+        "victor.security.safety.infrastructure": "(imports from code_patterns)",
     },
     "QualityDimension": {
         # Each variant has different dimensions for different purposes
@@ -353,8 +353,7 @@ SEMANTIC_RENAMES: Dict[str, Dict[str, str]] = {
     },
     "ScanResult": {
         # Different scan result types for different domains
-        "victor.safety.code_patterns": "SafetyScanResult (safety pattern matching)",
-        "victor.security.safety.code_patterns": "SafetyScanResult (duplicate)",
+        "victor.security.safety.code_patterns": "SafetyScanResult (safety pattern matching)",
         "victor.iac.protocol": "IaCScanResult (IaC scan results)",
     },
     "RecoveryAction": {
@@ -372,13 +371,7 @@ SEMANTIC_RENAMES: Dict[str, Dict[str, str]] = {
 # These are full module duplications that should be consolidated in a future sprint.
 # One module should be canonical, others should import from it.
 
-MODULE_DUPLICATIONS = {
-    "safety_patterns": {
-        "canonical": "victor.safety",
-        "duplicates": ["victor.security.safety"],
-        "note": "Near-identical modules with different import paths",
-    },
-}
+MODULE_DUPLICATIONS = {}
 
 
 def get_canonical_source(alias_path: str) -> str:

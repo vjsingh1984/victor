@@ -1696,11 +1696,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_analysis(self, orchestrator):
         """Task guidance for analysis tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="analyze this code",
-            unified_task_type=TaskType.ANALYSIS,
+            unified_task_type=ClassifierTaskType.ANALYSIS,
             is_analysis_task=True,
             is_action_task=False,
             needs_execution=False,
@@ -1710,11 +1710,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_action(self, orchestrator):
         """Task guidance for action tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="create a new function",
-            unified_task_type=TaskType.GENERATION,
+            unified_task_type=ClassifierTaskType.GENERATION,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=False,
@@ -1724,11 +1724,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_execution(self, orchestrator):
         """Task guidance for execution tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="run the tests",
-            unified_task_type=TaskType.ACTION,
+            unified_task_type=ClassifierTaskType.ACTION,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=True,

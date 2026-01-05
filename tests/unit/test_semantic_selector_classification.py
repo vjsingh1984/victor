@@ -243,10 +243,10 @@ class TestClassificationAwareSelection:
     @pytest.fixture
     def mock_classification_result(self):
         """Create mock classification result."""
-        from victor.agent.unified_classifier import TaskType, ClassificationResult
+        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
 
         return ClassificationResult(
-            task_type=TaskType.ANALYSIS,
+            task_type=ClassifierTaskType.ANALYSIS,
             confidence=0.8,
             is_analysis_task=True,
             is_action_task=False,
@@ -273,11 +273,15 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_negation_excludes_tools(self, selector, mock_tools):
         """Test that negated keywords exclude related tools."""
-        from victor.agent.unified_classifier import TaskType, ClassificationResult, KeywordMatch
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+            KeywordMatch,
+        )
 
         # Create classification with negated "analyze"
         result = ClassificationResult(
-            task_type=TaskType.ACTION,
+            task_type=ClassifierTaskType.ACTION,
             confidence=0.7,
             is_action_task=True,
             negated_keywords=[KeywordMatch("analyze", "analysis", 0, True)],
@@ -300,10 +304,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_high_confidence_stricter_selection(self, selector, mock_tools):
         """Test that high confidence leads to stricter selection."""
-        from victor.agent.unified_classifier import TaskType, ClassificationResult
+        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
 
         result = ClassificationResult(
-            task_type=TaskType.ANALYSIS,
+            task_type=ClassifierTaskType.ANALYSIS,
             confidence=0.95,
             is_analysis_task=True,
             negated_keywords=[],
@@ -325,10 +329,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_low_confidence_broader_selection(self, selector, mock_tools):
         """Test that low confidence leads to broader selection."""
-        from victor.agent.unified_classifier import TaskType, ClassificationResult
+        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
 
         result = ClassificationResult(
-            task_type=TaskType.DEFAULT,
+            task_type=ClassifierTaskType.DEFAULT,
             confidence=0.2,
             negated_keywords=[],
             matched_keywords=[],

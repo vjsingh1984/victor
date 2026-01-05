@@ -29,7 +29,7 @@ from victor.agent.complexity_classifier import (
 from victor.agent.unified_classifier import (
     UnifiedTaskClassifier,
     ClassificationResult,
-    TaskType as UnifiedTaskType,
+    ClassifierTaskType as UnifiedTaskType,
 )
 
 if TYPE_CHECKING:

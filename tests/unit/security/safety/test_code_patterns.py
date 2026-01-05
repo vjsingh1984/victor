@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for victor.safety.code_patterns module."""
+"""Tests for victor.security.safety.code_patterns module."""
 
 import pytest
 

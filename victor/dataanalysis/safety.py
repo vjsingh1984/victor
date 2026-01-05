@@ -20,7 +20,7 @@ MEDIUM = "MEDIUM"
 LOW = "LOW"
 
 # Data analysis-specific safety patterns as tuples
-# Note: PII detection patterns are now in victor.safety.pii
+# Note: PII detection patterns are now in victor.security.safety.pii
 _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
     # High-risk patterns - PII exposure (kept for SafetyPattern interface)
     (r"(?i)(social[_\s-]?security|ssn)[^\w]", "Social Security Number exposure", HIGH),
@@ -81,7 +81,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def get_pii_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting PII columns.
 
-        Uses patterns from victor.safety.pii for comprehensive detection.
+        Uses patterns from victor.security.safety.pii for comprehensive detection.
 
         Returns:
             Dict of pii_type -> regex_pattern for column names.
@@ -94,7 +94,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def detect_pii_columns(self, columns: List[str]) -> List[Tuple[str, str]]:
         """Detect potential PII columns in a dataframe.
 
-        Uses victor.safety.pii.detect_pii_columns for detection.
+        Uses victor.security.safety.pii.detect_pii_columns for detection.
 
         Args:
             columns: List of column names.
@@ -109,7 +109,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def get_anonymization_suggestions(self, pii_type: str) -> str:
         """Get suggestions for anonymizing a PII type.
 
-        Uses victor.safety.pii.get_anonymization_suggestion.
+        Uses victor.security.safety.pii.get_anonymization_suggestion.
 
         Args:
             pii_type: Type of PII detected (string).
@@ -127,7 +127,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def get_safety_reminders(self) -> List[str]:
         """Return safety reminders for data analysis.
 
-        Uses victor.safety.pii.get_safety_reminders.
+        Uses victor.security.safety.pii.get_safety_reminders.
         """
         return core_get_safety_reminders()
 
