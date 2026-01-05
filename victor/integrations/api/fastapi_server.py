@@ -48,6 +48,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from victor.integrations.search_types import CodeSearchResult
+
 logger = logging.getLogger(__name__)
 
 
@@ -161,6 +163,15 @@ class APISearchResult(BaseModel):
     line: int
     content: str
     score: float
+
+    @classmethod
+    def from_code_result(cls, result: CodeSearchResult) -> "APISearchResult":
+        return cls(
+            file=result.file,
+            line=result.line,
+            content=result.content,
+            score=result.score,
+        )
 
 
 # Backward compatibility alias
@@ -599,15 +610,17 @@ class VictorFastAPIServer:
 
                 if tool_result.success:
                     matches = tool_result.data.get("matches", [])
-                    results = [
-                        APISearchResult(
+                    code_results = [
+                        CodeSearchResult(
                             file=r.get("file", ""),
                             line=r.get("line", 0),
                             content=r.get("content", ""),
                             score=r.get("score", 0.0),
+                            context=r.get("context", ""),
                         )
                         for r in matches
                     ]
+                    results = [APISearchResult.from_code_result(r) for r in code_results]
                     return SearchResponse(results=results)
                 return SearchResponse(results=[])
 
@@ -636,14 +649,14 @@ class VictorFastAPIServer:
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
-                results = []
+                code_results = []
                 for line in result.stdout.splitlines():
                     try:
                         match = json.loads(line)
                         if match.get("type") == "match":
                             data = match.get("data", {})
-                            results.append(
-                                APISearchResult(
+                            code_results.append(
+                                CodeSearchResult(
                                     file=data.get("path", {}).get("text", ""),
                                     line=data.get("line_number", 0),
                                     content=data.get("lines", {}).get("text", "").strip(),
@@ -653,7 +666,8 @@ class VictorFastAPIServer:
                     except json.JSONDecodeError:
                         continue
 
-                return SearchResponse(results=results[:50])
+                results = [APISearchResult.from_code_result(r) for r in code_results[:50]]
+                return SearchResponse(results=results)
 
             except Exception as e:
                 logger.exception("Code search error")

@@ -17,12 +17,12 @@ from victor.integrations.protocol.interface import (
     ChatMessage,
     ChatResponse,
     ClientStreamChunk,
-    CodeSearchResult,
     ToolCall,
     UndoRedoResult,
     AgentMode,
     AgentStatus,
 )
+from victor.integrations.search_types import CodeSearchResult
 
 
 class DirectProtocolAdapter(VictorProtocol):

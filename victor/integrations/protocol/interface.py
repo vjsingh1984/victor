@@ -24,6 +24,7 @@ from datetime import datetime
 
 # Import canonical AgentMode from mode_controller
 from victor.agent.mode_controller import AgentMode
+from victor.integrations.search_types import CodeSearchResult
 
 
 @dataclass
@@ -167,40 +168,6 @@ class ClientStreamChunk:
             "tool_call": self.tool_call.to_dict() if self.tool_call else None,
             "finish_reason": self.finish_reason,
         }
-
-
-@dataclass
-class CodeSearchResult:
-    """Result from a code search operation.
-
-    For line-level code search results with file context.
-    Renamed from SearchResult to be semantically distinct from other search types.
-    """
-
-    file: str
-    line: int
-    content: str
-    score: float
-    context: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "file": self.file,
-            "line": self.line,
-            "content": self.content,
-            "score": self.score,
-            "context": self.context,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "CodeSearchResult":
-        return cls(
-            file=data["file"],
-            line=data["line"],
-            content=data["content"],
-            score=data["score"],
-            context=data.get("context", ""),
-        )
 
 
 @dataclass
