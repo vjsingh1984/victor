@@ -766,7 +766,43 @@ __all__ = (
     + _TOOL_NAMING_EXPORTS
     + _MIDDLEWARE_EXPORTS
     + _TASK_TYPES_EXPORTS
+    + ["discover"]  # Capability discovery function
 )
+
+
+def discover() -> dict:
+    """Discover all Victor framework capabilities programmatically.
+
+    Returns a dictionary containing all available tools, verticals, personas,
+    teams, chains, handlers, task types, providers, and events.
+
+    Example:
+        from victor.framework import discover
+
+        caps = discover()
+        print(f"Available tools: {len(caps['tools'])}")
+        print(f"Available verticals: {caps['verticals']}")
+
+    Returns:
+        dict: Capability manifest with keys:
+            - tools: List of tool names
+            - tool_categories: List of category names
+            - verticals: List of vertical names
+            - personas: List of persona names
+            - teams: List of team names
+            - chains: List of chain/workflow names
+            - handlers: List of handler names
+            - task_types: List of task type names
+            - providers: List of provider names
+            - events: List of event type names
+            - summary: Aggregated counts
+    """
+    from victor.ui.commands.capabilities import get_capability_discovery
+
+    discovery = get_capability_discovery()
+    manifest = discovery.discover_all()
+    return manifest.to_dict()
+
 
 # Vertical Integration (Phase 3.1 - Step Handlers)
 try:

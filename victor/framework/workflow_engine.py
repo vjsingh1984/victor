@@ -286,6 +286,35 @@ class WorkflowEngine:
         # Lazy-loaded unified compiler for consistent compilation and caching
         self._unified_compiler: Optional["UnifiedWorkflowCompiler"] = None
 
+    def _emit_workflow_event(
+        self,
+        event_type: str,
+        workflow_id: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """Emit a workflow event to the EventBus for observability.
+
+        Args:
+            event_type: Type of event (workflow_started, workflow_completed, etc.)
+            workflow_id: Workflow execution identifier
+            data: Event payload data
+        """
+        try:
+            from victor.observability.event_bus import get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                event_type,
+                {
+                    "workflow_id": workflow_id,
+                    "source": "WorkflowEngine",
+                    **data,
+                },
+            )
+        except Exception as e:
+            # Don't let event emission failures break workflow execution
+            logger.debug(f"Failed to emit {event_type} event: {e}")
+
     @property
     def config(self) -> WorkflowEngineConfig:
         """Get the engine configuration."""
@@ -439,8 +468,20 @@ class WorkflowEngine:
             ExecutionResult with final state and metadata.
         """
         import time
+        import uuid
 
         start_time = time.time()
+        workflow_id = kwargs.get("workflow_id") or uuid.uuid4().hex
+
+        # Emit workflow started event
+        self._emit_workflow_event(
+            "workflow_started",
+            workflow_id,
+            {
+                "workflow_name": getattr(workflow, "name", "unknown"),
+                "node_count": len(getattr(workflow, "nodes", [])),
+            },
+        )
 
         try:
             executor = self._get_executor()
@@ -450,6 +491,17 @@ class WorkflowEngine:
             )
 
             duration = time.time() - start_time
+
+            # Emit workflow completed event
+            self._emit_workflow_event(
+                "workflow_completed",
+                workflow_id,
+                {
+                    "success": result.success,
+                    "duration": duration,
+                    "nodes_executed": result.nodes_executed,
+                },
+            )
 
             return ExecutionResult(
                 success=result.success,
@@ -461,10 +513,22 @@ class WorkflowEngine:
 
         except Exception as e:
             logger.error(f"Workflow execution failed: {e}")
+            duration = time.time() - start_time
+
+            # Emit workflow error event
+            self._emit_workflow_event(
+                "workflow_error",
+                workflow_id,
+                {
+                    "error": str(e),
+                    "duration": duration,
+                },
+            )
+
             return ExecutionResult(
                 success=False,
                 error=str(e),
-                duration_seconds=time.time() - start_time,
+                duration_seconds=duration,
             )
 
     async def execute_workflow_graph(

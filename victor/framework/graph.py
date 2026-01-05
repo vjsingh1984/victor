@@ -672,6 +672,8 @@ class GraphConfig:
         interrupt_before: Nodes to interrupt before execution
         interrupt_after: Nodes to interrupt after execution
         use_copy_on_write: Enable copy-on-write state optimization (default: None uses settings)
+        emit_events: Enable EventBus integration for observability (default: True)
+        graph_id: Optional identifier for this graph execution
     """
 
     max_iterations: int = 25
@@ -681,6 +683,8 @@ class GraphConfig:
     interrupt_before: List[str] = field(default_factory=list)
     interrupt_after: List[str] = field(default_factory=list)
     use_copy_on_write: Optional[bool] = None  # None = use settings default
+    emit_events: bool = True  # Enable EventBus observability integration
+    graph_id: Optional[str] = None  # Optional identifier for event correlation
 
 
 @dataclass
@@ -757,6 +761,40 @@ class CompiledGraph(Generic[StateType]):
             # Default to True if settings can't be loaded
             return True
 
+    def _emit_event(
+        self,
+        event_type: str,
+        graph_id: str,
+        data: Dict[str, Any],
+        emit_events: bool,
+    ) -> None:
+        """Emit an event to the EventBus for observability.
+
+        Args:
+            event_type: Type of event (graph_started, node_start, etc.)
+            graph_id: Graph execution identifier
+            data: Event payload data
+            emit_events: Whether to emit events (from config)
+        """
+        if not emit_events:
+            return
+
+        try:
+            from victor.observability.event_bus import get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                event_type,
+                {
+                    "graph_id": graph_id,
+                    "source": "StateGraph",
+                    **data,
+                },
+            )
+        except Exception as e:
+            # Don't let event emission failures break graph execution
+            logger.debug(f"Failed to emit {event_type} event: {e}")
+
     async def invoke(
         self,
         input_state: StateType,
@@ -796,6 +834,19 @@ class CompiledGraph(Generic[StateType]):
         iterations = 0
         node_history: List[str] = []
         visited_count: Dict[str, int] = {}
+        graph_id = exec_config.graph_id or thread_id
+
+        # Emit graph started event for observability
+        self._emit_event(
+            "graph_started",
+            graph_id,
+            {
+                "entry_point": self._entry_point,
+                "node_count": len(self._nodes),
+                "thread_id": thread_id,
+            },
+            exec_config.emit_events,
+        )
 
         try:
             while current_node != END:
@@ -855,6 +906,18 @@ class CompiledGraph(Generic[StateType]):
                 logger.debug(f"Executing node: {current_node}")
                 node_history.append(current_node)
 
+                # Emit node_start event for observability
+                node_start_time = time.time()
+                self._emit_event(
+                    "node_start",
+                    graph_id,
+                    {
+                        "node_id": current_node,
+                        "iteration": iterations,
+                    },
+                    exec_config.emit_events,
+                )
+
                 # Execute with timeout, optionally using copy-on-write
                 if use_cow:
                     # Wrap state in COW wrapper for efficient read-heavy nodes
@@ -901,6 +964,19 @@ class CompiledGraph(Generic[StateType]):
                     else:
                         state = await node.execute(state)
 
+                # Emit node_end event for observability
+                self._emit_event(
+                    "node_end",
+                    graph_id,
+                    {
+                        "node_id": current_node,
+                        "iteration": iterations,
+                        "duration": time.time() - node_start_time,
+                        "success": True,
+                    },
+                    exec_config.emit_events,
+                )
+
                 # WorkflowCheckpoint after execution
                 if exec_config.checkpointer:
                     await self._save_checkpoint(
@@ -928,6 +1004,19 @@ class CompiledGraph(Generic[StateType]):
                 duration=time.time() - start_time,
             )
 
+            # Emit graph_completed event for observability
+            self._emit_event(
+                "graph_completed",
+                graph_id,
+                {
+                    "success": True,
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                    "node_count": len(node_history),
+                },
+                exec_config.emit_events,
+            )
+
             return ExecutionResult(
                 state=state,
                 success=True,
@@ -937,6 +1026,17 @@ class CompiledGraph(Generic[StateType]):
             )
 
         except asyncio.TimeoutError:
+            # Emit graph_error event for observability
+            self._emit_event(
+                "graph_error",
+                graph_id,
+                {
+                    "error": "Execution timeout",
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                },
+                exec_config.emit_events,
+            )
             return ExecutionResult(
                 state=state,
                 success=False,
@@ -948,6 +1048,17 @@ class CompiledGraph(Generic[StateType]):
 
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
+            # Emit graph_error event for observability
+            self._emit_event(
+                "graph_error",
+                graph_id,
+                {
+                    "error": str(e),
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                },
+                exec_config.emit_events,
+            )
             return ExecutionResult(
                 state=state,
                 success=False,
