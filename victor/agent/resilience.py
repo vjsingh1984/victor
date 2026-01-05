@@ -322,8 +322,6 @@ class AgentRetryConfig:
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
 
 
-# Backward compatibility alias
-RetryConfig = AgentRetryConfig
 
 
 class RetryHandler:
@@ -333,13 +331,13 @@ class RetryHandler:
     transient failures gracefully.
     """
 
-    def __init__(self, config: Optional[RetryConfig] = None):
+    def __init__(self, config: Optional[AgentRetryConfig] = None):
         """Initialize retry handler.
 
         Args:
             config: Retry configuration
         """
-        self.config = config or RetryConfig()
+        self.config = config or AgentRetryConfig()
 
     def calculate_delay(self, attempt: int) -> float:
         """Calculate delay for a retry attempt.

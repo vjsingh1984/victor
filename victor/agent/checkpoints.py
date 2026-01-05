@@ -89,8 +89,6 @@ class GitCheckpoint:
     stash_message: str
 
 
-# Backward compatibility alias
-Checkpoint = GitCheckpoint
 
 
 class CheckpointError(Exception):
@@ -188,7 +186,7 @@ class CheckpointManager:
 
         return result
 
-    def create(self, description: str = "") -> Checkpoint:
+    def create(self, description: str = "") -> GitCheckpoint:
         """Create a checkpoint before making changes.
 
         This method creates a git stash with all current changes (staged and unstaged)
@@ -199,7 +197,7 @@ class CheckpointManager:
             description: Human-readable description of the checkpoint
 
         Returns:
-            Checkpoint object with metadata
+            GitCheckpoint object with metadata
 
         Raises:
             CheckpointError: If checkpoint creation fails
@@ -226,7 +224,7 @@ class CheckpointManager:
 
             if not has_changes:
                 logger.info("No changes to checkpoint (working tree clean)")
-                return Checkpoint(
+                return GitCheckpoint(
                     id=checkpoint_id,
                     timestamp=timestamp,
                     description="No changes",  # Always "No changes" when tree is clean
@@ -260,7 +258,7 @@ class CheckpointManager:
 
             logger.info(f"Created checkpoint {checkpoint_id}: {description or '(no description)'}")
 
-            return Checkpoint(
+            return GitCheckpoint(
                 id=checkpoint_id,
                 timestamp=timestamp,
                 description=description or "(no description)",
@@ -306,7 +304,7 @@ class CheckpointManager:
                         break
 
             if not stash_ref:
-                raise CheckpointNotFoundError(f"Checkpoint {checkpoint_id} not found in stash list")
+                raise CheckpointNotFoundError(f"GitCheckpoint {checkpoint_id} not found in stash list")
 
             # Reset working tree to clean state
             self._run_git_command(["reset", "--hard"])
@@ -332,11 +330,11 @@ class CheckpointManager:
         except subprocess.CalledProcessError as e:
             raise CheckpointError(f"Failed to rollback to checkpoint: {e.stderr}") from e
 
-    def list_checkpoints(self) -> List[Checkpoint]:
+    def list_checkpoints(self) -> List[GitCheckpoint]:
         """List all available checkpoints.
 
         Returns:
-            List of Checkpoint objects, sorted by timestamp (most recent first)
+            List of GitCheckpoint objects, sorted by timestamp (most recent first)
 
         Example:
             >>> checkpoints = manager.list_checkpoints()
@@ -382,7 +380,7 @@ class CheckpointManager:
                     timestamp = datetime.now()
 
                 checkpoints.append(
-                    Checkpoint(
+                    GitCheckpoint(
                         id=checkpoint_id,
                         timestamp=timestamp,
                         description=description,
@@ -437,14 +435,14 @@ class CheckpointManager:
         logger.info(f"Cleaned up {removed_count} old checkpoints")
         return removed_count
 
-    def get_checkpoint(self, checkpoint_id: str) -> Optional[Checkpoint]:
+    def get_checkpoint(self, checkpoint_id: str) -> Optional[GitCheckpoint]:
         """Get a specific checkpoint by ID.
 
         Args:
             checkpoint_id: ID of the checkpoint to retrieve
 
         Returns:
-            Checkpoint object if found, None otherwise
+            GitCheckpoint object if found, None otherwise
         """
         checkpoints = self.list_checkpoints()
         for checkpoint in checkpoints:

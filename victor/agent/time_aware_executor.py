@@ -60,8 +60,6 @@ class ExecutionCheckpoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-# Backward compatibility alias
-Checkpoint = ExecutionCheckpoint
 
 
 @dataclass
@@ -115,7 +113,7 @@ class ExecutionBudget:
 
         return new_phase
 
-    def checkpoint(self, description: str, **metadata) -> Checkpoint:
+    def checkpoint(self, description: str, **metadata) -> ExecutionCheckpoint:
         """Record a checkpoint for progress tracking.
 
         Args:
@@ -123,9 +121,9 @@ class ExecutionBudget:
             **metadata: Additional metadata to store
 
         Returns:
-            Created Checkpoint
+            Created ExecutionCheckpoint
         """
-        cp = Checkpoint(
+        cp = ExecutionCheckpoint(
             timestamp=time.time(),
             elapsed=self.elapsed,
             remaining=self.remaining,
@@ -134,7 +132,7 @@ class ExecutionBudget:
             metadata=metadata,
         )
         self.checkpoints.append(cp)
-        logger.debug(f"Checkpoint: {description} (elapsed: {self.elapsed:.1f}s)")
+        logger.debug(f"ExecutionCheckpoint: {description} (elapsed: {self.elapsed:.1f}s)")
         return cp
 
     def get_summary(self) -> Dict[str, Any]:
@@ -176,7 +174,7 @@ class TimeAwareExecutor:
     Provides:
     - Time budget tracking with phases
     - Guidance messages based on remaining time
-    - Checkpoint recording for progress tracking
+    - ExecutionCheckpoint recording for progress tracking
     - Callbacks for phase transitions
 
     Usage:
@@ -307,15 +305,15 @@ class TimeAwareExecutor:
         """
         return self._budget.elapsed if self._budget else 0.0
 
-    def checkpoint(self, description: str, **metadata) -> Optional[Checkpoint]:
+    def checkpoint(self, description: str, **metadata) -> Optional[ExecutionCheckpoint]:
         """Record a progress checkpoint.
 
         Args:
-            description: Checkpoint description
+            description: ExecutionCheckpoint description
             **metadata: Additional metadata
 
         Returns:
-            Created Checkpoint or None if no budget
+            Created ExecutionCheckpoint or None if no budget
         """
         if self._budget:
             return self._budget.checkpoint(description, **metadata)
@@ -329,7 +327,7 @@ class TimeAwareExecutor:
         """
         return self._budget.get_summary() if self._budget else None
 
-    def get_checkpoints(self) -> List[Checkpoint]:
+    def get_checkpoints(self) -> List[ExecutionCheckpoint]:
         """Get all recorded checkpoints.
 
         Returns:

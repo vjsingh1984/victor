@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class OperationalRiskLevel(Enum):
     """Risk level categorization for tool/command operations.
 
-    This is the CANONICAL RiskLevel for operational risk assessment.
+    This is the CANONICAL OperationalRiskLevel for operational risk assessment.
 
     Renamed from RiskLevel to be semantically distinct:
     - OperationalRiskLevel (here): Tool/command risk with SAFE level (5 values)
@@ -50,8 +50,6 @@ class OperationalRiskLevel(Enum):
     CRITICAL = "critical"  # System-level destructive operations
 
 
-# Backward compatibility alias
-RiskLevel = OperationalRiskLevel
 
 
 class ApprovalMode(Enum):
@@ -114,11 +112,11 @@ WRITE_TOOL_NAMES = _STATIC_WRITE_TOOL_NAMES
 
 # Numeric ordering for risk level comparisons
 _RISK_ORDER = {
-    RiskLevel.SAFE: 0,
-    RiskLevel.LOW: 1,
-    RiskLevel.MEDIUM: 2,
-    RiskLevel.HIGH: 3,
-    RiskLevel.CRITICAL: 4,
+    OperationalRiskLevel.SAFE: 0,
+    OperationalRiskLevel.LOW: 1,
+    OperationalRiskLevel.MEDIUM: 2,
+    OperationalRiskLevel.HIGH: 3,
+    OperationalRiskLevel.CRITICAL: 4,
 }
 
 
@@ -127,7 +125,7 @@ class ConfirmationRequest:
     """Request for user confirmation before executing a dangerous operation."""
 
     tool_name: str
-    risk_level: RiskLevel
+    risk_level: OperationalRiskLevel
     description: str
     details: List[str]
     arguments: Dict[str, Any]
@@ -135,11 +133,11 @@ class ConfirmationRequest:
     def format_message(self) -> str:
         """Format confirmation request as a user-friendly message."""
         icon = {
-            RiskLevel.SAFE: "✅",
-            RiskLevel.LOW: "📝",
-            RiskLevel.MEDIUM: "⚠️",
-            RiskLevel.HIGH: "🔴",
-            RiskLevel.CRITICAL: "⛔",
+            OperationalRiskLevel.SAFE: "✅",
+            OperationalRiskLevel.LOW: "📝",
+            OperationalRiskLevel.MEDIUM: "⚠️",
+            OperationalRiskLevel.HIGH: "🔴",
+            OperationalRiskLevel.CRITICAL: "⛔",
         }.get(self.risk_level, "❓")
 
         lines = [
@@ -231,7 +229,7 @@ class SafetyChecker:
         self,
         confirmation_callback: Optional[ConfirmationCallback] = None,
         auto_confirm_low_risk: bool = True,
-        require_confirmation_threshold: RiskLevel = RiskLevel.HIGH,
+        require_confirmation_threshold: OperationalRiskLevel = OperationalRiskLevel.HIGH,
         approval_mode: ApprovalMode = ApprovalMode.RISKY_ONLY,
     ):
         """Initialize safety checker.
@@ -262,7 +260,7 @@ class SafetyChecker:
         ]
 
         # Custom patterns from vertical extensions
-        self._custom_patterns: List[tuple[re.Pattern, str, RiskLevel]] = []
+        self._custom_patterns: List[tuple[re.Pattern, str, OperationalRiskLevel]] = []
 
     def add_custom_pattern(
         self,
@@ -279,15 +277,15 @@ class SafetyChecker:
             risk_level: Risk level string (CRITICAL, HIGH, MEDIUM, LOW).
             category: Category for the pattern (for logging/grouping).
         """
-        # Convert risk_level string to RiskLevel enum
+        # Convert risk_level string to OperationalRiskLevel enum
         risk_map = {
-            "CRITICAL": RiskLevel.CRITICAL,
-            "HIGH": RiskLevel.HIGH,
-            "MEDIUM": RiskLevel.MEDIUM,
-            "LOW": RiskLevel.LOW,
-            "SAFE": RiskLevel.SAFE,
+            "CRITICAL": OperationalRiskLevel.CRITICAL,
+            "HIGH": OperationalRiskLevel.HIGH,
+            "MEDIUM": OperationalRiskLevel.MEDIUM,
+            "LOW": OperationalRiskLevel.LOW,
+            "SAFE": OperationalRiskLevel.SAFE,
         }
-        risk = risk_map.get(risk_level.upper(), RiskLevel.HIGH)
+        risk = risk_map.get(risk_level.upper(), OperationalRiskLevel.HIGH)
 
         try:
             compiled = re.compile(pattern, re.IGNORECASE)
@@ -296,7 +294,7 @@ class SafetyChecker:
         except re.error as e:
             logger.warning(f"Invalid regex pattern for safety checker: {pattern} - {e}")
 
-    def check_bash_command(self, command: str) -> tuple[RiskLevel, List[str]]:
+    def check_bash_command(self, command: str) -> tuple[OperationalRiskLevel, List[str]]:
         """Check a bash command for dangerous patterns.
 
         Args:
@@ -306,33 +304,33 @@ class SafetyChecker:
             Tuple of (risk_level, list of matched pattern descriptions)
         """
         matched: List[str] = []
-        max_risk = RiskLevel.SAFE
+        max_risk = OperationalRiskLevel.SAFE
 
         # Check critical patterns first
         for pattern, desc in self._critical_patterns:
             if pattern.search(command):
                 matched.append(desc)
-                max_risk = RiskLevel.CRITICAL
+                max_risk = OperationalRiskLevel.CRITICAL
 
-        if max_risk == RiskLevel.CRITICAL:
+        if max_risk == OperationalRiskLevel.CRITICAL:
             return max_risk, matched
 
         # Check high risk patterns
         for pattern, desc in self._high_patterns:
             if pattern.search(command):
                 matched.append(desc)
-                if _RISK_ORDER[max_risk] < _RISK_ORDER[RiskLevel.HIGH]:
-                    max_risk = RiskLevel.HIGH
+                if _RISK_ORDER[max_risk] < _RISK_ORDER[OperationalRiskLevel.HIGH]:
+                    max_risk = OperationalRiskLevel.HIGH
 
-        if max_risk == RiskLevel.HIGH:
+        if max_risk == OperationalRiskLevel.HIGH:
             return max_risk, matched
 
         # Check medium risk patterns
         for pattern, desc in self._medium_patterns:
             if pattern.search(command):
                 matched.append(desc)
-                if _RISK_ORDER[max_risk] < _RISK_ORDER[RiskLevel.MEDIUM]:
-                    max_risk = RiskLevel.MEDIUM
+                if _RISK_ORDER[max_risk] < _RISK_ORDER[OperationalRiskLevel.MEDIUM]:
+                    max_risk = OperationalRiskLevel.MEDIUM
 
         # Check custom patterns from vertical extensions
         for pattern, desc, risk in self._custom_patterns:
@@ -348,7 +346,7 @@ class SafetyChecker:
         operation: str,
         file_path: str,
         overwrite: bool = False,
-    ) -> tuple[RiskLevel, List[str]]:
+    ) -> tuple[OperationalRiskLevel, List[str]]:
         """Check a file operation for risk.
 
         Args:
@@ -360,7 +358,7 @@ class SafetyChecker:
             Tuple of (risk_level, list of risk descriptions)
         """
         risks: List[str] = []
-        max_risk = RiskLevel.SAFE
+        max_risk = OperationalRiskLevel.SAFE
 
         path = Path(file_path)
 
@@ -368,25 +366,25 @@ class SafetyChecker:
         for ext in self.DANGEROUS_FILE_EXTENSIONS:
             if file_path.endswith(ext) or ext in file_path:
                 risks.append(f"Modifying sensitive file: {ext}")
-                max_risk = RiskLevel.HIGH
+                max_risk = OperationalRiskLevel.HIGH
                 break
 
         # Check for destructive operations
         if operation == "delete":
             risks.append(f"Deleting file: {file_path}")
-            if _RISK_ORDER[max_risk] < _RISK_ORDER[RiskLevel.HIGH]:
-                max_risk = RiskLevel.HIGH
+            if _RISK_ORDER[max_risk] < _RISK_ORDER[OperationalRiskLevel.HIGH]:
+                max_risk = OperationalRiskLevel.HIGH
         elif operation == "write" and overwrite:
             # Check if file exists (would be overwritten)
             if path.exists():
                 risks.append(f"Overwriting existing file: {file_path}")
-                if _RISK_ORDER[max_risk] < _RISK_ORDER[RiskLevel.MEDIUM]:
-                    max_risk = RiskLevel.MEDIUM
+                if _RISK_ORDER[max_risk] < _RISK_ORDER[OperationalRiskLevel.MEDIUM]:
+                    max_risk = OperationalRiskLevel.MEDIUM
 
         # Check for system paths
         if file_path.startswith("/etc/") or file_path.startswith("/usr/"):
             risks.append("Modifying system file")
-            max_risk = RiskLevel.HIGH
+            max_risk = OperationalRiskLevel.HIGH
 
         return max_risk, risks
 
@@ -427,7 +425,7 @@ class SafetyChecker:
         if self.approval_mode == ApprovalMode.OFF:
             return True, None
 
-        risk_level = RiskLevel.SAFE
+        risk_level = OperationalRiskLevel.SAFE
         descriptions: List[str] = []
         details: List[str] = []
         is_write_operation = self.is_write_tool(tool_name)
@@ -477,8 +475,8 @@ class SafetyChecker:
             if not descriptions:
                 descriptions.append(f"Execute write operation: {tool_name}")
             # Set minimum risk to LOW for display purposes
-            if risk_level == RiskLevel.SAFE:
-                risk_level = RiskLevel.LOW
+            if risk_level == OperationalRiskLevel.SAFE:
+                risk_level = OperationalRiskLevel.LOW
                 details.append("Write operation requiring approval")
 
         # RISKY_ONLY mode: only require confirmation for high-risk operations
@@ -492,7 +490,7 @@ class SafetyChecker:
 
         # No callback registered - log warning but proceed
         if not self.confirmation_callback:
-            if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            if risk_level in (OperationalRiskLevel.HIGH, OperationalRiskLevel.CRITICAL):
                 logger.warning(
                     f"High-risk operation without confirmation callback: "
                     f"{tool_name} - {', '.join(details)}"
@@ -523,7 +521,7 @@ class SafetyChecker:
         except Exception as e:
             logger.error(f"Confirmation callback failed: {e}")
             # If callback fails, block high-risk operations
-            if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            if risk_level in (OperationalRiskLevel.HIGH, OperationalRiskLevel.CRITICAL):
                 return False, f"Confirmation failed: {e}"
             return True, None
 
@@ -644,11 +642,11 @@ def create_hitl_confirmation_callback(
         """Convert SafetyChecker request to HITL and get response."""
         # Map risk level to context for display
         risk_icon = {
-            RiskLevel.SAFE: "✅",
-            RiskLevel.LOW: "📝",
-            RiskLevel.MEDIUM: "⚠️",
-            RiskLevel.HIGH: "🔴",
-            RiskLevel.CRITICAL: "⛔",
+            OperationalRiskLevel.SAFE: "✅",
+            OperationalRiskLevel.LOW: "📝",
+            OperationalRiskLevel.MEDIUM: "⚠️",
+            OperationalRiskLevel.HIGH: "🔴",
+            OperationalRiskLevel.CRITICAL: "⛔",
         }.get(request.risk_level, "❓")
 
         # Create HITL request
@@ -703,7 +701,7 @@ def create_hitl_confirmation_callback(
         except Exception as e:
             logger.error(f"HITL confirmation error: {e}")
             # Block high-risk operations on error
-            if request.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            if request.risk_level in (OperationalRiskLevel.HIGH, OperationalRiskLevel.CRITICAL):
                 return False
             return True
 

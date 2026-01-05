@@ -44,9 +44,9 @@ from victor.core.errors import (
     get_error_handler,
 )
 from victor.core.retry import (
+    BaseRetryStrategy,
     RetryContext,
     RetryExecutor,
-    RetryStrategy,
     tool_retry_strategy,
 )
 from victor.tools.base import (
@@ -221,7 +221,7 @@ class ToolExecutor:
         safety_checker: Optional[SafetyChecker] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        retry_strategy: Optional[RetryStrategy] = None,
+        retry_strategy: Optional[BaseRetryStrategy] = None,
         context: Optional[Dict[str, Any]] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         enable_code_correction: bool = False,
@@ -759,7 +759,7 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         context: Dict[str, Any],
     ) -> Tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
-        """Execute a tool with retry logic from unified RetryStrategy.
+        """Execute a tool with retry logic from unified BaseRetryStrategy.
 
         Uses the configured retry strategy for exponential backoff and
         retry decisions. Hooks are run before/after each attempt. Errors

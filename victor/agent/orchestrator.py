@@ -129,7 +129,7 @@ from victor.agent.search_router import SearchRoute, SearchType
 from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.metrics_collector import MetricsCollectorConfig
-from victor.agent.unified_task_tracker import UnifiedTaskTracker, TaskType
+from victor.agent.unified_task_tracker import TrackerTaskType, UnifiedTaskTracker
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
 # Decomposed components - configs, strategies, functions
@@ -3875,7 +3875,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         int,
         int,
         bool,
-        TaskType,
+        TrackerTaskType,
         Any,
         int,
     ]:
@@ -4075,7 +4075,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return ctx
 
-    def _prepare_task(self, user_message: str, unified_task_type: TaskType) -> tuple[Any, int]:
+    def _prepare_task(
+        self, user_message: str, unified_task_type: TrackerTaskType
+    ) -> tuple[Any, int]:
         """Prepare task-specific guidance and budget adjustments.
 
         Delegates to TaskCoordinator for centralized task preparation.
@@ -4107,7 +4109,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _apply_task_guidance(
         self,
         user_message: str,
-        unified_task_type: TaskType,
+        unified_task_type: TrackerTaskType,
         is_analysis_task: bool,
         is_action_task: bool,
         needs_execution: bool,

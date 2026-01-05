@@ -204,7 +204,7 @@ class UnifiedTaskProgress:
     """Single source of truth for task progress."""
 
     # Task classification
-    task_type: TaskType = TrackerTaskType.GENERAL
+    task_type: TrackerTaskType = TrackerTaskType.GENERAL
 
     # Iteration tracking
     iteration_count: int = 0  # Productive iterations (tool calls)
@@ -468,7 +468,7 @@ class UnifiedTaskConfigLoader:
         self._config = None
         self._load_config()
 
-    def get_task_config(self, task_type: TaskType) -> TaskConfig:
+    def get_task_config(self, task_type: TrackerTaskType) -> TaskConfig:
         """Get configuration for a specific task type."""
         config = self._config or self.DEFAULT_CONFIG
         task_configs = config.get("task_types", {})
@@ -582,7 +582,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         return self._progress
 
     @property
-    def task_type(self) -> TaskType:
+    def task_type(self) -> TrackerTaskType:
         """Get current task type."""
         return self._progress.task_type
 
@@ -633,7 +633,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
     # Configuration
     # =========================================================================
 
-    def set_task_type(self, task_type: TaskType) -> None:
+    def set_task_type(self, task_type: TrackerTaskType) -> None:
         """Set the task type and load corresponding configuration."""
         self._progress.task_type = task_type
         self._task_config = self._config_loader.get_task_config(task_type)
@@ -1515,14 +1515,14 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """Get unique resources (LoopDetector compatibility)."""
         return self._progress.unique_resources.copy()
 
-    def detect_task_type(self, message: str) -> TaskType:
+    def detect_task_type(self, message: str) -> TrackerTaskType:
         """Detect task type from message and configure tracker.
 
         Args:
             message: User message to classify
 
         Returns:
-            Detected TaskType
+            Detected TrackerTaskType
         """
         from victor.embeddings.task_classifier import TaskType as ClassifierTaskType
         from victor.embeddings.task_classifier import TaskTypeClassifier
@@ -1535,16 +1535,16 @@ class UnifiedTaskTracker(ModeAwareMixin):
         classifier_type = result.task_type
 
         type_map = {
-            ClassifierTrackerTaskType.EDIT: TrackerTaskType.EDIT,
-            ClassifierTrackerTaskType.CREATE: TrackerTaskType.CREATE,
-            ClassifierTrackerTaskType.CREATE_SIMPLE: TrackerTaskType.CREATE_SIMPLE,
-            ClassifierTrackerTaskType.SEARCH: TrackerTaskType.SEARCH,
-            ClassifierTrackerTaskType.ANALYZE: TrackerTaskType.ANALYZE,
-            ClassifierTrackerTaskType.DESIGN: TrackerTaskType.DESIGN,
-            ClassifierTrackerTaskType.GENERAL: TrackerTaskType.GENERAL,
+            ClassifierTaskType.EDIT: TrackerTaskType.EDIT,
+            ClassifierTaskType.CREATE: TrackerTaskType.CREATE,
+            ClassifierTaskType.CREATE_SIMPLE: TrackerTaskType.CREATE_SIMPLE,
+            ClassifierTaskType.SEARCH: TrackerTaskType.SEARCH,
+            ClassifierTaskType.ANALYZE: TrackerTaskType.ANALYZE,
+            ClassifierTaskType.DESIGN: TrackerTaskType.DESIGN,
+            ClassifierTaskType.GENERAL: TrackerTaskType.GENERAL,
             # Map additional types to closest match
-            ClassifierTrackerTaskType.ACTION: TrackerTaskType.GENERAL,  # Actions use general limits
-            ClassifierTrackerTaskType.ANALYSIS_DEEP: TrackerTaskType.ANALYZE,  # Deep analysis uses analyze limits
+            ClassifierTaskType.ACTION: TrackerTaskType.GENERAL,  # Actions use general limits
+            ClassifierTaskType.ANALYSIS_DEEP: TrackerTaskType.ANALYZE,  # Deep analysis uses analyze limits
         }
 
         task_type = type_map.get(classifier_type, TrackerTaskType.GENERAL)
@@ -1555,7 +1555,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         self,
         message: str,
         history: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[TaskType, "ClassificationResult"]:
+    ) -> Tuple[TrackerTaskType, "ClassificationResult"]:
         """Detect task type using negation-aware keyword classification.
 
         Uses UnifiedTaskClassifier for robust classification that handles:
@@ -1569,10 +1569,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
             history: Optional conversation history for context boosting
 
         Returns:
-            Tuple of (TaskType, ClassificationResult) for detailed inspection
+            Tuple of (TrackerTaskType, ClassificationResult) for detailed inspection
         """
         from victor.agent.unified_classifier import (
-            TaskType as UnifiedTaskType,
+            ClassifierTaskType as UnifiedTaskType,
             get_unified_classifier,
         )
 
@@ -1584,14 +1584,14 @@ class UnifiedTaskTracker(ModeAwareMixin):
         else:
             result = classifier.classify(message)
 
-        # Map UnifiedTaskClassifier.TaskType to UnifiedTaskTracker.TaskType
+        # Map UnifiedTaskClassifier.ClassifierTaskType to UnifiedTaskTracker.TrackerTaskType
         type_map = {
-            UnifiedTrackerTaskType.EDIT: TrackerTaskType.EDIT,
-            UnifiedTrackerTaskType.SEARCH: TrackerTaskType.SEARCH,
-            UnifiedTrackerTaskType.ANALYSIS: TrackerTaskType.ANALYZE,
-            UnifiedTrackerTaskType.GENERATION: TrackerTaskType.CREATE,
-            UnifiedTrackerTaskType.ACTION: TrackerTaskType.GENERAL,  # ACTION maps to GENERAL for broad tool access
-            UnifiedTrackerTaskType.DEFAULT: TrackerTaskType.GENERAL,
+            UnifiedTaskType.EDIT: TrackerTaskType.EDIT,
+            UnifiedTaskType.SEARCH: TrackerTaskType.SEARCH,
+            UnifiedTaskType.ANALYSIS: TrackerTaskType.ANALYZE,
+            UnifiedTaskType.GENERATION: TrackerTaskType.CREATE,
+            UnifiedTaskType.ACTION: TrackerTaskType.GENERAL,  # ACTION maps to GENERAL for broad tool access
+            UnifiedTaskType.DEFAULT: TrackerTaskType.GENERAL,
         }
 
         task_type = type_map.get(result.task_type, TrackerTaskType.GENERAL)
@@ -1627,7 +1627,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         Returns:
             Dictionary with classification details:
-            - task_type: TaskType enum value
+            - task_type: TrackerTaskType enum value
             - confidence: Classification confidence (0-1)
             - is_action_task: Whether task involves actions
             - is_analysis_task: Whether task involves analysis
@@ -1755,7 +1755,7 @@ class CompatConfig:
 # =============================================================================
 
 
-def create_tracker_for_task(task_type: TaskType) -> UnifiedTaskTracker:
+def create_tracker_for_task(task_type: TrackerTaskType) -> UnifiedTaskTracker:
     """Create a tracker configured for a specific task type.
 
     Args:
@@ -1769,7 +1769,7 @@ def create_tracker_for_task(task_type: TaskType) -> UnifiedTaskTracker:
     return tracker
 
 
-def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TaskType]:
+def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
     """Create a tracker by classifying a message.
 
     Args:
@@ -1787,13 +1787,13 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TaskT
 
     # Map classifier types to unified types
     type_map = {
-        ClassifierTrackerTaskType.EDIT: TrackerTaskType.EDIT,
-        ClassifierTrackerTaskType.CREATE: TrackerTaskType.CREATE,
-        ClassifierTrackerTaskType.CREATE_SIMPLE: TrackerTaskType.CREATE_SIMPLE,
-        ClassifierTrackerTaskType.SEARCH: TrackerTaskType.SEARCH,
-        ClassifierTrackerTaskType.ANALYZE: TrackerTaskType.ANALYZE,
-        ClassifierTrackerTaskType.DESIGN: TrackerTaskType.DESIGN,
-        ClassifierTrackerTaskType.GENERAL: TrackerTaskType.GENERAL,
+        ClassifierTaskType.EDIT: TrackerTaskType.EDIT,
+        ClassifierTaskType.CREATE: TrackerTaskType.CREATE,
+        ClassifierTaskType.CREATE_SIMPLE: TrackerTaskType.CREATE_SIMPLE,
+        ClassifierTaskType.SEARCH: TrackerTaskType.SEARCH,
+        ClassifierTaskType.ANALYZE: TrackerTaskType.ANALYZE,
+        ClassifierTaskType.DESIGN: TrackerTaskType.DESIGN,
+        ClassifierTaskType.GENERAL: TrackerTaskType.GENERAL,
     }
 
     task_type = type_map.get(classifier_type, TrackerTaskType.GENERAL)
@@ -1807,7 +1807,7 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TaskT
 def create_tracker_with_negation_awareness(
     message: str,
     history: Optional[List[Dict[str, Any]]] = None,
-) -> Tuple[UnifiedTaskTracker, TaskType, Dict[str, Any]]:
+) -> Tuple[UnifiedTaskTracker, TrackerTaskType, Dict[str, Any]]:
     """Create a tracker using negation-aware keyword classification.
 
     This is the recommended way to create a tracker when negation detection
@@ -1850,7 +1850,7 @@ def create_tracker_with_negation_awareness(
 def create_tracker_with_prompt_requirements(
     message: str,
     history: Optional[List[Dict[str, Any]]] = None,
-) -> Tuple[UnifiedTaskTracker, TaskType, Dict[str, Any]]:
+) -> Tuple[UnifiedTaskTracker, TrackerTaskType, Dict[str, Any]]:
     """Create a tracker using prompt requirement extraction.
 
     This function extracts explicit requirements from the prompt (e.g.,
