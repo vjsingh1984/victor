@@ -57,7 +57,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
 from victor.safety.types import SafetyPattern
-from victor.safety.code_patterns import PatternRiskLevel, RiskLevel  # Re-export for convenience
+from victor.safety.code_patterns import PatternRiskLevel
 
 
 # =============================================================================
@@ -75,10 +75,6 @@ class InfraPatternCategory(Enum):
     CLOUD = "cloud"
     DATABASE = "database"
     SECURITY = "security"
-
-
-# RiskLevel imported from code_patterns.py (PatternRiskLevel)
-# Backward compatibility: RiskLevel is available via import above
 
 
 # =============================================================================
@@ -741,7 +737,7 @@ def get_safety_reminders() -> List[str]:
 __all__ = [
     # Enums
     "InfraPatternCategory",
-    "RiskLevel",
+    "PatternRiskLevel",
     # Pattern lists
     "DESTRUCTIVE_PATTERNS",
     "KUBERNETES_PATTERNS",

@@ -82,10 +82,6 @@ class PatternRiskLevel(Enum):
     LOW = "LOW"
 
 
-# Backward compatibility alias
-RiskLevel = PatternRiskLevel
-
-
 # =============================================================================
 # Pattern Definitions
 # =============================================================================
@@ -633,7 +629,7 @@ def get_all_patterns() -> List[SafetyPattern]:
 __all__ = [
     # Enums
     "CodePatternCategory",
-    "RiskLevel",
+    "PatternRiskLevel",
     # Pattern lists
     "GIT_PATTERNS",
     "REFACTORING_PATTERNS",

@@ -396,7 +396,7 @@ def _audit_log_secret_access(
 
     # Try to log to audit system if available
     try:
-        from victor.audit import AuditManager, AuditEventType
+        from victor.security.audit import AuditManager, AuditEventType
 
         audit = AuditManager.get_instance()
         audit.log_event(

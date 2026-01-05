@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from victor.core.search_types import SearchHit
+
 if TYPE_CHECKING:
     from victor.storage.vector_stores.models import BaseEmbeddingModel
 
@@ -79,6 +81,16 @@ class EmbeddingSearchResult(BaseModel):
     score: float = Field(description="Relevance score (0-1, higher is better)")
     line_number: Optional[int] = Field(default=None, description="Line number in file")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+    def to_search_hit(self) -> SearchHit:
+        """Convert to a generic SearchHit for cross-layer consumers."""
+        return SearchHit(
+            file_path=self.file_path,
+            content=self.content,
+            score=self.score,
+            line_number=self.line_number,
+            metadata=self.metadata,
+        )
 
 
 class BaseEmbeddingProvider(ABC):

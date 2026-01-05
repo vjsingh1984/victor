@@ -153,11 +153,9 @@ class BaseRetryStrategy(ABC):
         """
 
 
-# Backward compatibility alias
-RetryStrategy = BaseRetryStrategy
 
 
-class ExponentialBackoffStrategy(RetryStrategy):
+class ExponentialBackoffStrategy(BaseRetryStrategy):
     """Exponential backoff with optional jitter.
 
     Default strategy for most operations. Delay doubles after each
@@ -239,7 +237,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
         )
 
 
-class LinearBackoffStrategy(RetryStrategy):
+class LinearBackoffStrategy(BaseRetryStrategy):
     """Linear backoff - delay increases linearly with each attempt.
 
     Useful for operations where rapid initial retries are acceptable
@@ -278,7 +276,7 @@ class LinearBackoffStrategy(RetryStrategy):
         return min(delay, self.max_delay)
 
 
-class FixedDelayStrategy(RetryStrategy):
+class FixedDelayStrategy(BaseRetryStrategy):
     """Fixed delay between retries - no backoff.
 
     Suitable for operations where the failure is likely transient
@@ -308,7 +306,7 @@ class FixedDelayStrategy(RetryStrategy):
         return self.delay
 
 
-class NoRetryStrategy(RetryStrategy):
+class NoRetryStrategy(BaseRetryStrategy):
     """No retry - fail immediately on first error.
 
     Useful for operations that should not be retried,
@@ -351,7 +349,7 @@ class RetryExecutor:
     configurable retry strategies.
     """
 
-    def __init__(self, strategy: Optional[RetryStrategy] = None):
+    def __init__(self, strategy: Optional[BaseRetryStrategy] = None):
         """Initialize executor with a retry strategy.
 
         Args:
@@ -476,7 +474,7 @@ class RetryExecutor:
 
 
 def with_retry(
-    strategy: Optional[RetryStrategy] = None,
+    strategy: Optional[BaseRetryStrategy] = None,
     raise_on_failure: bool = True,
 ) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Decorator for async functions with retry logic.
@@ -510,7 +508,7 @@ def with_retry(
 
 
 def with_retry_sync(
-    strategy: Optional[RetryStrategy] = None,
+    strategy: Optional[BaseRetryStrategy] = None,
     raise_on_failure: bool = True,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator for sync functions with retry logic.

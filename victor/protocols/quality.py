@@ -64,8 +64,6 @@ class ProtocolQualityDimension(str, Enum):
     SAFETY = "safety"
 
 
-# Backward compatibility alias
-QualityDimension = ProtocolQualityDimension
 
 
 @dataclass
@@ -105,11 +103,11 @@ class QualityScore:
     is_acceptable: bool
     threshold: float = 0.80
     provider: str = ""
-    dimension_scores: Dict[QualityDimension, DimensionScore] = field(default_factory=dict)
+    dimension_scores: Dict[ProtocolQualityDimension, DimensionScore] = field(default_factory=dict)
     feedback: str = ""
     suggestions: List[str] = field(default_factory=list)
 
-    def get_dimension_score(self, dimension: QualityDimension) -> float:
+    def get_dimension_score(self, dimension: ProtocolQualityDimension) -> float:
         """Get score for a specific dimension."""
         if dimension in self.dimension_scores:
             return self.dimension_scores[dimension].score
@@ -159,7 +157,7 @@ class IQualityAssessor(Protocol):
         ...
 
     @property
-    def dimensions(self) -> List[QualityDimension]:
+    def dimensions(self) -> List[ProtocolQualityDimension]:
         """Return dimensions this assessor evaluates."""
         ...
 
@@ -169,7 +167,7 @@ class BaseQualityAssessor(ABC):
 
     def __init__(
         self,
-        weights: Optional[Dict[QualityDimension, float]] = None,
+        weights: Optional[Dict[ProtocolQualityDimension, float]] = None,
         threshold: float = 0.80,
     ):
         """Initialize assessor.
@@ -179,23 +177,23 @@ class BaseQualityAssessor(ABC):
             threshold: Minimum score for acceptability
         """
         self._weights = weights or {
-            QualityDimension.GROUNDING: 0.25,
-            QualityDimension.COVERAGE: 0.20,
-            QualityDimension.CLARITY: 0.15,
-            QualityDimension.CORRECTNESS: 0.25,
-            QualityDimension.CONCISENESS: 0.15,
+            ProtocolQualityDimension.GROUNDING: 0.25,
+            ProtocolQualityDimension.COVERAGE: 0.20,
+            ProtocolQualityDimension.CLARITY: 0.15,
+            ProtocolQualityDimension.CORRECTNESS: 0.25,
+            ProtocolQualityDimension.CONCISENESS: 0.15,
         }
         self._threshold = threshold
 
     @property
-    def dimensions(self) -> List[QualityDimension]:
+    def dimensions(self) -> List[ProtocolQualityDimension]:
         """Return dimensions this assessor evaluates."""
         return list(self._weights.keys())
 
     @abstractmethod
     def _assess_dimension(
         self,
-        dimension: QualityDimension,
+        dimension: ProtocolQualityDimension,
         response: str,
         context: Dict[str, Any],
     ) -> DimensionScore:
@@ -235,20 +233,20 @@ class SimpleQualityAssessor(BaseQualityAssessor):
 
     def _assess_dimension(
         self,
-        dimension: QualityDimension,
+        dimension: ProtocolQualityDimension,
         response: str,
         context: Dict[str, Any],
     ) -> DimensionScore:
         """Assess using simple heuristics."""
-        if dimension == QualityDimension.CLARITY:
+        if dimension == ProtocolQualityDimension.CLARITY:
             return self._assess_clarity(response)
-        elif dimension == QualityDimension.CONCISENESS:
+        elif dimension == ProtocolQualityDimension.CONCISENESS:
             return self._assess_conciseness(response, context)
-        elif dimension == QualityDimension.CORRECTNESS:
+        elif dimension == ProtocolQualityDimension.CORRECTNESS:
             return self._assess_correctness(response)
-        elif dimension == QualityDimension.COVERAGE:
+        elif dimension == ProtocolQualityDimension.COVERAGE:
             return self._assess_coverage(response, context)
-        elif dimension == QualityDimension.GROUNDING:
+        elif dimension == ProtocolQualityDimension.GROUNDING:
             return self._assess_grounding(response, context)
         else:
             return DimensionScore(dimension=dimension, score=0.5)
@@ -276,7 +274,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             score -= 0.1
 
         return DimensionScore(
-            dimension=QualityDimension.CLARITY,
+            dimension=ProtocolQualityDimension.CLARITY,
             score=min(1.0, max(0.0, score)),
             reason="Assessed based on structure and formatting",
         )
@@ -308,7 +306,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             score = 0.3
 
         return DimensionScore(
-            dimension=QualityDimension.CONCISENESS,
+            dimension=ProtocolQualityDimension.CONCISENESS,
             score=score,
             reason=f"Response/query ratio: {actual_ratio:.1f} (ideal: {ideal_ratio})",
             evidence={"response_words": response_len, "query_words": query_len},
@@ -340,7 +338,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             score += 0.1  # Bonus for having code
 
         return DimensionScore(
-            dimension=QualityDimension.CORRECTNESS,
+            dimension=ProtocolQualityDimension.CORRECTNESS,
             score=min(1.0, max(0.0, score)),
             reason="Assessed based on syntax heuristics",
         )
@@ -365,7 +363,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             score = 0.3 + (0.7 * coverage_ratio)
 
         return DimensionScore(
-            dimension=QualityDimension.COVERAGE,
+            dimension=ProtocolQualityDimension.COVERAGE,
             score=score,
             reason=(
                 f"Covered {covered}/{len(key_terms)} key terms"
@@ -382,13 +380,13 @@ class SimpleQualityAssessor(BaseQualityAssessor):
 
         if grounding_result:
             return DimensionScore(
-                dimension=QualityDimension.GROUNDING,
+                dimension=ProtocolQualityDimension.GROUNDING,
                 score=grounding_result.get("confidence", 0.5),
                 reason=grounding_result.get("reason", "From grounding verifier"),
             )
 
         return DimensionScore(
-            dimension=QualityDimension.GROUNDING,
+            dimension=ProtocolQualityDimension.GROUNDING,
             score=0.7,  # Assume grounded if not verified
             reason="Grounding not verified",
         )
@@ -404,7 +402,7 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
         self,
         provider_name: str = "",
         provider_threshold: float = 0.80,
-        weights: Optional[Dict[QualityDimension, float]] = None,
+        weights: Optional[Dict[ProtocolQualityDimension, float]] = None,
     ):
         """Initialize with provider context.
 
@@ -418,7 +416,7 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
 
     def _assess_dimension(
         self,
-        dimension: QualityDimension,
+        dimension: ProtocolQualityDimension,
         response: str,
         context: Dict[str, Any],
     ) -> DimensionScore:
@@ -439,27 +437,27 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
             evidence=base_score.evidence,
         )
 
-    def _get_provider_adjustment(self, dimension: QualityDimension) -> float:
+    def _get_provider_adjustment(self, dimension: ProtocolQualityDimension) -> float:
         """Get provider-specific score adjustment."""
         # Known provider adjustments
         adjustments = {
             "deepseek": {
-                QualityDimension.CORRECTNESS: 0.05,  # Good at code
-                QualityDimension.CONCISENESS: -0.05,  # Can be verbose
+                ProtocolQualityDimension.CORRECTNESS: 0.05,  # Good at code
+                ProtocolQualityDimension.CONCISENESS: -0.05,  # Can be verbose
             },
             "anthropic": {
-                QualityDimension.CLARITY: 0.05,
-                QualityDimension.GROUNDING: 0.05,
+                ProtocolQualityDimension.CLARITY: 0.05,
+                ProtocolQualityDimension.GROUNDING: 0.05,
             },
             "openai": {
-                QualityDimension.CLARITY: 0.03,
+                ProtocolQualityDimension.CLARITY: 0.03,
             },
             "xai": {
-                QualityDimension.CONCISENESS: -0.10,  # Known for repetition
+                ProtocolQualityDimension.CONCISENESS: -0.10,  # Known for repetition
             },
             "ollama": {
-                QualityDimension.CORRECTNESS: -0.05,  # Local models vary
-                QualityDimension.GROUNDING: -0.05,
+                ProtocolQualityDimension.CORRECTNESS: -0.05,  # Local models vary
+                ProtocolQualityDimension.GROUNDING: -0.05,
             },
         }
 
@@ -502,7 +500,7 @@ class CompositeQualityAssessor:
         self._assessors.append(assessor)
 
     @property
-    def dimensions(self) -> List[QualityDimension]:
+    def dimensions(self) -> List[ProtocolQualityDimension]:
         """Return all dimensions covered by assessors."""
         all_dims = set()
         for assessor in self._assessors:
