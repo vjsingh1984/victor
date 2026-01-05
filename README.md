@@ -78,6 +78,57 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 ---
 
+## Capability Matrix
+
+| Category | Capability | Count | Status |
+|----------|------------|:-----:|--------|
+| **LLM Providers** | Anthropic, OpenAI, Google, Groq, DeepSeek, Mistral, xAI, Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, Together, Cohere, Replicate, Bedrock, Azure, Vertex AI, Fireworks, Perplexity, Cerebras | 21 | Stable |
+| **Tools** | File operations, code editing, shell execution, search, git, test runners, semantic search | 55+ | Stable |
+| **Verticals** | Coding, DevOps, RAG, Data Analysis, Research | 5 | Stable |
+| **Workflows** | YAML DSL, StateGraph, scheduling, versioning, parallel execution | - | Stable |
+| **Multi-Agent** | Team coordination, personas, formations (hierarchical, flat, sequential, collaborative) | 4 | Stable |
+| **Observability** | EventBus, OpenTelemetry, live streaming, TUI dashboard | - | Stable |
+| **Resilience** | Circuit breaker, retry policies, provider fallback, budget controls | - | Stable |
+| **Integrations** | MCP protocol, VS Code extension, HTTP API, WebSocket events | 4 | Beta |
+
+### Tools by Category
+
+| Category | Tools |
+|----------|-------|
+| **File System** | read_file, write_file, list_directory, search_files, glob_files |
+| **Code Editing** | edit_file, multi_edit, apply_patch, undo_edit |
+| **Shell** | run_command, run_background, kill_process |
+| **Git** | git_status, git_diff, git_commit, git_log, git_branch |
+| **Search** | semantic_search, grep_search, symbol_search, find_references |
+| **Testing** | run_tests, coverage_report, test_generation |
+| **Analysis** | ast_parse, dependency_graph, code_review |
+| **Web** | web_search, fetch_url, scrape_page |
+
+### Domain Verticals
+
+| Vertical | Description | Key Tools |
+|----------|-------------|-----------|
+| **Coding** | Code editing, AST analysis, LSP integration | 20+ code-specific tools |
+| **DevOps** | Docker, Terraform, CI/CD, infrastructure | Container, IaC tools |
+| **RAG** | Document ingestion, vector search, QA | Embeddings, retrieval |
+| **Data Analysis** | Pandas, statistics, visualization | Data processing tools |
+| **Research** | Web search, citations, synthesis | Research workflows |
+
+### Discover Capabilities Programmatically
+
+```bash
+# List all capabilities (CLI)
+victor capabilities              # Full manifest
+victor capabilities --tools      # Tools only
+victor capabilities --teams      # Multi-agent teams
+victor capabilities --json       # JSON for tooling
+
+# HTTP API
+curl http://localhost:8765/capabilities
+```
+
+---
+
 ## Providers
 
 Use the same CLI with local or cloud models. Pick based on privacy, cost, and speed.
