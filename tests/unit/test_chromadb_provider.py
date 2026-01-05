@@ -23,7 +23,7 @@ try:
 except ImportError:
     pytest.skip("chromadb not available or has import errors", allow_module_level=True)
 
-from victor.storage.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.storage.vector_stores.base import EmbeddingConfig, EmbeddingSearchResult
 from victor.storage.vector_stores.chromadb_provider import ChromaDBProvider
 
 
@@ -267,7 +267,7 @@ class TestChromaDBProvider:
             results = await provider.search_similar("query text", limit=2)
 
             assert len(results) == 2
-            assert isinstance(results[0], SearchResult)
+            assert isinstance(results[0], EmbeddingSearchResult)
             assert results[0].file_path == "test1.py"
             assert results[0].content == "content1"
             assert results[0].score > 0

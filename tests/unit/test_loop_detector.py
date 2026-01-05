@@ -18,10 +18,10 @@ import pytest
 from unittest.mock import MagicMock
 
 from victor.agent.loop_detector import (
-    TaskType,
+    LoopDetectorTaskType,
     FileReadRange,
     ProgressConfig,
-    StopReason,
+    LoopStopRecommendation,
     LoopDetector,
     RESEARCH_TOOLS,
     get_progress_params_for_tool,
@@ -36,15 +36,15 @@ from victor.agent.loop_detector import (
 # =============================================================================
 
 
-class TestTaskType:
-    """Tests for TaskType enum."""
+class TestLoopDetectorTaskType:
+    """Tests for LoopDetectorTaskType enum."""
 
     def test_enum_values(self):
         """Test all expected enum values exist."""
-        assert TaskType.DEFAULT.value == "default"
-        assert TaskType.ANALYSIS.value == "analysis"
-        assert TaskType.ACTION.value == "action"
-        assert TaskType.RESEARCH.value == "research"
+        assert LoopDetectorTaskType.DEFAULT.value == "default"
+        assert LoopDetectorTaskType.ANALYSIS.value == "analysis"
+        assert LoopDetectorTaskType.ACTION.value == "action"
+        assert LoopDetectorTaskType.RESEARCH.value == "research"
 
 
 # =============================================================================
@@ -147,12 +147,12 @@ class TestProgressConfig:
 # =============================================================================
 
 
-class TestStopReason:
-    """Tests for StopReason dataclass."""
+class TestLoopStopRecommendation:
+    """Tests for LoopStopRecommendation dataclass."""
 
     def test_creation(self):
         """Test basic stop reason creation."""
-        reason = StopReason(should_stop=True, reason="Budget exceeded")
+        reason = LoopStopRecommendation(should_stop=True, reason="Budget exceeded")
         assert reason.should_stop is True
         assert reason.reason == "Budget exceeded"
         assert reason.details == {}
@@ -160,7 +160,7 @@ class TestStopReason:
 
     def test_creation_with_details(self):
         """Test stop reason with details."""
-        reason = StopReason(
+        reason = LoopStopRecommendation(
             should_stop=False,
             reason="",
             details={"tool_calls": 5},
@@ -186,7 +186,7 @@ class TestLoopDetector:
 
     def test_init_default(self, detector):
         """Test default initialization."""
-        assert detector.task_type == TaskType.DEFAULT
+        assert detector.task_type == LoopDetectorTaskType.DEFAULT
         assert detector.tool_calls == 0
         assert detector.iterations == 0
         assert detector.remaining_budget == 50
@@ -354,7 +354,7 @@ class TestGetMetrics:
 
     def test_returns_all_metrics(self):
         """Test returns all expected metrics."""
-        detector = LoopDetector(task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(task_type=LoopDetectorTaskType.ANALYSIS)
         detector.record_tool_call("read", {"path": "test.py"})
 
         metrics = detector.get_metrics()

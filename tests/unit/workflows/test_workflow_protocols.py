@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
 from victor.workflows.protocols import (
-    NodeStatus,
+    ProtocolNodeStatus,
     RetryPolicy,
     NodeResult,
     IWorkflowNode,
@@ -20,33 +20,33 @@ from victor.workflows.protocols import (
 )
 
 
-class TestNodeStatus:
-    """Tests for NodeStatus enum."""
+class TestProtocolNodeStatus:
+    """Tests for ProtocolNodeStatus enum."""
 
     def test_has_pending_status(self):
-        """NodeStatus should have PENDING state."""
-        assert NodeStatus.PENDING is not None
-        assert NodeStatus.PENDING.value == "pending"
+        """ProtocolNodeStatus should have PENDING state."""
+        assert ProtocolNodeStatus.PENDING is not None
+        assert ProtocolNodeStatus.PENDING.value == "pending"
 
     def test_has_running_status(self):
-        """NodeStatus should have RUNNING state."""
-        assert NodeStatus.RUNNING is not None
-        assert NodeStatus.RUNNING.value == "running"
+        """ProtocolNodeStatus should have RUNNING state."""
+        assert ProtocolNodeStatus.RUNNING is not None
+        assert ProtocolNodeStatus.RUNNING.value == "running"
 
     def test_has_completed_status(self):
-        """NodeStatus should have COMPLETED state."""
-        assert NodeStatus.COMPLETED is not None
-        assert NodeStatus.COMPLETED.value == "completed"
+        """ProtocolNodeStatus should have COMPLETED state."""
+        assert ProtocolNodeStatus.COMPLETED is not None
+        assert ProtocolNodeStatus.COMPLETED.value == "completed"
 
     def test_has_failed_status(self):
-        """NodeStatus should have FAILED state."""
-        assert NodeStatus.FAILED is not None
-        assert NodeStatus.FAILED.value == "failed"
+        """ProtocolNodeStatus should have FAILED state."""
+        assert ProtocolNodeStatus.FAILED is not None
+        assert ProtocolNodeStatus.FAILED.value == "failed"
 
     def test_has_skipped_status(self):
-        """NodeStatus should have SKIPPED state."""
-        assert NodeStatus.SKIPPED is not None
-        assert NodeStatus.SKIPPED.value == "skipped"
+        """ProtocolNodeStatus should have SKIPPED state."""
+        assert ProtocolNodeStatus.SKIPPED is not None
+        assert ProtocolNodeStatus.SKIPPED.value == "skipped"
 
 
 class TestRetryPolicy:
@@ -80,10 +80,10 @@ class TestNodeResult:
     def test_successful_result(self):
         """NodeResult should store successful execution data."""
         result = NodeResult(
-            status=NodeStatus.COMPLETED,
+            status=ProtocolNodeStatus.COMPLETED,
             output={"key": "value"},
         )
-        assert result.status == NodeStatus.COMPLETED
+        assert result.status == ProtocolNodeStatus.COMPLETED
         assert result.output == {"key": "value"}
         assert result.error is None
 
@@ -91,18 +91,18 @@ class TestNodeResult:
         """NodeResult should store failure information."""
         error = ValueError("Something went wrong")
         result = NodeResult(
-            status=NodeStatus.FAILED,
+            status=ProtocolNodeStatus.FAILED,
             output=None,
             error=error,
         )
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ProtocolNodeStatus.FAILED
         assert result.output is None
         assert result.error is error
 
     def test_result_with_metadata(self):
         """NodeResult should support metadata."""
         result = NodeResult(
-            status=NodeStatus.COMPLETED,
+            status=ProtocolNodeStatus.COMPLETED,
             output="result",
             metadata={"duration_ms": 150, "retries": 2},
         )
@@ -137,7 +137,7 @@ class TestIWorkflowNode:
             async def execute(
                 self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
             ) -> NodeResult:
-                return NodeResult(status=NodeStatus.COMPLETED, output=state)
+                return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=state)
 
         node = MockNode()
         assert isinstance(node, IWorkflowNode)

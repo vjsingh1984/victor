@@ -19,7 +19,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.workflows import (
-    NodeType,
+    WorkflowNodeType,
     WorkflowNode,
     AgentNode,
     ConditionNode,
@@ -32,7 +32,7 @@ from victor.workflows import (
     WorkflowMetadata,
     WorkflowRegistry,
     get_global_registry,
-    NodeStatus,
+    ExecutorNodeStatus,
     NodeResult,
     WorkflowContext,
     WorkflowResult,
@@ -40,17 +40,17 @@ from victor.workflows import (
 )
 
 
-class TestNodeType:
-    """Test NodeType enum."""
+class TestWorkflowNodeType:
+    """Test WorkflowNodeType enum."""
 
     def test_all_types_defined(self):
         """All expected node types are defined."""
-        assert NodeType.AGENT.value == "agent"
-        assert NodeType.CONDITION.value == "condition"
-        assert NodeType.PARALLEL.value == "parallel"
-        assert NodeType.TRANSFORM.value == "transform"
-        assert NodeType.START.value == "start"
-        assert NodeType.END.value == "end"
+        assert WorkflowNodeType.AGENT.value == "agent"
+        assert WorkflowNodeType.CONDITION.value == "condition"
+        assert WorkflowNodeType.PARALLEL.value == "parallel"
+        assert WorkflowNodeType.TRANSFORM.value == "transform"
+        assert WorkflowNodeType.START.value == "start"
+        assert WorkflowNodeType.END.value == "end"
 
 
 class TestAgentNode:
@@ -61,7 +61,7 @@ class TestAgentNode:
         node = AgentNode(id="test", name="Test Node")
         assert node.id == "test"
         assert node.name == "Test Node"
-        assert node.node_type == NodeType.AGENT
+        assert node.node_type == WorkflowNodeType.AGENT
         assert node.role == "executor"
         assert node.tool_budget == 15
 
@@ -105,7 +105,7 @@ class TestConditionNode:
         """Create node with minimal fields."""
         node = ConditionNode(id="decide", name="Decision")
         assert node.id == "decide"
-        assert node.node_type == NodeType.CONDITION
+        assert node.node_type == WorkflowNodeType.CONDITION
 
     def test_evaluate_condition(self):
         """Condition evaluation works."""
@@ -132,7 +132,7 @@ class TestParallelNode:
         """Create node with minimal fields."""
         node = ParallelNode(id="parallel", name="Parallel")
         assert node.id == "parallel"
-        assert node.node_type == NodeType.PARALLEL
+        assert node.node_type == WorkflowNodeType.PARALLEL
         assert node.join_strategy == "all"
 
     def test_with_parallel_nodes(self):
@@ -154,7 +154,7 @@ class TestTransformNode:
         """Create node with minimal fields."""
         node = TransformNode(id="transform", name="Transform")
         assert node.id == "transform"
-        assert node.node_type == NodeType.TRANSFORM
+        assert node.node_type == WorkflowNodeType.TRANSFORM
 
     def test_with_transform(self):
         """Transform function works."""
@@ -642,7 +642,7 @@ class TestNodeResult:
         """Create successful result."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Found 5 items",
             tool_calls_used=10,
         )
@@ -653,7 +653,7 @@ class TestNodeResult:
         """Create failed result."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.FAILED,
+            status=ExecutorNodeStatus.FAILED,
             error="Something went wrong",
         )
         assert result.success is False
@@ -663,7 +663,7 @@ class TestNodeResult:
         """to_dict serializes correctly."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Done",
         )
         d = result.to_dict()
@@ -693,7 +693,7 @@ class TestWorkflowContext:
         ctx = WorkflowContext()
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Done",
         )
         ctx.add_result(result)
@@ -702,18 +702,18 @@ class TestWorkflowContext:
     def test_has_failures(self):
         """has_failures detects failures."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED))
         assert ctx.has_failures() is False
 
-        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
+        ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
         assert ctx.has_failures() is True
 
     def test_get_outputs(self):
         """get_outputs returns successful outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="A output"))
-        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
-        ctx.add_result(NodeResult(node_id="c", status=NodeStatus.COMPLETED, output="C output"))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output"))
+        ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
+        ctx.add_result(NodeResult(node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output"))
 
         outputs = ctx.get_outputs()
         assert outputs == {"a": "A output", "c": "C output"}
@@ -725,7 +725,7 @@ class TestWorkflowResult:
     def test_success_result(self):
         """Create successful result."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Done"))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Done"))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1084,7 +1084,7 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         condition_result = result.context.get_result("decide")
-        assert condition_result.status == NodeStatus.FAILED
+        assert condition_result.status == ExecutorNodeStatus.FAILED
         assert "Condition evaluation failed" in condition_result.error
 
     @pytest.mark.asyncio
@@ -1139,7 +1139,7 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         transform_result = result.context.get_result("transform")
-        assert transform_result.status == NodeStatus.FAILED
+        assert transform_result.status == ExecutorNodeStatus.FAILED
         assert "Transform failed" in transform_result.error
 
     @pytest.mark.asyncio
@@ -1172,7 +1172,7 @@ class TestWorkflowExecutorExtended:
         # Parallel node executes child nodes and returns COMPLETED
         # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.COMPLETED
+        assert parallel_result.status == ExecutorNodeStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_parallel_node_any_strategy(
@@ -1205,7 +1205,7 @@ class TestWorkflowExecutorExtended:
         # Parallel node executes child nodes and returns COMPLETED
         # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.COMPLETED
+        assert parallel_result.status == ExecutorNodeStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_parallel_node_no_nodes(self, mock_orchestrator):
@@ -1228,7 +1228,7 @@ class TestWorkflowExecutorExtended:
         result = await executor.execute(workflow)
 
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == ExecutorNodeStatus.SKIPPED
 
     @pytest.mark.asyncio
     async def test_execute_unknown_node_type_skipped(self, mock_orchestrator):
@@ -1253,7 +1253,7 @@ class TestWorkflowExecutorExtended:
         result = await executor.execute(workflow)
 
         custom_result = result.context.get_result("custom")
-        assert custom_result.status == NodeStatus.SKIPPED
+        assert custom_result.status == ExecutorNodeStatus.SKIPPED
 
     @pytest.mark.asyncio
     async def test_execute_by_name_success(self, mock_orchestrator, mock_sub_agent_result):
@@ -1427,7 +1427,7 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         node_result = result.context.get_result("start")
-        assert node_result.status == NodeStatus.FAILED
+        assert node_result.status == ExecutorNodeStatus.FAILED
         assert "Unexpected error" in node_result.error
 
     @pytest.mark.asyncio
@@ -1514,7 +1514,7 @@ class TestNodeResultExtended:
         """Skipped status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.SKIPPED,
+            status=ExecutorNodeStatus.SKIPPED,
         )
         assert result.success is False
 
@@ -1522,7 +1522,7 @@ class TestNodeResultExtended:
         """Pending status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.PENDING,
+            status=ExecutorNodeStatus.PENDING,
         )
         assert result.success is False
 
@@ -1530,7 +1530,7 @@ class TestNodeResultExtended:
         """Running status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.RUNNING,
+            status=ExecutorNodeStatus.RUNNING,
         )
         assert result.success is False
 
@@ -1550,7 +1550,7 @@ class TestWorkflowResultExtended:
     def test_get_output_node_without_output(self):
         """get_output returns None for node without output."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="test", status=NodeStatus.COMPLETED))
+        ctx.add_result(NodeResult(node_id="test", status=ExecutorNodeStatus.COMPLETED))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1562,7 +1562,7 @@ class TestWorkflowResultExtended:
     def test_to_dict_includes_outputs(self):
         """to_dict includes node outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Output A"))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A"))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1580,7 +1580,7 @@ class TestModuleExports:
     def test_workflows_init_exports(self):
         """Workflows __init__ exports all expected symbols."""
         from victor.workflows import (
-            NodeType,
+            WorkflowNodeType,
             WorkflowNode,
             AgentNode,
             ConditionNode,
@@ -1589,7 +1589,7 @@ class TestModuleExports:
             WorkflowBuilder,
             workflow,
             WorkflowRegistry,
-            NodeStatus,
+            ExecutorNodeStatus,
             NodeResult,
             WorkflowContext,
             WorkflowResult,

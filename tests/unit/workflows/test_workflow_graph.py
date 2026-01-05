@@ -8,7 +8,7 @@ import pytest
 from typing import Any, Dict, Optional
 
 from victor.workflows.protocols import (
-    NodeStatus,
+    ProtocolNodeStatus,
     RetryPolicy,
     NodeResult,
     IWorkflowNode,
@@ -32,7 +32,7 @@ async def simple_handler(
     state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
 ) -> NodeResult:
     """A simple handler that passes through state."""
-    return NodeResult(status=NodeStatus.COMPLETED, output=state)
+    return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=state)
 
 
 async def increment_handler(
@@ -41,7 +41,7 @@ async def increment_handler(
     """Handler that increments a counter in state."""
     new_state = state.copy()
     new_state["counter"] = state.get("counter", 0) + 1
-    return NodeResult(status=NodeStatus.COMPLETED, output=new_state)
+    return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=new_state)
 
 
 async def failing_handler(
@@ -49,7 +49,7 @@ async def failing_handler(
 ) -> NodeResult:
     """Handler that always fails."""
     return NodeResult(
-        status=NodeStatus.FAILED,
+        status=ProtocolNodeStatus.FAILED,
         error=ValueError("Intentional failure"),
     )
 
@@ -99,7 +99,7 @@ class TestWorkflowNode:
             handler=increment_handler,
         )
         result = await node.execute({"counter": 5})
-        assert result.status == NodeStatus.COMPLETED
+        assert result.status == ProtocolNodeStatus.COMPLETED
         assert result.output["counter"] == 6
 
     def test_node_implements_protocol(self):

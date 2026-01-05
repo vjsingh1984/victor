@@ -285,7 +285,7 @@ class ToolDeduplicationTracker:
             formatted.append(f"{key}={repr(value)}")
         return ", ".join(formatted)
 
-    def get_recent_calls(self, limit: Optional[int] = None) -> List[ToolCall]:
+    def get_recent_calls(self, limit: Optional[int] = None) -> List[TrackedToolCall]:
         """Get recent tool calls.
 
         Args:

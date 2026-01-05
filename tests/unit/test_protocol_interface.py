@@ -17,18 +17,18 @@
 import pytest
 from datetime import datetime
 
-from victor.protocol.interface import (
+from victor.integrations.protocol.interface import (
     AgentMode,
     AgentStatus,
     ChatMessage,
     ChatResponse,
-    SearchResult,
-    StreamChunk,
+    ClientStreamChunk,
     ToolCall,
     ToolResult,
     UndoRedoResult,
     VictorProtocol,
 )
+from victor.integrations.search_types import CodeSearchResult
 
 
 # =============================================================================
@@ -373,12 +373,12 @@ class TestChatResponse:
 # =============================================================================
 
 
-class TestStreamChunk:
-    """Tests for StreamChunk dataclass."""
+class TestClientStreamChunk:
+    """Tests for ClientStreamChunk dataclass."""
 
     def test_creation_content_only(self):
         """Test stream chunk with content only."""
-        chunk = StreamChunk(content="Hello")
+        chunk = ClientStreamChunk(content="Hello")
         assert chunk.content == "Hello"
         assert chunk.tool_call is None
         assert chunk.finish_reason is None
@@ -386,18 +386,18 @@ class TestStreamChunk:
     def test_creation_with_tool_call(self):
         """Test stream chunk with tool call."""
         call = ToolCall("call_1", "search", {"q": "test"})
-        chunk = StreamChunk(content="", tool_call=call)
+        chunk = ClientStreamChunk(content="", tool_call=call)
         assert chunk.tool_call is not None
         assert chunk.tool_call.name == "search"
 
     def test_creation_with_finish_reason(self):
         """Test stream chunk with finish reason."""
-        chunk = StreamChunk(content="", finish_reason="stop")
+        chunk = ClientStreamChunk(content="", finish_reason="stop")
         assert chunk.finish_reason == "stop"
 
     def test_to_dict_simple(self):
         """Test to_dict with simple content."""
-        chunk = StreamChunk(content="Text")
+        chunk = ClientStreamChunk(content="Text")
         d = chunk.to_dict()
         assert d["content"] == "Text"
         assert d["tool_call"] is None
@@ -406,7 +406,7 @@ class TestStreamChunk:
     def test_to_dict_with_tool_call(self):
         """Test to_dict with tool call."""
         call = ToolCall("c1", "run", {"cmd": "ls"})
-        chunk = StreamChunk(content="", tool_call=call)
+        chunk = ClientStreamChunk(content="", tool_call=call)
         d = chunk.to_dict()
         assert d["tool_call"] is not None
         assert d["tool_call"]["name"] == "run"
@@ -417,12 +417,12 @@ class TestStreamChunk:
 # =============================================================================
 
 
-class TestSearchResult:
-    """Tests for SearchResult dataclass."""
+class TestCodeSearchResult:
+    """Tests for CodeSearchResult dataclass."""
 
     def test_creation_minimal(self):
         """Test minimal search result creation."""
-        result = SearchResult(
+        result = CodeSearchResult(
             file="test.py",
             line=42,
             content="def test_func():",
@@ -435,7 +435,7 @@ class TestSearchResult:
 
     def test_creation_with_context(self):
         """Test search result with context."""
-        result = SearchResult(
+        result = CodeSearchResult(
             file="module.py",
             line=10,
             content="class MyClass:",
@@ -446,7 +446,7 @@ class TestSearchResult:
 
     def test_to_dict(self):
         """Test to_dict serialization."""
-        result = SearchResult(
+        result = CodeSearchResult(
             file="file.py",
             line=5,
             content="x = 1",
@@ -468,7 +468,7 @@ class TestSearchResult:
             "score": 0.75,
             "context": "context lines",
         }
-        result = SearchResult.from_dict(data)
+        result = CodeSearchResult.from_dict(data)
         assert result.file == "main.py"
         assert result.line == 100
         assert result.context == "context lines"
@@ -481,7 +481,7 @@ class TestSearchResult:
             "content": "import os",
             "score": 0.5,
         }
-        result = SearchResult.from_dict(data)
+        result = CodeSearchResult.from_dict(data)
         assert result.context == ""
 
 
@@ -579,7 +579,7 @@ class ConcreteProtocol(VictorProtocol):
         return ChatResponse(content="Test response")
 
     async def stream_chat(self, messages):
-        yield StreamChunk(content="Test")
+        yield ClientStreamChunk(content="Test")
 
     async def reset_conversation(self):
         pass

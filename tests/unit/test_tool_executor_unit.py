@@ -883,7 +883,7 @@ class TestToolExecutorValidateArguments:
     @pytest.fixture
     def mock_tool_with_validation(self):
         """Create a mock tool that can return validation results."""
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_tool"
@@ -896,7 +896,7 @@ class TestToolExecutorValidateArguments:
                 "arg": {"type": "string"},
             },
         }
-        return mock_tool, ValidationResult
+        return mock_tool, ToolValidationResult
 
     def test_validate_arguments_off_mode(self, mock_tool_with_validation):
         """Test that validation is skipped in OFF mode."""
@@ -918,10 +918,10 @@ class TestToolExecutorValidateArguments:
     def test_validate_arguments_strict_mode_invalid(self, mock_tool_with_validation):
         """Test that STRICT mode blocks execution on invalid arguments."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ValidationResult.failure(
+        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
             ["Missing required parameter: path", "Invalid type for: count", "Extra error"]
         )
 
@@ -941,10 +941,10 @@ class TestToolExecutorValidateArguments:
     def test_validate_arguments_lenient_mode_invalid(self, mock_tool_with_validation):
         """Test that LENIENT mode proceeds despite invalid arguments."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ValidationResult.failure(
+        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
             ["Missing required parameter"]
         )
 
@@ -964,10 +964,10 @@ class TestToolExecutorValidateArguments:
     def test_validate_arguments_valid(self, mock_tool_with_validation):
         """Test validation with valid arguments."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool, _ = mock_tool_with_validation
-        mock_tool.validate_parameters_detailed.return_value = ValidationResult.success()
+        mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.success()
 
         registry = ToolRegistry()
         executor = ToolExecutor(
@@ -1024,7 +1024,7 @@ class TestToolExecutorValidateArguments:
     async def test_strict_validation_blocks_execution(self):
         """Test that STRICT validation failures block execution."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         registry = ToolRegistry()
 
@@ -1032,7 +1032,7 @@ class TestToolExecutorValidateArguments:
         mock_tool.name = "validated_tool"
         mock_tool.execute = AsyncMock(return_value="should not be called")
         mock_tool.validate_parameters_detailed = MagicMock(
-            return_value=ValidationResult.failure(["path is required"])
+            return_value=ToolValidationResult.failure(["path is required"])
         )
         registry.register(mock_tool)
 
@@ -1105,10 +1105,10 @@ class TestToolExecutorUnknownArguments:
     def test_validate_arguments_rejects_unknown_in_strict_mode(self, mock_tool_with_schema):
         """Test that STRICT mode rejects unknown arguments with helpful error."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool_with_schema.validate_parameters_detailed = MagicMock(
-            return_value=ValidationResult.success()
+            return_value=ToolValidationResult.success()
         )
 
         registry = ToolRegistry()
@@ -1131,10 +1131,10 @@ class TestToolExecutorUnknownArguments:
     def test_validate_arguments_warns_unknown_in_lenient_mode(self, mock_tool_with_schema):
         """Test that LENIENT mode warns but proceeds with unknown arguments."""
         from victor.agent.tool_executor import ValidationMode
-        from victor.tools.base import ValidationResult
+        from victor.tools.base import ToolValidationResult
 
         mock_tool_with_schema.validate_parameters_detailed = MagicMock(
-            return_value=ValidationResult.success()
+            return_value=ToolValidationResult.success()
         )
 
         registry = ToolRegistry()

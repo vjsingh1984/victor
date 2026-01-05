@@ -22,7 +22,7 @@ from victor.storage.unified.protocol import (
     UnifiedEdge,
     SearchMode,
     SearchParams,
-    SearchResult,
+    UnifiedSearchResult,
 )
 
 
@@ -229,8 +229,8 @@ class TestSearchParams:
         assert params.max_depth == 2
 
 
-class TestSearchResult:
-    """Tests for SearchResult dataclass."""
+class TestUnifiedSearchResult:
+    """Tests for UnifiedSearchResult dataclass."""
 
     def test_create_result(self):
         """Test creating a search result."""
@@ -240,7 +240,7 @@ class TestSearchResult:
             type="function",
             file_path="file.py",
         )
-        result = SearchResult(
+        result = UnifiedSearchResult(
             symbol=symbol,
             score=0.85,
             match_type="hybrid",

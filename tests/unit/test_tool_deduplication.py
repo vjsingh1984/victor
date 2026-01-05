@@ -4,7 +4,7 @@ import pytest
 import time
 
 from victor.agent.tool_deduplication import (
-    ToolCall,
+    TrackedToolCall,
     ToolDeduplicationTracker,
     get_deduplication_tracker,
     is_redundant_call,
@@ -12,12 +12,12 @@ from victor.agent.tool_deduplication import (
 )
 
 
-class TestToolCall:
-    """Test ToolCall dataclass."""
+class TestTrackedToolCall:
+    """Test TrackedToolCall dataclass."""
 
     def test_initialization(self):
-        """Test ToolCall initialization."""
-        call = ToolCall(tool_name="read_file", args={"path": "foo.py"})
+        """Test TrackedToolCall initialization."""
+        call = TrackedToolCall(tool_name="read_file", args={"path": "foo.py"})
 
         assert call.tool_name == "read_file"
         assert call.args == {"path": "foo.py"}
@@ -26,9 +26,9 @@ class TestToolCall:
 
     def test_timestamp_auto_generated(self):
         """Test that timestamp is auto-generated."""
-        call1 = ToolCall(tool_name="test", args={})
+        call1 = TrackedToolCall(tool_name="test", args={})
         time.sleep(0.01)
-        call2 = ToolCall(tool_name="test", args={})
+        call2 = TrackedToolCall(tool_name="test", args={})
 
         assert call2.timestamp > call1.timestamp
 

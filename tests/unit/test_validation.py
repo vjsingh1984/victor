@@ -34,7 +34,7 @@ from victor.core.validation import (
     ResilienceConfigSchema,
     ToolConfigSchema,
     ValidationIssue,
-    ValidationResult,
+    ConfigValidationResult,
     ValidationSeverity,
     validate_agent_config,
     validate_model_config,
@@ -43,23 +43,23 @@ from victor.core.validation import (
 
 
 # =============================================================================
-# ValidationResult Tests
+# ConfigValidationResult Tests
 # =============================================================================
 
 
-class TestValidationResult:
-    """Tests for ValidationResult."""
+class TestConfigValidationResult:
+    """Tests for ConfigValidationResult."""
 
     def test_empty_result_is_valid(self):
         """Empty result should be valid."""
-        result = ValidationResult()
+        result = ConfigValidationResult()
         assert result.is_valid is True
         assert len(result.errors) == 0
         assert len(result.warnings) == 0
 
     def test_result_with_error_is_invalid(self):
         """Result with error should be invalid."""
-        result = ValidationResult()
+        result = ConfigValidationResult()
         result.add_error("field", "Something went wrong")
 
         assert result.is_valid is False
@@ -68,7 +68,7 @@ class TestValidationResult:
 
     def test_result_with_only_warnings_is_valid(self):
         """Result with only warnings should still be valid."""
-        result = ValidationResult()
+        result = ConfigValidationResult()
         result.add_warning("field", "Consider changing this")
 
         assert result.is_valid is True
@@ -76,10 +76,10 @@ class TestValidationResult:
 
     def test_merge_results(self):
         """Test merging results."""
-        result1 = ValidationResult()
+        result1 = ConfigValidationResult()
         result1.add_error("field1", "Error 1")
 
-        result2 = ValidationResult()
+        result2 = ConfigValidationResult()
         result2.add_error("field2", "Error 2")
         result2.add_warning("field3", "Warning")
 
@@ -90,7 +90,7 @@ class TestValidationResult:
 
     def test_to_dict(self):
         """Test conversion to dictionary."""
-        result = ValidationResult()
+        result = ConfigValidationResult()
         result.add_error("field", "Error", code="E001")
 
         data = result.to_dict()

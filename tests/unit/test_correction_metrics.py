@@ -6,7 +6,7 @@ from datetime import datetime
 
 from victor.evaluation.correction import (
     Language,
-    ValidationResult,
+    CodeValidationResult,
 )
 from victor.evaluation.correction.metrics import (
     CorrectionAttempt,
@@ -39,7 +39,7 @@ class TestCorrectionMetrics:
         """Test recording a Python validation."""
         metrics = CorrectionMetrics()
 
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -59,7 +59,7 @@ class TestCorrectionMetrics:
         """Test recording validation with syntax and import errors."""
         metrics = CorrectionMetrics()
 
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,
@@ -79,7 +79,7 @@ class TestCorrectionMetrics:
         """Test recording a successful correction."""
         metrics = CorrectionMetrics()
 
-        validation_before = ValidationResult(
+        validation_before = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,
@@ -87,7 +87,7 @@ class TestCorrectionMetrics:
             errors=("SyntaxError",),
             warnings=(),
         )
-        validation_after = ValidationResult(
+        validation_after = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -127,7 +127,7 @@ class TestCorrectionMetrics:
         """Test recording a failed correction."""
         metrics = CorrectionMetrics()
 
-        validation = ValidationResult(
+        validation = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,
@@ -194,7 +194,7 @@ class TestCorrectionMetrics:
         """Test timing metrics calculation."""
         metrics = CorrectionMetrics()
 
-        validation = ValidationResult(
+        validation = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -283,7 +283,7 @@ class TestCorrectionMetricsCollector:
         """Test recording validation through collector."""
         collector = CorrectionMetricsCollector()
 
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -300,7 +300,7 @@ class TestCorrectionMetricsCollector:
         """Test tracking correction with context manager."""
         collector = CorrectionMetricsCollector()
 
-        validation_before = ValidationResult(
+        validation_before = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,
@@ -308,7 +308,7 @@ class TestCorrectionMetricsCollector:
             errors=("SyntaxError",),
             warnings=(),
         )
-        validation_after = ValidationResult(
+        validation_after = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -338,7 +338,7 @@ class TestCorrectionMetricsCollector:
         """Test collector in memory-efficient mode (keep_attempts=False)."""
         collector = CorrectionMetricsCollector(keep_attempts=False)
 
-        validation = ValidationResult(
+        validation = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -367,7 +367,7 @@ class TestCorrectionTracker:
         """Test that duration is tracked correctly."""
         collector = CorrectionMetricsCollector()
 
-        validation = ValidationResult(
+        validation = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -394,7 +394,7 @@ class TestCorrectionTracker:
         """Test tracking of test pass/fail metrics."""
         collector = CorrectionMetricsCollector()
 
-        validation = ValidationResult(
+        validation = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -451,7 +451,7 @@ class TestMultiLanguageMetrics:
         """Test validation metrics across multiple languages."""
         metrics = CorrectionMetrics()
 
-        python_result = ValidationResult(
+        python_result = CodeValidationResult(
             valid=True,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -460,7 +460,7 @@ class TestMultiLanguageMetrics:
             warnings=(),
         )
 
-        js_result = ValidationResult(
+        js_result = CodeValidationResult(
             valid=False,
             language=Language.JAVASCRIPT,
             syntax_valid=False,
@@ -469,7 +469,7 @@ class TestMultiLanguageMetrics:
             warnings=(),
         )
 
-        rust_result = ValidationResult(
+        rust_result = CodeValidationResult(
             valid=True,
             language=Language.RUST,
             syntax_valid=True,

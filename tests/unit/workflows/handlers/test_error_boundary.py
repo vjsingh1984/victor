@@ -116,7 +116,7 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_success(self):
         """Should return handler result on success."""
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         node = MockComputeNode(id="test_node")
         context = MockContext({"input": "value"})
@@ -125,7 +125,7 @@ class TestHandlerErrorBoundary:
         async def success_handler(n, ctx, reg):
             return NodeResult(
                 node_id=n.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="success",
             )
 
@@ -138,13 +138,13 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.COMPLETED
+        assert result.status == ExecutorNodeStatus.COMPLETED
         assert result.output == "success"
 
     @pytest.mark.asyncio
     async def test_execute_timeout_error(self):
         """Should handle asyncio.TimeoutError."""
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         node = MockComputeNode(id="timeout_node")
         context = MockContext()
@@ -162,14 +162,14 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "timeout_handler" in result.error
         assert "timed out" in result.error.lower() or "timeout" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_execute_value_error(self):
         """Should handle ValueError as validation error."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="validation_node")
         context = MockContext()
@@ -187,13 +187,13 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "Invalid parameter" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_key_error(self):
         """Should handle KeyError as missing_key error."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="key_node")
         context = MockContext()
@@ -211,13 +211,13 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "key_handler" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_type_error(self):
         """Should handle TypeError."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="type_node")
         context = MockContext()
@@ -235,13 +235,13 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "Wrong type" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_generic_exception(self):
         """Should handle generic exceptions."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="generic_node")
         context = MockContext()
@@ -259,13 +259,13 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "Something went wrong" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_preserves_context(self):
         """Should snapshot context when preserve_context=True."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="context_node")
         context = MockContext({"input": "value", "number": 42})
@@ -285,12 +285,12 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_execute_no_context_preservation(self):
         """Should not snapshot when preserve_context=False."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="no_context_node")
         context = MockContext({"input": "value"})
@@ -308,12 +308,12 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_execute_duration_tracked(self):
         """Should track execution duration."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="duration_node")
         context = MockContext()
@@ -332,7 +332,7 @@ class TestHandlerErrorBoundary:
             tool_registry=registry,
         )
 
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert result.duration_seconds >= 0.01
 
 
@@ -342,13 +342,13 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_wraps_handler(self):
         """Decorator should wrap handler with error boundary."""
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         @with_error_boundary("decorated_handler")
         async def my_handler(node, context, tool_registry):
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output="decorated",
             )
 
@@ -357,13 +357,13 @@ class TestWithErrorBoundaryDecorator:
         registry = MagicMock()
 
         result = await my_handler(node, context, registry)
-        assert result.status == NodeStatus.COMPLETED
+        assert result.status == ExecutorNodeStatus.COMPLETED
         assert result.output == "decorated"
 
     @pytest.mark.asyncio
     async def test_decorator_catches_errors(self):
         """Decorator should catch and wrap errors."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         @with_error_boundary("failing_handler")
         async def failing_handler(node, context, tool_registry):
@@ -374,7 +374,7 @@ class TestWithErrorBoundaryDecorator:
         registry = MagicMock()
 
         result = await failing_handler(node, context, registry)
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED
         assert "failing_handler" in result.error
         assert "Decorated handler failed" in result.error
 
@@ -391,7 +391,7 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_timeout_handling(self):
         """Decorator should handle timeout errors."""
-        from victor.workflows.executor import NodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         @with_error_boundary("timeout_decorated")
         async def timeout_handler(node, context, tool_registry):
@@ -402,4 +402,4 @@ class TestWithErrorBoundaryDecorator:
         registry = MagicMock()
 
         result = await timeout_handler(node, context, registry)
-        assert result.status == NodeStatus.FAILED
+        assert result.status == ExecutorNodeStatus.FAILED

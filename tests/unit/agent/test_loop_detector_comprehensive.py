@@ -47,10 +47,10 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.agent.loop_detector import (
-    TaskType,
+    LoopDetectorTaskType,
     FileReadRange,
     ProgressConfig,
-    StopReason,
+    LoopStopRecommendation,
     LoopDetector,
     RESEARCH_TOOLS,
     DEFAULT_READ_LIMIT,
@@ -192,22 +192,22 @@ class TestLoopDetectorInitializationComprehensive:
             signature_history_size=15,
             max_total_iterations=100,
         )
-        detector = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         assert detector.config.tool_budget == 100
         assert detector.config.max_iterations_analysis == 60
-        assert detector.task_type == TaskType.ANALYSIS
+        assert detector.task_type == LoopDetectorTaskType.ANALYSIS
         assert detector.remaining_budget == 100
 
     def test_init_with_research_task_type(self):
         """Test initialization with RESEARCH task type."""
-        detector = LoopDetector(task_type=TaskType.RESEARCH)
-        assert detector.task_type == TaskType.RESEARCH
+        detector = LoopDetector(task_type=LoopDetectorTaskType.RESEARCH)
+        assert detector.task_type == LoopDetectorTaskType.RESEARCH
 
     def test_init_with_action_task_type(self):
         """Test initialization with ACTION task type."""
-        detector = LoopDetector(task_type=TaskType.ACTION)
-        assert detector.task_type == TaskType.ACTION
+        detector = LoopDetector(task_type=LoopDetectorTaskType.ACTION)
+        assert detector.task_type == LoopDetectorTaskType.ACTION
 
     def test_reset_clears_all_state(self):
         """Test reset clears all internal state completely."""
@@ -616,7 +616,7 @@ class TestForceStopAndShouldStop:
     def test_should_stop_on_research_loop(self):
         """Test should_stop on research loop detection."""
         config = ProgressConfig(max_iterations_research=3)
-        detector = LoopDetector(config=config, task_type=TaskType.RESEARCH)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.RESEARCH)
 
         for _ in range(4):
             detector.record_tool_call("web_search", {"query": f"query_{_}"})
@@ -647,7 +647,7 @@ class TestGetMetrics:
 
     def test_get_metrics_returns_all_expected_fields(self):
         """Test get_metrics returns all expected fields."""
-        detector = LoopDetector(task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(task_type=LoopDetectorTaskType.ANALYSIS)
         detector.record_tool_call("read", {"path": "file1.py"})
         detector.record_tool_call("read", {"path": "file2.py"})
         detector.record_iteration(500)
@@ -856,7 +856,7 @@ class TestCheckLoop:
             repeat_threshold_analysis=5,
             max_overlapping_reads_per_file=10,  # High limit to test signature threshold
         )
-        detector = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         # 4 repeats - below analysis signature threshold of 5
         # Use non-file tool to avoid file read loop detection
@@ -870,7 +870,7 @@ class TestCheckLoop:
     def test_check_loop_with_action_task_type(self):
         """Test _check_loop uses action threshold for ACTION task type."""
         config = ProgressConfig(repeat_threshold_action=4)
-        detector = LoopDetector(config=config, task_type=TaskType.ACTION)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ACTION)
 
         for _ in range(5):
             detector.record_tool_call("write", {"path": "same.py", "content": "test"})
@@ -938,7 +938,7 @@ class TestCheckLoopWarning:
     def test_check_loop_warning_with_analysis_task_type(self):
         """Test check_loop_warning uses correct threshold for task type."""
         config = ProgressConfig(repeat_threshold_analysis=6)
-        detector = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         for _ in range(5):  # threshold - 1 = 5
             detector.record_tool_call("read", {"path": "same.py"})
@@ -1083,25 +1083,25 @@ class TestGetMaxIterations:
     def test_max_iterations_default(self):
         """Test max iterations for DEFAULT task type."""
         config = ProgressConfig(max_iterations_default=8)
-        detector = LoopDetector(config=config, task_type=TaskType.DEFAULT)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.DEFAULT)
         assert detector._get_max_iterations() == 8
 
     def test_max_iterations_analysis(self):
         """Test max iterations for ANALYSIS task type."""
         config = ProgressConfig(max_iterations_analysis=50)
-        detector = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
         assert detector._get_max_iterations() == 50
 
     def test_max_iterations_action(self):
         """Test max iterations for ACTION task type."""
         config = ProgressConfig(max_iterations_action=12)
-        detector = LoopDetector(config=config, task_type=TaskType.ACTION)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ACTION)
         assert detector._get_max_iterations() == 12
 
     def test_max_iterations_research(self):
         """Test max iterations for RESEARCH task type."""
         config = ProgressConfig(max_iterations_research=6)
-        detector = LoopDetector(config=config, task_type=TaskType.RESEARCH)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.RESEARCH)
         assert detector._get_max_iterations() == 6
 
 
@@ -1116,7 +1116,7 @@ class TestGetBaseDetails:
     def test_get_base_details_returns_all_fields(self):
         """Test _get_base_details returns all expected fields."""
         config = ProgressConfig(tool_budget=50)
-        detector = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
         detector.record_tool_call("read", {"path": "test.py"})
         detector.record_iteration(500)
 
@@ -1283,7 +1283,7 @@ class TestFactoryFunctions:
         tracker, hint = create_tracker_from_classification(mock_classification)
 
         assert tracker.config.tool_budget == 15
-        assert tracker.task_type == TaskType.DEFAULT
+        assert tracker.task_type == LoopDetectorTaskType.DEFAULT
 
     def test_create_tracker_from_classification_complex(self):
         """Test create_tracker_from_classification with COMPLEX complexity."""
@@ -1296,7 +1296,7 @@ class TestFactoryFunctions:
         tracker, hint = create_tracker_from_classification(mock_classification)
 
         assert tracker.config.tool_budget == 25
-        assert tracker.task_type == TaskType.ANALYSIS
+        assert tracker.task_type == LoopDetectorTaskType.ANALYSIS
 
     def test_create_tracker_from_classification_generation(self):
         """Test create_tracker_from_classification with GENERATION complexity."""
@@ -1309,7 +1309,7 @@ class TestFactoryFunctions:
         tracker, hint = create_tracker_from_classification(mock_classification)
 
         assert tracker.config.tool_budget == 20
-        assert tracker.task_type == TaskType.ACTION
+        assert tracker.task_type == LoopDetectorTaskType.ACTION
 
     def test_create_tracker_from_classification_with_base_config(self):
         """Test create_tracker_from_classification with base config."""
@@ -1398,7 +1398,7 @@ class TestLoopDetectorIntegration:
 
     def test_typical_analysis_workflow(self):
         """Test typical analysis workflow with file reads and searches."""
-        detector = LoopDetector(task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(task_type=LoopDetectorTaskType.ANALYSIS)
 
         # Simulate reading multiple files
         detector.record_tool_call("read", {"path": "src/main.py"})

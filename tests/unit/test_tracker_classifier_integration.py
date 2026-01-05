@@ -23,7 +23,7 @@ Tests cover:
 
 from victor.agent.unified_task_tracker import (
     UnifiedTaskTracker,
-    TaskType,
+    TrackerTaskType,
     create_tracker_with_negation_awareness,
 )
 
@@ -37,7 +37,7 @@ class TestNegationAwareDetection:
         task_type, result = tracker.detect_task_type_with_negation(
             "Analyze the codebase for security issues"
         )
-        assert task_type == TaskType.ANALYZE
+        assert task_type == TrackerTaskType.ANALYZE
         assert result.is_analysis_task is True
 
     def test_negated_analysis_not_detected_as_analysis(self):
@@ -48,7 +48,7 @@ class TestNegationAwareDetection:
         )
         # Should NOT be ANALYZE since "analyze" is negated
         # "run" is not negated, so should detect as action-related
-        assert task_type != TaskType.ANALYZE
+        assert task_type != TrackerTaskType.ANALYZE
         assert "analyze" in [m.keyword for m in result.negated_keywords]
 
     def test_positive_override_run_after_negated_analyze(self):
@@ -71,7 +71,7 @@ class TestNegationAwareDetection:
         task_type, result = tracker.detect_task_type_with_negation(
             "Refactor the authentication module"
         )
-        assert task_type == TaskType.EDIT
+        assert task_type == TrackerTaskType.EDIT
         assert "refactor" in [m.keyword for m in result.matched_keywords]
 
     def test_search_task_detected(self):
@@ -80,7 +80,7 @@ class TestNegationAwareDetection:
         task_type, result = tracker.detect_task_type_with_negation(
             "Find all usages of the deprecated function"
         )
-        assert task_type == TaskType.SEARCH
+        assert task_type == TrackerTaskType.SEARCH
         assert "find" in [m.keyword for m in result.matched_keywords]
 
     def test_generation_task_maps_to_create(self):
@@ -89,7 +89,7 @@ class TestNegationAwareDetection:
         task_type, result = tracker.detect_task_type_with_negation(
             "Generate a function to validate emails"
         )
-        assert task_type == TaskType.CREATE
+        assert task_type == TrackerTaskType.CREATE
         assert result.is_generation_task is True
 
     def test_budget_set_from_classification(self):
@@ -178,8 +178,8 @@ class TestFactoryFunction:
         )
 
         assert isinstance(tracker, UnifiedTaskTracker)
-        assert task_type == TaskType.ANALYZE
-        assert tracker.task_type == TaskType.ANALYZE
+        assert task_type == TrackerTaskType.ANALYZE
+        assert tracker.task_type == TrackerTaskType.ANALYZE
 
     def test_factory_with_negated_message(self):
         """Test factory handles negated keywords correctly."""
@@ -188,7 +188,7 @@ class TestFactoryFunction:
         )
 
         assert "analyze" in details["negated_keywords"]
-        assert task_type != TaskType.ANALYZE
+        assert task_type != TrackerTaskType.ANALYZE
 
     def test_factory_with_history(self):
         """Test factory accepts history parameter."""
@@ -216,7 +216,7 @@ class TestEdgeCases:
         task_type, result = tracker.detect_task_type_with_negation("")
 
         # Should default gracefully
-        assert task_type == TaskType.GENERAL
+        assert task_type == TrackerTaskType.GENERAL
         assert result.confidence < 0.5
 
     def test_multiple_task_types_in_message(self):
@@ -238,4 +238,4 @@ class TestEdgeCases:
         )
 
         # Should have low confidence or default type
-        assert task_type == TaskType.GENERAL or result.confidence < 0.5
+        assert task_type == TrackerTaskType.GENERAL or result.confidence < 0.5

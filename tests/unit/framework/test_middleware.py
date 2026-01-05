@@ -34,7 +34,7 @@ from victor.framework.middleware import (
     SecretMaskingMiddleware,
     ToolMetrics,
     ValidationIssue,
-    ValidationResult,
+    ContentValidationResult,
     ValidationSeverity,
     ValidatorProtocol,
 )
@@ -506,15 +506,15 @@ class TestGitSafetyMiddleware:
 class SimpleJsonValidator:
     """Simple JSON validator for testing."""
 
-    def validate(self, content: str, context=None) -> ValidationResult:
+    def validate(self, content: str, context=None) -> ContentValidationResult:
         """Validate JSON content."""
         import json
 
         try:
             json.loads(content)
-            return ValidationResult(is_valid=True)
+            return ContentValidationResult(is_valid=True)
         except json.JSONDecodeError as e:
-            return ValidationResult(
+            return ContentValidationResult(
                 is_valid=False,
                 issues=[
                     ValidationIssue(
@@ -529,10 +529,10 @@ class SimpleJsonValidator:
 class FixableValidator:
     """Validator that can auto-fix issues for testing."""
 
-    def validate(self, content: str, context=None) -> ValidationResult:
+    def validate(self, content: str, context=None) -> ContentValidationResult:
         """Validate content - fails if 'BAD' is in content."""
         if "BAD" in content:
-            return ValidationResult(
+            return ContentValidationResult(
                 is_valid=False,
                 issues=[
                     ValidationIssue(
@@ -541,7 +541,7 @@ class FixableValidator:
                     )
                 ],
             )
-        return ValidationResult(is_valid=True)
+        return ContentValidationResult(is_valid=True)
 
     def fix(self, content: str, issues, context=None) -> str:
         """Fix issues by replacing BAD with GOOD."""
@@ -699,7 +699,7 @@ class TestOutputValidationMiddleware:
 
         class InfiniteFixValidator:
             def validate(self, content, context=None):
-                return ValidationResult(
+                return ContentValidationResult(
                     is_valid=False,
                     issues=[ValidationIssue(message="Always fails")],
                 )
@@ -764,16 +764,16 @@ class TestValidationTypes:
     """Tests for validation type dataclasses."""
 
     def test_validation_result_defaults(self):
-        """ValidationResult should have sensible defaults."""
-        result = ValidationResult()
+        """ContentValidationResult should have sensible defaults."""
+        result = ContentValidationResult()
         assert result.is_valid is True
         assert result.issues == []
         assert result.fixed_content is None
         assert result.metadata == {}
 
     def test_validation_result_error_count(self):
-        """ValidationResult.error_count should count errors and criticals."""
-        result = ValidationResult(
+        """ContentValidationResult.error_count should count errors and criticals."""
+        result = ContentValidationResult(
             is_valid=False,
             issues=[
                 ValidationIssue(message="Error 1", severity=ValidationSeverity.ERROR),
@@ -786,11 +786,11 @@ class TestValidationTypes:
         assert result.warning_count == 1
 
     def test_validation_result_has_fix(self):
-        """ValidationResult.has_fix should check for fixed_content."""
-        result1 = ValidationResult()
+        """ContentValidationResult.has_fix should check for fixed_content."""
+        result1 = ContentValidationResult()
         assert result1.has_fix is False
 
-        result2 = ValidationResult(fixed_content="fixed")
+        result2 = ContentValidationResult(fixed_content="fixed")
         assert result2.has_fix is True
 
     def test_validation_issue_defaults(self):

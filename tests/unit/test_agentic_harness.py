@@ -31,18 +31,18 @@ from victor.evaluation.agentic_harness import (
     FileEditValidator,
     PatchApplicationValidator,
     TestPassingValidator,
-    ToolCall,
+    EvalToolCall,
     ToolUsageValidator,
 )
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, TaskStatus
 
 
-class TestToolCall:
-    """Tests for ToolCall dataclass."""
+class TestEvalToolCall:
+    """Tests for EvalToolCall dataclass."""
 
     def test_default_values(self):
-        """Test ToolCall with default values."""
-        call = ToolCall(name="file_read", arguments={"path": "/test.py"})
+        """Test EvalToolCall with default values."""
+        call = EvalToolCall(name="file_read", arguments={"path": "/test.py"})
         assert call.name == "file_read"
         assert call.arguments == {"path": "/test.py"}
         assert call.result is None
@@ -50,8 +50,8 @@ class TestToolCall:
         assert call.timestamp == 0.0
 
     def test_with_result(self):
-        """Test ToolCall with result."""
-        call = ToolCall(
+        """Test EvalToolCall with result."""
+        call = EvalToolCall(
             name="file_write",
             arguments={"path": "/test.py", "content": "print('hello')"},
             result="File written successfully",
@@ -63,8 +63,8 @@ class TestToolCall:
         assert call.success is True
 
     def test_failed_call(self):
-        """Test failed ToolCall."""
-        call = ToolCall(
+        """Test failed EvalToolCall."""
+        call = EvalToolCall(
             name="file_read",
             arguments={"path": "/nonexistent.py"},
             result="File not found",
@@ -138,8 +138,8 @@ class TestAgenticExecutionTrace:
     def test_with_tool_calls(self):
         """Test trace with tool calls."""
         calls = [
-            ToolCall(name="file_read", arguments={"path": "a.py"}),
-            ToolCall(name="file_write", arguments={"path": "b.py"}),
+            EvalToolCall(name="file_read", arguments={"path": "a.py"}),
+            EvalToolCall(name="file_write", arguments={"path": "b.py"}),
         ]
         trace = AgenticExecutionTrace(task_id="test-001", start_time=0.0, tool_calls=calls)
         assert len(trace.tool_calls) == 2
@@ -165,7 +165,7 @@ class TestAgenticExecutionTrace:
     def test_to_dict(self):
         """Test to_dict serialization method."""
         calls = [
-            ToolCall(name="file_read", arguments={"path": "a.py"}, result="content", success=True),
+            EvalToolCall(name="file_read", arguments={"path": "a.py"}, result="content", success=True),
         ]
         edits = [
             FileEdit(path="a.py", action="modify", before_content="old", after_content="new"),
@@ -423,8 +423,8 @@ class TestToolUsageValidator:
                 task_id="test-001",
                 start_time=0.0,
                 tool_calls=[
-                    ToolCall(name="file_write", arguments={"path": "test.py"}, success=True),
-                    ToolCall(name="edit_file", arguments={"path": "test.py"}, success=True),
+                    EvalToolCall(name="file_write", arguments={"path": "test.py"}, success=True),
+                    EvalToolCall(name="edit_file", arguments={"path": "test.py"}, success=True),
                 ],
             )
             task = BenchmarkTask(
@@ -475,8 +475,8 @@ class TestToolUsageValidator:
                 task_id="test-001",
                 start_time=0.0,
                 tool_calls=[
-                    ToolCall(name="code_search", arguments={"query": "func"}, success=True),
-                    ToolCall(name="grep", arguments={"pattern": "def"}, success=True),
+                    EvalToolCall(name="code_search", arguments={"query": "func"}, success=True),
+                    EvalToolCall(name="grep", arguments={"pattern": "def"}, success=True),
                 ],
             )
             task = BenchmarkTask(

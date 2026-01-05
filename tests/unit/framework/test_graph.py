@@ -28,10 +28,10 @@ from victor.framework.graph import (
     Node,
     Edge,
     EdgeType,
-    NodeStatus,
+    FrameworkNodeStatus,
     ExecutionResult,
     GraphConfig,
-    Checkpoint,
+    WorkflowCheckpoint,
     CheckpointerProtocol,
     MemoryCheckpointer,
     RLCheckpointerAdapter,
@@ -198,16 +198,16 @@ class TestEdge:
 
 
 # =============================================================================
-# Checkpoint Tests
+# WorkflowCheckpoint Tests
 # =============================================================================
 
 
 class TestCheckpoint:
-    """Tests for Checkpoint class."""
+    """Tests for WorkflowCheckpoint class."""
 
     def test_checkpoint_creation(self):
-        """Checkpoint should store all fields."""
-        checkpoint = Checkpoint(
+        """WorkflowCheckpoint should store all fields."""
+        checkpoint = WorkflowCheckpoint(
             checkpoint_id="cp1",
             thread_id="t1",
             node_id="node1",
@@ -225,7 +225,7 @@ class TestCheckpoint:
 
     def test_to_dict(self):
         """to_dict should serialize checkpoint."""
-        checkpoint = Checkpoint(
+        checkpoint = WorkflowCheckpoint(
             checkpoint_id="cp1",
             thread_id="t1",
             node_id="node1",
@@ -250,7 +250,7 @@ class TestCheckpoint:
             "metadata": {"key": "value"},
         }
 
-        checkpoint = Checkpoint.from_dict(data)
+        checkpoint = WorkflowCheckpoint.from_dict(data)
 
         assert checkpoint.checkpoint_id == "cp1"
         assert checkpoint.metadata == {"key": "value"}
@@ -264,7 +264,7 @@ class TestMemoryCheckpointer:
         """save and load should work together."""
         checkpointer = MemoryCheckpointer()
 
-        checkpoint = Checkpoint(
+        checkpoint = WorkflowCheckpoint(
             checkpoint_id="cp1",
             thread_id="t1",
             node_id="node1",
@@ -285,7 +285,7 @@ class TestMemoryCheckpointer:
         checkpointer = MemoryCheckpointer()
 
         await checkpointer.save(
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id="cp1",
                 thread_id="t1",
                 node_id="node1",
@@ -294,7 +294,7 @@ class TestMemoryCheckpointer:
             )
         )
         await checkpointer.save(
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id="cp2",
                 thread_id="t1",
                 node_id="node2",
@@ -323,7 +323,7 @@ class TestMemoryCheckpointer:
         checkpointer = MemoryCheckpointer()
 
         await checkpointer.save(
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id="cp1",
                 thread_id="t1",
                 node_id="n1",
@@ -332,7 +332,7 @@ class TestMemoryCheckpointer:
             )
         )
         await checkpointer.save(
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id="cp2",
                 thread_id="t1",
                 node_id="n2",
@@ -702,7 +702,7 @@ class TestFrameworkExports:
             EdgeType,
             ExecutionResult,
             GraphConfig,
-            Checkpoint,
+            WorkflowCheckpoint,
             MemoryCheckpointer,
             RLCheckpointerAdapter,
             END,
@@ -723,11 +723,11 @@ class TestFrameworkExports:
         assert EdgeType.CONDITIONAL.value == "conditional"
 
     def test_node_status(self):
-        """NodeStatus enum should have correct values."""
-        from victor.framework import NodeStatus
+        """FrameworkNodeStatus enum should have correct values."""
+        from victor.framework import FrameworkNodeStatus
 
-        assert NodeStatus.PENDING.value == "pending"
-        assert NodeStatus.RUNNING.value == "running"
-        assert NodeStatus.COMPLETED.value == "completed"
-        assert NodeStatus.FAILED.value == "failed"
-        assert NodeStatus.SKIPPED.value == "skipped"
+        assert FrameworkNodeStatus.PENDING.value == "pending"
+        assert FrameworkNodeStatus.RUNNING.value == "running"
+        assert FrameworkNodeStatus.COMPLETED.value == "completed"
+        assert FrameworkNodeStatus.FAILED.value == "failed"
+        assert FrameworkNodeStatus.SKIPPED.value == "skipped"

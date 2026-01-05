@@ -2622,11 +2622,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_analysis_task(self, orchestrator):
         """Test _apply_task_guidance for analysis task."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="Analyze this code",
-            unified_task_type=TaskType.ANALYZE,
+            unified_task_type=TrackerTaskType.ANALYZE,
             is_analysis_task=True,
             is_action_task=False,
             needs_execution=False,
@@ -2639,11 +2639,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_action_task(self, orchestrator):
         """Test _apply_task_guidance for action task."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="Create a new file",
-            unified_task_type=TaskType.CREATE,
+            unified_task_type=TrackerTaskType.CREATE,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=True,
@@ -4034,11 +4034,11 @@ class TestApplyTaskGuidance:
 
     def test_applies_guidance(self, orchestrator):
         """Test _apply_task_guidance doesn't raise."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="create a new file",
-            unified_task_type=TaskType.CREATE,
+            unified_task_type=TrackerTaskType.CREATE,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=False,

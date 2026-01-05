@@ -18,7 +18,7 @@ Unit tests for provider improvement components.
 Tests:
 - ConversationStore (formerly ConversationStore)
 - StreamingMetricsCollector
-- CircuitBreaker and RetryStrategy
+- CircuitBreaker and ProviderRetryStrategy
 - RequestQueue (formerly RequestQueue)
 """
 
@@ -53,9 +53,9 @@ from victor.providers.resilience import (
     CircuitOpenError,
     CircuitState,
     ResilientProvider,
-    RetryConfig,
+    ProviderRetryConfig,
     RetryExhaustedError,
-    RetryStrategy,
+    ProviderRetryStrategy,
 )
 
 
@@ -376,17 +376,17 @@ class TestCircuitBreaker:
 
 
 class TestRetryStrategy:
-    """Tests for RetryStrategy."""
+    """Tests for ProviderRetryStrategy."""
 
     @pytest.fixture
     def retry(self):
         """Create retry strategy with low delays for testing."""
-        config = RetryConfig(
+        config = ProviderRetryConfig(
             max_retries=2,
             base_delay_seconds=0.01,
             max_delay_seconds=0.1,
         )
-        return RetryStrategy(config)
+        return ProviderRetryStrategy(config)
 
     @pytest.mark.asyncio
     async def test_retry_success_first_try(self, retry):
@@ -686,7 +686,7 @@ class TestResilientProvider:
             mock_provider,
             fallback_providers=[mock_fallback],
             circuit_config=CircuitBreakerConfig(failure_threshold=1),
-            retry_config=RetryConfig(max_retries=0),
+            retry_config=ProviderRetryConfig(max_retries=0),
         )
 
         result = await resilient.chat(
@@ -1082,7 +1082,7 @@ class TestSharedInfrastructureIntegration:
         from victor.providers.resilience import (
             ResilientProvider,
             CircuitBreakerConfig,
-            RetryConfig,
+            ProviderRetryConfig,
         )
 
         # Primary provider that always fails
@@ -1101,7 +1101,7 @@ class TestSharedInfrastructureIntegration:
                 failure_threshold=1,  # Open after 1 failure
                 timeout_seconds=1.0,
             ),
-            retry_config=RetryConfig(
+            retry_config=ProviderRetryConfig(
                 max_retries=0,  # No retries for faster test
             ),
             fallback_providers=[fallback_provider],

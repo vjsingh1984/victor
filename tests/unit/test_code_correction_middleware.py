@@ -24,7 +24,7 @@ from victor.agent.code_correction_middleware import (
 )
 from victor.evaluation.correction import (
     Language,
-    ValidationResult,
+    CodeValidationResult,
     CorrectionFeedback,
     CorrectionMetricsCollector,
     CodeValidatorRegistry,
@@ -259,7 +259,7 @@ class TestApplyCorrection:
         result = CorrectionResult(
             original_code="original code",
             corrected_code="fixed code",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=True, language=Language.PYTHON, errors=(), warnings=()
             ),
             was_corrected=True,
@@ -278,7 +278,7 @@ class TestApplyCorrection:
         result = CorrectionResult(
             original_code="original code",
             corrected_code="original code",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=True, language=Language.PYTHON, errors=(), warnings=()
             ),
             was_corrected=False,
@@ -302,7 +302,7 @@ class TestFormatValidationError:
         result = CorrectionResult(
             original_code="code",
             corrected_code="code",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=True, language=Language.PYTHON, errors=(), warnings=()
             ),
             was_corrected=False,
@@ -316,7 +316,7 @@ class TestFormatValidationError:
         result = CorrectionResult(
             original_code="def broken(",
             corrected_code="def broken(",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=False,
@@ -337,7 +337,7 @@ class TestFormatValidationError:
         result = CorrectionResult(
             original_code="import nonexistent",
             corrected_code="import nonexistent",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=True,
@@ -359,7 +359,7 @@ class TestFormatValidationError:
         result = CorrectionResult(
             original_code="broken",
             corrected_code="broken",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=False,
@@ -395,7 +395,7 @@ class TestGetRetryPrompt:
         result = CorrectionResult(
             original_code="def broken(",
             corrected_code="def broken(",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=False,
@@ -417,7 +417,7 @@ class TestGetRetryPrompt:
         result = CorrectionResult(
             original_code="def broken(",
             corrected_code="def broken(",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=False,
@@ -440,7 +440,7 @@ class TestCorrectionResult:
 
     def test_correction_result_creation(self):
         """Test creating a CorrectionResult."""
-        validation = ValidationResult(valid=True, language=Language.PYTHON, errors=(), warnings=())
+        validation = CodeValidationResult(valid=True, language=Language.PYTHON, errors=(), warnings=())
         result = CorrectionResult(
             original_code="original",
             corrected_code="corrected",
@@ -465,7 +465,7 @@ class TestCorrectionResult:
         result = CorrectionResult(
             original_code="broken",
             corrected_code="broken",
-            validation=ValidationResult(
+            validation=CodeValidationResult(
                 valid=False, language=Language.PYTHON, errors=(), warnings=()
             ),
             was_corrected=False,

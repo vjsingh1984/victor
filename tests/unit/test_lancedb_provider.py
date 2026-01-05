@@ -17,7 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.storage.vector_stores.base import EmbeddingConfig, SearchResult
+from victor.storage.vector_stores.base import EmbeddingConfig, EmbeddingSearchResult
 from victor.storage.vector_stores.lancedb_provider import LanceDBProvider
 
 
@@ -314,7 +314,7 @@ class TestLanceDBProvider:
             results = await provider.search_similar("query text", limit=2)
 
             assert len(results) == 2
-            assert isinstance(results[0], SearchResult)
+            assert isinstance(results[0], EmbeddingSearchResult)
             assert results[0].file_path == "test1.py"
             assert results[0].content == "content1"
             assert results[0].score > 0

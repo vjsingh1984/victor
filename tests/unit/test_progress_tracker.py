@@ -28,7 +28,7 @@ from typing import Dict, Any
 from enum import Enum
 
 
-class TaskType(Enum):
+class LoopDetectorTaskType(Enum):
     """Task type for configuring progress thresholds."""
 
     DEFAULT = "default"
@@ -63,7 +63,7 @@ class ProgressConfig:
 
 
 @dataclass
-class StopReason:
+class LoopStopRecommendation:
     """Reason why progress tracker recommends stopping."""
 
     should_stop: bool
@@ -72,7 +72,7 @@ class StopReason:
 
 
 # Import the class we're testing (will fail initially - TDD red phase)
-# from victor.agent.loop_detector import LoopDetector, TaskType, ProgressConfig, StopReason
+# from victor.agent.loop_detector import LoopDetector, LoopDetectorTaskType, ProgressConfig, LoopStopRecommendation
 
 
 class TestLoopDetectorInitialization:
@@ -90,13 +90,13 @@ class TestLoopDetectorInitialization:
 
     def test_custom_config(self):
         """Test LoopDetector accepts custom configuration."""
-        from victor.agent.loop_detector import LoopDetector, ProgressConfig, TaskType
+        from victor.agent.loop_detector import LoopDetector, ProgressConfig, LoopDetectorTaskType
 
         config = ProgressConfig(tool_budget=100, max_iterations_analysis=100)
-        tracker = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        tracker = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         assert tracker.config.tool_budget == 100
-        assert tracker.task_type == TaskType.ANALYSIS
+        assert tracker.task_type == LoopDetectorTaskType.ANALYSIS
 
     def test_reset(self):
         """Test tracker can be reset for new conversation turn."""
@@ -190,10 +190,10 @@ class TestLoopDetection:
 
     def test_analysis_task_more_lenient_loop_detection(self):
         """Test that analysis tasks allow more repeated calls before loop detection."""
-        from victor.agent.loop_detector import LoopDetector, ProgressConfig, TaskType
+        from victor.agent.loop_detector import LoopDetector, ProgressConfig, LoopDetectorTaskType
 
         config = ProgressConfig(repeat_threshold_default=3, repeat_threshold_analysis=5)
-        tracker = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        tracker = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         # 3 repeated calls should NOT trigger loop for analysis task
         for _ in range(3):
@@ -303,10 +303,10 @@ class TestIterationTracking:
 
     def test_analysis_task_higher_iteration_limit(self):
         """Test that analysis tasks have higher iteration limits."""
-        from victor.agent.loop_detector import LoopDetector, ProgressConfig, TaskType
+        from victor.agent.loop_detector import LoopDetector, ProgressConfig, LoopDetectorTaskType
 
         config = ProgressConfig(max_iterations_default=3, max_iterations_analysis=10)
-        tracker = LoopDetector(config=config, task_type=TaskType.ANALYSIS)
+        tracker = LoopDetector(config=config, task_type=LoopDetectorTaskType.ANALYSIS)
 
         for _ in range(5):
             tracker.record_iteration(content_length=50)
@@ -321,10 +321,10 @@ class TestResearchLoopDetection:
 
     def test_consecutive_research_calls_tracked(self):
         """Test that consecutive research calls are tracked."""
-        from victor.agent.loop_detector import LoopDetector, ProgressConfig, TaskType
+        from victor.agent.loop_detector import LoopDetector, ProgressConfig, LoopDetectorTaskType
 
         config = ProgressConfig(max_iterations_research=3)
-        tracker = LoopDetector(config=config, task_type=TaskType.RESEARCH)
+        tracker = LoopDetector(config=config, task_type=LoopDetectorTaskType.RESEARCH)
 
         tracker.record_tool_call("web_search", {"query": "test"})
         tracker.record_tool_call("web_fetch", {"url": "http://test.com"})
@@ -336,10 +336,10 @@ class TestResearchLoopDetection:
 
     def test_research_counter_resets_on_non_research_call(self):
         """Test that research counter resets when non-research tool is called."""
-        from victor.agent.loop_detector import LoopDetector, ProgressConfig, TaskType
+        from victor.agent.loop_detector import LoopDetector, ProgressConfig, LoopDetectorTaskType
 
         config = ProgressConfig(max_iterations_research=3)
-        tracker = LoopDetector(config=config, task_type=TaskType.RESEARCH)
+        tracker = LoopDetector(config=config, task_type=LoopDetectorTaskType.RESEARCH)
 
         tracker.record_tool_call("web_search", {"query": "test1"})
         tracker.record_tool_call("web_search", {"query": "test2"})
@@ -537,28 +537,28 @@ class TestSameFileLoopDetection:
 class TestTaskClassifierIntegration:
     """Tests for task classifier integration with progress tracker.
 
-    These tests interact with ComplexityClassifier and TaskTypeClassifier.
+    These tests interact with ComplexityClassifier and LoopDetectorTaskTypeClassifier.
     We reset the singleton instances before each test to ensure isolation.
     """
 
     @pytest.fixture(autouse=True)
     def reset_classifier_singletons(self):
         """Reset singleton classifiers before each test for isolation."""
-        # Reset TaskTypeClassifier singleton (used by ComplexityClassifier)
+        # Reset LoopDetectorTaskTypeClassifier singleton (used by ComplexityClassifier)
         try:
-            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+            from victor.storage.embeddings.task_classifier import LoopDetectorTaskTypeClassifier
 
-            TaskTypeClassifier.reset_instance()
+            LoopDetectorTaskTypeClassifier.reset_instance()
         except ImportError:
-            pass  # TaskTypeClassifier not available
+            pass  # LoopDetectorTaskTypeClassifier not available
 
         yield
 
         # Reset again after test
         try:
-            from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+            from victor.storage.embeddings.task_classifier import LoopDetectorTaskTypeClassifier
 
-            TaskTypeClassifier.reset_instance()
+            LoopDetectorTaskTypeClassifier.reset_instance()
         except ImportError:
             pass
 
@@ -580,7 +580,7 @@ class TestTaskClassifierIntegration:
     def test_create_tracker_from_complex_classification(self):
         """Test creating tracker from COMPLEX task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
-        from victor.agent.loop_detector import create_tracker_from_classification, TaskType
+        from victor.agent.loop_detector import create_tracker_from_classification, LoopDetectorTaskType
 
         classifier = ComplexityClassifier()
         classification = classifier.classify("generate a new feature")
@@ -589,13 +589,13 @@ class TestTaskClassifierIntegration:
 
         assert classification.complexity == TaskComplexity.COMPLEX
         assert tracker.config.tool_budget == 25  # Updated budget
-        assert tracker.task_type == TaskType.ANALYSIS
+        assert tracker.task_type == LoopDetectorTaskType.ANALYSIS
         assert "COMPLEX" in hint
 
     def test_create_tracker_from_generation_classification(self):
         """Test creating tracker from GENERATION task classification."""
         from victor.agent.complexity_classifier import ComplexityClassifier, TaskComplexity
-        from victor.agent.loop_detector import create_tracker_from_classification, TaskType
+        from victor.agent.loop_detector import create_tracker_from_classification, LoopDetectorTaskType
 
         classifier = ComplexityClassifier()
         classification = classifier.classify("write a function to add numbers")
@@ -606,7 +606,7 @@ class TestTaskClassifierIntegration:
         # GENERATION tasks have minimum budget of 10 (may need file reads)
         assert tracker.config.tool_budget == 10
         assert tracker.config.max_total_iterations == 11  # budget + 1
-        assert tracker.task_type == TaskType.ACTION
+        assert tracker.task_type == LoopDetectorTaskType.ACTION
         assert "GENERATE" in hint
 
     def test_classify_and_create_tracker_convenience(self):
