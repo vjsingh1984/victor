@@ -320,6 +320,14 @@ from victor.workflows.protocols import (
     NodeRunner,
     NodeRunnerResult,
 )
+from victor.workflows.graph_compiler import (
+    CompilerConfig,
+    NodeRunnerWrapper,
+    WorkflowGraphCompiler,
+    WorkflowDefinitionCompiler,
+    compile_workflow_graph,
+    compile_workflow_definition,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -559,4 +567,11 @@ __all__ = [
     "ConditionNodeRunner",
     "ParallelNodeRunner",
     "NodeRunnerRegistry",
+    # Graph Compilers (Single Execution Engine - Phase 4)
+    "CompilerConfig",
+    "NodeRunnerWrapper",
+    "WorkflowGraphCompiler",
+    "WorkflowDefinitionCompiler",
+    "compile_workflow_graph",
+    "compile_workflow_definition",
 ]

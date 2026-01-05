@@ -79,6 +79,13 @@ if TYPE_CHECKING:
     from victor.workflows.hitl import HITLHandler, HITLExecutor
     from victor.workflows.cache import WorkflowCacheManager
     from victor.workflows.definition import WorkflowDefinition
+    from victor.workflows.graph_dsl import WorkflowGraph
+    from victor.workflows.node_runners import NodeRunnerRegistry
+    from victor.workflows.graph_compiler import (
+        WorkflowGraphCompiler,
+        WorkflowDefinitionCompiler,
+        CompilerConfig,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +238,7 @@ class WorkflowEngine:
         config: Optional[WorkflowEngineConfig] = None,
         hitl_handler: Optional["HITLHandler"] = None,
         cache_manager: Optional["WorkflowCacheManager"] = None,
+        runner_registry: Optional["NodeRunnerRegistry"] = None,
     ) -> None:
         """Initialize WorkflowEngine.
 
@@ -238,15 +246,21 @@ class WorkflowEngine:
             config: Engine configuration.
             hitl_handler: Custom HITL handler for approval nodes.
             cache_manager: Custom cache manager for results.
+            runner_registry: Optional NodeRunner registry for unified execution.
         """
         self._config = config or WorkflowEngineConfig()
         self._hitl_handler = hitl_handler
         self._cache_manager = cache_manager
+        self._runner_registry = runner_registry
 
         # Lazy-loaded executors
         self._executor: Optional["WorkflowExecutor"] = None
         self._streaming_executor: Optional["StreamingWorkflowExecutor"] = None
         self._hitl_executor: Optional["HITLExecutor"] = None
+
+        # Lazy-loaded compilers
+        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
+        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
     @property
     def config(self) -> WorkflowEngineConfig:
@@ -428,6 +442,169 @@ class WorkflowEngine:
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
+
+    async def execute_workflow_graph(
+        self,
+        graph: "WorkflowGraph",
+        initial_state: Optional[Dict[str, Any]] = None,
+        use_node_runners: bool = False,
+        **kwargs: Any,
+    ) -> ExecutionResult:
+        """Execute a WorkflowGraph via CompiledGraph (unified execution path).
+
+        This method compiles a WorkflowGraph to CompiledGraph and executes
+        it through the single CompiledGraph.invoke() engine, providing a
+        unified execution path for all workflow types.
+
+        Args:
+            graph: WorkflowGraph to compile and execute.
+            initial_state: Initial workflow state.
+            use_node_runners: Whether to use NodeRunner protocol for execution.
+            **kwargs: Additional execution parameters.
+
+        Returns:
+            ExecutionResult with final state and metadata.
+
+        Example:
+            from victor.workflows.graph_dsl import WorkflowGraph, State
+
+            @dataclass
+            class MyState(State):
+                value: int = 0
+
+            graph = WorkflowGraph(MyState)
+            graph.add_node("process", lambda s: s)
+            graph.set_entry_point("process")
+            graph.set_finish_point("process")
+
+            result = await engine.execute_workflow_graph(graph, {"value": 42})
+        """
+        import time
+        from victor.workflows.graph_compiler import (
+            WorkflowGraphCompiler,
+            CompilerConfig,
+        )
+
+        start_time = time.time()
+
+        try:
+            # Configure compiler
+            compiler_config = CompilerConfig(
+                use_node_runners=use_node_runners and self._runner_registry is not None,
+                runner_registry=self._runner_registry,
+                validate_before_compile=True,
+            )
+
+            # Compile WorkflowGraph to CompiledGraph
+            compiler = WorkflowGraphCompiler(compiler_config)
+            compiled = compiler.compile(graph)
+
+            # Execute via CompiledGraph.invoke()
+            result = await compiled.invoke(initial_state or {})
+
+            duration = time.time() - start_time
+
+            # Extract execution info from result
+            if hasattr(result, "state"):
+                final_state = result.state
+                nodes_executed = getattr(result, "node_history", [])
+                success = getattr(result, "success", True)
+                error = getattr(result, "error", None)
+            else:
+                # Result is the final state dict
+                final_state = result
+                nodes_executed = []
+                success = True
+                error = None
+
+            return ExecutionResult(
+                success=success,
+                final_state=final_state,
+                nodes_executed=nodes_executed,
+                duration_seconds=duration,
+                error=error,
+            )
+
+        except Exception as e:
+            logger.error(f"WorkflowGraph execution failed: {e}")
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
+
+    async def execute_definition_compiled(
+        self,
+        workflow: "WorkflowDefinition",
+        initial_state: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> ExecutionResult:
+        """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
+
+        This method compiles a WorkflowDefinition to CompiledGraph and executes
+        it through the single CompiledGraph.invoke() engine.
+
+        Args:
+            workflow: WorkflowDefinition to compile and execute.
+            initial_state: Initial workflow state.
+            **kwargs: Additional execution parameters.
+
+        Returns:
+            ExecutionResult with final state and metadata.
+        """
+        import time
+        from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
+
+        start_time = time.time()
+
+        try:
+            # Compile WorkflowDefinition to CompiledGraph
+            compiler = WorkflowDefinitionCompiler(self._runner_registry)
+            compiled = compiler.compile(workflow)
+
+            # Execute via CompiledGraph.invoke()
+            result = await compiled.invoke(initial_state or {})
+
+            duration = time.time() - start_time
+
+            # Extract execution info from result
+            if hasattr(result, "state"):
+                final_state = result.state
+                nodes_executed = getattr(result, "node_history", [])
+                success = getattr(result, "success", True)
+                error = getattr(result, "error", None)
+            else:
+                final_state = result
+                nodes_executed = []
+                success = True
+                error = None
+
+            return ExecutionResult(
+                success=success,
+                final_state=final_state,
+                nodes_executed=nodes_executed,
+                duration_seconds=duration,
+                error=error,
+            )
+
+        except Exception as e:
+            logger.error(f"WorkflowDefinition compiled execution failed: {e}")
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
+
+    def set_runner_registry(self, registry: "NodeRunnerRegistry") -> None:
+        """Set the NodeRunner registry for unified execution.
+
+        Args:
+            registry: NodeRunnerRegistry with configured runners.
+        """
+        self._runner_registry = registry
+        # Reset compilers to use new registry
+        self._graph_compiler = None
+        self._definition_compiler = None
 
     # =========================================================================
     # Streaming Methods
