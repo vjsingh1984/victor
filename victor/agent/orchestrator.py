@@ -4814,6 +4814,183 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.warning(f"Error forcing final response: {e}")
             yield self._chunk_generator.generate_force_response_error_chunk()
 
+    async def _handle_empty_response_recovery(
+        self,
+        stream_ctx: StreamingChatContext,
+        tools: Optional[List[Dict[str, Any]]],
+    ) -> tuple[bool, Optional[List[Dict[str, Any]]], Optional[StreamChunk]]:
+        """Handle empty response with retry recovery attempts.
+
+        Attempts multiple recovery strategies with increasing temperature
+        to get a useful response from the model.
+
+        Args:
+            stream_ctx: The streaming context.
+            tools: Available tools for recovery attempts.
+
+        Returns:
+            Tuple of (recovery_success, recovered_tool_calls, final_chunk).
+            - recovery_success: True if recovery produced content or tool calls
+            - recovered_tool_calls: Tool calls extracted during recovery (or None)
+            - final_chunk: Final chunk to yield if recovery produced text response
+        """
+        # Get recovery prompts via streaming handler
+        has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
+        thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
+        recovery_prompts = self._streaming_handler.get_recovery_prompts(
+            ctx=stream_ctx,
+            base_temperature=self.temperature,
+            has_thinking_mode=has_thinking_mode,
+            thinking_disable_prefix=thinking_prefix,
+        )
+
+        for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
+            logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
+
+            # Create temporary message list with recent context
+            recent_messages = (
+                self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+            )
+            recovery_messages = recent_messages + [Message(role="user", content=prompt)]
+
+            # Check if tools should be enabled
+            use_tools = self._streaming_handler.should_use_tools_for_recovery(
+                stream_ctx, attempt
+            )
+            recovery_tools = tools if use_tools else None
+
+            try:
+                response = await self.provider.chat(
+                    messages=recovery_messages,
+                    model=self.model,
+                    temperature=temp,
+                    max_tokens=min(self.max_tokens, 1024),
+                    tools=recovery_tools,
+                )
+
+                # Check for tool calls in recovery response
+                if use_tools and response and response.tool_calls:
+                    logger.info(
+                        f"Recovery attempt {attempt}: model made {len(response.tool_calls)} tool call(s)"
+                    )
+                    self.add_message("user", prompt)
+                    if response.content:
+                        self.add_message("assistant", response.content)
+                    return True, response.tool_calls, None
+
+                if response and response.content:
+                    logger.debug(
+                        f"Recovery attempt {attempt}: got {len(response.content)} chars"
+                    )
+
+                    # Try to extract tool calls from text
+                    tool_calls = self._try_extract_tool_calls_from_text(
+                        response.content, prompt
+                    )
+                    if tool_calls:
+                        return True, tool_calls, None
+
+                    # Check if we have useful text content
+                    sanitized = self.sanitizer.sanitize(response.content)
+                    if sanitized and len(sanitized) > 20:
+                        self.add_message("assistant", sanitized)
+                        final_chunk = self._chunk_generator.generate_content_chunk(
+                            sanitized, is_final=True
+                        )
+                        return True, None, final_chunk
+                    elif response.content and len(response.content) > 20:
+                        self.add_message("assistant", response.content)
+                        final_chunk = self._chunk_generator.generate_content_chunk(
+                            response.content, is_final=True
+                        )
+                        return True, None, final_chunk
+                else:
+                    logger.debug(f"Recovery attempt {attempt}: empty response")
+
+            except Exception as exc:
+                await self._handle_recovery_exception(exc, attempt)
+
+        # All recovery attempts failed
+        return False, None, None
+
+    def _try_extract_tool_calls_from_text(
+        self,
+        content: str,
+        prompt: str,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Try to extract tool calls from text response.
+
+        Args:
+            content: Response content to parse.
+            prompt: Recovery prompt used.
+
+        Returns:
+            List of tool call dicts if extraction succeeded, None otherwise.
+        """
+        try:
+            from victor.agent.tool_calling.text_extractor import (
+                extract_tool_calls_from_text,
+            )
+
+            valid_tool_names = {
+                t.name for t in self.tools.list_tools(only_enabled=True)
+            }
+            extraction_result = extract_tool_calls_from_text(
+                content, valid_tool_names=valid_tool_names
+            )
+
+            if extraction_result.success and extraction_result.tool_calls:
+                logger.info(
+                    f"Recovery: Extracted {len(extraction_result.tool_calls)} "
+                    f"tool calls from text output"
+                )
+                tool_calls = [
+                    {
+                        "name": tc.name,
+                        "arguments": tc.arguments,
+                        "id": f"recovery_{idx}",
+                    }
+                    for idx, tc in enumerate(extraction_result.tool_calls)
+                ]
+                self.add_message("user", prompt)
+                if extraction_result.remaining_content:
+                    self.add_message("assistant", extraction_result.remaining_content)
+                return tool_calls
+        except Exception as e:
+            logger.debug(f"Text extraction failed during recovery: {e}")
+
+        return None
+
+    async def _handle_recovery_exception(
+        self,
+        exc: Exception,
+        attempt: int,
+    ) -> None:
+        """Handle exception during recovery attempt.
+
+        Args:
+            exc: The exception that occurred.
+            attempt: Current attempt number.
+        """
+        exc_str = str(exc)
+        logger.warning(f"Recovery attempt {attempt} failed: {exc}")
+
+        # Check for rate limit errors and extract wait time
+        if "rate_limit" in exc_str.lower() or "429" in exc_str:
+            import re
+
+            wait_match = re.search(
+                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
+            )
+            if wait_match:
+                wait_time = float(wait_match.group(1))
+                logger.info(f"Rate limited. Waiting {wait_time:.1f}s before retry...")
+                await asyncio.sleep(min(wait_time + 0.5, 30.0))
+            else:
+                backoff = min(2**attempt, 15)
+                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
+                await asyncio.sleep(backoff)
+
     def _parse_and_validate_tool_calls(
         self,
         tool_calls: Optional[List[Dict[str, Any]]],
@@ -5413,166 +5590,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     # The should_force flag confirms the handler's decision
                     continue
 
-                # Get recovery prompts via streaming handler directly
-                # Handler handles thinking mode prefix and task-aware prompts
-                has_thinking_mode = getattr(self.tool_calling_caps, "thinking_mode", False)
-                thinking_prefix = getattr(self.tool_calling_caps, "thinking_disable_prefix", None)
-                recovery_prompts = self._streaming_handler.get_recovery_prompts(
-                    ctx=stream_ctx,
-                    base_temperature=self.temperature,
-                    has_thinking_mode=has_thinking_mode,
-                    thinking_disable_prefix=thinking_prefix,
+                # Delegate empty response recovery to helper method
+                recovery_success, recovered_tool_calls, final_chunk = (
+                    await self._handle_empty_response_recovery(stream_ctx, tools)
                 )
 
-                recovery_success = False
-                for attempt, (prompt, temp) in enumerate(recovery_prompts, 1):
-                    logger.info(f"Recovery attempt {attempt}/3 with temp={temp:.1f}")
-
-                    # Create temporary message list to avoid polluting conversation history
-                    # Include only recent context (last 5 exchanges) to reduce token load
-                    recent_messages = (
-                        self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-                    )
-                    recovery_messages = recent_messages + [Message(role="user", content=prompt)]
-
-                    # Check if tools should be enabled via streaming handler directly
-                    use_tools = self._streaming_handler.should_use_tools_for_recovery(
-                        stream_ctx, attempt
-                    )
-                    recovery_tools = tools if use_tools else None
-
-                    try:
-                        response = await self.provider.chat(
-                            messages=recovery_messages,
-                            model=self.model,
-                            temperature=temp,
-                            max_tokens=min(self.max_tokens, 1024),  # Limit output for recovery
-                            tools=recovery_tools,
-                        )
-
-                        # Check for tool calls in recovery response
-                        if use_tools and response and response.tool_calls:
-                            logger.info(
-                                f"Recovery attempt {attempt}: model made {len(response.tool_calls)} tool call(s)"
-                            )
-                            # Re-inject the recovery prompt into conversation and let main loop handle
-                            self.add_message("user", prompt)
-                            if response.content:
-                                self.add_message("assistant", response.content)
-                            # Set tool_calls for main loop to process
-                            tool_calls = response.tool_calls
-                            recovery_success = True
-                            # Don't yield final chunk - let main loop continue with tool execution
-                            break
-
-                        if response and response.content:
-                            logger.debug(
-                                f"Recovery attempt {attempt}: got {len(response.content)} chars"
-                            )
-
-                            # Try to extract tool calls from text (for models like Groq that
-                            # write tool call syntax in their response instead of using API)
-                            try:
-                                from victor.agent.tool_calling.text_extractor import (
-                                    extract_tool_calls_from_text,
-                                )
-
-                                # Get valid tool names from registry
-                                valid_tool_names = {
-                                    t.name for t in self.tools.list_tools(only_enabled=True)
-                                }
-                                extraction_result = extract_tool_calls_from_text(
-                                    response.content,
-                                    valid_tool_names=valid_tool_names,
-                                )
-                                if extraction_result.success and extraction_result.tool_calls:
-                                    logger.info(
-                                        f"Recovery: Extracted {len(extraction_result.tool_calls)} "
-                                        f"tool calls from text output"
-                                    )
-                                    # Convert ExtractedToolCall to dict format for main loop
-                                    tool_calls = [
-                                        {
-                                            "name": tc.name,
-                                            "arguments": tc.arguments,
-                                            "id": f"recovery_{idx}",
-                                        }
-                                        for idx, tc in enumerate(extraction_result.tool_calls)
-                                    ]
-                                    # Re-inject prompt and let main loop handle tool execution
-                                    self.add_message("user", prompt)
-                                    if extraction_result.remaining_content:
-                                        self.add_message(
-                                            "assistant", extraction_result.remaining_content
-                                        )
-                                    recovery_success = True
-                                    break
-                            except Exception as e:
-                                logger.debug(f"Text extraction failed during recovery: {e}")
-
-                            sanitized = self.sanitizer.sanitize(response.content)
-                            if sanitized and len(sanitized) > 20:
-                                self.add_message("assistant", sanitized)
-                                yield self._chunk_generator.generate_content_chunk(
-                                    sanitized, is_final=True
-                                )
-                                recovery_success = True
-                                break
-                            elif response.content and len(response.content) > 20:
-                                # Use raw if sanitization failed but content exists
-                                self.add_message("assistant", response.content)
-                                yield self._chunk_generator.generate_content_chunk(
-                                    response.content, is_final=True
-                                )
-                                recovery_success = True
-                                break
-                        else:
-                            logger.debug(f"Recovery attempt {attempt}: empty response")
-                    except Exception as exc:
-                        exc_str = str(exc)
-                        logger.warning(f"Recovery attempt {attempt} failed: {exc}")
-
-                        # Check for rate limit errors and extract wait time
-                        if "rate_limit" in exc_str.lower() or "429" in exc_str:
-                            import re
-
-                            # Try to extract "try again in X.XXs" or similar patterns
-                            wait_match = re.search(
-                                r"try again in (\d+(?:\.\d+)?)\s*s", exc_str, re.I
-                            )
-                            if wait_match:
-                                wait_time = float(wait_match.group(1))
-                                logger.info(
-                                    f"Rate limited. Waiting {wait_time:.1f}s before retry..."
-                                )
-                                await asyncio.sleep(
-                                    min(wait_time + 0.5, 30.0)
-                                )  # Add 0.5s buffer, cap at 30s
-                            else:
-                                # Default exponential backoff for rate limits
-                                backoff = min(2**attempt, 15)  # 2, 4, 8 seconds
-                                logger.info(f"Rate limited. Waiting {backoff}s before retry...")
-                                await asyncio.sleep(backoff)
-
                 if recovery_success:
-                    # If recovery produced tool_calls, continue the main loop to execute them
-                    # Otherwise, we've already yielded the text response, so return
-                    if not tool_calls:
+                    if final_chunk:
+                        # Recovery produced text response - yield and return
+                        yield final_chunk
                         return
-                    # Fall through to tool execution with recovered tool_calls
-                    logger.info(
-                        f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
-                    )
+                    elif recovered_tool_calls:
+                        # Recovery produced tool calls - continue main loop
+                        tool_calls = recovered_tool_calls
+                        logger.info(
+                            f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
+                        )
                 else:
-                    # All recovery attempts failed - get fallback message via recovery coordinator
+                    # All recovery attempts failed - get fallback message
                     recovery_ctx = self._create_recovery_context(stream_ctx)
                     fallback_msg = self._recovery_coordinator.get_recovery_fallback_message(
                         recovery_ctx
                     )
-                    # Record outcome for Q-learning (fallback = partial failure)
                     self._record_intelligent_outcome(
                         success=False,
-                        quality_score=0.3,  # Low quality since model didn't provide useful content
+                        quality_score=0.3,
                         user_satisfied=False,
                         completed=False,
                     )
