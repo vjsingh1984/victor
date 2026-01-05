@@ -12,51 +12,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module has moved to victor.integrations.protocols.
+"""Core protocol interfaces for provider adaptation, grounding, and quality."""
 
-This stub provides backward compatibility. Please update imports to use:
-    from victor.integrations.protocols import ...
-"""
-
-# Re-export all public symbols for backward compatibility
-from victor.integrations.protocols import (
-    # Provider Adapter
+# Provider Adapter
+from victor.protocols.provider_adapter import (
+    BaseProviderAdapter,
+    ContinuationContext,
     IProviderAdapter,
     ProviderCapabilities,
     ToolCallFormat,
-    ToolCall,
     get_provider_adapter,
     register_provider_adapter,
-    # Grounding
-    IGroundingStrategy,
-    GroundingClaimType,
-    GroundingClaim,
-    VerificationResult,
+)
+# Grounding
+from victor.protocols.grounding import (
     AggregatedVerificationResult,
-    FileExistenceStrategy,
-    SymbolReferenceStrategy,
-    ContentMatchStrategy,
     CompositeGroundingVerifier,
-    # Quality
-    IQualityAssessor,
-    QualityDimension,
-    DimensionScore,
-    QualityScore,
+    ContentMatchStrategy,
+    FileExistenceStrategy,
+    GroundingClaim,
+    GroundingClaimType,
+    IGroundingStrategy,
+    SymbolReferenceStrategy,
+    VerificationResult,
+)
+# Quality
+from victor.protocols.quality import (
     BaseQualityAssessor,
-    SimpleQualityAssessor,
-    ProviderAwareQualityAssessor,
     CompositeQualityAssessor,
-    # Mode Awareness
+    DimensionScore,
+    IQualityAssessor,
+    ProtocolQualityDimension,
+    ProviderAwareQualityAssessor,
+    QualityScore,
+    SimpleQualityAssessor,
+)
+# Mode Awareness
+from victor.protocols.mode_aware import (
     IModeController,
-    ModeInfo,
     ModeAwareMixin,
+    ModeInfo,
     create_mode_aware_mixin,
-    # Path Resolution
+)
+# Path Resolution
+from victor.protocols.path_resolver import (
     IPathResolver,
     PathResolution,
     PathResolver,
     create_path_resolver,
-    # LSP Types - Enumerations
+)
+# LSP Types - Enumerations
+from victor.protocols.lsp_types import (
     DiagnosticSeverity,
     CompletionItemKind,
     SymbolKind,
@@ -88,7 +94,8 @@ __all__ = [
     "IProviderAdapter",
     "ProviderCapabilities",
     "ToolCallFormat",
-    "ToolCall",
+    "BaseProviderAdapter",
+    "ContinuationContext",
     "get_provider_adapter",
     "register_provider_adapter",
     # Grounding
@@ -103,7 +110,7 @@ __all__ = [
     "CompositeGroundingVerifier",
     # Quality
     "IQualityAssessor",
-    "QualityDimension",
+    "ProtocolQualityDimension",
     "DimensionScore",
     "QualityScore",
     "BaseQualityAssessor",
