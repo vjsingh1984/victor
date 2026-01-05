@@ -63,14 +63,17 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Optional, TypeVar, Union, TYPE_CHECKING
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
-    CircuitState,
+    CircuitState as _CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
     CircuitBreakerError,
 )
+
+if TYPE_CHECKING:
+    from victor.providers.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +365,7 @@ class ObservableCircuitBreaker:
         self._name = name or "circuit_breaker"
         self._on_state_change = on_state_change
 
-        self._state = CircuitState.CLOSED
+        self._state = _CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
         self._last_failure_time: Optional[float] = None
@@ -382,12 +385,12 @@ class ObservableCircuitBreaker:
     @property
     def is_closed(self) -> bool:
         """Check if circuit is closed (normal operation)."""
-        return self._state == CircuitState.CLOSED
+        return self._state == _CircuitState.CLOSED
 
     @property
     def is_open(self) -> bool:
         """Check if circuit is open (failing fast)."""
-        return self._state == CircuitState.OPEN
+        return self._state == _CircuitState.OPEN
 
     def _transition_to(self, new_state: CircuitState) -> None:
         """Transition to new state with callback."""
@@ -407,21 +410,21 @@ class ObservableCircuitBreaker:
             True if call should proceed.
         """
         async with self._lock:
-            if self._state == CircuitState.CLOSED:
+            if self._state == _CircuitState.CLOSED:
                 return True
 
-            if self._state == CircuitState.OPEN:
+            if self._state == _CircuitState.OPEN:
                 # Check if recovery timeout has passed
                 if self._last_failure_time:
                     elapsed = time.time() - self._last_failure_time
                     if elapsed >= self._timeout_seconds:
-                        self._transition_to(CircuitState.HALF_OPEN)
+                        self._transition_to(_CircuitState.HALF_OPEN)
                         self._half_open_calls = 0
                         self._success_count = 0
                         return True
                 return False
 
-            if self._state == CircuitState.HALF_OPEN:
+            if self._state == _CircuitState.HALF_OPEN:
                 if self._half_open_calls < self._half_open_max_calls:
                     self._half_open_calls += 1
                     return True
@@ -432,10 +435,10 @@ class ObservableCircuitBreaker:
     async def _record_success(self) -> None:
         """Record successful call."""
         async with self._lock:
-            if self._state == CircuitState.HALF_OPEN:
+            if self._state == _CircuitState.HALF_OPEN:
                 self._success_count += 1
                 if self._success_count >= self._success_threshold:
-                    self._transition_to(CircuitState.CLOSED)
+                    self._transition_to(_CircuitState.CLOSED)
                     self._failure_count = 0
 
     async def _record_failure(self, error: Exception) -> None:
@@ -448,12 +451,12 @@ class ObservableCircuitBreaker:
             self._failure_count += 1
             self._last_failure_time = time.time()
 
-            if self._state == CircuitState.CLOSED:
+            if self._state == _CircuitState.CLOSED:
                 if self._failure_count >= self._failure_threshold:
-                    self._transition_to(CircuitState.OPEN)
+                    self._transition_to(_CircuitState.OPEN)
 
-            elif self._state == CircuitState.HALF_OPEN:
-                self._transition_to(CircuitState.OPEN)
+            elif self._state == _CircuitState.HALF_OPEN:
+                self._transition_to(_CircuitState.OPEN)
 
     async def __aenter__(self) -> "CircuitBreaker":
         """Enter circuit breaker context."""
@@ -484,7 +487,7 @@ class ObservableCircuitBreaker:
 
     def reset(self) -> None:
         """Reset circuit breaker to closed state."""
-        self._state = CircuitState.CLOSED
+        self._state = _CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
         self._last_failure_time = None

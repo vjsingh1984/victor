@@ -49,18 +49,23 @@ Usage:
         result = await fallback_provider.chat(...)
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
-    CircuitState,
+    CircuitState as _CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
 )
+
+if TYPE_CHECKING:
+    from victor.providers.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +91,7 @@ class CircuitStats:
     last_failure_time: float = 0.0
     total_failures: int = 0
     total_successes: int = 0
-    state: CircuitState = CircuitState.CLOSED
+    state: CircuitState = _CircuitState.CLOSED
     last_state_change: float = field(default_factory=time.time)
 
 
@@ -157,10 +162,10 @@ class MultiCircuitBreaker:
         stats = self._circuits[name]
 
         # Check for automatic state transitions
-        if stats.state == CircuitState.OPEN:
+        if stats.state == _CircuitState.OPEN:
             if time.time() - stats.last_failure_time >= self.config.recovery_timeout:
                 # Transition to half-open for testing
-                stats.state = CircuitState.HALF_OPEN
+                stats.state = _CircuitState.HALF_OPEN
                 stats.last_state_change = time.time()
                 self._half_open_calls[name] = 0
                 logger.info(f"Circuit '{name}' transitioning to HALF_OPEN for testing")
@@ -178,10 +183,10 @@ class MultiCircuitBreaker:
         """
         state = self.get_state(name)
 
-        if state == CircuitState.CLOSED:
+        if state == _CircuitState.CLOSED:
             return True
 
-        if state == CircuitState.HALF_OPEN:
+        if state == _CircuitState.HALF_OPEN:
             # Allow limited calls for testing
             if self._half_open_calls[name] < self.config.half_open_max_calls:
                 self._half_open_calls[name] += 1
@@ -202,10 +207,10 @@ class MultiCircuitBreaker:
         stats.total_successes += 1
         stats.failures = 0  # Reset consecutive failures
 
-        if stats.state == CircuitState.HALF_OPEN:
+        if stats.state == _CircuitState.HALF_OPEN:
             if stats.successes >= self.config.success_threshold:
                 # Service recovered, close circuit
-                stats.state = CircuitState.CLOSED
+                stats.state = _CircuitState.CLOSED
                 stats.last_state_change = time.time()
                 stats.successes = 0
                 logger.info(f"Circuit '{name}' CLOSED - service recovered")
@@ -228,19 +233,19 @@ class MultiCircuitBreaker:
         stats.last_failure_time = time.time()
         stats.successes = 0  # Reset consecutive successes
 
-        if stats.state == CircuitState.CLOSED:
+        if stats.state == _CircuitState.CLOSED:
             if stats.failures >= self.config.failure_threshold:
                 # Too many failures, open circuit
-                stats.state = CircuitState.OPEN
+                stats.state = _CircuitState.OPEN
                 stats.last_state_change = time.time()
                 logger.warning(
                     f"Circuit '{name}' OPEN - {stats.failures} failures "
                     f"(threshold: {self.config.failure_threshold})"
                 )
 
-        elif stats.state == CircuitState.HALF_OPEN:
+        elif stats.state == _CircuitState.HALF_OPEN:
             # Failure during testing, reopen circuit
-            stats.state = CircuitState.OPEN
+            stats.state = _CircuitState.OPEN
             stats.last_state_change = time.time()
             logger.warning(f"Circuit '{name}' reopened - test call failed")
 
