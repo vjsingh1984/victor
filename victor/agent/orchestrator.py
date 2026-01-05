@@ -229,8 +229,11 @@ from victor.workflows.discovery import register_builtin_workflows
 
 # Streaming submodule - extracted for testability
 from victor.agent.streaming import (
+    CoordinatorConfig,
+    IterationCoordinator,
     StreamingChatContext,
     StreamingChatHandler,
+    create_coordinator,
     create_stream_context,
 )
 
@@ -779,6 +782,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # StreamingChatHandler: Testable extraction of streaming loop logic (via factory)
         self._streaming_handler = self._factory.create_streaming_chat_handler(message_adder=self)
+
+        # IterationCoordinator: Loop control for streaming chat (using handler)
+        self._iteration_coordinator: Optional[IterationCoordinator] = None
 
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
@@ -4559,6 +4565,84 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if result and result.chunks:
             return result.chunks[0]
         return None
+
+    def _get_iteration_coordinator(self) -> IterationCoordinator:
+        """Get or create the iteration coordinator.
+
+        Creates the coordinator lazily to ensure unified_tracker is available.
+
+        Returns:
+            The iteration coordinator instance.
+        """
+        if self._iteration_coordinator is None:
+            # Create coordinator with unified tracker as loop detector
+            self._iteration_coordinator = create_coordinator(
+                handler=self._streaming_handler,
+                loop_detector=self.unified_tracker,
+                settings=self.settings,
+                config=CoordinatorConfig(
+                    session_idle_timeout=getattr(self.settings, "session_idle_timeout", 180.0),
+                    budget_warning_threshold=getattr(
+                        self.settings, "tool_call_budget_warning_threshold", 250
+                    ),
+                ),
+            )
+        return self._iteration_coordinator
+
+    def _run_pre_iteration_checks(
+        self,
+        stream_ctx: StreamingChatContext,
+    ) -> Optional[StreamChunk]:
+        """Run pre-iteration checks using the coordinator.
+
+        Combines time limit, iteration limit, and force completion checks.
+
+        Args:
+            stream_ctx: The streaming context.
+
+        Returns:
+            StreamChunk if iteration should be skipped, None otherwise.
+        """
+        coordinator = self._get_iteration_coordinator()
+
+        # Use handler's handle_iteration_start which combines all pre-checks
+        result = self._streaming_handler.handle_iteration_start(stream_ctx)
+        if result is not None:
+            if result.chunks:
+                return result.chunks[0]
+            # If result says to break but no chunks, return a marker
+            if result.should_break:
+                return StreamChunk(content="", is_final=True)
+        return None
+
+    def _should_continue_streaming(
+        self,
+        stream_ctx: StreamingChatContext,
+        has_tool_calls: bool,
+        has_content: bool,
+    ) -> tuple[bool, Optional[StreamChunk]]:
+        """Determine if streaming loop should continue.
+
+        Uses the coordinator for the continuation decision.
+
+        Args:
+            stream_ctx: The streaming context.
+            has_tool_calls: Whether response has tool calls.
+            has_content: Whether response has content.
+
+        Returns:
+            Tuple of (should_continue, optional_chunk_to_yield).
+        """
+        # Use handler's handle_continuation method
+        result = self._streaming_handler.handle_continuation(
+            stream_ctx, has_tool_calls, has_content
+        )
+
+        if result is not None:
+            chunk = result.chunks[0] if result.chunks else None
+            return not result.should_break, chunk
+
+        return True, None
 
     def _parse_and_validate_tool_calls(
         self,
