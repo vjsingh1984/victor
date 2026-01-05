@@ -49,6 +49,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
+from victor.integrations.api.event_bridge import EventBridge
+from victor.observability.event_bus import get_event_bus
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +358,8 @@ class VictorFastAPIServer:
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
         self._hitl_store = None
+        self._event_bridge: Optional[EventBridge] = None
+        self._event_clients: List[WebSocket] = []
 
         # Create FastAPI app with lifespan
         self.app = FastAPI(
@@ -395,12 +399,22 @@ class VictorFastAPIServer:
     async def _lifespan(self, app: FastAPI) -> AsyncIterator[None]:
         """Manage server lifespan."""
         logger.info(f"Starting Victor FastAPI server on {self.host}:{self.port}")
+
+        # Initialize EventBridge for real-time event streaming
+        event_bus = get_event_bus()
+        self._event_bridge = EventBridge(event_bus)
+        self._event_bridge.start()
+        logger.info("EventBridge started for real-time event streaming")
+
         yield
+
         # Cleanup
+        if self._event_bridge:
+            self._event_bridge.stop()
         if self._orchestrator:
             await self._orchestrator.graceful_shutdown()
         # Close WebSocket connections
-        for ws in self._ws_clients:
+        for ws in self._ws_clients + self._event_clients:
             try:
                 await ws.close()
             except Exception:
@@ -2895,6 +2909,62 @@ Respond with just the command to run."""
                 if websocket in self._ws_clients:
                     self._ws_clients.remove(websocket)
                 logger.info(f"WebSocket client disconnected. Total: {len(self._ws_clients)}")
+
+        # EventBridge WebSocket endpoint for real-time events
+        @app.websocket("/ws/events")
+        async def events_websocket_handler(websocket: WebSocket) -> None:
+            """Handle EventBridge WebSocket connections for real-time events.
+
+            This endpoint streams Victor events (tool execution, file changes,
+            provider updates, etc.) to connected clients like VS Code.
+
+            Message format:
+                Incoming: {"type": "subscribe", "categories": ["all"]}
+                Outgoing: {"type": "event", "event": {...}}
+            """
+            await websocket.accept()
+            self._event_clients.append(websocket)
+            client_id = uuid.uuid4().hex[:12]
+            logger.info(
+                f"EventBridge client {client_id} connected. Total: {len(self._event_clients)}"
+            )
+
+            # Register with EventBridge for event forwarding
+            async def send_event(message: str) -> None:
+                try:
+                    await websocket.send_text(message)
+                except Exception:
+                    pass
+
+            if self._event_bridge:
+                self._event_bridge._broadcaster.add_client(client_id, send_event)
+
+            try:
+                while True:
+                    data = await websocket.receive_json()
+                    msg_type = data.get("type", "")
+
+                    if msg_type == "subscribe":
+                        # Client wants to subscribe to specific event categories
+                        categories = data.get("categories", ["all"])
+                        logger.debug(f"Client {client_id} subscribed to: {categories}")
+                        # Send acknowledgment
+                        await websocket.send_json({"type": "subscribed", "categories": categories})
+
+                    elif msg_type == "ping":
+                        await websocket.send_json({"type": "pong"})
+
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if self._event_bridge:
+                    self._event_bridge._broadcaster.remove_client(client_id)
+                if websocket in self._event_clients:
+                    self._event_clients.remove(websocket)
+                logger.info(
+                    f"EventBridge client {client_id} disconnected. "
+                    f"Total: {len(self._event_clients)}"
+                )
 
     # =========================================================================
     # HITL (Human-in-the-Loop) Routes
