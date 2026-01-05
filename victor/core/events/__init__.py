@@ -14,47 +14,56 @@
 
 """Unified Event System for Victor.
 
-This package provides a unified event taxonomy and utilities for event handling
-across all Victor subsystems. The taxonomy consolidates fragmented event types
-from various modules into a single, hierarchical system.
+This package provides:
+1. Unified event taxonomy for consistent event types
+2. Protocol-based backends for distributed messaging
+3. Specialized buses for observability and agent communication
 
 Key Components:
 - UnifiedEventType: Hierarchical enum of all event types
-- Mapping functions: Convert legacy event types to unified taxonomy
-- Utility functions: Query and filter events by category
+- IEventBackend: Protocol for swappable backends (Kafka, SQS, RabbitMQ, etc.)
+- ObservabilityBus: High-throughput telemetry (lossy OK)
+- AgentMessageBus: Reliable cross-agent communication
 
-Usage:
+Usage - Event Taxonomy:
     from victor.core.events import (
         UnifiedEventType,
         map_workflow_event,
         get_events_by_category,
     )
 
-    # Use unified event types directly
     event_type = UnifiedEventType.WORKFLOW_NODE_START
     print(event_type.category)  # "workflow"
 
-    # Map from legacy event types
-    from victor.workflows.streaming import WorkflowEventType
-    unified = map_workflow_event(WorkflowEventType.NODE_START)
+Usage - Protocol-Based Backends:
+    from victor.core.events import (
+        create_event_backend,
+        Event,
+        ObservabilityBus,
+        AgentMessageBus,
+    )
 
-    # Query events by category
-    tool_events = get_events_by_category("tool")
+    # Observability (high volume, lossy OK)
+    obs_bus = ObservabilityBus()
+    await obs_bus.connect()
+    await obs_bus.emit("metric.latency", {"value": 42.5})
 
-Migration Guide:
-    Legacy event types from the following modules can be mapped to the
-    unified taxonomy:
+    # Agent communication (delivery guarantees)
+    agent_bus = AgentMessageBus()
+    await agent_bus.connect()
+    await agent_bus.send("task", {"action": "analyze"}, to_agent="researcher")
 
-    - victor.workflows.streaming.WorkflowEventType -> map_workflow_event()
-    - victor.observability.event_bus.EventCategory -> map_event_category()
-
-    While legacy event types continue to work, new code should use
-    UnifiedEventType directly for consistency.
+Backend Types:
+    - IN_MEMORY: Default, single-instance (victor.core.events.backends)
+    - KAFKA: Distributed, high-throughput (register external implementation)
+    - SQS: AWS serverless (register external implementation)
+    - RABBITMQ: Traditional MQ (register external implementation)
+    - REDIS: Fast streams (register external implementation)
 
 See Also:
-    - victor.core.events.taxonomy: Full documentation and implementation
-    - victor.observability.event_bus: EventBus for event pub/sub
-    - victor.workflows.observability: Workflow observability integration
+    - victor.core.events.protocols: Protocol definitions
+    - victor.core.events.backends: Backend implementations
+    - victor.core.events.taxonomy: Event type taxonomy
 """
 
 from victor.core.events.taxonomy import (
@@ -75,20 +84,69 @@ from victor.core.events.taxonomy import (
     emit_deprecation_warning,
 )
 
+# Protocol-based event system
+from victor.core.events.protocols import (
+    # Core types
+    Event,
+    SubscriptionHandle,
+    DeliveryGuarantee,
+    BackendType,
+    BackendConfig,
+    # Protocols
+    IEventBackend,
+    IEventPublisher,
+    IEventSubscriber,
+    # Exceptions
+    EventPublishError,
+    EventSubscriptionError,
+)
+
+from victor.core.events.backends import (
+    # Backends
+    InMemoryEventBackend,
+    # Specialized buses
+    ObservabilityBus,
+    AgentMessageBus,
+    # Factory
+    create_event_backend,
+    register_backend_factory,
+)
+
 __all__ = [
-    # Core enum
+    # Taxonomy - Core enum
     "UnifiedEventType",
-    # Mapping functions
+    # Taxonomy - Mapping functions
     "map_workflow_event",
     "map_event_category",
     "map_framework_event",
     "map_tool_event",
     "map_agent_event",
     "map_system_event",
-    # Utility functions
+    # Taxonomy - Utility functions
     "get_all_categories",
     "get_events_by_category",
     "is_valid_event_type",
-    # Deprecation helpers
+    # Taxonomy - Deprecation helpers
     "emit_deprecation_warning",
+    # Protocol-based - Core types
+    "Event",
+    "SubscriptionHandle",
+    "DeliveryGuarantee",
+    "BackendType",
+    "BackendConfig",
+    # Protocol-based - Protocols
+    "IEventBackend",
+    "IEventPublisher",
+    "IEventSubscriber",
+    # Protocol-based - Exceptions
+    "EventPublishError",
+    "EventSubscriptionError",
+    # Protocol-based - Backends
+    "InMemoryEventBackend",
+    # Protocol-based - Specialized buses
+    "ObservabilityBus",
+    "AgentMessageBus",
+    # Protocol-based - Factory
+    "create_event_backend",
+    "register_backend_factory",
 ]
