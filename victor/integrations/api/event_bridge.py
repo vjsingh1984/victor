@@ -441,3 +441,72 @@ def emit_notification(
             },
         )
     )
+
+
+class EventBridge:
+    """Main EventBridge interface for bridging EventBus to WebSocket clients.
+
+    Provides a unified interface for:
+    - Starting/stopping the bridge
+    - Connecting to EventBus
+    - Broadcasting events to WebSocket clients
+
+    Example:
+        bus = get_event_bus()
+        bridge = EventBridge(bus)
+        bridge.start()
+
+        # ... later
+        bridge.stop()
+    """
+
+    def __init__(self, event_bus: Optional[EventBus] = None):
+        """Initialize the EventBridge.
+
+        Args:
+            event_bus: Optional EventBus to connect to immediately
+        """
+        self._event_bus = event_bus
+        self._broadcaster = EventBroadcaster()
+        self._adapter = EventBusAdapter(event_bus, self._broadcaster)
+        self._running = False
+
+    def start(self) -> None:
+        """Start the EventBridge.
+
+        Connects to the EventBus and begins broadcasting events.
+        """
+        if self._running:
+            return
+
+        if self._event_bus:
+            self._adapter.connect(self._event_bus)
+
+        self._running = True
+        logger.info("EventBridge started")
+
+    def stop(self) -> None:
+        """Stop the EventBridge.
+
+        Disconnects from EventBus and stops broadcasting.
+        """
+        if not self._running:
+            return
+
+        self._adapter.disconnect()
+        self._running = False
+        logger.info("EventBridge stopped")
+
+    async def handle_connection(
+        self,
+        websocket,
+        client_id: Optional[str] = None,
+    ) -> None:
+        """Handle a new WebSocket connection.
+
+        Args:
+            websocket: WebSocket connection object
+            client_id: Optional client identifier
+        """
+        handler = WebSocketEventHandler(self._broadcaster)
+        await handler.handle_connection(websocket, client_id)
