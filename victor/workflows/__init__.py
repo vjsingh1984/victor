@@ -306,6 +306,20 @@ from victor.workflows.context import (
     from_adapter_workflow_state,
     to_adapter_workflow_state,
 )
+from victor.workflows.node_runners import (
+    BaseNodeRunner,
+    AgentNodeRunner,
+    ComputeNodeRunner,
+    TransformNodeRunner,
+    HITLNodeRunner,
+    ConditionNodeRunner,
+    ParallelNodeRunner,
+    NodeRunnerRegistry,
+)
+from victor.workflows.protocols import (
+    NodeRunner,
+    NodeRunnerResult,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -534,4 +548,15 @@ __all__ = [
     "to_compiler_workflow_state",
     "from_adapter_workflow_state",
     "to_adapter_workflow_state",
+    # NodeRunner Protocol and Implementations (ISP + DIP)
+    "NodeRunner",
+    "NodeRunnerResult",
+    "BaseNodeRunner",
+    "AgentNodeRunner",
+    "ComputeNodeRunner",
+    "TransformNodeRunner",
+    "HITLNodeRunner",
+    "ConditionNodeRunner",
+    "ParallelNodeRunner",
+    "NodeRunnerRegistry",
 ]
