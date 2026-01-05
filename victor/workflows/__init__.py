@@ -328,6 +328,14 @@ from victor.workflows.graph_compiler import (
     compile_workflow_graph,
     compile_workflow_definition,
 )
+from victor.workflows.observability import (
+    StreamingObserver,
+    AsyncStreamingObserver,
+    FunctionObserver,
+    ObservabilityEmitter,
+    create_emitter,
+    create_logging_observer,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -574,4 +582,11 @@ __all__ = [
     "WorkflowDefinitionCompiler",
     "compile_workflow_graph",
     "compile_workflow_definition",
+    # Observability (Unified Streaming - Phase 5)
+    "StreamingObserver",
+    "AsyncStreamingObserver",
+    "FunctionObserver",
+    "ObservabilityEmitter",
+    "create_emitter",
+    "create_logging_observer",
 ]

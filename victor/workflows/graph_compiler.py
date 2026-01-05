@@ -103,12 +103,16 @@ class CompilerConfig:
         runner_registry: Registry of node runners (if use_node_runners=True).
         validate_before_compile: Whether to validate graph before compilation.
         preserve_state_type: Whether to preserve typed state or use dict.
+        emitter: Optional ObservabilityEmitter for streaming events (Phase 5).
+        enable_observability: Whether to emit observability events during execution.
     """
 
     use_node_runners: bool = False
     runner_registry: Optional["NodeRunnerRegistry"] = None
     validate_before_compile: bool = True
     preserve_state_type: bool = False
+    emitter: Optional[Any] = None  # ObservabilityEmitter, use Any to avoid circular import
+    enable_observability: bool = False
 
 
 # =============================================================================
@@ -121,6 +125,8 @@ class NodeRunnerWrapper:
 
     This adapter allows NodeRunner implementations to be used within
     CompiledGraph execution, bridging the two execution models.
+
+    Supports observability events via optional emitter (Phase 5).
     """
 
     def __init__(
@@ -128,6 +134,7 @@ class NodeRunnerWrapper:
         node_id: str,
         node_config: Dict[str, Any],
         runner: NodeRunner,
+        emitter: Optional[Any] = None,  # ObservabilityEmitter
     ):
         """Initialize the wrapper.
 
@@ -135,10 +142,12 @@ class NodeRunnerWrapper:
             node_id: ID of the node being wrapped.
             node_config: Configuration for the node.
             runner: NodeRunner to delegate execution to.
+            emitter: Optional ObservabilityEmitter for streaming events.
         """
         self._node_id = node_id
         self._node_config = node_config
         self._runner = runner
+        self._emitter = emitter
 
     async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the node via NodeRunner.
@@ -149,6 +158,15 @@ class NodeRunnerWrapper:
         Returns:
             Updated state after node execution.
         """
+        import time
+
+        start_time = time.time()
+        node_name = self._node_config.get("name", self._node_id)
+
+        # Emit NODE_START if emitter is configured
+        if self._emitter:
+            self._emitter.emit_node_start(self._node_id, node_name)
+
         # Convert state to ExecutionContext if needed
         if "_workflow_id" not in state:
             # Wrap in ExecutionContext structure
@@ -161,19 +179,49 @@ class NodeRunnerWrapper:
         else:
             context = state
 
-        # Execute via NodeRunner
-        updated_context, result = await self._runner.execute(
-            self._node_id,
-            self._node_config,
-            context,
-        )
+        try:
+            # Execute via NodeRunner
+            updated_context, result = await self._runner.execute(
+                self._node_id,
+                self._node_config,
+                context,
+            )
 
-        # Return updated state
-        if "_workflow_id" not in state:
-            # Return just the data for simple state
-            return updated_context.get("data", state)
-        else:
+            duration = time.time() - start_time
+
+            # Emit NODE_COMPLETE or NODE_ERROR if emitter is configured
+            if self._emitter:
+                if result.success:
+                    self._emitter.emit_node_complete(
+                        self._node_id,
+                        node_name,
+                        duration=duration,
+                        output=result.output,
+                    )
+                else:
+                    self._emitter.emit_node_error(
+                        self._node_id,
+                        error=result.error or "Unknown error",
+                        node_name=node_name,
+                        duration=duration,
+                    )
+
+            # Return updated state
+            if "_workflow_id" not in state:
+                # Return just the data for simple state
+                return updated_context.get("data", state)
             return updated_context
+
+        except Exception as e:
+            duration = time.time() - start_time
+            if self._emitter:
+                self._emitter.emit_node_error(
+                    self._node_id,
+                    error=str(e),
+                    node_name=node_name,
+                    duration=duration,
+                )
+            raise
 
 
 # =============================================================================
@@ -334,7 +382,8 @@ class WorkflowGraphCompiler(Generic[S]):
             )
             if runner:
                 node_config = self._extract_node_config(graph_node, GraphNodeType)
-                return NodeRunnerWrapper(graph_node.name, node_config, runner)
+                emitter = self._config.emitter if self._config.enable_observability else None
+                return NodeRunnerWrapper(graph_node.name, node_config, runner, emitter)
 
         # Default: wrap the original function with state conversion
         original_func = graph_node.func
