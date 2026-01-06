@@ -57,11 +57,11 @@ class PipelineFormation(BaseFormationStrategy):
 
             # Create task for this stage
             stage_task = AgentMessage(
-                message_message_type=MessageType.TASK,
-                sender="system",
-                receiver=agent.id,
+                message_type=MessageType.TASK,
+                sender_id="system",
+                recipient_id=agent.id,
                 content=current_data,
-                metadata={"stage": i, "pipeline": True},
+                data={"stage": i, "pipeline": True},
             )
 
             try:
@@ -74,8 +74,8 @@ class PipelineFormation(BaseFormationStrategy):
                     break
 
                 # Update current_data for next stage
-                if result.content is not None:
-                    current_data = result.content
+                if result.output is not None:
+                    current_data = result.output
                 else:
                     logger.warning(f"PipelineFormation: stage {i} produced no output")
                     break
@@ -84,9 +84,9 @@ class PipelineFormation(BaseFormationStrategy):
                 logger.error(f"PipelineFormation: stage {i} failed: {e}")
                 results.append(
                     MemberResult(
-                        agent_id=agent.id,
+                        member_id=agent.id,
                         success=False,
-                        content=None,
+                        output="",
                         error=str(e),
                         metadata={"stage": i, "pipeline": True},
                     )

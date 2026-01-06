@@ -40,6 +40,14 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
+from victor.coordination.formations import (
+    SequentialFormation,
+    ParallelFormation,
+    HierarchicalFormation,
+    PipelineFormation,
+    ConsensusFormation,
+)
 from victor.teams.mixins.observability import ObservabilityMixin
 from victor.teams.mixins.rl import RLMixin
 from victor.teams.types import (
@@ -54,6 +62,54 @@ if TYPE_CHECKING:
     from victor.teams.protocols import ITeamMember
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Team Member Adapter
+# =============================================================================
+
+
+class _TeamMemberAdapter:
+    """Adapter to bridge ITeamMember to formation strategy agent interface.
+
+    Formation strategies expect agents with execute(task, context) -> MemberResult
+    but ITeamMember uses execute_task(task, context) -> str.
+    """
+
+    def __init__(self, member: "ITeamMember", coordinator_context: Dict[str, Any]):
+        self._member = member
+        self._context = coordinator_context
+        self.id = member.id
+
+    async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
+        """Execute task using ITeamMember interface."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Call ITeamMember's execute_task
+            output = await self._member.execute_task(task.content, self._context)
+
+            duration = time.time() - start_time
+
+            return MemberResult(
+                member_id=self._member.id,
+                success=True,
+                output=output,
+                duration_seconds=duration,
+                metadata={"task": task.content},
+            )
+        except Exception as e:
+            duration = time.time() - start_time
+            return MemberResult(
+                member_id=self._member.id,
+                success=False,
+                output="",
+                error=str(e),
+                duration_seconds=duration,
+                metadata={"task": task.content},
+            )
 
 
 class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
@@ -85,6 +141,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         *,
         enable_observability: bool = True,
         enable_rl: bool = True,
+        lightweight_mode: bool = False,
     ) -> None:
         """Initialize the unified coordinator.
 
@@ -92,20 +149,38 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             orchestrator: Optional agent orchestrator for SubAgent spawning
             enable_observability: Enable EventBus integration
             enable_rl: Enable RL integration
+            lightweight_mode: If True, disable mixins (for testing without dependencies)
         """
-        # Initialize mixins
-        ObservabilityMixin.__init__(self, enable_observability=enable_observability)
-        RLMixin.__init__(self, enable_rl=enable_rl)
+        # Initialize mixins conditionally based on lightweight_mode
+        if not lightweight_mode:
+            ObservabilityMixin.__init__(self, enable_observability=enable_observability)
+            RLMixin.__init__(self, enable_rl=enable_rl)
+            self._enable_observability = enable_observability
+            self._enable_rl = enable_rl
+        else:
+            # In lightweight mode, skip mixin initialization
+            self._enable_observability = False
+            self._enable_rl = False
 
         # Core state
         self._orchestrator = orchestrator
         self._members: List[ITeamMember] = []
         self._formation = TeamFormation.SEQUENTIAL
         self._manager: Optional[ITeamMember] = None
+        self._lightweight_mode = lightweight_mode
 
         # Communication
         self._message_history: List[AgentMessage] = []
         self._shared_context: Dict[str, Any] = {}
+
+        # Formation strategies (composition over inheritance)
+        self._formations: Dict[TeamFormation, BaseFormationStrategy] = {
+            TeamFormation.SEQUENTIAL: SequentialFormation(),
+            TeamFormation.PARALLEL: ParallelFormation(),
+            TeamFormation.HIERARCHICAL: HierarchicalFormation(),
+            TeamFormation.PIPELINE: PipelineFormation(),
+            TeamFormation.CONSENSUS: ConsensusFormation(),
+        }
 
     # =========================================================================
     # ITeamCoordinator Protocol Methods
@@ -265,6 +340,34 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         return responses
 
+    async def send_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+        """Send a message to a specific team member.
+
+        Args:
+            message: Message with recipient_id set
+
+        Returns:
+            Response from the recipient, or None if not found
+        """
+        if not message.recipient_id:
+            return None
+
+        self._message_history.append(message)
+
+        # Find recipient
+        for member in self._members:
+            if member.id == message.recipient_id:
+                try:
+                    response = await member.receive_message(message)
+                    if response:
+                        self._message_history.append(response)
+                    return response
+                except Exception as e:
+                    logger.warning(f"Member {member.id} failed to receive: {e}")
+                    return None
+
+        return None
+
     # =========================================================================
     # IMessageBusProvider / ISharedMemoryProvider
     # =========================================================================
@@ -284,7 +387,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # =========================================================================
 
     async def _execute_formation(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Dispatch to appropriate formation executor.
+        """Execute using formation strategies.
+
+        This replaces the old per-formation methods with a single method
+        that delegates to the appropriate formation strategy.
 
         Args:
             task: Task description
@@ -293,346 +399,69 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         Returns:
             Result dictionary
         """
-        executors = {
-            TeamFormation.SEQUENTIAL: self._execute_sequential,
-            TeamFormation.PARALLEL: self._execute_parallel,
-            TeamFormation.HIERARCHICAL: self._execute_hierarchical,
-            TeamFormation.PIPELINE: self._execute_pipeline,
-            TeamFormation.CONSENSUS: self._execute_consensus,
+        # Get the formation strategy
+        strategy = self._formations[self._formation]
+
+        # Wrap team members with adapters
+        adapted_members = [_TeamMemberAdapter(m, context) for m in self._members]
+
+        # Create TeamContext
+        team_context = TeamContext(
+            team_id=context.get("team_name", "UnifiedTeam"),
+            formation=self._formation.value,
+            shared_state=self._shared_context,
+            **context,
+        )
+
+        # Create AgentMessage for the task
+        agent_task = AgentMessage(
+            sender_id="coordinator",
+            content=task,
+            message_type=MessageType.TASK,
+            data=context,
+        )
+
+        # Execute using formation strategy
+        member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
+
+        # Convert list of MemberResults to dict
+        member_results: Dict[str, MemberResult] = {
+            r.member_id: r for r in member_results_list
         }
-        return await executors[self._formation](task, context)
 
-    async def _execute_sequential(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute members sequentially with context chaining.
+        # Build final output
+        success = all(r.success for r in member_results_list) if member_results_list else False
+        final_outputs = [r.output for r in member_results_list if r.success]
+        total_tool_calls = sum(r.tool_calls_used for r in member_results_list)
 
-        Each member receives the accumulated context from previous members.
-        """
-        member_results: Dict[str, MemberResult] = {}
-        accumulated_context = dict(context)
-        final_outputs: List[str] = []
-        total_tool_calls = 0
-        success = True
+        # Determine final output based on formation
+        # For pipeline, use only the last stage's output
+        # For other formations, join all outputs
+        if self._formation == TeamFormation.PIPELINE and final_outputs:
+            final_output = final_outputs[-1]  # Last stage's output only
+        else:
+            final_output = "\n\n".join(final_outputs)
 
-        for i, member in enumerate(self._members):
-            self._report_progress(member.id, "executing", (i + 1) / len(self._members))
-
-            try:
-                start = time.time()
-                output = await member.execute_task(task, accumulated_context)
-                duration = time.time() - start
-
-                result = MemberResult(
-                    member_id=member.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=duration,
-                )
-                member_results[member.id] = result
-                final_outputs.append(output)
-
-                # Update context for next member
-                accumulated_context[f"member_{member.id}_output"] = output
-                self._shared_context[member.id] = output
-
-            except Exception as e:
-                logger.warning(f"Member {member.id} failed: {e}")
-                member_results[member.id] = MemberResult(
-                    member_id=member.id,
-                    success=False,
-                    output="",
-                    error=str(e),
-                )
-                success = False
-
-        return {
+        # Extract consensus metadata if present (from ConsensusFormation)
+        result_dict = {
             "success": success,
             "member_results": member_results,
-            "final_output": "\n\n".join(final_outputs),
+            "final_output": final_output,
             "formation": self._formation.value,
             "total_tool_calls": total_tool_calls,
             "communication_log": self._message_history,
             "shared_context": self._shared_context,
         }
 
-    async def _execute_parallel(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute all members in parallel.
+        # Add consensus metadata if any member result has it
+        if member_results_list:
+            first_metadata = member_results_list[0].metadata
+            if "consensus_achieved" in first_metadata:
+                result_dict["consensus_achieved"] = first_metadata["consensus_achieved"]
+            if "consensus_rounds" in first_metadata:
+                result_dict["consensus_rounds"] = first_metadata["consensus_rounds"]
 
-        All members work simultaneously on the same task.
-        """
-        member_results: Dict[str, MemberResult] = {}
-
-        async def run_member(member: "ITeamMember") -> MemberResult:
-            try:
-                start = time.time()
-                output = await member.execute_task(task, context)
-                duration = time.time() - start
-                return MemberResult(
-                    member_id=member.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=duration,
-                )
-            except Exception as e:
-                return MemberResult(
-                    member_id=member.id,
-                    success=False,
-                    output="",
-                    error=str(e),
-                )
-
-        # Execute all in parallel
-        results = await asyncio.gather(
-            *[run_member(m) for m in self._members],
-            return_exceptions=False,
-        )
-
-        for result in results:
-            member_results[result.member_id] = result
-
-        success = all(r.success for r in results)
-        final_outputs = [r.output for r in results if r.success]
-
-        return {
-            "success": success,
-            "member_results": member_results,
-            "final_output": "\n\n".join(final_outputs),
-            "formation": self._formation.value,
-            "communication_log": self._message_history,
-            "shared_context": self._shared_context,
-        }
-
-    async def _execute_hierarchical(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute with manager-worker hierarchy.
-
-        1. Manager plans and delegates
-        2. Workers execute in parallel
-        3. Manager synthesizes results
-        """
-        member_results: Dict[str, MemberResult] = {}
-
-        # Determine manager
-        manager = self._manager or (self._members[0] if self._members else None)
-        if not manager:
-            return {
-                "success": False,
-                "error": "No manager available",
-                "member_results": {},
-                "final_output": "",
-                "formation": self._formation.value,
-            }
-
-        workers = [m for m in self._members if m != manager]
-
-        # Phase 1: Manager planning
-        self._report_progress(manager.id, "planning", 0.1)
-        planning_context = {
-            **context,
-            "role": "manager",
-            "phase": "planning",
-            "worker_count": len(workers),
-        }
-
-        try:
-            plan_output = await manager.execute_task(
-                f"Plan delegation for: {task}", planning_context
-            )
-            member_results[manager.id] = MemberResult(
-                member_id=manager.id,
-                success=True,
-                output=f"[Plan] {plan_output}",
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Manager planning failed: {e}",
-                "member_results": member_results,
-                "final_output": "",
-                "formation": self._formation.value,
-            }
-
-        # Phase 2: Worker execution (parallel)
-        if workers:
-            worker_context = {
-                **context,
-                "role": "worker",
-                "manager_plan": plan_output,
-            }
-
-            async def run_worker(worker: "ITeamMember") -> MemberResult:
-                try:
-                    output = await worker.execute_task(task, worker_context)
-                    return MemberResult(
-                        member_id=worker.id,
-                        success=True,
-                        output=output,
-                    )
-                except Exception as e:
-                    return MemberResult(
-                        member_id=worker.id,
-                        success=False,
-                        output="",
-                        error=str(e),
-                    )
-
-            worker_results = await asyncio.gather(*[run_worker(w) for w in workers])
-
-            for result in worker_results:
-                member_results[result.member_id] = result
-
-        # Phase 3: Manager synthesis
-        self._report_progress(manager.id, "synthesizing", 0.9)
-        worker_outputs = [r.output for r in member_results.values() if r.success]
-
-        synthesis_context = {
-            **context,
-            "role": "manager",
-            "phase": "synthesis",
-            "worker_outputs": worker_outputs,
-        }
-
-        try:
-            final_output = await manager.execute_task(
-                f"Synthesize worker results for: {task}", synthesis_context
-            )
-        except Exception as e:
-            final_output = f"Synthesis failed: {e}. Results: {worker_outputs}"
-
-        success = all(r.success for r in member_results.values())
-
-        return {
-            "success": success,
-            "member_results": member_results,
-            "final_output": final_output,
-            "formation": self._formation.value,
-            "communication_log": self._message_history,
-            "shared_context": self._shared_context,
-        }
-
-    async def _execute_pipeline(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute as a pipeline where output feeds to next stage.
-
-        Each member's output becomes the input for the next member.
-        """
-        member_results: Dict[str, MemberResult] = {}
-        current_input = task
-        current_context = dict(context)
-        success = True
-
-        for i, member in enumerate(self._members):
-            self._report_progress(member.id, "processing", (i + 1) / len(self._members))
-
-            # Build pipeline context
-            pipeline_context = {
-                **current_context,
-                "pipeline_stage": i,
-                "pipeline_input": current_input,
-            }
-
-            try:
-                start = time.time()
-                output = await member.execute_task(current_input, pipeline_context)
-                duration = time.time() - start
-
-                member_results[member.id] = MemberResult(
-                    member_id=member.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=duration,
-                )
-
-                # Output becomes input for next stage
-                current_input = output
-                current_context[f"stage_{i}_output"] = output
-
-                # Send handoff message
-                if i < len(self._members) - 1:
-                    handoff = AgentMessage(
-                        sender_id=member.id,
-                        recipient_id=self._members[i + 1].id,
-                        content=output,
-                        message_type=MessageType.HANDOFF,
-                    )
-                    self._message_history.append(handoff)
-
-            except Exception as e:
-                logger.warning(f"Pipeline stage {i} failed: {e}")
-                member_results[member.id] = MemberResult(
-                    member_id=member.id,
-                    success=False,
-                    output="",
-                    error=str(e),
-                )
-                success = False
-                break  # Pipeline breaks on failure
-
-        return {
-            "success": success,
-            "member_results": member_results,
-            "final_output": current_input,  # Last stage output
-            "formation": self._formation.value,
-            "communication_log": self._message_history,
-            "shared_context": current_context,
-        }
-
-    async def _execute_consensus(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute with consensus - all members must agree.
-
-        Members execute in parallel, and success requires consensus
-        (configurable agreement threshold). If not reached, re-execute
-        with shared context until agreement or max rounds.
-
-        Args:
-            task: Task description
-            context: Context with optional:
-                - max_consensus_rounds: Max attempts (default: 3)
-                - agreement_threshold: Required agreement (default: 1.0)
-        """
-        max_rounds = context.get("max_consensus_rounds", 3)
-        threshold = context.get("agreement_threshold", 1.0)
-
-        for round_num in range(max_rounds):
-            # Add round context
-            round_context = {
-                **context,
-                "consensus_round": round_num + 1,
-                "max_rounds": max_rounds,
-            }
-
-            if round_num > 0:
-                # Add disagreement context for retry rounds
-                round_context["previous_results"] = self._shared_context.get("previous_results", [])
-
-            # Execute parallel
-            result = await self._execute_parallel(task, round_context)
-
-            # Check consensus
-            member_results = result.get("member_results", {})
-            success_rate = (
-                sum(1 for r in member_results.values() if r.success) / len(member_results)
-                if member_results
-                else 0
-            )
-
-            if success_rate >= threshold:
-                result["consensus_achieved"] = True
-                result["consensus_rounds"] = round_num + 1
-                return result
-
-            # Store for next round
-            self._shared_context["previous_results"] = [
-                {"member": mid, "output": r.output} for mid, r in member_results.items()
-            ]
-
-        # Max rounds exceeded
-        return {
-            "success": False,
-            "error": f"Consensus not reached after {max_rounds} rounds",
-            "member_results": member_results if "member_results" in locals() else {},
-            "final_output": "",
-            "formation": self._formation.value,
-            "consensus_achieved": False,
-            "consensus_rounds": max_rounds,
-        }
+        return result_dict
 
     # =========================================================================
     # Utility Methods
@@ -659,3 +488,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     def formation(self) -> TeamFormation:
         """Get current formation."""
         return self._formation
+
+    @property
+    def manager(self) -> Optional["ITeamMember"]:
+        """Get team manager (for hierarchical formation)."""
+        return self._manager

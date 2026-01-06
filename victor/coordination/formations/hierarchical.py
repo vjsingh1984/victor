@@ -65,7 +65,34 @@ class HierarchicalFormation(BaseFormationStrategy):
 
         # Check if manager created delegation tasks
         if not manager_result.success or not manager_result.metadata.get("delegated_tasks"):
-            logger.warning("HierarchicalFormation: manager did not delegate tasks")
+            logger.info("HierarchicalFormation: manager did not delegate tasks, executing all workers with original task")
+            # Fallback: Execute all workers with the original task
+            worker_tasks = [
+                self._execute_worker(worker, task, context, i)
+                for i, worker in enumerate(workers)
+            ]
+
+            # Execute workers in parallel
+            import asyncio
+
+            worker_results = await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+            # Process worker results
+            for i, result in enumerate(worker_results):
+                if isinstance(result, Exception):
+                    logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
+                    results.append(
+                        MemberResult(
+                            member_id=workers[i].id,
+                            success=False,
+                            output="",
+                            error=str(result),
+                            metadata={"index": i + 1, "role": "worker"},
+                        )
+                    )
+                else:
+                    results.append(result)
+
             return results
 
         # Phase 2: Workers execute delegated tasks in parallel
@@ -94,9 +121,9 @@ class HierarchicalFormation(BaseFormationStrategy):
                 logger.error(f"HierarchicalFormation: worker {workers[i].id} failed: {result}")
                 results.append(
                     MemberResult(
-                        agent_id=workers[i].id,
+                        member_id=workers[i].id,
                         success=False,
-                        content=None,
+                        output="",
                         error=str(result),
                         metadata={"index": i + 1, "role": "worker"},
                     )

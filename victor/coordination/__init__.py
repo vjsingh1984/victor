@@ -14,36 +14,44 @@
 
 """Multi-agent coordination module.
 
-This module provides unified coordination for multi-agent systems,
-consolidating multiple coordinator implementations into a single,
-configurable system.
+This module provides formation strategies for multi-agent coordination,
+without creating circular dependencies.
 
-Architecture:
-    - Single coordinator with mode-based configuration
-    - Formation strategies for different execution patterns
-    - Event system integration
-    - Clean dependency hierarchy (no circular dependencies)
+The coordination module is intentionally kept lightweight and independent:
+- Formation strategies (sequential, parallel, hierarchical, pipeline, consensus)
+- Base classes and protocols for coordination
+- No dependency on teams module (breaks circular dependency)
 
 Example:
-    from victor.coordination import create_coordinator
+    from victor.coordination.formations import SequentialFormation, ParallelFormation
+    from victor.teams import UnifiedTeamCoordinator
 
-    coordinator = create_coordinator(
-        formation="hierarchical",
-        mode="production",
-        config=coordinator_config
-    )
+    # Formations are used by coordinators, not the other way around
+    coordinator = UnifiedTeamCoordinator()
+    coordinator.set_formation(TeamFormation.SEQUENTIAL)
 """
 
-from victor.teams import create_coordinator
-from victor.teams.types import (
-    AgentMessage,
-    MessageType,
-    TeamFormation,
+# Re-export formation strategies for convenience
+from victor.coordination.formations.base import (
+    BaseFormationStrategy,
+    TeamContext,
+)
+from victor.coordination.formations import (
+    SequentialFormation,
+    ParallelFormation,
+    HierarchicalFormation,
+    PipelineFormation,
+    ConsensusFormation,
 )
 
 __all__ = [
-    "create_coordinator",
-    "AgentMessage",
-    "MessageType",
-    "TeamFormation",
+    # Base classes
+    "BaseFormationStrategy",
+    "TeamContext",
+    # Formation strategies
+    "SequentialFormation",
+    "ParallelFormation",
+    "HierarchicalFormation",
+    "PipelineFormation",
+    "ConsensusFormation",
 ]
