@@ -86,7 +86,7 @@ from victor.teams.protocols import (
 from victor.teams.unified_coordinator import UnifiedTeamCoordinator
 
 # Framework coordinator (for testing/lightweight usage)
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
+# Note: Imported in create_coordinator() to avoid circular dependency
 
 # Communication infrastructure (from agent.teams)
 from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
@@ -115,12 +115,12 @@ def create_coordinator(
 
     Args:
         orchestrator: Agent orchestrator (optional, for SubAgent spawning)
-        lightweight: Use lightweight framework coordinator (for testing)
+        lightweight: Use lightweight mode (disables mixins, for testing)
         with_observability: Enable EventBus integration (default: True)
         with_rl: Enable RL integration (default: True)
 
     Returns:
-        ITeamCoordinator implementation
+        ITeamCoordinator implementation (UnifiedTeamCoordinator)
 
     Example:
         # Production coordinator with all features
@@ -132,17 +132,13 @@ def create_coordinator(
         # Without RL
         coordinator = create_coordinator(orchestrator, with_rl=False)
     """
-    if lightweight:
-        # Use lightweight framework coordinator for testing
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
-
-        return FrameworkTeamCoordinator()
-
-    # Use unified production coordinator
+    # Always use UnifiedTeamCoordinator with appropriate mode
+    # This effectively merges FrameworkTeamCoordinator into UnifiedTeamCoordinator
     return UnifiedTeamCoordinator(
         orchestrator,
-        enable_observability=with_observability,
-        enable_rl=with_rl,
+        enable_observability=with_observability if not lightweight else False,
+        enable_rl=with_rl if not lightweight else False,
+        lightweight_mode=lightweight,
     )
 
 
@@ -164,7 +160,6 @@ __all__ = [
     "IEnhancedTeamCoordinator",
     # Coordinators
     "UnifiedTeamCoordinator",
-    "FrameworkTeamCoordinator",
     # Communication
     "TeamMessageBus",
     "TeamSharedMemory",
