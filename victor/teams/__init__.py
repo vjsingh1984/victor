@@ -17,15 +17,6 @@
 This is the recommended import location for all team functionality.
 Import from here instead of victor.framework or victor.agent.teams.
 
-**Migration from FrameworkTeamCoordinator**:
-    Old (deprecated):
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
-        coordinator = FrameworkTeamCoordinator()
-
-    New (recommended):
-        from victor.teams import create_coordinator
-        coordinator = create_coordinator(lightweight=True)
-
 **Basic Usage**:
     from victor.teams import (
         TeamFormation,
@@ -154,10 +145,6 @@ def create_coordinator(
 
     This is the recommended way to create coordinators as it handles
     the appropriate configuration based on requirements.
-
-    **Migration from FrameworkTeamCoordinator**:
-        Old: coordinator = FrameworkTeamCoordinator()
-        New: coordinator = create_coordinator(lightweight=True)
 
     Args:
         orchestrator: Agent orchestrator (optional, for SubAgent spawning)
