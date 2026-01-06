@@ -28,15 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 class SequentialFormation(BaseFormationStrategy):
-    """Execute agents sequentially with context chaining.
+    """Execute agents sequentially with context accumulation.
 
     In sequential formation:
-    - Agent 1 receives initial task
-    - Agent 2 receives Agent 1's result as context
-    - Agent N receives Agent N-1's result as context
-    - Context accumulates through the chain
+    - All agents receive the same task
+    - Agent 1 executes with initial context
+    - Agent 2 executes with Agent 1's output in context
+    - Agent N executes with all previous outputs in context
+    - Context accumulates through shared_state
 
-    Use case: Stepwise refinement, multi-stage analysis
+    Use case: Multi-perspective analysis, sequential review
     """
 
     async def execute(
@@ -47,30 +48,46 @@ class SequentialFormation(BaseFormationStrategy):
     ) -> List[MemberResult]:
         """Execute agents sequentially with context chaining."""
         results = []
-        current_task = task
+        previous_output = None
+        previous_agent_id = None
 
         for i, agent in enumerate(agents):
             logger.debug(
                 f"SequentialFormation: executing agent {i+1}/{len(agents)}: {agent.id}"
             )
 
-            # Execute agent with current task
+            # Add previous output and agent to context
+            if previous_output:
+                context.shared_state["previous_output"] = previous_output
+            if previous_agent_id is not None:
+                context.shared_state["previous_agent"] = previous_agent_id
+
+            # Create task for this agent with previous_agent in data
+            agent_task = task
+            if previous_agent_id is not None:
+                # Create a copy of task data with previous_agent
+                task_data = dict(task.data)
+                task_data["previous_agent"] = previous_agent_id
+                agent_task = AgentMessage(
+                    sender_id=task.sender_id,
+                    content=task.content,
+                    message_type=task.message_type,
+                    recipient_id=agent.id,
+                    data=task_data,
+                    timestamp=task.timestamp,
+                    reply_to=task.reply_to,
+                    priority=task.priority,
+                )
+
+            # Execute agent with task
             try:
-                result = await agent.execute(current_task, context)
+                result = await agent.execute(agent_task, context)
                 results.append(result)
 
-                # Chain context for next agent
+                # Store output and agent ID for next agent's context
                 if result.success and result.output:
-                    # Create task for next agent with previous result
-                    current_task = AgentMessage(
-                        message_type=MessageType.TASK,
-                        sender_id="system",
-                        content=result.output,
-                        data={
-                            "previous_agent": agent.id,
-                            "previous_result": result.metadata,
-                        },
-                    )
+                    previous_output = result.output
+                    previous_agent_id = agent.id
 
             except Exception as e:
                 logger.error(f"SequentialFormation: agent {agent.id} failed: {e}")

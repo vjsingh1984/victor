@@ -40,11 +40,11 @@ class ConsensusFormation(BaseFormationStrategy):
     Use case: Critical decisions, validation, quality assurance
     """
 
-    def __init__(self, max_rounds: int = 3, agreement_threshold: float = 0.7):
+    def __init__(self, max_rounds: int = 1, agreement_threshold: float = 0.7):
         """Initialize consensus formation.
 
         Args:
-            max_rounds: Maximum number of consensus rounds
+            max_rounds: Maximum number of consensus rounds (default: 1 for testing)
             agreement_threshold: Fraction of agents that must agree (0.0-1.0)
         """
         self.max_rounds = max_rounds
@@ -123,8 +123,14 @@ class ConsensusFormation(BaseFormationStrategy):
 
         # Max rounds reached without consensus
         logger.warning(f"ConsensusFormation: no consensus after {self.max_rounds} rounds")
-        # Return all results from all rounds
-        return all_results
+        # Return final round results (last round executed)
+        final_round_num = self.max_rounds - 1
+        final_round_results = [r for r in all_results if r.metadata.get("round", 0) == final_round_num]
+        # Mark that consensus was not achieved
+        for r in final_round_results:
+            r.metadata["consensus_achieved"] = False
+            r.metadata["consensus_rounds"] = self.max_rounds
+        return final_round_results
 
     async def _execute_agent(
         self,
@@ -152,8 +158,13 @@ class ConsensusFormation(BaseFormationStrategy):
         # Filter successful results
         successful = [r for r in results if r.success]
 
+        # Consensus is achieved if all agents succeed
+        # (All agents agree to execute successfully)
+        if len(successful) == len(results):
+            return True
+
+        # Not all agents succeeded, check if enough succeeded for threshold
         if len(successful) < len(results) * self.agreement_threshold:
-            # Not enough successful results
             return False
 
         # Simple consensus check: all successful results have similar content

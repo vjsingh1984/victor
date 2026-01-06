@@ -53,15 +53,59 @@ class HierarchicalFormation(BaseFormationStrategy):
         if len(agents) < 2:
             raise ValueError("Hierarchical formation requires at least 2 agents (manager + workers)")
 
-        # First agent is the manager
-        manager = agents[0]
-        workers = agents[1:]
+        # Check for explicit manager in context first
+        explicit_manager_id = context.shared_state.get("explicit_manager_id")
+
+        # Auto-detect manager: find agent with DELEGATE capability or role attribute
+        manager = None
+        workers = []
+        manager_index = 0  # Track original index for result ordering
+
+        for i, agent in enumerate(agents):
+            # If explicit manager is set, use it
+            if explicit_manager_id and agent.id == explicit_manager_id:
+                manager = agent
+                manager_index = i
+                continue
+
+            # Otherwise check for manager by capability
+            is_manager = False
+            if hasattr(agent, 'role') and hasattr(agent.role, 'capabilities'):
+                from victor.framework.agent_protocols import AgentCapability
+                if AgentCapability.DELEGATE in agent.role.capabilities:
+                    is_manager = True
+
+            # Check if agent has _role attribute with manager in name
+            if not is_manager and hasattr(agent, '_role') and hasattr(agent._role, 'name'):
+                role_name = agent._role.name.lower()
+                if 'manager' in role_name or 'lead' in role_name or 'coordinator' in role_name:
+                    is_manager = True
+
+            if is_manager:
+                manager = agent
+                manager_index = i
+            else:
+                workers.append(agent)
+
+        # If no manager found by capability, use first agent as fallback
+        if manager is None:
+            logger.warning("HierarchicalFormation: no manager detected by capability, using first agent as manager")
+            manager = agents[0]
+            workers = agents[1:]
+        else:
+            if explicit_manager_id:
+                logger.info(f"HierarchicalFormation: using explicit manager={manager.id}")
+            else:
+                logger.info(f"HierarchicalFormation: auto-detected manager={manager.id}")
 
         logger.debug(f"HierarchicalFormation: manager={manager.id}, workers={[w.id for w in workers]}")
 
-        # Phase 1: Manager plans and delegates
+        # Phase 1: Manager plans and delegates (executes first!)
         manager_result = await manager.execute(task, context)
-        results = [manager_result]
+
+        # Create results list with manager first, followed by workers in original order
+        results = []
+        results.append(manager_result)
 
         # Check if manager created delegation tasks
         if not manager_result.success or not manager_result.metadata.get("delegated_tasks"):

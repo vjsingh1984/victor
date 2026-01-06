@@ -51,8 +51,8 @@ from victor.framework.agent_roles import (
     get_role,
 )
 from victor.framework.personas import Persona, get_persona
-from victor.teams import (
-    FrameworkTeamCoordinator,
+from victor.framework.team_coordinator import FrameworkTeamCoordinator
+from victor.teams.types import (
     MemberResult,
     TeamResult,
 )

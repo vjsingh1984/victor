@@ -48,24 +48,19 @@ class PipelineFormation(BaseFormationStrategy):
     ) -> List[MemberResult]:
         """Execute agents as a pipeline."""
         results = []
-        current_data = task.content
+        previous_output = None
 
         for i, agent in enumerate(agents):
             logger.debug(
                 f"PipelineFormation: stage {i+1}/{len(agents)}: {agent.id}"
             )
 
-            # Create task for this stage
-            stage_task = AgentMessage(
-                message_type=MessageType.TASK,
-                sender_id="system",
-                recipient_id=agent.id,
-                content=current_data,
-                data={"stage": i, "pipeline": True},
-            )
+            # Add previous output to context
+            if previous_output is not None:
+                context.shared_state["previous_output"] = previous_output
 
             try:
-                result = await agent.execute(stage_task, context)
+                result = await agent.execute(task, context)
                 results.append(result)
 
                 if not result.success:
@@ -73,9 +68,9 @@ class PipelineFormation(BaseFormationStrategy):
                     # Stop pipeline on failure
                     break
 
-                # Update current_data for next stage
+                # Store output for next stage
                 if result.output is not None:
-                    current_data = result.output
+                    previous_output = result.output
                 else:
                     logger.warning(f"PipelineFormation: stage {i} produced no output")
                     break

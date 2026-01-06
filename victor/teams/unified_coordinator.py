@@ -81,6 +81,11 @@ class _TeamMemberAdapter:
         self._context = coordinator_context
         self.id = member.id
 
+    @property
+    def role(self):
+        """Expose role from underlying member for formation strategy detection."""
+        return getattr(self._member, 'role', None)
+
     async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
         """Execute task using ITeamMember interface."""
         import time
@@ -88,8 +93,11 @@ class _TeamMemberAdapter:
         start_time = time.time()
 
         try:
+            # Merge TeamContext.shared_state into coordinator context
+            merged_context = {**self._context, **context.shared_state}
+
             # Call ITeamMember's execute_task
-            output = await self._member.execute_task(task.content, self._context)
+            output = await self._member.execute_task(task.content, merged_context)
 
             duration = time.time() - start_time
 
@@ -406,10 +414,15 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         adapted_members = [_TeamMemberAdapter(m, context) for m in self._members]
 
         # Create TeamContext
+        # Add explicit manager ID if set (for hierarchical formation)
+        shared_state_with_manager = dict(self._shared_context)
+        if self._manager is not None:
+            shared_state_with_manager["explicit_manager_id"] = self._manager.id
+
         team_context = TeamContext(
             team_id=context.get("team_name", "UnifiedTeam"),
             formation=self._formation.value,
-            shared_state=self._shared_context,
+            shared_state=shared_state_with_manager,
             **context,
         )
 
