@@ -60,6 +60,8 @@ from victor.agent.budget import (
     BudgetTracker,
     BudgetState,
     ModeCompletionChecker,
+    ModeCompletionConfig,
+    ModeObjective,
     MultiplierCalculator,
     ToolCallClassifier,
 )
@@ -71,6 +73,9 @@ from victor.agent.protocols import (
     IBudgetManager,
 )
 from victor.protocols.mode_aware import ModeAwareMixin
+
+# Type alias for backward compatibility
+ModeCompletionCriteria = ModeCompletionChecker
 
 logger = logging.getLogger(__name__)
 

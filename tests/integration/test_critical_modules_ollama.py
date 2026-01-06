@@ -312,7 +312,7 @@ class TestBudgetManagement:
     @pytest.mark.asyncio
     async def test_mode_objective_enum(self):
         """Test mode objective enumeration."""
-        from victor.agent.budget_manager import ModeObjective
+        from victor.agent.budget import ModeObjective
 
         # Test enum values exist
         assert hasattr(ModeObjective, "BUILD") or hasattr(ModeObjective, "EXPLORE")
