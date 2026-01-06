@@ -57,33 +57,6 @@ class DataAnalysisAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get Data Analysis-specific provider hints.
-
-        Override base class to specify preferred providers and features.
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 128000,  # Large context for data descriptions
-            "features": ["tool_calling", "large_context", "code_execution"],
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get Data Analysis-specific evaluation criteria.
-
-        Override base class with data analysis-focused criteria.
-        """
-        return [
-            "statistical_correctness",
-            "visualization_quality",
-            "insight_clarity",
-            "reproducibility",
-            "data_privacy",
-            "methodology_transparency",
-        ]
-
-    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get Data Analysis-specific stage definitions.
 
@@ -200,63 +173,34 @@ When presenting analysis:
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        from victor.dataanalysis.prompts import DataAnalysisPromptContributor
-
-        return DataAnalysisPromptContributor()
+        return cls._get_extension_factory(
+            "prompt_contributor", "victor.dataanalysis.prompts"
+        )
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        from victor.dataanalysis.mode_config import DataAnalysisModeConfigProvider
-
-        return DataAnalysisModeConfigProvider()
+        return cls._get_extension_factory(
+            "mode_config_provider", "victor.dataanalysis.mode_config"
+        )
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        from victor.dataanalysis.safety import DataAnalysisSafetyExtension
-
-        return DataAnalysisSafetyExtension()
+        return cls._get_extension_factory(
+            "safety_extension", "victor.dataanalysis.safety"
+        )
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        from victor.dataanalysis.tool_dependencies import (
-            DataAnalysisToolDependencyProvider,
+        return cls._get_extension_factory(
+            "tool_dependency_provider", "victor.dataanalysis.tool_dependencies"
         )
-
-        return DataAnalysisToolDependencyProvider()
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for Data Analysis.
+        """Get tiered tool configuration for Data Analysis."""
+        from victor.core.vertical_types import TieredToolTemplate
 
-        Simplified configuration using consolidated tool metadata:
-        - Mandatory: Core tools always included for any task
-        - Vertical Core: Essential tools for data analysis tasks
-        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
-        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
-
-        Returns:
-            TieredToolConfig for Data Analysis vertical
-        """
-        from victor.tools.tool_names import ToolNames
-
-        return TieredToolConfig(
-            # Tier 1: Mandatory - always included for any task
-            mandatory={
-                ToolNames.READ,  # Read files - essential for data
-                ToolNames.LS,  # List directory - essential
-                ToolNames.GREP,  # Search code/data - essential
-            },
-            # Tier 2: Vertical Core - essential for data analysis tasks
-            vertical_core={
-                ToolNames.SHELL,  # Shell commands - core for running Python scripts
-                ToolNames.WRITE,  # Write files - core for saving results
-                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
-            },
-            # semantic_pool and stage_tools are now derived from @tool decorator metadata
-            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
-            # Data analysis often involves exploratory work, allow write tools for analysis
-            readonly_only_for_analysis=False,
-        )
+        return TieredToolTemplate.for_vertical(cls.name)
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)

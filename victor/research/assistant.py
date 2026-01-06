@@ -54,34 +54,6 @@ class ResearchAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get Research-specific provider hints.
-
-        Override base class to specify preferred providers and features.
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 100000,
-            "features": ["web_search", "large_context"],
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get Research-specific evaluation criteria.
-
-        Override base class with research-focused criteria.
-        """
-        return [
-            "accuracy",
-            "source_quality",
-            "comprehensiveness",
-            "clarity",
-            "attribution",
-            "objectivity",
-            "timeliness",
-        ]
-
-    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get research-specific stage definitions.
 
@@ -197,61 +169,32 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        from victor.research.prompts import ResearchPromptContributor
-
-        return ResearchPromptContributor()
+        return cls._get_extension_factory(
+            "prompt_contributor", "victor.research.prompts"
+        )
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        from victor.research.mode_config import ResearchModeConfigProvider
-
-        return ResearchModeConfigProvider()
+        return cls._get_extension_factory(
+            "mode_config_provider", "victor.research.mode_config"
+        )
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        from victor.research.safety import ResearchSafetyExtension
-
-        return ResearchSafetyExtension()
+        return cls._get_extension_factory("safety_extension", "victor.research.safety")
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        from victor.research.tool_dependencies import ResearchToolDependencyProvider
-
-        return ResearchToolDependencyProvider()
+        return cls._get_extension_factory(
+            "tool_dependency_provider", "victor.research.tool_dependencies"
+        )
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for research.
+        """Get tiered tool configuration for research."""
+        from victor.core.vertical_types import TieredToolTemplate
 
-        Simplified configuration using consolidated tool metadata:
-        - Mandatory: Core tools always included for any task
-        - Vertical Core: Essential tools for research tasks
-        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
-        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
-
-        Returns:
-            TieredToolConfig for research vertical
-        """
-        from victor.tools.tool_names import ToolNames
-
-        return TieredToolConfig(
-            # Tier 1: Mandatory - always included for any task
-            mandatory={
-                ToolNames.READ,  # Read files - essential
-                ToolNames.LS,  # List directory - essential
-                ToolNames.GREP,  # Search - essential for research
-            },
-            # Tier 2: Vertical Core - essential for research tasks
-            vertical_core={
-                ToolNames.WEB_SEARCH,  # Web search is core to research
-                ToolNames.WEB_FETCH,  # Fetching content is core to research
-                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
-            },
-            # semantic_pool and stage_tools are now derived from @tool decorator metadata
-            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
-            # Research can benefit from readonly_only_for_analysis since it's primarily reading
-            readonly_only_for_analysis=True,
-        )
+        return TieredToolTemplate.for_vertical(cls.name)
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)

@@ -246,6 +246,65 @@ class VerticalBase(ABC):
         return cls._extensions_cache[cache_key]
 
     @classmethod
+    def _get_extension_factory(
+        cls,
+        extension_key: str,
+        import_path: str,
+        attribute_name: Optional[str] = None,
+    ) -> Any:
+        """Generic factory for lazy-loading and caching extensions.
+
+        Eliminates boilerplate across all verticals by providing a single
+        implementation of the lazy import + create + cache pattern.
+
+        Args:
+            extension_key: Cache key (e.g., "safety_extension", "prompt_contributor")
+            import_path: Full Python import path (e.g., "victor.coding.safety")
+            attribute_name: Class name to import. If None, auto-generates from vertical name
+                          (e.g., "CodingSafetyExtension" for CodingAssistant)
+
+        Returns:
+            Cached or newly created extension instance
+
+        Example:
+            # Before (13 lines)
+            def get_safety_extension(cls):
+                def _create():
+                    from victor.coding.safety import CodingSafetyExtension
+                    return CodingSafetyExtension()
+                return cls._get_cached_extension("safety_extension", _create)
+
+            # After (3 lines)
+            def get_safety_extension(cls):
+                return cls._get_extension_factory(
+                    "safety_extension",
+                    "victor.coding.safety",
+                )
+        """
+        def _create():
+            # Determine the class name to import
+            if attribute_name is None:
+                # Auto-generate class name
+                # Convert "CodingAssistant" → "Coding"
+                vertical_name = cls.__name__.replace("Assistant", "")
+                # Convert "safety_extension" → "SafetyExtension"
+                extension_type = (
+                    extension_key.replace("_", " ").title().replace(" ", "")
+                )
+                class_name = f"{vertical_name}{extension_type}"
+            else:
+                class_name = attribute_name
+
+            # Lazy import: only loads module when first called
+            module = __import__(import_path, fromlist=[class_name])
+
+            # Import and instantiate
+            return getattr(module, class_name)()
+
+        # Use existing caching infrastructure
+        return cls._get_cached_extension(extension_key, _create)
+
+    @classmethod
     @abstractmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tool names for this vertical.
@@ -430,12 +489,22 @@ class VerticalBase(ABC):
 
         Returns:
             Dictionary with provider preferences.
+
+        Default implementation uses VerticalConfigRegistry. Override in subclasses
+        for vertical-specific requirements.
         """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-        }
+        from victor.core.verticals.config_registry import VerticalConfigRegistry
+
+        # Try to get from registry based on vertical name
+        try:
+            return VerticalConfigRegistry.get_provider_hints(cls.name)
+        except KeyError:
+            # Fallback to generic defaults
+            return {
+                "preferred_providers": ["anthropic", "openai"],
+                "min_context_window": 100000,
+                "requires_tool_calling": True,
+            }
 
     @classmethod
     def get_evaluation_criteria(cls) -> List[str]:
@@ -443,12 +512,22 @@ class VerticalBase(ABC):
 
         Returns:
             List of evaluation criteria descriptions.
+
+        Default implementation uses VerticalConfigRegistry. Override in subclasses
+        for vertical-specific requirements.
         """
-        return [
-            "Task completion accuracy",
-            "Tool usage efficiency",
-            "Response relevance",
-        ]
+        from victor.core.verticals.config_registry import VerticalConfigRegistry
+
+        # Try to get from registry based on vertical name
+        try:
+            return VerticalConfigRegistry.get_evaluation_criteria(cls.name)
+        except KeyError:
+            # Fallback to generic defaults
+            return [
+                "Task completion accuracy",
+                "Tool usage efficiency",
+                "Response relevance",
+            ]
 
     @classmethod
     def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:

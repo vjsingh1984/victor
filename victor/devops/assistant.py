@@ -62,35 +62,6 @@ class DevOpsAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get DevOps-specific provider hints.
-
-        Override base class to specify preferred providers and features.
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "features": ["tool_calling", "large_context"],
-            "requires_tool_calling": True,
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get DevOps-specific evaluation criteria.
-
-        Override base class with infrastructure-focused criteria.
-        """
-        return [
-            "configuration_correctness",
-            "security_best_practices",
-            "idempotency",
-            "documentation_completeness",
-            "resource_efficiency",
-            "disaster_recovery",
-            "monitoring_coverage",
-        ]
-
-    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
@@ -205,21 +176,19 @@ When creating configurations:
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        from victor.devops.prompts import DevOpsPromptContributor
-
-        return DevOpsPromptContributor()
+        return cls._get_extension_factory(
+            "prompt_contributor", "victor.devops.prompts"
+        )
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        from victor.devops.mode_config import DevOpsModeConfigProvider
-
-        return DevOpsModeConfigProvider()
+        return cls._get_extension_factory(
+            "mode_config_provider", "victor.devops.mode_config"
+        )
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        from victor.devops.safety import DevOpsSafetyExtension
-
-        return DevOpsSafetyExtension()
+        return cls._get_extension_factory("safety_extension", "victor.devops.safety")
 
     @classmethod
     def get_middleware(cls) -> List[MiddlewareProtocol]:
@@ -262,44 +231,16 @@ When creating configurations:
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        from victor.devops.tool_dependencies import DevOpsToolDependencyProvider
-
-        return DevOpsToolDependencyProvider()
+        return cls._get_extension_factory(
+            "tool_dependency_provider", "victor.devops.tool_dependencies"
+        )
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for DevOps.
+        """Get tiered tool configuration for DevOps."""
+        from victor.core.vertical_types import TieredToolTemplate
 
-        Simplified configuration using consolidated tool metadata:
-        - Mandatory: Core tools always included for any task
-        - Vertical Core: Essential tools for DevOps tasks
-        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
-        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
-
-        Returns:
-            TieredToolConfig for DevOps vertical
-        """
-        from victor.tools.tool_names import ToolNames
-
-        return TieredToolConfig(
-            # Tier 1: Mandatory - always included for any task
-            mandatory={
-                ToolNames.READ,  # Read files - essential
-                ToolNames.LS,  # List directory - essential
-                ToolNames.GREP,  # Search code/configs - essential for DevOps
-            },
-            # Tier 2: Vertical Core - essential for DevOps tasks
-            vertical_core={
-                ToolNames.SHELL,  # Shell commands - core for infrastructure
-                ToolNames.GIT,  # Git operations - core for version control
-                ToolNames.DOCKER,  # Docker - core for containers
-                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
-            },
-            # semantic_pool and stage_tools are now derived from @tool decorator metadata
-            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
-            # DevOps often needs write/execute tools even for analysis queries
-            readonly_only_for_analysis=False,
-        )
+        return TieredToolTemplate.for_vertical(cls.name)
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
@@ -317,9 +258,9 @@ When creating configurations:
         Returns:
             DevOpsWorkflowProvider instance
         """
-        from victor.devops.workflows import DevOpsWorkflowProvider
-
-        return DevOpsWorkflowProvider()
+        return cls._get_extension_factory(
+            "workflow_provider", "victor.devops.workflows"
+        )
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:
@@ -328,9 +269,9 @@ When creating configurations:
         Returns:
             DevOpsRLConfig instance (implements RLConfigProviderProtocol)
         """
-        from victor.devops.rl import DevOpsRLConfig
-
-        return DevOpsRLConfig()
+        return cls._get_extension_factory(
+            "rl_config_provider", "victor.devops.rl", "DevOpsRLConfig"
+        )
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
@@ -339,9 +280,7 @@ When creating configurations:
         Returns:
             DevOpsRLHooks instance
         """
-        from victor.devops.rl import DevOpsRLHooks
-
-        return DevOpsRLHooks()
+        return cls._get_extension_factory("rl_hooks", "victor.devops.rl")
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -355,9 +294,7 @@ When creating configurations:
         Returns:
             DevOpsTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        from victor.devops.teams import DevOpsTeamSpecProvider
-
-        return DevOpsTeamSpecProvider()
+        return cls._get_extension_factory("team_spec_provider", "victor.devops.teams")
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:
@@ -373,6 +310,6 @@ When creating configurations:
         Returns:
             DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
         """
-        from victor.devops.capabilities import DevOpsCapabilityProvider
-
-        return DevOpsCapabilityProvider()
+        return cls._get_extension_factory(
+            "capability_provider", "victor.devops.capabilities"
+        )
