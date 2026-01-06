@@ -92,7 +92,7 @@ class RLDataMigrator:
             print(f"\n⚠️  {self.continuation_json} not found, skipping")
             return 0
 
-        print(f"\n📊 Migrating continuation prompts data...")
+        print("\n📊 Migrating continuation prompts data...")
 
         try:
             with open(self.continuation_json) as f:
@@ -178,7 +178,7 @@ class RLDataMigrator:
             print(f"\n⚠️  {self.semantic_json} not found, skipping")
             return 0
 
-        print(f"\n📊 Migrating semantic threshold data...")
+        print("\n📊 Migrating semantic threshold data...")
 
         try:
             with open(self.semantic_json) as f:
@@ -262,7 +262,7 @@ class RLDataMigrator:
             print(f"\n⚠️  {self.model_selector_json} not found, skipping")
             return 0
 
-        print(f"\n📊 Migrating model selector Q-tables...")
+        print("\n📊 Migrating model selector Q-tables...")
 
         try:
             with open(self.model_selector_json) as f:
@@ -352,7 +352,7 @@ class RLDataMigrator:
         Returns:
             True if verification successful
         """
-        print(f"\n🔍 Verifying migration...")
+        print("\n🔍 Verifying migration...")
 
         try:
             conn = sqlite3.connect(str(self.db_path))

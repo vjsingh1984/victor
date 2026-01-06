@@ -228,7 +228,7 @@ def main():
     print(f"Total imports to migrate: {total_changes}")
 
     if args.check and total_changes > 0:
-        print(f"\nRun with --apply to update imports")
+        print("\nRun with --apply to update imports")
         return 1
 
     return 0

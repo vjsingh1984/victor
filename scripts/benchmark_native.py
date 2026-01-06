@@ -77,7 +77,7 @@ def benchmark_deduplication():
     content_medium = generate_content(50, 200)
     content_large = generate_content(200, 300)
 
-    print(f"\nTest data sizes:")
+    print("\nTest data sizes:")
     print(f"  Small:  {len(content_small):,} chars, ~10 blocks")
     print(f"  Medium: {len(content_medium):,} chars, ~50 blocks")
     print(f"  Large:  {len(content_large):,} chars, ~200 blocks")
@@ -128,11 +128,11 @@ def benchmark_similarity():
     corpus_medium = generate_embeddings(100, 384)
     corpus_large = generate_embeddings(1000, 384)
 
-    print(f"\nTest data sizes:")
-    print(f"  Query:  384 dimensions")
-    print(f"  Small:  10 vectors")
-    print(f"  Medium: 100 vectors")
-    print(f"  Large:  1000 vectors")
+    print("\nTest data sizes:")
+    print("  Query:  384 dimensions")
+    print("  Small:  10 vectors")
+    print("  Medium: 100 vectors")
+    print("  Large:  1000 vectors")
 
     # Benchmark cosine_similarity
     print("\ncosine_similarity():")
@@ -190,7 +190,7 @@ def benchmark_json_repair():
     End of document.
     """
 
-    print(f"\nTest data:")
+    print("\nTest data:")
     print(f"  Simple Python dict:  {len(simple_python)} chars")
     print(f"  Complex Python dict: {len(complex_python)} chars")
     print(f"  Text with JSON:      {len(text_with_json)} chars")
@@ -238,7 +238,7 @@ def benchmark_hashing():
 
     tool_calls = [("read_file", {"path": f"/file_{i}.py"}) for i in range(100)]
 
-    print(f"\nTest data:")
+    print("\nTest data:")
     print(f"  Simple args:  {len(simple_args)} keys")
     print(f"  Complex args: {len(complex_args)} keys")
     print(f"  Batch:        {len(tool_calls)} tool calls")
