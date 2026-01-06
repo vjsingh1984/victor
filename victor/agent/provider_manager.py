@@ -445,9 +445,6 @@ class ProviderManager:
                     metadata={"from_provider": self.provider_name, "from_model": self.model},
                 )
 
-                # Notify callbacks
-                self._notify_switch(self._current_state)
-
             return True
 
         except Exception as e:
@@ -511,9 +508,6 @@ class ProviderManager:
                     reason=reason,
                     metadata={"from_model": old_model},
                 )
-
-                # Notify callbacks
-                self._notify_switch(self._current_state)
 
             logger.info(
                 f"Switched model: {old_model} -> {model} "
@@ -613,8 +607,7 @@ class ProviderManager:
         Args:
             callback: Function called with new ProviderState after switch
         """
-        self._on_switch_callbacks.append(callback)
-        # Also register with ProviderSwitcher
+        # Register with ProviderSwitcher for automatic notification
         self._provider_switcher.on_switch(callback)
 
     # IProviderEventEmitter implementation

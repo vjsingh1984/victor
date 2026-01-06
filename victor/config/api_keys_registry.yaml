@@ -81,6 +81,16 @@ providers:
     free_tier_limits: "Free credits on signup"
     notes: "Excellent price-performance ratio."
 
+  zai:
+    env_var: ZAI_API_KEY
+    aliases: ["zhipuai", "zhipu"]
+    description: "GLM models (glm-4.7, glm-4.6, glm-4.5) - ZhipuAI/智谱AI"
+    registration_url: "https://open.bigmodel.cn/"
+    docs_url: "https://docs.z.ai/"
+    free_tier: true
+    free_tier_limits: "Free credits on signup"
+    notes: "Chinese provider, OpenAI-compatible API. Excellent for multilingual tasks."
+
   # --------------------------------------------------------------------------
   # Free-Tier Providers (Great for getting started)
   # --------------------------------------------------------------------------
@@ -355,6 +365,6 @@ services:
 # METADATA
 # ============================================================================
 metadata:
-  version: "1.0.0"
-  last_updated: "2026-01-02"
+  version: "1.0.1"
+  last_updated: "2026-01-05"
   maintainer: "Victor Team"

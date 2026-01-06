@@ -34,6 +34,8 @@ PROVIDER_ALIASES = {
     "azure-openai": "azure",
     "aws": "bedrock",
     "hf": "huggingface",
+    "zhipuai": "zai",
+    "zhipu": "zai",
 }
 
 # Primary provider to aliases mapping (for display)
@@ -44,6 +46,7 @@ PROVIDER_ALIAS_DISPLAY = {
     "azure": "azure-openai",
     "bedrock": "aws",
     "huggingface": "hf",
+    "zai": "zhipuai, zhipu",
 }
 console = Console()
 

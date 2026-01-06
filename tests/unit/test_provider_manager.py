@@ -260,7 +260,7 @@ class TestToolAdapter:
             provider_name="anthropic",
         )
 
-    @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
+    @patch("victor.agent.provider.tool_adapter_coordinator.ToolCallingAdapterRegistry")
     def test_initialize_tool_adapter(self, mock_registry, manager):
         """Test tool adapter initialization."""
         mock_adapter = MagicMock()
@@ -299,7 +299,7 @@ class TestProviderSwitching:
         )
 
     @pytest.mark.asyncio
-    @patch("victor.agent.provider_manager.ProviderRegistry")
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
     @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
     async def test_switch_provider_success(
         self, mock_adapter_registry, mock_provider_registry, manager
@@ -337,7 +337,7 @@ class TestProviderSwitching:
         assert manager.model == "gpt-4-turbo"
 
     @pytest.mark.asyncio
-    @patch("victor.agent.provider_manager.ProviderRegistry")
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
     async def test_switch_provider_failure(self, mock_registry, manager):
         """Test failed provider switch."""
         mock_registry.create.side_effect = Exception("Connection failed")
@@ -349,7 +349,7 @@ class TestProviderSwitching:
         assert manager.provider_name == "anthropic"
 
     @pytest.mark.asyncio
-    @patch("victor.agent.provider_manager.ProviderRegistry")
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
     @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
     async def test_switch_provider_with_fallback(
         self, mock_adapter_registry, mock_provider_registry
@@ -509,7 +509,7 @@ class TestSwitchHistory:
         )
 
     @pytest.mark.asyncio
-    @patch("victor.agent.provider_manager.ProviderRegistry")
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
     @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
     async def test_switch_history_recorded(
         self, mock_adapter_registry, mock_provider_registry, manager
@@ -557,8 +557,8 @@ class TestSwitchCallbacks:
         )
 
     @pytest.mark.asyncio
-    @patch("victor.agent.provider_manager.ProviderRegistry")
-    @patch("victor.agent.provider_manager.ToolCallingAdapterRegistry")
+    @patch("victor.agent.provider.switcher.ProviderRegistry")
+    @patch("victor.agent.provider.tool_adapter_coordinator.ToolCallingAdapterRegistry")
     async def test_callback_called_on_switch(
         self, mock_adapter_registry, mock_provider_registry, manager
     ):
