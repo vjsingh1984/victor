@@ -22,7 +22,8 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from dataclasses import dataclass, field
+import datetime
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason
@@ -106,10 +107,8 @@ class ProviderSwitcher(IProviderSwitcher):
 
         self._current_state: Optional[ProviderSwitcherState] = None
         self._model_switcher = ModelSwitcher()
-        self._switch_history: List[Dict[str, Any]] = field(default_factory=list)
-        self._on_switch_callbacks: List[Callable[[ProviderSwitcherState], None]] = field(
-            default_factory=list
-        )
+        self._switch_history: List[Dict[str, Any]] = []
+        self._on_switch_callbacks: List[Callable[[ProviderSwitcherState], None]] = []
 
     def get_current_provider(self) -> Optional[BaseProvider]:
         """Get current provider instance.
@@ -211,7 +210,7 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.AUTO,
+                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
                 metadata={
                     "from_provider": old_provider,
                     "from_model": old_model,
@@ -226,7 +225,7 @@ class ProviderSwitcher(IProviderSwitcher):
                     "to_provider": provider_name,
                     "to_model": model,
                     "reason": reason,
-                    "timestamp": ModelSwitcher._get_timestamp(),
+                    "timestamp": datetime.datetime.now().isoformat(),
                 }
             )
 
@@ -286,7 +285,7 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=self._current_state.provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.AUTO,
+                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
                 metadata={"from_model": old_model},
             )
 
@@ -298,7 +297,7 @@ class ProviderSwitcher(IProviderSwitcher):
                     "to_provider": self._current_state.provider_name,
                     "to_model": model,
                     "reason": reason,
-                    "timestamp": ModelSwitcher._get_timestamp(),
+                    "timestamp": datetime.datetime.now().isoformat(),
                 }
             )
 

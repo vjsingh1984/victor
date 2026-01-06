@@ -3086,3 +3086,505 @@ class VerticalStorageProtocol(Protocol):
             Dictionary of team specs, or empty dict if not set
         """
         ...
+
+
+# =============================================================================
+# Manager/Coordinator Refactoring Protocols (SOLID-based)
+# =============================================================================
+
+
+class IProviderHealthMonitor(Protocol):
+    """Protocol for provider health monitoring.
+
+    Defines interface for monitoring provider health and triggering fallbacks.
+    Separated from IProviderSwitcher to follow ISP.
+    """
+
+    async def check_health(self, provider: Any) -> bool:
+        """Check if provider is healthy.
+
+        Args:
+            provider: Provider instance to check
+
+        Returns:
+            True if provider is healthy, False otherwise
+        """
+        ...
+
+    async def start_health_checks(
+        self,
+        interval: Optional[float] = None,
+        provider: Optional[Any] = None,
+        provider_name: Optional[str] = None,
+    ) -> None:
+        """Start periodic health checks.
+
+        Args:
+            interval: Interval between health checks in seconds
+            provider: Provider to monitor (optional)
+            provider_name: Provider name (optional)
+        """
+        ...
+
+    async def stop_health_checks(self) -> None:
+        """Stop health checks."""
+        ...
+
+    def is_monitoring(self) -> bool:
+        """Check if health monitoring is currently active.
+
+        Returns:
+            True if monitoring is active, False otherwise
+        """
+        ...
+
+
+class IProviderSwitcher(Protocol):
+    """Protocol for provider switching operations.
+
+    Defines interface for switching between providers and models.
+    Separated from IProviderHealthMonitor to follow ISP.
+    """
+
+    def get_current_provider(self) -> Optional[Any]:
+        """Get current provider instance.
+
+        Returns:
+            Current provider or None if not configured
+        """
+        ...
+
+    def get_current_model(self) -> str:
+        """Get current model name.
+
+        Returns:
+            Current model name or empty string if not configured
+        """
+        ...
+
+    def get_current_state(self) -> Optional[Any]:
+        """Get current switcher state.
+
+        Returns:
+            Current state or None if not configured
+        """
+        ...
+
+    def set_initial_state(
+        self,
+        provider: Any,
+        provider_name: str,
+        model: str,
+    ) -> None:
+        """Set initial provider state (used during initialization).
+
+        Args:
+            provider: Provider instance
+            provider_name: Provider name
+            model: Model name
+        """
+        ...
+
+    async def switch_provider(
+        self,
+        provider_name: str,
+        model: str,
+        reason: str = "manual",
+        settings: Optional[Any] = None,
+        **provider_kwargs: Any,
+    ) -> bool:
+        """Switch to a different provider/model.
+
+        Args:
+            provider_name: Name of provider to switch to
+            model: Model identifier
+            reason: Reason for switch (default "manual")
+            settings: Optional settings for provider configuration
+            **provider_kwargs: Additional provider arguments
+
+        Returns:
+            True if switch succeeded, False otherwise
+        """
+        ...
+
+    async def switch_model(self, model: str, reason: str = "manual") -> bool:
+        """Switch to a different model on current provider.
+
+        Args:
+            model: Model identifier
+            reason: Reason for the switch
+
+        Returns:
+            True if switch succeeded, False otherwise
+        """
+        ...
+
+    def get_switch_history(self) -> List[Dict[str, Any]]:
+        """Get history of provider switches.
+
+        Returns:
+            List of switch event dictionaries
+        """
+        ...
+
+
+class IToolAdapterCoordinator(Protocol):
+    """Protocol for tool adapter coordination.
+
+    Defines interface for initializing and managing tool adapters.
+    Separated to allow independent testing and mocking.
+    """
+
+    def initialize_adapter(self) -> Any:
+        """Initialize tool adapter for current provider.
+
+        Returns:
+            ToolCallingCapabilities instance
+
+        Raises:
+            ValueError: If no provider is configured
+        """
+        ...
+
+    def get_capabilities(self) -> Any:
+        """Get tool calling capabilities.
+
+        Returns:
+            ToolCallingCapabilities instance
+
+        Raises:
+            ValueError: If adapter not initialized
+        """
+        ...
+
+    def get_adapter(self) -> Any:
+        """Get current tool adapter instance.
+
+        Returns:
+            Tool adapter instance
+
+        Raises:
+            ValueError: If adapter not initialized
+        """
+        ...
+
+    def is_initialized(self) -> bool:
+        """Check if adapter has been initialized.
+
+        Returns:
+            True if adapter is initialized, False otherwise
+        """
+        ...
+
+
+class IProviderEventEmitter(Protocol):
+    """Protocol for provider-related events.
+
+    Defines interface for emitting and handling provider events.
+    Separated to support different event implementations.
+    """
+
+    def emit_switch_event(self, event: Dict[str, Any]) -> None:
+        """Emit provider switch event.
+
+        Args:
+            event: Event dictionary with switch details
+        """
+        ...
+
+    def on_switch(self, callback: Any) -> None:
+        """Register callback for provider switches.
+
+        Args:
+            callback: Callable to invoke on switch
+        """
+        ...
+
+
+class IProviderClassificationStrategy(Protocol):
+    """Protocol for provider classification.
+
+    Defines interface for classifying providers by type.
+    Supports Open/Closed Principle via strategy pattern.
+    """
+
+    def is_cloud_provider(self, provider_name: str) -> bool:
+        """Check if provider is cloud-based.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            True if cloud provider, False otherwise
+        """
+        ...
+
+    def is_local_provider(self, provider_name: str) -> bool:
+        """Check if provider is local.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            True if local provider, False otherwise
+        """
+        ...
+
+    def get_provider_type(self, provider_name: str) -> str:
+        """Get provider type category.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            Provider type ("cloud", "local", "unknown")
+        """
+        ...
+
+
+class IMessageStore(Protocol):
+    """Protocol for message storage and retrieval.
+
+    Defines interface for persisting and retrieving messages.
+    Separated from other conversation concerns to follow ISP.
+    """
+
+    def add_message(self, role: str, content: str, **metadata) -> None:
+        """Add a message to storage.
+
+        Args:
+            role: Message role (user, assistant, system, tool)
+            content: Message content
+            **metadata: Additional message metadata
+        """
+        ...
+
+    def get_messages(self, limit: Optional[int] = None) -> List[Any]:
+        """Retrieve messages.
+
+        Args:
+            limit: Optional limit on number of messages
+
+        Returns:
+            List of messages
+        """
+        ...
+
+    def persist(self) -> bool:
+        """Persist messages to storage.
+
+        Returns:
+            True if persistence succeeded, False otherwise
+        """
+        ...
+
+
+class IContextOverflowHandler(Protocol):
+    """Protocol for context overflow handling.
+
+    Defines interface for detecting and handling context overflow.
+    Separated from IMessageStore to follow ISP.
+    """
+
+    def check_overflow(self) -> bool:
+        """Check if context has overflowed.
+
+        Returns:
+            True if overflow detected, False otherwise
+        """
+        ...
+
+    def handle_compaction(self) -> Optional[Any]:
+        """Handle context compaction.
+
+        Returns:
+            Compaction result or None
+        """
+        ...
+
+
+class ISessionManager(Protocol):
+    """Protocol for session lifecycle management.
+
+    Defines interface for creating and managing sessions.
+    Separated to support different session backends.
+    """
+
+    def create_session(self) -> str:
+        """Create a new session.
+
+        Returns:
+            Session ID
+        """
+        ...
+
+    def recover_session(self, session_id: str) -> bool:
+        """Recover an existing session.
+
+        Args:
+            session_id: Session ID to recover
+
+        Returns:
+            True if recovery succeeded, False otherwise
+        """
+        ...
+
+    def persist_session(self) -> bool:
+        """Persist session state.
+
+        Returns:
+            True if persistence succeeded, False otherwise
+        """
+        ...
+
+
+class IEmbeddingManager(Protocol):
+    """Protocol for embedding and semantic search.
+
+    Defines interface for semantic search over conversations.
+    Separated because not all conversations need embeddings.
+    """
+
+    def initialize_embeddings(self) -> None:
+        """Initialize embedding store."""
+        ...
+
+    def semantic_search(self, query: str, k: int = 5) -> List[Any]:
+        """Perform semantic search.
+
+        Args:
+            query: Search query
+            k: Number of results to return
+
+        Returns:
+            List of search results
+        """
+        ...
+
+
+class IBudgetTracker(Protocol):
+    """Protocol for budget tracking.
+
+    Defines interface for tracking and consuming budget.
+    Core budget functionality, separated from other concerns.
+    """
+
+    def consume(self, budget_type: Any, amount: int) -> bool:
+        """Consume from budget.
+
+        Args:
+            budget_type: Type of budget to consume from
+            amount: Amount to consume
+
+        Returns:
+            True if consumption succeeded, False if exhausted
+        """
+        ...
+
+    def get_status(self, budget_type: Any) -> Any:
+        """Get current budget status.
+
+        Args:
+            budget_type: Type of budget to query
+
+        Returns:
+            BudgetStatus instance
+        """
+        ...
+
+    def reset(self) -> None:
+        """Reset all budgets."""
+        ...
+
+
+class IMultiplierCalculator(Protocol):
+    """Protocol for budget multiplier calculation.
+
+    Defines interface for calculating effective budget with multipliers.
+    Separated from IBudgetTracker to follow ISP.
+    """
+
+    def calculate_effective_max(self, base_max: int) -> int:
+        """Calculate effective maximum with multipliers.
+
+        Args:
+            base_max: Base maximum budget
+
+        Returns:
+            Effective maximum after applying multipliers
+        """
+        ...
+
+    def set_model_multiplier(self, multiplier: float) -> None:
+        """Set model-specific multiplier.
+
+        Args:
+            multiplier: Multiplier value (e.g., 1.0-1.5)
+        """
+        ...
+
+    def set_mode_multiplier(self, multiplier: float) -> None:
+        """Set mode-specific multiplier.
+
+        Args:
+            multiplier: Multiplier value (e.g., 1.0-3.0)
+        """
+        ...
+
+
+class IModeCompletionChecker(Protocol):
+    """Protocol for mode completion detection.
+
+    Defines interface for checking if mode should complete early.
+    Separated from budget tracking to follow ISP.
+    """
+
+    def should_early_exit(self, mode: str, response: str) -> Tuple[bool, str]:
+        """Check if should exit mode early.
+
+        Args:
+            mode: Current mode
+            response: Response to check
+
+        Returns:
+            Tuple of (should_exit, reason)
+        """
+        ...
+
+
+class IToolCallClassifier(Protocol):
+    """Protocol for classifying tool calls.
+
+    Defines interface for classifying tools by operation type.
+    Supports Open/Closed Principle via strategy pattern.
+    """
+
+    def is_write_operation(self, tool_name: str) -> bool:
+        """Check if tool is a write operation.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if write operation, False otherwise
+        """
+        ...
+
+    def classify_operation(self, tool_name: str) -> str:
+        """Classify tool operation type.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Operation type category
+        """
+        ...
+
+    def add_write_tool(self, tool_name: str) -> None:
+        """Add a tool to the write operation classification.
+
+        Args:
+            tool_name: Name of the tool to add
+        """
+        ...
