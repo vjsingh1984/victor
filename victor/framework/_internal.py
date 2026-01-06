@@ -13,6 +13,11 @@ Phase 8.0 - Vertical Integration Unification:
 - Added vertical parameter to create_orchestrator_from_options()
 - Uses VerticalIntegrationPipeline for consistent vertical application
 - Achieves parity with FrameworkShim CLI path
+
+Phase 4 - Agent Creation Unification:
+- create_orchestrator_from_options() now delegates to OrchestratorFactory.create_agent()
+- Ensures consistent code maintenance and eliminates code proliferation
+- All agent creation paths use same factory infrastructure (SOLID SRP, DIP)
 """
 
 from __future__ import annotations
@@ -58,6 +63,11 @@ async def create_orchestrator_from_options(
 ) -> Any:
     """Create an AgentOrchestrator from framework options.
 
+    Phase 4 Refactoring:
+    Now delegates to OrchestratorFactory.create_agent() for unified
+    agent creation, ensuring consistent code maintenance and eliminating
+    code proliferation (SOLID SRP, DIP).
+
     This function bridges the simplified framework API to the
     internal orchestrator creation logic.
 
@@ -81,8 +91,10 @@ async def create_orchestrator_from_options(
         Configured AgentOrchestrator instance
     """
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.orchestrator_factory import OrchestratorFactory
     from victor.config.settings import load_settings
     from victor.core.bootstrap import ensure_bootstrapped
+    from victor.providers.registry import get_provider_class
 
     # Load settings
     settings = load_settings()
@@ -109,42 +121,48 @@ async def create_orchestrator_from_options(
     # This ensures vertical services are registered with correct vertical name
     ensure_bootstrapped(settings, vertical=vertical_name)
 
-    # Create orchestrator using from_settings
-    orchestrator = await AgentOrchestrator.from_settings(
-        settings,
+    # Create OrchestratorFactory with provider
+    provider_class = get_provider_class(provider)
+    provider_instance = provider_class(
+        model=model or settings.default_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+    factory = OrchestratorFactory(
+        settings=settings,
+        provider=provider_instance,
+        model=model or settings.default_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
         profile_name=profile or "default",
         thinking=thinking,
     )
 
-    # Override provider/model if specified
-    if provider != "anthropic" or model:
-        # Need to switch provider/model - use capability-based check
-        if hasattr(orchestrator, "_provider_manager") or hasattr(orchestrator, "provider_manager"):
-            pm = getattr(orchestrator, "_provider_manager", None) or getattr(
-                orchestrator, "provider_manager", None
-            )
-            if pm:
-                await pm.switch_provider(provider, model or orchestrator.model)
+    # Use factory's create_agent() method for unified agent creation
+    # This delegates to existing factory infrastructure (SOLID DIP)
+    agent = await factory.create_agent(
+        mode="foreground",
+        tools=tools,
+        airgapped=airgapped,
+        vertical=vertical,
+        system_prompt=system_prompt,
+        enable_observability=enable_observability,
+        session_id=session_id,
+    )
 
     # Apply vertical configuration using unified pipeline
     # This achieves parity with FrameworkShim CLI path
     if vertical:
-        apply_vertical_to_orchestrator(orchestrator, vertical)
-
-    # Configure tools if specified using ToolConfigurator
-    if tools:
-        configure_tools(orchestrator, tools, airgapped=airgapped)
-
-    # Apply custom system prompt (e.g., from vertical)
-    # Note: This is in addition to any prompt from vertical
-    if system_prompt:
-        apply_system_prompt(orchestrator, system_prompt)
+        apply_vertical_to_orchestrator(agent._orchestrator, vertical)
 
     # Auto-initialize observability integration
     if enable_observability:
-        setup_observability_integration(orchestrator, session_id)
+        setup_observability_integration(agent._orchestrator, session_id)
 
-    return orchestrator
+    # Return the agent's orchestrator for backward compatibility
+    # Note: This maintains the existing API while delegating to factory
+    return agent._orchestrator
 
 
 def apply_vertical_to_orchestrator(
