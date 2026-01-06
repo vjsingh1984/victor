@@ -59,7 +59,8 @@ from victor.agent.subagents.orchestrator import (
     SubAgentOrchestrator,
     SubAgentTask,
 )
-from victor.teams.protocols import ITeamCoordinator, ITeamMember
+# Import from canonical location to avoid circular dependencies
+from victor.protocols.team import ITeamCoordinator, ITeamMember
 
 # Import canonical types from victor.teams.types
 from victor.teams.types import (

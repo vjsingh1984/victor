@@ -348,14 +348,39 @@ class TestConsensusFormation:
     """Tests for ConsensusFormation."""
 
     @pytest.mark.asyncio
-    async def test_reaches_consensus(self, mock_agents, mock_context, mock_task):
+    async def test_reaches_consensus(self, mock_context, mock_task):
         """Test agents can reach consensus."""
         formation = ConsensusFormation(max_rounds=2, agreement_threshold=0.7)
 
-        results = await formation.execute(mock_agents, mock_context, mock_task)
+        # Create agents that return identical results to test consensus
+        class ConsensusMockAgent:
+            """Mock agent that returns identical results for consensus testing."""
 
-        # Should complete in 1 round since all agents return similar results
+            def __init__(self, agent_id: str):
+                self.id = agent_id
+                self.executed = False
+                self.received_tasks = []
+
+            async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
+                """Mock execution that returns identical result."""
+                self.executed = True
+                self.received_tasks.append(task)
+
+                return MemberResult(
+                    member_id=self.id,
+                    success=True,
+                    output="Consensus result",  # All agents return same result
+                    metadata={"task": task.content},
+                )
+
+        agents = [ConsensusMockAgent(f"agent{i}") for i in range(3)]
+
+        results = await formation.execute(agents, mock_context, mock_task)
+
+        # Should complete in 1 round since all agents return identical results
         assert len(results) == 3
+        # All results should have the same output
+        assert all(r.output == "Consensus result" for r in results)
 
     @pytest.mark.asyncio
     async def test_multiple_rounds(self, mock_context, mock_task):

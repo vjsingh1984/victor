@@ -23,7 +23,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
-from victor.teams.types import AgentMessage, MemberResult
+from victor.teams.types import AgentMessage, MemberResult, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +77,9 @@ class ConsensusFormation(BaseFormationStrategy):
                 if isinstance(result, Exception):
                     processed_results.append(
                         MemberResult(
-                            agent_id=agents[i].id,
+                            member_id=agents[i].id,
                             success=False,
-                            content=None,
+                            output="",
                             error=str(result),
                             metadata={"round": round_num},
                         )
@@ -94,6 +94,10 @@ class ConsensusFormation(BaseFormationStrategy):
 
             if consensus:
                 logger.info(f"ConsensusFormation: consensus reached in round {round_num + 1}")
+                # Mark results with consensus metadata
+                for r in processed_results:
+                    r.metadata["consensus_achieved"] = True
+                    r.metadata["consensus_rounds"] = round_num + 1
                 # Return results from final consensus round
                 return processed_results
 
@@ -101,19 +105,19 @@ class ConsensusFormation(BaseFormationStrategy):
             current_task = AgentMessage(
                 message_type=MessageType.TASK,
                 sender_id="system",
-                content={
+                content=str({
                     "original_task": task.content,
                     "round": round_num + 1,
                     "previous_results": [
                         {
                             "agent_id": r.member_id,
-                            "content": r.output,
+                            "output": r.output,
                             "success": r.success,
                         }
                         for r in processed_results
                     ],
                     "instruction": "Review previous results and reach consensus",
-                },
+                }),
                 data={"consensus_round": round_num + 1},
             )
 
@@ -158,12 +162,12 @@ class ConsensusFormation(BaseFormationStrategy):
             return False
 
         # Get first successful result as reference
-        reference = successful[0].content
+        reference = successful[0].output
 
         # Count how many match reference
         matches = 0
         for result in successful:
-            if self._content_matches(result.content, reference):
+            if self._content_matches(result.output, reference):
                 matches += 1
 
         # Check if enough matches

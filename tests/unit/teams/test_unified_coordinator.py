@@ -278,22 +278,31 @@ class TestFactoryFunction:
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
     def test_lightweight_creates_framework(self):
-        """Lightweight should create FrameworkTeamCoordinator."""
+        """Lightweight should create UnifiedTeamCoordinator in lightweight mode.
+
+        After the merge, create_coordinator always returns UnifiedTeamCoordinator,
+        but lightweight=True sets lightweight_mode=True which disables mixins.
+        """
         coordinator = create_coordinator(lightweight=True)
-        # Should be the framework coordinator
+        # After merge: always returns UnifiedTeamCoordinator, but with lightweight mode
+        assert isinstance(coordinator, UnifiedTeamCoordinator)
+        assert coordinator._lightweight_mode is True
         assert hasattr(coordinator, "add_member")
-        assert not isinstance(coordinator, UnifiedTeamCoordinator)
+        # In lightweight mode, mixins are disabled
+        assert coordinator._enable_observability is False
+        assert coordinator._enable_rl is False
 
     def test_disable_observability(self):
         """Should respect observability flag."""
         coordinator = create_coordinator(with_observability=False)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
-        assert coordinator._observability_enabled is False
+        assert coordinator._enable_observability is False
 
     def test_disable_rl(self):
         """Should respect RL flag."""
         coordinator = create_coordinator(with_rl=False)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
+        assert coordinator._enable_rl is False
         assert coordinator._rl_enabled is False
 
 

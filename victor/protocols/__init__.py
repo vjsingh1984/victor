@@ -94,6 +94,20 @@ from victor.protocols.lsp_types import (
     TextDocumentEdit,
 )
 
+# Team Coordination
+from victor.protocols.team import (
+    IAgent,
+    ITeamMember,
+    ITeamCoordinator,
+    IObservableCoordinator,
+    IRLCoordinator,
+    IMessageBusProvider,
+    ISharedMemoryProvider,
+    IEnhancedTeamCoordinator,
+    TeamCoordinatorProtocol,
+    TeamMemberProtocol,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -157,4 +171,15 @@ __all__ = [
     "TextDocumentIdentifier",
     "VersionedTextDocumentIdentifier",
     "TextDocumentEdit",
+    # Team Coordination
+    "IAgent",
+    "ITeamMember",
+    "ITeamCoordinator",
+    "IObservableCoordinator",
+    "IRLCoordinator",
+    "IMessageBusProvider",
+    "ISharedMemoryProvider",
+    "IEnhancedTeamCoordinator",
+    "TeamCoordinatorProtocol",
+    "TeamMemberProtocol",
 ]
