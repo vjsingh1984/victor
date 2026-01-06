@@ -21,6 +21,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 
 Available Builders:
     ComponentBuilder: Abstract base class for all builders
+    FactoryAwareBuilder: Base class for builders that use OrchestratorFactory
     ServiceBuilder: Builds core services (DI container, controllers, etc.)
     ToolBuilder: Builds tools and tool-related components
     ProviderBuilder: Builds provider and provider-related components
@@ -43,13 +44,14 @@ Usage:
     )
 """
 
-from victor.agent.builders.base import ComponentBuilder
+from victor.agent.builders.base import ComponentBuilder, FactoryAwareBuilder
 from victor.agent.builders.service_builder import ServiceBuilder
 from victor.agent.builders.tool_builder import ToolBuilder
 from victor.agent.builders.provider_builder import ProviderBuilder
 
 __all__ = [
     "ComponentBuilder",
+    "FactoryAwareBuilder",
     "ServiceBuilder",
     "ToolBuilder",
     "ProviderBuilder",
