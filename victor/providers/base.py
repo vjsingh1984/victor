@@ -172,6 +172,10 @@ class Message(BaseModel):
         default=None, description="ID of the tool call being responded to"
     )
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert message to dictionary representation."""
+        return self.model_dump()
+
 
 class ToolDefinition(BaseModel):
     """Standard tool definition format."""
