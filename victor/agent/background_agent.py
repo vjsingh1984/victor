@@ -81,13 +81,18 @@ class ToolCallRecord:
 
 @dataclass
 class BackgroundAgent:
-    """Represents a background agent task."""
+    """Represents a background agent task.
+
+    Phase 4 Refactoring:
+    Now includes optional orchestrator reference for unified agent creation.
+    """
 
     id: str
     name: str
     description: str
     task: str
     mode: str  # build, plan, explore
+    orchestrator: Optional[Any] = None  # Phase 4: Optional orchestrator reference
     status: AgentStatus = AgentStatus.PENDING
     progress: int = 0  # 0-100
     start_time: float = field(default_factory=time.time)
