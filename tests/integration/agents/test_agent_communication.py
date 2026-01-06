@@ -43,8 +43,8 @@ from victor.teams.types import (
     MessageType,
     TeamFormation,
 )
+from victor.framework.team_coordinator import FrameworkTeamCoordinator
 from victor.teams import (
-    FrameworkTeamCoordinator,
     AgentMessage as TeamAgentMessage,
     MessageType as TeamMessageType,
     TeamMessageBus,

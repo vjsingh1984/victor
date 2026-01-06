@@ -39,7 +39,6 @@ import pytest
 
 from victor.teams import (
     AgentMessage,
-    FrameworkTeamCoordinator,
     ITeamCoordinator,
     ITeamMember,
     MemberResult,
@@ -51,6 +50,7 @@ from victor.teams import (
     UnifiedTeamCoordinator,
     create_coordinator,
 )
+from victor.framework.team_coordinator import FrameworkTeamCoordinator
 
 
 # =============================================================================
@@ -527,18 +527,21 @@ class TestFactoryFunctionTDD:
         coordinator = create_coordinator()
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
-    def test_lightweight_creates_framework(self):
-        """RED -> GREEN: Lightweight should create framework coordinator."""
+    def test_lightweight_creates_unified_with_lightweight_mode(self):
+        """RED -> GREEN: Lightweight creates UnifiedTeamCoordinator in lightweight mode."""
         coordinator = create_coordinator(lightweight=True)
-        assert isinstance(coordinator, FrameworkTeamCoordinator)
+        assert isinstance(coordinator, UnifiedTeamCoordinator)
+        assert coordinator._lightweight_mode is True
+        assert coordinator._enable_observability is False
+        assert coordinator._enable_rl is False
 
     def test_respects_observability_flag(self):
         """RED -> GREEN: Should respect observability configuration."""
         with_obs = create_coordinator(with_observability=True)
         without_obs = create_coordinator(with_observability=False)
 
-        assert with_obs._observability_enabled is True
-        assert without_obs._observability_enabled is False
+        assert with_obs._enable_observability is True
+        assert without_obs._enable_observability is False
 
 
 if __name__ == "__main__":
