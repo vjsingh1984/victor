@@ -34,8 +34,10 @@ import pytest
 
 from victor.framework.agent_protocols import (
     AgentCapability,
-    AgentMessage,
     IAgentRole,
+)
+from victor.teams.types import (
+    AgentMessage,
     MessageType,
     TeamFormation,
 )

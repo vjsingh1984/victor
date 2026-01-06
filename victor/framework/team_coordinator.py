@@ -47,11 +47,8 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.framework.agent_protocols import (
-    AgentCapability,
-    ITeamCoordinator,
-    ITeamMember,
-)
+from victor.framework.agent_protocols import AgentCapability
+from victor.teams.protocols import ITeamCoordinator, ITeamMember
 from victor.teams import (
     AgentMessage,
     MemberResult,
@@ -73,7 +70,7 @@ from victor.teams import (
 # =============================================================================
 
 
-class FrameworkTeamCoordinator:
+class FrameworkTeamCoordinator(ITeamCoordinator):
     """Protocol-compliant team coordinator for multi-agent orchestration.
 
     FrameworkTeamCoordinator implements the ITeamCoordinator protocol and
@@ -314,7 +311,8 @@ class FrameworkTeamCoordinator:
         if not manager and self._members:
             # Auto-select manager: first member with DELEGATE capability, or first member
             for member in self._members:
-                if AgentCapability.DELEGATE in member.role.capabilities:
+                capabilities = getattr(member.role, 'capabilities', set())
+                if AgentCapability.DELEGATE in capabilities:
                     manager = member
                     break
             if not manager:

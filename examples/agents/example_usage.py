@@ -19,7 +19,7 @@ import asyncio
 from pathlib import Path
 
 # Agent system imports
-from victor.agents import (
+from victor.agent.specs import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,
@@ -324,7 +324,7 @@ async def example_ensemble_to_workflow():
     """Convert ensemble to workflow for execution."""
     print("\n=== Ensemble to Workflow Conversion ===\n")
 
-    from victor.agents import (
+    from victor.agent.specs import (
         Pipeline,
         researcher_agent,
         coder_agent,

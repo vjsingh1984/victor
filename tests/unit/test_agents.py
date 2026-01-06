@@ -15,7 +15,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from victor.agents import (
+from victor.agent.specs import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,
@@ -30,9 +30,9 @@ from victor.agents import (
     load_agents_from_dict,
     load_agents_from_yaml,
 )
-from victor.agents.spec import OutputFormat, DelegationPolicy
-from victor.agents.ensemble import ExecutionStatus, AgentResult, EnsembleResult
-from victor.agents.presets import get_preset_agent, list_preset_agents
+from victor.agent.specs.models import OutputFormat, DelegationPolicy
+from victor.agent.specs.ensemble import ExecutionStatus, AgentResult, EnsembleResult
+from victor.agent.specs.presets import get_preset_agent, list_preset_agents
 
 
 class TestAgentCapabilities:

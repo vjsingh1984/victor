@@ -25,14 +25,14 @@ from victor.agent.teams import (
     TeamMessageBus,
     TeamSharedMemory,
 )
-from victor.agent.teams.team import MemberStatus
+from victor.teams.types import MemberStatus
 
-# Use canonical types from victor.teams
-from victor.teams import TeamFormation, MemberResult, TeamResult
+# Use canonical types from victor.teams.types
+from victor.teams.types import TeamFormation, MemberResult, TeamResult
 
-# Use local AgentMessage from communication.py for TeamMessageBus tests
-# (the local type has from_agent/to_agent/type field names)
-from victor.agent.teams.communication import AgentMessage, MessageType
+# Use canonical AgentMessage from victor.teams.types
+# TeamMessageBus works with canonical AgentMessage via compatibility aliases
+from victor.teams.types import AgentMessage, MessageType
 from victor.agent.subagents import SubAgentRole
 
 
@@ -351,8 +351,8 @@ class TestAgentMessage:
     def test_minimal_message(self):
         """Create message with minimal fields."""
         msg = AgentMessage(
-            type=MessageType.DISCOVERY,
-            from_agent="researcher",
+            sender_id="researcher",
+            message_type=MessageType.DISCOVERY,
             content="Found something",
         )
         assert msg.type == MessageType.DISCOVERY
@@ -364,9 +364,9 @@ class TestAgentMessage:
     def test_directed_message(self):
         """Create directed message."""
         msg = AgentMessage(
-            type=MessageType.REQUEST,
-            from_agent="manager",
-            to_agent="worker",
+            sender_id="manager",
+            recipient_id="worker",
+            message_type=MessageType.REQUEST,
             content="Do this task",
         )
         assert msg.to_agent == "worker"
@@ -374,8 +374,8 @@ class TestAgentMessage:
     def test_to_dict(self):
         """to_dict serializes correctly."""
         msg = AgentMessage(
-            type=MessageType.STATUS,
-            from_agent="worker",
+            sender_id="worker",
+            message_type=MessageType.STATUS,
             content="50% done",
         )
         d = msg.to_dict()
@@ -386,8 +386,8 @@ class TestAgentMessage:
     def test_to_context_string(self):
         """to_context_string formats correctly."""
         msg = AgentMessage(
-            type=MessageType.DISCOVERY,
-            from_agent="researcher",
+            sender_id="researcher",
+            message_type=MessageType.DISCOVERY,
             content="Found 5 endpoints",
         )
         s = msg.to_context_string()
@@ -416,8 +416,8 @@ class TestTeamMessageBus:
         bus.register_agent("receiver2")
 
         msg = AgentMessage(
-            type=MessageType.DISCOVERY,
-            from_agent="sender",
+            sender_id="sender",
+            message_type=MessageType.DISCOVERY,
             content="Found something",
         )
         await bus.send(msg)
@@ -442,9 +442,9 @@ class TestTeamMessageBus:
         bus.register_agent("other")
 
         msg = AgentMessage(
-            type=MessageType.REQUEST,
-            from_agent="sender",
-            to_agent="target",
+            sender_id="sender",
+            recipient_id="target",
+            message_type=MessageType.REQUEST,
             content="Do this",
         )
         await bus.send(msg)

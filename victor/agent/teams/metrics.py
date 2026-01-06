@@ -27,11 +27,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-# Import canonical types from victor.teams
-from victor.teams import TeamFormation, TeamResult
-
-# Import local TeamConfig which has module-specific fields
-from victor.agent.teams.team import TeamConfig
+# Import canonical types from victor.teams.types
+from victor.teams.types import TeamConfig, TeamFormation, TeamResult
 
 logger = logging.getLogger(__name__)
 

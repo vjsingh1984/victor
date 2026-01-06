@@ -66,6 +66,7 @@ from victor.teams.types import (
     MessageType,
     TeamFormation,
 )
+from victor.teams.protocols import ITeamMember, ITeamCoordinator
 
 
 # =============================================================================
@@ -244,71 +245,6 @@ class IAgentPersona(Protocol):
 # =============================================================================
 
 
-@runtime_checkable
-class ITeamMember(Protocol):
-    """Protocol for individual team members.
-
-    A team member combines a role, persona, and execution capability.
-    Team members can execute tasks and communicate with other members.
-
-    Attributes:
-        id: Unique identifier for this team member
-        role: The role this member plays (IAgentRole)
-        persona: The personality of this member (IAgentPersona or None)
-
-    Example:
-        class ResearchAgent:
-            def __init__(self):
-                self.id = "researcher_001"
-                self.role = ResearcherRole()
-                self.persona = SecurityExpertPersona()
-
-            async def execute_task(self, task, context):
-                # Execute the research task
-                return result
-
-            async def receive_message(self, message):
-                # Process incoming message
-                return response_message
-    """
-
-    @property
-    def id(self) -> str:
-        """Get the member's unique identifier."""
-        ...
-
-    @property
-    def role(self) -> IAgentRole:
-        """Get the member's role."""
-        ...
-
-    @property
-    def persona(self) -> Optional[IAgentPersona]:
-        """Get the member's persona (may be None)."""
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
-        """Execute a task with the given context.
-
-        Args:
-            task: Description of the task to execute
-            context: Additional context for task execution
-
-        Returns:
-            The result of task execution as a string
-        """
-        ...
-
-    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
-        """Receive and process a message from another agent.
-
-        Args:
-            message: The incoming message
-
-        Returns:
-            Optional response message, or None if no response needed
-        """
-        ...
 
 
 # =============================================================================
@@ -316,69 +252,6 @@ class ITeamMember(Protocol):
 # =============================================================================
 
 
-@runtime_checkable
-class ITeamCoordinator(Protocol):
-    """Protocol for team coordination.
-
-    The team coordinator manages team members, sets formations, and
-    orchestrates task execution across the team.
-
-    Example:
-        coordinator = TeamCoordinator()
-        coordinator.add_member(researcher)
-        coordinator.add_member(executor)
-        coordinator.set_formation(TeamFormation.SEQUENTIAL)
-
-        result = await coordinator.execute_task(
-            "Implement authentication feature",
-            {"target_dir": "src/auth/"}
-        )
-    """
-
-    def add_member(self, member: ITeamMember) -> "ITeamCoordinator":
-        """Add a member to the team.
-
-        Args:
-            member: The team member to add
-
-        Returns:
-            Self for fluent chaining
-        """
-        ...
-
-    def set_formation(self, formation: TeamFormation) -> "ITeamCoordinator":
-        """Set the team's formation pattern.
-
-        Args:
-            formation: The formation to use
-
-        Returns:
-            Self for fluent chaining
-        """
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a task using the configured team.
-
-        Args:
-            task: The task description
-            context: Context for task execution
-
-        Returns:
-            Dict containing execution results from team members
-        """
-        ...
-
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
-        """Broadcast a message to all team members.
-
-        Args:
-            message: The message to broadcast
-
-        Returns:
-            List of responses from team members
-        """
-        ...
 
 
 # =============================================================================

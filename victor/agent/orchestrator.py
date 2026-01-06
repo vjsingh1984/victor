@@ -4185,6 +4185,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if self.observed_files:
                 available_inputs.append("file_contents")
             planned_tools = self._tool_planner.plan_tools(goals, available_inputs)
+            logger.info(f"available_inputs={available_inputs}")
 
         conversation_depth = self.conversation.message_count()
         conversation_history = (
@@ -4197,6 +4198,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             conversation_depth=conversation_depth,
             planned_tools=planned_tools,
         )
+        logger.info(f"context_msg={context_msg}\nuse_semantic={self.use_semantic_selection}\nconversation_depth={conversation_depth}")
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(self, "_current_intent", None)
         tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)

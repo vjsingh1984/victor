@@ -425,7 +425,7 @@ try:
         team_complete_event,
         team_start_event,
     )
-    from victor.agent.teams.team import (
+    from victor.teams.types import (
         TeamConfig,
         TeamMember,
     )

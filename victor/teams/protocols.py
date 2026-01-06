@@ -48,7 +48,43 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class ITeamMember(Protocol):
+class IAgent(Protocol):
+    """Unified protocol for all agent implementations.
+
+    This is the minimal interface that all agents in the Victor system
+    must implement. It provides a consistent way to execute tasks
+    regardless of the underlying implementation (SubAgent, team member, etc.).
+
+    Attributes:
+        id: Unique identifier for this agent
+        role: Role of this agent (IAgentRole, SubAgentRole, or any type)
+    """
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this agent."""
+        ...
+
+    @property
+    def role(self) -> Any:
+        """Role of this agent (IAgentRole, SubAgentRole, or any type)."""
+        ...
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
+        """Execute a task and return the result.
+
+        Args:
+            task: Task description
+            context: Execution context with shared state
+
+        Returns:
+            Result of task execution (string, dict, or any type)
+        """
+        ...
+
+
+@runtime_checkable
+class ITeamMember(IAgent, Protocol):
     """Protocol for team members.
 
     Defines the minimal interface for an agent that can participate
@@ -56,13 +92,8 @@ class ITeamMember(Protocol):
     """
 
     @property
-    def id(self) -> str:
-        """Unique identifier for this member."""
-        ...
-
-    @property
-    def role(self) -> Any:
-        """Role of this member (IAgentRole or SubAgentRole)."""
+    def persona(self) -> Optional[Any]:
+        """Persona of this member (IAgentPersona or None)."""
         ...
 
     async def execute_task(self, task: str, context: Dict[str, Any]) -> str:

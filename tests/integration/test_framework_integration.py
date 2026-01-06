@@ -34,7 +34,7 @@ from victor.storage.memory import (
 )
 
 # Agent Ensemble imports
-from victor.agents import (
+from victor.agent.specs import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,
@@ -46,7 +46,7 @@ from victor.agents import (
     reviewer_agent,
     load_agents_from_dict,
 )
-from victor.agents.ensemble import ExecutionStatus
+from victor.agent.specs.ensemble import ExecutionStatus
 
 # HITL imports
 from victor.workflows.hitl import (

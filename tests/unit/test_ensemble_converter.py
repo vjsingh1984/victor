@@ -5,7 +5,7 @@
 
 import pytest
 
-from victor.agents import (
+from victor.agent.specs import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,
@@ -17,7 +17,7 @@ from victor.agents import (
     ensemble_to_workflow,
     workflow_to_ensemble,
 )
-from victor.agents.ensemble import EnsembleType
+from victor.agent.specs.ensemble import EnsembleType
 from victor.workflows.definition import (
     AgentNode,
     ParallelNode,

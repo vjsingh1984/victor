@@ -49,11 +49,14 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
+from victor.teams.protocols import IAgent
+from victor.teams.types import AgentMessage
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -151,7 +154,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent:
+class SubAgent(IAgent):
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
@@ -202,6 +205,7 @@ class SubAgent:
             testing through protocol-based dependency injection.
         """
         self.config = config
+        self._id = uuid.uuid4().hex[:12]
 
         # Auto-adapt full orchestrator to SubAgentContext for ISP compliance
         # Check if it's already a SubAgentContext (including adapters)
@@ -220,6 +224,48 @@ class SubAgent:
             f"Created {config.role.value} sub-agent: {config.task[:50]}... "
             f"(budget={config.tool_budget}, tools={len(config.allowed_tools)})"
         )
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this agent."""
+        return self._id
+
+    @property
+    def role(self):
+        """Role of this agent (SubAgentRole)."""
+        return self.config.role
+
+    @property
+    def persona(self):
+        """Persona of this agent (None for SubAgent)."""
+        return None
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+        """Execute a task using this sub-agent.
+
+        Note: The SubAgent is configured with a specific task at creation.
+        This method executes that configured task, ignoring the passed task
+        parameter. The context parameter is also ignored as SubAgent has
+        its own isolated context.
+
+        Returns:
+            String summary of execution outcome.
+        """
+        # Execute the configured task (ignore passed task parameter)
+        result = await self.execute()
+        return result.summary if result.summary else ""
+
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+        """Receive a message (SubAgents don't support direct messaging).
+
+        SubAgents are isolated execution units that don't participate in
+        direct agent-to-agent communication. This method exists for protocol
+        compatibility.
+
+        Returns:
+            None, as SubAgents don't respond to messages
+        """
+        return None
 
     def _create_constrained_orchestrator(self) -> "AgentOrchestrator":
         """Create orchestrator with role-specific constraints.

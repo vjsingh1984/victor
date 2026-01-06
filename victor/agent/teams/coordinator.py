@@ -51,7 +51,7 @@ from victor.observability.team_metrics import (
     record_team_spawned,
     record_team_completed,
 )
-from victor.agent.subagents.base import SubAgentConfig, SubAgentResult
+from victor.agent.subagents.base import SubAgentConfig, SubAgentResult, SubAgentRole
 from victor.agent.subagents.orchestrator import (
     ROLE_DEFAULT_BUDGETS,
     ROLE_DEFAULT_CONTEXT,
@@ -59,23 +59,23 @@ from victor.agent.subagents.orchestrator import (
     SubAgentOrchestrator,
     SubAgentTask,
 )
+from victor.teams.protocols import ITeamCoordinator, ITeamMember
 
-# Import canonical types from victor.teams
-from victor.teams import (
-    TeamFormation,
-    MessageType,
+# Import canonical types from victor.teams.types
+from victor.teams.types import (
     MemberResult,
+    MemberStatus,
+    MessageType,
+    TeamConfig,
+    TeamFormation,
+    TeamMember,
     TeamResult,
 )
+# Import canonical AgentMessage from victor.teams.types
+from victor.teams.types import AgentMessage
 from victor.agent.teams.communication import (
-    AgentMessage,  # Local AgentMessage for TeamMessageBus compatibility
     TeamMessageBus,
     TeamSharedMemory,
-)
-from victor.agent.teams.team import (
-    MemberStatus,
-    TeamConfig,
-    TeamMember,
 )
 
 if TYPE_CHECKING:
@@ -112,7 +112,7 @@ class TeamExecution:
             self.message_bus.register_agent(member.id)
 
 
-class TeamCoordinator:
+class TeamCoordinator(ITeamCoordinator):
     """Coordinates execution of agent teams.
 
     Provides high-level API for executing teams with different formation
@@ -150,6 +150,10 @@ class TeamCoordinator:
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
+        # ITeamCoordinator state
+        self._members: List[ITeamMember] = []
+        self._formation: TeamFormation = TeamFormation.SEQUENTIAL
+
         # Execution context for observability
         self._task_type: str = "unknown"
         self._complexity: str = "medium"
@@ -158,6 +162,116 @@ class TeamCoordinator:
         self._rl_coordinator: Optional[Any] = None
 
         logger.info("TeamCoordinator initialized")
+
+    # =========================================================================
+    # ITeamCoordinator Protocol Methods
+    # =========================================================================
+
+    def add_member(self, member: ITeamMember) -> "TeamCoordinator":
+        """Add a member to the team.
+
+        Args:
+            member: Team member implementing ITeamMember protocol
+
+        Returns:
+            Self for fluent chaining
+        """
+        self._members.append(member)
+        return self
+
+    def set_formation(self, formation: TeamFormation) -> "TeamCoordinator":
+        """Set the team formation pattern.
+
+        Args:
+            formation: Formation to use
+
+        Returns:
+            Self for fluent chaining
+        """
+        self._formation = formation
+        return self
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a task with the team using stored members and formation.
+
+        Args:
+            task: Task description
+            context: Execution context
+
+        Returns:
+            Result dictionary with success, member_results, formation
+        """
+        if not self._members:
+            return {
+                "success": False,
+                "error": "No team members added",
+                "member_results": {},
+                "formation": self._formation.value,
+            }
+
+        # Convert ITeamMember instances to TeamMember configurations
+        team_members = []
+        for i, member in enumerate(self._members):
+            # Try to extract TeamMember attributes from ITeamMember
+            # For now, create a basic TeamMember with defaults
+            team_members.append(
+                TeamMember(
+                    id=member.id,
+                    role=getattr(member, 'role', SubAgentRole.EXECUTOR),
+                    name=getattr(member, 'name', f"Member {i}"),
+                    goal=task,  # Use task as goal
+                    tool_budget=getattr(member, 'tool_budget', 15),
+                    allowed_tools=getattr(member, 'allowed_tools', None),
+                    # Copy other attributes if available
+                    backstory=getattr(member, 'backstory', ''),
+                    expertise=getattr(member, 'expertise', []),
+                    personality=getattr(member, 'personality', ''),
+                )
+            )
+
+        # Create TeamConfig
+        config = TeamConfig(
+            name=f"Team_{uuid.uuid4().hex[:8]}",
+            goal=task,
+            members=team_members,
+            formation=self._formation,
+            total_tool_budget=sum(m.tool_budget for m in team_members),
+            timeout_seconds=600,
+        )
+
+        # Execute using existing execute_team method
+        result = await self.execute_team(config)
+
+        # Convert TeamResult to protocol-compatible dictionary
+        # Follow same format as FrameworkTeamCoordinator
+        return {
+            "success": result.success,
+            "member_results": result.member_results,
+            "formation": result.formation.value,
+        }
+
+    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
+        """Broadcast a message to all team members.
+
+        Args:
+            message: Message to broadcast
+
+        Returns:
+            List of responses from members
+        """
+        responses = []
+        for member in self._members:
+            try:
+                response = await member.receive_message(message)
+                responses.append(response)
+            except Exception as e:
+                logger.warning(f"Member {member.id} failed to receive message: {e}")
+                responses.append(None)
+        return responses
+
+    # =========================================================================
+    # Original TeamCoordinator API
+    # =========================================================================
 
     def set_execution_context(
         self,
@@ -486,8 +600,8 @@ class TeamCoordinator:
             # Notify team via message bus
             await execution.message_bus.send(
                 AgentMessage(
-                    type=MessageType.RESULT,
-                    from_agent=member.id,
+                    sender_id=member.id,
+                    message_type=MessageType.RESULT,
                     content=result.output[:500],
                     data={"success": result.success, "tool_calls": result.tool_calls_used},
                 )
@@ -796,9 +910,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 next_member = sorted_members[i + 1]
                 await execution.message_bus.send(
                     AgentMessage(
-                        type=MessageType.HANDOFF,
-                        from_agent=member.id,
-                        to_agent=next_member.id,
+                        sender_id=member.id,
+                        recipient_id=next_member.id,
+                        message_type=MessageType.HANDOFF,
                         content=f"Pipeline stage complete. Passing to {next_member.name}.",
                     )
                 )

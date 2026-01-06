@@ -22,7 +22,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.subagents.base import SubAgentRole
-from victor.agent.teams.team import TeamMember, TeamConfig
+from victor.teams.types import TeamMember, TeamConfig
 from victor.teams import TeamFormation
 from victor.framework.teams import (
     AgentTeam,
@@ -603,7 +603,7 @@ class TestAgentTeamExecution:
     @pytest.fixture
     def mock_coordinator(self):
         """Create a mock coordinator with execute_team."""
-        from victor.agent.teams.team import TeamResult, MemberResult
+        from victor.teams.types import TeamFormation, TeamResult, MemberResult
 
         coordinator = MagicMock()
         coordinator.execute_team = AsyncMock(
@@ -619,6 +619,7 @@ class TestAgentTeamExecution:
                         duration_seconds=1.0,
                     ),
                 },
+                formation=TeamFormation.SEQUENTIAL,
                 total_tool_calls=5,
                 total_duration=2.0,
             )
