@@ -136,8 +136,16 @@ EventCallback = Callable[[str, Dict[str, Any]], None]
 class BackgroundAgentManager:
     """Manages background agent execution.
 
+    Phase 4 Refactoring:
+    Now supports OrchestratorFactory for unified agent creation, ensuring
+    consistent code maintenance and eliminating code proliferation (SOLID DIP).
+
     Provides async agent execution with progress tracking and WebSocket
     event broadcasting for real-time UI updates.
+
+    Note: This manager shares a single orchestrator across all background
+    agents for efficiency. Agent instances are state trackers, not separate
+    agent implementations.
     """
 
     def __init__(
@@ -145,15 +153,19 @@ class BackgroundAgentManager:
         orchestrator: Any,
         max_concurrent: int = 4,
         event_callback: Optional[EventCallback] = None,
+        factory: Optional[Any] = None,
     ):
         """Initialize the background agent manager.
 
         Args:
-            orchestrator: The AgentOrchestrator instance
+            orchestrator: The AgentOrchestrator instance (shared by all agents)
             max_concurrent: Maximum concurrent agents (default: 4)
             event_callback: Callback for broadcasting events
+            factory: Optional OrchestratorFactory for unified agent creation
+                    (recommended for consistency with Phase 4 architecture)
         """
         self._orchestrator = orchestrator
+        self._factory = factory  # Store factory for unified creation
         self._max_concurrent = max_concurrent
         self._event_callback = event_callback
 
@@ -168,6 +180,46 @@ class BackgroundAgentManager:
         """Get count of active (running/pending) agents."""
         return len(self._running_tasks)
 
+    @classmethod
+    def from_factory(
+        cls,
+        factory: Any,
+        max_concurrent: int = 4,
+        event_callback: Optional[EventCallback] = None,
+    ) -> "BackgroundAgentManager":
+        """Create BackgroundAgentManager from OrchestratorFactory.
+
+        Phase 4: Recommended factory method for unified agent creation.
+
+        Args:
+            factory: OrchestratorFactory instance
+            max_concurrent: Maximum concurrent agents
+            event_callback: Callback for broadcasting events
+
+        Returns:
+            BackgroundAgentManager instance with factory-created orchestrator
+
+        Example:
+            from victor.agent.orchestrator_factory import OrchestratorFactory
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            factory = OrchestratorFactory(settings, provider, model)
+            manager = BackgroundAgentManager.from_factory(factory)
+        """
+        import asyncio
+
+        # Create orchestrator using factory (this is the unified creation path)
+        orchestrator = asyncio.run(factory.create_agent(mode="foreground"))
+
+        # Return manager with factory stored for consistency
+        return cls(
+            orchestrator=orchestrator,
+            max_concurrent=max_concurrent,
+            event_callback=event_callback,
+            factory=factory,  # Store factory for future use
+        )
+
     def set_event_callback(self, callback: EventCallback) -> None:
         """Set the event callback for broadcasting updates."""
         self._event_callback = callback
@@ -178,14 +230,21 @@ class BackgroundAgentManager:
         mode: str = "build",
         name: Optional[str] = None,
         description: Optional[str] = None,
+        config: Optional[Any] = None,
     ) -> str:
         """Start a new background agent.
+
+        Phase 4 Refactoring:
+        Accepts optional UnifiedAgentConfig and uses OrchestratorFactory if available
+        for unified agent creation. Falls back to direct instantiation for
+        backward compatibility.
 
         Args:
             task: The task/prompt for the agent
             mode: Agent mode (build, plan, explore)
             name: Optional display name
             description: Optional description
+            config: Optional UnifiedAgentConfig for advanced configuration
 
         Returns:
             Agent ID
@@ -206,13 +265,48 @@ class BackgroundAgentManager:
             if not name:
                 name = task[:40] + ("..." if len(task) > 40 else "")
 
-            agent = BackgroundAgent(
-                id=agent_id,
-                name=name,
-                description=description or task,
-                task=task,
-                mode=mode,
-            )
+            # Phase 4: Use factory if available for unified agent creation
+            if self._factory and config:
+                # Import here to avoid circular dependency
+                from victor.agent.config import UnifiedAgentConfig
+
+                # Convert to UnifiedAgentConfig if needed
+                if not isinstance(config, UnifiedAgentConfig):
+                    config = UnifiedAgentConfig(
+                        mode="background",
+                        task=task,
+                        mode_type=mode,
+                    )
+
+                # Use factory to create agent wrapper (gets orchestrator)
+                agent_wrapper = await self._factory.create_agent(
+                    mode="background",
+                    task=task,
+                    mode_type=mode,
+                    config=config,
+                )
+
+                # Create BackgroundAgent state tracker
+                agent = BackgroundAgent(
+                    id=agent_id,
+                    name=name,
+                    description=description or task,
+                    task=task,
+                    mode=mode,
+                    orchestrator=agent_wrapper._orchestrator
+                    if hasattr(agent_wrapper, "_orchestrator")
+                    else self._orchestrator,
+                )
+            else:
+                # Legacy path: direct BackgroundAgent instantiation
+                agent = BackgroundAgent(
+                    id=agent_id,
+                    name=name,
+                    description=description or task,
+                    task=task,
+                    mode=mode,
+                    orchestrator=self._orchestrator,
+                )
 
             self._agents[agent_id] = agent
             self._running_tasks.add(agent_id)
