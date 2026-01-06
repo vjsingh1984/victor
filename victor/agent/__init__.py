@@ -16,6 +16,7 @@
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.config_loader import ConfigLoader
+from victor.agent.config import UnifiedAgentConfig, AgentMode
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.message_history import MessageHistory
 from victor.agent.observability import (
@@ -76,6 +77,8 @@ __all__ = [
     "ArgumentNormalizer",
     "NormalizationStrategy",
     "ConfigLoader",
+    "UnifiedAgentConfig",
+    "AgentMode",
     "get_critical_tools",
     # Conversation
     "MessageHistory",

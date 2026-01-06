@@ -2228,7 +2228,16 @@ class OrchestratorFactory(ModeAwareMixin):
             # Foreground agent (simple)
             agent = await factory.create_agent(mode="foreground")
 
-            # Foreground agent with options
+            # Foreground agent with UnifiedAgentConfig
+            from victor.agent.config import UnifiedAgentConfig
+            config = UnifiedAgentConfig.foreground(
+                provider="openai",
+                model="gpt-4-turbo",
+                tool_budget=100
+            )
+            agent = await factory.create_agent(config=config)
+
+            # Foreground agent with options (legacy)
             agent = await factory.create_agent(
                 mode="foreground",
                 provider="openai",
@@ -2243,6 +2252,13 @@ class OrchestratorFactory(ModeAwareMixin):
                 mode_type="build"
             )
 
+            # Background agent with UnifiedAgentConfig
+            config = UnifiedAgentConfig.background(
+                task="Implement feature X",
+                tool_budget=100
+            )
+            agent = await factory.create_agent(config=config)
+
             # Team member
             agent = await factory.create_agent(
                 mode="team_member",
@@ -2251,6 +2267,62 @@ class OrchestratorFactory(ModeAwareMixin):
             )
         """
         from victor.agent.orchestrator import AgentOrchestrator
+
+        # Extract parameters from UnifiedAgentConfig if provided
+        if config:
+            # Import here to avoid circular dependency
+            from victor.agent.config import UnifiedAgentConfig
+
+            if isinstance(config, UnifiedAgentConfig):
+                # Apply config settings to kwargs (config takes precedence)
+                mode = config.mode
+                task = config.task or task
+
+                # Merge config settings with kwargs (kwargs override config)
+                merged_kwargs = {}
+
+                # Common settings
+                if config.provider != "anthropic":
+                    merged_kwargs["provider"] = config.provider
+                if config.model:
+                    merged_kwargs["model"] = config.model
+                if config.temperature != 0.7:
+                    merged_kwargs["temperature"] = config.temperature
+                if config.max_tokens != 4096:
+                    merged_kwargs["max_tokens"] = config.max_tokens
+
+                # Foreground-specific
+                if mode == "foreground":
+                    merged_kwargs["tool_budget"] = config.tool_budget
+                    merged_kwargs["max_iterations"] = config.max_iterations
+                    merged_kwargs["enable_parallel_tools"] = config.enable_parallel_tools
+                    merged_kwargs["max_concurrent_tools"] = config.max_concurrent_tools
+                    merged_kwargs["enable_context_compaction"] = config.enable_context_compaction
+                    merged_kwargs["enable_semantic_search"] = config.enable_semantic_search
+                    merged_kwargs["enable_analytics"] = config.enable_analytics
+
+                # Background-specific
+                elif mode == "background":
+                    merged_kwargs["task"] = config.task or task
+                    merged_kwargs["mode_type"] = config.mode_type
+                    merged_kwargs["websocket"] = config.websocket
+                    merged_kwargs["timeout_seconds"] = config.timeout_seconds
+                    merged_kwargs["tool_budget"] = config.tool_budget
+
+                # Team member-specific
+                elif mode == "team_member":
+                    merged_kwargs["role"] = config.role
+                    merged_kwargs["capabilities"] = config.capabilities
+                    merged_kwargs["description"] = config.description
+                    merged_kwargs["allowed_tools"] = config.allowed_tools
+                    merged_kwargs["can_spawn_subagents"] = config.can_spawn_subagents
+
+                # Apply extra settings
+                merged_kwargs.update(config.extra)
+
+                # Merge with provided kwargs (kwargs take precedence)
+                merged_kwargs.update(kwargs)
+                kwargs = merged_kwargs
 
         # Create orchestrator using existing factory methods
         # Note: We re-use the existing from_settings pattern which internally
@@ -2309,7 +2381,7 @@ class OrchestratorFactory(ModeAwareMixin):
             # Create background agent
             agent = BackgroundAgent(
                 orchestrator=orchestrator,
-                task=task or "",
+                task=task or kwargs.get("task", ""),
                 mode_type=kwargs.get("mode_type", "build"),
                 websocket=kwargs.get("websocket", False),
                 enable_observability=kwargs.get("enable_observability", True),
