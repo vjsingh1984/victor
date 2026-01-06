@@ -18,7 +18,7 @@ Ready-to-use agent configurations for common use cases.
 These can be used directly or as templates for customization.
 
 Example:
-    from victor.agents.presets import researcher_agent, coder_agent
+    from victor.agent.specs.presets import researcher_agent, coder_agent
 
     # Use directly
     pipeline = Pipeline([researcher_agent, coder_agent])
@@ -30,7 +30,7 @@ Example:
     )
 """
 
-from victor.agents.spec import (
+from victor.agent.specs.models import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,

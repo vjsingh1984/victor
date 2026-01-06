@@ -27,14 +27,14 @@ This bridge enables:
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.agents.ensemble import (
+from victor.agent.specs.ensemble import (
     Ensemble,
     EnsembleType,
     Pipeline,
     Parallel,
     Hierarchical,
 )
-from victor.agents.spec import AgentSpec, ModelPreference
+from victor.agent.specs.models import AgentSpec, ModelPreference
 from victor.workflows.definition import (
     AgentNode,
     ParallelNode,
@@ -359,7 +359,7 @@ def workflow_to_ensemble(
 
 def _agent_node_to_spec(node: AgentNode) -> AgentSpec:
     """Convert an AgentNode back to AgentSpec."""
-    from victor.agents.spec import AgentCapabilities, AgentConstraints
+    from victor.agent.specs.models import AgentCapabilities, AgentConstraints
 
     # Map role back to model preference
     role_to_preference = {

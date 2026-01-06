@@ -47,8 +47,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from victor.agents.spec import AgentSpec
-from victor.agents.ensemble import (
+from victor.agent.specs.models import AgentSpec
+from victor.agent.specs.ensemble import (
     Ensemble,
     EnsembleType,
     Pipeline,
@@ -128,7 +128,7 @@ def load_agents_from_dict(
     Returns:
         AgentConfig with loaded agents and ensemble
     """
-    from victor.agents.presets import get_preset_agent, list_preset_agents
+    from victor.agent.specs.presets import get_preset_agent, list_preset_agents
 
     config = AgentConfig()
 
@@ -275,7 +275,7 @@ def save_agents_to_yaml(
     """
     import yaml
 
-    from victor.agents.presets import list_preset_agents
+    from victor.agent.specs.presets import list_preset_agents
 
     preset_names = set(list_preset_agents()) if not include_presets else set()
 

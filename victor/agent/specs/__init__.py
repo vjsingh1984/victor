@@ -28,7 +28,7 @@ Key Concepts:
 - Pipeline: Sequential or parallel agent execution
 
 Example (Python DSL):
-    from victor.agents import AgentSpec, Ensemble, Pipeline
+    from victor.agent.specs import AgentSpec, Ensemble, Pipeline
 
     researcher = AgentSpec(
         name="researcher",
@@ -63,31 +63,31 @@ Example (YAML):
       agents: [researcher, coder]
 """
 
-from victor.agents.spec import (
+from victor.agent.specs.models import (
     AgentSpec,
     AgentCapabilities,
     AgentConstraints,
     ModelPreference,
 )
-from victor.agents.ensemble import (
+from victor.agent.specs.ensemble import (
     Ensemble,
     EnsembleType,
     Pipeline,
     Parallel,
     Hierarchical,
 )
-from victor.agents.presets import (
+from victor.agent.specs.presets import (
     researcher_agent,
     coder_agent,
     reviewer_agent,
     devops_agent,
     analyst_agent,
 )
-from victor.agents.loader import (
+from victor.agent.specs.loader import (
     load_agents_from_yaml,
     load_agents_from_dict,
 )
-from victor.agents.converter import (
+from victor.agent.specs.converter import (
     EnsembleConverter,
     ensemble_to_workflow,
     workflow_to_ensemble,

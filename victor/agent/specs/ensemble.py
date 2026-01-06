@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
-from victor.agents.spec import AgentSpec
+from victor.agent.specs.models import AgentSpec
 
 logger = logging.getLogger(__name__)
 
@@ -530,7 +530,7 @@ def create_pipeline(
     Returns:
         Configured Pipeline
     """
-    from victor.agents.presets import get_preset_agent
+    from victor.agent.specs.presets import get_preset_agent
 
     resolved = []
     for agent in agents:
@@ -555,7 +555,7 @@ def create_parallel(
     Returns:
         Configured Parallel
     """
-    from victor.agents.presets import get_preset_agent
+    from victor.agent.specs.presets import get_preset_agent
 
     resolved = []
     for agent in agents:
