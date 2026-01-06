@@ -43,8 +43,10 @@ from victor.teams.types import (
     MessageType,
     TeamFormation,
 )
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
 from victor.teams import (
+    create_coordinator,
+    UnifiedTeamCoordinator,
+    ITeamCoordinator,
     AgentMessage as TeamAgentMessage,
     MessageType as TeamMessageType,
     TeamMessageBus,
@@ -131,9 +133,9 @@ class CommunicationTestAgent:
 
 
 @pytest.fixture
-def coordinator() -> FrameworkTeamCoordinator:
+def coordinator() -> ITeamCoordinator:
     """Create a fresh coordinator."""
-    return FrameworkTeamCoordinator()
+    return create_coordinator(lightweight=True)
 
 
 @pytest.fixture
@@ -171,7 +173,7 @@ class TestBroadcastMessaging:
     @pytest.mark.asyncio
     async def test_broadcast_delivers_to_all_members(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Broadcast delivers message to all team members."""
@@ -194,7 +196,7 @@ class TestBroadcastMessaging:
     @pytest.mark.asyncio
     async def test_broadcast_returns_all_responses(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Broadcast returns responses from all members."""
@@ -216,7 +218,7 @@ class TestBroadcastMessaging:
     @pytest.mark.asyncio
     async def test_broadcast_responses_contain_correct_senders(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Broadcast responses correctly identify senders."""
@@ -239,7 +241,7 @@ class TestBroadcastMessaging:
     @pytest.mark.asyncio
     async def test_broadcast_preserves_message_type(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Broadcast preserves the original message type."""
@@ -261,7 +263,7 @@ class TestBroadcastMessaging:
     @pytest.mark.asyncio
     async def test_broadcast_preserves_metadata(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Broadcast preserves message metadata."""
@@ -298,7 +300,7 @@ class TestDirectMessaging:
     @pytest.mark.asyncio
     async def test_direct_message_to_specific_agent(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Direct message is delivered only to specified agent."""
@@ -322,7 +324,7 @@ class TestDirectMessaging:
     @pytest.mark.asyncio
     async def test_direct_message_returns_response(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Direct message returns response from recipient."""
         agent = CommunicationTestAgent(
@@ -346,7 +348,7 @@ class TestDirectMessaging:
     @pytest.mark.asyncio
     async def test_direct_message_to_nonexistent_agent(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_comm_agents: List[CommunicationTestAgent],
     ):
         """Direct message to nonexistent agent returns None."""
@@ -367,7 +369,7 @@ class TestDirectMessaging:
     @pytest.mark.asyncio
     async def test_direct_message_response_type(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Direct message response has correct type."""
         agent = CommunicationTestAgent("responder")
@@ -786,7 +788,7 @@ class TestResponseAggregation:
     @pytest.mark.asyncio
     async def test_aggregate_broadcast_responses(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Broadcast responses can be aggregated."""
         agents = [
@@ -817,7 +819,7 @@ class TestResponseAggregation:
     @pytest.mark.asyncio
     async def test_aggregate_with_varying_delays(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Aggregation handles varying response times."""
         agents = [
@@ -845,7 +847,7 @@ class TestResponseAggregation:
     @pytest.mark.asyncio
     async def test_aggregate_metadata_from_responses(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Response metadata can be aggregated."""
         agents = [
@@ -884,7 +886,7 @@ class TestCommunicationWithTeamExecution:
     @pytest.mark.asyncio
     async def test_communication_during_sequential_execution(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Agents can receive messages during sequential execution."""
         agent1 = CommunicationTestAgent("agent_1")
@@ -910,7 +912,7 @@ class TestCommunicationWithTeamExecution:
     @pytest.mark.asyncio
     async def test_message_bus_integration_with_coordinator(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Message bus works alongside team coordinator."""
         bus = TeamMessageBus("test_team")

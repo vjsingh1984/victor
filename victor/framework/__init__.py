@@ -958,15 +958,16 @@ except ImportError:
     pass
 
 # Team Coordinator (Multi-Agent Coordination)
+# NOTE: FrameworkTeamCoordinator has been removed.
+# Use victor.teams.create_coordinator() instead.
+# See victor/teams/MIGRATION_GUIDE.md for migration instructions.
 try:
-    from victor.framework.team_coordinator import (
-        FrameworkTeamCoordinator,
+    from victor.teams import (
         MemberResult as CoordinatorMemberResult,  # Alias to avoid conflict
         TeamResult as CoordinatorTeamResult,  # Alias to avoid conflict
     )
 
     _TEAM_COORDINATOR_EXPORTS = [
-        "FrameworkTeamCoordinator",
         "CoordinatorMemberResult",
         "CoordinatorTeamResult",
     ]

@@ -51,7 +51,10 @@ from victor.framework.agent_roles import (
     get_role,
 )
 from victor.framework.personas import Persona, get_persona
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
+from victor.teams import (
+    create_coordinator,
+    ITeamCoordinator,
+)
 from victor.teams.types import (
     MemberResult,
     TeamResult,
@@ -166,9 +169,9 @@ class IntegrationTestAgent:
 
 
 @pytest.fixture
-def coordinator() -> FrameworkTeamCoordinator:
+def coordinator() -> ITeamCoordinator:
     """Create a fresh coordinator for each test."""
-    return FrameworkTeamCoordinator()
+    return create_coordinator(lightweight=True)
 
 
 @pytest.fixture
@@ -237,7 +240,7 @@ class TestSequentialFormation:
     @pytest.mark.asyncio
     async def test_sequential_execution_order(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
         execution_tracker: List[str],
     ):
@@ -258,7 +261,7 @@ class TestSequentialFormation:
     @pytest.mark.asyncio
     async def test_sequential_all_agents_receive_same_task(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """All agents receive the same task description."""
@@ -277,7 +280,7 @@ class TestSequentialFormation:
     @pytest.mark.asyncio
     async def test_sequential_collects_all_results(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """Results are collected from all agents."""
@@ -295,7 +298,7 @@ class TestSequentialFormation:
     @pytest.mark.asyncio
     async def test_sequential_handles_agent_failure(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Sequential formation handles individual agent failures."""
         agent1 = IntegrationTestAgent("agent_1")
@@ -316,7 +319,7 @@ class TestSequentialFormation:
     @pytest.mark.asyncio
     async def test_sequential_timing_is_additive(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Sequential execution time is sum of individual delays."""
         # Each agent takes 0.05s
@@ -348,7 +351,7 @@ class TestParallelFormation:
     @pytest.mark.asyncio
     async def test_parallel_concurrent_execution(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Agents execute concurrently with parallel formation."""
         # Each agent takes 0.1s
@@ -369,7 +372,7 @@ class TestParallelFormation:
     @pytest.mark.asyncio
     async def test_parallel_all_agents_execute(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """All agents execute the task in parallel formation."""
@@ -388,7 +391,7 @@ class TestParallelFormation:
     @pytest.mark.asyncio
     async def test_parallel_timestamps_overlap(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Agent execution timestamps should overlap in parallel."""
         agents = [IntegrationTestAgent(f"agent_{i}", delay=0.1) for i in range(3)]
@@ -410,7 +413,7 @@ class TestParallelFormation:
     @pytest.mark.asyncio
     async def test_parallel_handles_mixed_failures(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Parallel formation handles some agents failing."""
         agent1 = IntegrationTestAgent("agent_1")
@@ -433,7 +436,7 @@ class TestParallelFormation:
     @pytest.mark.asyncio
     async def test_parallel_collects_all_results(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """Parallel execution collects results from all agents."""
@@ -461,7 +464,7 @@ class TestHierarchicalFormation:
     @pytest.mark.asyncio
     async def test_hierarchical_manager_executes_first(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         hierarchical_team: tuple,
         execution_tracker: List[str],
     ):
@@ -486,7 +489,7 @@ class TestHierarchicalFormation:
     @pytest.mark.asyncio
     async def test_hierarchical_workers_execute_after_manager(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         hierarchical_team: tuple,
         execution_tracker: List[str],
     ):
@@ -511,7 +514,7 @@ class TestHierarchicalFormation:
     @pytest.mark.asyncio
     async def test_hierarchical_auto_selects_manager_by_capability(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         execution_tracker: List[str],
     ):
         """Auto-selects manager based on DELEGATE capability."""
@@ -544,7 +547,7 @@ class TestHierarchicalFormation:
     @pytest.mark.asyncio
     async def test_hierarchical_with_explicit_manager(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         execution_tracker: List[str],
     ):
         """Explicit manager is used when set."""
@@ -567,7 +570,7 @@ class TestHierarchicalFormation:
     @pytest.mark.asyncio
     async def test_hierarchical_all_results_collected(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         hierarchical_team: tuple,
     ):
         """All results are collected in hierarchical formation."""
@@ -599,7 +602,7 @@ class TestPipelineFormation:
     @pytest.mark.asyncio
     async def test_pipeline_sequential_order(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         pipeline_team: List[IntegrationTestAgent],
         execution_tracker: List[str],
     ):
@@ -619,7 +622,7 @@ class TestPipelineFormation:
     @pytest.mark.asyncio
     async def test_pipeline_passes_output_to_next_stage(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         pipeline_team: List[IntegrationTestAgent],
     ):
         """Pipeline passes previous output to next stage."""
@@ -639,7 +642,7 @@ class TestPipelineFormation:
     @pytest.mark.asyncio
     async def test_pipeline_final_output(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         pipeline_team: List[IntegrationTestAgent],
     ):
         """Pipeline returns final stage output."""
@@ -657,7 +660,7 @@ class TestPipelineFormation:
     @pytest.mark.asyncio
     async def test_pipeline_stops_on_failure(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         execution_tracker: List[str],
     ):
         """Pipeline stops when a stage fails."""
@@ -683,7 +686,7 @@ class TestPipelineFormation:
     @pytest.mark.asyncio
     async def test_pipeline_output_chain(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Each stage output becomes input for the next."""
         agents = [IntegrationTestAgent(f"stage_{i}", output_prefix=f"Stage{i}") for i in range(3)]
@@ -718,7 +721,7 @@ class TestConsensusFormation:
     @pytest.mark.asyncio
     async def test_consensus_all_agents_execute(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """All agents execute in consensus formation."""
@@ -735,7 +738,7 @@ class TestConsensusFormation:
     @pytest.mark.asyncio
     async def test_consensus_achieved_when_all_succeed(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """Consensus is achieved when all agents succeed."""
@@ -752,7 +755,7 @@ class TestConsensusFormation:
     @pytest.mark.asyncio
     async def test_consensus_fails_when_any_agent_fails(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Consensus fails when any agent fails."""
         agent1 = IntegrationTestAgent("agent_1")
@@ -781,13 +784,13 @@ class TestCrossFormation:
     @pytest.mark.asyncio
     async def test_formation_affects_execution_pattern(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Different formations produce different execution patterns."""
         results = {}
 
         for formation in [TeamFormation.SEQUENTIAL, TeamFormation.PARALLEL]:
-            coord = FrameworkTeamCoordinator()
+            coord = create_coordinator(lightweight=True)
             tracker: List[str] = []
 
             agents = [IntegrationTestAgent(f"agent_{i}", delay=0.05) for i in range(3)]
@@ -812,11 +815,11 @@ class TestCrossFormation:
     @pytest.mark.asyncio
     async def test_all_formations_produce_results(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """All formations produce member results."""
         for formation in TeamFormation:
-            coord = FrameworkTeamCoordinator()
+            coord = create_coordinator(lightweight=True)
 
             # For hierarchical, need a manager
             if formation == TeamFormation.HIERARCHICAL:
@@ -842,7 +845,7 @@ class TestCrossFormation:
     @pytest.mark.asyncio
     async def test_formation_switching(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
         three_agent_team: List[IntegrationTestAgent],
     ):
         """Formation can be switched between tasks."""
@@ -881,7 +884,7 @@ class TestRealRoleIntegration:
     @pytest.mark.asyncio
     async def test_team_with_real_roles(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Team with actual ManagerRole, ResearcherRole, etc."""
         manager = IntegrationTestAgent("manager", role=ManagerRole())
@@ -908,7 +911,7 @@ class TestRealRoleIntegration:
     @pytest.mark.asyncio
     async def test_role_capabilities_preserved(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Agent roles preserve their capabilities."""
         researcher = IntegrationTestAgent("researcher", role=ResearcherRole())
@@ -938,7 +941,7 @@ class TestPersonaIntegration:
     @pytest.mark.asyncio
     async def test_team_with_personas(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Team members can have personas."""
         senior_dev = get_persona("senior_developer")
@@ -959,7 +962,7 @@ class TestPersonaIntegration:
     @pytest.mark.asyncio
     async def test_persona_formats_messages(
         self,
-        coordinator: FrameworkTeamCoordinator,
+        coordinator: ITeamCoordinator,
     ):
         """Personas format messages according to their style."""
         formal_persona = Persona(
@@ -1008,7 +1011,7 @@ class TestFluentAPI:
         manager = IntegrationTestAgent("manager", role=ManagerRole())
 
         coordinator = (
-            FrameworkTeamCoordinator()
+            create_coordinator(lightweight=True)
             .add_member(manager)
             .add_member(agent1)
             .add_member(agent2)
@@ -1027,7 +1030,7 @@ class TestFluentAPI:
         agent2 = IntegrationTestAgent("agent_2")
 
         coordinator = (
-            FrameworkTeamCoordinator()
+            create_coordinator(lightweight=True)
             .add_member(agent1)
             .add_member(agent2)
             .set_formation(TeamFormation.PARALLEL)

@@ -50,7 +50,6 @@ from victor.teams import (
     UnifiedTeamCoordinator,
     create_coordinator,
 )
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
 
 
 # =============================================================================
