@@ -66,7 +66,8 @@ from victor.teams.types import (
     MessageType,
     TeamFormation,
 )
-from victor.teams.protocols import ITeamMember, ITeamCoordinator
+# Import protocols from canonical location to avoid circular dependencies
+from victor.protocols.team import ITeamMember, ITeamCoordinator
 
 
 # =============================================================================

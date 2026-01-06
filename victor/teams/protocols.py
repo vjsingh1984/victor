@@ -12,281 +12,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Enhanced protocols for team coordination.
+"""Team coordination protocols (re-export from canonical location).
 
-This module extends the base ITeamCoordinator protocol with optional
-capabilities via composition (ISP compliance).
+This module re-exports team protocols from victor.protocols.team for backward
+compatibility. The canonical location is victor.protocols.team which breaks
+circular dependencies between victor.teams and victor.framework.
 
 Protocols:
-    IObservableCoordinator: Adds observability (EventBus, progress tracking)
-    IRLCoordinator: Adds RL integration for team composition learning
-    IEnhancedTeamCoordinator: Combines all capabilities
+    IAgent: Base agent protocol
+    ITeamMember: Team member protocol
+    ITeamCoordinator: Base coordinator protocol
+    IObservableCoordinator: Observability capabilities
+    IRLCoordinator: RL integration capabilities
+    IMessageBusProvider: Message bus provider
+    ISharedMemoryProvider: Shared memory provider
+    IEnhancedTeamCoordinator: Combined capabilities
 
-Design Principles:
-    - ISP: Small, focused protocols that can be implemented independently
-    - DIP: Depend on protocols, not concrete implementations
-    - OCP: New capabilities added via new protocols, not modification
+Import from here for backward compatibility, or import from victor.protocols.team
+directly to break circular dependencies.
 """
 
-from __future__ import annotations
-
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Protocol,
-    runtime_checkable,
-)
-
-from victor.teams.types import AgentMessage, TeamFormation
-
-if TYPE_CHECKING:
-    from victor.teams.types import MemberResult, TeamResult
-
-
-@runtime_checkable
-class IAgent(Protocol):
-    """Unified protocol for all agent implementations.
-
-    This is the minimal interface that all agents in the Victor system
-    must implement. It provides a consistent way to execute tasks
-    regardless of the underlying implementation (SubAgent, team member, etc.).
-
-    Attributes:
-        id: Unique identifier for this agent
-        role: Role of this agent (IAgentRole, SubAgentRole, or any type)
-    """
-
-    @property
-    def id(self) -> str:
-        """Unique identifier for this agent."""
-        ...
-
-    @property
-    def role(self) -> Any:
-        """Role of this agent (IAgentRole, SubAgentRole, or any type)."""
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
-        """Execute a task and return the result.
-
-        Args:
-            task: Task description
-            context: Execution context with shared state
-
-        Returns:
-            Result of task execution (string, dict, or any type)
-        """
-        ...
-
-
-@runtime_checkable
-class ITeamMember(IAgent, Protocol):
-    """Protocol for team members.
-
-    Defines the minimal interface for an agent that can participate
-    in team coordination.
-    """
-
-    @property
-    def persona(self) -> Optional[Any]:
-        """Persona of this member (IAgentPersona or None)."""
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
-        """Execute a task and return the result.
-
-        Args:
-            task: Task description
-            context: Execution context with shared state
-
-        Returns:
-            Result string from execution
-        """
-        ...
-
-    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
-        """Receive and optionally respond to a message.
-
-        Args:
-            message: Incoming message
-
-        Returns:
-            Optional response message
-        """
-        ...
-
-
-@runtime_checkable
-class ITeamCoordinator(Protocol):
-    """Base protocol for team coordinators.
-
-    This is the canonical protocol that all team coordinators must implement.
-    Ensures LSP compliance across implementations.
-    """
-
-    def add_member(self, member: ITeamMember) -> "ITeamCoordinator":
-        """Add a member to the team.
-
-        Args:
-            member: Team member to add
-
-        Returns:
-            Self for fluent chaining
-        """
-        ...
-
-    def set_formation(self, formation: TeamFormation) -> "ITeamCoordinator":
-        """Set the team formation pattern.
-
-        Args:
-            formation: Formation to use
-
-        Returns:
-            Self for fluent chaining
-        """
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a task with the team.
-
-        Args:
-            task: Task description
-            context: Execution context
-
-        Returns:
-            Result dictionary with success, member_results, final_output
-        """
-        ...
-
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
-        """Broadcast a message to all team members.
-
-        Args:
-            message: Message to broadcast
-
-        Returns:
-            List of responses from members
-        """
-        ...
-
-
-@runtime_checkable
-class IObservableCoordinator(Protocol):
-    """Protocol for coordinators with observability capabilities.
-
-    Adds EventBus integration, progress tracking, and execution context.
-    This is an optional capability that can be composed with ITeamCoordinator.
-    """
-
-    def set_execution_context(
-        self,
-        task_type: str,
-        complexity: str,
-        vertical: str,
-        trigger: str,
-    ) -> None:
-        """Set execution context for observability.
-
-        Args:
-            task_type: Type of task (e.g., "feature", "bugfix")
-            complexity: Task complexity level
-            vertical: Domain vertical (e.g., "coding", "devops")
-            trigger: How the task was triggered (e.g., "auto", "manual")
-        """
-        ...
-
-    def set_progress_callback(
-        self,
-        callback: Callable[[str, str, float], None],
-    ) -> None:
-        """Set callback for progress updates.
-
-        Args:
-            callback: Function(member_id, status, progress_percent)
-        """
-        ...
-
-
-@runtime_checkable
-class IRLCoordinator(Protocol):
-    """Protocol for coordinators with RL (Reinforcement Learning) integration.
-
-    Adds support for recording outcomes and learning optimal team compositions.
-    This is an optional capability that can be composed with ITeamCoordinator.
-    """
-
-    def set_rl_coordinator(self, rl_coordinator: Any) -> None:
-        """Set the RL coordinator for outcome recording.
-
-        Args:
-            rl_coordinator: RL coordinator instance
-        """
-        ...
-
-
-@runtime_checkable
-class IMessageBusProvider(Protocol):
-    """Protocol for coordinators that provide a message bus.
-
-    Enables inter-agent communication beyond simple broadcast.
-    """
-
-    @property
-    def message_bus(self) -> Any:
-        """Get the team message bus.
-
-        Returns:
-            TeamMessageBus instance or None if not available
-        """
-        ...
-
-
-@runtime_checkable
-class ISharedMemoryProvider(Protocol):
-    """Protocol for coordinators that provide shared memory.
-
-    Enables shared context and state across team members.
-    """
-
-    @property
-    def shared_memory(self) -> Any:
-        """Get the team shared memory.
-
-        Returns:
-            TeamSharedMemory instance or None if not available
-        """
-        ...
-
-
-@runtime_checkable
-class IEnhancedTeamCoordinator(
+# Import from canonical location to avoid circular dependencies
+from victor.protocols.team import (
+    IAgent,
+    ITeamMember,
     ITeamCoordinator,
     IObservableCoordinator,
     IRLCoordinator,
     IMessageBusProvider,
     ISharedMemoryProvider,
-    Protocol,
-):
-    """Enhanced protocol combining all team coordinator capabilities.
+    IEnhancedTeamCoordinator,
+    TeamCoordinatorProtocol,
+    TeamMemberProtocol,
+)
 
-    This is the full-featured protocol that production coordinators
-    should implement for maximum capability.
-
-    Combines:
-        - ITeamCoordinator: Base team coordination
-        - IObservableCoordinator: EventBus and progress tracking
-        - IRLCoordinator: RL integration for learning
-        - IMessageBusProvider: Inter-agent messaging
-        - ISharedMemoryProvider: Shared team context
-    """
-
-    pass
-
-
-# Type aliases for backward compatibility with framework
-TeamCoordinatorProtocol = ITeamCoordinator
-TeamMemberProtocol = ITeamMember
+__all__ = [
+    "IAgent",
+    "ITeamMember",
+    "ITeamCoordinator",
+    "IObservableCoordinator",
+    "IRLCoordinator",
+    "IMessageBusProvider",
+    "ISharedMemoryProvider",
+    "IEnhancedTeamCoordinator",
+    "TeamCoordinatorProtocol",
+    "TeamMemberProtocol",
+]

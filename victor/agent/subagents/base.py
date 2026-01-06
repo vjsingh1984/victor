@@ -55,7 +55,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
-from victor.teams.protocols import IAgent
+# Import from canonical location to avoid circular dependencies
+from victor.protocols.team import IAgent
 from victor.teams.types import AgentMessage
 
 if TYPE_CHECKING:
