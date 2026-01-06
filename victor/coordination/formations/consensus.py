@@ -1,0 +1,207 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Consensus formation strategy.
+
+All agents must agree on result.
+Multiple rounds if needed until consensus or timeout.
+"""
+
+import asyncio
+import logging
+from typing import Any, Dict, List, Optional
+
+from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
+from victor.teams.types import AgentMessage, MemberResult
+
+logger = logging.getLogger(__name__)
+
+
+class ConsensusFormation(BaseFormationStrategy):
+    """Execute agents until consensus is reached.
+
+    In consensus formation:
+    - All agents analyze the same task
+    - Results are compared for agreement
+    - If no consensus, agents see each other's results and try again
+    - Multiple rounds until consensus or max rounds reached
+
+    Use case: Critical decisions, validation, quality assurance
+    """
+
+    def __init__(self, max_rounds: int = 3, agreement_threshold: float = 0.7):
+        """Initialize consensus formation.
+
+        Args:
+            max_rounds: Maximum number of consensus rounds
+            agreement_threshold: Fraction of agents that must agree (0.0-1.0)
+        """
+        self.max_rounds = max_rounds
+        self.agreement_threshold = agreement_threshold
+
+    async def execute(
+        self,
+        agents: List[Any],
+        context: TeamContext,
+        task: AgentMessage,
+    ) -> List[MemberResult]:
+        """Execute agents until consensus reached."""
+        all_results = []
+        current_task = task
+
+        for round_num in range(self.max_rounds):
+            logger.info(f"ConsensusFormation: round {round_num + 1}/{self.max_rounds}")
+
+            # Execute all agents in parallel for this round
+            round_tasks = [
+                self._execute_agent(agent, current_task, context, round_num)
+                for agent in agents
+            ]
+
+            round_results = await asyncio.gather(*round_tasks, return_exceptions=True)
+
+            # Process results
+            processed_results = []
+            for i, result in enumerate(round_results):
+                if isinstance(result, Exception):
+                    processed_results.append(
+                        MemberResult(
+                            agent_id=agents[i].id,
+                            success=False,
+                            content=None,
+                            error=str(result),
+                            metadata={"round": round_num},
+                        )
+                    )
+                else:
+                    processed_results.append(result)
+
+            all_results.extend(processed_results)
+
+            # Check for consensus
+            consensus = self._check_consensus(processed_results)
+
+            if consensus:
+                logger.info(f"ConsensusFormation: consensus reached in round {round_num + 1}")
+                # Return results from final consensus round
+                return processed_results
+
+            # Prepare task for next round with previous results
+            current_task = AgentMessage(
+                message_type=MessageType.TASK,
+                sender_id="system",
+                content={
+                    "original_task": task.content,
+                    "round": round_num + 1,
+                    "previous_results": [
+                        {
+                            "agent_id": r.member_id,
+                            "content": r.output,
+                            "success": r.success,
+                        }
+                        for r in processed_results
+                    ],
+                    "instruction": "Review previous results and reach consensus",
+                },
+                data={"consensus_round": round_num + 1},
+            )
+
+        # Max rounds reached without consensus
+        logger.warning(f"ConsensusFormation: no consensus after {self.max_rounds} rounds")
+        # Return all results from all rounds
+        return all_results
+
+    async def _execute_agent(
+        self,
+        agent: Any,
+        task: AgentMessage,
+        context: TeamContext,
+        round_num: int,
+    ) -> MemberResult:
+        """Execute a single agent."""
+        logger.debug(f"ConsensusFormation: round {round_num + 1}, agent {agent.id}")
+        return await agent.execute(task, context)
+
+    def _check_consensus(self, results: List[MemberResult]) -> bool:
+        """Check if results indicate consensus.
+
+        Args:
+            results: Results from all agents in this round
+
+        Returns:
+            True if consensus reached
+        """
+        if not results:
+            return False
+
+        # Filter successful results
+        successful = [r for r in results if r.success]
+
+        if len(successful) < len(results) * self.agreement_threshold:
+            # Not enough successful results
+            return False
+
+        # Simple consensus check: all successful results have similar content
+        # (In practice, this might use more sophisticated comparison)
+        if len(successful) == 0:
+            return False
+
+        # Get first successful result as reference
+        reference = successful[0].content
+
+        # Count how many match reference
+        matches = 0
+        for result in successful:
+            if self._content_matches(result.content, reference):
+                matches += 1
+
+        # Check if enough matches
+        return matches >= len(results) * self.agreement_threshold
+
+    def _content_matches(self, content1: Any, content2: Any) -> bool:
+        """Check if two contents match for consensus.
+
+        This is a simple implementation. In practice, you might use:
+        - Semantic similarity
+        - Fuzzy matching
+        - Content-specific comparison logic
+
+        Args:
+            content1: First content
+            content2: Second content
+
+        Returns:
+            True if contents match
+        """
+        if content1 is None or content2 is None:
+            return False
+
+        # For strings, use simple equality
+        if isinstance(content1, str) and isinstance(content2, str):
+            return content1.lower() == content2.lower()
+
+        # For dicts, compare keys and basic structure
+        if isinstance(content1, dict) and isinstance(content2, dict):
+            return set(content1.keys()) == set(content2.keys())
+
+        # Default: exact match
+        return content1 == content2
+
+    def validate_context(self, context: TeamContext) -> bool:
+        """Consensus formation requires shared state for comparing results."""
+        return context is not None and hasattr(context, "shared_state")
+
+    def supports_early_termination(self) -> bool:
+        """Consensus formation terminates early when consensus reached."""
+        return True
