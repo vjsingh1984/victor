@@ -63,8 +63,14 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class RetryStrategy(Enum):
-    """Retry strategy for failed items."""
+class BatchRetryStrategy(Enum):
+    """Retry strategy for failed batch items.
+
+    Renamed from RetryStrategy to be semantically distinct:
+    - BatchRetryStrategy (here): Enum for batch retry modes
+    - BaseRetryStrategy (victor.core.retry): Abstract base with should_retry(), get_delay()
+    - ProviderRetryStrategy (victor.providers.resilience): Concrete provider retry with execute()
+    """
 
     NONE = "none"  # No retries
     IMMEDIATE = "immediate"  # Retry immediately
@@ -91,7 +97,7 @@ class BatchConfig:
     batch_size: int = 5
     max_concurrent: int = 3
     delay_seconds: float = 1.0
-    retry_strategy: RetryStrategy = RetryStrategy.END_OF_BATCH
+    retry_strategy: BatchRetryStrategy = BatchRetryStrategy.END_OF_BATCH
     max_retries: int = 2
     retry_delay_seconds: float = 5.0
     progress_interval: int = 1
@@ -102,7 +108,9 @@ class BatchConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "BatchConfig":
         """Create config from dictionary (e.g., from YAML metadata)."""
         retry_str = data.get("retry_strategy", "end_of_batch")
-        retry_strategy = RetryStrategy(retry_str) if retry_str else RetryStrategy.END_OF_BATCH
+        retry_strategy = (
+            BatchRetryStrategy(retry_str) if retry_str else BatchRetryStrategy.END_OF_BATCH
+        )
 
         return cls(
             batch_size=data.get("batch_size", 5),
@@ -421,7 +429,7 @@ class BatchWorkflowExecutor(Generic[T]):
                     await asyncio.sleep(config.delay_seconds)
 
             # Process retry queue at end if using END_OF_BATCH strategy
-            if retry_queue and config.retry_strategy == RetryStrategy.END_OF_BATCH:
+            if retry_queue and config.retry_strategy == BatchRetryStrategy.END_OF_BATCH:
                 logger.info(f"Retrying {len(retry_queue)} failed items")
                 await self._process_retry_queue(
                     workflow=workflow,
@@ -585,7 +593,7 @@ class BatchWorkflowExecutor(Generic[T]):
         item_result.attempts += 1
 
         if item_result.attempts <= config.max_retries:
-            if config.retry_strategy == RetryStrategy.IMMEDIATE:
+            if config.retry_strategy == BatchRetryStrategy.IMMEDIATE:
                 # Retry immediately with backoff
                 delay = config.retry_delay_seconds * (2 ** (item_result.attempts - 1))
                 logger.debug(f"Retrying item {idx} after {delay}s (attempt {item_result.attempts})")
@@ -594,13 +602,13 @@ class BatchWorkflowExecutor(Generic[T]):
                 # Re-queue for immediate retry in current batch
                 retry_queue.append(idx)
 
-            elif config.retry_strategy == RetryStrategy.END_OF_BATCH:
+            elif config.retry_strategy == BatchRetryStrategy.END_OF_BATCH:
                 # Queue for retry at end
                 logger.debug(f"Queueing item {idx} for retry at end of batch")
                 item_result.status = ItemStatus.RETRYING
                 retry_queue.append(idx)
 
-            elif config.retry_strategy == RetryStrategy.EXPONENTIAL_BACKOFF:
+            elif config.retry_strategy == BatchRetryStrategy.EXPONENTIAL_BACKOFF:
                 # Queue with exponential backoff marker
                 item_result.status = ItemStatus.RETRYING
                 retry_queue.append(idx)
@@ -649,7 +657,7 @@ class BatchWorkflowExecutor(Generic[T]):
             batch = retry_indices[i : i + batch_size]
 
             # Apply backoff delay for exponential strategy
-            if config.retry_strategy == RetryStrategy.EXPONENTIAL_BACKOFF:
+            if config.retry_strategy == BatchRetryStrategy.EXPONENTIAL_BACKOFF:
                 max_attempts = max(item_results[idx].attempts for idx in batch)
                 delay = config.retry_delay_seconds * (2 ** (max_attempts - 1))
                 await asyncio.sleep(delay)
@@ -710,5 +718,5 @@ __all__ = [
     "BatchWorkflowExecutor",
     "ItemStatus",
     "ProgressCallback",
-    "RetryStrategy",
+    "BatchRetryStrategy",
 ]

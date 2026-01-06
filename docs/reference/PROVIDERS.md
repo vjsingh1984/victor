@@ -33,4 +33,4 @@ Open model platforms:
 - Hugging Face
 - Replicate
 
-Capabilities vary by provider and model (tool calling, streaming, vision). Use `victor providers` to see what is available in your install and `docs/guides/PROVIDER_SETUP.md` for setup.
+Capabilities vary by provider and model (tool calling, streaming, vision). Use `victor providers` to see what is available in your install and `../guides/PROVIDER_SETUP.md` for setup.

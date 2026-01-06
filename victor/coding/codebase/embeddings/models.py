@@ -134,7 +134,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
             return
 
         # Import here to avoid circular imports
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
 

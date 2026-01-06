@@ -19,7 +19,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.workflows import (
-    NodeType,
+    WorkflowNodeType,
     WorkflowNode,
     AgentNode,
     ConditionNode,
@@ -32,7 +32,7 @@ from victor.workflows import (
     WorkflowMetadata,
     WorkflowRegistry,
     get_global_registry,
-    NodeStatus,
+    ExecutorNodeStatus,
     NodeResult,
     WorkflowContext,
     WorkflowResult,
@@ -40,17 +40,17 @@ from victor.workflows import (
 )
 
 
-class TestNodeType:
-    """Test NodeType enum."""
+class TestWorkflowNodeType:
+    """Test WorkflowNodeType enum."""
 
     def test_all_types_defined(self):
         """All expected node types are defined."""
-        assert NodeType.AGENT.value == "agent"
-        assert NodeType.CONDITION.value == "condition"
-        assert NodeType.PARALLEL.value == "parallel"
-        assert NodeType.TRANSFORM.value == "transform"
-        assert NodeType.START.value == "start"
-        assert NodeType.END.value == "end"
+        assert WorkflowNodeType.AGENT.value == "agent"
+        assert WorkflowNodeType.CONDITION.value == "condition"
+        assert WorkflowNodeType.PARALLEL.value == "parallel"
+        assert WorkflowNodeType.TRANSFORM.value == "transform"
+        assert WorkflowNodeType.START.value == "start"
+        assert WorkflowNodeType.END.value == "end"
 
 
 class TestAgentNode:
@@ -61,7 +61,7 @@ class TestAgentNode:
         node = AgentNode(id="test", name="Test Node")
         assert node.id == "test"
         assert node.name == "Test Node"
-        assert node.node_type == NodeType.AGENT
+        assert node.node_type == WorkflowNodeType.AGENT
         assert node.role == "executor"
         assert node.tool_budget == 15
 
@@ -105,7 +105,7 @@ class TestConditionNode:
         """Create node with minimal fields."""
         node = ConditionNode(id="decide", name="Decision")
         assert node.id == "decide"
-        assert node.node_type == NodeType.CONDITION
+        assert node.node_type == WorkflowNodeType.CONDITION
 
     def test_evaluate_condition(self):
         """Condition evaluation works."""
@@ -132,7 +132,7 @@ class TestParallelNode:
         """Create node with minimal fields."""
         node = ParallelNode(id="parallel", name="Parallel")
         assert node.id == "parallel"
-        assert node.node_type == NodeType.PARALLEL
+        assert node.node_type == WorkflowNodeType.PARALLEL
         assert node.join_strategy == "all"
 
     def test_with_parallel_nodes(self):
@@ -154,7 +154,7 @@ class TestTransformNode:
         """Create node with minimal fields."""
         node = TransformNode(id="transform", name="Transform")
         assert node.id == "transform"
-        assert node.node_type == NodeType.TRANSFORM
+        assert node.node_type == WorkflowNodeType.TRANSFORM
 
     def test_with_transform(self):
         """Transform function works."""
@@ -642,7 +642,7 @@ class TestNodeResult:
         """Create successful result."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Found 5 items",
             tool_calls_used=10,
         )
@@ -653,7 +653,7 @@ class TestNodeResult:
         """Create failed result."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.FAILED,
+            status=ExecutorNodeStatus.FAILED,
             error="Something went wrong",
         )
         assert result.success is False
@@ -663,7 +663,7 @@ class TestNodeResult:
         """to_dict serializes correctly."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Done",
         )
         d = result.to_dict()
@@ -693,7 +693,7 @@ class TestWorkflowContext:
         ctx = WorkflowContext()
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Done",
         )
         ctx.add_result(result)
@@ -702,18 +702,22 @@ class TestWorkflowContext:
     def test_has_failures(self):
         """has_failures detects failures."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED))
         assert ctx.has_failures() is False
 
-        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
+        ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
         assert ctx.has_failures() is True
 
     def test_get_outputs(self):
         """get_outputs returns successful outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="A output"))
-        ctx.add_result(NodeResult(node_id="b", status=NodeStatus.FAILED))
-        ctx.add_result(NodeResult(node_id="c", status=NodeStatus.COMPLETED, output="C output"))
+        ctx.add_result(
+            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output")
+        )
+        ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
+        ctx.add_result(
+            NodeResult(node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output")
+        )
 
         outputs = ctx.get_outputs()
         assert outputs == {"a": "A output", "c": "C output"}
@@ -725,7 +729,7 @@ class TestWorkflowResult:
     def test_success_result(self):
         """Create successful result."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Done"))
+        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Done"))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1084,7 +1088,7 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         condition_result = result.context.get_result("decide")
-        assert condition_result.status == NodeStatus.FAILED
+        assert condition_result.status == ExecutorNodeStatus.FAILED
         assert "Condition evaluation failed" in condition_result.error
 
     @pytest.mark.asyncio
@@ -1139,14 +1143,14 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         transform_result = result.context.get_result("transform")
-        assert transform_result.status == NodeStatus.FAILED
+        assert transform_result.status == ExecutorNodeStatus.FAILED
         assert "Transform failed" in transform_result.error
 
     @pytest.mark.asyncio
     async def test_execute_parallel_node_all_strategy(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """Execute parallel node with 'all' join strategy returns SKIPPED without workflow in context."""
+        """Execute parallel node with 'all' join strategy executes all nodes."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
@@ -1169,18 +1173,20 @@ class TestWorkflowExecutorExtended:
 
         result = await executor.execute(workflow)
 
-        # Parallel node returns SKIPPED when child nodes can't be resolved
-        # (requires workflow reference in context.metadata which executor doesn't set)
+        # Parallel node executes child nodes and returns COMPLETED
+        # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == ExecutorNodeStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_node_any_strategy(self, mock_orchestrator):
-        """Execute parallel node with 'any' join strategy returns SKIPPED without workflow in context."""
+    async def test_execute_parallel_node_any_strategy(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
+        """Execute parallel node with 'any' join strategy executes all nodes."""
         executor = WorkflowExecutor(mock_orchestrator)
 
         mock_sub_agents = MagicMock()
-        mock_sub_agents.spawn = AsyncMock()
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
         workflow = WorkflowDefinition(
@@ -1200,9 +1206,10 @@ class TestWorkflowExecutorExtended:
 
         result = await executor.execute(workflow)
 
-        # Parallel node returns SKIPPED when child nodes can't be resolved
+        # Parallel node executes child nodes and returns COMPLETED
+        # (workflow reference is now included in context.metadata)
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == ExecutorNodeStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_parallel_node_no_nodes(self, mock_orchestrator):
@@ -1225,7 +1232,7 @@ class TestWorkflowExecutorExtended:
         result = await executor.execute(workflow)
 
         parallel_result = result.context.get_result("parallel")
-        assert parallel_result.status == NodeStatus.SKIPPED
+        assert parallel_result.status == ExecutorNodeStatus.SKIPPED
 
     @pytest.mark.asyncio
     async def test_execute_unknown_node_type_skipped(self, mock_orchestrator):
@@ -1250,7 +1257,7 @@ class TestWorkflowExecutorExtended:
         result = await executor.execute(workflow)
 
         custom_result = result.context.get_result("custom")
-        assert custom_result.status == NodeStatus.SKIPPED
+        assert custom_result.status == ExecutorNodeStatus.SKIPPED
 
     @pytest.mark.asyncio
     async def test_execute_by_name_success(self, mock_orchestrator, mock_sub_agent_result):
@@ -1297,19 +1304,20 @@ class TestWorkflowExecutorExtended:
     async def test_build_agent_task_with_input_mapping(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """_build_agent_task includes input mapping in task."""
+        """_build_agent_task substitutes placeholders in goal using input mapping."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
+        # Goal uses {placeholder} syntax for template substitution
         workflow = WorkflowDefinition(
             name="test",
             nodes={
                 "start": AgentNode(
                     id="start",
                     name="Start",
-                    goal="Analyze these files",
+                    goal="Analyze files {files} in {mode} mode",
                     input_mapping={"files": "target_files", "mode": "analysis_mode"},
                 ),
             },
@@ -1324,19 +1332,20 @@ class TestWorkflowExecutorExtended:
             },
         )
 
-        # Check that task contains input mapping
+        # Check that task has placeholders substituted
         call_kwargs = mock_sub_agents.spawn.call_args[1]
         task = call_kwargs["task"]
-        assert "Analyze these files" in task
-        assert "files" in task
-        assert "main.py" in task or "['main.py'" in task
-        assert "mode" in task
+        assert "Analyze files" in task
+        # Placeholders are replaced with JSON-serialized values
+        assert "main.py" in task
+        assert "utils.py" in task
+        assert "full" in task
 
     @pytest.mark.asyncio
     async def test_build_agent_task_with_previous_outputs(
         self, mock_orchestrator, mock_sub_agent_result
     ):
-        """_build_agent_task includes previous node outputs."""
+        """_build_agent_task uses goal with template substitution; previous outputs stored in context."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
@@ -1351,50 +1360,56 @@ class TestWorkflowExecutorExtended:
             start_node="first",
         )
 
-        await executor.execute(workflow)
+        result = await executor.execute(workflow)
 
-        # Second agent's task should include first agent's output
+        # Both agents should be called
         assert mock_sub_agents.spawn.call_count == 2
+
+        # Second agent's task is just the goal (template substitution only)
         second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
         task = second_call_kwargs["task"]
-        assert "Previous Results" in task or "Task completed successfully" in task
+        assert task == "Continue work"
+
+        # Previous outputs are stored in context, not appended to task
+        assert result.context.get("first") == "Task completed successfully"
 
     @pytest.mark.asyncio
-    async def test_build_agent_task_truncates_long_outputs(self, mock_orchestrator):
-        """_build_agent_task truncates long previous outputs."""
-        long_result = MagicMock()
-        long_result.success = True
-        long_result.summary = "x" * 500  # Long output
-        long_result.error = None
-        long_result.tool_calls_used = 5
+    async def test_build_agent_task_with_template_substitution(self, mock_orchestrator):
+        """_build_agent_task substitutes template placeholders from context."""
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.summary = "Analysis complete"
+        mock_result.error = None
+        mock_result.tool_calls_used = 5
 
-        short_result = MagicMock()
-        short_result.success = True
-        short_result.summary = "Short result"
-        short_result.error = None
-        short_result.tool_calls_used = 3
-
-        executor = WorkflowExecutor(MagicMock())
+        executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
-        mock_sub_agents.spawn = AsyncMock(side_effect=[long_result, short_result])
+        mock_sub_agents.spawn = AsyncMock(return_value=mock_result)
         executor._sub_agents = mock_sub_agents
 
         workflow = WorkflowDefinition(
             name="test",
             nodes={
-                "first": AgentNode(id="first", name="First", next_nodes=["second"]),
-                "second": AgentNode(id="second", name="Second"),
+                "start": AgentNode(
+                    id="start",
+                    name="Start",
+                    goal="Process {item} with priority {level}",
+                    input_mapping={"item": "target_item", "level": "priority_level"},
+                ),
             },
-            start_node="first",
+            start_node="start",
         )
 
-        await executor.execute(workflow)
+        result = await executor.execute(
+            workflow,
+            {"target_item": "config.yaml", "priority_level": "high"},
+        )
 
-        # Second agent's task should have truncated output
-        second_call_kwargs = mock_sub_agents.spawn.call_args_list[1][1]
-        task = second_call_kwargs["task"]
-        # The long output should be truncated to 200 chars + "..."
-        assert "..." in task or len(task) < 700
+        # Task should have placeholders substituted
+        call_kwargs = mock_sub_agents.spawn.call_args[1]
+        task = call_kwargs["task"]
+        assert "Process config.yaml with priority high" == task
+        assert result.success is True
 
     @pytest.mark.asyncio
     async def test_execute_node_exception_handling(self, mock_orchestrator):
@@ -1416,7 +1431,7 @@ class TestWorkflowExecutorExtended:
 
         assert result.success is False
         node_result = result.context.get_result("start")
-        assert node_result.status == NodeStatus.FAILED
+        assert node_result.status == ExecutorNodeStatus.FAILED
         assert "Unexpected error" in node_result.error
 
     @pytest.mark.asyncio
@@ -1503,7 +1518,7 @@ class TestNodeResultExtended:
         """Skipped status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.SKIPPED,
+            status=ExecutorNodeStatus.SKIPPED,
         )
         assert result.success is False
 
@@ -1511,7 +1526,7 @@ class TestNodeResultExtended:
         """Pending status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.PENDING,
+            status=ExecutorNodeStatus.PENDING,
         )
         assert result.success is False
 
@@ -1519,7 +1534,7 @@ class TestNodeResultExtended:
         """Running status is not successful."""
         result = NodeResult(
             node_id="test",
-            status=NodeStatus.RUNNING,
+            status=ExecutorNodeStatus.RUNNING,
         )
         assert result.success is False
 
@@ -1539,7 +1554,7 @@ class TestWorkflowResultExtended:
     def test_get_output_node_without_output(self):
         """get_output returns None for node without output."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="test", status=NodeStatus.COMPLETED))
+        ctx.add_result(NodeResult(node_id="test", status=ExecutorNodeStatus.COMPLETED))
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1551,7 +1566,9 @@ class TestWorkflowResultExtended:
     def test_to_dict_includes_outputs(self):
         """to_dict includes node outputs."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=NodeStatus.COMPLETED, output="Output A"))
+        ctx.add_result(
+            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A")
+        )
 
         result = WorkflowResult(
             workflow_name="test",
@@ -1569,7 +1586,7 @@ class TestModuleExports:
     def test_workflows_init_exports(self):
         """Workflows __init__ exports all expected symbols."""
         from victor.workflows import (
-            NodeType,
+            WorkflowNodeType,
             WorkflowNode,
             AgentNode,
             ConditionNode,
@@ -1578,7 +1595,7 @@ class TestModuleExports:
             WorkflowBuilder,
             workflow,
             WorkflowRegistry,
-            NodeStatus,
+            ExecutorNodeStatus,
             NodeResult,
             WorkflowContext,
             WorkflowResult,

@@ -26,7 +26,7 @@ from victor.workflows.hitl import (
     HITLExecutor,
     DefaultHITLHandler,
 )
-from victor.workflows.definition import NodeType, WorkflowBuilder
+from victor.workflows.definition import WorkflowNodeType, WorkflowBuilder
 
 
 class TestHITLRequest:
@@ -125,7 +125,7 @@ class TestHITLNode:
 
         assert node.id == "approve_delete"
         assert node.hitl_type == HITLNodeType.APPROVAL
-        assert node.node_type == NodeType.HITL
+        assert node.node_type == WorkflowNodeType.HITL
         assert node.timeout == 120.0
 
     def test_create_choice_node(self):
@@ -428,7 +428,7 @@ class TestSafetyCheckerHITLIntegration:
         from victor.agent.safety import (
             create_hitl_confirmation_callback,
             ConfirmationRequest,
-            RiskLevel,
+            OperationalRiskLevel,
         )
 
         # Create mock handler that approves
@@ -448,7 +448,7 @@ class TestSafetyCheckerHITLIntegration:
 
         request = ConfirmationRequest(
             tool_name="execute_bash",
-            risk_level=RiskLevel.HIGH,
+            risk_level=OperationalRiskLevel.HIGH,
             description="rm -rf dangerous",
             details=["Deletes files"],
             arguments={"command": "rm -rf temp"},
@@ -465,7 +465,7 @@ class TestSafetyCheckerHITLIntegration:
         from victor.agent.safety import (
             create_hitl_confirmation_callback,
             ConfirmationRequest,
-            RiskLevel,
+            OperationalRiskLevel,
         )
 
         mock_handler = MagicMock()
@@ -485,7 +485,7 @@ class TestSafetyCheckerHITLIntegration:
 
         request = ConfirmationRequest(
             tool_name="execute_bash",
-            risk_level=RiskLevel.CRITICAL,
+            risk_level=OperationalRiskLevel.CRITICAL,
             description="Format disk",
             details=["Critical operation"],
             arguments={"command": "mkfs"},

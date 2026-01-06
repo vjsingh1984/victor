@@ -92,7 +92,7 @@ Production Distribution (Optional):
 ./docker-quickstart.sh
 
 # 2. Save images
-docker save -o victor.tar $(docker images -q codingagent-victor)
+docker save -o victor.tar vjsingh1984/victor-ai:latest
 docker save -o ollama.tar ollama/ollama:latest
 
 # 3. Export models

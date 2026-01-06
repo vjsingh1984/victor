@@ -19,7 +19,7 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from victor.workflows import (
-    NodeStatus,
+    ExecutorNodeStatus,
     NodeResult,
     WorkflowContext,
     WorkflowDefinition,
@@ -135,7 +135,7 @@ class TestWorkflowCache:
         node = TransformNode(id="transform", name="Transform")
         node_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"processed": True},
         )
 
@@ -152,7 +152,7 @@ class TestWorkflowCache:
         context = {"count": 5}
         node_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"count": 10},
         )
 
@@ -177,7 +177,7 @@ class TestWorkflowCache:
 
         node_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"count": 10},
         )
 
@@ -197,7 +197,7 @@ class TestWorkflowCache:
         context = {"count": 5}
         failed_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.FAILED,
+            status=ExecutorNodeStatus.FAILED,
             error="Transform failed",
         )
 
@@ -218,7 +218,7 @@ class TestWorkflowCache:
         context = {"task": "analyze"}
         node_result = NodeResult(
             node_id="agent",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output="Analysis complete",
         )
 
@@ -239,7 +239,7 @@ class TestWorkflowCache:
         context = {"count": 5}
         node_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"count": 10},
         )
 
@@ -267,7 +267,7 @@ class TestWorkflowCache:
             {"a": 1},
             NodeResult(
                 node_id="transform1",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"a": 2},
             ),
         )
@@ -276,7 +276,7 @@ class TestWorkflowCache:
             {"b": 2},
             NodeResult(
                 node_id="transform2",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"b": 4},
             ),
         )
@@ -298,7 +298,7 @@ class TestWorkflowCache:
         context = {"count": 5}
         node_result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"count": 10},
         )
 
@@ -329,12 +329,12 @@ class TestWorkflowCache:
 
         result1 = NodeResult(
             node_id="transform1",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"result": 1},
         )
         result2 = NodeResult(
             node_id="transform2",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"result": 2},
         )
 
@@ -359,7 +359,7 @@ class TestWorkflowCache:
 
         result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"count": 10},
         )
 
@@ -381,7 +381,7 @@ class TestWorkflowCache:
 
         result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"processed": True},
         )
 
@@ -434,7 +434,7 @@ class TestWorkflowCacheManager:
             {"x": 1},
             NodeResult(
                 node_id="transform",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"x": 2},
             ),
         )
@@ -457,7 +457,7 @@ class TestWorkflowCacheManager:
             {"x": 1},
             NodeResult(
                 node_id="transform",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"x": 2},
             ),
         )
@@ -466,7 +466,7 @@ class TestWorkflowCacheManager:
             {"y": 1},
             NodeResult(
                 node_id="transform",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"y": 2},
             ),
         )
@@ -586,7 +586,7 @@ class TestWorkflowExecutorWithCache:
         context = {"count": 5}
         result = NodeResult(
             node_id="transform",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"doubled": 10},
         )
 
@@ -650,7 +650,7 @@ class TestWorkflowExecutorWithCache:
         context = {"value": 10}
         result = NodeResult(
             node_id="condition",
-            status=NodeStatus.COMPLETED,
+            status=ExecutorNodeStatus.COMPLETED,
             output={"branch": "branch_a", "next_node": "agent_a"},
         )
 

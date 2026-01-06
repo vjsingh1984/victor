@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-updating Homebrew Formula** - Polls PyPI every 6 hours for new releases
 
 ### Changed
-- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor`)
+- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor-ai`)
 - **Simplified Binary Builds** - macOS and Windows binaries only; Linux users should use `pip install victor-ai`
 
 ### Fixed
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PyPI Trusted Publishing** - OIDC-based publishing without API tokens
 - **GitHub Actions Release Pipeline** - Automated builds on tag push
 - **Multi-Platform Binaries** - macOS ARM64/x64, Windows x64 via PyInstaller
-- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor`
+- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor-ai`
 - **Rust Native Extensions** - PyO3 bindings for SIMD-optimized operations
 - **Homebrew Tap** - `vjsingh1984/homebrew-tap` with auto-update workflow
 

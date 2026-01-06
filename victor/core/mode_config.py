@@ -47,9 +47,12 @@ Example usage:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 
 class ModeLevel(Enum):
@@ -68,10 +71,13 @@ class ModeConfig:
     This is the primary dataclass for mode configuration, providing the essential
     parameters needed for agent operation control.
 
+    Validation is performed at construction time via __post_init__.
+    Invalid values will raise ValueError with descriptive messages.
+
     Attributes:
-        tool_budget: Maximum number of tool calls allowed
-        max_iterations: Maximum conversation iterations
-        exploration_multiplier: Factor to multiply exploration iterations (default 1.0)
+        tool_budget: Maximum number of tool calls allowed (1-500)
+        max_iterations: Maximum conversation iterations (1-500)
+        exploration_multiplier: Factor to multiply exploration iterations (0.1-10.0)
         allowed_tools: Optional set of allowed tool names (None means all tools allowed)
     """
 
@@ -79,6 +85,62 @@ class ModeConfig:
     max_iterations: int
     exploration_multiplier: float = 1.0
     allowed_tools: Optional[Set[str]] = None
+
+    def __post_init__(self) -> None:
+        """Validate configuration at construction time."""
+        # Validate tool_budget (1-500)
+        if not isinstance(self.tool_budget, int):
+            try:
+                self.tool_budget = int(self.tool_budget)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"tool_budget must be an integer: {e}")
+        if not (1 <= self.tool_budget <= 500):
+            raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
+
+        # Validate max_iterations (1-500)
+        if not isinstance(self.max_iterations, int):
+            try:
+                self.max_iterations = int(self.max_iterations)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"max_iterations must be an integer: {e}")
+        if not (1 <= self.max_iterations <= 500):
+            raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
+
+        # Validate exploration_multiplier (0.1-10.0)
+        if not isinstance(self.exploration_multiplier, (int, float)):
+            try:
+                self.exploration_multiplier = float(self.exploration_multiplier)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"exploration_multiplier must be numeric: {e}")
+        if not (0.1 <= self.exploration_multiplier <= 10.0):
+            raise ValueError(
+                f"exploration_multiplier must be between 0.1 and 10.0, "
+                f"got {self.exploration_multiplier}"
+            )
+
+        # Convert allowed_tools list to set if needed
+        if self.allowed_tools is not None and isinstance(self.allowed_tools, list):
+            self.allowed_tools = set(self.allowed_tools)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ModeConfig":
+        """Create ModeConfig from dictionary with validation.
+
+        Args:
+            data: Dictionary with configuration values
+
+        Returns:
+            Validated ModeConfig instance
+
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        return cls(
+            tool_budget=data.get("tool_budget", 15),
+            max_iterations=data.get("max_iterations", 10),
+            exploration_multiplier=data.get("exploration_multiplier", 1.0),
+            allowed_tools=data.get("allowed_tools"),
+        )
 
 
 @dataclass
@@ -88,13 +150,16 @@ class ModeDefinition:
     Extended mode definition with additional metadata for vertical-specific
     configurations. Use ModeConfig for simpler use cases.
 
+    Validation is performed at construction time via __post_init__.
+    Invalid values will raise ValueError with descriptive messages.
+
     Attributes:
-        name: Mode identifier
-        tool_budget: Maximum tool calls allowed
-        max_iterations: Maximum conversation iterations
-        temperature: LLM temperature setting
-        description: Human-readable description
-        exploration_multiplier: Factor to multiply exploration iterations
+        name: Mode identifier (1-50 chars)
+        tool_budget: Maximum tool calls allowed (1-500)
+        max_iterations: Maximum conversation iterations (1-500)
+        temperature: LLM temperature setting (0.0-2.0)
+        description: Human-readable description (max 500 chars)
+        exploration_multiplier: Factor to multiply exploration iterations (0.1-10.0)
         allowed_stages: Optional list of allowed workflow stages
         priority_tools: Optional list of tools to prioritize
         allowed_tools: Optional set of allowed tool names
@@ -110,7 +175,91 @@ class ModeDefinition:
     allowed_stages: List[str] = field(default_factory=list)
     priority_tools: List[str] = field(default_factory=list)
     allowed_tools: Optional[Set[str]] = None
-    metadata: Dict[str, any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate configuration at construction time."""
+        # Validate name (1-50 chars)
+        if not isinstance(self.name, str):
+            raise ValueError("name must be a string")
+        if not (1 <= len(self.name) <= 50):
+            raise ValueError(f"name must be between 1 and 50 characters, got {len(self.name)}")
+
+        # Validate tool_budget (1-500)
+        if not isinstance(self.tool_budget, int):
+            try:
+                self.tool_budget = int(self.tool_budget)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"tool_budget must be an integer: {e}")
+        if not (1 <= self.tool_budget <= 500):
+            raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
+
+        # Validate max_iterations (1-500)
+        if not isinstance(self.max_iterations, int):
+            try:
+                self.max_iterations = int(self.max_iterations)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"max_iterations must be an integer: {e}")
+        if not (1 <= self.max_iterations <= 500):
+            raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
+
+        # Validate temperature (0.0-2.0)
+        if not isinstance(self.temperature, (int, float)):
+            try:
+                self.temperature = float(self.temperature)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"temperature must be numeric: {e}")
+        if not (0.0 <= self.temperature <= 2.0):
+            raise ValueError(f"temperature must be between 0.0 and 2.0, got {self.temperature}")
+
+        # Validate description (max 500 chars)
+        if not isinstance(self.description, str):
+            self.description = str(self.description)
+        if len(self.description) > 500:
+            logger.warning(f"description exceeds 500 chars ({len(self.description)}), truncating")
+            self.description = self.description[:500]
+
+        # Validate exploration_multiplier (0.1-10.0)
+        if not isinstance(self.exploration_multiplier, (int, float)):
+            try:
+                self.exploration_multiplier = float(self.exploration_multiplier)
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"exploration_multiplier must be numeric: {e}")
+        if not (0.1 <= self.exploration_multiplier <= 10.0):
+            raise ValueError(
+                f"exploration_multiplier must be between 0.1 and 10.0, "
+                f"got {self.exploration_multiplier}"
+            )
+
+        # Convert allowed_tools list to set if needed
+        if self.allowed_tools is not None and isinstance(self.allowed_tools, list):
+            self.allowed_tools = set(self.allowed_tools)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ModeDefinition":
+        """Create ModeDefinition from dictionary with validation.
+
+        Args:
+            data: Dictionary with configuration values
+
+        Returns:
+            Validated ModeDefinition instance
+
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        return cls(
+            name=data.get("name", ""),
+            tool_budget=data.get("tool_budget", 15),
+            max_iterations=data.get("max_iterations", 10),
+            temperature=data.get("temperature", 0.7),
+            description=data.get("description", ""),
+            exploration_multiplier=data.get("exploration_multiplier", 1.0),
+            allowed_stages=data.get("allowed_stages", []),
+            priority_tools=data.get("priority_tools", []),
+            allowed_tools=data.get("allowed_tools"),
+            metadata=data.get("metadata", {}),
+        )
 
     def to_mode_config(self) -> ModeConfig:
         """Convert to simplified ModeConfig."""

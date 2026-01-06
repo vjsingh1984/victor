@@ -16,7 +16,7 @@ import time
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.safety import (
     ConfirmationRequest,
-    RiskLevel,
+    OperationalRiskLevel,
     set_confirmation_callback,
 )
 from victor.coding.codebase.indexer import CodebaseIndex
@@ -476,11 +476,11 @@ async def preload_semantic_index(
 async def cli_confirmation_callback(request: ConfirmationRequest) -> bool:
     """Prompt user for confirmation of dangerous operations."""
     risk_colors = {
-        RiskLevel.SAFE: "green",
-        RiskLevel.LOW: "blue",
-        RiskLevel.MEDIUM: "yellow",
-        RiskLevel.HIGH: "red",
-        RiskLevel.CRITICAL: "bold red",
+        OperationalRiskLevel.SAFE: "green",
+        OperationalRiskLevel.LOW: "blue",
+        OperationalRiskLevel.MEDIUM: "yellow",
+        OperationalRiskLevel.HIGH: "red",
+        OperationalRiskLevel.CRITICAL: "bold red",
     }
     color = risk_colors.get(request.risk_level, "white")
     console.print()

@@ -55,8 +55,13 @@ class DependencyParser(Protocol):
         ...
 
 
-class BaseDependencyParser(ABC):
-    """Abstract base class for dependency parsers."""
+class BaseSecurityDependencyParser(ABC):
+    """Abstract base class for security dependency parsers.
+
+    Renamed from BaseDependencyParser to be semantically distinct:
+    - BaseSecurityDependencyParser (here): Security scanning with ecosystem property
+    - BasePackageDependencyParser (victor.deps.parsers): Package management with PackageManager
+    """
 
     @property
     @abstractmethod
@@ -74,6 +79,10 @@ class BaseDependencyParser(ABC):
     def parse(self, file_path: Path) -> list[Dependency]:
         """Parse a dependency file."""
         ...
+
+
+# Backward compatibility alias
+BaseDependencyParser = BaseSecurityDependencyParser
 
 
 class PythonDependencyParser(BaseDependencyParser):

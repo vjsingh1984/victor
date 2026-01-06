@@ -67,7 +67,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, NodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class StatsComputeHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -112,7 +112,7 @@ class StatsComputeHandler:
             if data is None:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="No 'data' input provided",
                     duration_seconds=time.time() - start_time,
                 )
@@ -126,7 +126,7 @@ class StatsComputeHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=results,
                 duration_seconds=time.time() - start_time,
             )
@@ -134,7 +134,7 @@ class StatsComputeHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -201,7 +201,7 @@ class MLTrainingHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -224,7 +224,9 @@ class MLTrainingHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED
+                ),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -232,7 +234,7 @@ class MLTrainingHandler:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -275,7 +277,7 @@ class PyCaretHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -295,7 +297,7 @@ class PyCaretHandler:
             except ImportError:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="pandas is required for PyCaret. Install with: pip install pandas",
                     duration_seconds=time.time() - start_time,
                 )
@@ -305,7 +307,7 @@ class PyCaretHandler:
             if data is None:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="No 'data' input provided",
                     duration_seconds=time.time() - start_time,
                 )
@@ -319,7 +321,7 @@ class PyCaretHandler:
                 else:
                     return NodeResult(
                         node_id=node.id,
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         error=f"Unsupported data type: {type(data).__name__}",
                         duration_seconds=time.time() - start_time,
                     )
@@ -340,7 +342,11 @@ class PyCaretHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.get("success") else NodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED
+                    if result.get("success")
+                    else ExecutorNodeStatus.FAILED
+                ),
                 output=result,
                 duration_seconds=time.time() - start_time,
                 error=result.get("error"),
@@ -350,7 +356,7 @@ class PyCaretHandler:
             logger.exception(f"PyCaret AutoML failed: {e}")
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -545,7 +551,7 @@ class AutoSklearnHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -564,7 +570,7 @@ class AutoSklearnHandler:
         except ImportError:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="numpy is required. Install with: pip install numpy",
                 duration_seconds=time.time() - start_time,
             )
@@ -577,7 +583,7 @@ class AutoSklearnHandler:
             if X is None or y is None:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="Both 'X' (features) and 'y' (target) inputs are required",
                     duration_seconds=time.time() - start_time,
                 )
@@ -607,7 +613,11 @@ class AutoSklearnHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.get("success") else NodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED
+                    if result.get("success")
+                    else ExecutorNodeStatus.FAILED
+                ),
                 output=result,
                 duration_seconds=time.time() - start_time,
                 error=result.get("error"),
@@ -617,7 +627,7 @@ class AutoSklearnHandler:
             logger.exception(f"Auto-sklearn AutoML failed: {e}")
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -776,7 +786,7 @@ class RLTrainingHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, NodeStatus
+        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -805,7 +815,11 @@ class RLTrainingHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED if result.get("success") else NodeStatus.FAILED,
+                status=(
+                    ExecutorNodeStatus.COMPLETED
+                    if result.get("success")
+                    else ExecutorNodeStatus.FAILED
+                ),
                 output=result,
                 duration_seconds=time.time() - start_time,
                 error=result.get("error"),
@@ -815,7 +829,7 @@ class RLTrainingHandler:
             logger.exception(f"RL training failed: {e}")
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )

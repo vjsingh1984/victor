@@ -47,7 +47,7 @@ from victor.agent.task_completion import TaskCompletionDetector
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
     FileEdit,
-    ToolCall,
+    EvalToolCall,
 )
 from victor.evaluation.correction.metrics import (
     CorrectionMetricsCollector,
@@ -116,7 +116,7 @@ class VictorAgentAdapter:
         self.config = config or AdapterConfig()
 
         # Execution tracking
-        self._tool_calls: List[ToolCall] = []
+        self._tool_calls: List[EvalToolCall] = []
         self._file_edits: List[FileEdit] = []
         self._messages: List[Dict[str, str]] = []
         self._turns: int = 0
@@ -161,7 +161,7 @@ class VictorAgentAdapter:
 
         # Record tool call with start time for duration tracking
         self._tool_calls.append(
-            ToolCall(
+            EvalToolCall(
                 name=tool_name,
                 arguments=arguments,
                 timestamp=start_time,

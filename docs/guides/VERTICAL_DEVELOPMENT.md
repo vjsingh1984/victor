@@ -1,279 +1,302 @@
-# Victor Vertical Development Guide
+# Vertical Development Guide
 
-This guide covers how to create custom domain verticals for Victor, allowing you to extend its capabilities with specialized assistants for different domains.
+This guide covers how to develop custom verticals for Victor, enabling domain-specific AI assistants with specialized tools, prompts, and workflows.
 
 ## Overview
 
-Victor's vertical system allows you to:
+### What Are Verticals?
 
-- Create specialized assistants for specific domains (security, healthcare, finance, etc.)
-- Define custom tools, prompts, and workflows for each domain
-- Configure tiered tool selection for context-efficient execution
-- Register personas for consistent agent behavior
-- Compose tool chains for complex operations
+Verticals are domain-specific configurations that transform Victor into specialized AI assistants. Each vertical defines:
 
-## Architecture
+- **Tools**: Which tools the assistant can use
+- **System Prompt**: Domain expertise and behavioral guidelines
+- **Stages**: Workflow stages for task progression
+- **Extensions**: Middleware, safety checks, and integrations
 
-### Vertical Components
+Victor includes five built-in verticals:
 
-Each vertical consists of these core components:
+| Vertical | Description | Use Case |
+|----------|-------------|----------|
+| `coding` | Software development assistant | Code exploration, bug fixing, feature implementation |
+| `research` | Web research and synthesis | Fact-checking, literature review, report generation |
+| `devops` | Infrastructure and deployment | Docker, Terraform, CI/CD pipelines |
+| `data_analysis` | Data exploration and visualization | Pandas, statistics, charts |
+| `rag` | Document retrieval and Q&A | Knowledge base queries, document search |
 
-```
-victor/{vertical_name}/
-├── __init__.py              # Package init, exports VerticalAssistant
-├── assistant.py             # Main VerticalAssistant class
-├── safety.py                # Safety patterns and constraints
-├── prompts.py               # Prompt contributors
-├── mode_config.py           # Agent mode configurations
-├── service_provider.py      # Dependency injection services (optional)
-├── tool_dependencies.py     # Tool dependency provider class (optional)
-├── tool_dependencies.yaml   # YAML tool dependency configuration (recommended)
-└── workflows/               # YAML workflow definitions
-    └── {workflow_name}.yaml
-```
+### Why Create Custom Verticals?
 
-### Key Concepts
+Custom verticals enable you to:
 
-1. **VerticalBase**: Abstract base class that all verticals inherit from
-2. **VerticalRegistry**: Singleton that manages vertical discovery and access
-3. **VerticalIntegrationPipeline**: Applies vertical configurations to the orchestrator
-4. **Protocols**: ISP-compliant interfaces for different extension points
+1. **Restrict tool access** - Limit to only relevant tools for safety and focus
+2. **Provide domain expertise** - System prompts with specialized knowledge
+3. **Define workflows** - Multi-step processes for complex tasks
+4. **Integrate extensions** - Custom middleware, safety checks, and handlers
 
-## Quick Start
+## VerticalBase Interface
 
-### 1. Create the Vertical Package
+All verticals inherit from `VerticalBase` and must implement two abstract methods:
 
 ```python
-# victor/security/__init__.py
-from victor.security.assistant import SecurityAssistant
+from typing import List
+from victor.core.verticals import VerticalBase
 
-__all__ = ["SecurityAssistant"]
-```
-
-### 2. Implement the Assistant Class
-
-```python
-# victor/security/assistant.py
-from typing import Dict, List, Optional, Any
-from victor.core.verticals.base import VerticalBase
-from victor.core.vertical_types import TieredToolConfig
-
-class SecurityAssistant(VerticalBase):
-    """Security analysis vertical assistant."""
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "security"
-
-    @classmethod
-    def get_description(cls) -> str:
-        return "Security analysis and vulnerability assessment assistant"
+class MyVertical(VerticalBase):
+    # Required class attributes
+    name = "my_vertical"  # Unique identifier
+    description = "Description of what this vertical does"
 
     @classmethod
     def get_tools(cls) -> List[str]:
-        """Return list of tool names this vertical uses."""
-        return [
-            "read",          # Read files for security review
-            "grep",          # Search for security patterns
-            "bash",          # Run security scanners
-            "web_fetch",     # Fetch CVE databases
-        ]
-
-    @classmethod
-    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
-        """Return tiered tool configuration for context-efficient selection."""
-        return TieredToolConfig(
-            mandatory={"read", "grep"},
-            vertical_core={"bash", "web_fetch"},
-            semantic_pool={"write", "edit"},
-            readonly_only_for_analysis=False,
-        )
+        """Return list of tool names available to this vertical."""
+        return ["read", "write", "grep"]
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return """You are a security analysis assistant specializing in:
-- Vulnerability assessment
-- Code security review
-- Security best practices
-- Threat modeling
+        """Return the system prompt for this vertical."""
+        return "You are an expert assistant specializing in..."
+```
 
-Always prioritize security and never execute potentially harmful code."""
+### Required Members
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `name` | `str` | Unique identifier for the vertical (lowercase, underscores) |
+| `get_tools()` | `classmethod` | Returns list of tool names to enable |
+| `get_system_prompt()` | `classmethod` | Returns the system prompt text |
+
+### Optional Members
+
+| Member | Default | Description |
+|--------|---------|-------------|
+| `description` | `""` | Human-readable description |
+| `version` | `"1.0.0"` | Semantic version of the vertical |
+| `get_stages()` | 7-stage workflow | Stage definitions for task progression |
+| `get_provider_hints()` | Default hints | Provider selection preferences |
+| `get_evaluation_criteria()` | Basic criteria | Quality evaluation criteria |
+| `get_middleware()` | `[]` | Middleware implementations |
+| `get_safety_extension()` | `None` | Safety check patterns |
+| `get_prompt_contributor()` | `None` | Task-type prompt hints |
+| `get_mode_config_provider()` | `None` | Operational modes (fast/thorough) |
+| `get_tool_dependency_provider()` | `None` | Tool execution patterns |
+| `get_workflow_provider()` | `None` | YAML workflow provider |
+| `get_handlers()` | `{}` | Compute handlers for workflows |
+| `get_tool_graph()` | `None` | Tool execution graph |
+| `get_team_specs()` | `None` | Multi-agent team configurations |
+
+## Creating a Custom Vertical
+
+### Step 1: Define the Vertical Class
+
+Create a new Python file for your vertical:
+
+```python
+# victor/security/assistant.py
+from typing import Any, Dict, List, Optional
+from victor.core.verticals import VerticalBase, StageDefinition
+
+class SecurityAssistant(VerticalBase):
+    """Security analysis and vulnerability assessment assistant."""
+
+    name = "security"
+    description = "Security analysis, vulnerability assessment, and code auditing"
+    version = "1.0.0"
 
     @classmethod
-    def get_priority_keywords(cls) -> List[str]:
-        """Keywords that trigger this vertical."""
+    def get_tools(cls) -> List[str]:
+        """Tools for security analysis."""
         return [
-            "security", "vulnerability", "cve", "exploit",
-            "authentication", "authorization", "encryption",
-            "threat", "attack", "penetration", "audit",
-        ]
-```
-
-### 3. Add Safety Patterns
-
-```python
-# victor/security/safety.py
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
-
-class SecuritySafetyExtension(SafetyExtensionProtocol):
-    """Safety patterns for security vertical."""
-
-    def get_bash_patterns(self) -> list[SafetyPattern]:
-        return [
-            SafetyPattern(
-                pattern=r"nmap\s+-sS",
-                description="SYN scan requires explicit approval",
-                severity="high",
-                action="require_approval",
-            ),
-            SafetyPattern(
-                pattern=r"sqlmap",
-                description="SQL injection testing",
-                severity="high",
-                action="require_approval",
-            ),
+            # Core filesystem (read-only focused)
+            "read",
+            "ls",
+            "grep",
+            "overview",
+            # Code analysis
+            "code_search",
+            "symbol",
+            "refs",
+            # Shell for running security tools
+            "shell",
+            # Web for CVE lookups
+            "web_search",
+            "web_fetch",
         ]
 
-    def get_file_patterns(self) -> list[SafetyPattern]:
-        return [
-            SafetyPattern(
-                pattern=r"/etc/shadow",
-                description="Accessing shadow password file",
-                severity="critical",
-                action="block",
-            ),
-        ]
-```
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        """Security-focused system prompt."""
+        return """You are a security analyst assistant specializing in:
+- Vulnerability assessment and code auditing
+- Security best practices and OWASP guidelines
+- Dependency vulnerability analysis
+- Authentication and authorization review
+- Secrets and sensitive data detection
 
-### 4. Configure Prompt Contributors
+Guidelines:
+1. Always analyze code with a security-first mindset
+2. Check for common vulnerabilities (SQLi, XSS, CSRF, etc.)
+3. Review authentication and session management
+4. Identify hardcoded secrets or sensitive data
+5. Suggest secure coding practices
+6. Reference CVE databases when applicable
 
-```python
-# victor/security/prompts.py
-from typing import Dict
-from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
+Be thorough but prioritize high-severity issues."""
 
-class SecurityPromptContributor(PromptContributorProtocol):
-    """Prompt contributions for security analysis."""
-
-    def get_priority(self) -> int:
-        return 100  # Higher = later in prompt
-
-    def get_system_prompt_section(self) -> str:
-        return """
-## Security Guidelines
-- Always check for common vulnerabilities (OWASP Top 10)
-- Report findings with severity levels
-- Suggest remediation steps
-- Never exploit vulnerabilities without explicit permission
-"""
-
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    @classmethod
+    def get_stages(cls) -> Dict[str, StageDefinition]:
+        """Security-specific workflow stages."""
         return {
-            "security_audit": TaskTypeHint(
-                keywords=["audit", "review", "assess"],
-                suggested_tools=["grep", "read", "bash"],
-                prompt_additions="Focus on systematic security review.",
+            "INITIAL": StageDefinition(
+                name="INITIAL",
+                description="Understanding the security assessment scope",
+                tools={"read", "ls", "overview"},
+                keywords=["audit", "assess", "check", "review", "scan"],
+                next_stages={"RECONNAISSANCE", "ANALYSIS"},
             ),
-            "vulnerability_scan": TaskTypeHint(
-                keywords=["scan", "vulnerability", "cve"],
-                suggested_tools=["bash", "web_fetch"],
-                prompt_additions="Check CVE databases for known issues.",
+            "RECONNAISSANCE": StageDefinition(
+                name="RECONNAISSANCE",
+                description="Gathering information about the target",
+                tools={"grep", "code_search", "overview", "symbol"},
+                keywords=["find", "search", "discover", "enumerate"],
+                next_stages={"ANALYSIS", "VULNERABILITY_SCAN"},
+            ),
+            "VULNERABILITY_SCAN": StageDefinition(
+                name="VULNERABILITY_SCAN",
+                description="Scanning for known vulnerabilities",
+                tools={"shell", "grep", "web_search"},
+                keywords=["scan", "detect", "identify", "vulnerability"],
+                next_stages={"ANALYSIS", "REPORTING"},
+            ),
+            "ANALYSIS": StageDefinition(
+                name="ANALYSIS",
+                description="Analyzing findings and assessing risk",
+                tools={"read", "refs", "symbol", "web_fetch"},
+                keywords=["analyze", "risk", "severity", "impact"],
+                next_stages={"REPORTING", "REMEDIATION"},
+            ),
+            "REMEDIATION": StageDefinition(
+                name="REMEDIATION",
+                description="Suggesting and implementing fixes",
+                tools={"read", "grep", "shell"},
+                keywords=["fix", "patch", "remediate", "mitigate"],
+                next_stages={"VERIFICATION", "REPORTING"},
+            ),
+            "VERIFICATION": StageDefinition(
+                name="VERIFICATION",
+                description="Verifying fixes are effective",
+                tools={"shell", "grep", "read"},
+                keywords=["verify", "test", "confirm", "validate"],
+                next_stages={"REPORTING"},
+            ),
+            "REPORTING": StageDefinition(
+                name="REPORTING",
+                description="Generating security report",
+                tools={"read"},
+                keywords=["report", "summarize", "document", "findings"],
+                next_stages=set(),
             ),
         }
-```
 
-### 5. Add Mode Configurations
-
-```python
-# victor/security/mode_config.py
-from victor.core.verticals.protocols import ModeConfigProviderProtocol, ModeConfig
-
-class SecurityModeConfigProvider(ModeConfigProviderProtocol):
-    """Mode configurations for security vertical."""
-
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
+    @classmethod
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Provider preferences for security tasks."""
         return {
-            "audit": ModeConfig(
-                name="Security Audit",
-                description="Comprehensive security review mode",
-                tool_budget_multiplier=2.0,
-                allowed_tools=["read", "grep", "bash"],
-                system_prompt_additions="Perform thorough security analysis.",
-            ),
-            "quick_scan": ModeConfig(
-                name="Quick Scan",
-                description="Fast vulnerability check",
-                tool_budget_multiplier=0.5,
-                allowed_tools=["grep", "read"],
-                system_prompt_additions="Quick security scan, prioritize critical issues.",
-            ),
+            "preferred_providers": ["anthropic", "openai"],
+            "min_context_window": 100000,
+            "requires_tool_calling": True,
+            "prefers_extended_thinking": True,  # Security needs careful analysis
         }
+
+    @classmethod
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Criteria for evaluating security analysis."""
+        return [
+            "Vulnerability detection accuracy",
+            "Risk assessment quality",
+            "Coverage of OWASP Top 10",
+            "False positive rate",
+            "Remediation guidance quality",
+            "Report clarity and completeness",
+        ]
 ```
 
-## Advanced Features
+### Step 2: Create the Package Structure
 
-### Tool Tier Registry
+Organize your vertical as a package:
 
-Register your vertical's tool tiers globally:
+```
+victor/security/
+    __init__.py
+    assistant.py          # SecurityAssistant class
+    safety.py             # Safety extension (optional)
+    prompts.py            # Prompt contributor (optional)
+    mode_config.py        # Mode configurations (optional)
+    escape_hatches.py     # YAML workflow conditions (optional)
+    workflows/
+        __init__.py
+        security_audit.yaml
+```
+
+### Step 3: Register the Vertical
+
+Add your vertical to the registry in `victor/core/verticals/__init__.py`:
 
 ```python
-from victor.core.tool_tier_registry import get_tool_tier_registry
-from victor.core.vertical_types import TieredToolConfig
+def _register_builtin_verticals() -> None:
+    """Register all built-in verticals with the registry."""
+    # ... existing registrations ...
 
-registry = get_tool_tier_registry()
-registry.register(
-    "security",
-    TieredToolConfig(
-        mandatory={"read", "grep"},
-        vertical_core={"bash", "web_fetch"},
-        semantic_pool={"write", "edit"},
-    ),
-    parent="base",  # Inherit from base tier
-    description="Security analysis tools",
+    try:
+        from victor.security import SecurityAssistant
+        VerticalRegistry.register(SecurityAssistant)
+    except ImportError:
+        pass
+```
+
+Or register dynamically:
+
+```python
+from victor.core.verticals import VerticalRegistry
+from victor.security import SecurityAssistant
+
+VerticalRegistry.register(SecurityAssistant)
+```
+
+### Step 4: Use the Vertical
+
+```python
+from victor.security import SecurityAssistant
+
+# Get configuration
+config = SecurityAssistant.get_config()
+print(f"Tools: {config.tools.get_tool_names()}")
+
+# Get extensions
+extensions = SecurityAssistant.get_extensions()
+
+# Create an agent with this vertical
+agent = await Agent.create(
+    provider="anthropic",
+    model="claude-sonnet-4-20250514",
+    tools=config.tools,
+    system_prompt=config.system_prompt,
 )
 ```
 
-### Chain Registry
+## YAML Workflow Integration
 
-Register reusable tool chains:
+Verticals can define complex workflows using YAML with Python escape hatches for conditions that cannot be expressed declaratively.
 
-```python
-from victor.framework.chain_registry import chain, get_chain_registry
+### Workflow Directory Structure
 
-@chain("security:vulnerability_scan", description="Scan for vulnerabilities")
-def vulnerability_scan_chain():
-    from victor.tools.composition import as_runnable
-    return (
-        as_runnable(grep_tool, pattern="TODO|FIXME|HACK")
-        | as_runnable(analyze_tool)
-        | format_results
-    )
-
-# Use in YAML workflows:
-# handler: chain:security:vulnerability_scan
+```
+victor/security/
+    workflows/
+        __init__.py           # WorkflowProvider implementation
+        security_audit.yaml   # Workflow definition
+    escape_hatches.py         # Python conditions and transforms
 ```
 
-### Persona Registry
-
-Register domain-specific personas:
-
-```python
-from victor.framework.persona_registry import persona, PersonaSpec
-
-@persona("security:analyst")
-def security_analyst():
-    return PersonaSpec(
-        name="security_analyst",
-        role="Security Analyst",
-        expertise=["vulnerability assessment", "threat modeling", "secure coding"],
-        communication_style="professional",
-        behavioral_traits=["thorough", "cautious", "detail-oriented"],
-    )
-```
-
-### YAML Workflows
-
-Create domain workflows in `victor/{vertical}/workflows/`:
+### Creating a YAML Workflow
 
 ```yaml
 # victor/security/workflows/security_audit.yaml
@@ -285,356 +308,630 @@ workflows:
       vertical: "security"
 
     nodes:
-      - id: gather_files
+      - id: gather_context
         type: agent
-        role: file_gatherer
-        goal: "Identify all security-relevant files"
-        tool_budget: 10
-        output: files_list
-        next: [analyze_code]
+        role: security_analyst
+        goal: "Understand the codebase structure and identify entry points"
+        tool_budget: 15
+        output: context_report
+        next: [identify_vulnerabilities]
 
-      - id: analyze_code
-        type: compute
-        handler: chain:security:vulnerability_scan
+      - id: identify_vulnerabilities
+        type: agent
+        role: vulnerability_scanner
+        goal: "Scan for common vulnerabilities using gathered context"
+        tool_budget: 20
         inputs:
-          files: $ctx.files_list
-        output: scan_results
+          context: $ctx.context_report
+        output: vulnerability_list
+        next: [assess_severity]
+
+      - id: assess_severity
+        type: compute
+        handler: severity_assessment  # Maps to escape hatch
+        inputs:
+          vulnerabilities: $ctx.vulnerability_list
+        output: prioritized_findings
+        next: [check_findings]
+
+      - id: check_findings
+        type: condition
+        condition: "has_critical_findings"  # Escape hatch function
+        branches:
+          "critical": deep_analysis
+          "non_critical": generate_report
+
+      - id: deep_analysis
+        type: agent
+        role: security_expert
+        goal: "Deep dive into critical vulnerabilities"
+        tool_budget: 30
+        inputs:
+          findings: $ctx.prioritized_findings
+        output: detailed_analysis
         next: [generate_report]
 
       - id: generate_report
         type: agent
         role: report_writer
-        goal: "Generate security audit report"
-        tool_budget: 5
+        goal: "Generate comprehensive security report"
+        tool_budget: 10
         output: final_report
+        next: []
 ```
 
-### YAML Tool Dependencies
-
-Tool dependencies define execution patterns and transition probabilities for intelligent tool selection. The YAML-based configuration replaces hand-coded Python dictionaries.
-
-#### Configuration File
-
-Create `tool_dependencies.yaml` in your vertical directory:
-
-```yaml
-# victor/security/tool_dependencies.yaml
-version: "1.0"
-vertical: security
-
-# Tool transition probabilities (weights sum to <= 1.0)
-transitions:
-  grep:
-    - tool: read
-      weight: 0.6
-    - tool: code_search
-      weight: 0.3
-    - tool: bash
-      weight: 0.1
-
-  read:
-    - tool: grep
-      weight: 0.4
-    - tool: web_fetch
-      weight: 0.3
-    - tool: edit
-      weight: 0.3
-
-# Groups of related tools
-clusters:
-  file_operations:
-    - read
-    - write
-    - edit
-    - ls
-
-  security_scanning:
-    - grep
-    - bash
-    - code_search
-
-# Named tool sequences for task types
-sequences:
-  vulnerability_scan:
-    - grep
-    - read
-    - bash
-
-  code_review:
-    - read
-    - grep
-    - code_search
-    - read
-
-# Tool dependency relationships
-dependencies:
-  - tool: edit
-    depends_on:
-      - read
-    enables:
-      - bash
-    weight: 0.9
-
-  - tool: bash
-    depends_on: []
-    enables:
-      - read
-    weight: 0.8
-
-# Essential tools for this vertical
-required_tools:
-  - read
-  - grep
-  - bash
-
-# Optional enhancement tools
-optional_tools:
-  - code_search
-  - web_fetch
-  - write
-  - edit
-
-# Fallback sequence for unknown tasks
-default_sequence:
-  - read
-  - grep
-  - bash
-
-# Extensible metadata
-metadata:
-  description: "Tool dependencies for security analysis workflows"
-  author: "Your Name"
-```
-
-#### Schema Structure
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | string | Schema version (currently "1.0") |
-| `vertical` | string | Vertical name (lowercase) |
-| `transitions` | dict | Tool -> list of {tool, weight} transitions |
-| `clusters` | dict | Named groups of related tools |
-| `sequences` | dict | Named ordered tool sequences |
-| `dependencies` | list | Tool dependency entries with depends_on/enables |
-| `required_tools` | list | Essential tools for the vertical |
-| `optional_tools` | list | Enhancement tools (not required) |
-| `default_sequence` | list | Fallback sequence for unknown tasks |
-| `metadata` | dict | Extensible metadata (description, author, etc.) |
-
-#### Using YAMLToolDependencyProvider
-
-Create a provider class that loads from YAML:
+### Escape Hatches for Complex Logic
 
 ```python
-# victor/security/tool_dependencies.py
-from pathlib import Path
-from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
+# victor/security/escape_hatches.py
+"""Escape hatches for Security YAML workflows.
 
-_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
+Complex conditions and transforms that cannot be expressed in YAML.
+These are registered with the YAML workflow loader for use in condition nodes.
+"""
 
-class SecurityToolDependencyProvider(YAMLToolDependencyProvider):
-    """Tool dependency provider for security vertical."""
+from typing import Any, Dict
 
-    def __init__(self):
-        super().__init__(
-            yaml_path=_YAML_CONFIG_PATH,
-            canonicalize=True,  # Normalize tool names
-        )
+# =============================================================================
+# Condition Functions
+# =============================================================================
 
-# Usage
-provider = SecurityToolDependencyProvider()
-deps = provider.get_dependencies()
-sequence = provider.get_recommended_sequence("vulnerability_scan")
-weight = provider.get_transition_weight("grep", "read")
-```
+def has_critical_findings(ctx: Dict[str, Any]) -> str:
+    """Check if any findings are critical severity.
 
-#### Adding Custom Dependencies at Runtime
+    Args:
+        ctx: Workflow context with keys:
+            - prioritized_findings (list): List of findings with severity
 
-Merge additional dependencies with the YAML config:
+    Returns:
+        "critical" or "non_critical"
+    """
+    findings = ctx.get("prioritized_findings", [])
 
-```python
-from victor.core.tool_types import ToolDependency
+    for finding in findings:
+        if finding.get("severity") in ("critical", "high"):
+            return "critical"
 
-provider = SecurityToolDependencyProvider(
-    additional_dependencies=[
-        ToolDependency(
-            tool_name="custom_scanner",
-            depends_on={"read"},
-            enables={"bash"},
-            weight=0.7,
-        )
-    ],
-    additional_sequences={
-        "custom_workflow": ["read", "custom_scanner", "bash"],
-    },
-)
-```
+    return "non_critical"
 
-#### Migration from Python to YAML
 
-**Before (hand-coded Python):**
+def vulnerability_count_check(ctx: Dict[str, Any]) -> str:
+    """Determine next action based on vulnerability count.
 
-```python
-# victor/security/tool_dependencies.py
-SECURITY_TOOL_DEPENDENCIES = [
-    ToolDependency(tool_name="edit", depends_on={"read"}, enables={"bash"}, weight=0.9),
-]
-SECURITY_TOOL_SEQUENCES = {"scan": ["grep", "read", "bash"]}
-SECURITY_REQUIRED_TOOLS = {"read", "grep", "bash"}
-```
+    Args:
+        ctx: Workflow context with vulnerability_list
 
-**After (YAML-based):**
+    Returns:
+        "many", "few", or "none"
+    """
+    vulns = ctx.get("vulnerability_list", [])
+    count = len(vulns)
 
-1. Create `tool_dependencies.yaml` with the schema above
-2. Update `tool_dependencies.py` to use `YAMLToolDependencyProvider`:
+    if count == 0:
+        return "none"
+    elif count <= 5:
+        return "few"
+    else:
+        return "many"
 
-```python
-# victor/security/tool_dependencies.py
-from pathlib import Path
-from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
 
-_YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
+# =============================================================================
+# Transform Functions
+# =============================================================================
 
-class SecurityToolDependencyProvider(YAMLToolDependencyProvider):
-    def __init__(self):
-        super().__init__(yaml_path=_YAML_CONFIG_PATH, canonicalize=True)
+def merge_findings(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge findings from multiple analysis passes.
 
-# Deprecated legacy constants (backward compatibility)
-def __getattr__(name: str):
-    """Provide deprecation warnings for legacy constant access."""
-    import warnings
-    deprecated = {
-        "SECURITY_TOOL_DEPENDENCIES": "get_dependencies()",
-        "SECURITY_TOOL_SEQUENCES": "get_tool_sequences()",
-        "SECURITY_REQUIRED_TOOLS": "get_required_tools()",
+    Args:
+        ctx: Workflow context with multiple finding lists
+
+    Returns:
+        Merged and deduplicated findings
+    """
+    all_findings = []
+
+    for key in ["static_findings", "dynamic_findings", "dependency_findings"]:
+        findings = ctx.get(key, [])
+        all_findings.extend(findings)
+
+    # Deduplicate by vulnerability ID
+    seen = set()
+    unique = []
+    for finding in all_findings:
+        vuln_id = finding.get("id")
+        if vuln_id and vuln_id not in seen:
+            seen.add(vuln_id)
+            unique.append(finding)
+
+    return {
+        "total_findings": len(unique),
+        "findings": unique,
+        "sources": ["static", "dynamic", "dependency"],
     }
-    if name in deprecated:
-        warnings.warn(
-            f"{name} is deprecated. Use SecurityToolDependencyProvider().{deprecated[name]}",
-            DeprecationWarning,
-        )
-        provider = SecurityToolDependencyProvider()
-        # Return appropriate value...
-    raise AttributeError(f"module has no attribute {name!r}")
+
+
+# =============================================================================
+# Registry Exports
+# =============================================================================
+
+# Conditions available in YAML workflows
+CONDITIONS = {
+    "has_critical_findings": has_critical_findings,
+    "vulnerability_count_check": vulnerability_count_check,
+}
+
+# Transforms available in YAML workflows
+TRANSFORMS = {
+    "merge_findings": merge_findings,
+}
 ```
 
-## Protocol Reference
-
-### Core Protocols
-
-| Protocol | Purpose | Key Methods |
-|----------|---------|-------------|
-| `VerticalBase` | Base class for verticals | `get_name()`, `get_tools()`, `get_system_prompt()` |
-| `SafetyExtensionProtocol` | Safety patterns | `get_bash_patterns()`, `get_file_patterns()` |
-| `PromptContributorProtocol` | Prompt contributions | `get_system_prompt_section()`, `get_task_type_hints()` |
-| `ModeConfigProviderProtocol` | Mode configurations | `get_mode_configs()` |
-| `ToolDependencyProviderProtocol` | Tool dependencies | `get_tool_dependencies()` |
-| `WorkflowProviderProtocol` | Workflow definitions | `get_workflows()` |
-| `TieredToolConfigProviderProtocol` | Tiered tools | `get_tiered_tool_config()` |
-| `VerticalPersonaProviderProtocol` | Personas | `get_persona_specs()` |
-
-### VerticalExtensions Container
-
-The `VerticalExtensions` dataclass aggregates all extensions:
+### Implementing WorkflowProviderProtocol
 
 ```python
-from victor.core.verticals.protocols import VerticalExtensions
+# victor/security/workflows/__init__.py
+"""Security workflow provider."""
 
-extensions = VerticalExtensions(
-    middleware=[CustomMiddleware()],
-    safety_extensions=[SecuritySafetyExtension()],
-    prompt_contributors=[SecurityPromptContributor()],
-    mode_config_provider=SecurityModeConfigProvider(),
-    tiered_tool_config=my_tiered_config,
-)
+from pathlib import Path
+from typing import List, Tuple
+
+from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
+
+
+class SecurityWorkflowProvider(BaseYAMLWorkflowProvider):
+    """Provides security-specific YAML workflows.
+
+    Workflows are loaded from victor/security/workflows/*.yaml
+    with escape hatches from victor/security/escape_hatches.py
+    """
+
+    def _get_escape_hatches_module(self) -> str:
+        """Return the module path for escape hatches."""
+        return "victor.security.escape_hatches"
+
+    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+        """Get automatic workflow triggers based on query patterns."""
+        return [
+            (r"security\s+audit", "security_audit"),
+            (r"vulnerability\s+scan", "vulnerability_scan"),
+            (r"check\s+for\s+vulnerabilities", "quick_scan"),
+        ]
+
+    def get_workflow_for_task_type(self, task_type: str) -> str | None:
+        """Map task types to workflow names."""
+        mapping = {
+            "audit": "security_audit",
+            "scan": "vulnerability_scan",
+            "pentest": "penetration_test",
+        }
+        return mapping.get(task_type.lower())
 ```
 
-## Registering Your Vertical
-
-### Built-in Registration
-
-Add to `victor/core/verticals/__init__.py`:
+Then connect it to your vertical:
 
 ```python
-def _register_builtin_verticals(self) -> None:
-    # ... existing verticals ...
-    from victor.security import SecurityAssistant
-    self._register_class(SecurityAssistant)
+# In SecurityAssistant class
+@classmethod
+def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
+    """Get security-specific workflow provider."""
+    from victor.security.workflows import SecurityWorkflowProvider
+    return SecurityWorkflowProvider()
 ```
 
-### External Plugin (entry_points)
+## External Plugin Registration
 
-For pip-installable verticals:
+External packages can register verticals without modifying Victor's source code using Python entry points.
+
+### Package Structure
+
+```
+victor-security/
+    pyproject.toml
+    victor_security/
+        __init__.py
+        assistant.py
+        workflows/
+            __init__.py
+            security_audit.yaml
+        escape_hatches.py
+```
+
+### Entry Point Configuration
 
 ```toml
 # pyproject.toml
+[project]
+name = "victor-security"
+version = "1.0.0"
+dependencies = ["victor-ai>=0.4.0"]
+
 [project.entry-points."victor.verticals"]
 security = "victor_security:SecurityAssistant"
 ```
 
-## Testing Your Vertical
+### Package Implementation
+
+```python
+# victor_security/__init__.py
+from victor_security.assistant import SecurityAssistant
+
+__all__ = ["SecurityAssistant"]
+```
+
+```python
+# victor_security/assistant.py
+from typing import List
+from victor.core.verticals import VerticalBase
+
+class SecurityAssistant(VerticalBase):
+    name = "security"
+    description = "Security analysis and vulnerability assessment"
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        return ["read", "grep", "shell", "web_search"]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        return "You are a security analyst..."
+```
+
+### Installation and Discovery
+
+```bash
+# Install the external package
+pip install victor-security
+
+# Victor automatically discovers and registers the vertical
+victor chat --vertical security
+```
+
+### Validation Requirements
+
+External verticals must meet these requirements to be registered:
+
+1. **Inherit from VerticalBase**: The class must be a subclass of `VerticalBase`
+2. **Define `name` attribute**: A non-empty string identifier
+3. **Implement `get_tools()`**: Must return a `List[str]`
+4. **Implement `get_system_prompt()`**: Must return a `str`
+
+Victor validates these during discovery and logs warnings for invalid verticals.
+
+## Testing Verticals
+
+### Unit Testing
 
 ```python
 # tests/unit/security/test_security_assistant.py
 import pytest
-from victor.security import SecurityAssistant
+from typing import List
+
+from victor.core.verticals import (
+    VerticalBase,
+    VerticalConfig,
+    VerticalRegistry,
+    StageDefinition,
+)
+
 
 class TestSecurityAssistant:
-    def test_get_name(self):
-        assert SecurityAssistant.get_name() == "security"
+    """Tests for SecurityAssistant vertical."""
 
-    def test_get_tools(self):
-        tools = SecurityAssistant.get_tools()
+    @pytest.fixture
+    def vertical(self):
+        """Get the security vertical."""
+        from victor.security import SecurityAssistant
+        return SecurityAssistant
+
+    def test_name_and_description(self, vertical):
+        """Vertical should have name and description."""
+        assert vertical.name == "security"
+        assert "security" in vertical.description.lower()
+
+    def test_get_tools_returns_list(self, vertical):
+        """get_tools should return a list of strings."""
+        tools = vertical.get_tools()
+        assert isinstance(tools, list)
+        assert all(isinstance(t, str) for t in tools)
+        # Verify essential tools
         assert "read" in tools
         assert "grep" in tools
 
-    def test_priority_keywords(self):
-        keywords = SecurityAssistant.get_priority_keywords()
-        assert "security" in keywords
-        assert "vulnerability" in keywords
+    def test_get_system_prompt(self, vertical):
+        """get_system_prompt should return security-focused prompt."""
+        prompt = vertical.get_system_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 100
+        assert "security" in prompt.lower()
 
-    def test_tiered_config(self):
-        config = SecurityAssistant.get_tiered_tool_config()
-        assert config is not None
-        assert "read" in config.mandatory
+    def test_get_stages(self, vertical):
+        """get_stages should return valid stage definitions."""
+        stages = vertical.get_stages()
+        assert isinstance(stages, dict)
+
+        # Verify stage structure
+        for name, stage in stages.items():
+            assert isinstance(stage, StageDefinition)
+            assert stage.name == name
+            assert stage.description
+
+    def test_get_config(self, vertical):
+        """get_config should return complete configuration."""
+        config = vertical.get_config()
+
+        assert isinstance(config, VerticalConfig)
+        assert config.system_prompt is not None
+        assert len(config.stages) > 0
+        assert config.metadata["vertical_name"] == "security"
+
+    def test_get_extensions_never_returns_none(self, vertical):
+        """get_extensions should always return VerticalExtensions."""
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        extensions = vertical.get_extensions()
+
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
+
+
+class TestSecurityVerticalRegistration:
+    """Tests for vertical registration."""
+
+    @pytest.fixture(autouse=True)
+    def reset_registry(self):
+        """Reset registry state."""
+        original = dict(VerticalRegistry._registry)
+        yield
+        VerticalRegistry._registry = original
+
+    def test_register_and_retrieve(self):
+        """Vertical should be registered and retrievable."""
+        from victor.security import SecurityAssistant
+
+        VerticalRegistry.register(SecurityAssistant)
+
+        retrieved = VerticalRegistry.get("security")
+        assert retrieved is SecurityAssistant
+
+    def test_appears_in_list(self):
+        """Registered vertical should appear in list."""
+        from victor.security import SecurityAssistant
+
+        VerticalRegistry.register(SecurityAssistant)
+
+        names = VerticalRegistry.list_names()
+        assert "security" in names
+
+
+class TestSecurityEscapeHatches:
+    """Tests for escape hatch functions."""
+
+    def test_has_critical_findings_with_critical(self):
+        """Should return 'critical' when critical findings exist."""
+        from victor.security.escape_hatches import has_critical_findings
+
+        ctx = {
+            "prioritized_findings": [
+                {"id": "CVE-2024-1234", "severity": "critical"},
+                {"id": "CVE-2024-5678", "severity": "low"},
+            ]
+        }
+
+        result = has_critical_findings(ctx)
+        assert result == "critical"
+
+    def test_has_critical_findings_without_critical(self):
+        """Should return 'non_critical' when no critical findings."""
+        from victor.security.escape_hatches import has_critical_findings
+
+        ctx = {
+            "prioritized_findings": [
+                {"id": "CVE-2024-9999", "severity": "low"},
+            ]
+        }
+
+        result = has_critical_findings(ctx)
+        assert result == "non_critical"
+```
+
+### Integration Testing
+
+```python
+# tests/integration/security/test_security_workflow.py
+import pytest
+
+from victor.core.verticals import get_vertical_loader
+
+
+@pytest.mark.integration
+class TestSecurityWorkflowIntegration:
+    """Integration tests for security workflows."""
+
+    def test_load_security_vertical(self):
+        """Security vertical should load correctly."""
+        loader = get_vertical_loader()
+        loader.load("security")
+
+        assert loader.active_vertical_name == "security"
+
+        tools = loader.get_tools()
+        assert "read" in tools
+        assert "grep" in tools
+
+    @pytest.mark.asyncio
+    async def test_workflow_execution(self, mock_orchestrator):
+        """Security audit workflow should execute."""
+        from victor.security.workflows import SecurityWorkflowProvider
+
+        provider = SecurityWorkflowProvider()
+        workflow = provider.get_workflow("security_audit")
+
+        assert workflow is not None
+        assert workflow.name == "security_audit"
+```
+
+### Test Fixtures
+
+Victor provides useful fixtures for testing verticals:
+
+```python
+# conftest.py
+import pytest
+
+from victor.core.verticals import VerticalRegistry
+
+
+@pytest.fixture
+def reset_vertical_registry():
+    """Reset vertical registry between tests."""
+    original = dict(VerticalRegistry._registry)
+    original_discovered = VerticalRegistry._external_discovered
+    yield
+    VerticalRegistry._registry = original
+    VerticalRegistry._external_discovered = original_discovered
+
+
+@pytest.fixture
+def reset_vertical_caches():
+    """Clear all vertical config caches."""
+    from victor.core.verticals import VerticalBase
+    VerticalBase._config_cache.clear()
+    VerticalBase._extensions_cache.clear()
+    yield
+```
+
+## Advanced Topics
+
+### Extension Caching
+
+Verticals use caching to avoid repeated computation:
+
+```python
+@classmethod
+def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
+    """Get safety extension with caching."""
+    def _create() -> SafetyExtensionProtocol:
+        from victor.security.safety import SecuritySafetyExtension
+        return SecuritySafetyExtension()
+
+    return cls._get_cached_extension("safety_extension", _create)
+```
+
+Clear caches when needed:
+
+```python
+# Clear caches for this vertical
+SecurityAssistant.clear_config_cache()
+
+# Clear all vertical caches
+SecurityAssistant.clear_config_cache(clear_all=True)
+```
+
+### Strict Extension Loading
+
+Enable strict mode to fail fast on extension errors:
+
+```python
+class SecurityAssistant(VerticalBase):
+    name = "security"
+    strict_extension_loading = True  # Raise on any extension failure
+    required_extensions = {"safety"}  # These must load successfully
+```
+
+### Tiered Tool Configuration
+
+Define tool tiers for intelligent selection:
+
+```python
+@classmethod
+def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
+    """Configure tool tiers for security analysis."""
+    from victor.core.vertical_types import TieredToolConfig
+
+    return TieredToolConfig(
+        # Always included
+        mandatory={"read", "grep", "ls"},
+        # Essential for security
+        vertical_core={"shell", "code_search", "web_search"},
+        # Selected based on context
+        semantic_pool={"symbol", "refs", "web_fetch"},
+        # Stage-specific tools
+        stage_tools={
+            "VULNERABILITY_SCAN": {"shell", "web_search"},
+            "ANALYSIS": {"read", "refs", "symbol"},
+        },
+        readonly_only_for_analysis=True,
+    )
+```
+
+### Multi-Agent Teams
+
+Define team configurations for complex tasks:
+
+```python
+@classmethod
+def get_team_spec_provider(cls) -> Optional[TeamSpecProviderProtocol]:
+    """Get security team specifications."""
+    from victor.security.teams import SecurityTeamSpecProvider
+    return SecurityTeamSpecProvider()
 ```
 
 ## Best Practices
 
-1. **Keep verticals focused**: Each vertical should handle a specific domain
-2. **Use tiered tools**: Configure mandatory, vertical_core, and semantic_pool appropriately
-3. **Implement safety patterns**: Protect against dangerous operations
-4. **Register personas**: Provide consistent agent behavior
-5. **Create reusable chains**: Use the ChainRegistry for complex operations
-6. **Write YAML workflows**: Define common workflows declaratively
-7. **Test thoroughly**: Unit test all protocol implementations
+1. **Start minimal**: Begin with essential tools and expand as needed
+2. **Focus the prompt**: Write clear, domain-specific system prompts
+3. **Define clear stages**: Map your domain's workflow to stages
+4. **Use escape hatches wisely**: Keep YAML for structure, Python for logic
+5. **Test thoroughly**: Unit test all components, integration test workflows
+6. **Cache extensions**: Use `_get_cached_extension()` for expensive operations
+7. **Handle errors gracefully**: Use non-strict mode with `required_extensions`
+8. **Document your vertical**: Include docstrings and usage examples
 
-## Example Verticals
+## Reference
 
-Reference implementations in the codebase:
+### Tool Names
 
-- `victor/coding/` - Code development and review
-- `victor/devops/` - DevOps and infrastructure
-- `victor/rag/` - Document retrieval and analysis
-- `victor/dataanalysis/` - Data analysis and visualization
-- `victor/research/` - Web research and synthesis
+Use canonical tool names from `victor.tools.tool_names`:
 
-## Troubleshooting
+```python
+from victor.tools.tool_names import ToolNames
 
-### Vertical Not Loading
+tools = [
+    ToolNames.READ,        # "read"
+    ToolNames.WRITE,       # "write"
+    ToolNames.EDIT,        # "edit"
+    ToolNames.GREP,        # "grep"
+    ToolNames.SHELL,       # "shell"
+    ToolNames.GIT,         # "git"
+    ToolNames.WEB_SEARCH,  # "web_search"
+    ToolNames.WEB_FETCH,   # "web_fetch"
+]
+```
 
-1. Check `VerticalRegistry` registration
-2. Verify `__init__.py` exports the assistant class
-3. Check for import errors in the vertical module
+### Stage Transitions
 
-### Tools Not Available
+Stages form a directed graph. Define valid transitions:
 
-1. Verify tools are listed in `get_tools()`
-2. Check tiered config includes the tool
-3. Ensure tool is registered in ToolRegistry
+```python
+StageDefinition(
+    name="ANALYSIS",
+    description="Analyzing findings",
+    next_stages={"REMEDIATION", "REPORTING"},  # Valid next stages
+)
+```
 
-### Prompts Not Applied
+### Extension Protocols
 
-1. Check prompt contributor priority
-2. Verify `get_extensions()` includes the contributor
-3. Check VerticalIntegrationPipeline logs
+Available extension protocols:
+
+| Protocol | Method | Purpose |
+|----------|--------|---------|
+| `MiddlewareProtocol` | `get_middleware()` | Tool execution processing |
+| `SafetyExtensionProtocol` | `get_safety_extension()` | Dangerous operation patterns |
+| `PromptContributorProtocol` | `get_prompt_contributor()` | Task-type hints |
+| `ModeConfigProviderProtocol` | `get_mode_config_provider()` | Operational modes |
+| `ToolDependencyProviderProtocol` | `get_tool_dependency_provider()` | Tool execution patterns |
+| `WorkflowProviderProtocol` | `get_workflow_provider()` | YAML workflows |
+| `TeamSpecProviderProtocol` | `get_team_spec_provider()` | Multi-agent teams |
+| `RLConfigProviderProtocol` | `get_rl_config_provider()` | RL configurations |
+| `EnrichmentStrategyProtocol` | `get_enrichment_strategy()` | Prompt enrichment |

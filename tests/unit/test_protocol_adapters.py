@@ -19,17 +19,17 @@ from unittest.mock import MagicMock, AsyncMock, patch
 import json
 import sys
 
-from victor.protocol.adapters import DirectProtocolAdapter, HTTPProtocolAdapter
-from victor.protocol.interface import (
+from victor.integrations.protocol.adapters import DirectProtocolAdapter, HTTPProtocolAdapter
+from victor.integrations.protocol.interface import (
     ChatMessage,
     ChatResponse,
-    StreamChunk,
-    SearchResult,
+    ClientStreamChunk,
     ToolCall,
     UndoRedoResult,
     AgentMode,
     AgentStatus,
 )
+from victor.integrations.search_types import CodeSearchResult
 
 
 # =============================================================================

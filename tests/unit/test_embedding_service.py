@@ -34,13 +34,13 @@ class TestDefaultEmbeddingModel:
 
     def test_default_model_constant_is_bge_small(self):
         """Test DEFAULT_EMBEDDING_MODEL is set to bge-small-en-v1.5."""
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         assert DEFAULT_EMBEDDING_MODEL == "BAAI/bge-small-en-v1.5"
 
     def test_settings_unified_model_matches_service(self):
         """Test settings.unified_embedding_model matches service default."""
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
         from victor.config.settings import Settings
 
         settings = Settings()
@@ -48,7 +48,7 @@ class TestDefaultEmbeddingModel:
 
     def test_service_init_uses_default_model(self):
         """Test EmbeddingService __init__ default matches constant."""
-        from victor.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
 
         EmbeddingService.reset_instance()
 
@@ -57,7 +57,7 @@ class TestDefaultEmbeddingModel:
 
     def test_get_instance_uses_default_model(self):
         """Test get_instance uses DEFAULT_EMBEDDING_MODEL as default."""
-        from victor.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
 
         EmbeddingService.reset_instance()
 
@@ -72,7 +72,7 @@ class TestEmbeddingServiceSingleton:
 
     def test_singleton_returns_same_instance(self):
         """Test get_instance returns same object."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -85,7 +85,7 @@ class TestEmbeddingServiceSingleton:
 
     def test_singleton_first_call_wins_for_model(self):
         """Test that first get_instance call sets the model."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -101,7 +101,7 @@ class TestEmbeddingServiceSingleton:
 
     def test_reset_instance_clears_singleton(self):
         """Test reset_instance clears the singleton."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -117,7 +117,7 @@ class TestEmbeddingServiceSingleton:
     def test_singleton_thread_safety(self):
         """Test singleton is thread-safe with double-checked locking."""
         import threading
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -158,7 +158,7 @@ class TestCPUOptimizedModels:
     )
     def test_model_dimensions(self, model_name, expected_dims):
         """Test that all CPU models produce 384-dimensional embeddings."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -179,7 +179,7 @@ class TestCPUOptimizedModels:
 
     def test_bge_small_model_name_huggingface_format(self):
         """Test bge-small uses HuggingFace format (BAAI/bge-small-en-v1.5)."""
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         # Should be full HuggingFace path
         assert "/" in DEFAULT_EMBEDDING_MODEL
@@ -187,7 +187,7 @@ class TestCPUOptimizedModels:
 
     def test_model_supports_mps_device(self):
         """Test model can use MPS device on Apple Silicon."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
 
@@ -204,7 +204,7 @@ class TestEmbeddingGeneration:
     @pytest.fixture(autouse=True)
     def reset_singleton(self):
         """Reset singleton before and after each test."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
         yield
@@ -212,7 +212,7 @@ class TestEmbeddingGeneration:
 
     def test_embed_text_sync(self):
         """Test synchronous text embedding."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -230,7 +230,7 @@ class TestEmbeddingGeneration:
 
     def test_embed_batch_sync(self):
         """Test synchronous batch embedding."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -248,7 +248,7 @@ class TestEmbeddingGeneration:
 
     def test_embed_batch_sync_empty_list(self):
         """Test batch embedding with empty list."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -265,7 +265,7 @@ class TestEmbeddingGeneration:
     @pytest.mark.asyncio
     async def test_embed_text_async(self):
         """Test async text embedding runs in thread pool."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -283,7 +283,7 @@ class TestEmbeddingGeneration:
     @pytest.mark.asyncio
     async def test_embed_batch_async(self):
         """Test async batch embedding."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -305,7 +305,7 @@ class TestEmbeddingFallback:
     @pytest.fixture(autouse=True)
     def reset_singleton(self):
         """Reset singleton before and after each test."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
         yield
@@ -313,7 +313,7 @@ class TestEmbeddingFallback:
 
     def test_embed_text_returns_zeros_on_error(self):
         """Test embed_text returns zero vector on encoding error."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -331,7 +331,7 @@ class TestEmbeddingFallback:
 
     def test_embed_batch_returns_zeros_on_error(self):
         """Test embed_batch returns zero vectors on error."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -348,7 +348,7 @@ class TestEmbeddingFallback:
 
     def test_import_error_raises_with_message(self):
         """Test ImportError is raised with helpful message."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
         service = EmbeddingService()
@@ -371,7 +371,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_identical_vectors(self):
         """Test similarity of identical vectors is 1.0."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([1.0, 2.0, 3.0])
@@ -382,7 +382,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_orthogonal_vectors(self):
         """Test similarity of orthogonal vectors is 0.0."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([0.0, 1.0, 0.0])
@@ -393,7 +393,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_opposite_vectors(self):
         """Test similarity of opposite vectors is -1.0."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([-1.0, -2.0, -3.0])
@@ -404,7 +404,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_zero_vector(self):
         """Test similarity with zero vector returns 0."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         a = np.array([1.0, 2.0, 3.0])
         b = np.zeros(3)
@@ -415,7 +415,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_matrix(self):
         """Test batch cosine similarity calculation."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         query = np.array([1.0, 0.0, 0.0])
         corpus = np.array(
@@ -435,7 +435,7 @@ class TestCosineSimilarity:
 
     def test_cosine_similarity_matrix_empty_corpus(self):
         """Test batch similarity with empty corpus."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         query = np.array([1.0, 0.0, 0.0])
         corpus = np.array([]).reshape(0, 3)
@@ -451,7 +451,7 @@ class TestLazyLoading:
     @pytest.fixture(autouse=True)
     def reset_singleton(self):
         """Reset singleton before and after each test."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
         yield
@@ -459,7 +459,7 @@ class TestLazyLoading:
 
     def test_model_not_loaded_on_init(self):
         """Test model is not loaded during __init__."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -468,7 +468,7 @@ class TestLazyLoading:
 
     def test_model_loaded_on_first_embedding(self):
         """Test model is loaded on first embedding request."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -490,7 +490,7 @@ class TestLazyLoading:
 
     def test_model_loaded_once(self):
         """Test model is loaded only once despite multiple embeddings."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -515,7 +515,7 @@ class TestSettingsIntegration:
     def test_settings_embedding_model_matches_service(self):
         """Test settings.embedding_model equals service default."""
         from victor.config.settings import Settings
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         settings = Settings()
         assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
@@ -523,7 +523,7 @@ class TestSettingsIntegration:
     def test_settings_codebase_embedding_model_matches_service(self):
         """Test settings.codebase_embedding_model equals service default."""
         from victor.config.settings import Settings
-        from victor.embeddings.service import DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         settings = Settings()
         assert settings.codebase_embedding_model == DEFAULT_EMBEDDING_MODEL
@@ -542,7 +542,7 @@ class TestModelQualityBenchmarks:
     @pytest.fixture(autouse=True)
     def reset_singleton(self):
         """Reset singleton before and after each test."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         EmbeddingService.reset_instance()
         yield
@@ -550,7 +550,7 @@ class TestModelQualityBenchmarks:
 
     def test_code_related_text_similarity(self):
         """Test that code-related texts produce similar embeddings."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         service = EmbeddingService()
 
@@ -587,7 +587,7 @@ class TestDocstrings:
 
     def test_init_docstring_lists_bge_small_first(self):
         """Test __init__ docstring lists bge-small-en-v1.5 as default."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         docstring = EmbeddingService.__init__.__doc__
         assert "BAAI/bge-small-en-v1.5" in docstring
@@ -595,7 +595,7 @@ class TestDocstrings:
 
     def test_init_docstring_includes_alternatives(self):
         """Test __init__ docstring includes alternative models."""
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
 
         docstring = EmbeddingService.__init__.__doc__
         assert "gte-small" in docstring

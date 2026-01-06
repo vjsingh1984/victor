@@ -39,7 +39,7 @@ Example:
         # Resilient Provider (complete solution)
         ResilientProvider,
         CircuitBreakerConfig,
-        RetryConfig,
+        ProviderRetryConfig,
 
         # Retry Strategies
         ExponentialBackoffStrategy,
@@ -62,7 +62,7 @@ Example:
         primary_provider=anthropic_provider,
         fallback_providers=[openai_provider],
         circuit_config=CircuitBreakerConfig(failure_threshold=5),
-        retry_config=RetryConfig(max_retries=3),
+        retry_config=ProviderRetryConfig(max_retries=3),
     )
 """
 
@@ -87,11 +87,11 @@ from victor.providers.resilience import (
     CircuitBreakerConfig,
     CircuitBreakerState,
     CircuitOpenError,
+    ProviderRetryConfig,
+    ProviderRetryStrategy,
     ProviderUnavailableError,
     ResilientProvider,
-    RetryConfig,
     RetryExhaustedError,
-    RetryStrategy as ResilientRetryStrategy,  # Renamed to avoid conflict with unified
 )
 
 # =============================================================================
@@ -99,6 +99,7 @@ from victor.providers.resilience import (
 # From: victor/core/retry.py
 # =============================================================================
 from victor.core.retry import (
+    BaseRetryStrategy,
     ExponentialBackoffStrategy,
     FixedDelayStrategy,
     LinearBackoffStrategy,
@@ -107,7 +108,6 @@ from victor.core.retry import (
     RetryExecutor,
     RetryOutcome,
     RetryResult,
-    RetryStrategy,
     connection_retry_strategy,
     provider_retry_strategy,
     tool_retry_strategy,
@@ -127,9 +127,9 @@ __all__ = [
     "CircuitOpenError",
     "ProviderUnavailableError",
     "ResilientProvider",
-    "RetryConfig",
+    "ProviderRetryConfig",
     "RetryExhaustedError",
-    "ResilientRetryStrategy",
+    "ProviderRetryStrategy",
     # Unified Retry Strategies
     "ExponentialBackoffStrategy",
     "FixedDelayStrategy",
@@ -139,7 +139,7 @@ __all__ = [
     "RetryExecutor",
     "RetryOutcome",
     "RetryResult",
-    "RetryStrategy",
+    "BaseRetryStrategy",
     "connection_retry_strategy",
     "provider_retry_strategy",
     "tool_retry_strategy",

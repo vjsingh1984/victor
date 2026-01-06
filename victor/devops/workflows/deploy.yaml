@@ -452,13 +452,19 @@ workflows:
           "false": complete
 
       - id: auto_deploy
-        type: agent
+        type: compute
         name: "Trigger Deployment"
-        role: executor
-        goal: "Trigger deployment to staging environment."
-        tool_budget: 10
+        handler: deployment_trigger
         tools: [shell]
+        inputs:
+          environment: staging
+          deploy_command: $ctx.deploy_command
+          wait_for_rollout: false
         output: deploy_trigger
+        constraints:
+          llm_allowed: false
+          network_allowed: true
+          timeout: 120
         next: [complete]
 
       - id: notify_failure

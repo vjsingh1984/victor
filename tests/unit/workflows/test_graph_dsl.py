@@ -22,7 +22,7 @@ from victor.workflows.graph_dsl import (
     State,
     StateGraph,
     GraphNode,
-    NodeType,
+    GraphNodeType,
     create_graph,
     compile_graph,
 )
@@ -198,7 +198,7 @@ class TestStateGraph:
         )
 
         node = graph._nodes["analyze"]
-        assert node.node_type == NodeType.AGENT
+        assert node.node_type == GraphNodeType.AGENT
         assert node.agent_role == "researcher"
         assert node.agent_goal == "Analyze the codebase"
         assert node.tool_budget == 20

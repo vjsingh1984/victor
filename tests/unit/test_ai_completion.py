@@ -19,11 +19,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
 from pathlib import Path
 
-from victor.completion.providers.ai import (
+from victor.processing.completion.providers.ai import (
     AICompletionProvider,
     FIM_TEMPLATES,
 )
-from victor.completion.protocol import (
+from victor.processing.completion.protocol import (
     CompletionParams,
     InlineCompletionParams,
     CompletionItemKind,

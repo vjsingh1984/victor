@@ -15,6 +15,7 @@ from victor.devops.prompts import DevOpsPromptContributor
 from victor.devops.mode_config import DevOpsModeConfigProvider
 from victor.devops.safety import DevOpsSafetyExtension
 from victor.devops.tool_dependencies import DevOpsToolDependencyProvider
+from victor.devops.capabilities import DevOpsCapabilityProvider
 
 __all__ = [
     "DevOpsAssistant",
@@ -22,4 +23,5 @@ __all__ = [
     "DevOpsModeConfigProvider",
     "DevOpsSafetyExtension",
     "DevOpsToolDependencyProvider",
+    "DevOpsCapabilityProvider",
 ]

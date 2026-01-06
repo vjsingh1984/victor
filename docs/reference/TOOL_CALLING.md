@@ -14,5 +14,5 @@ Tool calling depends on the provider and model. Some models return structured to
 - Air‑gapped mode: `airgapped_mode: true`
 
 ## References
-- `docs/embeddings/TOOL_CALLING_FORMATS.md`
+- `../embeddings/TOOL_CALLING_FORMATS.md`
 - `victor/config/tool_calling_models.yaml` (optional reference; may be outdated)

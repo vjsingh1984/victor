@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
-from victor.embeddings.question_classifier import (
+from victor.storage.embeddings.question_classifier import (
     QuestionTypeClassifier,
     QuestionType,
     classify_question,
@@ -262,7 +262,7 @@ class ContinuationStrategy:
             - reason: str - Human-readable reason for the action
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
         """
-        from victor.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType
 
         updates: Dict[str, Any] = {}
 

@@ -348,3 +348,14 @@ You: [Use rag_query tool with query="authentication"]
         from victor.rag.safety import RAGSafetyExtension
 
         return RAGSafetyExtension()
+
+    @classmethod
+    def get_capability_provider(cls):
+        """Get the capability provider for RAG vertical.
+
+        Returns:
+            RAGCapabilityProvider instance
+        """
+        from victor.rag.capabilities import RAGCapabilityProvider
+
+        return RAGCapabilityProvider()

@@ -110,7 +110,7 @@ from victor.evaluation.code_generation_harness import (
 # Agentic harness (SWE-bench, Aider Polyglot - with tools and file editing)
 from victor.evaluation.agentic_harness import (
     AgenticValidationType,
-    ToolCall,
+    EvalToolCall,
     FileEdit,
     AgenticExecutionTrace,
     AgenticTaskResult,
@@ -250,7 +250,7 @@ __all__ = [
     "create_code_gen_runner",
     # Agentic harness (SWE-bench, Aider Polyglot - with tools)
     "AgenticValidationType",
-    "ToolCall",
+    "EvalToolCall",
     "FileEdit",
     "AgenticExecutionTrace",
     "AgenticTaskResult",

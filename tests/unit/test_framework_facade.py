@@ -76,9 +76,9 @@ class TestResilienceFacade:
         assert FacadeConfig is OriginalConfig
 
     def test_retry_config_reexport_identity(self):
-        """Verify RetryConfig is same object from both modules."""
-        from victor.framework.resilience import RetryConfig as FacadeConfig
-        from victor.providers.resilience import RetryConfig as OriginalConfig
+        """Verify ProviderRetryConfig is same object from both modules."""
+        from victor.framework.resilience import ProviderRetryConfig as FacadeConfig
+        from victor.providers.resilience import ProviderRetryConfig as OriginalConfig
 
         assert FacadeConfig is OriginalConfig
 
@@ -177,9 +177,9 @@ class TestResilienceFacade:
             "CircuitOpenError",
             "ProviderUnavailableError",
             "ResilientProvider",
-            "RetryConfig",
+            "ProviderRetryConfig",
             "RetryExhaustedError",
-            "ResilientRetryStrategy",
+            "ProviderRetryStrategy",
             # Unified Retry Strategies
             "ExponentialBackoffStrategy",
             "FixedDelayStrategy",
@@ -189,7 +189,7 @@ class TestResilienceFacade:
             "RetryExecutor",
             "RetryOutcome",
             "RetryResult",
-            "RetryStrategy",
+            "BaseRetryStrategy",
             "connection_retry_strategy",
             "provider_retry_strategy",
             "tool_retry_strategy",
@@ -208,13 +208,14 @@ class TestResilienceFacade:
             CircuitState,
             ExponentialBackoffStrategy,
             ResilientProvider,
-            RetryStrategy,
+            BaseRetryStrategy,
             with_retry,
         )
 
         # Basic validation that classes are importable and usable
         assert CircuitBreaker is not None
         assert CircuitState.CLOSED.value == "closed"
+        assert BaseRetryStrategy is not None
 
 
 class TestHealthFacade:
@@ -507,12 +508,13 @@ class TestFrameworkMainExports:
             CircuitState,
             ExponentialBackoffStrategy,
             ResilientProvider,
-            RetryStrategy,
+            BaseRetryStrategy,
             with_retry,
         )
 
         assert CircuitBreaker is not None
         assert CircuitState.CLOSED.value == "closed"
+        assert BaseRetryStrategy is not None
 
     def test_health_exports_in_main_module(self):
         """Test that health exports are available from victor.framework."""

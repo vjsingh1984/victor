@@ -105,6 +105,267 @@ END = "__end__"
 START = "__start__"
 
 
+class CopyOnWriteState(Generic[StateType]):
+    """Copy-on-write wrapper for workflow state.
+
+    Delays deep copy of state until the first mutation, reducing overhead
+    for read-heavy workflows where nodes often only read state.
+
+    This optimization is particularly effective for:
+    - Workflows with many conditional branches that only read state
+    - Nodes that check conditions without modifying state
+    - Large state objects where deep copy is expensive
+
+    Example:
+        # Wrap original state
+        cow_state = CopyOnWriteState(original_state)
+
+        # Reading doesn't copy
+        value = cow_state["key"]  # No copy
+
+        # Writing triggers copy
+        cow_state["key"] = "new_value"  # Deep copy happens here
+
+        # Get the final state
+        final_state = cow_state.get_state()
+
+    Performance characteristics:
+        - Read operations: O(1), no copy overhead
+        - First write: O(n) deep copy where n is state size
+        - Subsequent writes: O(1), no additional copy
+
+    Thread safety:
+        This class is NOT thread-safe. Each thread should have its own
+        CopyOnWriteState wrapper if concurrent access is needed.
+    """
+
+    __slots__ = ("_source", "_copy", "_modified")
+
+    def __init__(self, source: StateType):
+        """Initialize with source state.
+
+        Args:
+            source: Original state dictionary (not copied until mutation)
+        """
+        self._source: StateType = source
+        self._copy: Optional[StateType] = None
+        self._modified: bool = False
+
+    def _ensure_copy(self) -> StateType:
+        """Ensure we have a mutable copy of the state.
+
+        Returns:
+            The mutable copy of the state
+        """
+        if not self._modified:
+            self._copy = copy.deepcopy(self._source)
+            self._modified = True
+        return self._copy  # type: ignore
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item without copying.
+
+        Args:
+            key: Key to look up
+
+        Returns:
+            Value associated with key
+
+        Raises:
+            KeyError: If key is not found
+        """
+        if self._modified:
+            return self._copy[key]  # type: ignore
+        return self._source[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item, triggering copy on first mutation.
+
+        Args:
+            key: Key to set
+            value: Value to associate with key
+        """
+        self._ensure_copy()[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        """Delete item, triggering copy on first mutation.
+
+        Args:
+            key: Key to delete
+
+        Raises:
+            KeyError: If key is not found
+        """
+        del self._ensure_copy()[key]
+
+    def __contains__(self, key: object) -> bool:
+        """Check if key exists without copying.
+
+        Args:
+            key: Key to check
+
+        Returns:
+            True if key exists, False otherwise
+        """
+        if self._modified:
+            return key in self._copy  # type: ignore
+        return key in self._source
+
+    def __len__(self) -> int:
+        """Get length without copying.
+
+        Returns:
+            Number of items in state
+        """
+        if self._modified:
+            return len(self._copy)  # type: ignore
+        return len(self._source)
+
+    def __iter__(self):
+        """Iterate over keys without copying.
+
+        Yields:
+            Keys from the state
+        """
+        if self._modified:
+            return iter(self._copy)  # type: ignore
+        return iter(self._source)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get with default without copying.
+
+        Args:
+            key: Key to look up
+            default: Value to return if key not found
+
+        Returns:
+            Value associated with key, or default
+        """
+        if self._modified:
+            return self._copy.get(key, default)  # type: ignore
+        return self._source.get(key, default)
+
+    def keys(self):
+        """Get keys without copying.
+
+        Returns:
+            View of keys in the state
+        """
+        if self._modified:
+            return self._copy.keys()  # type: ignore
+        return self._source.keys()
+
+    def values(self):
+        """Get values without copying.
+
+        Returns:
+            View of values in the state
+        """
+        if self._modified:
+            return self._copy.values()  # type: ignore
+        return self._source.values()
+
+    def items(self):
+        """Get items without copying.
+
+        Returns:
+            View of (key, value) pairs in the state
+        """
+        if self._modified:
+            return self._copy.items()  # type: ignore
+        return self._source.items()
+
+    def update(self, other: Dict[str, Any]) -> None:
+        """Update state, triggering copy.
+
+        Args:
+            other: Dictionary of items to update
+        """
+        self._ensure_copy().update(other)
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        """Set default value, may trigger copy.
+
+        If key is not present, sets it to default (triggering copy).
+        If key is present, returns its value without copying.
+
+        Args:
+            key: Key to look up or set
+            default: Value to set if key not found
+
+        Returns:
+            Value associated with key (existing or default)
+        """
+        if key not in self:
+            self._ensure_copy()[key] = default
+            return default
+        return self[key]
+
+    def pop(self, key: str, *args: Any) -> Any:
+        """Pop item, triggering copy.
+
+        Args:
+            key: Key to pop
+            *args: Optional default value
+
+        Returns:
+            Value associated with key
+
+        Raises:
+            KeyError: If key is not found and no default provided
+        """
+        return self._ensure_copy().pop(key, *args)
+
+    def copy(self) -> Dict[str, Any]:
+        """Create a shallow copy of the current state.
+
+        Returns:
+            Shallow copy of the state dictionary
+        """
+        if self._modified:
+            return self._copy.copy()  # type: ignore
+        return self._source.copy()  # type: ignore
+
+    def get_state(self) -> StateType:
+        """Get the final state.
+
+        Returns the modified copy if mutations occurred,
+        otherwise returns the original source.
+
+        Returns:
+            The current state (modified copy or original source)
+        """
+        if self._modified:
+            return self._copy  # type: ignore
+        return self._source
+
+    @property
+    def was_modified(self) -> bool:
+        """Check if state was modified (copy was made).
+
+        Returns:
+            True if any mutation occurred, False otherwise
+        """
+        return self._modified
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to regular dictionary.
+
+        Returns:
+            Dictionary copy of the current state
+        """
+        return dict(self.get_state())
+
+    def __repr__(self) -> str:
+        """String representation for debugging.
+
+        Returns:
+            Debug string showing modification status
+        """
+        status = "modified" if self._modified else "unmodified"
+        return f"CopyOnWriteState({status}, keys={list(self.keys())})"
+
+
 class EdgeType(Enum):
     """Types of edges in the graph."""
 
@@ -112,8 +373,14 @@ class EdgeType(Enum):
     CONDITIONAL = "conditional"
 
 
-class NodeStatus(Enum):
-    """Execution status of a node."""
+class FrameworkNodeStatus(Enum):
+    """Execution status of a framework graph node.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - FrameworkNodeStatus (here): Framework graph node status
+    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
+    - ExecutorNodeStatus (victor.workflows.executor): Executor node status
+    """
 
     PENDING = "pending"
     RUNNING = "running"
@@ -226,8 +493,14 @@ class Node:
 
 
 @dataclass
-class Checkpoint:
-    """Checkpoint for workflow state persistence.
+class WorkflowCheckpoint:
+    """WorkflowCheckpoint for workflow state persistence (StateGraph DSL).
+
+    Renamed from Checkpoint to be semantically distinct:
+    - GitCheckpoint (victor.agent.checkpoints): Git stash-based
+    - ExecutionCheckpoint (victor.agent.time_aware_executor): Time/progress tracking
+    - WorkflowCheckpoint (here): Workflow state with thread_id/node_id
+    - HITLCheckpoint (victor.framework.hitl): Human-in-the-loop pause/resume
 
     Attributes:
         checkpoint_id: Unique checkpoint identifier
@@ -257,7 +530,7 @@ class Checkpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Checkpoint":
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowCheckpoint":
         """Deserialize checkpoint from dictionary."""
         return cls(
             checkpoint_id=data["checkpoint_id"],
@@ -272,15 +545,15 @@ class Checkpoint:
 class CheckpointerProtocol(Protocol):
     """Protocol for checkpoint persistence."""
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save a checkpoint."""
         ...
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint for thread."""
         ...
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         ...
 
@@ -292,20 +565,20 @@ class MemoryCheckpointer:
     """
 
     def __init__(self):
-        self._checkpoints: Dict[str, List[Checkpoint]] = {}
+        self._checkpoints: Dict[str, List[WorkflowCheckpoint]] = {}
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save checkpoint to memory."""
         if checkpoint.thread_id not in self._checkpoints:
             self._checkpoints[checkpoint.thread_id] = []
         self._checkpoints[checkpoint.thread_id].append(checkpoint)
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint."""
         checkpoints = self._checkpoints.get(thread_id, [])
         return checkpoints[-1] if checkpoints else None
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints."""
         return self._checkpoints.get(thread_id, [])
 
@@ -334,7 +607,7 @@ class RLCheckpointerAdapter:
             self._store = get_checkpoint_store()
         return self._store
 
-    async def save(self, checkpoint: Checkpoint) -> None:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save checkpoint using RL checkpoint store."""
         store = self._get_store()
         # Convert to PolicyCheckpoint format
@@ -349,14 +622,14 @@ class RLCheckpointerAdapter:
             metadata=checkpoint.metadata,
         )
 
-    async def load(self, thread_id: str) -> Optional[Checkpoint]:
+    async def load(self, thread_id: str) -> Optional[WorkflowCheckpoint]:
         """Load latest checkpoint from RL checkpoint store."""
         store = self._get_store()
         policy_cp = store.get_latest_checkpoint(f"{self.learner_name}_{thread_id}")
         if not policy_cp:
             return None
 
-        return Checkpoint(
+        return WorkflowCheckpoint(
             checkpoint_id=policy_cp.version,
             thread_id=thread_id,
             node_id=policy_cp.state.get("node_id", ""),
@@ -365,13 +638,13 @@ class RLCheckpointerAdapter:
             metadata=policy_cp.metadata,
         )
 
-    async def list(self, thread_id: str) -> List[Checkpoint]:
+    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         store = self._get_store()
         policy_cps = store.list_checkpoints(f"{self.learner_name}_{thread_id}")
 
         return [
-            Checkpoint(
+            WorkflowCheckpoint(
                 checkpoint_id=cp.version,
                 thread_id=thread_id,
                 node_id=cp.state.get("node_id", ""),
@@ -394,6 +667,9 @@ class GraphConfig:
         recursion_limit: Maximum recursion depth
         interrupt_before: Nodes to interrupt before execution
         interrupt_after: Nodes to interrupt after execution
+        use_copy_on_write: Enable copy-on-write state optimization (default: None uses settings)
+        emit_events: Enable EventBus integration for observability (default: True)
+        graph_id: Optional identifier for this graph execution
     """
 
     max_iterations: int = 25
@@ -402,6 +678,9 @@ class GraphConfig:
     recursion_limit: int = 100
     interrupt_before: List[str] = field(default_factory=list)
     interrupt_after: List[str] = field(default_factory=list)
+    use_copy_on_write: Optional[bool] = None  # None = use settings default
+    emit_events: bool = True  # Enable EventBus observability integration
+    graph_id: Optional[str] = None  # Optional identifier for event correlation
 
 
 @dataclass
@@ -455,6 +734,63 @@ class CompiledGraph(Generic[StateType]):
         self._state_schema = state_schema
         self._config = config or GraphConfig()
 
+    def _should_use_cow(self, exec_config: GraphConfig) -> bool:
+        """Determine if copy-on-write should be used.
+
+        Args:
+            exec_config: Execution configuration
+
+        Returns:
+            True if COW should be enabled
+        """
+        # Explicit config takes precedence
+        if exec_config.use_copy_on_write is not None:
+            return exec_config.use_copy_on_write
+
+        # Fall back to settings
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            return settings.stategraph_copy_on_write_enabled
+        except Exception:
+            # Default to True if settings can't be loaded
+            return True
+
+    def _emit_event(
+        self,
+        event_type: str,
+        graph_id: str,
+        data: Dict[str, Any],
+        emit_events: bool,
+    ) -> None:
+        """Emit an event to the EventBus for observability.
+
+        Args:
+            event_type: Type of event (graph_started, node_start, etc.)
+            graph_id: Graph execution identifier
+            data: Event payload data
+            emit_events: Whether to emit events (from config)
+        """
+        if not emit_events:
+            return
+
+        try:
+            from victor.observability.event_bus import get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                event_type,
+                {
+                    "graph_id": graph_id,
+                    "source": "StateGraph",
+                    **data,
+                },
+            )
+        except Exception as e:
+            # Don't let event emission failures break graph execution
+            logger.debug(f"Failed to emit {event_type} event: {e}")
+
     async def invoke(
         self,
         input_state: StateType,
@@ -474,6 +810,7 @@ class CompiledGraph(Generic[StateType]):
         """
         exec_config = config or self._config
         thread_id = thread_id or uuid.uuid4().hex
+        use_cow = self._should_use_cow(exec_config)
 
         # Check for checkpoint to resume from
         if exec_config.checkpointer:
@@ -493,6 +830,19 @@ class CompiledGraph(Generic[StateType]):
         iterations = 0
         node_history: List[str] = []
         visited_count: Dict[str, int] = {}
+        graph_id = exec_config.graph_id or thread_id
+
+        # Emit graph started event for observability
+        self._emit_event(
+            "graph_started",
+            graph_id,
+            {
+                "entry_point": self._entry_point,
+                "node_count": len(self._nodes),
+                "thread_id": thread_id,
+            },
+            exec_config.emit_events,
+        )
 
         try:
             while current_node != END:
@@ -552,23 +902,78 @@ class CompiledGraph(Generic[StateType]):
                 logger.debug(f"Executing node: {current_node}")
                 node_history.append(current_node)
 
-                # Execute with timeout
-                if exec_config.timeout:
-                    remaining = exec_config.timeout - (time.time() - start_time)
-                    if remaining <= 0:
-                        return ExecutionResult(
-                            state=state,
-                            success=False,
-                            error="Execution timeout",
-                            iterations=iterations,
-                            duration=time.time() - start_time,
-                            node_history=node_history,
-                        )
-                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
-                else:
-                    state = await node.execute(state)
+                # Emit node_start event for observability
+                node_start_time = time.time()
+                self._emit_event(
+                    "node_start",
+                    graph_id,
+                    {
+                        "node_id": current_node,
+                        "iteration": iterations,
+                    },
+                    exec_config.emit_events,
+                )
 
-                # Checkpoint after execution
+                # Execute with timeout, optionally using copy-on-write
+                if use_cow:
+                    # Wrap state in COW wrapper for efficient read-heavy nodes
+                    cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
+                    if exec_config.timeout:
+                        remaining = exec_config.timeout - (time.time() - start_time)
+                        if remaining <= 0:
+                            return ExecutionResult(
+                                state=state,
+                                success=False,
+                                error="Execution timeout",
+                                iterations=iterations,
+                                duration=time.time() - start_time,
+                                node_history=node_history,
+                            )
+                        result = await asyncio.wait_for(
+                            node.execute(cow_state), timeout=remaining  # type: ignore
+                        )
+                    else:
+                        result = await node.execute(cow_state)  # type: ignore
+
+                    # Extract final state from COW wrapper or result
+                    if isinstance(result, CopyOnWriteState):
+                        state = result.get_state()
+                    elif isinstance(result, dict):
+                        state = result
+                    else:
+                        # Node returned something else, use COW state
+                        state = cow_state.get_state()
+                else:
+                    # Traditional deep copy approach
+                    if exec_config.timeout:
+                        remaining = exec_config.timeout - (time.time() - start_time)
+                        if remaining <= 0:
+                            return ExecutionResult(
+                                state=state,
+                                success=False,
+                                error="Execution timeout",
+                                iterations=iterations,
+                                duration=time.time() - start_time,
+                                node_history=node_history,
+                            )
+                        state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                    else:
+                        state = await node.execute(state)
+
+                # Emit node_end event for observability
+                self._emit_event(
+                    "node_end",
+                    graph_id,
+                    {
+                        "node_id": current_node,
+                        "iteration": iterations,
+                        "duration": time.time() - node_start_time,
+                        "success": True,
+                    },
+                    exec_config.emit_events,
+                )
+
+                # WorkflowCheckpoint after execution
                 if exec_config.checkpointer:
                     await self._save_checkpoint(
                         exec_config.checkpointer, thread_id, current_node, state
@@ -595,6 +1000,19 @@ class CompiledGraph(Generic[StateType]):
                 duration=time.time() - start_time,
             )
 
+            # Emit graph_completed event for observability
+            self._emit_event(
+                "graph_completed",
+                graph_id,
+                {
+                    "success": True,
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                    "node_count": len(node_history),
+                },
+                exec_config.emit_events,
+            )
+
             return ExecutionResult(
                 state=state,
                 success=True,
@@ -604,6 +1022,17 @@ class CompiledGraph(Generic[StateType]):
             )
 
         except asyncio.TimeoutError:
+            # Emit graph_error event for observability
+            self._emit_event(
+                "graph_error",
+                graph_id,
+                {
+                    "error": "Execution timeout",
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                },
+                exec_config.emit_events,
+            )
             return ExecutionResult(
                 state=state,
                 success=False,
@@ -615,6 +1044,17 @@ class CompiledGraph(Generic[StateType]):
 
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
+            # Emit graph_error event for observability
+            self._emit_event(
+                "graph_error",
+                graph_id,
+                {
+                    "error": str(e),
+                    "iterations": iterations,
+                    "duration": time.time() - start_time,
+                },
+                exec_config.emit_events,
+            )
             return ExecutionResult(
                 state=state,
                 success=False,
@@ -664,7 +1104,7 @@ class CompiledGraph(Generic[StateType]):
             node_id: Current node ID
             state: Current state
         """
-        checkpoint = Checkpoint(
+        checkpoint = WorkflowCheckpoint(
             checkpoint_id=uuid.uuid4().hex,
             thread_id=thread_id,
             node_id=node_id,
@@ -1039,12 +1479,14 @@ __all__ = [
     "Node",
     "Edge",
     "EdgeType",
-    "NodeStatus",
+    "FrameworkNodeStatus",
+    # State management
+    "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     # Execution
     "ExecutionResult",
     "GraphConfig",
     # Checkpointing
-    "Checkpoint",
+    "WorkflowCheckpoint",
     "CheckpointerProtocol",
     "MemoryCheckpointer",
     "RLCheckpointerAdapter",  # Uses existing RL CheckpointStore

@@ -259,11 +259,11 @@ class TestCliConfirmationCallback:
     async def test_confirmation_callback_prompts_user(self):
         """Test that callback prompts user for confirmation."""
         from victor.ui.commands.utils import cli_confirmation_callback
-        from victor.agent.safety import ConfirmationRequest, RiskLevel
+        from victor.agent.safety import ConfirmationRequest, OperationalRiskLevel
 
         request = ConfirmationRequest(
             tool_name="test_tool",
-            risk_level=RiskLevel.MEDIUM,
+            risk_level=OperationalRiskLevel.MEDIUM,
             description="Test action",
             details=["Detail 1", "Detail 2"],
             arguments={"param": "value"},
@@ -278,11 +278,11 @@ class TestCliConfirmationCallback:
     async def test_confirmation_callback_user_declines(self):
         """Test callback when user declines."""
         from victor.ui.commands.utils import cli_confirmation_callback
-        from victor.agent.safety import ConfirmationRequest, RiskLevel
+        from victor.agent.safety import ConfirmationRequest, OperationalRiskLevel
 
         request = ConfirmationRequest(
             tool_name="test_tool",
-            risk_level=RiskLevel.HIGH,
+            risk_level=OperationalRiskLevel.HIGH,
             description="Dangerous action",
             details=[],
             arguments={},
@@ -296,11 +296,11 @@ class TestCliConfirmationCallback:
     async def test_confirmation_callback_keyboard_interrupt(self):
         """Test callback handles KeyboardInterrupt."""
         from victor.ui.commands.utils import cli_confirmation_callback
-        from victor.agent.safety import ConfirmationRequest, RiskLevel
+        from victor.agent.safety import ConfirmationRequest, OperationalRiskLevel
 
         request = ConfirmationRequest(
             tool_name="test_tool",
-            risk_level=RiskLevel.LOW,
+            risk_level=OperationalRiskLevel.LOW,
             description="Test action",
             details=[],
             arguments={},
@@ -314,11 +314,11 @@ class TestCliConfirmationCallback:
     async def test_confirmation_callback_eof_error(self):
         """Test callback handles EOFError."""
         from victor.ui.commands.utils import cli_confirmation_callback
-        from victor.agent.safety import ConfirmationRequest, RiskLevel
+        from victor.agent.safety import ConfirmationRequest, OperationalRiskLevel
 
         request = ConfirmationRequest(
             tool_name="test_tool",
-            risk_level=RiskLevel.SAFE,
+            risk_level=OperationalRiskLevel.SAFE,
             description="Safe action",
             details=[],
             arguments={},
@@ -332,9 +332,9 @@ class TestCliConfirmationCallback:
     async def test_confirmation_callback_risk_levels(self):
         """Test callback handles all risk levels."""
         from victor.ui.commands.utils import cli_confirmation_callback
-        from victor.agent.safety import ConfirmationRequest, RiskLevel
+        from victor.agent.safety import ConfirmationRequest, OperationalRiskLevel
 
-        for level in RiskLevel:
+        for level in OperationalRiskLevel:
             request = ConfirmationRequest(
                 tool_name="test_tool",
                 risk_level=level,

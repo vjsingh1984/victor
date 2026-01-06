@@ -126,14 +126,14 @@ When a tag matching `v*` is pushed, GitHub Actions automatically:
 - Linux: Use `pip install victor-ai` (PyInstaller + PyTorch too complex)
 
 **Docker Images:**
-- `vjsingh1984/victor:<version>`
-- `vjsingh1984/victor:latest`
+- `vjsingh1984/victor-ai:<version>`
+- `vjsingh1984/victor-ai:latest`
 
 ### 3. Publishes to Distribution Channels
 
 - **PyPI**: Automatic via trusted publishing (OIDC, no token needed)
 - **GitHub Releases**: Creates release with artifacts and checksums
-- **Docker Hub**: Pushes images to `vjsingh1984/victor`
+- **Docker Hub**: Pushes images to `vjsingh1984/victor-ai`
 - **Homebrew**: Auto-updates via PyPI polling (every 6 hours)
 
 ### Required Secrets
@@ -184,12 +184,12 @@ ls dist/
 
 ```bash
 # Build
-docker build -t vjsingh1984/victor:0.2.3 .
-docker tag vjsingh1984/victor:0.2.3 vjsingh1984/victor:latest
+docker build -t vjsingh1984/victor-ai:0.2.3 .
+docker tag vjsingh1984/victor-ai:0.2.3 vjsingh1984/victor-ai:latest
 
 # Push
-docker push vjsingh1984/victor:0.2.3
-docker push vjsingh1984/victor:latest
+docker push vjsingh1984/victor-ai:0.2.3
+docker push vjsingh1984/victor-ai:latest
 ```
 
 ### Create GitHub Release
@@ -215,8 +215,8 @@ docker push vjsingh1984/victor:latest
 - **Contains**: Source code, binaries, changelog
 
 ### Docker Hub
-- **URL**: https://hub.docker.com/r/vjsingh1984/victor
-- **Pull**: `docker pull vjsingh1984/victor:latest`
+- **URL**: https://hub.docker.com/r/vjsingh1984/victor-ai
+- **Pull**: `docker pull vjsingh1984/victor-ai:latest`
 
 ### Homebrew
 - **Tap**: `vjsingh1984/tap`
@@ -235,8 +235,8 @@ After a successful release:
 
 2. **Test Docker Image**
    ```bash
-   docker pull vjsingh1984/victor:0.2.3
-   docker run vjsingh1984/victor:0.2.3 victor --version
+   docker pull vjsingh1984/victor-ai:0.2.3
+   docker run vjsingh1984/victor-ai:0.2.3 victor --version
    ```
 
 3. **Update Documentation**
@@ -345,7 +345,7 @@ pip install -e ".[build]"
 | `victor-macos-arm64.tar.gz` | GitHub | macOS Apple Silicon binary |
 | `victor-macos-x64.tar.gz` | GitHub | macOS Intel binary |
 | `victor-windows-x64.zip` | GitHub | Windows binary |
-| `vjsingh1984/victor:0.2.3` | Docker Hub | Docker image |
+| `vjsingh1984/victor-ai:0.2.3` | Docker Hub | Docker image |
 | `checksums.txt` | GitHub | SHA256 checksums |
 
 ## See Also

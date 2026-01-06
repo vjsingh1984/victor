@@ -1,0 +1,386 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# SWE-bench Evaluation Workflow
+# =============================
+# Multi-stage workflow for SWE-bench style evaluations:
+# - Issue understanding and analysis
+# - Codebase exploration and search
+# - Implementation of fixes
+# - Solution verification and testing
+
+workflows:
+  swe_bench:
+    description: "SWE-bench style issue resolution with testing"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Understand the Issue
+      # =====================================================================
+      - id: understand_issue
+        type: agent
+        name: "Understand Issue"
+        role: analyst
+        goal: |
+          Analyze the issue/bug report to understand:
+          1. The core problem being described
+          2. Expected behavior vs actual behavior
+          3. Error messages or stack traces if provided
+          4. Potential affected components or files
+          5. Reproduction steps if available
+
+          Extract key information to guide the search and fix process.
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: issue_analysis
+        next: [search_codebase]
+
+      # =====================================================================
+      # Stage 2: Search Codebase
+      # =====================================================================
+      - id: search_codebase
+        type: agent
+        name: "Search Codebase"
+        role: researcher
+        goal: |
+          Search the codebase to locate relevant files and code:
+          1. Find files mentioned in the issue
+          2. Search for related functions, classes, or modules
+          3. Identify test files that exercise the affected code
+          4. Understand the code structure and dependencies
+          5. Locate where the bug might be occurring
+
+          Build a complete picture of the affected code areas.
+        tool_budget: 40
+        tools: [grep, glob, read, semantic_search]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          analysis: issue_analysis
+        output: codebase_analysis
+        next: [check_complexity]
+
+      - id: check_complexity
+        type: condition
+        name: "Check Task Complexity"
+        condition: "code_complexity_check"
+        branches:
+          "simple": implement_fix
+          "medium": implement_fix
+          "complex": plan_implementation
+
+      - id: plan_implementation
+        type: agent
+        name: "Plan Implementation"
+        role: planner
+        goal: |
+          For complex changes, create a detailed implementation plan:
+          1. List all files that need modification
+          2. Define the order of changes
+          3. Identify potential side effects
+          4. Plan for test updates if needed
+          5. Consider backwards compatibility
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.3
+        output: implementation_plan
+        next: [implement_fix]
+
+      # =====================================================================
+      # Stage 3: Implement Fix
+      # =====================================================================
+      - id: implement_fix
+        type: agent
+        name: "Implement Fix"
+        role: executor
+        goal: |
+          Implement the fix for the issue:
+          1. Make minimal, focused changes to fix the bug
+          2. Follow existing code style and conventions
+          3. Add or update comments where helpful
+          4. Ensure changes don't break existing functionality
+          5. Update related test cases if necessary
+
+          Focus on correctness and maintainability.
+        tool_budget: 50
+        tools: [read, edit, write, grep, glob]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          analysis: issue_analysis
+          codebase: codebase_analysis
+          plan: implementation_plan
+        output: implementation_result
+        next: [verify_solution]
+
+      # =====================================================================
+      # Stage 4: Verify Solution
+      # =====================================================================
+      - id: verify_solution
+        type: compute
+        name: "Run Tests"
+        handler: test_runner
+        tools: [shell]
+        inputs:
+          test_command: $ctx.test_command
+          timeout: $ctx.test_timeout
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_test_status]
+
+      - id: check_test_status
+        type: condition
+        name: "Check Test Results"
+        condition: "test_execution_status"
+        branches:
+          "all_pass": quality_check
+          "partial_pass": analyze_failures
+          "all_fail": analyze_failures
+          "error": handle_test_error
+
+      - id: handle_test_error
+        type: agent
+        name: "Handle Test Error"
+        role: analyst
+        goal: |
+          Analyze the test execution error:
+          1. Identify what went wrong (syntax error, import error, etc.)
+          2. Determine if this is a test infrastructure issue
+          3. Propose a fix for the error
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: error_analysis
+        next: [should_retry]
+
+      - id: analyze_failures
+        type: transform
+        name: "Analyze Test Failures"
+        transform: "extract_error_patterns"
+        next: [should_retry]
+
+      - id: should_retry
+        type: condition
+        name: "Should Continue Fixing"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": refine_fix
+          "escalate": escalate_to_human
+          "submit_best_effort": quality_check
+
+      - id: refine_fix
+        type: agent
+        name: "Refine Fix"
+        role: executor
+        goal: |
+          Refine the implementation based on test failures:
+          1. Analyze the failing test cases
+          2. Identify what's still broken
+          3. Make targeted fixes
+          4. Avoid breaking passing tests
+
+          Error patterns identified:
+          {error_patterns}
+        tool_budget: 40
+        tools: [read, edit, grep]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          failures: failures
+          patterns: error_patterns
+        output: refined_implementation
+        next: [increment_iteration]
+
+      - id: increment_iteration
+        type: transform
+        name: "Track Iteration"
+        transform: |
+          fix_iterations = (fix_iterations or 0) + 1
+          progress_made = (pass_rate > previous_pass_rate) if previous_pass_rate else true
+          previous_pass_rate = pass_rate
+        next: [verify_solution]
+
+      - id: escalate_to_human
+        type: hitl
+        name: "Escalate to Human"
+        hitl_type: input
+        prompt: |
+          ## Unable to Automatically Fix
+
+          **Issue:** {issue_summary}
+
+          **Attempts Made:** {fix_iterations}
+
+          **Current Status:**
+          - Pass Rate: {pass_rate}%
+          - Dominant Error: {dominant_error_type}
+
+          **Last Error:**
+          {error_patterns}
+
+          Options:
+          1. Continue with more attempts
+          2. Submit current best effort
+          3. Abort task
+        context_keys:
+          - issue_summary
+          - fix_iterations
+          - pass_rate
+          - dominant_error_type
+          - error_patterns
+        timeout: 600
+        fallback: continue
+        next: [handle_escalation]
+
+      - id: handle_escalation
+        type: condition
+        name: "Handle Escalation Decision"
+        condition: "escalation_decision"
+        branches:
+          "continue": refine_fix
+          "submit": quality_check
+          "abort": complete_failed
+
+      # =====================================================================
+      # Stage 5: Quality Check
+      # =====================================================================
+      - id: quality_check
+        type: condition
+        name: "Solution Quality Check"
+        condition: "solution_quality_check"
+        branches:
+          "high_quality": format_output
+          "acceptable": format_output
+          "needs_improvement": final_review
+
+      - id: final_review
+        type: agent
+        name: "Final Review"
+        role: analyst
+        goal: |
+          Perform a final review of the solution:
+          1. Check for obvious issues
+          2. Verify code style consistency
+          3. Ensure documentation is updated
+          4. Confirm test coverage
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: review_notes
+        next: [format_output]
+
+      # =====================================================================
+      # Stage 6: Output Formatting
+      # =====================================================================
+      - id: format_output
+        type: transform
+        name: "Format Solution Output"
+        transform: "format_solution_output"
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Task Complete"
+        transform: |
+          status = "completed"
+          completion_time = current_timestamp()
+
+      - id: complete_failed
+        type: transform
+        name: "Task Failed"
+        transform: |
+          status = "failed"
+          completion_time = current_timestamp()
+
+
+  # =========================================================================
+  # SWE-bench Lite (Simplified workflow)
+  # =========================================================================
+  swe_bench_lite:
+    description: "Simplified SWE-bench workflow for faster evaluation"
+
+    metadata:
+      vertical: benchmark
+
+    nodes:
+      - id: understand_and_search
+        type: agent
+        name: "Understand and Search"
+        role: researcher
+        goal: |
+          Quickly analyze the issue and locate relevant code:
+          1. Understand the core problem
+          2. Find the affected files
+          3. Identify the fix location
+        tool_budget: 30
+        tools: [read, grep, glob, semantic_search]
+        llm_config:
+          temperature: 0.2
+        output: analysis
+        next: [implement]
+
+      - id: implement
+        type: agent
+        name: "Implement Fix"
+        role: executor
+        goal: |
+          Implement a minimal fix for the issue.
+          Make focused, targeted changes.
+        tool_budget: 40
+        tools: [read, edit, write, grep]
+        llm_config:
+          temperature: 0.1
+        output: implementation
+        next: [test]
+
+      - id: test
+        type: compute
+        name: "Run Tests"
+        handler: test_runner
+        tools: [shell]
+        inputs:
+          test_command: $ctx.test_command
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 180
+        next: [check_result]
+
+      - id: check_result
+        type: condition
+        name: "Check Result"
+        condition: "test_execution_status"
+        branches:
+          "all_pass": done
+          "partial_pass": done
+          "all_fail": done
+          "error": done
+
+      - id: done
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"

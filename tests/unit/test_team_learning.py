@@ -21,11 +21,8 @@ import pytest
 from victor.core.database import reset_database, get_database
 from victor.agent.subagents import SubAgentRole
 from victor.agent.teams import (
-    TeamFormation,
     TeamMember,
     TeamConfig,
-    MemberResult,
-    TeamResult,
     TaskCategory,
     TeamMetrics,
     CompositionStats,
@@ -33,6 +30,11 @@ from victor.agent.teams import (
     TeamRecommendation,
     TeamCompositionLearner,
     DEFAULT_COMPOSITIONS,
+)
+from victor.teams import (
+    TeamFormation,
+    MemberResult,
+    TeamResult,
 )
 
 
@@ -116,7 +118,7 @@ class TestTeamMetrics:
             },
             total_tool_calls=13,
             total_duration=25.0,
-            formation_used=TeamFormation.SEQUENTIAL,
+            formation=TeamFormation.SEQUENTIAL,
         )
 
     def _create_sample_config(self) -> TeamConfig:
@@ -421,7 +423,7 @@ class TestTeamCompositionLearner:
             },
             total_tool_calls=10,
             total_duration=30.0,
-            formation_used=TeamFormation.SEQUENTIAL,
+            formation=TeamFormation.SEQUENTIAL,
         )
 
         learner.record_team_outcome("Implement feature", config, result)
@@ -462,7 +464,7 @@ class TestTeamCompositionLearner:
                 },
                 total_tool_calls=8,
                 total_duration=25.0,
-                formation_used=TeamFormation.SEQUENTIAL,
+                formation=TeamFormation.SEQUENTIAL,
             )
             learner.record_team_outcome("Implement feature", config, result)
 
@@ -514,7 +516,7 @@ class TestTeamCompositionLearner:
             },
             total_tool_calls=10,
             total_duration=30.0,
-            formation_used=TeamFormation.SEQUENTIAL,
+            formation=TeamFormation.SEQUENTIAL,
         )
 
         learner.record_team_outcome("Create task", config, result)

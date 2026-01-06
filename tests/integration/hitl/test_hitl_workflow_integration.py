@@ -39,7 +39,7 @@ from victor.workflows.hitl import (
 from victor.workflows.definition import (
     WorkflowBuilder,
     WorkflowDefinition,
-    NodeType,
+    WorkflowNodeType,
     ConditionNode,
 )
 
@@ -76,7 +76,7 @@ class TestHITLNodesInWorkflowGraphs:
         # Verify HITL node
         hitl_node = workflow.get_node("approve_changes")
         assert hitl_node is not None
-        assert hitl_node.node_type == NodeType.HITL
+        assert hitl_node.node_type == WorkflowNodeType.HITL
         assert isinstance(hitl_node, HITLNode)
         assert hitl_node.hitl_type == HITLNodeType.APPROVAL
         assert hitl_node.prompt == "Do you approve these changes?"
@@ -454,7 +454,7 @@ class TestHITLCombinedWithConditionalEdges:
 
         # Verify structure
         assert len(workflow.nodes) == 6
-        assert workflow.get_node("decide").node_type == NodeType.CONDITION
+        assert workflow.get_node("decide").node_type == WorkflowNodeType.CONDITION
 
     def test_workflow_with_condition_before_hitl(self):
         """Conditional edge can route to different HITL nodes."""

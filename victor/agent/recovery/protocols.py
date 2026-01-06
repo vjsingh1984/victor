@@ -72,10 +72,15 @@ class FailureType(Enum):
     RATE_LIMITED = auto()  # Provider rate limit hit
 
 
-class RecoveryAction(Enum):
+class StrategyRecoveryAction(Enum):
     """Actions that recovery strategies can recommend.
 
     Defines the vocabulary of recovery interventions.
+
+    Renamed from RecoveryAction to be semantically distinct:
+    - ErrorRecoveryAction (victor.agent.error_recovery): Tool error recovery (string values)
+    - StrategyRecoveryAction (here): Recovery strategy actions (auto enum values)
+    - OrchestratorRecoveryAction (victor.agent.orchestrator_recovery): Orchestrator recovery dataclass
     """
 
     CONTINUE = auto()  # No recovery needed, continue normally
@@ -87,6 +92,10 @@ class RecoveryAction(Enum):
     RETRY_WITH_TEMPLATE = auto()  # Retry with specific prompt template
     WAIT_AND_RETRY = auto()  # Wait for rate limit, then retry
     ABORT = auto()  # Give up and return error
+
+
+# Backward compatibility alias
+RecoveryAction = StrategyRecoveryAction
 
 
 @dataclass(frozen=True)

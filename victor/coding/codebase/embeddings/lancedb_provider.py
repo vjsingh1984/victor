@@ -41,7 +41,7 @@ except ImportError:
 from victor.coding.codebase.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
-    SearchResult,
+    EmbeddingSearchResult,
 )
 from victor.coding.codebase.embeddings.models import (
     BaseEmbeddingModel,
@@ -257,7 +257,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         query: str,
         limit: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Note: Content is not stored in LanceDB. Use the returned id (unified_id)
@@ -300,7 +300,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             unified_id = result.get("id", "")
 
             search_results.append(
-                SearchResult(
+                EmbeddingSearchResult(
                     file_path=result.get("file_path", ""),
                     symbol_name=result.get("symbol_name"),
                     # Content not stored - use unified_id for graph lookup

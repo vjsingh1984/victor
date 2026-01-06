@@ -53,8 +53,8 @@ from victor.providers.base import BaseProvider, CompletionResponse, Message, Str
 from victor.providers.registry import ProviderRegistry
 from victor.providers.resilience import (
     CircuitBreakerConfig,
+    ProviderRetryConfig,
     ResilientProvider,
-    RetryConfig,
 )
 from victor.providers.concurrency import (
     RequestQueue,
@@ -109,7 +109,7 @@ class ProviderConfig:
     # Resilience settings
     enable_resilience: bool = True
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
-    retry_config: Optional[RetryConfig] = None
+    retry_config: Optional[ProviderRetryConfig] = None
     fallback_providers: List["ProviderConfig"] = field(default_factory=list)
 
     # Rate limiting settings

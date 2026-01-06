@@ -176,16 +176,29 @@ DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, any]] = {
 class DevOpsToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for DevOps vertical.
 
+    .. deprecated::
+        Use ``create_vertical_tool_dependency_provider('devops')`` instead.
+        This class is maintained for backward compatibility.
+
     Loads configuration from tool_dependencies.yaml for infrastructure
     and CI/CD workflows. Extends YAMLToolDependencyProvider with
     DevOps-specific features.
 
     Uses canonical ToolNames constants for consistency.
 
+    Example:
+        # Preferred (new code):
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        provider = create_vertical_tool_dependency_provider("devops")
+
+        # Deprecated (backward compatible):
+        provider = DevOpsToolDependencyProvider()
+
     Migration Notes:
         - Configuration now loaded from YAML instead of hand-coded Python
         - All functionality preserved via YAMLToolDependencyProvider
         - Composed patterns remain in DEVOPS_COMPOSED_PATTERNS constant
+        - For new code, use create_vertical_tool_dependency_provider('devops')
     """
 
     def __init__(self):
@@ -195,7 +208,18 @@ class DevOpsToolDependencyProvider(YAMLToolDependencyProvider):
         This is important because the YAML uses distinct tool names like 'grep'
         (keyword search) and 'code_search' (semantic/AI search) that would
         otherwise be collapsed by the alias mapping.
+
+        .. deprecated::
+            Use ``create_vertical_tool_dependency_provider('devops')`` instead.
         """
+        import warnings
+
+        warnings.warn(
+            "DevOpsToolDependencyProvider is deprecated. "
+            "Use create_vertical_tool_dependency_provider('devops') instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             yaml_path=_YAML_CONFIG_PATH,
             canonicalize=False,

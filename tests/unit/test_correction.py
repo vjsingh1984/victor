@@ -21,7 +21,7 @@ import pytest
 from victor.evaluation.correction import (
     # Types
     Language,
-    ValidationResult,
+    CodeValidationResult,
     CorrectionFeedback,
     # Base
     ValidatorCapabilities,
@@ -84,12 +84,12 @@ class TestLanguageEnum:
         assert Language.from_string("") == Language.UNKNOWN
 
 
-class TestValidationResult:
-    """Tests for ValidationResult dataclass."""
+class TestCodeValidationResult:
+    """Tests for CodeValidationResult dataclass."""
 
     def test_default_values(self):
         """Test default values."""
-        result = ValidationResult(valid=True)
+        result = CodeValidationResult(valid=True)
         assert result.valid is True
         assert result.language == Language.UNKNOWN
         assert result.syntax_valid is True
@@ -101,14 +101,14 @@ class TestValidationResult:
 
     def test_success_factory(self):
         """Test success factory method."""
-        result = ValidationResult.success(Language.PYTHON, used_ast=True)
+        result = CodeValidationResult.success(Language.PYTHON, used_ast=True)
         assert result.valid is True
         assert result.language == Language.PYTHON
         assert result.used_ast_validation is True
 
     def test_failure_factory(self):
         """Test failure factory method."""
-        result = ValidationResult.failure(
+        result = CodeValidationResult.failure(
             ["Error 1", "Error 2"], Language.PYTHON, syntax_error="SyntaxError: invalid syntax"
         )
         assert result.valid is False
@@ -119,14 +119,14 @@ class TestValidationResult:
 
     def test_with_warnings(self):
         """Test with_warnings method."""
-        result = ValidationResult.success(Language.PYTHON)
+        result = CodeValidationResult.success(Language.PYTHON)
         result_with_warnings = result.with_warnings(["Warning 1", "Warning 2"])
         assert result_with_warnings.warnings == ("Warning 1", "Warning 2")
         assert result.warnings == ()  # Original unchanged
 
     def test_immutability(self):
-        """Test that ValidationResult is frozen/immutable."""
-        result = ValidationResult(valid=True)
+        """Test that CodeValidationResult is frozen/immutable."""
+        result = CodeValidationResult(valid=True)
         with pytest.raises(AttributeError):
             result.valid = False
 
@@ -417,7 +417,7 @@ class TestGenericCodeValidator:
 
     def test_fix_returns_normalized(self):
         """Test fix returns code with normalized trailing newline."""
-        validation = ValidationResult.success()
+        validation = CodeValidationResult.success()
         fixed = self.validator.fix("original code", validation)
         # GenericCodeValidator.fix() ensures single trailing newline
         assert fixed == "original code\n"
@@ -467,14 +467,14 @@ class TestFeedbackGenerator:
 
     def test_generate_no_issues(self):
         """Test generate with no issues."""
-        validation = ValidationResult.success(Language.PYTHON)
+        validation = CodeValidationResult.success(Language.PYTHON)
         feedback = self.generator.generate("code", validation)
         assert feedback.has_issues is False
         assert feedback.language == Language.PYTHON
 
     def test_generate_with_syntax_error(self):
         """Test generate with syntax error."""
-        validation = ValidationResult.failure(
+        validation = CodeValidationResult.failure(
             ["Syntax error"], Language.PYTHON, syntax_error="Line 5: SyntaxError"
         )
         feedback = self.generator.generate("code", validation)
@@ -484,7 +484,7 @@ class TestFeedbackGenerator:
 
     def test_generate_with_test_failures(self):
         """Test generate with test failures."""
-        validation = ValidationResult.success(Language.PYTHON)
+        validation = CodeValidationResult.success(Language.PYTHON)
         feedback = self.generator.generate(
             "code",
             validation,
@@ -582,7 +582,7 @@ class TestSelfCorrector:
     def test_should_retry_under_limit(self):
         """Test should_retry under iteration limit."""
         corrector = SelfCorrector(max_iterations=3)
-        validation = ValidationResult.failure(["Error"])
+        validation = CodeValidationResult.failure(["Error"])
         assert corrector.should_retry(0, validation) is True
         assert corrector.should_retry(1, validation) is True
         assert corrector.should_retry(2, validation) is True
@@ -590,31 +590,31 @@ class TestSelfCorrector:
     def test_should_retry_at_limit(self):
         """Test should_retry at iteration limit."""
         corrector = SelfCorrector(max_iterations=3)
-        validation = ValidationResult.failure(["Error"])
+        validation = CodeValidationResult.failure(["Error"])
         assert corrector.should_retry(3, validation) is False
 
     def test_should_retry_validation_passed(self):
         """Test should_retry when validation passes."""
         corrector = SelfCorrector()
-        validation = ValidationResult.success()
+        validation = CodeValidationResult.success()
         assert corrector.should_retry(0, validation) is False
 
     def test_should_retry_tests_failed(self):
         """Test should_retry when tests fail."""
         corrector = SelfCorrector()
-        validation = ValidationResult.success()
+        validation = CodeValidationResult.success()
         assert corrector.should_retry(0, validation, test_passed=3, test_total=10) is True
 
     def test_should_retry_tests_passed(self):
         """Test should_retry when all tests pass."""
         corrector = SelfCorrector()
-        validation = ValidationResult.success()
+        validation = CodeValidationResult.success()
         assert corrector.should_retry(0, validation, test_passed=10, test_total=10) is False
 
     def test_generate_feedback(self):
         """Test generate_feedback method."""
         corrector = SelfCorrector()
-        validation = ValidationResult.failure(
+        validation = CodeValidationResult.failure(
             ["Error"], Language.PYTHON, syntax_error="SyntaxError"
         )
         feedback = corrector.generate_feedback("code", validation)
@@ -676,8 +676,8 @@ class TestCorrectionAttempt:
             iteration=0,
             timestamp=datetime.now(),
             duration_ms=100.0,
-            validation_before=ValidationResult.failure(["Error"]),
-            validation_after=ValidationResult.success(),
+            validation_before=CodeValidationResult.failure(["Error"]),
+            validation_after=CodeValidationResult.success(),
             test_passed_before=3,
             test_passed_after=10,
             test_total=10,
@@ -705,7 +705,7 @@ class TestCorrectionMetrics:
 
     def test_record_validation(self):
         """Test recording a validation."""
-        result = ValidationResult.failure(["Error"], syntax_error="Syntax error")
+        result = CodeValidationResult.failure(["Error"], syntax_error="Syntax error")
         self.metrics.record_validation(Language.PYTHON, result)
         assert self.metrics.total_validations == 1
         assert self.metrics.language_validations[Language.PYTHON] == 1
@@ -719,8 +719,8 @@ class TestCorrectionMetrics:
             iteration=0,
             timestamp=datetime.now(),
             duration_ms=100.0,
-            validation_before=ValidationResult.failure(["Error"]),
-            validation_after=ValidationResult.success(),
+            validation_before=CodeValidationResult.failure(["Error"]),
+            validation_after=CodeValidationResult.success(),
             test_passed_before=None,
             test_passed_after=None,
             test_total=None,
@@ -742,7 +742,7 @@ class TestCorrectionMetrics:
                 iteration=0,
                 timestamp=datetime.now(),
                 duration_ms=100.0,
-                validation_before=ValidationResult.failure(["Error"]),
+                validation_before=CodeValidationResult.failure(["Error"]),
                 validation_after=None,
                 test_passed_before=None,
                 test_passed_after=None,
@@ -760,8 +760,8 @@ class TestCorrectionMetrics:
             iteration=0,
             timestamp=datetime.now(),
             duration_ms=100.0,
-            validation_before=ValidationResult.failure(["Error"]),
-            validation_after=ValidationResult.success(),
+            validation_before=CodeValidationResult.failure(["Error"]),
+            validation_after=CodeValidationResult.success(),
             test_passed_before=None,
             test_passed_after=None,
             test_total=None,
@@ -798,13 +798,13 @@ class TestCorrectionMetricsCollector:
 
     def test_record_validation(self):
         """Test recording validation through collector."""
-        result = ValidationResult.success(Language.PYTHON)
+        result = CodeValidationResult.success(Language.PYTHON)
         self.collector.record_validation(Language.PYTHON, result)
         assert self.collector.metrics.total_validations == 1
 
     def test_track_correction_context_manager(self):
         """Test correction tracking context manager."""
-        validation_before = ValidationResult.failure(["Error"])
+        validation_before = CodeValidationResult.failure(["Error"])
 
         with self.collector.track_correction(
             task_id="task_1",
@@ -825,7 +825,7 @@ class TestCorrectionTracker:
     def test_tracker_records_timing(self):
         """Test that tracker records duration."""
         collector = CorrectionMetricsCollector()
-        validation_before = ValidationResult.failure(["Error"])
+        validation_before = CodeValidationResult.failure(["Error"])
 
         with collector.track_correction(
             task_id="task_1",
@@ -842,8 +842,8 @@ class TestCorrectionTracker:
     def test_tracker_set_result(self):
         """Test setting result on tracker."""
         collector = CorrectionMetricsCollector()
-        validation_before = ValidationResult.failure(["Error"])
-        validation_after = ValidationResult.success()
+        validation_before = CodeValidationResult.failure(["Error"])
+        validation_after = CodeValidationResult.success()
 
         with collector.track_correction(
             task_id="task_1",

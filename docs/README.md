@@ -1,46 +1,54 @@
 # Victor Documentation
 
-Short, task-focused docs for the Victor CLI and framework.
-
 ## Start Here
-- Quick Start: `guides/QUICKSTART.md`
-- 60‑Second Quickstart: `QUICKSTART_60S.md`
-- Installation: `guides/INSTALLATION.md`
-- First Run: `guides/FIRST_RUN.md`
-- User Guide: `USER_GUIDE.md`
 
-## Local-First Setup
-- Local Models: `guides/LOCAL_MODELS.md`
-- Provider Setup: `guides/PROVIDER_SETUP.md`
-- API Keys: `API_KEYS_CONFIGURATION.md`
-
-## Workflows & Tools
-- Tool Catalog: `TOOL_CATALOG.md`
-- Workflow DSL: `guides/WORKFLOW_DSL.md`
-- Verticals: `VERTICALS.md`
+| Doc | Audience | Content |
+|-----|----------|---------|
+| [Getting Started](getting-started.md) | New users | Install, first run, provider setup |
+| [User Guide](user-guide.md) | Daily users | Commands, modes, workflows |
 
 ## Reference
-- Providers: `reference/PROVIDERS.md`
-- Tool Calling: `reference/TOOL_CALLING.md`
-- Tool Migration: `reference/TOOL_MIGRATION.md`
-- Framework Migration: `FRAMEWORK_MIGRATION.md`
 
-## Enterprise
-- Enterprise evaluation: `ENTERPRISE.md`
-- Deployment appendix: `ENTERPRISE_DEPLOYMENT.md`
+| Doc | Content |
+|-----|---------|
+| [Provider Reference](reference/PROVIDERS.md) | All 21 providers: config, models, endpoints |
+| [Tool Catalog](TOOL_CATALOG.md) | All 55+ tools with parameters |
+| [Tool Calling](reference/TOOL_CALLING.md) | Provider-specific tool calling formats |
+
+## Guides
+
+| Guide | Topic |
+|-------|-------|
+| [Workflow DSL](guides/WORKFLOW_DSL.md) | YAML workflows, StateGraph |
+| [Workflow Scheduling](guides/WORKFLOW_SCHEDULER.md) | Cron, versioning, limits |
+| [Multi-Agent Teams](guides/MULTI_AGENT_TEAMS.md) | Team coordination, formations |
+| [Observability](guides/OBSERVABILITY.md) | EventBus, metrics, tracing |
+| [MCP Integration](guides/MCP_INTEGRATION.md) | MCP servers and clients |
+| [HITL Workflows](guides/HITL_WORKFLOWS.md) | Human-in-the-loop patterns |
+| [Resilience](guides/RESILIENCE.md) | Circuit breakers, retries, fallback |
 
 ## Development
-- Developer Guide: `DEVELOPER_GUIDE.md`
-- Plugin Guide: `guides/PLUGIN_GUIDE.md`
-- Testing Strategy: `TESTING_STRATEGY.md`
-- Releasing: `RELEASING.md`
+
+| Doc | Content |
+|-----|---------|
+| [Development Guide](development/README.md) | Setup, testing, patterns |
+| [Testing Strategy](TESTING_STRATEGY.md) | Fixtures, mocking, markers |
+| [Plugin Guide](guides/PLUGIN_GUIDE.md) | External verticals |
+| [Vertical Development](guides/VERTICAL_DEVELOPMENT.md) | Custom domain verticals |
+| [Releasing](RELEASING.md) | Version bumps, publishing |
 
 ## Architecture
-- Deep Dive: `ARCHITECTURE_DEEP_DIVE.md`
-- Deep Dive appendix: `ARCHITECTURE_DEEP_DIVE_APPENDIX.md`
-- State Machine: `STATE_MACHINE.md`
-- Embeddings: `embeddings/ARCHITECTURE.md`
-- Model comparison: `MODEL_COMPARISON.md`
 
-## Archive
-Historical documents live in `archive/`.
+| Doc | Content |
+|-----|---------|
+| [Architecture Deep Dive](ARCHITECTURE_DEEP_DIVE.md) | System internals |
+| [State Machine](STATE_MACHINE.md) | Conversation stages |
+| [Embeddings](embeddings.md) | Semantic search, tool selection |
+
+## Enterprise
+
+| Doc | Content |
+|-----|---------|
+| [Enterprise Evaluation](ENTERPRISE.md) | Security, compliance |
+| [Deployment](ENTERPRISE_DEPLOYMENT.md) | Production deployment |
+| [Air-Gapped Mode](embeddings/AIRGAPPED.md) | Offline operation |

@@ -34,8 +34,14 @@ import re
 logger = logging.getLogger(__name__)
 
 
-class RecoveryAction(Enum):
-    """Actions that can be taken to recover from an error."""
+class ErrorRecoveryAction(Enum):
+    """Actions that can be taken to recover from a tool error.
+
+    Renamed from RecoveryAction to be semantically distinct:
+    - ErrorRecoveryAction (here): Tool error recovery actions (string values)
+    - StrategyRecoveryAction (victor.agent.recovery.protocols): Recovery strategy actions (auto)
+    - OrchestratorRecoveryAction (victor.agent.orchestrator_recovery): Orchestrator recovery dataclass
+    """
 
     RETRY = "retry"
     RETRY_WITH_DEFAULTS = "retry_with_defaults"
@@ -44,6 +50,10 @@ class RecoveryAction(Enum):
     FALLBACK_TOOL = "fallback_tool"
     ASK_USER = "ask_user"
     ABORT = "abort"
+
+
+# Backward compatibility alias
+RecoveryAction = ErrorRecoveryAction
 
 
 @dataclass

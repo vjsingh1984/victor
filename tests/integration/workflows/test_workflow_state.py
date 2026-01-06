@@ -30,14 +30,14 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
-from victor.workflows.graph_dsl import StateGraph, State
+from victor.workflows.graph_dsl import WorkflowGraph, State
 from victor.workflows.definition import WorkflowBuilder, TransformNode
 from victor.workflows.executor import (
     WorkflowExecutor,
     WorkflowContext,
     WorkflowResult,
     NodeResult,
-    NodeStatus,
+    ExecutorNodeStatus,
 )
 
 
@@ -677,7 +677,7 @@ class TestWorkflowContextClass:
         context.add_result(
             NodeResult(
                 node_id="success_node",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
             )
         )
         assert context.has_failures() is False
@@ -686,7 +686,7 @@ class TestWorkflowContextClass:
         context.add_result(
             NodeResult(
                 node_id="failed_node",
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error="Test error",
             )
         )
@@ -700,21 +700,21 @@ class TestWorkflowContextClass:
         context.add_result(
             NodeResult(
                 node_id="node1",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"data": "output1"},
             )
         )
         context.add_result(
             NodeResult(
                 node_id="node2",
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"data": "output2"},
             )
         )
         context.add_result(
             NodeResult(
                 node_id="failed_node",
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 output=None,
             )
         )

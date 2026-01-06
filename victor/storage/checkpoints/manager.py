@@ -49,7 +49,7 @@ class CheckpointManager:
     - auto_checkpoint: Automatic checkpointing based on tool count
 
     Usage:
-        from victor.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+        from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
 
         backend = SQLiteCheckpointBackend()
         manager = CheckpointManager(backend)

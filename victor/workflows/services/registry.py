@@ -430,8 +430,298 @@ class ServiceContext:
         return self.registry.is_healthy(service_name)
 
 
+# =============================================================================
+# Restart Policy Enforcement
+# =============================================================================
+
+
+@dataclass
+class RestartAttempt:
+    """Record of a service restart attempt."""
+
+    timestamp: datetime
+    success: bool
+    error: Optional[str] = None
+
+
+class RestartPolicyEnforcer:
+    """Enforces restart policies for services.
+
+    Monitors service health and automatically restarts services
+    according to their configured restart policy. All verticals
+    (including third-party plugins) benefit from automatic service
+    recovery without manual intervention.
+
+    Restart policies:
+    - "no": Never restart (default)
+    - "on-failure": Restart only when service fails
+    - "always": Always restart unless explicitly stopped
+
+    Example:
+        enforcer = RestartPolicyEnforcer(registry)
+
+        # Check if service should restart
+        if enforcer.should_restart("postgres", exit_code=1):
+            await enforcer.restart_service("postgres")
+
+        # Start monitoring all services
+        await enforcer.start_monitoring(check_interval=10.0)
+    """
+
+    def __init__(self, registry: ServiceRegistry):
+        """Initialize restart policy enforcer.
+
+        Args:
+            registry: Service registry to monitor
+        """
+        self.registry = registry
+        self._restart_counts: Dict[str, int] = {}
+        self._restart_history: Dict[str, List[RestartAttempt]] = defaultdict(list)
+        self._monitoring = False
+        self._monitor_task: Optional[asyncio.Task] = None
+        self._manually_stopped: Set[str] = set()
+
+    def should_restart(
+        self,
+        service_name: str,
+        exit_code: Optional[int] = None,
+        was_manual_stop: bool = False,
+    ) -> bool:
+        """Determine if service should be restarted.
+
+        Args:
+            service_name: Service to check
+            exit_code: Exit code if service stopped (0 = success)
+            was_manual_stop: True if service was stopped intentionally
+
+        Returns:
+            True if service should be restarted
+        """
+        if was_manual_stop or service_name in self._manually_stopped:
+            return False
+
+        entry = self.registry.get_service(service_name)
+        if not entry:
+            return False
+
+        lifecycle = entry.config.lifecycle
+        policy = lifecycle.restart_policy
+        max_restarts = lifecycle.max_restarts
+
+        # Check restart limit
+        current_count = self._restart_counts.get(service_name, 0)
+        if current_count >= max_restarts:
+            logger.warning(
+                f"Service '{service_name}' reached max restarts "
+                f"({max_restarts}), not restarting"
+            )
+            return False
+
+        # Apply policy
+        if policy == "no":
+            return False
+        elif policy == "always":
+            return True
+        elif policy == "on-failure":
+            # Restart only if exit code indicates failure
+            return exit_code is None or exit_code != 0
+
+        return False
+
+    async def restart_service(
+        self,
+        service_name: str,
+        delay: float = 0.0,
+    ) -> bool:
+        """Restart a service.
+
+        Args:
+            service_name: Service to restart
+            delay: Delay before restart (for backoff)
+
+        Returns:
+            True if restart succeeded
+        """
+        entry = self.registry.get_service(service_name)
+        if not entry or not entry.config:
+            logger.error(f"Cannot restart unknown service: {service_name}")
+            return False
+
+        if delay > 0:
+            logger.info(f"Restarting '{service_name}' in {delay:.1f}s")
+            await asyncio.sleep(delay)
+
+        try:
+            # Increment restart count
+            self._restart_counts[service_name] = self._restart_counts.get(service_name, 0) + 1
+
+            # Stop if still running
+            if entry.handle and entry.handle.state == ServiceState.HEALTHY:
+                await self.registry.stop_service(service_name)
+
+            # Start again
+            await self.registry.start_service(
+                entry.config,
+                timeout=entry.config.lifecycle.startup_timeout,
+            )
+
+            # Record success
+            self._restart_history[service_name].append(
+                RestartAttempt(
+                    timestamp=datetime.now(),
+                    success=True,
+                )
+            )
+
+            logger.info(
+                f"Service '{service_name}' restarted successfully "
+                f"(attempt {self._restart_counts[service_name]})"
+            )
+            return True
+
+        except Exception as e:
+            self._restart_history[service_name].append(
+                RestartAttempt(
+                    timestamp=datetime.now(),
+                    success=False,
+                    error=str(e),
+                )
+            )
+            logger.error(f"Failed to restart '{service_name}': {e}")
+            return False
+
+    def get_restart_delay(self, service_name: str) -> float:
+        """Calculate delay before next restart (exponential backoff).
+
+        Args:
+            service_name: Service name
+
+        Returns:
+            Delay in seconds before next restart
+        """
+        count = self._restart_counts.get(service_name, 0)
+        base_delay = 1.0
+        max_delay = 60.0
+        delay = min(base_delay * (2**count), max_delay)
+        return delay
+
+    def reset_count(self, service_name: str) -> None:
+        """Reset restart count for a service.
+
+        Call when service has been healthy for a period.
+
+        Args:
+            service_name: Service to reset
+        """
+        self._restart_counts.pop(service_name, None)
+        logger.debug(f"Reset restart count for '{service_name}'")
+
+    def mark_manual_stop(self, service_name: str) -> None:
+        """Mark service as manually stopped (don't auto-restart).
+
+        Args:
+            service_name: Service that was manually stopped
+        """
+        self._manually_stopped.add(service_name)
+
+    def clear_manual_stop(self, service_name: str) -> None:
+        """Clear manual stop flag (allow auto-restart again).
+
+        Args:
+            service_name: Service to allow restarts for
+        """
+        self._manually_stopped.discard(service_name)
+
+    async def start_monitoring(
+        self,
+        check_interval: float = 10.0,
+        healthy_threshold: int = 3,
+    ) -> None:
+        """Start monitoring services for restart.
+
+        Args:
+            check_interval: Seconds between health checks
+            healthy_threshold: Consecutive healthy checks to reset count
+        """
+        if self._monitoring:
+            return
+
+        self._monitoring = True
+        self._monitor_task = asyncio.create_task(
+            self._monitor_loop(check_interval, healthy_threshold)
+        )
+        logger.info("Started service restart monitoring")
+
+    async def stop_monitoring(self) -> None:
+        """Stop monitoring services."""
+        self._monitoring = False
+        if self._monitor_task:
+            self._monitor_task.cancel()
+            try:
+                await self._monitor_task
+            except asyncio.CancelledError:
+                pass
+            self._monitor_task = None
+        logger.info("Stopped service restart monitoring")
+
+    async def _monitor_loop(
+        self,
+        check_interval: float,
+        healthy_threshold: int,
+    ) -> None:
+        """Main monitoring loop."""
+        healthy_counts: Dict[str, int] = defaultdict(int)
+
+        while self._monitoring:
+            await asyncio.sleep(check_interval)
+
+            for name, entry in self.registry._services.items():
+                if not entry.handle:
+                    continue
+
+                try:
+                    is_healthy = await self.registry._check_service_health(name)
+
+                    if is_healthy:
+                        healthy_counts[name] += 1
+                        # Reset restart count after sustained health
+                        if healthy_counts[name] >= healthy_threshold:
+                            self.reset_count(name)
+                            healthy_counts[name] = 0
+                    else:
+                        healthy_counts[name] = 0
+                        # Check if we should restart
+                        if self.should_restart(name, exit_code=1):
+                            delay = self.get_restart_delay(name)
+                            await self.restart_service(name, delay=delay)
+
+                except Exception as e:
+                    logger.error(f"Error checking health of '{name}': {e}")
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get restart policy enforcement statistics."""
+        return {
+            "monitoring": self._monitoring,
+            "restart_counts": dict(self._restart_counts),
+            "manually_stopped": list(self._manually_stopped),
+            "history": {
+                name: [
+                    {
+                        "timestamp": a.timestamp.isoformat(),
+                        "success": a.success,
+                        "error": a.error,
+                    }
+                    for a in attempts
+                ]
+                for name, attempts in self._restart_history.items()
+            },
+        }
+
+
 __all__ = [
     "ServiceRegistryEntry",
     "ServiceRegistry",
     "ServiceContext",
+    "RestartAttempt",
+    "RestartPolicyEnforcer",
 ]

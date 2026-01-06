@@ -91,14 +91,14 @@ def create_test_sqlite_db(db_path: Path, messages: list) -> None:
         conn.commit()
 
 
-class TestEmbeddingSearchResult:
-    """Tests for EmbeddingSearchResult dataclass."""
+class TestConversationEmbeddingSearchResult:
+    """Tests for ConversationEmbeddingSearchResult dataclass."""
 
     def test_creation(self):
         """Test creating a search result."""
-        from victor.agent.conversation_embedding_store import EmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
 
-        result = EmbeddingSearchResult(
+        result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
             session_id="session_456",
             similarity=0.85,
@@ -111,9 +111,9 @@ class TestEmbeddingSearchResult:
 
     def test_repr(self):
         """Test string representation."""
-        from victor.agent.conversation_embedding_store import EmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
 
-        result = EmbeddingSearchResult(
+        result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
             session_id="session_456",
             similarity=0.72,

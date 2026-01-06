@@ -27,7 +27,7 @@ Design Principles:
 - Observable: Statistics and monitoring support
 
 Example Usage:
-    from victor.cache.manager import get_cache_manager
+    from victor.storage.cache.manager import get_cache_manager
 
     # Get namespace-scoped cache
     cache = get_cache_manager()

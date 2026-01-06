@@ -32,8 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ToolCall:
-    """Record of a tool call."""
+class TrackedToolCall:
+    """Record of a tool call for deduplication tracking.
+
+    Different from victor.agent.tool_calling.base.ToolCall - this is specifically
+    for tracking recent calls to detect redundant operations.
+    """
 
     tool_name: str
     args: Dict[str, Any]
@@ -57,7 +61,7 @@ class ToolDeduplicationTracker:
 
         self.window_size = window_size
         self.similarity_threshold = similarity_threshold
-        self.recent_calls: Deque[ToolCall] = deque(maxlen=window_size)
+        self.recent_calls: Deque[TrackedToolCall] = deque(maxlen=window_size)
         # Use ContentHasher for consistent hashing across components
         # Tool calls need exact matching (no normalization) for precise deduplication
         self._hasher = ContentHasher(
@@ -86,7 +90,7 @@ class ToolDeduplicationTracker:
             tool_name: Name of the tool
             args: Tool arguments
         """
-        call = ToolCall(tool_name=tool_name, args=args)
+        call = TrackedToolCall(tool_name=tool_name, args=args)
         self.recent_calls.append(call)
         logger.debug(f"Tracking tool call: {tool_name}({self._format_args(args)})")
 
@@ -281,7 +285,7 @@ class ToolDeduplicationTracker:
             formatted.append(f"{key}={repr(value)}")
         return ", ".join(formatted)
 
-    def get_recent_calls(self, limit: Optional[int] = None) -> List[ToolCall]:
+    def get_recent_calls(self, limit: Optional[int] = None) -> List[TrackedToolCall]:
         """Get recent tool calls.
 
         Args:

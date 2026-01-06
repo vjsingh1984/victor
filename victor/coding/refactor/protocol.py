@@ -111,8 +111,14 @@ class SourceLocation:
 
 
 @dataclass
-class Symbol:
-    """A code symbol (function, class, variable, etc.)."""
+class RefactorSymbol:
+    """Code symbol for refactoring operations.
+
+    Renamed from Symbol to be semantically distinct:
+    - RefactorSymbol (here): Refactoring symbol with SourceLocation and references
+    - NativeSymbol (victor.native.protocols): Rust-extracted symbols (frozen)
+    - IndexedSymbol (victor.coding.codebase.indexer): Pydantic model for index storage
+    """
 
     name: str
     kind: str  # function, class, variable, parameter, etc.
@@ -129,6 +135,10 @@ class Symbol:
         if self.scope:
             return f"{self.scope}.{self.name}"
         return self.name
+
+
+# Backward compatibility alias
+Symbol = RefactorSymbol
 
 
 @dataclass

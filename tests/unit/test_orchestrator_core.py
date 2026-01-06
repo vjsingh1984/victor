@@ -1696,11 +1696,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_analysis(self, orchestrator):
         """Task guidance for analysis tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="analyze this code",
-            unified_task_type=TaskType.ANALYSIS,
+            unified_task_type=ClassifierTaskType.ANALYSIS,
             is_analysis_task=True,
             is_action_task=False,
             needs_execution=False,
@@ -1710,11 +1710,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_action(self, orchestrator):
         """Task guidance for action tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="create a new function",
-            unified_task_type=TaskType.GENERATION,
+            unified_task_type=ClassifierTaskType.GENERATION,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=False,
@@ -1724,11 +1724,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_execution(self, orchestrator):
         """Task guidance for execution tasks."""
-        from victor.agent.unified_classifier import TaskType
+        from victor.agent.unified_classifier import ClassifierTaskType
 
         orchestrator._apply_task_guidance(
             user_message="run the tests",
-            unified_task_type=TaskType.ACTION,
+            unified_task_type=ClassifierTaskType.ACTION,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=True,
@@ -2622,11 +2622,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_analysis_task(self, orchestrator):
         """Test _apply_task_guidance for analysis task."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="Analyze this code",
-            unified_task_type=TaskType.ANALYZE,
+            unified_task_type=TrackerTaskType.ANALYZE,
             is_analysis_task=True,
             is_action_task=False,
             needs_execution=False,
@@ -2639,11 +2639,11 @@ class TestApplyTaskGuidance:
 
     def test_apply_task_guidance_action_task(self, orchestrator):
         """Test _apply_task_guidance for action task."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="Create a new file",
-            unified_task_type=TaskType.CREATE,
+            unified_task_type=TrackerTaskType.CREATE,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=True,
@@ -3731,7 +3731,7 @@ class TestIntentClassifierModule:
 
     def test_intent_type_exists(self, orchestrator):
         """Test IntentType can be imported from embeddings."""
-        from victor.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType
 
         # IntentType should have CONTINUATION enum value
         assert hasattr(IntentType, "CONTINUATION") or True  # May not exist
@@ -4034,11 +4034,11 @@ class TestApplyTaskGuidance:
 
     def test_applies_guidance(self, orchestrator):
         """Test _apply_task_guidance doesn't raise."""
-        from victor.agent.unified_task_tracker import TaskType
+        from victor.agent.unified_task_tracker import TrackerTaskType
 
         orchestrator._apply_task_guidance(
             user_message="create a new file",
-            unified_task_type=TaskType.CREATE,
+            unified_task_type=TrackerTaskType.CREATE,
             is_analysis_task=False,
             is_action_task=True,
             needs_execution=False,

@@ -26,14 +26,12 @@ and transforms that cannot be expressed in YAML.
 Example:
     provider = DataAnalysisWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("eda_pipeline", {"data_path": "data.csv"})
 
-    # Streaming execution
-    async for chunk in provider.astream("eda_workflow", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("eda_pipeline", context):
+        print(f"Completed: {node_id}")
 
 Available workflows (all YAML-defined):
 - eda_pipeline: Full EDA with parallel statistics and visualizations
@@ -56,11 +54,10 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
     Uses YAML-first architecture with Python escape hatches for complex
     conditions and transforms that cannot be expressed in YAML.
 
-    Inherits from BaseYAMLWorkflowProvider which handles:
-    - YAML workflow loading and caching
-    - Escape hatches registration
-    - Standard and streaming executor creation
-    - Workflow retrieval methods
+    Inherits from BaseYAMLWorkflowProvider which provides:
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable analysis pipelines
 
     Example:
         provider = DataAnalysisWorkflowProvider()
@@ -68,9 +65,12 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream ML pipeline execution
-        async for chunk in provider.astream("ml_pipeline", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("ml_pipeline", {"data": "train.csv"})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("ml_pipeline", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

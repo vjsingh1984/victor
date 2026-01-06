@@ -22,17 +22,17 @@ from victor.observability.resilience import (
     BulkheadFullError,
     CircuitBreaker,
     CircuitBreakerError,
-    CircuitState,
     ConstantBackoff,
     ExponentialBackoff,
     LinearBackoff,
     RateLimiter,
     ResiliencePolicy,
-    RetryConfig,
+    ObservabilityRetryConfig,
     retry_with_backoff,
     with_timeout,
     TimeoutError,
 )
+from victor.providers.circuit_breaker import CircuitState
 
 
 # =============================================================================
@@ -511,7 +511,7 @@ class TestResiliencePolicy:
         """Test combined resilience policies."""
         policy = ResiliencePolicy(
             circuit_breaker=CircuitBreaker(failure_threshold=5),
-            retry_config=RetryConfig(max_retries=2, base_delay=0.01),
+            retry_config=ObservabilityRetryConfig(max_retries=2, base_delay=0.01),
             timeout=1.0,
         )
 
@@ -530,7 +530,7 @@ class TestResiliencePolicy:
 
         policy = ResiliencePolicy(
             circuit_breaker=CircuitBreaker(failure_threshold=10),
-            retry_config=RetryConfig(max_retries=2, base_delay=0.01),
+            retry_config=ObservabilityRetryConfig(max_retries=2, base_delay=0.01),
         )
 
         @policy

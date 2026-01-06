@@ -444,14 +444,14 @@ class WorkflowRuntime:
         Returns:
             True if workflow has HITL nodes
         """
-        from victor.workflows.definition import NodeType
+        from victor.workflows.definition import WorkflowNodeType
 
         # workflow.nodes is a Dict[str, WorkflowNode]
         nodes = workflow.nodes.values() if isinstance(workflow.nodes, dict) else workflow.nodes
         for node in nodes:
             # Check node type
             if hasattr(node, "node_type"):
-                if node.node_type == NodeType.HITL:
+                if node.node_type == WorkflowNodeType.HITL:
                     return True
             # Check if it's a HITLNode instance
             if node.__class__.__name__ == "HITLNode":

@@ -157,7 +157,7 @@ config = RAGAssistant.get_config()
 - SEC 10-K/10-Q filing ingestion for FAANG stocks
 - Project documentation ingestion
 
-See [RAG_DEMO.md](./guides/RAG_DEMO.md) for detailed usage examples.
+See `../examples/README.md` for usage examples.
 
 ## CLI Usage
 
@@ -525,4 +525,4 @@ victor chat --mode plan --vertical coding "Understand the caching system"
 - [STATE_MACHINE.md](./STATE_MACHINE.md) - Stage architecture details
 - [FRAMEWORK_MIGRATION.md](./FRAMEWORK_MIGRATION.md) - Migration guide for FrameworkShim
 - [Tool Catalog](./TOOL_CATALOG.md) - Complete tool reference
-- [Framework API](./API.md) - Agent creation with verticals
+- [Developer Guide](DEVELOPER_GUIDE.md) - Framework entrypoints and structure

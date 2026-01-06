@@ -13,7 +13,7 @@ Design Pattern: Null Object Pattern
 """
 
 from ..base import BaseCodeValidator
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class GenericCodeValidator(BaseCodeValidator):
@@ -34,7 +34,7 @@ class GenericCodeValidator(BaseCodeValidator):
         """Handles UNKNOWN and acts as fallback for all languages."""
         return {Language.UNKNOWN}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Basic validation without language-specific logic.
 
         Only catches universally problematic patterns.
@@ -44,13 +44,13 @@ class GenericCodeValidator(BaseCodeValidator):
             code: Source code string
 
         Returns:
-            ValidationResult (almost always valid unless obviously broken)
+            CodeValidationResult (almost always valid unless obviously broken)
         """
         warnings: list[str] = []
 
         # Check for empty code
         if not code or not code.strip():
-            return ValidationResult.failure(
+            return CodeValidationResult.failure(
                 errors=["Code is empty"],
                 language=Language.UNKNOWN,
             )
@@ -69,7 +69,7 @@ class GenericCodeValidator(BaseCodeValidator):
             warnings.append("Code ends with TODO comment (may be incomplete)")
 
         # Build result
-        result = ValidationResult.success(
+        result = CodeValidationResult.success(
             language=Language.UNKNOWN,
             used_ast=False,
         )
@@ -79,7 +79,7 @@ class GenericCodeValidator(BaseCodeValidator):
 
         return result
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Apply generic fixes that work for any language.
 
         Only applies safe transformations:

@@ -26,7 +26,7 @@ from victor.evaluation.agent_adapter import (
 )
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
-    ToolCall,
+    EvalToolCall,
     FileEdit,
 )
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
@@ -106,7 +106,7 @@ class TestVictorAgentAdapter:
     def test_reset(self, adapter):
         """Test reset clears state."""
         # Simulate some state
-        adapter._tool_calls = [ToolCall(name="test", arguments={}, timestamp=0)]
+        adapter._tool_calls = [EvalToolCall(name="test", arguments={}, timestamp=0)]
         adapter._file_edits = [FileEdit(path="test.py", action="create")]
         adapter._messages = [{"role": "user", "content": "test"}]
         adapter._turns = 5

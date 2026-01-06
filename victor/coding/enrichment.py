@@ -36,7 +36,6 @@ Example:
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.framework.enrichment import (
@@ -44,6 +43,8 @@ from victor.framework.enrichment import (
     EnrichmentContext,
     EnrichmentPriority,
     EnrichmentType,
+    extract_identifiers,
+    extract_dotted_paths,
 )
 
 if TYPE_CHECKING:
@@ -55,10 +56,9 @@ logger = logging.getLogger(__name__)
 def _extract_symbols_from_prompt(prompt: str) -> List[str]:
     """Extract potential code symbols from a prompt.
 
-    Looks for:
-    - CamelCase identifiers (class names)
-    - snake_case identifiers (function names)
-    - Dot-separated paths (module.function)
+    Uses the framework's extract_identifiers() utility for common patterns
+    (CamelCase, snake_case, quoted identifiers) and adds special handling
+    for dotted paths to include the last component.
 
     Args:
         prompt: The prompt text to analyze
@@ -66,56 +66,19 @@ def _extract_symbols_from_prompt(prompt: str) -> List[str]:
     Returns:
         List of potential symbol names
     """
-    symbols = []
+    # Use framework utility for standard identifier extraction
+    # This handles CamelCase, snake_case, dotted paths, and quoted identifiers
+    symbols = extract_identifiers(prompt)
 
-    # CamelCase patterns (class names)
-    camel_pattern = r"\b([A-Z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]*)+)\b"
-    symbols.extend(re.findall(camel_pattern, prompt))
+    # Additionally extract the last component of dotted paths
+    # (e.g., "module.function" -> also add "function")
+    dotted_paths = extract_dotted_paths(prompt)
+    for path in dotted_paths:
+        last_component = path.split(".")[-1]
+        if last_component not in symbols:
+            symbols.append(last_component)
 
-    # snake_case patterns (function/variable names)
-    snake_pattern = r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b"
-    symbols.extend(re.findall(snake_pattern, prompt))
-
-    # Dot-separated paths (module.function)
-    path_pattern = r"\b([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)\b"
-    for match in re.findall(path_pattern, prompt):
-        # Add both full path and last component
-        symbols.append(match)
-        symbols.append(match.split(".")[-1])
-
-    # Backtick-quoted code
-    backtick_pattern = r"`([a-zA-Z_][a-zA-Z0-9_]*)`"
-    symbols.extend(re.findall(backtick_pattern, prompt))
-
-    # Remove common words and duplicates
-    common_words = {
-        "the",
-        "and",
-        "for",
-        "with",
-        "this",
-        "that",
-        "from",
-        "have",
-        "are",
-        "was",
-        "were",
-        "been",
-        "being",
-        "has",
-        "had",
-        "can",
-        "could",
-        "will",
-        "would",
-        "should",
-        "may",
-        "might",
-        "must",
-    }
-    symbols = [s for s in symbols if s.lower() not in common_words]
-
-    return list(set(symbols))
+    return symbols
 
 
 def _format_graph_node(node: "GraphNode") -> str:

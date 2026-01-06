@@ -48,9 +48,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict
 
 from victor.workflows.definition import (
-    NodeType,
     WorkflowDefinition,
     WorkflowNode,
+    WorkflowNodeType,
 )
 
 if TYPE_CHECKING:
@@ -100,7 +100,7 @@ class AdaptedNode:
     """
 
     name: str
-    node_type: NodeType
+    node_type: WorkflowNodeType
     handler: Callable[[WorkflowState], WorkflowState]
     next_nodes: List[str] = field(default_factory=list)
     conditional_edges: Dict[str, str] = field(default_factory=dict)

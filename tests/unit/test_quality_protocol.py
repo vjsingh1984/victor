@@ -17,7 +17,7 @@
 import pytest
 
 from victor.protocols.quality import (
-    QualityDimension,
+    ProtocolQualityDimension,
     DimensionScore,
     QualityScore,
     IQualityAssessor,
@@ -33,18 +33,18 @@ from victor.protocols.quality import (
 # =============================================================================
 
 
-class TestQualityDimension:
-    """Tests for QualityDimension enum."""
+class TestProtocolQualityDimension:
+    """Tests for ProtocolQualityDimension enum."""
 
     def test_enum_values(self):
         """Test all expected enum values exist."""
-        assert QualityDimension.GROUNDING.value == "grounding"
-        assert QualityDimension.COVERAGE.value == "coverage"
-        assert QualityDimension.CLARITY.value == "clarity"
-        assert QualityDimension.CORRECTNESS.value == "correctness"
-        assert QualityDimension.CONCISENESS.value == "conciseness"
-        assert QualityDimension.HELPFULNESS.value == "helpfulness"
-        assert QualityDimension.SAFETY.value == "safety"
+        assert ProtocolQualityDimension.GROUNDING.value == "grounding"
+        assert ProtocolQualityDimension.COVERAGE.value == "coverage"
+        assert ProtocolQualityDimension.CLARITY.value == "clarity"
+        assert ProtocolQualityDimension.CORRECTNESS.value == "correctness"
+        assert ProtocolQualityDimension.CONCISENESS.value == "conciseness"
+        assert ProtocolQualityDimension.HELPFULNESS.value == "helpfulness"
+        assert ProtocolQualityDimension.SAFETY.value == "safety"
 
 
 # =============================================================================
@@ -58,10 +58,10 @@ class TestDimensionScore:
     def test_creation(self):
         """Test basic dimension score creation."""
         score = DimensionScore(
-            dimension=QualityDimension.CLARITY,
+            dimension=ProtocolQualityDimension.CLARITY,
             score=0.85,
         )
-        assert score.dimension == QualityDimension.CLARITY
+        assert score.dimension == ProtocolQualityDimension.CLARITY
         assert score.score == 0.85
         assert score.weight == 1.0
         assert score.reason == ""
@@ -70,7 +70,7 @@ class TestDimensionScore:
     def test_creation_with_all_fields(self):
         """Test dimension score with all fields."""
         score = DimensionScore(
-            dimension=QualityDimension.CORRECTNESS,
+            dimension=ProtocolQualityDimension.CORRECTNESS,
             score=0.9,
             weight=0.25,
             reason="Code syntax is correct",
@@ -106,12 +106,12 @@ class TestQualityScore:
     def test_creation_with_dimensions(self):
         """Test quality score with dimension scores."""
         dim_scores = {
-            QualityDimension.CLARITY: DimensionScore(
-                dimension=QualityDimension.CLARITY,
+            ProtocolQualityDimension.CLARITY: DimensionScore(
+                dimension=ProtocolQualityDimension.CLARITY,
                 score=0.9,
             ),
-            QualityDimension.CORRECTNESS: DimensionScore(
-                dimension=QualityDimension.CORRECTNESS,
+            ProtocolQualityDimension.CORRECTNESS: DimensionScore(
+                dimension=ProtocolQualityDimension.CORRECTNESS,
                 score=0.8,
             ),
         }
@@ -125,8 +125,8 @@ class TestQualityScore:
     def test_get_dimension_score(self):
         """Test get_dimension_score method."""
         dim_scores = {
-            QualityDimension.CLARITY: DimensionScore(
-                dimension=QualityDimension.CLARITY,
+            ProtocolQualityDimension.CLARITY: DimensionScore(
+                dimension=ProtocolQualityDimension.CLARITY,
                 score=0.9,
             ),
         }
@@ -135,14 +135,14 @@ class TestQualityScore:
             is_acceptable=True,
             dimension_scores=dim_scores,
         )
-        assert score.get_dimension_score(QualityDimension.CLARITY) == 0.9
-        assert score.get_dimension_score(QualityDimension.CORRECTNESS) == 0.0
+        assert score.get_dimension_score(ProtocolQualityDimension.CLARITY) == 0.9
+        assert score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS) == 0.0
 
     def test_to_dict(self):
         """Test to_dict method."""
         dim_scores = {
-            QualityDimension.CLARITY: DimensionScore(
-                dimension=QualityDimension.CLARITY,
+            ProtocolQualityDimension.CLARITY: DimensionScore(
+                dimension=ProtocolQualityDimension.CLARITY,
                 score=0.9,
                 weight=0.15,
                 reason="Well structured",
@@ -185,11 +185,11 @@ class TestSimpleQualityAssessor:
     def test_dimensions_property(self, assessor):
         """Test dimensions property."""
         dims = assessor.dimensions
-        assert QualityDimension.CLARITY in dims
-        assert QualityDimension.CORRECTNESS in dims
-        assert QualityDimension.COVERAGE in dims
-        assert QualityDimension.CONCISENESS in dims
-        assert QualityDimension.GROUNDING in dims
+        assert ProtocolQualityDimension.CLARITY in dims
+        assert ProtocolQualityDimension.CORRECTNESS in dims
+        assert ProtocolQualityDimension.COVERAGE in dims
+        assert ProtocolQualityDimension.CONCISENESS in dims
+        assert ProtocolQualityDimension.GROUNDING in dims
 
     def test_assess_basic_response(self, assessor):
         """Test assessing a basic response."""
@@ -226,7 +226,7 @@ def solve():
         score = assessor.assess(response, context)
 
         # Structured responses should score well on clarity
-        clarity = score.get_dimension_score(QualityDimension.CLARITY)
+        clarity = score.get_dimension_score(ProtocolQualityDimension.CLARITY)
         assert clarity >= 0.5
 
     def test_assess_code_correctness(self, assessor):
@@ -239,7 +239,7 @@ def add(a, b):
 ```
 """
         score = assessor.assess(good_response, {})
-        good_correctness = score.get_dimension_score(QualityDimension.CORRECTNESS)
+        good_correctness = score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS)
 
         # Bad code with unbalanced brackets
         bad_response = """
@@ -249,7 +249,7 @@ def add(a, b:
 ```
 """
         score = assessor.assess(bad_response, {})
-        bad_correctness = score.get_dimension_score(QualityDimension.CORRECTNESS)
+        bad_correctness = score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS)
 
         assert good_correctness >= bad_correctness
 
@@ -272,8 +272,8 @@ question about what 2+2 equals is simply 4.
 """
         verbose_score = assessor.assess(verbose, {"query": query})
 
-        concise_val = concise_score.get_dimension_score(QualityDimension.CONCISENESS)
-        verbose_val = verbose_score.get_dimension_score(QualityDimension.CONCISENESS)
+        concise_val = concise_score.get_dimension_score(ProtocolQualityDimension.CONCISENESS)
+        verbose_val = verbose_score.get_dimension_score(ProtocolQualityDimension.CONCISENESS)
 
         assert concise_val >= verbose_val
 
@@ -289,8 +289,8 @@ question about what 2+2 equals is simply 4.
         poor_response = "Here's how to use Python."
         poor_score = assessor.assess(poor_response, {"query": query})
 
-        good_coverage = good_score.get_dimension_score(QualityDimension.COVERAGE)
-        poor_coverage = poor_score.get_dimension_score(QualityDimension.COVERAGE)
+        good_coverage = good_score.get_dimension_score(ProtocolQualityDimension.COVERAGE)
+        poor_coverage = poor_score.get_dimension_score(ProtocolQualityDimension.COVERAGE)
 
         assert good_coverage > poor_coverage
 
@@ -305,7 +305,7 @@ question about what 2+2 equals is simply 4.
         }
 
         score = assessor.assess(response, context)
-        grounding = score.get_dimension_score(QualityDimension.GROUNDING)
+        grounding = score.get_dimension_score(ProtocolQualityDimension.GROUNDING)
 
         assert grounding == 0.95
 
@@ -317,8 +317,8 @@ question about what 2+2 equals is simply 4.
         with_score = assessor.assess(with_headers, {})
         without_score = assessor.assess(without_headers, {})
 
-        with_clarity = with_score.get_dimension_score(QualityDimension.CLARITY)
-        without_clarity = without_score.get_dimension_score(QualityDimension.CLARITY)
+        with_clarity = with_score.get_dimension_score(ProtocolQualityDimension.CLARITY)
+        without_clarity = without_score.get_dimension_score(ProtocolQualityDimension.CLARITY)
 
         assert with_clarity >= without_clarity
 
@@ -352,8 +352,8 @@ class TestProviderAwareQualityAssessor:
         """Test Anthropic gets positive adjustments."""
         assessor = ProviderAwareQualityAssessor(provider_name="anthropic")
 
-        clarity_adj = assessor._get_provider_adjustment(QualityDimension.CLARITY)
-        grounding_adj = assessor._get_provider_adjustment(QualityDimension.GROUNDING)
+        clarity_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CLARITY)
+        grounding_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.GROUNDING)
 
         assert clarity_adj > 0
         assert grounding_adj > 0
@@ -362,7 +362,7 @@ class TestProviderAwareQualityAssessor:
         """Test xAI gets negative conciseness adjustment."""
         assessor = ProviderAwareQualityAssessor(provider_name="xai")
 
-        conciseness_adj = assessor._get_provider_adjustment(QualityDimension.CONCISENESS)
+        conciseness_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CONCISENESS)
 
         assert conciseness_adj < 0
 
@@ -370,8 +370,8 @@ class TestProviderAwareQualityAssessor:
         """Test Ollama gets appropriate adjustments."""
         assessor = ProviderAwareQualityAssessor(provider_name="ollama")
 
-        correctness_adj = assessor._get_provider_adjustment(QualityDimension.CORRECTNESS)
-        grounding_adj = assessor._get_provider_adjustment(QualityDimension.GROUNDING)
+        correctness_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CORRECTNESS)
+        grounding_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.GROUNDING)
 
         assert correctness_adj < 0
         assert grounding_adj < 0
@@ -380,7 +380,7 @@ class TestProviderAwareQualityAssessor:
         """Test unknown provider gets zero adjustment."""
         assessor = ProviderAwareQualityAssessor(provider_name="unknown_provider")
 
-        adjustment = assessor._get_provider_adjustment(QualityDimension.CLARITY)
+        adjustment = assessor._get_provider_adjustment(ProtocolQualityDimension.CLARITY)
 
         assert adjustment == 0.0
 
@@ -393,7 +393,7 @@ def example():
     return 42
 ```
 """
-        dim_score = assessor._assess_dimension(QualityDimension.CORRECTNESS, response, {})
+        dim_score = assessor._assess_dimension(ProtocolQualityDimension.CORRECTNESS, response, {})
 
         assert "provider adjustment" in dim_score.reason
 
@@ -436,8 +436,8 @@ class TestCompositeQualityAssessor:
         )
 
         dims = assessor.dimensions
-        assert QualityDimension.CLARITY in dims
-        assert QualityDimension.CORRECTNESS in dims
+        assert ProtocolQualityDimension.CLARITY in dims
+        assert ProtocolQualityDimension.CORRECTNESS in dims
 
     def test_assess_weighted_strategy(self):
         """Test assessment with weighted strategy."""
@@ -549,7 +549,7 @@ class TestProtocolCompliance:
 
             @property
             def dimensions(self):
-                return [QualityDimension.CLARITY]
+                return [ProtocolQualityDimension.CLARITY]
 
         assessor = CustomAssessor()
         assert isinstance(assessor, IQualityAssessor)
@@ -599,15 +599,15 @@ def add(a, b):
 ```"""
 
         score = assessor.assess(response, {})
-        correctness = score.get_dimension_score(QualityDimension.CORRECTNESS)
+        correctness = score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS)
 
         assert correctness >= 0.5
 
     def test_custom_weights(self):
         """Test assessor with custom weights."""
         custom_weights = {
-            QualityDimension.CORRECTNESS: 0.5,
-            QualityDimension.CLARITY: 0.5,
+            ProtocolQualityDimension.CORRECTNESS: 0.5,
+            ProtocolQualityDimension.CLARITY: 0.5,
         }
         assessor = SimpleQualityAssessor(weights=custom_weights)
 

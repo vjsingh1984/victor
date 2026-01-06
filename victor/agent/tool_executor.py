@@ -44,9 +44,9 @@ from victor.core.errors import (
     get_error_handler,
 )
 from victor.core.retry import (
+    BaseRetryStrategy,
     RetryContext,
     RetryExecutor,
-    RetryStrategy,
     tool_retry_strategy,
 )
 from victor.tools.base import (
@@ -56,7 +56,7 @@ from victor.tools.base import (
     HookError,
     ToolRegistry,
     ToolResult,
-    ValidationResult,
+    ToolValidationResult,
 )
 
 # RL hook integration (lazy import to avoid circular dependencies)
@@ -221,7 +221,7 @@ class ToolExecutor:
         safety_checker: Optional[SafetyChecker] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        retry_strategy: Optional[RetryStrategy] = None,
+        retry_strategy: Optional[BaseRetryStrategy] = None,
         context: Optional[Dict[str, Any]] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         enable_code_correction: bool = False,
@@ -380,7 +380,7 @@ class ToolExecutor:
         self,
         tool: BaseTool,
         arguments: Dict[str, Any],
-    ) -> Tuple[bool, Optional[ValidationResult]]:
+    ) -> Tuple[bool, Optional[ToolValidationResult]]:
         """Validate tool arguments against JSON Schema before execution.
 
         Performs pre-execution validation based on the configured validation_mode:
@@ -395,7 +395,7 @@ class ToolExecutor:
         Returns:
             Tuple of (should_proceed, validation_result)
             - should_proceed: True if execution should continue
-            - validation_result: ValidationResult or None if validation was skipped
+            - validation_result: ToolValidationResult or None if validation was skipped
         """
         if self.validation_mode == ValidationMode.OFF:
             return True, None
@@ -413,7 +413,7 @@ class ToolExecutor:
             self._validation_failures += 1
             logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
             if self.validation_mode == ValidationMode.STRICT:
-                return False, ValidationResult.failure([error_msg])
+                return False, ToolValidationResult.failure([error_msg])
             else:
                 logger.warning("Proceeding with unknown arguments (lenient mode)")
 
@@ -444,7 +444,7 @@ class ToolExecutor:
             logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
             if self.validation_mode == ValidationMode.STRICT:
-                return False, ValidationResult.failure([f"Validation system error: {e}"])
+                return False, ToolValidationResult.failure([f"Validation system error: {e}"])
             return True, None
 
     async def execute(
@@ -759,7 +759,7 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         context: Dict[str, Any],
     ) -> Tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
-        """Execute a tool with retry logic from unified RetryStrategy.
+        """Execute a tool with retry logic from unified BaseRetryStrategy.
 
         Uses the configured retry strategy for exponential backoff and
         retry decisions. Hooks are run before/after each attempt. Errors

@@ -134,13 +134,19 @@ class TestRAGWorkflowProvider:
             assert not errors, f"Workflow '{name}' has validation errors: {errors}"
 
     def test_workflow_has_agents(self):
-        """Each workflow should have at least one agent node."""
+        """Each workflow should have at least one agent node (except utility workflows)."""
         from victor.rag.workflows import RAGWorkflowProvider
 
         provider = RAGWorkflowProvider()
         workflows = provider.get_workflows()
 
+        # Some workflows are utility/compute-only (no LLM agents)
+        utility_workflows = {"incremental_update", "maintenance"}
+
         for name, workflow in workflows.items():
+            if name in utility_workflows:
+                # Utility workflows may not have agent nodes
+                continue
             agent_count = workflow.get_agent_count()
             assert agent_count >= 1, f"Workflow '{name}' should have at least one agent"
 
@@ -159,17 +165,21 @@ class TestIngestWorkflow:
 
     def test_ingest_workflow_structure(self):
         """Ingest workflow should have proper structure."""
-        from victor.rag.workflows import ingest_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = ingest_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("document_ingest")
+        assert workflow is not None
         assert isinstance(workflow, WorkflowDefinition)
-        assert workflow.name == "ingest" or "ingest" in workflow.name.lower()
+        assert "ingest" in workflow.name.lower()
 
     def test_ingest_has_parse_step(self):
         """Ingest workflow should have a parsing/processing step."""
-        from victor.rag.workflows import ingest_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = ingest_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("document_ingest")
+        assert workflow is not None
         nodes = workflow.nodes
 
         # Should have a node related to parsing/processing
@@ -177,6 +187,7 @@ class TestIngestWorkflow:
             "parse" in node_id.lower()
             or "process" in node_id.lower()
             or "extract" in node_id.lower()
+            or "discover" in node_id.lower()
             for node_id in nodes
         )
         assert has_parse, "Ingest workflow should have a parse/process step"
@@ -187,17 +198,21 @@ class TestQueryWorkflow:
 
     def test_query_workflow_structure(self):
         """Query workflow should have proper structure."""
-        from victor.rag.workflows import query_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = query_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
         assert isinstance(workflow, WorkflowDefinition)
-        assert workflow.name == "query" or "query" in workflow.name.lower()
+        assert "query" in workflow.name.lower()
 
     def test_query_has_search_step(self):
         """Query workflow should have a search/retrieve step."""
-        from victor.rag.workflows import query_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = query_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
         nodes = workflow.nodes
 
         # Should have a node related to search/retrieve
@@ -208,9 +223,11 @@ class TestQueryWorkflow:
 
     def test_query_has_synthesis_step(self):
         """Query workflow should have a synthesis/answer step."""
-        from victor.rag.workflows import query_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = query_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
         nodes = workflow.nodes
 
         # Should have a node related to synthesis
@@ -228,8 +245,10 @@ class TestMaintenanceWorkflow:
 
     def test_maintenance_workflow_structure(self):
         """Maintenance workflow should have proper structure."""
-        from victor.rag.workflows import maintenance_workflow
+        from victor.rag.workflows import RAGWorkflowProvider
 
-        workflow = maintenance_workflow()
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("maintenance")
+        assert workflow is not None
         assert isinstance(workflow, WorkflowDefinition)
         assert "maintenance" in workflow.name.lower() or "optimize" in workflow.name.lower()

@@ -49,7 +49,7 @@ from enum import Enum
 
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from victor.workflows.definition import NodeType, WorkflowNode
+from victor.workflows.definition import WorkflowNode, WorkflowNodeType
 
 
 def _utc_now() -> datetime:
@@ -555,9 +555,9 @@ class HITLNode(WorkflowNode):
     validator: Optional[Callable[[Any], bool]] = None
 
     @property
-    def node_type(self) -> NodeType:
+    def node_type(self) -> WorkflowNodeType:
         """HITL nodes have their own node type."""
-        return NodeType.HITL
+        return WorkflowNodeType.HITL
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node."""

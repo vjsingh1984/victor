@@ -354,7 +354,7 @@ class TestGlobalSingleton:
 
     def test_get_rl_eviction_policy(self) -> None:
         """Test getting global singleton."""
-        import victor.cache.rl_eviction_policy as module
+        import victor.storage.cache.rl_eviction_policy as module
 
         module._rl_eviction_policy = None
 
@@ -365,7 +365,7 @@ class TestGlobalSingleton:
 
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
-        import victor.cache.rl_eviction_policy as module
+        import victor.storage.cache.rl_eviction_policy as module
 
         module._rl_eviction_policy = None
 

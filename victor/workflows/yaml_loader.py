@@ -98,10 +98,85 @@ import operator
 import os
 import re
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHECKING, Union
 
 import yaml
+
+
+# =============================================================================
+# Enums for controlled values (code maintenance)
+# =============================================================================
+
+
+class YAMLNodeType(str, Enum):
+    """Valid node types for YAML workflow definitions.
+
+    Renamed from NodeType to be semantically distinct:
+    - YAMLNodeType (here): YAML loader validation nodes
+    - WorkflowNodeType (victor.workflows.definition): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - GraphNodeType (victor.workflows.graph_dsl): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    """
+
+    AGENT = "agent"
+    COMPUTE = "compute"
+    CONDITION = "condition"
+    PARALLEL = "parallel"
+    TRANSFORM = "transform"
+    HITL = "hitl"
+
+
+class ConstraintType(str, Enum):
+    """Valid constraint types for blocking resources.
+
+    Used in list-format constraints: constraints: [llm, network, write]
+    """
+
+    LLM = "llm"
+    NETWORK = "network"
+    WRITE = "write"
+    FILESYSTEM = "filesystem"  # Alias for strict sandboxing
+    NONE = "none"  # Special: no constraints (everything allowed)
+
+
+class JoinStrategy(str, Enum):
+    """Join strategies for parallel nodes."""
+
+    ALL = "all"
+    ANY = "any"
+    FIRST = "first"
+
+
+class HITLType(str, Enum):
+    """HITL node types."""
+
+    APPROVAL = "approval"
+    INPUT = "input"
+    REVIEW = "review"
+    CHOICE = "choice"
+
+
+class HITLFallback(str, Enum):
+    """HITL fallback behaviors on timeout."""
+
+    ABORT = "abort"
+    CONTINUE = "continue"
+    DEFAULT = "default"
+
+
+class ExecutionTarget(str, Enum):
+    """Execution target for compute nodes.
+
+    Specifies how a compute node should be executed:
+    - IN_PROCESS: Direct Python execution (fastest, shared memory)
+    - SUBPROCESS: Separate process (isolation, can timeout)
+    - DOCKER: Container execution (full isolation, reproducible)
+    """
+
+    IN_PROCESS = "in-process"
+    SUBPROCESS = "subprocess"
+    DOCKER = "docker"
 
 
 # =============================================================================
@@ -163,6 +238,7 @@ def _interpolate_env_vars(value: Any) -> Any:
 if TYPE_CHECKING:
     from victor.workflows.batch_executor import BatchConfig
     from victor.workflows.services.definition import ServiceConfig
+    from victor.workflows.validation.tool_validator import ToolValidationResult
 
 from victor.workflows.definition import (
     AgentNode,
@@ -538,20 +614,20 @@ class BatchConfigYAML:
 
     def to_batch_config(self) -> "BatchConfig":
         """Convert to BatchConfig for executor."""
-        from victor.workflows.batch_executor import BatchConfig, RetryStrategy
+        from victor.workflows.batch_executor import BatchConfig, BatchRetryStrategy
 
         strategy_map = {
-            "none": RetryStrategy.NONE,
-            "immediate": RetryStrategy.IMMEDIATE,
-            "end_of_batch": RetryStrategy.END_OF_BATCH,
-            "exponential_backoff": RetryStrategy.EXPONENTIAL_BACKOFF,
+            "none": BatchRetryStrategy.NONE,
+            "immediate": BatchRetryStrategy.IMMEDIATE,
+            "end_of_batch": BatchRetryStrategy.END_OF_BATCH,
+            "exponential_backoff": BatchRetryStrategy.EXPONENTIAL_BACKOFF,
         }
 
         return BatchConfig(
             batch_size=self.batch_size,
             max_concurrent=self.max_concurrent,
             delay_seconds=self.delay_seconds,
-            retry_strategy=strategy_map.get(self.retry_strategy, RetryStrategy.END_OF_BATCH),
+            retry_strategy=strategy_map.get(self.retry_strategy, BatchRetryStrategy.END_OF_BATCH),
             max_retries=self.max_retries,
             retry_delay_seconds=self.retry_delay_seconds,
             timeout_per_item=self.timeout_per_item,
@@ -864,6 +940,9 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
     if llm_config_data:
         llm_config = LLMConfig.from_dict(llm_config_data).to_dict()
 
+    # Parse timeout (supports both 'timeout' and 'timeout_seconds' keys)
+    timeout_seconds = node_data.get("timeout_seconds") or node_data.get("timeout")
+
     return AgentNode(
         id=node_id,
         name=node_data.get("name", node_id),
@@ -874,6 +953,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
         input_mapping=node_data.get("input_mapping", {}),
         output_key=node_data.get("output", node_id),
         llm_config=llm_config,
+        timeout_seconds=timeout_seconds,
         next_nodes=node_data.get("next", []),
     )
 
@@ -960,13 +1040,120 @@ def _parse_hitl_node(node_data: Dict[str, Any]) -> WorkflowNode:
     )
 
 
+def _parse_constraints(constraints_data: Any, timeout: float = 60.0) -> TaskConstraints:
+    """Parse constraints from YAML data.
+
+    Supports two formats:
+    1. List format (compact): constraints: [llm, network, write]
+       - Items in list are BLOCKED
+       - "none" = no constraints (everything allowed)
+       - "none" cannot be combined with other values
+
+    2. Dict format (legacy): constraints: {llm_allowed: false, ...}
+       - Explicit key-value pairs
+
+    Examples:
+        constraints: none                    # No constraints at all
+        constraints: [llm]                   # Only LLM blocked
+        constraints: [llm, network, write]   # LLM, network, and write blocked
+        constraints: [llm, filesystem]       # LLM and filesystem blocked
+        constraints:                         # Legacy dict format
+          llm_allowed: false
+          network_allowed: true
+
+    Valid constraint names for list format (from ConstraintType enum):
+        - llm: Block LLM inference
+        - network: Block network calls
+        - write: Block disk writes
+        - filesystem: Block filesystem access (alias for strict sandboxing)
+        - none: Special value - no constraints (everything allowed)
+
+    Args:
+        constraints_data: Either a list, "none", or dict
+        timeout: Default timeout value
+
+    Returns:
+        TaskConstraints instance
+
+    Raises:
+        YAMLWorkflowError: If "none" is combined with other values
+    """
+    # Handle None / missing constraints
+    if constraints_data is None:
+        return TaskConstraints(_timeout=timeout)
+
+    # Handle string "none" - no constraints
+    if isinstance(constraints_data, str):
+        if constraints_data.lower() == ConstraintType.NONE.value:
+            return TaskConstraints(
+                llm_allowed=True,
+                network_allowed=True,
+                write_allowed=True,
+                _timeout=timeout,
+            )
+        else:
+            valid_values = [c.value for c in ConstraintType]
+            raise YAMLWorkflowError(
+                f"Invalid constraint string: '{constraints_data}'. " f"Valid values: {valid_values}"
+            )
+
+    # Handle list format (compact)
+    if isinstance(constraints_data, list):
+        # Normalize to lowercase
+        normalized = [item.lower() for item in constraints_data]
+
+        # Validate: "none" cannot be combined with other values
+        if ConstraintType.NONE.value in normalized:
+            if len(normalized) > 1:
+                raise YAMLWorkflowError(
+                    f"Constraint '{ConstraintType.NONE.value}' cannot be combined "
+                    f"with other values. Got: {constraints_data}"
+                )
+            # Just "none" in list
+            return TaskConstraints(
+                llm_allowed=True,
+                network_allowed=True,
+                write_allowed=True,
+                _timeout=timeout,
+            )
+
+        # Parse list of blocked items using enum values
+        blocked = set(normalized)
+        return TaskConstraints(
+            llm_allowed=ConstraintType.LLM.value not in blocked,
+            network_allowed=ConstraintType.NETWORK.value not in blocked,
+            write_allowed=ConstraintType.WRITE.value not in blocked,
+            # filesystem blocks both network and write for strict sandboxing
+            _timeout=timeout,
+        )
+
+    # Handle dict format (legacy)
+    if isinstance(constraints_data, dict):
+        return TaskConstraints(
+            llm_allowed=constraints_data.get("llm_allowed", False),
+            network_allowed=constraints_data.get("network_allowed", True),
+            write_allowed=constraints_data.get("write_allowed", False),
+            max_cost_tier=constraints_data.get("max_cost_tier", "FREE"),
+            _max_tool_calls=constraints_data.get("max_tool_calls", 100),
+            _timeout=constraints_data.get("timeout", timeout),
+            allowed_tools=constraints_data.get("allowed_tools"),
+            blocked_tools=constraints_data.get("blocked_tools"),
+        )
+
+    raise YAMLWorkflowError(
+        f"Invalid constraints format: {type(constraints_data)}. "
+        f"Use '{ConstraintType.NONE.value}', a list [{ConstraintType.LLM.value}, "
+        f"{ConstraintType.NETWORK.value}, {ConstraintType.WRITE.value}], or a dict."
+    )
+
+
 def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
     """Parse a compute node from YAML data.
 
     Compute nodes execute tools with configurable constraints.
     Supports LLM-free execution and custom handlers.
 
-    YAML format:
+    YAML format (new compact constraints):
         - id: run_valuation
           type: compute
           tools: [multi_model_valuation, sector_valuation]
@@ -974,15 +1161,25 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
             symbol: $ctx.symbol
             financials: $ctx.sec_data
           output: fair_values
-          handler: null  # Optional custom handler
+          constraints: [llm, write]  # Blocks LLM and write, allows network
+          timeout: 60
+          next: [blend]
+
+        # No constraints (everything allowed)
+        - id: unrestricted_task
+          type: compute
+          handler: custom_handler
+          constraints: none
+
+    YAML format (legacy dict constraints):
+        - id: run_valuation
+          type: compute
+          tools: [multi_model_valuation]
           constraints:
             llm_allowed: false
             network_allowed: true
             max_cost_tier: FREE
             timeout: 60
-          fail_fast: true
-          parallel: false
-          next: [blend]
 
         # With custom handler
         - id: rl_weights
@@ -1004,18 +1201,19 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
         else:
             input_mapping[key] = value
 
-    # Parse constraints
-    constraints_data = node_data.get("constraints", {})
-    constraints = TaskConstraints(
-        llm_allowed=constraints_data.get("llm_allowed", False),
-        network_allowed=constraints_data.get("network_allowed", True),
-        write_allowed=constraints_data.get("write_allowed", False),
-        max_cost_tier=constraints_data.get("max_cost_tier", "FREE"),
-        _max_tool_calls=constraints_data.get("max_tool_calls", 100),
-        _timeout=constraints_data.get("timeout", node_data.get("timeout", 60.0)),
-        allowed_tools=constraints_data.get("allowed_tools"),
-        blocked_tools=constraints_data.get("blocked_tools"),
-    )
+    # Parse constraints using new format-aware parser
+    timeout = node_data.get("timeout", 60.0)
+    constraints = _parse_constraints(node_data.get("constraints"), timeout)
+
+    # Parse execution target with enum validation
+    exec_target_str = node_data.get("execution_target", "in-process")
+    try:
+        exec_target = ExecutionTarget(exec_target_str.lower())
+    except ValueError:
+        valid_targets = [t.value for t in ExecutionTarget]
+        raise YAMLWorkflowError(
+            f"Invalid execution_target '{exec_target_str}'. " f"Valid values: {valid_targets}"
+        )
 
     return ComputeNode(
         id=node_id,
@@ -1027,6 +1225,7 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
         handler=node_data.get("handler"),
         fail_fast=node_data.get("fail_fast", True),
         parallel=node_data.get("parallel", False),
+        execution_target=exec_target.value,
         next_nodes=node_data.get("next", []),
     )
 
@@ -1035,23 +1234,45 @@ def _parse_node(
     node_data: Dict[str, Any],
     config: YAMLWorkflowConfig,
 ) -> WorkflowNode:
-    """Parse a workflow node from YAML data."""
-    node_type = node_data.get("type", "agent")
+    """Parse a workflow node from YAML data.
 
-    if node_type == "agent":
+    Node type defaults to 'agent' if not specified, making the common case
+    (LLM-powered agent nodes) more concise:
+
+        nodes:
+          # Agent node (type defaults to 'agent')
+          - id: analyze
+            role: researcher
+            goal: "Analyze the codebase"
+            tool_budget: 20
+
+          # Compute node (must be explicit)
+          - id: run_tests
+            type: compute
+            handler: test_runner
+            constraints: [llm]
+
+    This reduces YAML verbosity for the most common agentic workflows.
+    """
+    # Default to 'agent' if type not specified - makes common case concise
+    node_type_str = node_data.get("type", YAMLNodeType.AGENT.value)
+
+    # Use enum for matching to avoid string typos
+    if node_type_str == YAMLNodeType.AGENT.value:
         return _parse_agent_node(node_data)
-    elif node_type == "compute":
+    elif node_type_str == YAMLNodeType.COMPUTE.value:
         return _parse_compute_node(node_data)
-    elif node_type == "condition":
+    elif node_type_str == YAMLNodeType.CONDITION.value:
         return _parse_condition_node(node_data, config)
-    elif node_type == "parallel":
+    elif node_type_str == YAMLNodeType.PARALLEL.value:
         return _parse_parallel_node(node_data)
-    elif node_type == "transform":
+    elif node_type_str == YAMLNodeType.TRANSFORM.value:
         return _parse_transform_node(node_data, config)
-    elif node_type == "hitl":
+    elif node_type_str == YAMLNodeType.HITL.value:
         return _parse_hitl_node(node_data)
     else:
-        raise YAMLWorkflowError(f"Unknown node type: {node_type}")
+        valid_types = [t.value for t in YAMLNodeType]
+        raise YAMLWorkflowError(f"Unknown node type: '{node_type_str}'. Valid types: {valid_types}")
 
 
 def load_workflow_from_dict(
@@ -1135,12 +1356,52 @@ def load_workflow_from_dict(
         metadata["services"] = services
         logger.debug(f"Parsed {len(services)} services for workflow '{name}'")
 
+    # Parse workflow-level execution settings
+    # These can be specified at workflow level or in metadata
+    execution_settings = data.get("execution", {}) or {}
+    max_execution_timeout = (
+        execution_settings.get("timeout")
+        or execution_settings.get("max_execution_timeout_seconds")
+        or data.get("timeout")
+        or data.get("max_execution_timeout_seconds")
+    )
+    default_node_timeout = (
+        execution_settings.get("default_node_timeout")
+        or execution_settings.get("default_node_timeout_seconds")
+        or data.get("default_node_timeout")
+        or data.get("default_node_timeout_seconds")
+    )
+    max_iterations = execution_settings.get("max_iterations") or data.get("max_iterations") or 25
+    max_retries = execution_settings.get("max_retries") or data.get("max_retries") or 0
+
+    # Parse schedule configuration if present
+    schedule_data = data.get("schedule")
+    if schedule_data:
+        schedule_config = {
+            "cron": schedule_data.get("cron"),
+            "timezone": schedule_data.get("timezone", "UTC"),
+            "catchup": schedule_data.get("catchup", False),
+            "start_date": schedule_data.get("start_date"),
+            "end_date": schedule_data.get("end_date"),
+            "max_active_runs": schedule_data.get("max_active_runs", 1),
+            "enabled": schedule_data.get("enabled", True),
+        }
+        # Also support interval syntax
+        if schedule_data.get("interval"):
+            schedule_config["interval"] = schedule_data["interval"]
+        metadata["schedule"] = schedule_config
+        logger.debug(f"Parsed schedule for workflow '{name}': {schedule_config.get('cron')}")
+
     workflow = WorkflowDefinition(
         name=name,
         description=data.get("description", ""),
         nodes=nodes,
         start_node=start_node,
         metadata=metadata,
+        max_execution_timeout_seconds=max_execution_timeout,
+        default_node_timeout_seconds=default_node_timeout,
+        max_iterations=max_iterations,
+        max_retries=max_retries,
     )
 
     # Validate
@@ -1223,6 +1484,102 @@ def load_workflow_from_file(
 
     yaml_content = path.read_text()
     return load_workflow_from_yaml(yaml_content, workflow_name, config)
+
+
+def load_and_validate(
+    file_path: Union[str, Path],
+    workflow_name: Optional[str] = None,
+    config: Optional[YAMLWorkflowConfig] = None,
+    tool_registry: Optional[Any] = None,
+    strict: bool = True,
+) -> Tuple[Union[WorkflowDefinition, Dict[str, WorkflowDefinition]], "ToolValidationResult"]:
+    """Load workflow(s) from a YAML file and validate tool dependencies.
+
+    This function combines workflow loading with tool dependency validation,
+    ensuring all tools referenced in workflow nodes exist and are available
+    before workflow execution begins.
+
+    Args:
+        file_path: Path to YAML file
+        workflow_name: Optional specific workflow to load
+        config: Optional loader configuration
+        tool_registry: Tool registry for validation (if None, validation passes)
+        strict: If True, missing tools cause errors; if False, they cause warnings
+
+    Returns:
+        Tuple of (workflow(s), ToolValidationResult)
+
+    Raises:
+        YAMLWorkflowError: If file not found or YAML is invalid
+        ToolValidationError: If strict=True and tools are missing
+
+    Example:
+        from victor.workflows.yaml_loader import load_and_validate
+        from victor.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        workflow, validation = load_and_validate(
+            "my_workflow.yaml",
+            tool_registry=registry,
+            strict=True,
+        )
+
+        if not validation.valid:
+            print(f"Missing tools: {validation.missing_tools}")
+            for error in validation.errors:
+                print(f"  - {error}")
+    """
+    from victor.workflows.validation import (
+        ToolDependencyValidator,
+        ToolValidationResult,
+        validate_workflow_tools,
+    )
+
+    # Load the workflow(s)
+    workflows = load_workflow_from_file(file_path, workflow_name, config)
+
+    # Validate tool dependencies
+    if tool_registry is not None:
+        validator = ToolDependencyValidator(tool_registry, strict=strict)
+
+        if isinstance(workflows, dict):
+            # Multiple workflows - validate each
+            combined_result = ToolValidationResult()
+            for wf_name, workflow in workflows.items():
+                result = validator.validate(workflow)
+                combined_result.validated_tools.update(result.validated_tools)
+                combined_result.missing_tools.update(result.missing_tools)
+                for error in result.errors:
+                    combined_result.add_error(error)
+                for warning in result.warnings:
+                    combined_result.add_error(warning)
+            validation_result = combined_result
+        else:
+            # Single workflow
+            validation_result = validator.validate(workflows)
+
+        # Raise if strict and invalid
+        if strict and not validation_result.valid:
+            raise YAMLWorkflowError(
+                f"Tool validation failed: {validation_result.summary()}\n"
+                f"Missing tools: {validation_result.missing_tools}"
+            )
+    else:
+        # No registry - return valid result with all tools marked as validated
+        validation_result = ToolValidationResult()
+        if isinstance(workflows, dict):
+            for workflow in workflows.values():
+                for node in workflow.nodes.values():
+                    tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
+                    if tools:
+                        validation_result.validated_tools.update(tools)
+        else:
+            for node in workflows.nodes.values():
+                tools = getattr(node, "allowed_tools", None) or getattr(node, "tools", None)
+                if tools:
+                    validation_result.validated_tools.update(tools)
+
+    return workflows, validation_result
 
 
 def load_workflows_from_directory(
@@ -1497,6 +1854,12 @@ def parse_workflow_args(
 
 
 __all__ = [
+    # Enums for controlled values
+    "YAMLNodeType",
+    "ConstraintType",
+    "JoinStrategy",
+    "HITLType",
+    "HITLFallback",
     # Error types
     "YAMLWorkflowError",
     # Configuration
@@ -1515,4 +1878,6 @@ __all__ = [
     "load_workflows_from_directory",
     # Argument parsing
     "parse_workflow_args",
+    # Constraint parsing (for external use)
+    "_parse_constraints",
 ]

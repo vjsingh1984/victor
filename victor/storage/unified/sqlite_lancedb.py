@@ -35,7 +35,7 @@ from victor.storage.unified.protocol import (
     GraphNode,
     SearchMode,
     SearchParams,
-    SearchResult,
+    UnifiedSearchResult,
     UnifiedEdge,
     UnifiedId,
     UnifiedSymbol,
@@ -373,7 +373,7 @@ class SqliteLanceDBStore:
     # Unified Search
     # =========================================================================
 
-    async def search(self, params: SearchParams) -> List[SearchResult]:
+    async def search(self, params: SearchParams) -> List[UnifiedSearchResult]:
         """Unified search combining keyword, semantic, and graph.
 
         Algorithm:
@@ -386,7 +386,7 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        results: Dict[str, SearchResult] = {}
+        results: Dict[str, UnifiedSearchResult] = {}
 
         # Semantic search
         if params.mode in (SearchMode.HYBRID, SearchMode.SEMANTIC):
@@ -445,7 +445,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int = 20,
         threshold: float = 0.25,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Pure semantic search (vector similarity)."""
         return await self._semantic_search(query, limit, threshold)
 
@@ -454,7 +454,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int = 20,
         symbol_types: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Pure keyword search (FTS)."""
         return await self._keyword_search(query, limit, symbol_types)
 
@@ -463,7 +463,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int,
         threshold: float,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Internal semantic search."""
         if not self._vector_store or not self._vector_table:
             return []
@@ -490,7 +490,7 @@ class SqliteLanceDBStore:
                 continue
 
             search_results.append(
-                SearchResult(
+                UnifiedSearchResult(
                     symbol=symbol,
                     score=score,
                     match_type="semantic",
@@ -505,7 +505,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int,
         symbol_types: Optional[List[str]],
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Internal keyword search using graph FTS."""
         if not self._graph_store:
             return []
@@ -520,7 +520,7 @@ class SqliteLanceDBStore:
         for node in nodes:
             symbol = self._node_to_symbol(node)
             results.append(
-                SearchResult(
+                UnifiedSearchResult(
                     symbol=symbol,
                     score=1.0,  # FTS doesn't provide scores
                     match_type="keyword",
@@ -661,7 +661,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         limit: int = 10,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Find semantically similar symbols to given symbol."""
         if not self._initialized:
             await self.initialize()
@@ -685,7 +685,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         similarity_threshold: float = 0.5,
-    ) -> List[SearchResult]:
+    ) -> List[UnifiedSearchResult]:
         """Find symbols that might be affected by changes (graph + semantic).
 
         Combines:
@@ -695,12 +695,12 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        results: Dict[str, SearchResult] = {}
+        results: Dict[str, UnifiedSearchResult] = {}
 
         # Get graph callers (structural impact)
         callers = await self.get_callers(unified_id, max_depth=2)
         for caller in callers:
-            results[caller.unified_id] = SearchResult(
+            results[caller.unified_id] = UnifiedSearchResult(
                 symbol=caller,
                 score=0.9,  # High confidence - direct callers
                 match_type="graph",

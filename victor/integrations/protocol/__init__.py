@@ -29,14 +29,14 @@ from victor.integrations.protocol.interface import (
     VictorProtocol,
     ChatMessage,
     ChatResponse,
-    StreamChunk,
-    SearchResult,
+    ClientStreamChunk,
     ToolCall,
     ToolResult,
     UndoRedoResult,
     AgentMode,
     AgentStatus,
 )
+from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.protocol.adapters import (
     DirectProtocolAdapter,
     HTTPProtocolAdapter,
@@ -48,8 +48,8 @@ __all__ = [
     # Data types
     "ChatMessage",
     "ChatResponse",
-    "StreamChunk",
-    "SearchResult",
+    "ClientStreamChunk",
+    "CodeSearchResult",
     "ToolCall",
     "ToolResult",
     "UndoRedoResult",

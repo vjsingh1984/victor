@@ -34,6 +34,7 @@ from victor.workflows.yaml_loader import (
     load_workflow_from_yaml,
     load_workflows_from_directory,
     _create_simple_condition,
+    _parse_constraints,
     _parse_value,
 )
 
@@ -102,6 +103,83 @@ class TestSimpleCondition:
         condition = _create_simple_condition("status in [active, pending, review]")
         assert condition({"status": "active"}) == "true"
         assert condition({"status": "completed"}) == "false"
+
+
+class TestParseConstraints:
+    """Tests for constraint parsing."""
+
+    def test_none_string_allows_all(self):
+        """constraints: none allows everything."""
+        constraints = _parse_constraints("none")
+        assert constraints.llm_allowed is True
+        assert constraints.network_allowed is True
+        assert constraints.write_allowed is True
+
+    def test_none_in_list_allows_all(self):
+        """constraints: [none] allows everything."""
+        constraints = _parse_constraints(["none"])
+        assert constraints.llm_allowed is True
+        assert constraints.network_allowed is True
+        assert constraints.write_allowed is True
+
+    def test_none_cannot_combine_with_others(self):
+        """constraints: [none, llm] is invalid."""
+        with pytest.raises(YAMLWorkflowError) as exc_info:
+            _parse_constraints(["none", "llm"])
+        assert "cannot be combined" in str(exc_info.value)
+
+    def test_list_blocks_specified(self):
+        """constraints: [llm, network] blocks those items."""
+        constraints = _parse_constraints(["llm", "network"])
+        assert constraints.llm_allowed is False
+        assert constraints.network_allowed is False
+        assert constraints.write_allowed is True  # Not in list
+
+    def test_list_case_insensitive(self):
+        """constraints: [LLM, NETWORK] works."""
+        constraints = _parse_constraints(["LLM", "NETWORK"])
+        assert constraints.llm_allowed is False
+        assert constraints.network_allowed is False
+
+    def test_empty_list_allows_all(self):
+        """constraints: [] allows everything."""
+        constraints = _parse_constraints([])
+        assert constraints.llm_allowed is True
+        assert constraints.network_allowed is True
+        assert constraints.write_allowed is True
+
+    def test_missing_constraints_uses_defaults(self):
+        """No constraints = TaskConstraints defaults."""
+        constraints = _parse_constraints(None)
+        assert constraints.llm_allowed is False  # Default
+        assert constraints.network_allowed is True  # Default
+        assert constraints.write_allowed is False  # Default
+
+    def test_dict_format_legacy_support(self):
+        """Dict format still works for backwards compatibility."""
+        constraints = _parse_constraints(
+            {
+                "llm_allowed": True,
+                "network_allowed": False,
+                "write_allowed": True,
+            }
+        )
+        assert constraints.llm_allowed is True
+        assert constraints.network_allowed is False
+        assert constraints.write_allowed is True
+
+    def test_timeout_passthrough(self):
+        """Timeout is passed through."""
+        constraints = _parse_constraints(["llm"], timeout=120.0)
+        assert constraints.timeout == 120.0
+
+    def test_invalid_string_raises_error(self):
+        """constraints: 'invalid' raises error."""
+        with pytest.raises(YAMLWorkflowError) as exc_info:
+            _parse_constraints("invalid")
+        # Error message includes valid values from enum
+        assert "Invalid constraint string" in str(exc_info.value)
+        assert "Valid values" in str(exc_info.value)
 
 
 class TestLoadWorkflowFromDict:

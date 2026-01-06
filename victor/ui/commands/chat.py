@@ -676,7 +676,7 @@ async def _run_cli_repl(
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
     panel_content = (
-        f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
+        f"[bold blue]Victor[/] - Open-source AI coding assistant\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
         f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
         f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."

@@ -3,16 +3,16 @@
 
 """File editing and transaction support.
 
-This module re-exports from the core victor.editing module for backward
+This module re-exports from the core victor.processing.editing module for backward
 compatibility. The file editing infrastructure is now part of victor-core
 and available to all verticals.
 
-For new code, prefer importing directly from victor.editing:
-    from victor.editing import FileEditor, EditTransaction
+For new code, prefer importing directly from victor.processing.editing:
+    from victor.processing.editing import FileEditor, EditTransaction
 """
 
 # Re-export from victor-core
-from victor.editing import (
+from victor.processing.editing import (
     OperationType,
     EditOperation,
     EditTransaction,

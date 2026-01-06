@@ -59,8 +59,12 @@ class AgenticValidationType(Enum):
 
 
 @dataclass
-class ToolCall:
-    """Record of a tool invocation during task execution."""
+class EvalToolCall:
+    """Record of a tool invocation during evaluation task execution.
+
+    Renamed from ToolCall to avoid confusion with victor.agent.tool_calling.base.ToolCall
+    which is the canonical ToolCall for request representation.
+    """
 
     name: str
     arguments: dict[str, Any]
@@ -93,7 +97,7 @@ class AgenticExecutionTrace:
     messages: list[dict[str, str]] = field(default_factory=list)
 
     # Tool usage tracking
-    tool_calls: list[ToolCall] = field(default_factory=list)
+    tool_calls: list[EvalToolCall] = field(default_factory=list)
 
     # File edit tracking
     file_edits: list[FileEdit] = field(default_factory=list)
@@ -656,7 +660,7 @@ class SemanticMatchValidator(AgenticValidator):
         """Lazily load embedding service."""
         if self._embedding_service is None:
             try:
-                from victor.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import EmbeddingService
 
                 self._embedding_service = EmbeddingService.get_instance()
             except ImportError:

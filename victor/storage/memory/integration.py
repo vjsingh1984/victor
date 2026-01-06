@@ -18,13 +18,13 @@ Provides automatic entity extraction from conversation messages
 and entity-enhanced context retrieval.
 
 Example:
-    from victor.memory.integration import EntityAwareConversationStore
+    from victor.storage.memory.integration import EntityMemoryIntegration
 
-    store = EntityAwareConversationStore()
-    store.add_message(session_id, MessageRole.USER, "Let's fix the UserAuth class")
+    integration = EntityMemoryIntegration(entity_memory, conversation_store)
+    await integration.process_message("Let's fix the UserAuth class")
 
     # Entities are automatically extracted
-    entities = await store.get_session_entities(session_id)
+    entities = await integration.get_session_entities()
     # Returns [Entity(name="UserAuth", type=CLASS, ...)]
 """
 

@@ -10,7 +10,7 @@ Example:
     # Advanced usage - use Task for more control
     task = Task(
         prompt="Refactor the auth module",
-        type=TaskType.EDIT,
+        type=FrameworkTaskType.EDIT,
         files=["src/auth.py"],
         constraints={"no_delete": True}
     )
@@ -23,11 +23,18 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional
 
 
-class TaskType(Enum):
-    """Type of task being performed.
+class FrameworkTaskType(Enum):
+    """Framework-level task types for agent operation.
 
-    Task types help the agent optimize its approach and
-    can be used for analytics and debugging.
+    High-level types used by the framework Task class.
+    Uses auto() values for internal identity.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
     """
 
     CHAT = auto()
@@ -78,14 +85,14 @@ class Task:
         # Advanced - explicit Task for more control
         task = Task(
             prompt="Refactor the auth module",
-            type=TaskType.EDIT,
+            type=FrameworkTaskType.EDIT,
             files=["src/auth.py", "src/auth_utils.py"],
             constraints={"preserve_api": True}
         )
     """
 
     prompt: str
-    type: TaskType = TaskType.CHAT
+    type: FrameworkTaskType = FrameworkTaskType.CHAT
     files: List[str] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     constraints: Dict[str, Any] = field(default_factory=dict)

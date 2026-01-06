@@ -21,7 +21,7 @@ from victor.agent.streaming.context import (
     StreamingChatContext,
     create_stream_context,
 )
-from victor.agent.unified_classifier import TaskType
+from victor.agent.unified_classifier import ClassifierTaskType
 
 
 class TestStreamingChatContext:
@@ -204,27 +204,27 @@ class TestStreamingChatContextTaskTypes:
     def test_default_task_type(self):
         """Default task type is DEFAULT."""
         ctx = StreamingChatContext(user_message="test")
-        assert ctx.unified_task_type == TaskType.DEFAULT
+        assert ctx.unified_task_type == ClassifierTaskType.DEFAULT
 
     def test_analysis_task_type(self):
         """Can set ANALYSIS task type."""
         ctx = StreamingChatContext(
             user_message="test",
-            unified_task_type=TaskType.ANALYSIS,
+            unified_task_type=ClassifierTaskType.ANALYSIS,
             is_analysis_task=True,
         )
-        assert ctx.unified_task_type == TaskType.ANALYSIS
+        assert ctx.unified_task_type == ClassifierTaskType.ANALYSIS
         assert ctx.is_analysis_task is True
 
     def test_action_task_type(self):
         """Can set ACTION task type."""
         ctx = StreamingChatContext(
             user_message="test",
-            unified_task_type=TaskType.ACTION,
+            unified_task_type=ClassifierTaskType.ACTION,
             is_action_task=True,
             needs_execution=True,
         )
-        assert ctx.unified_task_type == TaskType.ACTION
+        assert ctx.unified_task_type == ClassifierTaskType.ACTION
         assert ctx.is_action_task is True
         assert ctx.needs_execution is True
 
@@ -232,9 +232,9 @@ class TestStreamingChatContextTaskTypes:
         """Can set GENERATION task type."""
         ctx = StreamingChatContext(
             user_message="test",
-            unified_task_type=TaskType.GENERATION,
+            unified_task_type=ClassifierTaskType.GENERATION,
         )
-        assert ctx.unified_task_type == TaskType.GENERATION
+        assert ctx.unified_task_type == ClassifierTaskType.GENERATION
 
 
 class TestStreamingChatContextGoals:

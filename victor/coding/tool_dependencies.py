@@ -67,6 +67,10 @@ _YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 class CodingToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for coding vertical.
 
+    .. deprecated::
+        Use ``create_vertical_tool_dependency_provider('coding')`` instead.
+        This class is maintained for backward compatibility.
+
     Extends YAMLToolDependencyProvider with coding-specific tool
     relationships, transitions, and sequences loaded from YAML.
 
@@ -77,6 +81,11 @@ class CodingToolDependencyProvider(YAMLToolDependencyProvider):
         victor/coding/tool_dependencies.yaml
 
     Example:
+        # Preferred (new code):
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        provider = create_vertical_tool_dependency_provider("coding")
+
+        # Deprecated (backward compatible):
         provider = CodingToolDependencyProvider()
 
         # Get tool dependencies
@@ -91,7 +100,8 @@ class CodingToolDependencyProvider(YAMLToolDependencyProvider):
     Migration Notes:
         This class previously used hand-coded Python dictionaries. It has
         been migrated to use YAML configuration while maintaining full
-        backward compatibility with the existing interface.
+        backward compatibility with the existing interface. For new code,
+        use create_vertical_tool_dependency_provider('coding') instead.
     """
 
     def __init__(
@@ -104,7 +114,16 @@ class CodingToolDependencyProvider(YAMLToolDependencyProvider):
         Args:
             additional_dependencies: Additional tool dependencies to merge
             additional_sequences: Additional tool sequences to merge
+
+        .. deprecated::
+            Use ``create_vertical_tool_dependency_provider('coding')`` instead.
         """
+        warnings.warn(
+            "CodingToolDependencyProvider is deprecated. "
+            "Use create_vertical_tool_dependency_provider('coding') instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             yaml_path=_YAML_CONFIG_PATH,
             canonicalize=True,

@@ -39,6 +39,14 @@ from victor.workflows.definition import (
     WorkflowNode,
 )
 from victor.workflows.isolation import IsolationMapper
+from victor.workflows.resilience import (
+    CircuitBreaker,
+    CircuitBreakerRegistry,
+    CircuitState,
+    RetryExecutor,
+    retry_policy_to_strategy,
+    get_node_circuit_breaker,
+)
 
 # Chain handler prefix for referencing registered chains
 CHAIN_HANDLER_PREFIX = "chain:"
@@ -50,6 +58,7 @@ if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
     from victor.workflows.services import ServiceRegistry, ServiceConfig
+    from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +81,7 @@ class ComputeHandler(Protocol):
             features = {k: context.get(k) for k in node.input_mapping.values()}
             decision = policy.predict(features)
             context.set(node.output_key, decision)
-            return NodeResult(node.id, NodeStatus.COMPLETED, output=decision)
+            return NodeResult(node.id, ExecutorNodeStatus.COMPLETED, output=decision)
 
         register_compute_handler("rl_decision", rl_decision_handler)
     """
@@ -135,8 +144,14 @@ def list_compute_handlers() -> List[str]:
     return list(_compute_handlers.keys())
 
 
-class NodeStatus(Enum):
-    """Execution status of a workflow node."""
+class ExecutorNodeStatus(Enum):
+    """Execution status of a workflow executor node.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - ExecutorNodeStatus (here): Executor node status
+    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
+    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
+    """
 
     PENDING = "pending"
     RUNNING = "running"
@@ -159,7 +174,7 @@ class NodeResult:
     """
 
     node_id: str
-    status: NodeStatus
+    status: ExecutorNodeStatus
     output: Optional[Any] = None
     error: Optional[str] = None
     duration_seconds: float = 0.0
@@ -168,7 +183,7 @@ class NodeResult:
     @property
     def success(self) -> bool:
         """Check if node completed successfully."""
-        return self.status == NodeStatus.COMPLETED
+        return self.status == ExecutorNodeStatus.COMPLETED
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
@@ -331,7 +346,7 @@ class WorkflowContext:
 
     def has_failures(self) -> bool:
         """Check if any nodes failed."""
-        return any(r.status == NodeStatus.FAILED for r in self.node_results.values())
+        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
 
     def get_outputs(self) -> Dict[str, Any]:
         """Get all successful node outputs."""
@@ -655,6 +670,7 @@ class WorkflowExecutor:
                 "execution_id": execution_id,
                 "workflow_name": workflow.name,
                 "thread_id": thread_id,
+                "workflow": workflow,  # Required for parallel node execution
             },
             temporal=temporal_context,
         )
@@ -782,12 +798,12 @@ class WorkflowExecutor:
                 workflow_name=workflow.name,
                 node_id=node_id,
                 node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
-                success=result.status == NodeStatus.COMPLETED,
+                success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
 
             # If failed, stop unless configured to continue
-            if result.status == NodeStatus.FAILED:
+            if result.status == ExecutorNodeStatus.FAILED:
                 if not workflow.metadata.get("continue_on_failure", False):
                     logger.warning(f"Stopping workflow due to node failure: {node_id}")
                     break
@@ -831,6 +847,7 @@ class WorkflowExecutor:
 
         Checks cache for cacheable nodes before execution.
         Caches successful results for deterministic nodes.
+        Applies retry policy and circuit breaker when configured.
 
         Args:
             node: Node to execute
@@ -857,6 +874,105 @@ class WorkflowExecutor:
                     tool_calls_used=cached_result.tool_calls_used,
                 )
 
+        # Check circuit breaker if enabled
+        circuit_breaker = None
+        if getattr(node, "circuit_breaker_enabled", False):
+            circuit_breaker = get_node_circuit_breaker(node.id)
+            if not circuit_breaker.can_execute():
+                logger.warning(
+                    f"Circuit breaker OPEN for node '{node.id}', "
+                    f"state: {circuit_breaker.state.name}"
+                )
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.FAILED,
+                    error=f"Circuit breaker is {circuit_breaker.state.name}",
+                    duration_seconds=time.time() - start_time,
+                )
+
+        # Execute with or without retry policy
+        retry_policy = getattr(node, "retry_policy", None)
+        if retry_policy:
+            result = await self._execute_node_with_retry(node, context, start_time, retry_policy)
+        else:
+            result = await self._execute_node_inner(node, context, start_time)
+
+        # Update circuit breaker state
+        if circuit_breaker:
+            if result.success:
+                circuit_breaker.record_success()
+            else:
+                circuit_breaker.record_failure()
+
+        # Cache successful results for cacheable nodes
+        if self._cache is not None and result.success:
+            self._cache.set(node, context.data, result)
+
+        return result
+
+    async def _execute_node_with_retry(
+        self,
+        node: WorkflowNode,
+        context: WorkflowContext,
+        start_time: float,
+        retry_policy: "RetryPolicy",
+    ) -> NodeResult:
+        """Execute node with retry policy.
+
+        Args:
+            node: Node to execute
+            context: Execution context
+            start_time: Node start time
+            retry_policy: Retry policy to apply
+
+        Returns:
+            NodeResult with execution outcome
+        """
+        from victor.workflows.protocols import RetryPolicy as WorkflowRetryPolicy
+
+        strategy = retry_policy_to_strategy(retry_policy)
+        executor = RetryExecutor(strategy)
+
+        async def execute_func() -> NodeResult:
+            return await self._execute_node_inner(node, context, start_time)
+
+        retry_result = await executor.execute(execute_func)
+
+        if retry_result.success:
+            logger.debug(f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)")
+            return retry_result.result
+        else:
+            logger.warning(
+                f"Node '{node.id}' failed after {retry_result.attempts} attempt(s): "
+                f"{retry_result.last_exception}"
+            )
+            return NodeResult(
+                node_id=node.id,
+                status=ExecutorNodeStatus.FAILED,
+                error=(
+                    str(retry_result.last_exception)
+                    if retry_result.last_exception
+                    else "Retry exhausted"
+                ),
+                duration_seconds=time.time() - start_time,
+            )
+
+    async def _execute_node_inner(
+        self,
+        node: WorkflowNode,
+        context: WorkflowContext,
+        start_time: float,
+    ) -> NodeResult:
+        """Execute a single workflow node (inner logic).
+
+        Args:
+            node: Node to execute
+            context: Execution context
+            start_time: Node start time
+
+        Returns:
+            NodeResult with execution outcome
+        """
         try:
             if isinstance(node, AgentNode):
                 result = await self._execute_agent_node(node, context, start_time)
@@ -877,13 +993,9 @@ class WorkflowExecutor:
                 # Unknown node type - skip
                 result = NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.SKIPPED,
+                    status=ExecutorNodeStatus.SKIPPED,
                     duration_seconds=time.time() - start_time,
                 )
-
-            # Cache successful results for cacheable nodes
-            if self._cache is not None and result.success:
-                self._cache.set(node, context.data, result)
 
             return result
 
@@ -891,7 +1003,7 @@ class WorkflowExecutor:
             logger.error(f"Node '{node.id}' failed: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
@@ -942,7 +1054,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,
@@ -952,33 +1064,38 @@ class WorkflowExecutor:
     def _build_agent_task(self, node: AgentNode, context: WorkflowContext) -> str:
         """Build task string for an agent node.
 
+        Performs template substitution on node.goal using input_mapping values,
+        allowing YAML workflows to use {placeholder} syntax in goal templates.
+
         Args:
             node: Agent node
             context: Execution context
 
         Returns:
-            Task description for agent
+            Task description for agent with placeholders substituted
         """
-        lines = [node.goal]
+        import json
 
-        # Add mapped inputs from context
+        # Build substitution dict from input_mapping
+        substitutions = {}
         if node.input_mapping:
-            lines.append("\n## Context")
             for param, key in node.input_mapping.items():
                 value = context.get(key)
                 if value is not None:
-                    lines.append(f"- **{param}**: {value}")
+                    # Convert complex objects to string for template substitution
+                    if not isinstance(value, str):
+                        try:
+                            value = json.dumps(value, indent=2, default=str)
+                        except (TypeError, ValueError):
+                            value = str(value)
+                    substitutions[param] = value
 
-        # Add outputs from previous nodes
-        outputs = context.get_outputs()
-        if outputs:
-            lines.append("\n## Previous Results")
-            for output_key, output_value in outputs.items():
-                if isinstance(output_value, str) and len(output_value) > 200:
-                    output_value = output_value[:200] + "..."
-                lines.append(f"- **{output_key}**: {output_value}")
+        # Substitute placeholders in goal template (e.g., {symbol} -> "AAPL")
+        goal = node.goal
+        for key, value in substitutions.items():
+            goal = goal.replace(f"{{{key}}}", value)
 
-        return "\n".join(lines)
+        return goal
 
     async def _execute_condition_node(
         self,
@@ -1002,7 +1119,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output={"branch": branch, "next_node": next_node},
                 duration_seconds=time.time() - start_time,
             )
@@ -1010,7 +1127,7 @@ class WorkflowExecutor:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Condition evaluation failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1047,7 +1164,7 @@ class WorkflowExecutor:
         if not parallel_nodes:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.SKIPPED,
+                status=ExecutorNodeStatus.SKIPPED,
                 duration_seconds=time.time() - start_time,
             )
 
@@ -1068,7 +1185,7 @@ class WorkflowExecutor:
                 node_results.append(
                     NodeResult(
                         node_id="unknown",
-                        status=NodeStatus.FAILED,
+                        status=ExecutorNodeStatus.FAILED,
                         error=str(r),
                     )
                 )
@@ -1088,7 +1205,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
             output={"results": [r.output for r in node_results if r.output]},
             duration_seconds=time.time() - start_time,
             tool_calls_used=total_tools,
@@ -1116,7 +1233,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=new_data,
                 duration_seconds=time.time() - start_time,
             )
@@ -1124,7 +1241,7 @@ class WorkflowExecutor:
         except Exception as e:
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Transform failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1199,7 +1316,7 @@ class WorkflowExecutor:
             if not allowed_tools and node.tools:
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error="All tools blocked by constraints",
                     duration_seconds=time.time() - start_time,
                 )
@@ -1250,7 +1367,7 @@ class WorkflowExecutor:
                     if tool_calls_used > constraints.max_tool_calls:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1262,7 +1379,7 @@ class WorkflowExecutor:
                     elif node.fail_fast:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Tool '{tool_name}' failed: {result.error}",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1274,7 +1391,7 @@ class WorkflowExecutor:
                     if tool_calls_used >= constraints.max_tool_calls:
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.FAILED,
+                            status=ExecutorNodeStatus.FAILED,
                             error=f"Exceeded max tool calls ({constraints.max_tool_calls})",
                             output=outputs,
                             duration_seconds=time.time() - start_time,
@@ -1299,7 +1416,7 @@ class WorkflowExecutor:
                         elif node.fail_fast:
                             return NodeResult(
                                 node_id=node.id,
-                                status=NodeStatus.FAILED,
+                                status=ExecutorNodeStatus.FAILED,
                                 error=f"Tool '{tool_name}' failed: {result.error}",
                                 output=outputs,
                                 duration_seconds=time.time() - start_time,
@@ -1310,7 +1427,7 @@ class WorkflowExecutor:
                         if node.fail_fast:
                             return NodeResult(
                                 node_id=node.id,
-                                status=NodeStatus.FAILED,
+                                status=ExecutorNodeStatus.FAILED,
                                 error=f"Tool '{tool_name}' timed out after {constraints.timeout}s",
                                 output=outputs,
                                 duration_seconds=time.time() - start_time,
@@ -1323,7 +1440,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=outputs,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=tool_calls_used,
@@ -1333,7 +1450,7 @@ class WorkflowExecutor:
             logger.error(f"ComputeNode '{node.id}' failed: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Compute failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1420,7 +1537,7 @@ class WorkflowExecutor:
                 logger.error(f"Chain '{chain_name}' not found in registry")
                 return NodeResult(
                     node_id=node.id,
-                    status=NodeStatus.FAILED,
+                    status=ExecutorNodeStatus.FAILED,
                     error=f"Chain '{chain_name}' not found in ChainRegistry",
                     duration_seconds=time.time() - start_time,
                 )
@@ -1459,7 +1576,7 @@ class WorkflowExecutor:
 
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.COMPLETED,
+                status=ExecutorNodeStatus.COMPLETED,
                 output=result,
                 duration_seconds=time.time() - start_time,
             )
@@ -1468,7 +1585,7 @@ class WorkflowExecutor:
             logger.error(f"Chain execution failed for node {node.id}: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
-                status=NodeStatus.FAILED,
+                status=ExecutorNodeStatus.FAILED,
                 error=f"Chain execution failed: {e}",
                 duration_seconds=time.time() - start_time,
             )
@@ -1641,7 +1758,7 @@ class WorkflowExecutor:
 
 __all__ = [
     # Core types
-    "NodeStatus",
+    "ExecutorNodeStatus",
     "NodeResult",
     "WorkflowContext",
     "WorkflowResult",

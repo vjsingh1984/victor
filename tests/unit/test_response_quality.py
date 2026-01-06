@@ -18,7 +18,7 @@ import pytest
 
 from victor.agent.response_quality import (
     DimensionScore,
-    QualityDimension,
+    ResponseQualityDimension,
     QualityGate,
     QualityResult,
     ResponseQualityScorer,
@@ -32,14 +32,14 @@ class TestDimensionScore:
     def test_creation(self):
         """Test creating a dimension score."""
         score = DimensionScore(
-            dimension=QualityDimension.RELEVANCE,
+            dimension=ResponseQualityDimension.RELEVANCE,
             score=0.8,
             weight=1.5,
             feedback="Good relevance",
             evidence=["Term coverage: 80%"],
         )
 
-        assert score.dimension == QualityDimension.RELEVANCE
+        assert score.dimension == ResponseQualityDimension.RELEVANCE
         assert score.score == 0.8
         assert score.weight == 1.5
         assert "Good relevance" in score.feedback
@@ -53,24 +53,28 @@ class TestQualityResult:
         result = QualityResult(
             overall_score=0.75,
             dimension_scores=[
-                DimensionScore(dimension=QualityDimension.RELEVANCE, score=0.8, weight=1.0),
-                DimensionScore(dimension=QualityDimension.COMPLETENESS, score=0.7, weight=1.0),
+                DimensionScore(dimension=ResponseQualityDimension.RELEVANCE, score=0.8, weight=1.0),
+                DimensionScore(
+                    dimension=ResponseQualityDimension.COMPLETENESS, score=0.7, weight=1.0
+                ),
             ],
             passes_threshold=True,
         )
 
-        assert result.get_dimension_score(QualityDimension.RELEVANCE) == 0.8
-        assert result.get_dimension_score(QualityDimension.COMPLETENESS) == 0.7
-        assert result.get_dimension_score(QualityDimension.ACCURACY) is None
+        assert result.get_dimension_score(ResponseQualityDimension.RELEVANCE) == 0.8
+        assert result.get_dimension_score(ResponseQualityDimension.COMPLETENESS) == 0.7
+        assert result.get_dimension_score(ResponseQualityDimension.ACCURACY) is None
 
     def test_get_weakest_dimensions(self):
         """Should return weakest scoring dimensions."""
         result = QualityResult(
             overall_score=0.7,
             dimension_scores=[
-                DimensionScore(dimension=QualityDimension.RELEVANCE, score=0.9, weight=1.0),
-                DimensionScore(dimension=QualityDimension.COMPLETENESS, score=0.5, weight=1.0),
-                DimensionScore(dimension=QualityDimension.ACCURACY, score=0.6, weight=1.0),
+                DimensionScore(dimension=ResponseQualityDimension.RELEVANCE, score=0.9, weight=1.0),
+                DimensionScore(
+                    dimension=ResponseQualityDimension.COMPLETENESS, score=0.5, weight=1.0
+                ),
+                DimensionScore(dimension=ResponseQualityDimension.ACCURACY, score=0.6, weight=1.0),
             ],
             passes_threshold=True,
         )
@@ -144,8 +148,8 @@ class TestResponseQualityScorer:
         relevant_result = await scorer.score(query, relevant_response)
         irrelevant_result = await scorer.score(query, irrelevant_response)
 
-        relevant_score = relevant_result.get_dimension_score(QualityDimension.RELEVANCE)
-        irrelevant_score = irrelevant_result.get_dimension_score(QualityDimension.RELEVANCE)
+        relevant_score = relevant_result.get_dimension_score(ResponseQualityDimension.RELEVANCE)
+        irrelevant_score = irrelevant_result.get_dimension_score(ResponseQualityDimension.RELEVANCE)
 
         assert relevant_score > irrelevant_score
 
@@ -168,9 +172,11 @@ class TestResponseQualityScorer:
         with_code_result = await scorer.score(query, with_code)
         without_code_result = await scorer.score(query, without_code)
 
-        with_code_completeness = with_code_result.get_dimension_score(QualityDimension.COMPLETENESS)
+        with_code_completeness = with_code_result.get_dimension_score(
+            ResponseQualityDimension.COMPLETENESS
+        )
         without_code_completeness = without_code_result.get_dimension_score(
-            QualityDimension.COMPLETENESS
+            ResponseQualityDimension.COMPLETENESS
         )
 
         assert with_code_completeness > without_code_completeness
@@ -192,8 +198,8 @@ class TestResponseQualityScorer:
         concise_result = await scorer.score(query, concise)
         verbose_result = await scorer.score(query, verbose)
 
-        concise_score = concise_result.get_dimension_score(QualityDimension.CONCISENESS)
-        verbose_score = verbose_result.get_dimension_score(QualityDimension.CONCISENESS)
+        concise_score = concise_result.get_dimension_score(ResponseQualityDimension.CONCISENESS)
+        verbose_score = verbose_result.get_dimension_score(ResponseQualityDimension.CONCISENESS)
 
         # Both scores should be valid floats
         assert concise_score is not None
@@ -231,9 +237,11 @@ class TestResponseQualityScorer:
         actionable_result = await scorer.score(query, actionable)
         not_actionable_result = await scorer.score(query, not_actionable)
 
-        actionable_score = actionable_result.get_dimension_score(QualityDimension.ACTIONABILITY)
+        actionable_score = actionable_result.get_dimension_score(
+            ResponseQualityDimension.ACTIONABILITY
+        )
         not_actionable_score = not_actionable_result.get_dimension_score(
-            QualityDimension.ACTIONABILITY
+            ResponseQualityDimension.ACTIONABILITY
         )
 
         assert actionable_score > not_actionable_score
@@ -258,8 +266,8 @@ class TestResponseQualityScorer:
         coherent_result = await scorer.score(query, coherent)
         incoherent_result = await scorer.score(query, incoherent)
 
-        coherent_score = coherent_result.get_dimension_score(QualityDimension.COHERENCE)
-        incoherent_score = incoherent_result.get_dimension_score(QualityDimension.COHERENCE)
+        coherent_score = coherent_result.get_dimension_score(ResponseQualityDimension.COHERENCE)
+        incoherent_score = incoherent_result.get_dimension_score(ResponseQualityDimension.COHERENCE)
 
         # Both should be valid scores
         assert coherent_score is not None
@@ -295,8 +303,8 @@ class TestResponseQualityScorer:
         good_result = await scorer.score(query, good_code)
         bad_result = await scorer.score(query, bad_code)
 
-        good_score = good_result.get_dimension_score(QualityDimension.CODE_QUALITY)
-        bad_score = bad_result.get_dimension_score(QualityDimension.CODE_QUALITY)
+        good_score = good_result.get_dimension_score(ResponseQualityDimension.CODE_QUALITY)
+        bad_score = bad_result.get_dimension_score(ResponseQualityDimension.CODE_QUALITY)
 
         # Good code should score better
         assert good_score is None or good_score >= bad_score if bad_score else True
@@ -314,7 +322,7 @@ class TestResponseQualityScorer:
     @pytest.mark.asyncio
     async def test_custom_dimension_weights(self):
         """Should apply custom dimension weights."""
-        config = ScorerConfig(dimension_weights={QualityDimension.RELEVANCE: 2.0})
+        config = ScorerConfig(dimension_weights={ResponseQualityDimension.RELEVANCE: 2.0})
         scorer = ResponseQualityScorer(config=config)
 
         query = "Test query"
@@ -323,7 +331,7 @@ class TestResponseQualityScorer:
         result = await scorer.score(query, response)
 
         relevance_dim = next(
-            d for d in result.dimension_scores if d.dimension == QualityDimension.RELEVANCE
+            d for d in result.dimension_scores if d.dimension == ResponseQualityDimension.RELEVANCE
         )
         assert relevance_dim.weight == 2.0
 
@@ -410,7 +418,7 @@ class TestQualityGate:
         gate = QualityGate(
             scorer,
             min_score=0.5,
-            required_dimensions=[QualityDimension.RELEVANCE],
+            required_dimensions=[ResponseQualityDimension.RELEVANCE],
         )
 
         query = "How do I sort a list in Python?"
@@ -420,7 +428,7 @@ class TestQualityGate:
         passes, result = await gate.check(query, response)
 
         # Should fail due to low relevance even if overall score is acceptable
-        relevance_score = result.get_dimension_score(QualityDimension.RELEVANCE)
+        relevance_score = result.get_dimension_score(ResponseQualityDimension.RELEVANCE)
         if relevance_score and relevance_score < scorer.config.dimension_threshold:
             assert not passes
 
@@ -458,7 +466,7 @@ class TestScoringEdgeCases:
 
         assert isinstance(result, QualityResult)
         # Should penalize for verbosity/repetition
-        conciseness = result.get_dimension_score(QualityDimension.CONCISENESS)
+        conciseness = result.get_dimension_score(ResponseQualityDimension.CONCISENESS)
         assert conciseness is not None
 
     @pytest.mark.asyncio

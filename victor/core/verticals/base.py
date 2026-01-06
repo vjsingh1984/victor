@@ -629,6 +629,39 @@ class VerticalBase(ABC):
         return None
 
     @classmethod
+    def get_tool_graph(cls) -> Optional[Any]:
+        """Get tool execution graph for this vertical.
+
+        Override to provide a custom ToolExecutionGraph that defines
+        tool dependencies, transitions, and execution sequences.
+        The graph is registered with the global ToolGraphRegistry.
+
+        Returns:
+            ToolExecutionGraph instance or None (no graph registered)
+        """
+        return None
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for workflow execution.
+
+        Override to provide domain-specific handlers for workflow nodes.
+        These handlers are registered with the HandlerRegistry during
+        vertical integration, replacing the previous import-side-effect
+        registration pattern.
+
+        Example:
+            @classmethod
+            def get_handlers(cls) -> Dict[str, Any]:
+                from victor.coding.handlers import HANDLERS
+                return HANDLERS
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        return {}
+
+    @classmethod
     def get_tiered_tools(cls) -> Optional[Any]:
         """Get tiered tool configuration for intelligent selection.
 
@@ -1091,10 +1124,22 @@ class VerticalRegistry:
         return list(cls._registry.keys())
 
     @classmethod
-    def clear(cls) -> None:
-        """Clear all registered verticals (for testing)."""
+    def clear(cls, *, reregister_builtins: bool = True) -> None:
+        """Clear all registered verticals (for testing).
+
+        Args:
+            reregister_builtins: If True (default), re-register built-in verticals
+                after clearing. This prevents test pollution where clearing in one
+                test affects other tests that expect built-ins to be available.
+        """
         cls._registry.clear()
         cls._external_discovered = False
+
+        if reregister_builtins:
+            # Re-register built-in verticals to prevent test pollution
+            from victor.core.verticals import _register_builtin_verticals
+
+            _register_builtin_verticals()
 
     @classmethod
     def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:

@@ -175,7 +175,7 @@ async def mock_agent_callback(
     trace.end_time = time.time()
     trace.messages = [
         {"role": "user", "content": task.prompt},
-        {"role": "assistant", "content": f"I'll fix the issue in main.py"},
+        {"role": "assistant", "content": "I'll fix the issue in main.py"},
     ]
 
     return trace

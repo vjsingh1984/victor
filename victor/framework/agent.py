@@ -31,7 +31,7 @@ from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.agent.teams.team import TeamFormation
+    from victor.teams import TeamFormation
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
@@ -331,7 +331,7 @@ class Agent:
                 formation=TeamFormation.HIERARCHICAL,
             )
         """
-        from victor.agent.teams.team import TeamFormation as TF
+        from victor.teams import TeamFormation as TF
         from victor.framework.teams import AgentTeam
 
         # Default to SEQUENTIAL if not specified

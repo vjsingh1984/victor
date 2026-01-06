@@ -5,6 +5,61 @@
 # - Feature and positioning analysis
 # - Market trend research
 # - Strategic recommendations
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for market research and competitor websites)            │
+# │   - Write access (for competitive analysis report output)                   │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - web_search: Market size data, industry reports, news                    │
+# │   - web_fetch: Competitor websites, pricing pages, feature lists            │
+# │   - External APIs: Crunchbase, LinkedIn (if available)                      │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ competitor_limit: 10 (max competitors for detailed analysis)                │
+# │ threat_levels: HIGH, MEDIUM, EMERGING, LOW                                  │
+# │ analysis_depth: comprehensive (alt: quick_scan for competitive_scan)        │
+# │ hitl_timeout: 900s (15 min for review and feedback)                         │
+# │ report_max_tokens: 10000 (comprehensive competitive analysis)               │
+# │ quick_scan_limit: 5 competitors (for competitive_scan workflow)             │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes: NONE in this workflow                                         │
+# │                                                                              │
+# │ AGENT nodes (ALL require LLM reasoning):                                     │
+# │   - define_market: INTERPRETING market boundaries and segments              │
+# │   - identify_competitors: CATEGORIZING companies by competitive threat      │
+# │   - product_analysis: COMPARING features (not just listing them)            │
+# │   - pricing_research: ANALYZING pricing strategy intent                     │
+# │   - positioning_research: UNDERSTANDING brand perception and messaging      │
+# │   - threat_assessment: EVALUATING competitive strength (subjective)         │
+# │   - swot_analysis: SYNTHESIZING strengths/weaknesses/opps/threats           │
+# │   - generate_recommendations: STRATEGIC advice requiring business acumen    │
+# │   - generate_report: WRITING executive-level analysis                       │
+# │                                                                              │
+# │ Competitive analysis is strategic work requiring:                           │
+# │   - Understanding market dynamics and customer needs                        │
+# │   - Interpreting competitor positioning and strategy                        │
+# │   - Evaluating competitive threats (not just listing features)              │
+# │   - Synthesizing SWOT with actionable recommendations                       │
+# │   - Writing persuasive business recommendations                             │
+# │                                                                              │
+# │ Even "aggregate research" requires understanding what each data point       │
+# │ means for competitive positioning - pure merging would lose context.        │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   competitive_analysis:

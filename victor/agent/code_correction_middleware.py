@@ -42,7 +42,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 
 from victor.evaluation.correction import (
     SelfCorrector,
-    ValidationResult,
+    CodeValidationResult,
     CorrectionFeedback,
     Language,
     detect_language,
@@ -90,7 +90,7 @@ class CorrectionResult:
 
     original_code: str
     corrected_code: str
-    validation: ValidationResult
+    validation: CodeValidationResult
     was_corrected: bool
     feedback: Optional[CorrectionFeedback] = None
 
@@ -186,7 +186,7 @@ class CodeCorrectionMiddleware:
 
         if not code_arg:
             return CorrectionResult(
-                "", "", ValidationResult(True, Language.UNKNOWN, True, True, (), ()), False
+                "", "", CodeValidationResult(True, Language.UNKNOWN, True, True, (), ()), False
             )
 
         arg_name, code = code_arg

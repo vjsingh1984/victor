@@ -58,7 +58,17 @@ from victor.tools.bash import shell  # noqa: E402
 
 @pytest.fixture
 async def ollama_coding_provider():
-    """Create Ollama provider with a coding model."""
+    """Create Ollama provider with a coding model.
+
+    Best models for tool-calling (in order of reliability):
+    1. qwen2.5-coder:32b - Excellent tool calling, best overall
+    2. qwen2.5-coder:14b - Good balance of speed/capability
+    3. llama3.1:70b - Strong tool support
+    4. mistral-nemo:12b - Decent tool calling
+    5. qwen2.5-coder:7b - Minimum viable, may be unreliable
+
+    Note: Smaller models (<7B) generally have poor tool-calling reliability.
+    """
     provider = OllamaProvider(base_url="http://localhost:11434")
 
     try:
@@ -67,35 +77,66 @@ async def ollama_coding_provider():
         if not models:
             pytest.skip("No models available in Ollama")
 
-        # Look for a coding model with good tool-calling support
-        # Prioritize latest models with best tool-call benchmarks (MTEB/Berkeley)
-        # qwen3-coder:30b, deepseek-coder-v2, qwen2.5-coder:32b are best for tool use
+        # Models with best tool-calling support (prioritized by reliability)
+        # Based on MTEB/Berkeley Function Calling benchmarks
         preferred_models = [
-            "qwen3-coder:30b",  # Latest Qwen3 coder with tool support
-            "qwen2.5-coder:32b",  # Excellent tool calling
-            "deepseek-coder-v2:16b",  # Strong tool-use with MoE efficiency
-            "qwen2.5-coder:14b",  # Good balance of speed/capability
-            "deepseek-coder:33b",  # Large model, reliable tools
-            "qwen2.5-coder:7b",  # Minimum viable for tool use
+            # User's local models
+            "gpt-oss",
+            "gpt-oss:latest",
+            # Qwen 2.5 series - best open-source tool calling
+            "qwen2.5-coder:32b",
+            "qwen2.5-coder:14b",
+            "qwen2.5-coder:7b",
+            "qwen2.5:32b",
+            "qwen2.5:14b",
+            "qwen2.5:7b",
+            # Llama 3.1 series - good tool support
+            "llama3.1:70b",
+            "llama3.1:8b",
+            # Mistral series
+            "mistral-nemo:12b",
+            "mistral:7b",
+            # DeepSeek
+            "deepseek-coder-v2:16b",
+            "deepseek-coder:33b",
+            # Qwen 3 (if available)
+            "qwen3-coder:30b",
         ]
 
         available_names = [m["name"] for m in models]
+
+        # First try exact matches from preferred list
         coding_models = [m for m in preferred_models if m in available_names]
 
+        # Then try partial matches (e.g., "qwen2.5-coder:7b-instruct" matches "qwen2.5-coder")
         if not coding_models:
-            # Fallback to any 14b+ coding model
-            coding_models = [
-                m["name"]
-                for m in models
-                if any(kw in m["name"].lower() for kw in ["coder", "code"])
-                and any(size in m["name"] for size in ["14b", "16b", "30b", "32b", "33b", "70b"])
-            ]
+            for preferred in preferred_models:
+                base_name = preferred.split(":")[0]
+                matches = [n for n in available_names if base_name in n]
+                if matches:
+                    coding_models = matches[:1]
+                    break
 
         if not coding_models:
-            pytest.skip("No suitable coding model (14B+) with tool-call support available")
+            # Fallback: use any available model with a warning
+            print("\n⚠️  WARNING: No preferred tool-calling model found.")
+            print("Available models:", available_names)
+            print("For best results, pull: ollama pull qwen2.5-coder:7b")
 
-        print(f"\nUsing model: {coding_models[0]}")
-        provider.default_model = coding_models[0]
+            # Use whatever is available
+            if available_names:
+                coding_models = [available_names[0]]
+            else:
+                pytest.skip("No models available in Ollama")
+
+        selected_model = coding_models[0]
+        print(f"\n✓ Using model: {selected_model}")
+
+        # Warn if using a small model
+        if any(size in selected_model for size in [":1b", ":3b", ":4b"]):
+            print("⚠️  Small model detected - tool calling may be unreliable")
+
+        provider.default_model = selected_model
         yield provider
 
     except ConnectError:
@@ -136,7 +177,10 @@ async def agent_with_tools(ollama_coding_provider):
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
+@pytest.mark.xfail(
+    reason="LLM tool-calling is non-deterministic. Best with qwen2.5-coder:14b+",
+    strict=False,
+)
 async def test_full_code_lifecycle_simple(agent_with_tools, temp_workspace):
     """Test creating, enhancing, and executing a simple Python script.
 
@@ -249,7 +293,10 @@ Read the file first, then write the enhanced version."""
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
+@pytest.mark.xfail(
+    reason="LLM tool-calling is non-deterministic. Best with qwen2.5-coder:14b+",
+    strict=False,
+)
 async def test_code_lifecycle_with_bugs(agent_with_tools, temp_workspace):
     """Test creating code with bugs, detecting them, fixing, and re-executing.
 
@@ -365,7 +412,10 @@ and write the corrected version."""
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-@pytest.mark.xfail(reason="Flaky - depends on non-deterministic LLM output", strict=False)
+@pytest.mark.xfail(
+    reason="LLM tool-calling is non-deterministic. Best with qwen2.5-coder:14b+",
+    strict=False,
+)
 async def test_code_lifecycle_minimal(ollama_coding_provider, temp_workspace):
     """Minimal test that doesn't rely on agent understanding tool usage.
 

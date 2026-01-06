@@ -17,7 +17,7 @@
 import pytest
 from victor.agent.safety import (
     ConfirmationRequest,
-    RiskLevel,
+    OperationalRiskLevel,
     SafetyChecker,
     _RISK_ORDER,
     get_safety_checker,
@@ -25,20 +25,20 @@ from victor.agent.safety import (
 )
 
 
-class TestRiskLevel:
-    """Tests for RiskLevel enum and ordering."""
+class TestOperationalRiskLevel:
+    """Tests for OperationalRiskLevel enum and ordering."""
 
     def test_risk_order_completeness(self):
-        """All RiskLevel values should be in _RISK_ORDER."""
-        for level in RiskLevel:
+        """All OperationalRiskLevel values should be in _RISK_ORDER."""
+        for level in OperationalRiskLevel:
             assert level in _RISK_ORDER
 
     def test_risk_order_values(self):
         """Risk levels should be ordered correctly."""
-        assert _RISK_ORDER[RiskLevel.SAFE] < _RISK_ORDER[RiskLevel.LOW]
-        assert _RISK_ORDER[RiskLevel.LOW] < _RISK_ORDER[RiskLevel.MEDIUM]
-        assert _RISK_ORDER[RiskLevel.MEDIUM] < _RISK_ORDER[RiskLevel.HIGH]
-        assert _RISK_ORDER[RiskLevel.HIGH] < _RISK_ORDER[RiskLevel.CRITICAL]
+        assert _RISK_ORDER[OperationalRiskLevel.SAFE] < _RISK_ORDER[OperationalRiskLevel.LOW]
+        assert _RISK_ORDER[OperationalRiskLevel.LOW] < _RISK_ORDER[OperationalRiskLevel.MEDIUM]
+        assert _RISK_ORDER[OperationalRiskLevel.MEDIUM] < _RISK_ORDER[OperationalRiskLevel.HIGH]
+        assert _RISK_ORDER[OperationalRiskLevel.HIGH] < _RISK_ORDER[OperationalRiskLevel.CRITICAL]
 
 
 class TestSafetyChecker:
@@ -57,7 +57,7 @@ class TestSafetyChecker:
         ]
         for cmd in safe_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == RiskLevel.SAFE, f"'{cmd}' should be SAFE but got {level}"
+            assert level == OperationalRiskLevel.SAFE, f"'{cmd}' should be SAFE but got {level}"
             assert details == []
 
     def test_check_bash_medium_risk(self):
@@ -70,7 +70,7 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in medium_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == RiskLevel.MEDIUM, f"'{cmd}' should be MEDIUM but got {level}"
+            assert level == OperationalRiskLevel.MEDIUM, f"'{cmd}' should be MEDIUM but got {level}"
             assert any(
                 expected_detail in d for d in details
             ), f"Expected '{expected_detail}' in {details}"
@@ -86,7 +86,7 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in high_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == RiskLevel.HIGH, f"'{cmd}' should be HIGH but got {level}"
+            assert level == OperationalRiskLevel.HIGH, f"'{cmd}' should be HIGH but got {level}"
             assert any(
                 expected_detail.lower() in d.lower() for d in details
             ), f"Expected '{expected_detail}' in {details}"
@@ -101,7 +101,9 @@ class TestSafetyChecker:
         ]
         for cmd, expected_detail in critical_commands:
             level, details = checker.check_bash_command(cmd)
-            assert level == RiskLevel.CRITICAL, f"'{cmd}' should be CRITICAL but got {level}"
+            assert (
+                level == OperationalRiskLevel.CRITICAL
+            ), f"'{cmd}' should be CRITICAL but got {level}"
             assert any(
                 expected_detail.lower() in d.lower() for d in details
             ), f"Expected '{expected_detail}' in {details}"
@@ -117,20 +119,22 @@ class TestSafetyChecker:
         ]
         for file_path in sensitive_files:
             level, details = checker.check_file_operation("write", file_path)
-            assert level == RiskLevel.HIGH, f"'{file_path}' should be HIGH risk but got {level}"
+            assert (
+                level == OperationalRiskLevel.HIGH
+            ), f"'{file_path}' should be HIGH risk but got {level}"
 
     def test_check_file_operation_delete(self):
         """Delete operations should be HIGH risk."""
         checker = SafetyChecker()
         level, details = checker.check_file_operation("delete", "/path/to/file.txt")
-        assert level == RiskLevel.HIGH
+        assert level == OperationalRiskLevel.HIGH
         assert any("deleting" in d.lower() for d in details)
 
     def test_check_file_operation_system_paths(self):
         """System path operations should be HIGH risk."""
         checker = SafetyChecker()
         level, details = checker.check_file_operation("write", "/etc/config")
-        assert level == RiskLevel.HIGH
+        assert level == OperationalRiskLevel.HIGH
         assert any("system" in d.lower() for d in details)
 
     @pytest.mark.asyncio
@@ -151,12 +155,12 @@ class TestSafetyChecker:
         async def mock_callback(request):
             nonlocal confirmed
             confirmed = True
-            assert request.risk_level == RiskLevel.HIGH
+            assert request.risk_level == OperationalRiskLevel.HIGH
             return True  # User confirms
 
         checker = SafetyChecker(
             confirmation_callback=mock_callback,
-            require_confirmation_threshold=RiskLevel.HIGH,
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
         should_proceed, reason = await checker.check_and_confirm(
             "execute_bash", {"command": "rm -rf /tmp/test"}
@@ -173,7 +177,7 @@ class TestSafetyChecker:
 
         checker = SafetyChecker(
             confirmation_callback=mock_callback,
-            require_confirmation_threshold=RiskLevel.HIGH,
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
         should_proceed, reason = await checker.check_and_confirm(
             "execute_bash", {"command": "rm -rf /tmp/test"}
@@ -186,7 +190,7 @@ class TestSafetyChecker:
         """Without callback, operations proceed with warning."""
         checker = SafetyChecker(
             confirmation_callback=None,
-            require_confirmation_threshold=RiskLevel.HIGH,
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
         )
         should_proceed, reason = await checker.check_and_confirm(
             "execute_bash", {"command": "rm -rf /tmp/test"}
@@ -202,7 +206,7 @@ class TestConfirmationRequest:
         """format_message should produce readable output."""
         request = ConfirmationRequest(
             tool_name="execute_bash",
-            risk_level=RiskLevel.HIGH,
+            risk_level=OperationalRiskLevel.HIGH,
             description="Delete files",
             details=["Recursively delete files/directories"],
             arguments={"command": "rm -rf /tmp/test"},

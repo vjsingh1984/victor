@@ -32,7 +32,7 @@ from victor.tools.base import (
     ToolMetadataProvider,
     ToolParameter,
     ToolResult,
-    ValidationResult,
+    ToolValidationResult,
 )
 
 # Re-export enums from enums.py
@@ -122,7 +122,7 @@ __all__ = [
     "ToolResult",
     "ToolParameter",
     "ToolConfig",
-    "ValidationResult",
+    "ToolValidationResult",
     "ToolMetadataProvider",
     # Enums
     "CostTier",

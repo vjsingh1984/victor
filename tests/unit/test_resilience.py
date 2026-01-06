@@ -23,13 +23,13 @@ from victor.agent.resilience import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitOpenError,
-    CircuitState,
     RateLimiter,
     RateLimitConfig,
     ResilientExecutor,
-    RetryConfig,
+    AgentRetryConfig,
     RetryHandler,
 )
+from victor.providers.circuit_breaker import CircuitState
 
 
 class TestCircuitBreaker:
@@ -191,7 +191,7 @@ class TestRetryHandler:
 
     def test_calculate_delay_exponential_backoff(self):
         """Delay should increase exponentially."""
-        config = RetryConfig(base_delay=1.0, exponential_base=2.0, jitter=False)
+        config = AgentRetryConfig(base_delay=1.0, exponential_base=2.0, jitter=False)
         handler = RetryHandler(config)
 
         assert handler.calculate_delay(0) == 1.0
@@ -201,14 +201,14 @@ class TestRetryHandler:
 
     def test_calculate_delay_respects_max(self):
         """Delay should not exceed max_delay."""
-        config = RetryConfig(base_delay=10.0, max_delay=15.0, jitter=False)
+        config = AgentRetryConfig(base_delay=10.0, max_delay=15.0, jitter=False)
         handler = RetryHandler(config)
 
         assert handler.calculate_delay(5) == 15.0
 
     def test_should_retry_respects_max_retries(self):
         """Should not retry beyond max_retries."""
-        config = RetryConfig(max_retries=3)
+        config = AgentRetryConfig(max_retries=3)
         handler = RetryHandler(config)
 
         assert handler.should_retry(0, error=ConnectionError()) is True
@@ -217,7 +217,7 @@ class TestRetryHandler:
 
     def test_should_retry_only_retryable_exceptions(self):
         """Should only retry on retryable exceptions."""
-        config = RetryConfig(retryable_exceptions=(ConnectionError,))
+        config = AgentRetryConfig(retryable_exceptions=(ConnectionError,))
         handler = RetryHandler(config)
 
         assert handler.should_retry(0, error=ConnectionError()) is True
@@ -225,7 +225,7 @@ class TestRetryHandler:
 
     def test_should_retry_on_status_codes(self):
         """Should retry on retryable status codes."""
-        config = RetryConfig(retryable_status_codes=(429, 500))
+        config = AgentRetryConfig(retryable_status_codes=(429, 500))
         handler = RetryHandler(config)
 
         assert handler.should_retry(0, status_code=429) is True
@@ -246,7 +246,7 @@ class TestRetryHandler:
     @pytest.mark.asyncio
     async def test_execute_with_retry_eventually_succeeds(self):
         """Should retry and eventually succeed."""
-        config = RetryConfig(
+        config = AgentRetryConfig(
             max_retries=3,
             base_delay=0.01,
             jitter=False,
@@ -270,7 +270,7 @@ class TestRetryHandler:
     @pytest.mark.asyncio
     async def test_execute_with_retry_exhausted(self):
         """Should raise after exhausting retries."""
-        config = RetryConfig(
+        config = AgentRetryConfig(
             max_retries=2,
             base_delay=0.01,
             jitter=False,
@@ -398,7 +398,7 @@ class TestResilientExecutor:
     async def test_execute_uses_fallback_on_failure(self):
         """Should use fallback when primary fails and retries exhausted."""
         retry = RetryHandler(
-            RetryConfig(max_retries=1, base_delay=0.01, retryable_exceptions=(ValueError,))
+            AgentRetryConfig(max_retries=1, base_delay=0.01, retryable_exceptions=(ValueError,))
         )
         executor = ResilientExecutor(retry_handler=retry)
 

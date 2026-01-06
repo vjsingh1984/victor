@@ -97,14 +97,14 @@ class TestLangGraphParity:
         in workflow definitions, such as missing entry/finish points.
         """
         from dataclasses import dataclass
-        from victor.workflows.graph_dsl import StateGraph, State
+        from victor.workflows.graph_dsl import WorkflowGraph, State
 
         @dataclass
         class ValidationState(State):
             value: str = ""
 
         # Test 1: Graph without entry point should fail validation
-        graph_no_entry = StateGraph(ValidationState, name="no_entry_test")
+        graph_no_entry = WorkflowGraph(ValidationState, name="no_entry_test")
         graph_no_entry.add_node("a", lambda s: s)
         graph_no_entry.add_node("b", lambda s: s)
         graph_no_entry.add_edge("a", "b")
@@ -115,7 +115,7 @@ class TestLangGraphParity:
         assert any("entry" in e.lower() for e in errors)
 
         # Test 2: Unreachable node should be detected
-        graph_unreachable = StateGraph(ValidationState, name="unreachable_test")
+        graph_unreachable = WorkflowGraph(ValidationState, name="unreachable_test")
         graph_unreachable.add_node("a", lambda s: s)
         graph_unreachable.add_node("b", lambda s: s)
         graph_unreachable.add_node("c", lambda s: s)  # c is unreachable
@@ -165,7 +165,7 @@ class TestCrewAIParity:
         patterns (sequential, parallel, hierarchical, pipeline).
         """
         from victor.framework.teams import TeamMemberSpec
-        from victor.agent.teams.team import TeamFormation, TeamConfig, TeamMember
+        from victor.teams import TeamFormation, TeamConfig, TeamMember
         from victor.agent.subagents.base import SubAgentRole
 
         # Given team member specifications
@@ -258,7 +258,7 @@ class TestCrewAIParity:
         Verifies that the message bus infrastructure enables
         inter-agent communication.
         """
-        from victor.agent.teams.communication import (
+        from victor.teams import (
             TeamMessageBus,
             AgentMessage,
             MessageType,
@@ -271,9 +271,9 @@ class TestCrewAIParity:
 
         # When agents send and receive messages
         test_message = AgentMessage(
-            type=MessageType.REQUEST,  # Use REQUEST type for task-like messages
-            from_agent="agent_a",
-            to_agent="agent_b",
+            message_type=MessageType.REQUEST,  # Use REQUEST type for task-like messages
+            sender_id="agent_a",
+            recipient_id="agent_b",
             content="Test message",
         )
 

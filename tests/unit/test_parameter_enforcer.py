@@ -513,11 +513,11 @@ class TestDeepSeekScenarios:
         assert enforced["file_path"] == "/src/latest.py"
 
 
-class TestValidationResult:
-    """Tests for ValidationResult object."""
+class TestParameterValidationResult:
+    """Tests for ParameterValidationResult object."""
 
     def test_validation_result_is_valid(self):
-        """Test ValidationResult.is_valid property."""
+        """Test ParameterValidationResult.is_valid property."""
         specs = [
             ParameterSpec(
                 name="required",
@@ -534,7 +534,7 @@ class TestValidationResult:
         assert invalid_result.is_valid is False
 
     def test_validation_result_details(self):
-        """Test ValidationResult contains error details."""
+        """Test ParameterValidationResult contains error details."""
         specs = [
             ParameterSpec(
                 name="file_path",

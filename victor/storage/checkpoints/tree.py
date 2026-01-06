@@ -29,8 +29,8 @@ Design Philosophy:
 - Tree structure enables time-travel and parallel exploration
 
 Usage:
-    from victor.checkpoints import SQLiteCheckpointBackend
-    from victor.checkpoints.tree import BranchManager, CheckpointTree
+    from victor.storage.checkpoints import SQLiteCheckpointBackend
+    from victor.storage.checkpoints.tree import BranchManager, CheckpointTree
 
     backend = SQLiteCheckpointBackend()
     branch_mgr = BranchManager(backend)

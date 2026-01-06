@@ -27,7 +27,7 @@ import pytest
 from victor.agent.unified_classifier import (
     UnifiedTaskClassifier,
     ClassificationResult,
-    TaskType,
+    ClassifierTaskType,
     KeywordMatch,
     _is_keyword_negated,
     _find_keywords_with_positions,
@@ -171,38 +171,38 @@ class TestUnifiedTaskClassifier:
     def test_classify_action_task(self, classifier):
         """Test classification of action tasks."""
         result = classifier.classify("Run the tests")
-        assert result.task_type == TaskType.ACTION
+        assert result.task_type == ClassifierTaskType.ACTION
         assert result.is_action_task is True
         assert result.needs_execution is True
 
     def test_classify_analysis_task(self, classifier):
         """Test classification of analysis tasks."""
         result = classifier.classify("Analyze the codebase for issues")
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
         assert result.is_analysis_task is True
         assert result.temperature_adjustment > 0
 
     def test_classify_generation_task(self, classifier):
         """Test classification of generation tasks."""
         result = classifier.classify("Generate a function to sort arrays")
-        assert result.task_type == TaskType.GENERATION
+        assert result.task_type == ClassifierTaskType.GENERATION
         assert result.is_generation_task is True
         assert result.is_action_task is True  # Generation implies action
 
     def test_classify_search_task(self, classifier):
         """Test classification of search tasks."""
         result = classifier.classify("Find all usages of the function")
-        assert result.task_type == TaskType.SEARCH
+        assert result.task_type == ClassifierTaskType.SEARCH
 
     def test_classify_edit_task(self, classifier):
         """Test classification of edit tasks."""
         result = classifier.classify("Refactor the authentication module")
-        assert result.task_type == TaskType.EDIT
+        assert result.task_type == ClassifierTaskType.EDIT
 
     def test_classify_default_task(self, classifier):
         """Test classification of ambiguous messages."""
         result = classifier.classify("Hello, how are you?")
-        assert result.task_type == TaskType.DEFAULT
+        assert result.task_type == ClassifierTaskType.DEFAULT
         assert result.confidence < 0.5
 
     def test_negation_prevents_classification(self, classifier):
@@ -220,13 +220,13 @@ class TestUnifiedTaskClassifier:
         assert result.is_analysis_task is True
         assert result.is_action_task is True
         # Action (generation) should win since "create" appears last
-        assert result.task_type == TaskType.GENERATION
+        assert result.task_type == ClassifierTaskType.GENERATION
 
         # When analysis appears last, it should win
         result2 = classifier.classify("Create initial draft and analyze it thoroughly")
         assert result2.is_analysis_task is True
         assert result2.is_action_task is True
-        assert result2.task_type == TaskType.ANALYSIS
+        assert result2.task_type == ClassifierTaskType.ANALYSIS
 
     def test_confidence_scoring(self, classifier):
         """Test that confidence scores are reasonable."""
@@ -279,7 +279,7 @@ class TestContextualClassification:
         # Ambiguous message that would be DEFAULT
         result = classifier.classify_with_context("Continue", history)
         # With strong analysis context, should lean toward analysis
-        assert result.context_signals or result.task_type != TaskType.DEFAULT
+        assert result.context_signals or result.task_type != ClassifierTaskType.DEFAULT
 
     def test_no_context_no_boost(self, classifier):
         """Test that empty history doesn't affect classification."""
@@ -341,7 +341,7 @@ class TestModuleFunctions:
         """Test the classify_task convenience function."""
         result = classify_task("Analyze the code")
         assert isinstance(result, ClassificationResult)
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
 
 
 class TestCaching:
@@ -435,24 +435,24 @@ class TestEdgeCases:
     def test_empty_message(self, classifier):
         """Test classification of empty message."""
         result = classifier.classify("")
-        assert result.task_type == TaskType.DEFAULT
+        assert result.task_type == ClassifierTaskType.DEFAULT
         assert result.confidence < 0.5
 
     def test_very_long_message(self, classifier):
         """Test classification of very long message."""
         long_msg = "Analyze " + "the code " * 1000
         result = classifier.classify(long_msg)
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
 
     def test_special_characters(self, classifier):
         """Test classification with special characters."""
         result = classifier.classify("Analyze @#$%^& the code!")
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
 
     def test_multiple_keywords_same_category(self, classifier):
         """Test message with multiple keywords from same category."""
         result = classifier.classify("Analyze, review, and audit the codebase")
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
         assert len(result.matched_keywords) >= 3
 
     def test_conflicting_keywords(self, classifier):
@@ -464,7 +464,7 @@ class TestEdgeCases:
     def test_question_patterns(self, classifier):
         """Test analysis classification via question patterns."""
         result = classifier.classify("How does the authentication work?")
-        assert result.task_type == TaskType.ANALYSIS
+        assert result.task_type == ClassifierTaskType.ANALYSIS
 
     def test_multi_word_keyword(self, classifier):
         """Test matching of multi-word keywords."""

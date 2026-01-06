@@ -50,7 +50,7 @@ import sqlite3
 import uuid
 
 if TYPE_CHECKING:
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 
 logger = logging.getLogger(__name__)

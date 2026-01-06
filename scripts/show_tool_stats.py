@@ -17,8 +17,8 @@ def show_tool_stats():
         print("Try running some commands with 'victor main' first.")
         return
 
-    print(f"📊 Tool Usage Statistics")
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("📊 Tool Usage Statistics")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"Cache file: {cache_file}")
     print(f"File size: {cache_file.stat().st_size:,} bytes")
     print(

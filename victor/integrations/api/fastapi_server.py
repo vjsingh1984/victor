@@ -48,6 +48,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from victor.integrations.search_types import CodeSearchResult
+from victor.integrations.api.event_bridge import EventBridge
+from victor.observability.event_bus import EventBus
+
 logger = logging.getLogger(__name__)
 
 
@@ -150,19 +154,33 @@ class CodeSearchRequest(BaseModel):
         return v
 
 
-class SearchResult(BaseModel):
-    """Single search result."""
+class APISearchResult(BaseModel):
+    """Single search result for API responses.
+
+    For HTTP API search result serialization.
+    Renamed from SearchResult to be semantically distinct from other search types.
+    """
 
     file: str
     line: int
     content: str
     score: float
 
+    @classmethod
+    def from_code_result(cls, result: CodeSearchResult) -> "APISearchResult":
+        return cls(
+            file=result.file,
+            line=result.line,
+            content=result.content,
+            score=result.score,
+        )
 
+
+# Backward compatibility alias
 class SearchResponse(BaseModel):
     """Search response payload."""
 
-    results: List[SearchResult]
+    results: List[APISearchResult]
     error: Optional[str] = None
 
 
@@ -340,6 +358,8 @@ class VictorFastAPIServer:
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
         self._hitl_store = None
+        self._event_bridge: Optional[EventBridge] = None
+        self._event_clients: List[WebSocket] = []
 
         # Create FastAPI app with lifespan
         self.app = FastAPI(
@@ -379,12 +399,22 @@ class VictorFastAPIServer:
     async def _lifespan(self, app: FastAPI) -> AsyncIterator[None]:
         """Manage server lifespan."""
         logger.info(f"Starting Victor FastAPI server on {self.host}:{self.port}")
+
+        # Initialize EventBridge for real-time event streaming
+        event_bus = EventBus.get_instance()
+        self._event_bridge = EventBridge(event_bus)
+        self._event_bridge.start()
+        logger.info("EventBridge started for real-time event streaming")
+
         yield
+
         # Cleanup
+        if self._event_bridge:
+            self._event_bridge.stop()
         if self._orchestrator:
             await self._orchestrator.graceful_shutdown()
         # Close WebSocket connections
-        for ws in self._ws_clients:
+        for ws in self._ws_clients + self._event_clients:
             try:
                 await ws.close()
             except Exception:
@@ -594,15 +624,17 @@ class VictorFastAPIServer:
 
                 if tool_result.success:
                     matches = tool_result.data.get("matches", [])
-                    results = [
-                        SearchResult(
+                    code_results = [
+                        CodeSearchResult(
                             file=r.get("file", ""),
                             line=r.get("line", 0),
                             content=r.get("content", ""),
                             score=r.get("score", 0.0),
+                            context=r.get("context", ""),
                         )
                         for r in matches
                     ]
+                    results = [APISearchResult.from_code_result(r) for r in code_results]
                     return SearchResponse(results=results)
                 return SearchResponse(results=[])
 
@@ -631,14 +663,14 @@ class VictorFastAPIServer:
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
-                results = []
+                code_results = []
                 for line in result.stdout.splitlines():
                     try:
                         match = json.loads(line)
                         if match.get("type") == "match":
                             data = match.get("data", {})
-                            results.append(
-                                SearchResult(
+                            code_results.append(
+                                CodeSearchResult(
                                     file=data.get("path", {}).get("text", ""),
                                     line=data.get("line_number", 0),
                                     content=data.get("lines", {}).get("text", "").strip(),
@@ -648,7 +680,8 @@ class VictorFastAPIServer:
                     except json.JSONDecodeError:
                         continue
 
-                return SearchResponse(results=results[:50])
+                results = [APISearchResult.from_code_result(r) for r in code_results[:50]]
+                return SearchResponse(results=results)
 
             except Exception as e:
                 logger.exception("Code search error")
@@ -751,6 +784,31 @@ class VictorFastAPIServer:
             except Exception as e:
                 logger.exception("List providers error")
                 return JSONResponse({"providers": [], "error": str(e)})
+
+        @app.get("/capabilities", tags=["Configuration"])
+        async def get_capabilities(
+            vertical: Optional[str] = Query(None, description="Filter by vertical")
+        ) -> JSONResponse:
+            """Discover all Victor capabilities.
+
+            Returns aggregated information about tools, verticals, personas,
+            teams, workflows, and other discoverable features.
+            """
+            try:
+                from victor.ui.commands.capabilities import get_capability_discovery
+
+                discovery = get_capability_discovery()
+
+                if vertical:
+                    manifest = discovery.discover_by_vertical(vertical)
+                    return JSONResponse(manifest)
+                else:
+                    manifest = discovery.discover_all()
+                    return JSONResponse(manifest.to_dict())
+
+            except Exception as e:
+                logger.exception("Capabilities discovery error")
+                return JSONResponse({"error": str(e), "capabilities": {}}, status_code=500)
 
         # Tools
         @app.get("/tools", tags=["Tools"])
@@ -2369,7 +2427,7 @@ Respond with just the command to run."""
             # Start team execution in background
             async def execute_team():
                 try:
-                    from victor.agent.teams import (
+                    from victor.teams import (
                         TeamConfig,
                         TeamMember,
                         TeamFormation,
@@ -2851,6 +2909,62 @@ Respond with just the command to run."""
                 if websocket in self._ws_clients:
                     self._ws_clients.remove(websocket)
                 logger.info(f"WebSocket client disconnected. Total: {len(self._ws_clients)}")
+
+        # EventBridge WebSocket endpoint for real-time events
+        @app.websocket("/ws/events")
+        async def events_websocket_handler(websocket: WebSocket) -> None:
+            """Handle EventBridge WebSocket connections for real-time events.
+
+            This endpoint streams Victor events (tool execution, file changes,
+            provider updates, etc.) to connected clients like VS Code.
+
+            Message format:
+                Incoming: {"type": "subscribe", "categories": ["all"]}
+                Outgoing: {"type": "event", "event": {...}}
+            """
+            await websocket.accept()
+            self._event_clients.append(websocket)
+            client_id = uuid.uuid4().hex[:12]
+            logger.info(
+                f"EventBridge client {client_id} connected. Total: {len(self._event_clients)}"
+            )
+
+            # Register with EventBridge for event forwarding
+            async def send_event(message: str) -> None:
+                try:
+                    await websocket.send_text(message)
+                except Exception:
+                    pass
+
+            if self._event_bridge:
+                self._event_bridge._broadcaster.add_client(client_id, send_event)
+
+            try:
+                while True:
+                    data = await websocket.receive_json()
+                    msg_type = data.get("type", "")
+
+                    if msg_type == "subscribe":
+                        # Client wants to subscribe to specific event categories
+                        categories = data.get("categories", ["all"])
+                        logger.debug(f"Client {client_id} subscribed to: {categories}")
+                        # Send acknowledgment
+                        await websocket.send_json({"type": "subscribed", "categories": categories})
+
+                    elif msg_type == "ping":
+                        await websocket.send_json({"type": "pong"})
+
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if self._event_bridge:
+                    self._event_bridge._broadcaster.remove_client(client_id)
+                if websocket in self._event_clients:
+                    self._event_clients.remove(websocket)
+                logger.info(
+                    f"EventBridge client {client_id} disconnected. "
+                    f"Total: {len(self._event_clients)}"
+                )
 
     # =========================================================================
     # HITL (Human-in-the-Loop) Routes

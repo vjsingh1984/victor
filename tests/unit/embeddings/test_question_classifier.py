@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.embeddings.question_classifier import (
+from victor.storage.embeddings.question_classifier import (
     QuestionType,
     QuestionTypeClassifier,
     QuestionClassificationResult,

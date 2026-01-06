@@ -23,7 +23,7 @@ Design Patterns:
 - Observer Pattern: Transition notifications
 
 Example:
-    from victor.state import StateMachine, StateConfig
+    from victor.storage.state import StateMachine, StateConfig
 
     config = StateConfig(
         stages=["DRAFT", "REVIEW", "APPROVED", "REJECTED"],

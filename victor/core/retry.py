@@ -93,8 +93,13 @@ class RetryContext:
         self.total_delay += delay
 
 
-class RetryStrategy(ABC):
+class BaseRetryStrategy(ABC):
     """Abstract base class for retry strategies.
+
+    Renamed from RetryStrategy to be semantically distinct:
+    - BaseRetryStrategy (here): Abstract base with should_retry(), get_delay() methods
+    - ProviderRetryStrategy (victor.providers.resilience): Concrete provider retry with execute()
+    - BatchRetryStrategy (victor.workflows.batch_executor): Enum for batch retry modes
 
     Implementations define when and how long to wait between retries.
     This provides a consistent interface for all retry logic in Victor.
@@ -148,7 +153,7 @@ class RetryStrategy(ABC):
         """
 
 
-class ExponentialBackoffStrategy(RetryStrategy):
+class ExponentialBackoffStrategy(BaseRetryStrategy):
     """Exponential backoff with optional jitter.
 
     Default strategy for most operations. Delay doubles after each
@@ -230,7 +235,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
         )
 
 
-class LinearBackoffStrategy(RetryStrategy):
+class LinearBackoffStrategy(BaseRetryStrategy):
     """Linear backoff - delay increases linearly with each attempt.
 
     Useful for operations where rapid initial retries are acceptable
@@ -269,7 +274,7 @@ class LinearBackoffStrategy(RetryStrategy):
         return min(delay, self.max_delay)
 
 
-class FixedDelayStrategy(RetryStrategy):
+class FixedDelayStrategy(BaseRetryStrategy):
     """Fixed delay between retries - no backoff.
 
     Suitable for operations where the failure is likely transient
@@ -299,7 +304,7 @@ class FixedDelayStrategy(RetryStrategy):
         return self.delay
 
 
-class NoRetryStrategy(RetryStrategy):
+class NoRetryStrategy(BaseRetryStrategy):
     """No retry - fail immediately on first error.
 
     Useful for operations that should not be retried,
@@ -342,13 +347,34 @@ class RetryExecutor:
     configurable retry strategies.
     """
 
-    def __init__(self, strategy: Optional[RetryStrategy] = None):
+    def __init__(self, strategy: Optional[BaseRetryStrategy] = None):
         """Initialize executor with a retry strategy.
 
         Args:
             strategy: Retry strategy to use (default: ExponentialBackoffStrategy)
         """
         self.strategy = strategy or ExponentialBackoffStrategy()
+
+    async def execute(
+        self,
+        func: Callable[..., Awaitable[T]],
+        *args: Any,
+        **kwargs: Any,
+    ) -> "RetryResult":
+        """Execute an async function with retries.
+
+        This is an alias for execute_async for backward compatibility.
+        Use this when executing async functions in an async context.
+
+        Args:
+            func: Async function to execute
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            RetryResult with success status, result, and context
+        """
+        return await self.execute_async(func, *args, **kwargs)
 
     async def execute_async(
         self,
@@ -446,7 +472,7 @@ class RetryExecutor:
 
 
 def with_retry(
-    strategy: Optional[RetryStrategy] = None,
+    strategy: Optional[BaseRetryStrategy] = None,
     raise_on_failure: bool = True,
 ) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Decorator for async functions with retry logic.
@@ -480,7 +506,7 @@ def with_retry(
 
 
 def with_retry_sync(
-    strategy: Optional[RetryStrategy] = None,
+    strategy: Optional[BaseRetryStrategy] = None,
     raise_on_failure: bool = True,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator for sync functions with retry logic.

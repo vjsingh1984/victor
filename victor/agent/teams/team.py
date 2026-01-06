@@ -36,6 +36,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from victor.agent.subagents.base import SubAgentRole
 
+# Import canonical TeamFormation from victor.teams.types
+from victor.teams.types import TeamFormation
+
 if TYPE_CHECKING:
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
@@ -105,28 +108,8 @@ class MemoryConfig:
         )
 
 
-class TeamFormation(Enum):
-    """How agents are organized within a team.
-
-    Each formation defines a different coordination pattern:
-
-    - SEQUENTIAL: Agents execute one after another, each receiving context
-      from previous agents. Good for dependent tasks.
-
-    - PARALLEL: All agents execute simultaneously on independent aspects
-      of the same problem. Good for research and exploration.
-
-    - HIERARCHICAL: A manager agent delegates to worker agents and
-      synthesizes their results. Good for complex tasks.
-
-    - PIPELINE: Output of each agent feeds directly into the next.
-      Good for multi-stage processing (research → plan → execute → review).
-    """
-
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-    HIERARCHICAL = "hierarchical"
-    PIPELINE = "pipeline"
+# TeamFormation is imported from victor.teams.types (canonical location)
+# See victor.teams.types.TeamFormation for documentation
 
 
 class MemberStatus(Enum):
@@ -396,7 +379,7 @@ class TeamMember:
             return False
 
         try:
-            from victor.memory.unified import MemoryType
+            from victor.storage.memory.unified import MemoryType
 
             full_metadata = {"member_id": self.id, "member_name": self.name}
             if self.expertise:

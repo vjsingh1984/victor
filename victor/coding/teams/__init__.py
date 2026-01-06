@@ -58,11 +58,17 @@ from victor.coding.teams.specs import (
 )
 
 from victor.coding.teams.personas import (
-    # Types
+    # Framework types (re-exported for convenience)
+    FrameworkPersonaTraits,
+    FrameworkCommunicationStyle,
+    ExpertiseLevel,
+    PersonaTemplate,
+    # Coding-specific types
     ExpertiseCategory,
     CommunicationStyle,
     DecisionStyle,
-    PersonaTraits,
+    CodingPersonaTraits,
+    PersonaTraits,  # Backward compatibility alias
     CodingPersona,
     # Pre-defined personas
     CODING_PERSONAS,
@@ -89,11 +95,17 @@ __all__ = [
     "get_role_config",
     "list_team_types",
     "list_roles",
-    # Types from personas
+    # Framework types (re-exported for convenience)
+    "FrameworkPersonaTraits",
+    "FrameworkCommunicationStyle",
+    "ExpertiseLevel",
+    "PersonaTemplate",
+    # Coding-specific types from personas
     "ExpertiseCategory",
     "CommunicationStyle",
     "DecisionStyle",
-    "PersonaTraits",
+    "CodingPersonaTraits",
+    "PersonaTraits",  # Backward compatibility alias
     "CodingPersona",
     # Pre-defined personas
     "CODING_PERSONAS",

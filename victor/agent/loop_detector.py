@@ -69,8 +69,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class TaskType(Enum):
-    """Task type for configuring progress thresholds."""
+class LoopDetectorTaskType(Enum):
+    """Task types for loop detection threshold configuration.
+
+    Simplified types for configuring progress thresholds in loop detection.
+
+    Renamed from TaskType to be semantically distinct:
+    - TaskType (victor.classification.pattern_registry): Canonical prompt classification
+    - TrackerTaskType: Progress tracking with milestones
+    - LoopDetectorTaskType: Loop detection thresholds
+    - ClassifierTaskType: Unified classification output
+    - FrameworkTaskType: Framework-level task abstraction
+    """
 
     DEFAULT = "default"
     ANALYSIS = "analysis"
@@ -195,8 +205,13 @@ class ProgressConfig:
 
 
 @dataclass
-class StopReason:
-    """Reason why progress tracker recommends stopping.
+class LoopStopRecommendation:
+    """Recommendation from loop detector about whether to stop execution.
+
+    Renamed from StopReason to be semantically distinct:
+    - LoopStopRecommendation (here): Loop detection recommendation dataclass
+    - TrackerStopReason (victor.agent.unified_task_tracker): Task tracker stop reasons enum
+    - DebugStopReason (victor.observability.debug.protocol): Debugger stop reasons enum
 
     Attributes:
         should_stop: Whether execution should stop
@@ -209,6 +224,10 @@ class StopReason:
     reason: str
     details: Dict[str, Any] = field(default_factory=dict)
     is_warning: bool = False  # True for soft warnings before hard stop
+
+
+# Backward compatibility alias
+StopReason = LoopStopRecommendation
 
 
 class LoopDetector:
@@ -225,7 +244,7 @@ class LoopDetector:
     For goal-aware milestone tracking and proactive nudging, see TaskMilestoneMonitor.
 
     Usage:
-        detector = LoopDetector(task_type=TaskType.ANALYSIS)
+        detector = LoopDetector(task_type=LoopDetectorTaskType.ANALYSIS)
 
         # In the main loop:
         detector.record_tool_call("read_file", {"path": "test.py"})
@@ -252,7 +271,7 @@ class LoopDetector:
     def __init__(
         self,
         config: Optional[ProgressConfig] = None,
-        task_type: TaskType = TaskType.DEFAULT,
+        task_type: LoopDetectorTaskType = LoopDetectorTaskType.DEFAULT,
     ):
         """Initialize the progress tracker.
 
@@ -508,7 +527,7 @@ class LoopDetector:
             )
 
         # Check research loop
-        if self.task_type == TaskType.RESEARCH:
+        if self.task_type == LoopDetectorTaskType.RESEARCH:
             if self._consecutive_research_calls >= self.config.max_iterations_research:
                 return StopReason(
                     should_stop=True,
@@ -676,9 +695,9 @@ class LoopDetector:
             return None
 
         # Get repeat threshold based on task type
-        if self.task_type == TaskType.ANALYSIS:
+        if self.task_type == LoopDetectorTaskType.ANALYSIS:
             threshold = self.config.repeat_threshold_analysis
-        elif self.task_type == TaskType.ACTION:
+        elif self.task_type == LoopDetectorTaskType.ACTION:
             threshold = self.config.repeat_threshold_action
         else:
             threshold = self.config.repeat_threshold_default
@@ -714,9 +733,9 @@ class LoopDetector:
             return None
 
         # Get repeat threshold based on task type
-        if self.task_type == TaskType.ANALYSIS:
+        if self.task_type == LoopDetectorTaskType.ANALYSIS:
             threshold = self.config.repeat_threshold_analysis
-        elif self.task_type == TaskType.ACTION:
+        elif self.task_type == LoopDetectorTaskType.ACTION:
             threshold = self.config.repeat_threshold_action
         else:
             threshold = self.config.repeat_threshold_default
@@ -804,11 +823,11 @@ class LoopDetector:
 
     def _get_max_iterations(self) -> int:
         """Get maximum iterations based on task type."""
-        if self.task_type == TaskType.ANALYSIS:
+        if self.task_type == LoopDetectorTaskType.ANALYSIS:
             return self.config.max_iterations_analysis
-        elif self.task_type == TaskType.ACTION:
+        elif self.task_type == LoopDetectorTaskType.ACTION:
             return self.config.max_iterations_action
-        elif self.task_type == TaskType.RESEARCH:
+        elif self.task_type == LoopDetectorTaskType.RESEARCH:
             return self.config.max_iterations_research
         return self.config.max_iterations_default
 
@@ -970,15 +989,15 @@ def create_tracker_from_classification(
     """
     from victor.agent.complexity_classifier import TaskComplexity, get_prompt_hint
 
-    # Map TaskComplexity to TaskType
+    # Map TaskComplexity to LoopDetectorTaskType
     complexity_to_task_type = {
-        TaskComplexity.SIMPLE: TaskType.DEFAULT,  # Simple uses default, but with lower budget
-        TaskComplexity.MEDIUM: TaskType.DEFAULT,
-        TaskComplexity.COMPLEX: TaskType.ANALYSIS,
-        TaskComplexity.GENERATION: TaskType.ACTION,
+        TaskComplexity.SIMPLE: LoopDetectorTaskType.DEFAULT,  # Simple uses default, but with lower budget
+        TaskComplexity.MEDIUM: LoopDetectorTaskType.DEFAULT,
+        TaskComplexity.COMPLEX: LoopDetectorTaskType.ANALYSIS,
+        TaskComplexity.GENERATION: LoopDetectorTaskType.ACTION,
     }
 
-    task_type = complexity_to_task_type.get(classification.complexity, TaskType.DEFAULT)
+    task_type = complexity_to_task_type.get(classification.complexity, LoopDetectorTaskType.DEFAULT)
 
     # Create config with appropriate budget
     config = base_config or ProgressConfig()

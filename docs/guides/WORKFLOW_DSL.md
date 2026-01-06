@@ -283,12 +283,13 @@ from victor.framework.graph import MemoryCheckpointer
 checkpointer = MemoryCheckpointer()
 app = graph.compile(checkpointer=checkpointer)
 
-# Run workflow
-result = await app.invoke(initial_state)
+# Run workflow with a stable thread_id
+thread_id = "example-run-1"
+result = await app.invoke(initial_state, thread_id=thread_id)
 
-# Resume from checkpoint
-checkpoint = checkpointer.get_latest()
-resumed = await app.invoke(checkpoint.state)
+# Inspect latest checkpoint
+checkpoint = await checkpointer.load(thread_id)
+resumed = await app.invoke(initial_state, thread_id=thread_id)
 ```
 
 ### RL System Integration
@@ -310,24 +311,23 @@ result = await app.invoke(initial_state)
 ### Custom Checkpointer
 
 ```python
-from victor.framework.graph import BaseCheckpointer, Checkpoint
+from victor.framework.graph import CheckpointerProtocol, WorkflowCheckpoint
 
-class RedisCheckpointer(BaseCheckpointer):
+class RedisCheckpointer(CheckpointerProtocol):
     def __init__(self, redis_client):
         self.redis = redis_client
 
-    async def save(self, checkpoint: Checkpoint) -> str:
+    async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         key = f"workflow:{checkpoint.workflow_id}:{checkpoint.step}"
         await self.redis.set(key, checkpoint.to_json())
-        return key
 
-    async def load(self, checkpoint_id: str) -> Checkpoint:
-        data = await self.redis.get(checkpoint_id)
-        return Checkpoint.from_json(data)
+    async def load(self, thread_id: str) -> WorkflowCheckpoint | None:
+        data = await self.redis.get(thread_id)
+        return WorkflowCheckpoint.from_json(data) if data else None
 
-    async def list_checkpoints(self, workflow_id: str) -> list[Checkpoint]:
-        keys = await self.redis.keys(f"workflow:{workflow_id}:*")
-        return [await self.load(k) for k in keys]
+    async def list(self, thread_id: str) -> list[WorkflowCheckpoint]:
+        keys = await self.redis.keys(f"workflow:{thread_id}:*")
+        return [await self.load(k) for k in keys if k]
 ```
 
 ## Streaming

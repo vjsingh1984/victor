@@ -19,7 +19,7 @@ import pytest
 
 from victor.evaluation.correction import (
     Language,
-    ValidationResult,
+    CodeValidationResult,
     CorrectionFeedback,
     create_self_corrector,
     CodeValidatorRegistry,
@@ -574,7 +574,7 @@ class TestFeedbackGenerator:
 
     def test_generate_feedback_for_syntax_error(self, generator):
         """Test feedback for syntax errors."""
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,
@@ -589,7 +589,7 @@ class TestFeedbackGenerator:
 
     def test_generate_feedback_for_import_error(self, generator):
         """Test feedback for missing imports."""
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -603,7 +603,7 @@ class TestFeedbackGenerator:
 
     def test_feedback_to_prompt(self, generator):
         """Test converting feedback to prompt string."""
-        result = ValidationResult(
+        result = CodeValidationResult(
             valid=False,
             language=Language.PYTHON,
             syntax_valid=False,

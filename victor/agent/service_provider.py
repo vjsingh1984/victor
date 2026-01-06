@@ -695,7 +695,7 @@ class OrchestratorServiceProvider:
 
     def _register_intent_classifier(self, container: ServiceContainer) -> None:
         """Register IntentClassifier as singleton."""
-        from victor.embeddings.intent_classifier import IntentClassifier
+        from victor.storage.embeddings.intent_classifier import IntentClassifier
 
         container.register(
             IntentClassifier,
@@ -827,7 +827,7 @@ class OrchestratorServiceProvider:
 
         def create_memory_coordinator(_: ServiceContainer) -> Any:
             try:
-                from victor.memory.unified import get_memory_coordinator
+                from victor.storage.memory.unified import get_memory_coordinator
 
                 return get_memory_coordinator()
             except ImportError as e:
@@ -1110,7 +1110,7 @@ class OrchestratorServiceProvider:
     def _create_conversation_embedding_store(self) -> Any:
         """Create ConversationEmbeddingStore instance."""
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
         embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
@@ -1219,8 +1219,8 @@ class OrchestratorServiceProvider:
 
     def _create_intent_classifier(self) -> Any:
         """Create IntentClassifier instance."""
-        from victor.embeddings.intent_classifier import IntentClassifier
-        from victor.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.intent_classifier import IntentClassifier
+        from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
         embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")

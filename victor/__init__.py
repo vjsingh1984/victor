@@ -40,7 +40,7 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
@@ -60,13 +60,13 @@ from victor.framework import (
     ConfigurationError,
     Event,
     EventType,
+    FrameworkTaskType,
     ProviderError,
     Stage,
     State,
     StateHooks,
     Task,
     TaskResult,
-    TaskType,
     ToolCategory,
     ToolError,
     Tools,
@@ -83,7 +83,7 @@ __all__ = [
     # Supporting classes
     "ChatSession",
     "TaskResult",
-    "TaskType",
+    "FrameworkTaskType",
     "ToolSet",
     "ToolCategory",
     "Stage",

@@ -214,3 +214,222 @@ async def _list_tools_async(profile: str) -> None:
         # Ensure agent resources are properly cleaned up
         if agent:
             await agent.graceful_shutdown()
+
+
+@tools_app.command("cleanup-containers")
+def cleanup_containers(
+    include_unlabeled: bool = typer.Option(
+        False,
+        "--include-unlabeled",
+        "-u",
+        help="Also remove unlabeled python-slim containers with 'sleep infinity' (legacy cleanup).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show what would be removed without actually removing.",
+    ),
+) -> None:
+    """Clean up orphaned sandbox containers.
+
+    Removes Docker containers that were created by Victor's code executor
+    but may not have been properly cleaned up. By default, only removes
+    containers with the 'victor.sandbox' label.
+
+    Use --include-unlabeled to also clean up legacy containers (python-slim
+    images running 'sleep infinity') that lack the label. This is safe as
+    it excludes Kubernetes-related containers.
+
+    Examples:
+        victor tools cleanup-containers
+        victor tools cleanup-containers --include-unlabeled
+        victor tools cleanup-containers --dry-run
+    """
+    from victor.tools.code_executor_tool import (
+        cleanup_orphaned_containers,
+        DOCKER_AVAILABLE,
+        SANDBOX_CONTAINER_LABEL,
+        SANDBOX_CONTAINER_VALUE,
+    )
+
+    if not DOCKER_AVAILABLE:
+        console.print("[red]Docker is not available. Cannot cleanup containers.[/]")
+        raise typer.Exit(1)
+
+    try:
+        import docker
+
+        client = docker.from_env()
+
+        # First, list what we would clean up
+        containers_to_clean = []
+
+        # Find labeled containers
+        labeled = client.containers.list(
+            all=True,
+            filters={"label": f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"},
+        )
+        for c in labeled:
+            containers_to_clean.append((c.short_id, c.name, "labeled", c))
+
+        # Find unlabeled legacy containers if requested
+        if include_unlabeled:
+            # Kubernetes container name patterns to exclude
+            # Note: Docker auto-generates names like "kind_hugle" which should NOT be excluded
+            # Only exclude actual k8s infrastructure containers
+            k8s_name_patterns = (
+                "k8s_",  # Kubernetes pods
+                "kube-",  # Kubernetes components
+                "kind-",  # kind infrastructure (not kind_)
+                "minikube",
+                "desktop-",  # Docker Desktop k8s
+            )
+            all_containers = client.containers.list(all=True)
+            for container in all_containers:
+                try:
+                    container_name = container.name.lower()
+                    # Only skip if name starts with a k8s pattern
+                    if any(container_name.startswith(p) for p in k8s_name_patterns):
+                        continue
+
+                    # Skip already added labeled containers
+                    if container in [c[3] for c in containers_to_clean]:
+                        continue
+
+                    image_tags = container.image.tags
+                    is_python_slim = (
+                        any("python" in tag and "slim" in tag for tag in image_tags)
+                        if image_tags
+                        else False
+                    )
+
+                    if not image_tags:
+                        cmd = container.attrs.get("Config", {}).get("Cmd", [])
+                        if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
+                            is_python_slim = True
+
+                    if is_python_slim:
+                        cmd = container.attrs.get("Config", {}).get("Cmd", [])
+                        if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
+                            containers_to_clean.append(
+                                (container.short_id, container.name, "unlabeled", container)
+                            )
+                except Exception:
+                    pass
+
+        if not containers_to_clean:
+            console.print("[green]No orphaned containers found.[/]")
+            return
+
+        # Display containers
+        table = Table(title="Containers to Clean Up", show_header=True)
+        table.add_column("Container ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Type", style="yellow")
+
+        for short_id, name, ctype, _ in containers_to_clean:
+            table.add_row(short_id, name, ctype)
+
+        console.print(table)
+        console.print(f"\n[bold]Found {len(containers_to_clean)} container(s) to remove.[/]")
+
+        if dry_run:
+            console.print("[dim]Dry run - no containers removed.[/]")
+            return
+
+        # Confirm and clean
+        if not typer.confirm("Remove these containers?"):
+            console.print("[dim]Cancelled.[/]")
+            return
+
+        cleaned = 0
+        for short_id, name, _, container in containers_to_clean:
+            try:
+                container.remove(force=True)
+                console.print(f"[green]Removed:[/] {short_id} ({name})")
+                cleaned += 1
+            except Exception as e:
+                console.print(f"[red]Failed to remove {short_id}:[/] {e}")
+
+        console.print(f"\n[bold green]Cleaned up {cleaned} container(s).[/]")
+
+    except Exception as e:
+        console.print(f"[red]Error during cleanup:[/] {e}")
+        raise typer.Exit(1)
+
+
+@tools_app.command("cleanup-images")
+def cleanup_images(
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show what would be removed without actually removing.",
+    ),
+) -> None:
+    """Clean up dangling Docker images from sandbox operations.
+
+    Removes dangling (untagged) images that may have been left behind
+    from previous sandbox container operations. These are typically
+    old versions of python-slim images that have been superseded.
+
+    Examples:
+        victor tools cleanup-images
+        victor tools cleanup-images --dry-run
+    """
+    try:
+        import docker
+
+        client = docker.from_env()
+
+        # Find dangling images
+        dangling = client.images.list(filters={"dangling": True})
+
+        if not dangling:
+            console.print("[green]No dangling images found.[/]")
+            return
+
+        # Display images
+        table = Table(title="Dangling Images to Clean Up", show_header=True)
+        table.add_column("Image ID", style="cyan")
+        table.add_column("Size", style="yellow")
+        table.add_column("Created", style="dim")
+
+        total_size = 0
+        for img in dangling:
+            size_mb = img.attrs.get("Size", 0) / (1024 * 1024)
+            total_size += size_mb
+            created = img.attrs.get("Created", "unknown")[:19]  # Truncate timestamp
+            table.add_row(img.short_id, f"{size_mb:.1f} MB", created)
+
+        console.print(table)
+        console.print(
+            f"\n[bold]Found {len(dangling)} dangling image(s) ({total_size:.1f} MB total).[/]"
+        )
+
+        if dry_run:
+            console.print("[dim]Dry run - no images removed.[/]")
+            return
+
+        if not typer.confirm("Remove these images?"):
+            console.print("[dim]Cancelled.[/]")
+            return
+
+        removed = 0
+        for img in dangling:
+            try:
+                client.images.remove(img.id, force=True)
+                console.print(f"[green]Removed:[/] {img.short_id}")
+                removed += 1
+            except Exception as e:
+                console.print(f"[red]Failed to remove {img.short_id}:[/] {e}")
+
+        console.print(f"\n[bold green]Cleaned up {removed} image(s).[/]")
+
+    except ImportError:
+        console.print("[red]Docker package not installed.[/]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Error during cleanup:[/] {e}")
+        raise typer.Exit(1)

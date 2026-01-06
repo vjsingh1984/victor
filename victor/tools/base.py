@@ -48,8 +48,15 @@ from victor.tools.registry import Hook, HookError, ToolRegistry
 
 
 @dataclass
-class ValidationResult:
-    """Result of parameter validation.
+class ToolValidationResult:
+    """Result of tool parameter validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (here): Tool parameter validation with invalid_params
+    - ConfigValidationResult (victor.core.validation): Configuration validation with ValidationIssue list
+    - ContentValidationResult (victor.framework.middleware): Content validation with fixed_content
+    - ParameterValidationResult (victor.agent.parameter_enforcer): Parameter enforcement with missing_required
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation with syntax/imports
 
     Provides detailed information about validation failures including
     which parameters failed and why.
@@ -60,18 +67,18 @@ class ValidationResult:
     invalid_params: Dict[str, str] = field(default_factory=dict)
 
     def __bool__(self) -> bool:
-        """Allow using ValidationResult in boolean context."""
+        """Allow using ToolValidationResult in boolean context."""
         return self.valid
 
     @classmethod
-    def success(cls) -> "ValidationResult":
+    def success(cls) -> "ToolValidationResult":
         """Create a successful validation result."""
         return cls(valid=True)
 
     @classmethod
     def failure(
         cls, errors: List[str], invalid_params: Optional[Dict[str, str]] = None
-    ) -> "ValidationResult":
+    ) -> "ToolValidationResult":
         """Create a failed validation result."""
         return cls(valid=False, errors=errors, invalid_params=invalid_params or {})
 
@@ -475,7 +482,7 @@ class BaseTool(ABC):
         """
         return self.validate_parameters_detailed(**kwargs).valid
 
-    def validate_parameters_detailed(self, **kwargs: Any) -> ValidationResult:
+    def validate_parameters_detailed(self, **kwargs: Any) -> ToolValidationResult:
         """Validate provided parameters against JSON Schema with detailed errors.
 
         Uses JSON Schema Draft 7 validation for comprehensive type checking,
@@ -485,13 +492,13 @@ class BaseTool(ABC):
             **kwargs: Parameters to validate
 
         Returns:
-            ValidationResult with detailed error information
+            ToolValidationResult with detailed error information
         """
         schema = self.parameters
 
         # Handle empty/minimal schemas gracefully
         if not schema or schema == {"type": "object", "properties": {}}:
-            return ValidationResult.success()
+            return ToolValidationResult.success()
 
         try:
             # Ensure schema has proper structure for validation
@@ -546,19 +553,19 @@ class BaseTool(ABC):
                         invalid_params[str(error.path[0])] = error.message
 
             if errors:
-                return ValidationResult.failure(errors, invalid_params)
+                return ToolValidationResult.failure(errors, invalid_params)
 
-            return ValidationResult.success()
+            return ToolValidationResult.success()
 
         except JsonSchemaValidationError as e:
             # Single validation error (shouldn't happen with iter_errors but handle it)
-            return ValidationResult.failure(
+            return ToolValidationResult.failure(
                 [str(e.message)],
                 {str(e.path[0]): e.message} if e.path else {},
             )
         except jsonschema.SchemaError as e:
             # Invalid schema - this is a programming error
-            return ValidationResult.failure(
+            return ToolValidationResult.failure(
                 [f"Invalid tool schema: {e.message}"],
                 {},
             )
@@ -566,14 +573,14 @@ class BaseTool(ABC):
             # Unexpected error - fall back to basic validation
             return self._fallback_validate(**kwargs)
 
-    def _fallback_validate(self, **kwargs: Any) -> ValidationResult:
+    def _fallback_validate(self, **kwargs: Any) -> ToolValidationResult:
         """Basic validation fallback when JSON Schema validation fails.
 
         Args:
             **kwargs: Parameters to validate
 
         Returns:
-            ValidationResult with basic validation
+            ToolValidationResult with basic validation
         """
         errors: List[str] = []
         invalid_params: Dict[str, str] = {}
@@ -599,8 +606,8 @@ class BaseTool(ABC):
                     invalid_params[param] = f"type: expected {expected_type}"
 
         if errors:
-            return ValidationResult.failure(errors, invalid_params)
-        return ValidationResult.success()
+            return ToolValidationResult.failure(errors, invalid_params)
+        return ToolValidationResult.success()
 
     def _check_type(self, value: Any, expected_type: str) -> bool:
         """Check if value matches expected type.

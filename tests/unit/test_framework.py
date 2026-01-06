@@ -23,7 +23,7 @@ from victor.framework import (
     StateHooks,
     Task,
     TaskResult,
-    TaskType,
+    FrameworkTaskType,
     ToolCategory,
     ToolError,
     Tools,
@@ -243,12 +243,12 @@ class TestTask:
         """Basic Task should work."""
         task = Task(prompt="Do something")
         assert task.prompt == "Do something"
-        assert task.type == TaskType.CHAT
+        assert task.type == FrameworkTaskType.CHAT
 
     def test_task_with_type(self):
         """Task with type should work."""
-        task = Task(prompt="Edit file", type=TaskType.EDIT, files=["test.py"])
-        assert task.type == TaskType.EDIT
+        task = Task(prompt="Edit file", type=FrameworkTaskType.EDIT, files=["test.py"])
+        assert task.type == FrameworkTaskType.EDIT
         assert task.files == ["test.py"]
 
 

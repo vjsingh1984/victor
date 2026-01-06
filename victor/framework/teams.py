@@ -69,10 +69,12 @@ from victor.agent.subagents.base import SubAgentRole
 from victor.agent.teams.coordinator import TeamCoordinator
 from victor.agent.teams.team import (
     MemoryConfig,
-    MemberResult,
     TeamConfig,
-    TeamFormation,
     TeamMember,
+)
+from victor.teams import (
+    MemberResult,
+    TeamFormation,
     TeamResult,
 )
 

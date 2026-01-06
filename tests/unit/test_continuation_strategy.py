@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.agent.continuation_strategy import ContinuationStrategy
-from victor.embeddings.intent_classifier import IntentType
-from victor.embeddings.question_classifier import QuestionType, QuestionClassificationResult
+from victor.storage.embeddings.intent_classifier import IntentType
+from victor.storage.embeddings.question_classifier import QuestionType, QuestionClassificationResult
 
 
 # =============================================================================

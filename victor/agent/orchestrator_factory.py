@@ -1559,7 +1559,7 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             IntentClassifier singleton instance
         """
-        from victor.embeddings.intent_classifier import IntentClassifier
+        from victor.storage.embeddings.intent_classifier import IntentClassifier
 
         classifier = IntentClassifier.get_instance()
         logger.debug("IntentClassifier singleton retrieved")

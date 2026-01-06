@@ -55,33 +55,22 @@ from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Dict, List, Optional, Set
 
+# Import canonical types from victor.teams.types
+from victor.teams.types import MessageType, AgentMessage as CanonicalAgentMessage
+
 logger = logging.getLogger(__name__)
 
 
-class MessageType(Enum):
-    """Types of messages that agents can exchange.
-
-    - DISCOVERY: Agent found something relevant to share
-    - REQUEST: Agent asking for help or information
-    - RESPONSE: Agent responding to a request
-    - STATUS: Progress update from an agent
-    - ALERT: Something needs immediate attention
-    - HANDOFF: Passing work to another agent
-    - RESULT: Final result from an agent
-    """
-
-    DISCOVERY = "discovery"
-    REQUEST = "request"
-    RESPONSE = "response"
-    STATUS = "status"
-    ALERT = "alert"
-    HANDOFF = "handoff"
-    RESULT = "result"
+# MessageType is imported from victor.teams.types (canonical location)
+# See victor.teams.types.MessageType for documentation
 
 
 @dataclass
 class AgentMessage:
     """A message between agents in a team.
+
+    NOTE: This is a legacy wrapper for backward compatibility.
+    For new code, prefer using victor.teams.types.AgentMessage directly.
 
     Messages are the primary communication mechanism between team members.
     They support both directed (to specific agent) and broadcast (to all)

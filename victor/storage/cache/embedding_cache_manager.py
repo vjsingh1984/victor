@@ -27,7 +27,7 @@ Benefits:
 - Enables periodic cache refresh and incremental updates
 
 Usage:
-    from victor.cache.embedding_cache_manager import EmbeddingCacheManager
+    from victor.storage.cache.embedding_cache_manager import EmbeddingCacheManager
 
     manager = EmbeddingCacheManager.get_instance()
 

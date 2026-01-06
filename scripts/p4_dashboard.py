@@ -135,7 +135,7 @@ def print_dashboard(watch_mode: bool = False):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 80)
-    print(f"P4 MULTI-PROVIDER EXCELLENCE - MONITORING DASHBOARD")
+    print("P4 MULTI-PROVIDER EXCELLENCE - MONITORING DASHBOARD")
     print(f"Updated: {timestamp}")
     print("=" * 80)
     print()

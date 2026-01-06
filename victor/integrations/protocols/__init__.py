@@ -12,62 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor Protocols Module.
+"""Integration protocols for query enhancement.
 
-Provides SOLID-based protocol interfaces for:
-- Provider adaptation (IProviderAdapter)
-- Grounding verification (IGroundingStrategy)
-- Quality assessment (IQualityAssessor)
-
-These protocols enable clean separation of concerns and
-dependency inversion throughout the codebase.
+Core protocol interfaces (provider adapters, grounding, quality, mode awareness)
+live in `victor.protocols`.
 """
-
-from victor.integrations.protocols.provider_adapter import (
-    IProviderAdapter,
-    ProviderCapabilities,
-    ToolCallFormat,
-    ToolCall,
-    get_provider_adapter,
-    register_provider_adapter,
-)
-
-from victor.integrations.protocols.grounding import (
-    IGroundingStrategy,
-    GroundingClaimType,
-    GroundingClaim,
-    VerificationResult,
-    AggregatedVerificationResult,
-    FileExistenceStrategy,
-    SymbolReferenceStrategy,
-    ContentMatchStrategy,
-    CompositeGroundingVerifier,
-)
-
-from victor.integrations.protocols.quality import (
-    IQualityAssessor,
-    QualityDimension,
-    DimensionScore,
-    QualityScore,
-    BaseQualityAssessor,
-    SimpleQualityAssessor,
-    ProviderAwareQualityAssessor,
-    CompositeQualityAssessor,
-)
-
-from victor.integrations.protocols.mode_aware import (
-    IModeController,
-    ModeInfo,
-    ModeAwareMixin,
-    create_mode_aware_mixin,
-)
-
-from victor.integrations.protocols.path_resolver import (
-    IPathResolver,
-    PathResolution,
-    PathResolver,
-    create_path_resolver,
-)
 
 from victor.integrations.protocols.query_enhancement import (
     IQueryEnhancementStrategy,
@@ -78,96 +27,7 @@ from victor.integrations.protocols.query_enhancement import (
     QueryEnhancementConfig,
 )
 
-from victor.integrations.protocols.lsp_types import (
-    # Enumerations
-    DiagnosticSeverity,
-    CompletionItemKind,
-    SymbolKind,
-    DiagnosticTag,
-    # Position and Range
-    Position,
-    Range,
-    Location,
-    LocationLink,
-    # Diagnostics
-    DiagnosticRelatedInformation,
-    Diagnostic,
-    # Completions
-    CompletionItem,
-    # Hover
-    Hover,
-    # Symbols
-    DocumentSymbol,
-    SymbolInformation,
-    # Text Edits
-    TextEdit,
-    TextDocumentIdentifier,
-    VersionedTextDocumentIdentifier,
-    TextDocumentEdit,
-)
-
 __all__ = [
-    # Provider Adapter
-    "IProviderAdapter",
-    "ProviderCapabilities",
-    "ToolCallFormat",
-    "ToolCall",
-    "get_provider_adapter",
-    "register_provider_adapter",
-    # Grounding
-    "IGroundingStrategy",
-    "GroundingClaimType",
-    "GroundingClaim",
-    "VerificationResult",
-    "AggregatedVerificationResult",
-    "FileExistenceStrategy",
-    "SymbolReferenceStrategy",
-    "ContentMatchStrategy",
-    "CompositeGroundingVerifier",
-    # Quality
-    "IQualityAssessor",
-    "QualityDimension",
-    "DimensionScore",
-    "QualityScore",
-    "BaseQualityAssessor",
-    "SimpleQualityAssessor",
-    "ProviderAwareQualityAssessor",
-    "CompositeQualityAssessor",
-    # Mode Awareness
-    "IModeController",
-    "ModeInfo",
-    "ModeAwareMixin",
-    "create_mode_aware_mixin",
-    # Path Resolution
-    "IPathResolver",
-    "PathResolution",
-    "PathResolver",
-    "create_path_resolver",
-    # LSP Types - Enumerations
-    "DiagnosticSeverity",
-    "CompletionItemKind",
-    "SymbolKind",
-    "DiagnosticTag",
-    # LSP Types - Position and Range
-    "Position",
-    "Range",
-    "Location",
-    "LocationLink",
-    # LSP Types - Diagnostics
-    "DiagnosticRelatedInformation",
-    "Diagnostic",
-    # LSP Types - Completions
-    "CompletionItem",
-    # LSP Types - Hover
-    "Hover",
-    # LSP Types - Symbols
-    "DocumentSymbol",
-    "SymbolInformation",
-    # LSP Types - Text Edits
-    "TextEdit",
-    "TextDocumentIdentifier",
-    "VersionedTextDocumentIdentifier",
-    "TextDocumentEdit",
     # Query Enhancement
     "IQueryEnhancementStrategy",
     "IQueryEnhancementPipeline",

@@ -14,175 +14,90 @@
 
 """Coding workflow provider.
 
-Implements WorkflowProviderProtocol to provide coding-specific workflows
-to the framework, with support for streaming execution via
-StreamingWorkflowExecutor.
+Uses YAML-first architecture with Python escape hatches for complex
+conditions and transforms that cannot be expressed in YAML.
 
-Supports hybrid loading:
-- Python workflows (inline @workflow definitions)
-- YAML workflows (external files in workflows/*.yaml)
+All workflows are defined in YAML files (*.yaml) in this directory:
+- feature.yaml: Feature implementation workflows
+- bugfix.yaml: Bug fix workflows
+- code_review.yaml: Code review workflows (includes pr_review)
+- tdd.yaml: Test-driven development workflows
+- refactor.yaml: Refactoring workflows
 
-YAML workflows override Python workflows when names collide,
-allowing customization without code changes.
+Escape hatches for complex conditions/transforms are in:
+- victor/coding/escape_hatches.py
 
 Example:
     provider = CodingWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
 
-    # Streaming execution
-    async for chunk in provider.astream("code_review", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("code_review", context):
+        print(f"Completed: {node_id}")
+
+Available workflows (all YAML-defined):
+- feature_implementation: Full feature implementation workflow
+- quick_feature: Quick feature for small changes
+- bug_fix: Systematic bug investigation and fix
+- quick_fix: Quick fix for simple bugs
+- code_review: Comprehensive code review with parallel analysis
+- quick_review: Quick code review for small changes
+- pr_review: Pull request review workflow
+- tdd_cycle: Test-driven development cycle
+- refactor: Code refactoring workflow
 """
 
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
+from typing import List, Optional, Tuple
 
-from victor.core.verticals.protocols import WorkflowProviderProtocol
-from victor.workflows.definition import WorkflowDefinition
+from victor.framework.workflows import BaseYAMLWorkflowProvider
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.workflows.executor import WorkflowExecutor
-    from victor.workflows.streaming import WorkflowStreamChunk
-    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 
-
-class CodingWorkflowProvider(WorkflowProviderProtocol):
+class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
     """Provides coding-specific workflows.
 
-    This provider implements WorkflowProviderProtocol to expose all
-    coding workflows to the framework. Workflows can be retrieved
-    by name and auto-triggered based on task patterns.
+    Uses YAML-first architecture with Python escape hatches for complex
+    conditions and transforms that cannot be expressed in YAML.
+
+    Inherits from BaseYAMLWorkflowProvider which provides:
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable code reviews and TDD cycles
 
     Example:
         provider = CodingWorkflowProvider()
-        workflows = provider.get_workflows()
-        feature_wf = provider.get_workflow("feature_implementation")
+
+        # List available workflows
+        print(provider.get_workflow_names())
+
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("code_review", {}):
+            print(f"Completed: {node_id}")
     """
 
-    def __init__(self) -> None:
-        """Initialize the provider."""
-        self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
-
-    def _load_python_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Load Python-defined workflows.
+    def _get_escape_hatches_module(self) -> str:
+        """Return the module path for coding escape hatches.
 
         Returns:
-            Dict mapping workflow names to definitions
+            Module path string for CONDITIONS and TRANSFORMS dictionaries
         """
-        from victor.coding.workflows.bugfix import (
-            bug_fix_workflow,
-            quick_fix_workflow,
-        )
-        from victor.coding.workflows.feature import (
-            feature_implementation_workflow,
-            quick_feature_workflow,
-        )
-        from victor.coding.workflows.review import (
-            code_review_workflow,
-            pr_review_workflow,
-            quick_review_workflow,
-        )
-
-        return {
-            # Feature workflows
-            "feature_implementation": feature_implementation_workflow(),
-            "quick_feature": quick_feature_workflow(),
-            # Bug fix workflows
-            "bug_fix": bug_fix_workflow(),
-            "quick_fix": quick_fix_workflow(),
-            # Review workflows
-            "code_review": code_review_workflow(),
-            "quick_review": quick_review_workflow(),
-            "pr_review": pr_review_workflow(),
-        }
-
-    def _load_yaml_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Load YAML-defined workflows from workflows/*.yaml.
-
-        Returns:
-            Dict mapping workflow names to definitions
-        """
-        try:
-            from victor.workflows.yaml_loader import load_workflows_from_directory
-
-            # Load from the workflows directory (same as this file)
-            workflows_dir = Path(__file__).parent
-            yaml_workflows = load_workflows_from_directory(workflows_dir)
-            logger.debug(f"Loaded {len(yaml_workflows)} YAML workflows from {workflows_dir}")
-            return yaml_workflows
-        except Exception as e:
-            logger.warning(f"Failed to load YAML workflows: {e}")
-            return {}
-
-    def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Lazy load all workflows with hybrid Python/YAML support.
-
-        YAML workflows override Python workflows when names collide,
-        allowing external customization without code changes.
-
-        Returns:
-            Dict mapping workflow names to definitions
-        """
-        if self._workflows is None:
-            # Start with Python workflows as base
-            python_workflows = self._load_python_workflows()
-
-            # Override with YAML workflows (external overrides inline)
-            yaml_workflows = self._load_yaml_workflows()
-
-            # Merge: YAML takes precedence
-            self._workflows = {**python_workflows, **yaml_workflows}
-
-            logger.debug(
-                f"Loaded {len(python_workflows)} Python + {len(yaml_workflows)} YAML workflows "
-                f"= {len(self._workflows)} total"
-            )
-        return self._workflows
-
-    def get_workflows(self) -> Dict[str, WorkflowDefinition]:
-        """Get workflow definitions for this vertical.
-
-        Returns:
-            Dict mapping workflow names to WorkflowDefinition instances
-        """
-        return self._load_workflows()
-
-    def get_workflow(self, name: str) -> Optional[WorkflowDefinition]:
-        """Get a specific workflow by name.
-
-        Args:
-            name: Workflow name
-
-        Returns:
-            WorkflowDefinition or None if not found
-        """
-        workflows = self._load_workflows()
-        return workflows.get(name)
-
-    def get_workflow_names(self) -> List[str]:
-        """Get all available workflow names.
-
-        Returns:
-            List of workflow names
-        """
-        return list(self._load_workflows().keys())
+        return "victor.coding.escape_hatches"
 
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatically triggered workflows.
+        """Get automatic workflow triggers based on query patterns.
 
         Returns patterns that can trigger workflows automatically
         based on user input.
 
         Returns:
-            List of (pattern, workflow_name) tuples
+            List of (regex_pattern, workflow_name) tuples
         """
         return [
             # Feature patterns
@@ -206,6 +121,14 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
             (r"review\s+.+pr", "pr_review"),
             (r"review\s+pull\s+request", "pr_review"),
             (r"pr\s+review", "pr_review"),
+            # TDD patterns
+            (r"tdd\s+", "tdd_cycle"),
+            (r"test.?driven", "tdd_cycle"),
+            (r"write\s+tests?\s+first", "tdd_cycle"),
+            # Refactor patterns
+            (r"refactor\s+", "refactor"),
+            (r"clean\s+up\s+code", "refactor"),
+            (r"improve\s+code\s+quality", "refactor"),
         ]
 
     def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
@@ -215,20 +138,23 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
             task_type: Type of task (feature, bugfix, review, etc.)
 
         Returns:
-            Workflow name or None
+            Workflow name string or None if no mapping exists
         """
         task_mapping = {
+            # Feature workflows
             "feature": "feature_implementation",
             "implement": "feature_implementation",
             "new_feature": "feature_implementation",
             "simple_feature": "quick_feature",
             "quick_feature": "quick_feature",
+            # Bug fix workflows
             "bug": "bug_fix",
             "bugfix": "bug_fix",
             "debug": "bug_fix",
             "investigation": "bug_fix",
             "simple_bug": "quick_fix",
             "quick_fix": "quick_fix",
+            # Review workflows
             "review": "code_review",
             "code_review": "code_review",
             "security_review": "code_review",
@@ -236,79 +162,14 @@ class CodingWorkflowProvider(WorkflowProviderProtocol):
             "pr": "pr_review",
             "pull_request": "pr_review",
             "pr_review": "pr_review",
+            # TDD workflows
+            "tdd": "tdd_cycle",
+            "test_driven": "tdd_cycle",
+            # Refactor workflows
+            "refactor": "refactor",
+            "cleanup": "refactor",
         }
         return task_mapping.get(task_type.lower())
-
-    def create_executor(
-        self,
-        orchestrator: "AgentOrchestrator",
-    ) -> "WorkflowExecutor":
-        """Create a standard workflow executor.
-
-        Args:
-            orchestrator: Agent orchestrator instance
-
-        Returns:
-            WorkflowExecutor for running workflows
-        """
-        from victor.workflows.executor import WorkflowExecutor
-
-        return WorkflowExecutor(orchestrator)
-
-    def create_streaming_executor(
-        self,
-        orchestrator: "AgentOrchestrator",
-    ) -> "StreamingWorkflowExecutor":
-        """Create a streaming workflow executor.
-
-        Args:
-            orchestrator: Agent orchestrator instance
-
-        Returns:
-            StreamingWorkflowExecutor for real-time progress streaming
-        """
-        from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-        return StreamingWorkflowExecutor(orchestrator)
-
-    async def astream(
-        self,
-        workflow_name: str,
-        orchestrator: "AgentOrchestrator",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator["WorkflowStreamChunk"]:
-        """Stream workflow execution with real-time events.
-
-        Convenience method that creates a streaming executor and
-        streams the specified workflow.
-
-        Args:
-            workflow_name: Name of the workflow to execute
-            orchestrator: Agent orchestrator instance
-            context: Initial context data for the workflow
-
-        Yields:
-            WorkflowStreamChunk events during execution
-
-        Raises:
-            ValueError: If workflow_name is not found
-
-        Example:
-            provider = CodingWorkflowProvider()
-            async for chunk in provider.astream("code_review", orchestrator, {"files": ["main.py"]}):
-                if chunk.event_type == WorkflowEventType.NODE_START:
-                    print(f"Starting: {chunk.node_name}")
-        """
-        workflow = self.get_workflow(workflow_name)
-        if not workflow:
-            raise ValueError(f"Unknown workflow: {workflow_name}")
-
-        executor = self.create_streaming_executor(orchestrator)
-        async for chunk in executor.astream(workflow, context or {}):
-            yield chunk
-
-    def __repr__(self) -> str:
-        return f"CodingWorkflowProvider(workflows={len(self._load_workflows())})"
 
 
 # Register Coding domain handlers when this module is loaded

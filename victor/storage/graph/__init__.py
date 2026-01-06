@@ -14,7 +14,7 @@ multiple backend options:
 
 Example:
     ```python
-    from victor.graph import create_graph_store, GraphNode, GraphEdge
+    from victor.storage.graph import create_graph_store, GraphNode, GraphEdge
 
     # Create a SQLite-backed graph store
     store = create_graph_store("sqlite", "/path/to/graph.db")

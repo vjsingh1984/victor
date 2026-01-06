@@ -68,12 +68,19 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentRole
+    from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
 
-class NodeType(Enum):
-    """Type of workflow node."""
+class WorkflowNodeType(Enum):
+    """Type of workflow definition node.
+
+    Renamed from NodeType to be semantically distinct:
+    - WorkflowNodeType (here): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - GraphNodeType (victor.workflows.graph_dsl): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    - YAMLNodeType (victor.workflows.yaml_loader): YAML loader validation nodes
+    """
 
     AGENT = "agent"  # Spawns an agent to execute
     COMPUTE = "compute"  # Direct tool execution without LLM (extensible)
@@ -93,26 +100,39 @@ class WorkflowNode(ABC):
         id: Unique identifier for this node
         name: Human-readable name
         next_nodes: IDs of nodes to execute after this one
+        retry_policy: Optional retry policy for this node
+        circuit_breaker_enabled: Whether to enable circuit breaker for this node
     """
 
     id: str
     name: str
     next_nodes: List[str] = field(default_factory=list)
+    retry_policy: Optional["RetryPolicy"] = None
+    circuit_breaker_enabled: bool = False
 
     @property
     @abstractmethod
-    def node_type(self) -> NodeType:
+    def node_type(self) -> WorkflowNodeType:
         """The type of this node."""
         pass
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node to dictionary."""
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "type": self.node_type.value,
             "next_nodes": self.next_nodes,
         }
+        if self.retry_policy:
+            result["retry_policy"] = {
+                "max_retries": self.retry_policy.max_retries,
+                "delay_seconds": self.retry_policy.delay_seconds,
+                "exponential_backoff": self.retry_policy.exponential_backoff,
+            }
+        if self.circuit_breaker_enabled:
+            result["circuit_breaker_enabled"] = True
+        return result
 
 
 @dataclass
@@ -127,6 +147,7 @@ class AgentNode(WorkflowNode):
         input_mapping: Map context keys to agent inputs
         output_key: Key to store agent output in context
         llm_config: Optional LLM configuration (temperature, model_hint, etc.)
+        timeout_seconds: Maximum execution time in seconds (None = no timeout)
     """
 
     role: str = "executor"
@@ -136,10 +157,11 @@ class AgentNode(WorkflowNode):
     input_mapping: Dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
     llm_config: Optional[Dict[str, Any]] = None
+    timeout_seconds: Optional[float] = None
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.AGENT
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.AGENT
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -152,6 +174,7 @@ class AgentNode(WorkflowNode):
                 "input_mapping": self.input_mapping,
                 "output_key": self.output_key,
                 "llm_config": self.llm_config,
+                "timeout_seconds": self.timeout_seconds,
             }
         )
         return d
@@ -170,8 +193,8 @@ class ConditionNode(WorkflowNode):
     branches: Dict[str, str] = field(default_factory=dict)
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.CONDITION
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.CONDITION
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -202,8 +225,8 @@ class ParallelNode(WorkflowNode):
     join_strategy: str = "all"  # all, any, merge
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.PARALLEL
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.PARALLEL
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
@@ -227,8 +250,8 @@ class TransformNode(WorkflowNode):
     transform: Callable[[Dict[str, Any]], Dict[str, Any]] = field(default=lambda ctx: ctx)
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.TRANSFORM
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.TRANSFORM
 
 
 class ConstraintsProtocol(ABC):
@@ -443,10 +466,12 @@ class ComputeNode(WorkflowNode):
     handler: Optional[str] = None  # Custom handler name for extensibility
     fail_fast: bool = True
     parallel: bool = False
+    # Execution target: "in-process", "subprocess", "docker"
+    execution_target: str = "in-process"
 
     @property
-    def node_type(self) -> NodeType:
-        return NodeType.COMPUTE
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.COMPUTE
 
     @property
     def timeout(self) -> float:
@@ -464,6 +489,7 @@ class ComputeNode(WorkflowNode):
                 "handler": self.handler,
                 "fail_fast": self.fail_fast,
                 "parallel": self.parallel,
+                "execution_target": self.execution_target,
             }
         )
         return d
@@ -481,6 +507,10 @@ class WorkflowDefinition:
         nodes: All nodes in the workflow
         start_node: ID of the entry point node
         metadata: Additional workflow metadata
+        max_execution_timeout_seconds: Overall workflow timeout (None = no limit)
+        default_node_timeout_seconds: Default timeout for nodes (None = no default)
+        max_iterations: Maximum workflow iterations/cycles (default: 25)
+        max_retries: Maximum retries for the entire workflow (default: 0)
     """
 
     name: str
@@ -488,6 +518,10 @@ class WorkflowDefinition:
     nodes: Dict[str, WorkflowNode] = field(default_factory=dict)
     start_node: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    max_execution_timeout_seconds: Optional[float] = None
+    default_node_timeout_seconds: Optional[float] = None
+    max_iterations: int = 25
+    max_retries: int = 0
 
     def __post_init__(self):
         """Validate workflow structure."""
@@ -587,6 +621,10 @@ class WorkflowDefinition:
             "start_node": self.start_node,
             "nodes": {nid: node.to_dict() for nid, node in self.nodes.items()},
             "metadata": self.metadata,
+            "max_execution_timeout_seconds": self.max_execution_timeout_seconds,
+            "default_node_timeout_seconds": self.default_node_timeout_seconds,
+            "max_iterations": self.max_iterations,
+            "max_retries": self.max_retries,
         }
 
     def get_agent_count(self) -> int:
@@ -1151,7 +1189,7 @@ def get_registered_workflows() -> Dict[str, Callable[[], WorkflowDefinition]]:
 
 __all__ = [
     # Node types
-    "NodeType",
+    "WorkflowNodeType",
     "WorkflowNode",
     "AgentNode",
     "ComputeNode",

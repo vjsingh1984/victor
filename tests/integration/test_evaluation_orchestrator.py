@@ -30,7 +30,7 @@ import pytest
 from victor.evaluation.agentic_harness import (
     AgenticExecutionTrace,
     FileEdit,
-    ToolCall,
+    EvalToolCall,
 )
 from victor.evaluation.baseline_validator import (
     BaselineStatus,
@@ -324,8 +324,10 @@ class TestEvaluationOrchestrator:
                     end_time=10.0,
                     turns=3,
                     tool_calls=[
-                        ToolCall(name="file_read", arguments={"path": "test.py"}, success=True),
-                        ToolCall(name="file_write", arguments={"path": "test.py"}, success=True),
+                        EvalToolCall(name="file_read", arguments={"path": "test.py"}, success=True),
+                        EvalToolCall(
+                            name="file_write", arguments={"path": "test.py"}, success=True
+                        ),
                     ],
                     file_edits=[
                         FileEdit(path="test.py", action="modify", after_content="new content"),
@@ -645,8 +647,8 @@ class TestEvaluationOrchestrator:
                 end_time=10.0,
                 turns=5,
                 tool_calls=[
-                    ToolCall(name="file_read", arguments={}, success=True),
-                    ToolCall(name="file_write", arguments={}, success=True),
+                    EvalToolCall(name="file_read", arguments={}, success=True),
+                    EvalToolCall(name="file_write", arguments={}, success=True),
                 ],
             )
 

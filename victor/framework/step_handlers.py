@@ -921,6 +921,10 @@ class FrameworkStepHandler(BaseStepHandler):
         self.apply_personas(orchestrator, vertical, context, result)
         # Phase 1: Gap fix - Wire capability provider to framework
         self.apply_capability_provider(orchestrator, vertical, context, result)
+        # Phase 1: Gap fix - Register tool graphs with global registry
+        self.apply_tool_graphs(orchestrator, vertical, context, result)
+        # Phase 2: Gap fix - Register handlers explicitly
+        self.apply_handlers(orchestrator, vertical, context, result)
 
     def apply_workflows(
         self,
@@ -979,6 +983,28 @@ class FrameworkStepHandler(BaseStepHandler):
             result.add_warning("Workflow registry not available")
         except Exception as e:
             result.add_warning(f"Could not register workflows: {e}")
+
+        # NEW: Register workflow triggers with global WorkflowTriggerRegistry
+        try:
+            from victor.workflows.trigger_registry import get_trigger_registry
+
+            trigger_registry = get_trigger_registry()
+
+            # Get auto_workflows from provider if available
+            if hasattr(workflow_provider, "get_auto_workflows"):
+                auto_workflows = workflow_provider.get_auto_workflows()
+                if auto_workflows:
+                    trigger_registry.register_from_vertical(vertical.name, auto_workflows)
+                    logger.debug(
+                        f"Registered {len(auto_workflows)} workflow triggers "
+                        f"for {vertical.name}"
+                    )
+                    result.add_info(f"Registered {len(auto_workflows)} workflow triggers")
+        except ImportError:
+            # Trigger registry not available (optional dependency)
+            pass
+        except Exception as e:
+            result.add_warning(f"Could not register workflow triggers: {e}")
 
         logger.debug(f"Applied {workflow_count} workflows from vertical")
 
@@ -1098,6 +1124,20 @@ class FrameworkStepHandler(BaseStepHandler):
         # Log each team spec registration (matching workflow DEBUG logging pattern)
         for team_name in team_specs.keys():
             logger.debug(f"Registered team_spec: {team_name}")
+
+        # NEW: Register with global TeamSpecRegistry for cross-vertical discovery
+        try:
+            from victor.framework.team_registry import get_team_registry
+
+            team_registry = get_team_registry()
+            team_registry.register_from_vertical(vertical.name, team_specs, replace=True)
+            logger.debug(f"Registered {team_count} teams with global registry for {vertical.name}")
+        except ImportError:
+            # Team registry not available (optional dependency)
+            pass
+        except Exception as e:
+            result.add_warning(f"Could not register with team registry: {e}")
+
         logger.debug(f"Applied {team_count} team specifications from vertical")
 
     def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
@@ -1299,6 +1339,110 @@ class FrameworkStepHandler(BaseStepHandler):
         except Exception as e:
             result.add_warning(f"Could not wire capability provider: {e}")
             logger.debug(f"Capability provider error: {e}", exc_info=True)
+
+    def apply_tool_graphs(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Register vertical tool graphs with global ToolGraphRegistry.
+
+        Phase 1: Gap fix - Tool graphs were defined but never registered
+        globally, preventing cross-vertical tool planning.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Result to update
+        """
+        try:
+            from victor.tools.tool_graph import ToolGraphRegistry
+        except ImportError:
+            # ToolGraphRegistry not available (optional dependency)
+            return
+
+        graph_registry = ToolGraphRegistry.get_instance()
+        graph = None
+
+        # Check for direct tool graph method
+        if hasattr(vertical, "get_tool_graph"):
+            graph = vertical.get_tool_graph()
+
+        # Fallback: try to build from tool dependency provider
+        if graph is None and hasattr(vertical, "get_tool_dependency_provider"):
+            provider = vertical.get_tool_dependency_provider()
+            if provider and hasattr(provider, "get_tool_graph"):
+                graph = provider.get_tool_graph()
+
+        if graph is None:
+            return
+
+        try:
+            graph_registry.register_graph(vertical.name, graph)
+            result.add_info(f"Registered tool graph for {vertical.name}")
+            logger.debug(f"Registered tool graph for vertical={vertical.name}")
+        except Exception as e:
+            result.add_warning(f"Could not register tool graph: {e}")
+
+    def apply_handlers(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Explicitly register vertical compute handlers.
+
+        Phase 2: Gap fix - Handlers were registered via import side effects.
+        This method makes handler registration explicit and traceable.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Result to update
+        """
+        # Check if vertical provides handlers
+        if not hasattr(vertical, "get_handlers"):
+            return
+
+        handlers = vertical.get_handlers()
+        if not handlers:
+            return
+
+        handler_count = len(handlers)
+
+        try:
+            from victor.framework.handler_registry import get_handler_registry
+
+            registry = get_handler_registry()
+
+            for name, handler in handlers.items():
+                registry.register(name, handler, vertical=vertical.name, replace=True)
+                logger.debug(f"Registered handler: {vertical.name}:{name}")
+
+            result.add_info(f"Registered {handler_count} handlers: {', '.join(handlers.keys())}")
+            logger.debug(f"Applied {handler_count} handlers from vertical")
+        except ImportError:
+            # Handler registry not available - fall back to executor registration
+            try:
+                from victor.workflows.executor import register_compute_handler
+
+                for name, handler in handlers.items():
+                    register_compute_handler(name, handler)
+                    logger.debug(f"Registered handler via executor: {name}")
+
+                result.add_info(
+                    f"Registered {handler_count} handlers (fallback): "
+                    f"{', '.join(handlers.keys())}"
+                )
+            except ImportError:
+                result.add_warning("Handler registration not available")
+        except Exception as e:
+            result.add_warning(f"Could not register handlers: {e}")
 
 
 # =============================================================================

@@ -55,6 +55,10 @@ from victor.agent.subagents.base import (
 )
 from victor.agent.subagents.orchestrator import SubAgentOrchestrator
 from victor.agent.subagents.prompts import get_role_prompt
+from victor.agent.subagents.protocols import (
+    SubAgentContext,
+    SubAgentContextAdapter,
+)
 
 __all__ = [
     # Core classes
@@ -64,6 +68,9 @@ __all__ = [
     "SubAgentRole",
     # Orchestrator
     "SubAgentOrchestrator",
+    # Protocols (ISP compliant)
+    "SubAgentContext",
+    "SubAgentContextAdapter",
     # Utilities
     "get_role_prompt",
 ]

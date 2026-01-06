@@ -52,9 +52,11 @@ def demo_basic_caching():
 
     print("\n3️⃣ Cache statistics...")
     stats = cache.get_stats()
-    print(f"Memory hits: {stats['memory_hits']}")
-    print(f"Memory misses: {stats['memory_misses']}")
-    print(f"Hit rate: {stats['memory_hit_rate']:.2%}")
+    print(f"Memory hits: {stats.memory_hits}")
+    print(f"Memory misses: {stats.memory_misses}")
+    total = stats.memory_hits + stats.memory_misses
+    hit_rate = stats.memory_hits / total if total > 0 else 0
+    print(f"Hit rate: {hit_rate:.2%}")
 
     print("\n4️⃣ Cache with namespaces...")
     cache.set("api_key", "secret123", namespace="credentials")
@@ -70,7 +72,7 @@ def demo_basic_caching():
     print(f"After delete: {deleted_user}")  # Should be None
 
     print("\n6️⃣ Clear namespace...")
-    cache.clear(namespace="credentials")
+    cache.clear_namespace("credentials")
     print("✓ Cleared credentials namespace")
 
     cache.close()
@@ -94,25 +96,23 @@ def demo_tiered_caching():
     print(f"Retrieved in {elapsed_ms:.3f}ms from memory")
     print(f"Data: {data}")
 
-    print("\n3️⃣ Simulate memory cache clear...")
-    # Clear only memory cache to test disk fallback
-    if cache._memory_cache:
-        cache._memory_cache.clear()
-    print("✓ Cleared memory cache")
+    print("\n3️⃣ Clear all caches...")
+    cache.clear_all()
+    print("✓ Cleared all caches")
 
-    print("\n4️⃣ Retrieve from disk (slower but persistent)...")
+    print("\n4️⃣ Set data again and retrieve...")
+    cache.set("expensive_data", {"result": "new value", "cost": 200})
     start = time.time()
-    data = cache.get("expensive_data")  # Will hit disk cache
+    data = cache.get("expensive_data")
     elapsed_ms = (time.time() - start) * 1000
-    print(f"Retrieved in {elapsed_ms:.3f}ms from disk")
+    print(f"Retrieved in {elapsed_ms:.3f}ms")
     print(f"Data: {data}")
-    print("✓ Automatically promoted back to memory cache")
 
     print("\n5️⃣ Final statistics...")
     stats = cache.get_stats()
-    print(f"Memory hits: {stats['memory_hits']}")
-    print(f"Disk hits: {stats['disk_hits']}")
-    print(f"Total sets: {stats['sets']}")
+    print(f"Memory hits: {stats.memory_hits}")
+    print(f"Disk hits: {stats.disk_hits}")
+    print(f"Total sets: {stats.total_sets}")
 
     cache.close()
 
@@ -212,7 +212,10 @@ def demo_cache_warmup():
     }
 
     print("\n2️⃣ Warm up cache...")
-    count = cache.warmup(warmup_data, namespace="app")
+    count = 0
+    for key, value in warmup_data.items():
+        cache.set(key, value, namespace="app")
+        count += 1
     print(f"✓ Warmed up cache with {count} entries")
 
     print("\n3️⃣ Verify warmup...")
@@ -248,21 +251,24 @@ def demo_cache_stats():
     print("\n2️⃣ Cache statistics...")
     stats = cache.get_stats()
 
+    total_mem = stats.memory_hits + stats.memory_misses
+    mem_hit_rate = stats.memory_hits / total_mem if total_mem > 0 else 0
+    total_disk = stats.disk_hits + stats.disk_misses
+    disk_hit_rate = stats.disk_hits / total_disk if total_disk > 0 else 0
+
     print("\nMemory Cache:")
-    print(f"  Hits: {stats['memory_hits']}")
-    print(f"  Misses: {stats['memory_misses']}")
-    print(f"  Hit Rate: {stats['memory_hit_rate']:.2%}")
-    print(f"  Current Size: {stats.get('memory_size', 0)}/{stats.get('memory_max_size', 0)}")
+    print(f"  Hits: {stats.memory_hits}")
+    print(f"  Misses: {stats.memory_misses}")
+    print(f"  Hit Rate: {mem_hit_rate:.2%}")
 
     print("\nDisk Cache:")
-    print(f"  Hits: {stats['disk_hits']}")
-    print(f"  Misses: {stats['disk_misses']}")
-    print(f"  Hit Rate: {stats['disk_hit_rate']:.2%}")
-    print(f"  Entries: {stats.get('disk_size', 0)}")
+    print(f"  Hits: {stats.disk_hits}")
+    print(f"  Misses: {stats.disk_misses}")
+    print(f"  Hit Rate: {disk_hit_rate:.2%}")
 
     print("\nOverall:")
-    print(f"  Total Sets: {stats['sets']}")
-    print(f"  Total Requests: {stats['memory_hits'] + stats['memory_misses']}")
+    print(f"  Total Sets: {stats.total_sets}")
+    print(f"  Total Requests: {total_mem}")
 
     cache.close()
 

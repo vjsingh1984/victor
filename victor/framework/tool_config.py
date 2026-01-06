@@ -352,8 +352,23 @@ class ToolConfigurator:
         """
         # Check for tools attribute
         tools = getattr(orchestrator, "tools", None)
-        if tools:
+        if tools is None:
+            return set()
+
+        # Handle different tool container types:
+        # 1. ToolRegistry (has list_all() or keys() method)
+        # 2. dict (has keys() method)
+        # 3. list/set of tool names
+        if hasattr(tools, "list_all"):
+            # ToolRegistry or similar registry - preferred method
+            return set(tools.list_all())
+        elif hasattr(tools, "keys"):
+            # dict-like or registry with keys()
             return set(tools.keys())
+        elif isinstance(tools, (list, set, frozenset)):
+            # Direct collection of tool names
+            return set(tools)
+
         return set()
 
     def _get_current_tools(self, orchestrator: "AgentOrchestrator") -> Set[str]:

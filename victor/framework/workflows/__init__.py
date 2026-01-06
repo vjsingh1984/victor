@@ -21,7 +21,14 @@ eliminates boilerplate in vertical-specific workflow provider implementations.
 Key Components:
     - BaseYAMLWorkflowProvider: Template Method pattern base class for YAML
       workflow providers. Subclasses only need to specify the escape hatches
-      module path to get full workflow loading, caching, and streaming support.
+      module path to get full workflow loading, caching, and execution support
+      via UnifiedWorkflowCompiler.
+
+Key Features:
+    - Two-level caching (definition + execution) for 10x faster repeated runs
+    - Checkpointing support for resumable long-running workflows
+    - Consistent execution via UnifiedWorkflowCompiler
+    - TypedDict/dataclass state support for type safety
 
 Example:
     from victor.framework.workflows import BaseYAMLWorkflowProvider
@@ -38,11 +45,13 @@ Example:
                 (r"fact\\s*check", "fact_check"),
             ]
 
-    # Usage
+    # Usage (recommended - uses UnifiedWorkflowCompiler with caching)
     provider = ResearchWorkflowProvider()
-    workflow = provider.get_workflow("deep_research")
-    async for chunk in provider.astream("deep_research", orchestrator, {}):
-        print(f"Progress: {chunk.progress:.0f}%")
+    result = await provider.run_compiled_workflow("deep_research", {"query": "AI"})
+
+    # Stream with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("deep_research", {}):
+        print(f"Completed: {node_id}")
 """
 
 from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider

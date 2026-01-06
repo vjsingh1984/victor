@@ -68,6 +68,9 @@ from victor.tools.composition import (
     extract_output,
     map_keys,
     select_keys,
+    # Import lazy loading utilities from the framework
+    LazyToolRunnable as BaseLazyToolRunnable,
+    ToolCompositionBuilder,
 )
 
 if TYPE_CHECKING:
@@ -208,8 +211,12 @@ def is_javascript_file(ctx: Dict[str, Any]) -> bool:
 class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
     """Lazily loads a tool by name when first invoked.
 
-    This allows chain definitions without requiring all tools
-    to be imported at module load time.
+    This class extends the framework's LazyToolRunnable (BaseLazyToolRunnable)
+    with tool-by-name loading capabilities, making it suitable for LCEL-style
+    chain composition without requiring all tools to be imported at module load time.
+
+    Uses BaseLazyToolRunnable from victor.tools.composition for the underlying
+    lazy loading mechanism, adding the Runnable interface for chain composition.
     """
 
     def __init__(
@@ -221,7 +228,7 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         """Initialize with tool name.
 
         Args:
-            tool_name: Name of the tool to load
+            tool_name: Name of the tool to load from the registry
             output_key: Key to extract from output
             input_mapping: Input key remapping
         """
@@ -230,22 +237,35 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         self._input_mapping = input_mapping or {}
         self._runnable: Optional[Runnable] = None
 
+        # Use the framework's LazyToolRunnable for lazy loading
+        self._lazy_loader = BaseLazyToolRunnable(
+            factory=self._create_tool,
+            name=tool_name,
+            cache=True,
+        )
+
+    def _create_tool(self) -> Any:
+        """Factory method to create the tool - used by BaseLazyToolRunnable."""
+        from victor.tools import get_tool_by_name
+
+        tool = get_tool_by_name(self._tool_name)
+        if tool is None:
+            raise ValueError(f"Tool '{self._tool_name}' not found")
+        return tool
+
     @property
     def name(self) -> str:
         """Get tool name."""
         return self._tool_name
 
     def _load_tool(self) -> Runnable:
-        """Load the tool and create runnable."""
+        """Load the tool and create runnable using the lazy loader."""
         if self._runnable is not None:
             return self._runnable
 
         try:
-            from victor.tools import get_tool_by_name
-
-            tool = get_tool_by_name(self._tool_name)
-            if tool is None:
-                raise ValueError(f"Tool '{self._tool_name}' not found")
+            # Get the tool from the lazy loader (creates on first access)
+            tool = self._lazy_loader.tool
 
             self._runnable = as_runnable(
                 tool,
@@ -266,8 +286,25 @@ class LazyToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         runnable = self._load_tool()
         return await runnable.invoke(input, config)
 
+    @property
+    def is_initialized(self) -> bool:
+        """Check if the tool has been initialized.
+
+        Delegates to the underlying BaseLazyToolRunnable.
+        """
+        return self._lazy_loader.is_initialized
+
+    def reset(self) -> None:
+        """Reset the lazy tool, clearing the cached instance.
+
+        Useful for testing or forcing re-initialization.
+        """
+        self._runnable = None
+        self._lazy_loader.reset()
+
     def __repr__(self) -> str:
-        return f"LazyToolRunnable({self._tool_name})"
+        status = "initialized" if self.is_initialized else "pending"
+        return f"LazyToolRunnable({self._tool_name}, status={status})"
 
 
 def lazy_tool(
@@ -609,9 +646,12 @@ __all__ = [
     "create_exploration_chain",
     "create_edit_verify_chain",
     "create_refactor_chain",
-    # Lazy loading
+    # Lazy loading (local wrapper for tool-by-name loading)
     "lazy_tool",
     "LazyToolRunnable",
+    # Re-exported from victor.tools.composition for convenience
+    "BaseLazyToolRunnable",
+    "ToolCompositionBuilder",
     # Registry
     "get_chain",
     "list_chains",

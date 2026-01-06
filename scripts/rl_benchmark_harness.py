@@ -327,7 +327,7 @@ class RLBenchmarkHarness:
         Each batch uses the same prompt for all models (apples-to-apples).
         Batches cycle through different complexity levels.
         """
-        logger.info(f"Starting RL Benchmark Experiment")
+        logger.info("Starting RL Benchmark Experiment")
         logger.info(f"Output directory: {self.output_dir}")
         logger.info(f"Batches: {num_batches}, Include Ollama: {include_ollama}")
 
@@ -454,7 +454,7 @@ async def main():
     args = parser.parse_args()
 
     harness = RLBenchmarkHarness(timeout_seconds=args.timeout)
-    summary = await harness.run_experiment(
+    await harness.run_experiment(
         num_batches=args.batches,
         include_ollama=args.ollama,
     )

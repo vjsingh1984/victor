@@ -39,9 +39,14 @@ Usage:
     threshold = adapter.capabilities.quality_threshold
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Protocol, Tuple, List, Optional, Any, runtime_checkable
+from typing import Protocol, Tuple, List, Optional, Any, runtime_checkable, TYPE_CHECKING
 from enum import Enum
+
+if TYPE_CHECKING:
+    from victor.agent.tool_calling.base import ToolCall
 
 
 class ToolCallFormat(Enum):
@@ -90,21 +95,8 @@ class ProviderCapabilities:
     requires_thinking_time: bool = False
 
 
-@dataclass
-class ToolCall:
-    """Normalized tool call representation.
-
-    Attributes:
-        id: Unique identifier for the tool call
-        name: Name of the tool to invoke
-        arguments: Dictionary of arguments for the tool
-        raw: Original raw tool call data from provider
-    """
-
-    id: str
-    name: str
-    arguments: dict
-    raw: Optional[Any] = None
+# Import canonical ToolCall for runtime construction (kept private to avoid re-export).
+from victor.agent.tool_calling.base import ToolCall as _ToolCall
 
 
 @dataclass
@@ -263,7 +255,7 @@ class BaseProviderAdapter:
                 # OpenAI format
                 func = call.get("function", {})
                 normalized.append(
-                    ToolCall(
+                    _ToolCall(
                         id=call.get("id", f"call_{i}"),
                         name=func.get("name", ""),
                         arguments=func.get("arguments", {}),
@@ -273,7 +265,7 @@ class BaseProviderAdapter:
             elif hasattr(call, "function"):
                 # OpenAI object format
                 normalized.append(
-                    ToolCall(
+                    _ToolCall(
                         id=getattr(call, "id", f"call_{i}"),
                         name=call.function.name,
                         arguments=call.function.arguments,
@@ -457,7 +449,7 @@ class AnthropicAdapter(BaseProviderAdapter):
         for i, call in enumerate(raw_calls):
             if isinstance(call, dict) and call.get("type") == "tool_use":
                 normalized.append(
-                    ToolCall(
+                    _ToolCall(
                         id=call.get("id", f"call_{i}"),
                         name=call.get("name", ""),
                         arguments=call.get("input", {}),
@@ -529,7 +521,7 @@ class GoogleAdapter(BaseProviderAdapter):
                 if "function_call" in call:
                     fc = call["function_call"]
                     normalized.append(
-                        ToolCall(
+                        _ToolCall(
                             id=call.get("id", f"call_{i}"),
                             name=fc.get("name", ""),
                             arguments=fc.get("args", {}),
@@ -539,7 +531,7 @@ class GoogleAdapter(BaseProviderAdapter):
                 # Direct name/args format
                 elif "name" in call:
                     normalized.append(
-                        ToolCall(
+                        _ToolCall(
                             id=call.get("id", f"call_{i}"),
                             name=call.get("name", ""),
                             arguments=call.get("args", call.get("arguments", {})),
@@ -550,7 +542,7 @@ class GoogleAdapter(BaseProviderAdapter):
                 # Google object format
                 fc = call.function_call
                 normalized.append(
-                    ToolCall(
+                    _ToolCall(
                         id=getattr(call, "id", f"call_{i}"),
                         name=getattr(fc, "name", ""),
                         arguments=dict(getattr(fc, "args", {})),
@@ -1011,7 +1003,7 @@ class BedrockAdapter(BaseProviderAdapter):
                 # Anthropic Claude format on Bedrock
                 if call.get("type") == "tool_use":
                     normalized.append(
-                        ToolCall(
+                        _ToolCall(
                             id=call.get("id", f"call_{i}"),
                             name=call.get("name", ""),
                             arguments=call.get("input", {}),
@@ -1022,7 +1014,7 @@ class BedrockAdapter(BaseProviderAdapter):
                 elif "function" in call:
                     func = call.get("function", {})
                     normalized.append(
-                        ToolCall(
+                        _ToolCall(
                             id=call.get("id", f"call_{i}"),
                             name=func.get("name", ""),
                             arguments=func.get("arguments", {}),

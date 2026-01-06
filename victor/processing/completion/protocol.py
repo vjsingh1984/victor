@@ -17,6 +17,12 @@
 This module defines the data types for inline code completion,
 based on the Language Server Protocol (LSP) specification with
 extensions for AI-powered completions.
+
+This is the CANONICAL location for completion protocol types.
+
+Base LSP types (Position, Range, TextEdit, CompletionItemKind) are
+imported from victor.protocols.lsp_types - the canonical source for
+all LSP standard types.
 """
 
 from dataclasses import dataclass, field
@@ -24,35 +30,13 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Any, Optional
 
-
-class CompletionItemKind(IntEnum):
-    """Completion item kinds following LSP specification."""
-
-    TEXT = 1
-    METHOD = 2
-    FUNCTION = 3
-    CONSTRUCTOR = 4
-    FIELD = 5
-    VARIABLE = 6
-    CLASS = 7
-    INTERFACE = 8
-    MODULE = 9
-    PROPERTY = 10
-    UNIT = 11
-    VALUE = 12
-    ENUM = 13
-    KEYWORD = 14
-    SNIPPET = 15
-    COLOR = 16
-    FILE = 17
-    REFERENCE = 18
-    FOLDER = 19
-    ENUM_MEMBER = 20
-    CONSTANT = 21
-    STRUCT = 22
-    EVENT = 23
-    OPERATOR = 24
-    TYPE_PARAMETER = 25
+# Import canonical LSP types - DO NOT redefine these
+from victor.protocols.lsp_types import (
+    Position,
+    Range,
+    TextEdit,
+    CompletionItemKind,
+)
 
 
 class InsertTextFormat(IntEnum):
@@ -68,38 +52,6 @@ class CompletionTriggerKind(IntEnum):
     INVOKED = 1  # Explicitly invoked (e.g., Ctrl+Space)
     TRIGGER_CHARACTER = 2  # Triggered by a character (e.g., '.')
     TRIGGER_FOR_INCOMPLETE = 3  # Re-triggered for incomplete results
-
-
-@dataclass
-class Position:
-    """A position in a text document."""
-
-    line: int  # 0-indexed
-    character: int  # 0-indexed (UTF-16 code units in LSP, but we use chars)
-
-    def __lt__(self, other: "Position") -> bool:
-        if self.line != other.line:
-            return self.line < other.line
-        return self.character < other.character
-
-    def __le__(self, other: "Position") -> bool:
-        return self == other or self < other
-
-
-@dataclass
-class Range:
-    """A range in a text document."""
-
-    start: Position
-    end: Position
-
-
-@dataclass
-class TextEdit:
-    """A text edit to apply to a document."""
-
-    range: Range
-    new_text: str
 
 
 @dataclass
@@ -261,3 +213,25 @@ class CompletionMetrics:
         if self.total_requests == 0:
             return 0.0
         return self.successful_requests / self.total_requests
+
+
+__all__ = [
+    # Re-exported LSP types
+    "Position",
+    "Range",
+    "TextEdit",
+    "CompletionItemKind",
+    # Completion-specific types
+    "InsertTextFormat",
+    "CompletionTriggerKind",
+    "CompletionContext",
+    "CompletionParams",
+    "CompletionItemLabelDetails",
+    "CompletionItem",
+    "InlineCompletionItem",
+    "InlineCompletionParams",
+    "CompletionList",
+    "InlineCompletionList",
+    "CompletionCapabilities",
+    "CompletionMetrics",
+]

@@ -174,7 +174,7 @@ def main():
         recommendation_rows = cursor.fetchall()
 
         if not recommendation_rows:
-            print(f"\nNo recommendations to export yet (need more data)")
+            print("\nNo recommendations to export yet (need more data)")
             return
 
         # Build recommendations dict
@@ -203,9 +203,9 @@ def main():
         print(f"\n✅ Exported recommendations to: {filepath}")
         print(f"   Model:Task combinations: {len(recommendations)}")
         print(f"   Based on {outcome_count} outcomes")
-        print(f"\nTo use these recommendations:")
+        print("\nTo use these recommendations:")
         print(f"1. Merge {filepath} into your ~/.victor/profiles.yaml")
-        print(f"2. Or copy the semantic_threshold_overrides section manually")
+        print("2. Or copy the semantic_threshold_overrides section manually")
 
 
 if __name__ == "__main__":

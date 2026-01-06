@@ -35,6 +35,44 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+class BoundedQTable:
+    """Q-table with LRU eviction to prevent unbounded growth."""
+
+    def __init__(self, max_size: int = 100000):
+        self.max_size = max_size
+        self._table: Dict[str, float] = {}
+        self._access_order: List[str] = []
+
+    def get(self, key: str, default: float = 0.0) -> float:
+        if key in self._table:
+            self._access_order.remove(key)
+            self._access_order.append(key)
+            return self._table[key]
+        return default
+
+    def set(self, key: str, value: float) -> None:
+        if key in self._table:
+            self._access_order.remove(key)
+        elif len(self._table) >= self.max_size:
+            lru_key = self._access_order.pop(0)
+            del self._table[lru_key]
+        self._table[key] = value
+        self._access_order.append(key)
+
+    def __len__(self) -> int:
+        return len(self._table)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._table
+
+    def clear(self) -> None:
+        self._table.clear()
+        self._access_order.clear()
+
+    def keys(self) -> List[str]:
+        return list(self._table.keys())
+
+
 class EvictionAction(str, Enum):
     """Cache eviction actions."""
 

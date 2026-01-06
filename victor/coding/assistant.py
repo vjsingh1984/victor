@@ -613,6 +613,22 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
         return cls._get_cached_extension("personas", _create)
 
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for workflow execution.
+
+        Provides coding-specific handlers for workflow nodes:
+        - code_validation: Validates code changes (lint, type check)
+        - test_runner: Runs tests with timeout and reporting
+        - code_analyzer: Deep code analysis for context gathering
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        from victor.coding.handlers import HANDLERS
+
+        return HANDLERS
+
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.
     # To clear all caches, use cls.clear_config_cache().

@@ -54,7 +54,7 @@ from victor.framework.personas import (
     list_personas,
     register_persona,
 )
-from victor.framework.team_coordinator import FrameworkTeamCoordinator
+from victor.teams import FrameworkTeamCoordinator
 
 
 # =============================================================================

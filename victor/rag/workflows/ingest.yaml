@@ -1,12 +1,61 @@
 # RAG Ingestion Workflow
 # ======================
-# Document ingestion pipeline demonstrating:
-# - Multi-format document parsing
-# - Intelligent chunking with overlap
-# - Batch embedding generation
-# - Vector store ingestion
-# - Metadata extraction and indexing
-# - Quality validation and deduplication
+# Document ingestion pipeline for vector store population.
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python subprocess for shell commands)                   │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Docker execution:                                                            │
+# │   - Image: victor-rag:latest (or custom via ctx.docker_image)               │
+# │   - Requires: chromadb, sentence-transformers, pdfplumber, python-docx      │
+# │   - Build: docker build -f docker/Dockerfile.rag -t victor-rag .            │
+# │                                                                              │
+# │ Subprocess execution:                                                        │
+# │   - Uses system Python with required packages                                │
+# │   - Requires: pip install victor-ai[rag]                                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ chunk_size: 512 tokens                                                       │
+# │ chunk_overlap: 50 tokens (10% overlap)                                       │
+# │ embedding_model: "text-embedding-3-small" (OpenAI) or "all-MiniLM-L6-v2"    │
+# │ embedding_dimensions: 384 (MiniLM) or 1536 (OpenAI)                         │
+# │ batch_size: 100 chunks per embedding API call                               │
+# │ vector_store: chromadb (default), pinecone, qdrant supported                │
+# │ ocr_enabled: false (set true for scanned PDFs)                              │
+# │ retention_days: 365 (for stale document cleanup)                            │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes: Deterministic operations with no LLM reasoning required       │
+# │   - File discovery: glob/find patterns (algorithmic)                         │
+# │   - Parsing: Library-based extraction (pdfplumber, python-docx)             │
+# │   - Chunking: Token-based splitting with overlap (algorithmic)              │
+# │   - Embedding: API call to embedding model (not chat LLM)                   │
+# │   - Deduplication: Hash comparison (deterministic)                          │
+# │   - Validation: Schema/type checking (rule-based)                           │
+# │                                                                              │
+# │ AGENT nodes: Require LLM understanding/reasoning                             │
+# │   - Handling validation issues: Deciding how to fix encoding/quality        │
+# │   - Content understanding: When semantic decisions are needed               │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Pipeline stages:
+# 1. Document Discovery - Find files matching patterns
+# 2. Parallel Parsing - Extract text from PDF/DOCX/MD/code
+# 3. Content Validation - Check encoding, length, language
+# 4. Intelligent Chunking - Split with semantic boundaries
+# 5. Metadata Extraction - NER, topics, dates (parallel)
+# 6. Embedding Generation - Batch API calls
+# 7. Vector Store Ingestion - Upsert with metadata
+# 8. Report Generation - Templated summary
 
 workflows:
   document_ingest:
@@ -16,6 +65,88 @@ workflows:
       version: "1.0"
       author: "victor"
       vertical: rag
+
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    # Services are started before workflow execution and cleaned up after.
+    # Lifecycle: start_services -> nodes -> cleanup_services
+    #
+    # Supported service types:
+    #   - sqlite: SQLite database (in-process or file-backed)
+    #   - lancedb: LanceDB vector store (in-process)
+    #   - chromadb: ChromaDB vector store (in-process or server)
+    #   - docker: Docker container (requires docker daemon)
+    #
+    services:
+      # Project-specific metadata database
+      # Stores: document metadata, chunk mappings, ingestion history
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          # path: ":memory:" for in-memory (faster, no persistence)
+          journal_mode: WAL           # Write-Ahead Logging for concurrency
+          cache_size: 10000           # 10MB cache
+          busy_timeout: 30000         # 30s wait on lock
+        lifecycle:
+          start: auto                 # Start when workflow begins
+          cleanup: preserve           # Keep DB after workflow (default)
+          # cleanup: delete           # Delete DB after workflow
+          # cleanup: vacuum           # Run VACUUM after workflow
+        healthcheck:
+          query: "SELECT 1"
+          interval: 30s
+          timeout: 5s
+
+      # Global settings and cross-project cache
+      # Stores: embedding cache, model configs, usage stats
+      global_db:
+        type: sqlite
+        config:
+          path: ~/.victor/global.db
+          journal_mode: WAL
+          cache_size: 5000
+        lifecycle:
+          start: auto
+          cleanup: preserve
+        singleton: true               # Shared across workflows
+
+      # Vector store for document embeddings
+      # Alternatives: chromadb, pinecone, qdrant (see vector_store config)
+      vector_store:
+        type: lancedb
+        config:
+          path: $ctx.project_dir/.victor/vectors
+          # For ChromaDB:
+          # type: chromadb
+          # path: $ctx.project_dir/.victor/chromadb
+          #
+          # For cloud stores (Pinecone):
+          # type: pinecone
+          # api_key: $env.PINECONE_API_KEY
+          # environment: $env.PINECONE_ENV
+        lifecycle:
+          start: auto
+          cleanup: preserve
+        healthcheck:
+          type: list_collections
+          timeout: 10s
+
+    # Optional: Docker service for isolated execution
+    # Uncomment to run parsing/OCR in container
+    # docker_services:
+    #   pdf_parser:
+    #     image: victor-pdf:latest
+    #     build: docker/Dockerfile.pdf
+    #     ports: []                  # No exposed ports needed
+    #     volumes:
+    #       - $ctx.source_directory:/input:ro
+    #       - $ctx.output_directory:/output:rw
+    #     lifecycle:
+    #       start: on_demand         # Start when parse_pdf runs
+    #       cleanup: stop            # Stop container after workflow
+    #       # cleanup: remove        # Remove container after workflow
 
     batch_config:
       batch_size: 10
@@ -27,13 +158,16 @@ workflows:
       # =====================================================================
       # Stage 1: Document Discovery and Loading
       # =====================================================================
+      # COMPUTE: File discovery uses glob/find - pure filesystem operations
+      # No LLM needed; pattern matching is deterministic
+      # Execution: in-process (os.walk + fnmatch)
       - id: discover_documents
         type: compute
         name: "Discover Documents"
         tools: [shell, read]
         inputs:
           source_path: $ctx.source_directory
-          file_patterns: $ctx.file_patterns
+          file_patterns: $ctx.file_patterns  # e.g., ["*.pdf", "*.docx", "*.md"]
           recursive: true
         output: discovered_files
         constraints:
@@ -41,6 +175,9 @@ workflows:
           timeout: 60
         next: [filter_documents]
 
+      # COMPUTE: Deduplication uses content hashing (MD5/SHA256)
+      # Size/date filtering is numeric comparison - no reasoning needed
+      # Execution: in-process (hashlib + stat)
       - id: filter_documents
         type: compute
         name: "Filter and Deduplicate"
@@ -49,9 +186,9 @@ workflows:
         inputs:
           files: $ctx.discovered_files
           checks:
-            - content_hash_dedup
-            - size_filter
-            - date_filter
+            - content_hash_dedup  # SHA256 hash comparison
+            - size_filter         # min_size: 100 bytes, max_size: 100MB
+            - date_filter         # modified_after: ctx.last_ingest_time
         output: filtered_files
         constraints:
           llm_allowed: false
@@ -83,52 +220,64 @@ workflows:
         join_strategy: all
         next: [aggregate_parsed]
 
+      # COMPUTE: PDF parsing uses pdfplumber/PyMuPDF libraries
+      # Text extraction is deterministic; OCR uses tesseract (no LLM)
+      # Execution: subprocess (pdfplumber) or docker for OCR
       - id: parse_pdf
         type: compute
         name: "Parse PDF Documents"
         tools: [shell]
         inputs:
           file_type: pdf
-          extract_tables: true
-          extract_images: true
-          ocr_enabled: $ctx.ocr_enabled
+          extract_tables: true    # Uses tabula-py or pdfplumber
+          extract_images: true    # Extracts embedded images for OCR
+          ocr_enabled: $ctx.ocr_enabled  # Default: false
         output: pdf_content
         constraints:
           llm_allowed: false
-          timeout: 300
+          timeout: 300  # Longer for OCR processing
 
+      # COMPUTE: DOCX parsing uses python-docx library
+      # XML structure extraction - no interpretation needed
+      # Execution: in-process (python-docx)
       - id: parse_docx
         type: compute
         name: "Parse Word Documents"
         tools: [shell]
         inputs:
           file_type: docx
-          preserve_structure: true
+          preserve_structure: true  # Maintains heading hierarchy
         output: docx_content
         constraints:
           llm_allowed: false
           timeout: 120
 
+      # COMPUTE: Markdown parsing uses mistune/markdown-it
+      # Text files are direct read - no processing needed
+      # Execution: in-process (file read + regex for headers)
       - id: parse_markdown
         type: compute
         name: "Parse Markdown/Text"
         tools: [shell, read]
         inputs:
           file_types: [md, txt, rst]
-          preserve_headers: true
+          preserve_headers: true  # Extracts header hierarchy for chunking
         output: md_content
         constraints:
           llm_allowed: false
           timeout: 60
 
+      # COMPUTE: Code parsing uses tree-sitter AST parsing
+      # Docstring extraction is pattern matching, not understanding
+      # Execution: in-process (tree-sitter bindings)
       - id: parse_code
         type: compute
         name: "Parse Code Files"
         tools: [shell, read]
         inputs:
           file_types: [py, js, ts, java, go, rs]
-          extract_docstrings: true
-          extract_functions: true
+          extract_docstrings: true   # Regex/AST extraction
+          extract_functions: true    # AST node extraction
         output: code_content
         constraints:
           llm_allowed: false
@@ -145,6 +294,12 @@ workflows:
       # =====================================================================
       # Stage 3: Content Validation
       # =====================================================================
+      # COMPUTE: Validation uses rule-based checks
+      # - Encoding: chardet library detection
+      # - Length: character/token counting
+      # - Language: langdetect/fasttext classification
+      # - Sensitive data: regex patterns for PII/secrets
+      # Execution: in-process (Python libraries)
       - id: validate_content
         type: compute
         name: "Validate Parsed Content"
@@ -152,10 +307,10 @@ workflows:
         inputs:
           documents: $ctx.all_documents
           validations:
-            - check_encoding
-            - check_min_length
-            - check_language
-            - detect_sensitive_data
+            - check_encoding      # chardet: UTF-8/Latin-1/etc
+            - check_min_length    # min_chars: 50
+            - check_language      # fasttext language detection
+            - detect_sensitive_data  # PII regex patterns
         output: validation_report
         constraints:
           llm_allowed: false
@@ -191,41 +346,41 @@ workflows:
         next: [chunking]
 
       # =====================================================================
-      # Stage 4: Intelligent Chunking
+      # Stage 4: Intelligent Chunking (Compute - no LLM needed)
       # =====================================================================
+      # COMPUTE: Chunking is algorithmic text splitting
+      # - Token counting: tiktoken/transformers tokenizer
+      # - Boundary detection: regex for paragraphs/sections
+      # - AST chunking: tree-sitter for code files
+      # No LLM reasoning; splits are based on token counts + heuristics
+      #
+      # Execution: in-process (pure Python, no external deps)
+      # Constraints: SANDBOXED - only reads from ctx, no file/network access
       - id: chunking
-        type: agent
+        type: compute
         name: "Intelligent Chunking"
-        role: executor
-        goal: |
-          Chunk documents using intelligent strategies:
-
-          Strategies by document type:
-          - Technical docs: Section-based with header preservation
-          - Code files: Function/class boundaries
-          - Narratives: Semantic paragraph grouping
-          - Tables: Row-preserving chunks
-
-          Parameters:
-          - target_size: {chunk_size}
-          - overlap: {chunk_overlap}
-          - preserve_context: true
-
-          Ensure chunks maintain semantic coherence.
-        tool_budget: 30
-        tools: [shell]
-        llm_config:
-          temperature: 0.1
-          model_hint: claude-3-haiku
-        input_mapping:
-          documents: all_documents
-          chunk_size: $ctx.chunk_size
-          chunk_overlap: $ctx.chunk_overlap
+        handler: document_chunker
+        tools: []  # No tools needed - operates on in-memory documents
+        inputs:
+          documents: $ctx.all_documents
+          chunk_size: $ctx.chunk_size        # Default: 512 tokens
+          chunk_overlap: $ctx.chunk_overlap  # Default: 50 tokens
+          strategies:
+            technical_docs: section_based     # Split on markdown headers
+            code_files: ast_boundaries        # Split on function/class boundaries
+            narratives: semantic_paragraphs   # Split on paragraph boundaries
+            tables: row_preserving            # Keep table rows together
+          preserve_context: true
         output: chunks
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Pure in-memory operation
+          filesystem_allowed: false  # All data already in context
+          timeout: 300
         next: [extract_metadata]
 
       # =====================================================================
-      # Stage 5: Metadata Extraction
+      # Stage 5: Metadata Extraction (Parallel Compute Nodes)
       # =====================================================================
       - id: extract_metadata
         type: parallel
@@ -234,44 +389,71 @@ workflows:
         join_strategy: all
         next: [combine_metadata]
 
+      # COMPUTE: NER uses spaCy/transformers NER models (not chat LLM)
+      # Pre-trained models for entity extraction - deterministic
+      # Execution: in-process (spaCy) or subprocess (transformers)
+      # Constraints: SANDBOXED - model loaded once, operates on text
       - id: extract_entities
-        type: agent
+        type: compute
         name: "Extract Named Entities"
-        role: analyst
-        goal: |
-          Extract key entities from document chunks:
-          - People, organizations, locations
-          - Product names, technologies
-          - Domain-specific entities
-
-          Return structured entity list with positions.
-        tool_budget: 20
-        llm_config:
-          temperature: 0.2
-          model_hint: claude-3-haiku
+        handler: ner_extractor
+        tools: []  # No shell needed - uses Python NER library
+        inputs:
+          chunks: $ctx.chunks
+          entity_types:
+            - people           # PERSON entities
+            - organizations    # ORG entities
+            - locations        # GPE/LOC entities
+            - products         # PRODUCT entities
+            - technologies     # Custom trained labels
+          include_positions: true
+          model: $ctx.ner_model  # Default: "en_core_web_sm"
         output: entities
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Model pre-loaded
+          filesystem_allowed: false
+          timeout: 180
 
+      # COMPUTE: Topic modeling uses sklearn LDA/TF-IDF
+      # Statistical algorithm, not LLM understanding
+      # Execution: in-process (scikit-learn)
+      # Constraints: SANDBOXED - pure matrix operations
       - id: extract_topics
         type: compute
         name: "Extract Topics"
-        tools: [shell]
+        tools: []
         inputs:
-          method: lda_tfidf
-          num_topics: 10
+          chunks: $ctx.chunks
+          method: lda_tfidf      # Latent Dirichlet Allocation
+          num_topics: 10         # Default topic count
+          min_topic_frequency: 0.01
         output: topics
         constraints:
           llm_allowed: false
+          network_allowed: false
+          filesystem_allowed: false
           timeout: 120
 
+      # COMPUTE: Date extraction uses dateparser/regex patterns
+      # Pattern matching, not semantic understanding
+      # Execution: in-process (dateparser library)
+      # Constraints: SANDBOXED - regex on text
       - id: extract_dates
         type: compute
         name: "Extract Temporal References"
-        tools: [shell]
+        tools: []
         inputs:
+          chunks: $ctx.chunks
           patterns: [dates, versions, periods]
+          # dates: ISO-8601, natural language dates
+          # versions: semver patterns (v1.2.3)
+          # periods: "Q1 2024", "FY2023", etc.
         output: temporal_refs
         constraints:
           llm_allowed: false
+          network_allowed: false
+          filesystem_allowed: false
           timeout: 60
 
       - id: combine_metadata
@@ -293,36 +475,57 @@ workflows:
       # =====================================================================
       # Stage 6: Batch Embedding Generation
       # =====================================================================
+      # COMPUTE: Embedding uses dedicated embedding API (not chat LLM)
+      # - OpenAI: text-embedding-3-small/large (API call)
+      # - Local: sentence-transformers (in-process)
+      # API returns vectors directly - no reasoning involved
+      #
+      # Execution:
+      #   - Cloud: NETWORK REQUIRED - API calls to OpenAI/Cohere/etc
+      #   - Local: in-process or docker (sentence-transformers)
+      # Constraints: NETWORK for cloud, SANDBOXED for local models
       - id: generate_embeddings
         type: compute
         name: "Generate Embeddings"
-        handler: retry_with_backoff
-        tools: [shell]
+        handler: retry_with_backoff  # Handles rate limits with exponential backoff
+        tools: []  # Uses embedding client, not shell
         inputs:
           chunks: $ctx.chunk_metadata
-          model: $ctx.embedding_model
-          batch_size: 100
-          dimensions: $ctx.embedding_dimensions
+          model: $ctx.embedding_model  # Default: "text-embedding-3-small"
+          batch_size: 100              # Chunks per API call
+          dimensions: $ctx.embedding_dimensions  # Default: 1536 (OpenAI)
+          # For local models:
+          # model: "all-MiniLM-L6-v2"
+          # dimensions: 384
         output: embeddings
         constraints:
           llm_allowed: false
-          network_allowed: true
-          timeout: 600
+          network_allowed: true   # REQUIRED for cloud embedding APIs
+          write_allowed: false    # Read-only operation
+          timeout: 600            # Longer for large batches
         next: [verify_embeddings]
 
+      # COMPUTE: Verification is numerical validation
+      # - Check vector dimensions match expected
+      # - Check for NaN/Inf values (embedding failures)
+      # - Check L2 norms are in expected range
+      # Execution: in-process (numpy operations)
+      # Constraints: SANDBOXED - pure math on vectors
       - id: verify_embeddings
         type: compute
         name: "Verify Embedding Quality"
-        tools: [shell]
+        tools: []
         inputs:
           embeddings: $ctx.embeddings
           checks:
-            - dimensionality
-            - nan_values
-            - norm_range
+            - dimensionality    # vectors.shape[1] == expected_dim
+            - nan_values        # np.isnan(vectors).any() == False
+            - norm_range        # 0.5 < L2_norm < 2.0 typically
         output: embedding_validation
         constraints:
           llm_allowed: false
+          network_allowed: false
+          filesystem_allowed: false
           timeout: 60
         next: [check_embeddings]
 
@@ -375,34 +578,55 @@ workflows:
       # =====================================================================
       # Stage 7: Vector Store Ingestion
       # =====================================================================
+      # COMPUTE: Vector upsert is database operation
+      # - ChromaDB: Local SQLite/DuckDB (filesystem write)
+      # - Pinecone/Qdrant: Cloud API calls (network required)
+      # - Weaviate: HTTP API (network required)
+      # No LLM reasoning; direct database writes
+      #
+      # Execution:
+      #   - ChromaDB: in-process or docker, FILESYSTEM write
+      #   - Cloud stores: NETWORK REQUIRED
+      # Deployment: docker recommended for isolation
       - id: ingest_vectors
         type: compute
         name: "Ingest to Vector Store"
-        handler: retry_with_backoff
-        tools: [shell]
+        handler: retry_with_backoff  # Handles transient failures
+        tools: []  # Uses vector store client
         inputs:
           vectors: $ctx.embeddings
           metadata: $ctx.chunk_metadata
-          index_name: $ctx.index_name
-          upsert: true
+          index_name: $ctx.index_name  # Default: "documents"
+          upsert: true                 # Update existing or insert new
+          # Vector store config:
+          # store_type: chromadb | pinecone | qdrant | weaviate
+          # For Pinecone: api_key, environment required
+          # For ChromaDB: persist_directory (default: ~/.victor/chromadb)
         output: ingestion_result
         constraints:
           llm_allowed: false
-          network_allowed: true
-          write_allowed: true
+          network_allowed: true   # Required for cloud vector stores
+          write_allowed: true     # Required for local stores (ChromaDB)
           timeout: 300
         next: [verify_ingestion]
 
+      # COMPUTE: Verification queries vector store
+      # - Count check: actual vs expected
+      # - Sample search: test retrieval works
+      # Execution: Same as ingestion (in-process or network)
       - id: verify_ingestion
         type: compute
         name: "Verify Ingestion"
-        tools: [shell]
+        tools: []
         inputs:
           index_name: $ctx.index_name
           expected_count: $ctx.chunk_count
+          sample_query: $ctx.sample_text  # Optional: test query
         output: verification
         constraints:
           llm_allowed: false
+          network_allowed: true   # May need to query cloud store
+          write_allowed: false    # Read-only verification
           timeout: 60
         next: [check_verification]
 
@@ -450,10 +674,14 @@ workflows:
       # =====================================================================
       # Stage 8: Index Metadata Update
       # =====================================================================
+      # COMPUTE: Metadata update writes to index config
+      # - JSON/YAML metadata file for local stores
+      # - API metadata update for cloud stores
+      # Execution: filesystem write or network API
       - id: update_index_metadata
         type: compute
         name: "Update Index Metadata"
-        tools: [shell, write]
+        tools: [write]  # For local metadata file
         inputs:
           index_name: $ctx.index_name
           metadata:
@@ -465,32 +693,43 @@ workflows:
         output: metadata_update
         constraints:
           llm_allowed: false
-          write_allowed: true
+          network_allowed: true   # For cloud store metadata
+          write_allowed: true     # For local metadata file
           timeout: 30
         next: [generate_report]
 
       # =====================================================================
-      # Stage 9: Ingestion Report
+      # Stage 9: Ingestion Report (Compute - templated report)
       # =====================================================================
+      # COMPUTE: Report generation uses Jinja2 templates
+      # - No LLM needed - fills template with metrics
+      # - Markdown output with tables/charts
+      # Execution: in-process (Jinja2)
+      # Constraints: FILESYSTEM for output file
       - id: generate_report
-        type: agent
+        type: compute
         name: "Generate Ingestion Report"
-        role: writer
-        goal: |
-          Generate a summary report of the ingestion:
-
-          Include:
-          - Documents processed: count and types
-          - Chunks created: count and average size
-          - Embeddings generated: model and dimensions
-          - Ingestion stats: success rate, time taken
-          - Quality metrics: validation scores
-          - Recommendations for future ingestions
-        tool_budget: 10
+        handler: report_generator
         tools: [write]
-        llm_config:
-          temperature: 0.4
+        inputs:
+          template: ingestion_summary  # Template name in templates/
+          output_path: $ctx.report_path  # Default: ./ingestion_report.md
+          metrics:
+            documents_processed: $ctx.document_count
+            document_types: $ctx.document_types
+            chunks_created: $ctx.chunk_count
+            avg_chunk_size: $ctx.avg_chunk_size
+            embedding_model: $ctx.embedding_model
+            embedding_dimensions: $ctx.embedding_dimensions
+            success_rate: $ctx.success_rate
+            time_taken: $ctx.elapsed_time
+            validation_scores: $ctx.validation_report
         output: report
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Local file write only
+          write_allowed: true     # Writes report file
+          timeout: 30
         next: [complete]
 
       - id: complete

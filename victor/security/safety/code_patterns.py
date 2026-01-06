@@ -375,8 +375,12 @@ SENSITIVE_FILE_PATTERNS: List[SafetyPattern] = [
 
 
 @dataclass
-class ScanResult:
-    """Result from scanning a command or file path.
+class SafetyScanResult:
+    """Result from safety pattern scanning.
+
+    Renamed from ScanResult to be semantically distinct:
+    - SafetyScanResult (here): Safety pattern matching results
+    - IaCScanResult (victor.iac.protocol): Infrastructure-as-Code scan results
 
     Attributes:
         matches: List of matched patterns
@@ -399,6 +403,10 @@ class ScanResult:
             self.has_critical = True
         elif level == "HIGH":
             self.has_high = True
+
+
+# Backward compatibility alias
+ScanResult = SafetyScanResult
 
 
 class CodePatternScanner:

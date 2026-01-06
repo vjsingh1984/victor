@@ -91,6 +91,36 @@ from victor.framework.enrichment.tool_history import (
     get_relevant_tool_results,
 )
 
+# Identifier extraction (consolidated from verticals)
+from victor.framework.enrichment.identifiers import (
+    PATTERNS as IDENTIFIER_PATTERNS,
+    COMMON_WORDS,
+    extract_identifiers,
+    extract_camelcase,
+    extract_snake_case,
+    extract_dotted_paths,
+    extract_quoted_identifiers,
+    IdentifierExtractor,
+)
+
+# File pattern matching (consolidated from verticals)
+from victor.framework.enrichment.file_patterns import (
+    DEVOPS_PATTERNS,
+    DATA_PATTERNS,
+    CODE_PATTERNS,
+    FilePatternMatcher,
+    create_combined_matcher,
+)
+
+# Keyword classification (consolidated from verticals)
+from victor.framework.enrichment.keyword_classifier import (
+    ANALYSIS_TYPES,
+    INFRA_TYPES,
+    RESEARCH_TYPES,
+    KeywordClassifier,
+    create_combined_classifier,
+)
+
 __all__ = [
     # Core: Enums
     "EnrichmentType",
@@ -117,4 +147,25 @@ __all__ = [
     "ToolHistoryExtractor",
     "extract_tool_context",
     "get_relevant_tool_results",
+    # Utilities: Identifier extraction
+    "IDENTIFIER_PATTERNS",
+    "COMMON_WORDS",
+    "extract_identifiers",
+    "extract_camelcase",
+    "extract_snake_case",
+    "extract_dotted_paths",
+    "extract_quoted_identifiers",
+    "IdentifierExtractor",
+    # Utilities: File pattern matching
+    "DEVOPS_PATTERNS",
+    "DATA_PATTERNS",
+    "CODE_PATTERNS",
+    "FilePatternMatcher",
+    "create_combined_matcher",
+    # Utilities: Keyword classification
+    "ANALYSIS_TYPES",
+    "INFRA_TYPES",
+    "RESEARCH_TYPES",
+    "KeywordClassifier",
+    "create_combined_classifier",
 ]

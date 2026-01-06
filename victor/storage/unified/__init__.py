@@ -56,7 +56,7 @@ from victor.storage.unified.protocol import (
     # Search
     SearchMode,
     SearchParams,
-    SearchResult,
+    UnifiedSearchResult,
     # Protocols
     VectorStoreProtocol,
     GraphStoreProtocol,
@@ -80,7 +80,7 @@ __all__ = [
     # Search
     "SearchMode",
     "SearchParams",
-    "SearchResult",
+    "UnifiedSearchResult",
     # Protocols
     "VectorStoreProtocol",
     "GraphStoreProtocol",

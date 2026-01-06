@@ -77,8 +77,16 @@ class ParameterSpec:
 
 
 @dataclass
-class ValidationResult:
-    """Result of parameter validation."""
+class ParameterValidationResult:
+    """Result of parameter enforcement validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (victor.tools.base): Tool parameter validation
+    - ConfigValidationResult (victor.core.validation): Configuration validation
+    - ContentValidationResult (victor.framework.middleware): Content validation
+    - ParameterValidationResult (here): Parameter enforcement with missing_required
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation
+    """
 
     is_valid: bool
     missing_required: List[str] = field(default_factory=list)
@@ -104,7 +112,7 @@ class ParameterEnforcer:
         self.specs = {spec.name: spec for spec in parameter_specs}
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-    def validate(self, args: Dict[str, Any]) -> ValidationResult:
+    def validate(self, args: Dict[str, Any]) -> ParameterValidationResult:
         """
         Validate arguments against parameter specifications.
 
@@ -112,7 +120,7 @@ class ParameterEnforcer:
             args: The arguments to validate
 
         Returns:
-            ValidationResult with validation status and any errors
+            ParameterValidationResult with validation status and any errors
         """
         missing_required = []
         type_errors = {}
@@ -125,7 +133,7 @@ class ParameterEnforcer:
 
         is_valid = len(missing_required) == 0 and len(type_errors) == 0
 
-        return ValidationResult(
+        return ParameterValidationResult(
             is_valid=is_valid,
             missing_required=missing_required,
             type_errors=type_errors,
