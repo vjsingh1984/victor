@@ -505,7 +505,7 @@ class TestResetDiscovery:
         """VerticalRegistry.clear() should also reset the discovery flag."""
         VerticalRegistry._external_discovered = True
 
-        VerticalRegistry.clear()
+        VerticalRegistry.clear(reregister_builtins=False)
 
         assert VerticalRegistry._external_discovered is False
         assert VerticalRegistry._registry == {}
