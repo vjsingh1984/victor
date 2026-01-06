@@ -17,7 +17,16 @@
 This is the recommended import location for all team functionality.
 Import from here instead of victor.framework or victor.agent.teams.
 
-Example:
+**Migration from FrameworkTeamCoordinator**:
+    Old (deprecated):
+        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        coordinator = FrameworkTeamCoordinator()
+
+    New (recommended):
+        from victor.teams import create_coordinator
+        coordinator = create_coordinator(lightweight=True)
+
+**Basic Usage**:
     from victor.teams import (
         TeamFormation,
         MessageType,
@@ -31,6 +40,34 @@ Example:
     coordinator.add_member(researcher).add_member(executor)
     coordinator.set_formation(TeamFormation.PIPELINE)
     result = await coordinator.execute_task("Implement feature", {})
+
+**Formation Patterns**:
+    # Sequential: Chain agents one after another
+    coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+    # Parallel: Execute all agents simultaneously
+    coordinator.set_formation(TeamFormation.PARALLEL)
+
+    # Hierarchical: Manager delegates to workers
+    coordinator.set_formation(TeamFormation.HIERARCHICAL)
+
+    # Pipeline: Processing pipeline with output passing
+    coordinator.set_formation(TeamFormation.PIPELINE)
+
+    # Consensus: Multi-round agreement building
+    coordinator.set_formation(TeamFormation.CONSENSUS)
+
+**Testing**:
+    # Lightweight coordinator for testing (no dependencies)
+    coordinator = create_coordinator(lightweight=True)
+
+**Production**:
+    # Full-featured coordinator with observability and RL
+    coordinator = create_coordinator(
+        orchestrator=my_orchestrator,
+        enable_observability=True,
+        enable_rl=True,
+    )
 
 Factory Functions:
     create_coordinator: Create appropriate coordinator based on requirements
@@ -55,6 +92,11 @@ Coordinators:
 Mixins:
     ObservabilityMixin: Add observability to custom coordinators
     RLMixin: Add RL integration to custom coordinators
+
+Documentation:
+    - MIGRATION_GUIDE.md: Step-by-step migration instructions
+    - RELEASE_NOTES.md: Release notes and changes
+    - CONSOLIDATION.md: Architecture consolidation details
 """
 
 from __future__ import annotations
@@ -113,6 +155,10 @@ def create_coordinator(
     This is the recommended way to create coordinators as it handles
     the appropriate configuration based on requirements.
 
+    **Migration from FrameworkTeamCoordinator**:
+        Old: coordinator = FrameworkTeamCoordinator()
+        New: coordinator = create_coordinator(lightweight=True)
+
     Args:
         orchestrator: Agent orchestrator (optional, for SubAgent spawning)
         lightweight: Use lightweight mode (disables mixins, for testing)
@@ -122,15 +168,26 @@ def create_coordinator(
     Returns:
         ITeamCoordinator implementation (UnifiedTeamCoordinator)
 
-    Example:
+    Examples:
+        # Lightweight for testing (replaces FrameworkTeamCoordinator)
+        coordinator = create_coordinator(lightweight=True)
+
         # Production coordinator with all features
         coordinator = create_coordinator(orchestrator)
 
-        # Lightweight for testing
-        coordinator = create_coordinator(lightweight=True)
-
         # Without RL
         coordinator = create_coordinator(orchestrator, with_rl=False)
+
+        # Without observability (minimal dependencies)
+        coordinator = create_coordinator(
+            orchestrator,
+            with_observability=False,
+            with_rl=False,
+        )
+
+    See Also:
+        MIGRATION_GUIDE.md: Complete migration instructions
+        UnifiedTeamCoordinator: Direct coordinator class
     """
     # Always use UnifiedTeamCoordinator with appropriate mode
     # This effectively merges FrameworkTeamCoordinator into UnifiedTeamCoordinator
