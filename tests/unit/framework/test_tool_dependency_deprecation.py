@@ -33,6 +33,7 @@ class TestDeprecatedConstantDescriptor:
 
     def test_creates_descriptor_with_correct_attributes(self):
         """Test descriptor initialization stores attributes correctly."""
+
         def loader():
             return "test_value"
 
@@ -51,6 +52,7 @@ class TestDeprecatedConstantDescriptor:
 
     def test_get_emits_warning_on_first_access(self):
         """Test that deprecation warning is emitted on first access."""
+
         def loader():
             return "test_value"
 
@@ -75,6 +77,7 @@ class TestDeprecatedConstantDescriptor:
 
     def test_get_only_warns_once(self):
         """Test that warning is only emitted once."""
+
         def loader():
             return "test_value"
 
@@ -131,6 +134,7 @@ class TestDeprecatedConstantDescriptor:
     def test_get_returns_loaded_value(self):
         """Test that get returns the loaded value."""
         expected = {"dependencies": ["tool1", "tool2"]}
+
         def loader():
             return expected
 
