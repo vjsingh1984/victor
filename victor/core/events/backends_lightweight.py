@@ -167,7 +167,8 @@ class SQLiteEventBackend:
         self._conn.row_factory = sqlite3.Row
 
         # Create schema
-        self._conn.execute("""
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id TEXT UNIQUE NOT NULL,
@@ -181,16 +182,22 @@ class SQLiteEventBackend:
                 delivery_guarantee TEXT,
                 created_at REAL DEFAULT (strftime('%s', 'now'))
             )
-        """)
-        self._conn.execute("""
+        """
+        )
+        self._conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_events_topic ON events(topic)
-        """)
-        self._conn.execute("""
+        """
+        )
+        self._conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at)
-        """)
+        """
+        )
 
         # Create delivery tracking table
-        self._conn.execute("""
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS event_deliveries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id INTEGER NOT NULL,
@@ -200,7 +207,8 @@ class SQLiteEventBackend:
                 FOREIGN KEY (event_id) REFERENCES events(id),
                 UNIQUE(event_id, subscription_id)
             )
-        """)
+        """
+        )
 
         self._is_connected = True
 

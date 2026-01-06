@@ -77,9 +77,7 @@ class ITeamMember(Protocol):
         """
         ...
 
-    async def receive_message(
-        self, message: AgentMessage
-    ) -> Optional[AgentMessage]:
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message.
 
         Args:
@@ -121,9 +119,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def execute_task(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a task with the team.
 
         Args:
@@ -135,9 +131,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def broadcast(
-        self, message: AgentMessage
-    ) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:

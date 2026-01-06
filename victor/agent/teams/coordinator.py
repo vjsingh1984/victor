@@ -59,6 +59,7 @@ from victor.agent.subagents.orchestrator import (
     SubAgentOrchestrator,
     SubAgentTask,
 )
+
 # Import canonical types from victor.teams
 from victor.teams import (
     TeamFormation,

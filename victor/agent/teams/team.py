@@ -35,6 +35,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from victor.agent.subagents.base import SubAgentRole
+
 # Import canonical TeamFormation from victor.teams.types
 from victor.teams.types import TeamFormation
 

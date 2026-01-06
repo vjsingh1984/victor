@@ -106,7 +106,9 @@ class MCPCapabilities(BaseModel):
     """
 
     tools: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Tools capability")
-    resources: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Resources capability")
+    resources: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="Resources capability"
+    )
     prompts: Optional[Dict[str, Any]] = Field(default=None, description="Prompts capability")
     sampling: Optional[Dict[str, Any]] = Field(default=None, description="Sampling capability")
 

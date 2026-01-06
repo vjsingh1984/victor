@@ -253,9 +253,7 @@ class TeamResult:
         return {
             "success": self.success,
             "final_output": self.final_output,
-            "member_results": {
-                k: v.to_dict() for k, v in self.member_results.items()
-            },
+            "member_results": {k: v.to_dict() for k, v in self.member_results.items()},
             "formation": self.formation.value,
             "total_tool_calls": self.total_tool_calls,
             "total_duration": self.total_duration,

@@ -123,9 +123,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._members.append(member)
         return self
 
-    def set_formation(
-        self, formation: TeamFormation
-    ) -> "UnifiedTeamCoordinator":
+    def set_formation(self, formation: TeamFormation) -> "UnifiedTeamCoordinator":
         """Set the team formation pattern.
 
         Args:
@@ -137,9 +135,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._formation = formation
         return self
 
-    def set_manager(
-        self, manager: "ITeamMember"
-    ) -> "UnifiedTeamCoordinator":
+    def set_manager(self, manager: "ITeamMember") -> "UnifiedTeamCoordinator":
         """Set the manager for HIERARCHICAL formation.
 
         Args:
@@ -153,9 +149,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             self._members.insert(0, manager)
         return self
 
-    async def execute_task(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a task with the team.
 
         Dispatches to the appropriate formation executor based on
@@ -203,9 +197,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             # Record RL outcome
             duration = time.time() - start_time
             failed_count = sum(
-                1
-                for r in result.get("member_results", {}).values()
-                if not r.success
+                1 for r in result.get("member_results", {}).values() if not r.success
             )
             quality = self._compute_quality_score(
                 success=result.get("success", False),
@@ -248,9 +240,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "formation": self._formation.value,
             }
 
-    async def broadcast(
-        self, message: AgentMessage
-    ) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:
@@ -293,9 +283,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # Formation Executors
     # =========================================================================
 
-    async def _execute_formation(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_formation(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Dispatch to appropriate formation executor.
 
         Args:
@@ -314,9 +302,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         }
         return await executors[self._formation](task, context)
 
-    async def _execute_sequential(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_sequential(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute members sequentially with context chaining.
 
         Each member receives the accumulated context from previous members.
@@ -328,9 +314,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         success = True
 
         for i, member in enumerate(self._members):
-            self._report_progress(
-                member.id, "executing", (i + 1) / len(self._members)
-            )
+            self._report_progress(member.id, "executing", (i + 1) / len(self._members))
 
             try:
                 start = time.time()
@@ -370,9 +354,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "shared_context": self._shared_context,
         }
 
-    async def _execute_parallel(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_parallel(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute all members in parallel.
 
         All members work simultaneously on the same task.
@@ -419,9 +401,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "shared_context": self._shared_context,
         }
 
-    async def _execute_hierarchical(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_hierarchical(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute with manager-worker hierarchy.
 
         1. Manager plans and delegates
@@ -494,9 +474,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                         error=str(e),
                     )
 
-            worker_results = await asyncio.gather(
-                *[run_worker(w) for w in workers]
-            )
+            worker_results = await asyncio.gather(*[run_worker(w) for w in workers])
 
             for result in worker_results:
                 member_results[result.member_id] = result
@@ -530,9 +508,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "shared_context": self._shared_context,
         }
 
-    async def _execute_pipeline(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_pipeline(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute as a pipeline where output feeds to next stage.
 
         Each member's output becomes the input for the next member.
@@ -543,9 +519,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         success = True
 
         for i, member in enumerate(self._members):
-            self._report_progress(
-                member.id, "processing", (i + 1) / len(self._members)
-            )
+            self._report_progress(member.id, "processing", (i + 1) / len(self._members))
 
             # Build pipeline context
             pipeline_context = {
@@ -600,9 +574,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "shared_context": current_context,
         }
 
-    async def _execute_consensus(
-        self, task: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_consensus(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute with consensus - all members must agree.
 
         Members execute in parallel, and success requires consensus
@@ -628,9 +600,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
             if round_num > 0:
                 # Add disagreement context for retry rounds
-                round_context["previous_results"] = self._shared_context.get(
-                    "previous_results", []
-                )
+                round_context["previous_results"] = self._shared_context.get("previous_results", [])
 
             # Execute parallel
             result = await self._execute_parallel(task, round_context)
@@ -638,8 +608,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             # Check consensus
             member_results = result.get("member_results", {})
             success_rate = (
-                sum(1 for r in member_results.values() if r.success)
-                / len(member_results)
+                sum(1 for r in member_results.values() if r.success) / len(member_results)
                 if member_results
                 else 0
             )
@@ -651,8 +620,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
             # Store for next round
             self._shared_context["previous_results"] = [
-                {"member": mid, "output": r.output}
-                for mid, r in member_results.items()
+                {"member": mid, "output": r.output} for mid, r in member_results.items()
             ]
 
         # Max rounds exceeded

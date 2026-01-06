@@ -50,9 +50,7 @@ class MockTeamMember:
     async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
         return self._output
 
-    async def receive_message(
-        self, message: AgentMessage
-    ) -> Optional[AgentMessage]:
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         self._messages.append(message)
         return None
 
@@ -81,9 +79,7 @@ class TestProtocolCompliance:
         coordinator = UnifiedTeamCoordinator()
         member = MockTeamMember("m1")
 
-        result = coordinator.add_member(member).set_formation(
-            TeamFormation.PARALLEL
-        )
+        result = coordinator.add_member(member).set_formation(TeamFormation.PARALLEL)
         assert result is coordinator
 
     def test_factory_returns_protocol(self):
@@ -165,9 +161,7 @@ class TestFormations:
         coordinator.add_member(MockTeamMember("m2", "Agreed"))
         coordinator.set_formation(TeamFormation.CONSENSUS)
 
-        result = await coordinator.execute_task(
-            "Test task", {"max_consensus_rounds": 1}
-        )
+        result = await coordinator.execute_task("Test task", {"max_consensus_rounds": 1})
 
         assert result["success"] is True
         assert result.get("consensus_achieved") is True

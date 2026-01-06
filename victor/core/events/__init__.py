@@ -118,6 +118,7 @@ try:
         SQLiteEventBackend,
         register_lightweight_backends,
     )
+
     _LIGHTWEIGHT_AVAILABLE = True
 except ImportError:
     _LIGHTWEIGHT_AVAILABLE = False

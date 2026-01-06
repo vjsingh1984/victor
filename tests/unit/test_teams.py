@@ -26,8 +26,10 @@ from victor.agent.teams import (
     TeamSharedMemory,
 )
 from victor.agent.teams.team import MemberStatus
+
 # Use canonical types from victor.teams
 from victor.teams import TeamFormation, MemberResult, TeamResult
+
 # Use local AgentMessage from communication.py for TeamMessageBus tests
 # (the local type has from_agent/to_agent/type field names)
 from victor.agent.teams.communication import AgentMessage, MessageType

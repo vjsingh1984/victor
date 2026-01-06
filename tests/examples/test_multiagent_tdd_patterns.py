@@ -97,9 +97,7 @@ class MockAgent:
 
         return self.output
 
-    async def receive_message(
-        self, message: AgentMessage
-    ) -> Optional[AgentMessage]:
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message."""
         self.received_messages.append(message)
         return AgentMessage(
@@ -133,10 +131,12 @@ class TestAgentRoleTDD:
         )
 
         # Act: Execute research task
-        result = asyncio.run(researcher.execute_task(
-            "Find all API endpoints in the codebase",
-            {"codebase_path": "/project"},
-        ))
+        result = asyncio.run(
+            researcher.execute_task(
+                "Find all API endpoints in the codebase",
+                {"codebase_path": "/project"},
+            )
+        )
 
         # Assert: Researcher produces discovery output
         assert "Discovered" in result
@@ -152,10 +152,12 @@ class TestAgentRoleTDD:
         )
 
         # Act: Execute modification task
-        result = asyncio.run(executor.execute_task(
-            "Add authentication middleware to /api/v2/users",
-            {"file_path": "/project/api/routes.py"},
-        ))
+        result = asyncio.run(
+            executor.execute_task(
+                "Add authentication middleware to /api/v2/users",
+                {"file_path": "/project/api/routes.py"},
+            )
+        )
 
         # Assert: Executor produces modification output
         assert "Modified" in result
@@ -170,10 +172,12 @@ class TestAgentRoleTDD:
         )
 
         # Act: Execute review task
-        result = asyncio.run(reviewer.execute_task(
-            "Review the authentication changes",
-            {"diff": "--- old\n+++ new"},
-        ))
+        result = asyncio.run(
+            reviewer.execute_task(
+                "Review the authentication changes",
+                {"diff": "--- old\n+++ new"},
+            )
+        )
 
         # Assert: Reviewer produces feedback
         assert "Review" in result
@@ -498,8 +502,7 @@ class TestUnifiedCoordinatorTDD:
         # Act: Use fluent API
         agent = MockAgent(id="test")
         result_coordinator = (
-            coordinator
-            .add_member(agent)
+            coordinator.add_member(agent)
             .set_formation(TeamFormation.SEQUENTIAL)
             .clear()
             .add_member(agent)

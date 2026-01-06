@@ -125,11 +125,13 @@ class MockEventSubscriber:
     async def on_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Handle incoming event (simulates WebSocket message handler)."""
         async with self.lock:
-            self.events.append({
-                "type": event_type,
-                "data": data,
-                "timestamp": asyncio.get_event_loop().time(),
-            })
+            self.events.append(
+                {
+                    "type": event_type,
+                    "data": data,
+                    "timestamp": asyncio.get_event_loop().time(),
+                }
+            )
             self.event_types_received.add(event_type)
 
     def get_events_by_type(self, event_type: str) -> List[Dict[str, Any]]:
@@ -138,10 +140,7 @@ class MockEventSubscriber:
 
     def get_events_for_agent(self, agent_id: str) -> List[Dict[str, Any]]:
         """Filter events for a specific agent."""
-        return [
-            e for e in self.events
-            if e.get("data", {}).get("agent_id") == agent_id
-        ]
+        return [e for e in self.events if e.get("data", {}).get("agent_id") == agent_id]
 
 
 # =============================================================================
@@ -168,22 +167,28 @@ class ObservableAgent:
         correlation_id = context.get("correlation_id", "unknown")
 
         # Emit start event
-        await self._emit("agent.execution.started", {
-            "agent_id": self.id,
-            "correlation_id": correlation_id,
-            "task": task,
-        })
+        await self._emit(
+            "agent.execution.started",
+            {
+                "agent_id": self.id,
+                "correlation_id": correlation_id,
+                "task": task,
+            },
+        )
 
         # Simulate work
         if self.delay > 0:
             await asyncio.sleep(self.delay)
 
         # Emit completion event
-        await self._emit("agent.execution.completed", {
-            "agent_id": self.id,
-            "correlation_id": correlation_id,
-            "output": self.output,
-        })
+        await self._emit(
+            "agent.execution.completed",
+            {
+                "agent_id": self.id,
+                "correlation_id": correlation_id,
+                "output": self.output,
+            },
+        )
 
         return self.output
 
@@ -192,9 +197,7 @@ class ObservableAgent:
         self.events_emitted.append(event_type)
         await self.event_bus.emit(event_type, data)
 
-    async def receive_message(
-        self, message: AgentMessage
-    ) -> Optional[AgentMessage]:
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive message (protocol compliance)."""
         return None
 
@@ -219,9 +222,7 @@ class TestBasicEventEmission:
         return MockEventSubscriber("vscode_client")
 
     @pytest.mark.asyncio
-    async def test_agent_emits_start_and_complete_events(
-        self, event_bus, subscriber
-    ):
+    async def test_agent_emits_start_and_complete_events(self, event_bus, subscriber):
         """Agent should emit start and complete events during execution."""
         # Arrange: Subscribe to events
         await event_bus.subscribe("agent.execution.*", subscriber.on_event)
@@ -268,29 +269,27 @@ class TestConcurrentAgentEvents:
         return MockEventSubscriber("concurrent_test_client")
 
     @pytest.mark.asyncio
-    async def test_concurrent_agents_emit_ordered_events(
-        self, event_bus, subscriber
-    ):
+    async def test_concurrent_agents_emit_ordered_events(self, event_bus, subscriber):
         """Events from concurrent agents should maintain order within each agent."""
         # Arrange: Create multiple agents
         await event_bus.subscribe("agent.execution.*", subscriber.on_event)
 
         agents = [
-            ObservableAgent(id=f"agent_{i}", event_bus=event_bus, delay=0.05)
-            for i in range(3)
+            ObservableAgent(id=f"agent_{i}", event_bus=event_bus, delay=0.05) for i in range(3)
         ]
 
         # Act: Execute all agents concurrently
-        await asyncio.gather(*[
-            agent.execute_task(f"Task {i}", {"correlation_id": f"concurrent-{i}"})
-            for i, agent in enumerate(agents)
-        ])
+        await asyncio.gather(
+            *[
+                agent.execute_task(f"Task {i}", {"correlation_id": f"concurrent-{i}"})
+                for i, agent in enumerate(agents)
+            ]
+        )
 
         # Assert: Each agent has start before complete
         for i in range(3):
             agent_events = [
-                e for e in subscriber.events
-                if e["data"].get("agent_id") == f"agent_{i}"
+                e for e in subscriber.events if e["data"].get("agent_id") == f"agent_{i}"
             ]
             assert len(agent_events) == 2
             assert agent_events[0]["type"] == "agent.execution.started"
@@ -313,10 +312,12 @@ class TestConcurrentAgentEvents:
         ]
 
         # Act: Execute all concurrently
-        await asyncio.gather(*[
-            agent.execute_task(f"Task {i}", {"correlation_id": f"high-{i}"})
-            for i, agent in enumerate(agents)
-        ])
+        await asyncio.gather(
+            *[
+                agent.execute_task(f"Task {i}", {"correlation_id": f"high-{i}"})
+                for i, agent in enumerate(agents)
+            ]
+        )
 
         # Assert: All events received (2 per agent)
         expected_events = num_agents * 2
@@ -326,10 +327,7 @@ class TestConcurrentAgentEvents:
     async def test_multiple_subscribers_receive_all_events(self, event_bus):
         """Multiple subscribers should all receive the same events."""
         # Arrange: Multiple subscribers (simulating multiple VSCode clients)
-        subscribers = [
-            MockEventSubscriber(f"client_{i}")
-            for i in range(3)
-        ]
+        subscribers = [MockEventSubscriber(f"client_{i}") for i in range(3)]
 
         for sub in subscribers:
             await event_bus.subscribe("agent.execution.*", sub.on_event)
@@ -366,8 +364,7 @@ class TestTeamExecutionEvents:
 
         # Create observable agents
         agents = [
-            ObservableAgent(id=f"member_{i}", event_bus=event_bus, delay=0.01)
-            for i in range(2)
+            ObservableAgent(id=f"member_{i}", event_bus=event_bus, delay=0.01) for i in range(2)
         ]
 
         # Use lightweight coordinator for testing
@@ -428,10 +425,12 @@ class TestWebSocketIntegration:
 
         async def bridge_to_websocket(event_type: str, data: Dict[str, Any]):
             """Bridge event bus events to WebSocket."""
-            message = json.dumps({
-                "type": event_type,
-                "data": data,
-            })
+            message = json.dumps(
+                {
+                    "type": event_type,
+                    "data": data,
+                }
+            )
             await ws.send(message)
 
         await event_bus.subscribe("agent.*", bridge_to_websocket)
@@ -451,30 +450,30 @@ class TestWebSocketIntegration:
     async def test_multiple_websockets_concurrent_agents(self, event_bus):
         """Multiple WebSocket clients with concurrent agents."""
         # Arrange: Multiple WebSocket connections
-        websockets = [
-            self.MockWebSocket(f"vscode-{i}")
-            for i in range(3)
-        ]
+        websockets = [self.MockWebSocket(f"vscode-{i}") for i in range(3)]
 
         for i, ws in enumerate(websockets):
+
             async def create_bridge(ws_ref):
                 async def bridge(event_type: str, data: Dict[str, Any]):
                     await ws_ref.send(json.dumps({"type": event_type, "data": data}))
+
                 return bridge
 
             bridge = await create_bridge(ws)
             await event_bus.subscribe("agent.*", bridge)
 
         agents = [
-            ObservableAgent(id=f"concurrent_{i}", event_bus=event_bus, delay=0.02)
-            for i in range(2)
+            ObservableAgent(id=f"concurrent_{i}", event_bus=event_bus, delay=0.02) for i in range(2)
         ]
 
         # Act: Execute agents concurrently
-        await asyncio.gather(*[
-            agent.execute_task(f"Task {i}", {"correlation_id": f"multi-ws-{i}"})
-            for i, agent in enumerate(agents)
-        ])
+        await asyncio.gather(
+            *[
+                agent.execute_task(f"Task {i}", {"correlation_id": f"multi-ws-{i}"})
+                for i, agent in enumerate(agents)
+            ]
+        )
 
         # Assert: Each WebSocket got all events
         for ws in websockets:
@@ -532,15 +531,16 @@ class TestEventAggregation:
         await event_bus.subscribe("agent.execution.*", aggregate_progress)
 
         agents = [
-            ObservableAgent(id=f"prog_{i}", event_bus=event_bus, delay=0.01)
-            for i in range(5)
+            ObservableAgent(id=f"prog_{i}", event_bus=event_bus, delay=0.01) for i in range(5)
         ]
 
         # Act
-        await asyncio.gather(*[
-            agent.execute_task(f"Task {i}", {"correlation_id": f"prog-{i}"})
-            for i, agent in enumerate(agents)
-        ])
+        await asyncio.gather(
+            *[
+                agent.execute_task(f"Task {i}", {"correlation_id": f"prog-{i}"})
+                for i, agent in enumerate(agents)
+            ]
+        )
 
         # Assert
         assert progress["started"] == 5
@@ -554,10 +554,12 @@ class TestEventAggregation:
 
         async def group_events(event_type: str, data: Dict[str, Any]):
             corr_id = data.get("correlation_id", "unknown")
-            grouped_events[corr_id].append({
-                "type": event_type,
-                "data": data,
-            })
+            grouped_events[corr_id].append(
+                {
+                    "type": event_type,
+                    "data": data,
+                }
+            )
 
         await event_bus.subscribe("agent.*", group_events)
 
