@@ -2184,6 +2184,157 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ResponseProcessor created")
         return processor
 
+    # =========================================================================
+    # Unified Agent Creation (Phase 4)
+    # =========================================================================
+
+    async def create_agent(
+        self,
+        mode: str = "foreground",
+        config: Optional[Any] = None,
+        task: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Create ANY agent type using shared factory infrastructure.
+
+        This is the ONLY method that should create agents. All other entrypoints
+        (Agent.create, BackgroundAgentManager.start_agent, Vertical.create_agent)
+        must delegate here to ensure consistent code maintenance and eliminate
+        code proliferation (SOLID SRP, DIP).
+
+        Args:
+            mode: Agent creation mode
+                - "foreground": Interactive Agent instance (default)
+                - "background": BackgroundAgent for async task execution
+                - "team_member": TeamMember/SubAgent for multi-agent teams
+            config: Optional unified agent configuration (UnifiedAgentConfig)
+            task: Optional task description (for background agents)
+            **kwargs: Additional agent-specific parameters
+                - For foreground: provider, model, temperature, max_tokens, tools, etc.
+                - For background: mode_type ("build", "plan", "explore"), websocket, etc.
+                - For team_member: role, capabilities, description, etc.
+
+        Returns:
+            Agent instance based on mode:
+            - mode="foreground": Agent (victor.framework.agent.Agent)
+            - mode="background": BackgroundAgent (victor.agent.background_agent.BackgroundAgent)
+            - mode="team_member": TeamMember/SubAgent (victor.teams.types.TeamMember)
+
+        Raises:
+            ValueError: If mode is invalid or required parameters are missing
+            ProviderError: If provider initialization fails
+
+        Examples:
+            # Foreground agent (simple)
+            agent = await factory.create_agent(mode="foreground")
+
+            # Foreground agent with options
+            agent = await factory.create_agent(
+                mode="foreground",
+                provider="openai",
+                model="gpt-4-turbo",
+                tools=ToolSet.coding()
+            )
+
+            # Background agent with task
+            agent = await factory.create_agent(
+                mode="background",
+                task="Implement feature X",
+                mode_type="build"
+            )
+
+            # Team member
+            agent = await factory.create_agent(
+                mode="team_member",
+                role="researcher",
+                capabilities=["search", "analyze"]
+            )
+        """
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        # Create orchestrator using existing factory methods
+        # Note: We re-use the existing from_settings pattern which internally
+        # uses this factory's create_* methods
+        orchestrator = await AgentOrchestrator.from_settings(
+            self.settings,
+            profile_name=self.profile_name or "default",
+            thinking=self.thinking,
+        )
+
+        # Override provider/model if different from defaults
+        provider = kwargs.get("provider")
+        model = kwargs.get("model")
+        if provider or model:
+            if hasattr(orchestrator, "_provider_manager") or hasattr(
+                orchestrator, "provider_manager"
+            ):
+                pm = getattr(orchestrator, "_provider_manager", None) or getattr(
+                    orchestrator, "provider_manager", None
+                )
+                if pm:
+                    await pm.switch_provider(
+                        provider or pm.provider_name,
+                        model or self.model,
+                    )
+
+        # Create agent based on mode
+        if mode == "foreground":
+            # Import Agent to avoid circular dependency
+            from victor.framework.agent import Agent
+
+            # Create foreground Agent
+            agent = Agent(orchestrator)
+
+            # Apply tools if specified
+            tools = kwargs.get("tools")
+            if tools:
+                from victor.framework.tools import configure_tools
+
+                configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
+
+            # Apply vertical configuration if specified
+            vertical = kwargs.get("vertical")
+            if vertical:
+                # Apply vertical configuration
+                vertical_config = vertical.get_config()
+                if vertical_config.system_prompt:
+                    orchestrator.system_prompt = vertical_config.system_prompt
+
+            return agent
+
+        elif mode == "background":
+            # Import BackgroundAgent
+            from victor.agent.background_agent import BackgroundAgent
+
+            # Create background agent
+            agent = BackgroundAgent(
+                orchestrator=orchestrator,
+                task=task or "",
+                mode_type=kwargs.get("mode_type", "build"),
+                websocket=kwargs.get("websocket", False),
+                enable_observability=kwargs.get("enable_observability", True),
+            )
+            return agent
+
+        elif mode == "team_member":
+            # Import TeamMember
+            from victor.teams.types import TeamMember
+
+            # Create team member (wraps existing agent/team member)
+            member = TeamMember(
+                agent_ref=kwargs.get("agent_ref"),
+                role=kwargs.get("role", "team_member"),
+                capabilities=kwargs.get("capabilities", []),
+                description=kwargs.get("description", ""),
+            )
+            return member
+
+        else:
+            raise ValueError(
+                f"Invalid agent mode: {mode!r}. "
+                "Must be 'foreground', 'background', or 'team_member'"
+            )
+
 
 # Convenience function for creating factory
 def create_orchestrator_factory(
