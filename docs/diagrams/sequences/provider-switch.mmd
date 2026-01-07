@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant User
+    participant Orchestrator
+    participant ConversationController
+    participant ProviderA as Provider A<br/>(Anthropic)
+    participant ProviderB as Provider B<br/>(OpenAI)
+
+    %% Initial Context
+    User->>Orchestrator: Start conversation with Provider A
+    Orchestrator->>ConversationController: Initialize conversation
+    ConversationController->>ConversationController: Create conversation_id
+    ConversationController-->>Orchestrator: conversation_id
+
+    User->>Orchestrator: "Design a REST API"
+    Orchestrator->>ProviderA: chat("Design a REST API")
+    ProviderA-->>Orchestrator: "Here's a REST API design..."
+    Orchestrator->>ConversationController: Store message + response
+    ConversationController->>ConversationController: Append to history
+
+    %% Provider Switch (Context Preserved)
+    User->>Orchestrator: /provider openai --model gpt-4
+
+    Note over Orchestrator: Context is INDEPENDENT of provider
+
+    Orchestrator->>ConversationController: Get conversation history
+    ConversationController-->>Orchestrator: Full history<br/>(messages A1, A2...)
+
+    Orchestrator->>ProviderB: chat(continuation)<br/>+ context history
+    Note over ProviderB: Receives full context<br/>from Provider A
+
+    ProviderB-->>Orchestrator: "I'll continue the REST API..."
+    Orchestrator->>ConversationController: Store message + response
+    ConversationController->>ConversationController: Append to history<br/>(messages A1, A2, B1...)
+
+    User->>Orchestrator: "Add authentication"
+    Orchestrator->>ProviderB: chat("Add authentication")<br/>+ context history
+    ProviderB-->>Orchestrator: "Here's the auth implementation..."
+
+    Note over User,ProviderB: Context preserved throughout!
+    Note over ConversationController: Conversation history grows<br/>independent of providers

@@ -1,0 +1,84 @@
+flowchart TB
+    subgraph Formations["Team Formations"]
+        Hier["Hierarchical<br/>Lead + Sub-agents"]
+        Flat["Flat<br/>Peers + Shared Memory"]
+        Pipeline["Pipeline<br/>Sequential Processing"]
+        Consensus["Consensus<br/>Voting"]
+        Debate["Debate<br/>Discussion"]
+    end
+
+    subgraph HierarchicalTeam["Hierarchical Team Example"]
+        Lead["Lead Agent<br/>(Coordinates)"]
+        Sub1["Sub-Agent 1<br/>(Frontend)"]
+        Sub2["Sub-Agent 2<br/>(Backend)"]
+        Sub3["Sub-Agent 3<br/>(Testing)"]
+
+        Lead --> Sub1
+        Lead --> Sub2
+        Lead --> Sub3
+    end
+
+    subgraph FlatTeam["Flat Team Example"]
+        Peer1["Peer Agent 1<br/>(Equal)"]
+        Peer2["Peer Agent 2<br/>(Equal)"]
+        Peer3["Peer Agent 3<br/>(Equal)"]
+        SharedMem["Shared Memory<br/>(Common State)"]
+
+        Peer1 --> SharedMem
+        Peer2 --> SharedMem
+        Peer3 --> SharedMem
+    end
+
+    subgraph PipelineTeam["Pipeline Team Example"]
+        Stage1["Stage 1<br/>(Analyzer)"]
+        Stage2["Stage 2<br/>(Implementer)"]
+        Stage3["Stage 3<br/>(Tester)"]
+
+        Stage1 --> Stage2 --> Stage3
+    end
+
+    subgraph Communication["Team Communication"]
+        Bus["TeamMessageBus<br/>(Event Bus)"]
+        PubSub["Publish/Subscribe<br/>(Async Messaging)"]
+        Broadcast["Broadcast<br/>(All Agents)"]
+        Direct["Direct Message<br/>(Point-to-Point)"]
+
+        Bus --> PubSub
+        PubSub --> Broadcast
+        PubSub --> Direct
+    end
+
+    subgraph Coordination["Coordination Patterns"]
+        Orchestrator["Agent Orchestrator<br/>(Facilitator)"]
+        TeamAPI["AgentTeam API<br/>(create, coordinate)"]
+        Lifecycle["Lifecycle Manager<br/>(start, stop, monitor)"]
+        State["Team State<br/>(shared, distributed)"]
+
+        Orchestrator --> TeamAPI
+        TeamAPI --> Lifecycle
+        Lifecycle --> State
+    end
+
+    %% Formation connections
+    Formations --> HierarchicalTeam
+    Formations --> FlatTeam
+    Formations --> PipelineTeam
+
+    %% Team connections to communication
+    HierarchicalTeam --> Communication
+    FlatTeam --> Communication
+    PipelineTeam --> Communication
+
+    %% Communication to coordination
+    Communication --> Coordination
+
+    %% Styling
+    classDef formationStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    classDef teamStyle fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    classDef commStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
+    classDef coordStyle fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+
+    class Hier,Flat,Pipeline,Consensus,Debate formationStyle
+    class Lead,Sub1,Sub2,Sub3,Peer1,Peer2,Peer3,SharedMem,Stage1,Stage2,Stage3 teamStyle
+    class Bus,PubSub,Broadcast,Direct commStyle
+    class Orchestrator,TeamAPI,Lifecycle,State coordStyle

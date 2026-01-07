@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant User
+    participant Orchestrator
+    participant ToolPipeline
+    participant Tool
+    participant FileSystem
+    participant Provider
+
+    %% Tool Execution Flow
+    User->>Orchestrator: Execute task: "Read auth.py"
+    Orchestrator->>Orchestrator: Parse task (needs tool)
+    Orchestrator->>ToolPipeline: Validate tool request
+
+    ToolPipeline->>ToolPipeline: Check tool available
+    ToolPipeline->>ToolPipeline: Validate parameters
+    ToolPipeline-->>Orchestrator: Validation OK
+
+    Orchestrator->>ToolPipeline: Execute tool "read_file"
+    ToolPipeline->>Tool: Initialize read_file
+    Tool->>Tool: Validate parameters
+    Tool->>Tool: Check permissions
+
+    Tool->>FileSystem: Read file (auth.py)
+    FileSystem-->>Tool: File content
+    Tool-->>ToolPipeline: ToolResult(content=..., success=True)
+
+    ToolPipeline->>ToolPipeline: Format result
+    ToolPipeline-->>Orchestrator: Formatted result
+
+    Orchestrator->>Provider: Send context + file content
+    Provider->>Provider: Process with LLM
+    Provider-->>Orchestrator: LLM response
+
+    Orchestrator-->>User: Final response
+
+    Note over User,Provider: Total time: ~2-3 seconds
