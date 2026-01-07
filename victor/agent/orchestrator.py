@@ -22,6 +22,9 @@ Extracted Components (separate modules):
 - ConversationController: Message history, context tracking, stage management
 - ToolPipeline: Tool validation, execution coordination, budget enforcement
 - StreamingController: Session lifecycle, metrics collection, cancellation
+- StreamingCoordinator: Response processing, chunk aggregation, event dispatch (NEW)
+- ProviderSwitchCoordinator: Provider/model switching workflow coordination (NEW)
+- LifecycleManager: Session lifecycle and resource cleanup coordination (NEW)
 - TaskAnalyzer: Unified facade for complexity/task/intent classification
 - ToolSelector: Semantic and keyword-based tool selection
 - ToolRegistrar: Tool registration, plugins, MCP integration (NEW)
@@ -33,16 +36,22 @@ Remaining Orchestrator Responsibilities:
 
 Recently Integrated:
 - ProviderManager: Provider initialization, switching, health checks (NEW)
+- StreamingCoordinator: Simple response processing for streaming use cases (NEW)
+- ProviderSwitchCoordinator: Switch validation, health checks, retry logic (NEW)
+- LifecycleManager: Session reset, recovery, graceful shutdown, resource cleanup (NEW)
 
 Note: Keep orchestrator as a thin facade. New logic should go into
 appropriate extracted components, not added here.
 
-Recent Refactoring (December 2025):
+Recent Refactoring (December 2025 - January 2025):
 - Extracted ToolRegistrar from _register_default_tools, _initialize_plugins,
     _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
 - Added ProviderHealthChecker for proactive health monitoring
 - Added ResilienceMetricsExporter for dashboard integration
 - Added classification-aware tool selection in SemanticToolSelector
+- Added StreamingCoordinator for response processing (January 2025)
+- Added ProviderSwitchCoordinator for switching workflow coordination (January 2025)
+- Added LifecycleManager for lifecycle management (January 2025)
 """
 
 import ast
@@ -518,6 +527,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             ),
         )
 
+        # ProviderSwitchCoordinator: Coordinate provider/model switching workflow (via factory)
+        # Wraps ProviderSwitcher with validation, health checks, retry logic
+        self._provider_switch_coordinator = self._factory.create_provider_switch_coordinator(
+            provider_switcher=self._provider_manager._provider_switcher,
+            health_monitor=self._provider_manager._health_monitor,
+        )
+
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         self.sanitizer = self._factory.create_sanitizer()
 
@@ -763,6 +779,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             system_prompt=self._system_prompt,
         )
 
+        # LifecycleManager: Coordinate session lifecycle and resource cleanup (via factory)
+        # Handles conversation reset, session recovery, graceful shutdown
+        # Must be created AFTER conversation_controller and other dependencies
+        self._lifecycle_manager = self._factory.create_lifecycle_manager(
+            conversation_controller=self._conversation_controller,
+            metrics_collector=(
+                self._metrics_collector if hasattr(self, "_metrics_collector") else None
+            ),
+            context_compactor=(
+                self._context_compactor if hasattr(self, "_context_compactor") else None
+            ),
+            sequence_tracker=self._sequence_tracker if hasattr(self, "_sequence_tracker") else None,
+            usage_analytics=self._usage_analytics if hasattr(self, "_usage_analytics") else None,
+            reminder_manager=self._reminder_manager if hasattr(self, "_reminder_manager") else None,
+        )
+
         # Tool deduplication tracker for preventing redundant calls (via factory)
         self._deduplication_tracker = self._factory.create_tool_deduplication_tracker()
 
@@ -790,6 +822,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._streaming_controller = self._factory.create_streaming_controller(
             streaming_metrics_collector=self.streaming_metrics_collector,
             on_session_complete=self._on_streaming_session_complete,
+        )
+
+        # StreamingCoordinator: Coordinates streaming response processing (via factory)
+        self._streaming_coordinator = self._factory.create_streaming_coordinator(
+            streaming_controller=self._streaming_controller,
         )
 
         # StreamingChatHandler: Testable extraction of streaming loop logic (via factory)
@@ -915,6 +952,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize capability registry for explicit capability discovery
         # This replaces hasattr duck-typing with type-safe protocol conformance
         self.__init_capability_registry__()
+
+        # Wire up LifecycleManager with dependencies for shutdown
+        # (must be done after all components are initialized)
+        self._lifecycle_manager.set_provider(self.provider)
+        self._lifecycle_manager.set_code_manager(
+            self.code_manager if hasattr(self, "code_manager") else None
+        )
+        self._lifecycle_manager.set_semantic_selector(
+            self.semantic_selector if hasattr(self, "semantic_selector") else None
+        )
+        self._lifecycle_manager.set_usage_logger(
+            self.usage_logger if hasattr(self, "usage_logger") else None
+        )
+        # Note: background_tasks is a set, convert to list for lifecycle manager
+        self._lifecycle_manager.set_background_tasks(list(self._background_tasks))
+        # Set callbacks for orchestrator-specific shutdown logic
+        self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
+        self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
 
         logger.info(
             "Orchestrator initialized with decomposed components: "
@@ -2876,43 +2931,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
 
+        Delegates to LifecycleManager for core shutdown logic.
+
         Flushes analytics, stops health monitoring, and cleans up resources.
         Call this before application exit.
 
         Returns:
             Dictionary with shutdown status for each component
         """
-        results: Dict[str, bool] = {}
-
-        # Flush analytics data
-        try:
-            flush_results = self.flush_analytics()
-            results["analytics_flushed"] = all(flush_results.values())
-        except Exception as e:
-            logger.warning(f"Failed to flush analytics during shutdown: {e}")
-            results["analytics_flushed"] = False
-
-        # Stop health monitoring
-        try:
-            results["health_monitoring_stopped"] = await self.stop_health_monitoring()
-        except Exception as e:
-            logger.warning(f"Failed to stop health monitoring: {e}")
-            results["health_monitoring_stopped"] = False
-
-        # End usage analytics session
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            try:
-                if self._usage_analytics._current_session is not None:
-                    self._usage_analytics.end_session()
-                results["session_ended"] = True
-            except Exception as e:
-                logger.warning(f"Failed to end analytics session: {e}")
-                results["session_ended"] = False
-        else:
-            results["session_ended"] = True
-
-        logger.info(f"Graceful shutdown complete: {results}")
-        return results
+        # Delegate to LifecycleManager for graceful shutdown
+        return await self._lifecycle_manager.graceful_shutdown()
 
     # =========================================================================
     # Provider/Model Hot-Swap Methods
@@ -6268,6 +6296,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def reset_conversation(self) -> None:
         """Clear conversation history and session state.
 
+        Delegates to LifecycleManager for core reset logic.
+
         Resets:
         - Conversation history
         - Tool call counter
@@ -6281,10 +6311,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         - Sequence tracker history (preserves learned patterns)
         - Usage analytics session (ends current, starts fresh)
         """
-        self.conversation.clear()
-        self._system_added = False
+        # Delegate to LifecycleManager for core reset
+        self._lifecycle_manager.reset_conversation()
 
-        # Reset session-specific state to prevent memory leaks
+        # Reset orchestrator-specific state
+        self._system_added = False
         self.tool_calls_used = 0
         self.failed_tool_signatures.clear()
         self.observed_files.clear()
@@ -6292,32 +6323,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._consecutive_blocked_attempts = 0
         self._total_blocked_attempts = 0
 
-        # Reset conversation state machine
-        if hasattr(self, "conversation_state"):
-            self.conversation_state.reset()
-
-        # Reset context reminder manager
-        if hasattr(self, "reminder_manager"):
-            self.reminder_manager.reset()
-
-        # Reset metrics collector
-        if hasattr(self, "_metrics_collector"):
-            self._metrics_collector.reset_stats()
-
-        # Reset optimization components for clean session
-        if hasattr(self, "_context_compactor") and self._context_compactor:
-            self._context_compactor.reset_statistics()
-
-        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
-            self._sequence_tracker.clear_history()
-
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            # End current session if active, start fresh
-            if self._usage_analytics._current_session is not None:
-                self._usage_analytics.end_session()
-            self._usage_analytics.start_session()
-
-        logger.debug("Conversation and session state reset (including optimization components)")
+        logger.debug("Conversation and session state reset (via LifecycleManager)")
 
     def request_cancellation(self) -> None:
         """Request cancellation of the current streaming operation.
@@ -6392,6 +6398,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous conversation session.
 
+        Delegates to LifecycleManager for core recovery logic.
+
         Args:
             session_id: ID of the session to recover
 
@@ -6402,32 +6410,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.warning("Memory manager not enabled, cannot recover session")
             return False
 
-        try:
-            session = self.memory_manager.get_session(session_id)
-            if not session:
-                logger.warning("Session not found: %s", session_id)
-                return False
+        # Delegate to LifecycleManager for recovery
+        success = self._lifecycle_manager.recover_session(
+            session_id=session_id,
+            memory_manager=self.memory_manager,
+        )
 
-            # Update current session
+        if success:
+            # Update orchestrator-specific session tracking
             self._memory_session_id = session_id
+            logger.info(f"Recovered session {session_id[:8]}... ")
+        else:
+            logger.warning(f"Failed to recover session {session_id}")
 
-            # Restore messages to in-memory conversation
-            self.conversation.clear()
-            for msg in session.messages:
-                provider_msg = msg.to_provider_format()
-                self.conversation.add_message(
-                    role=provider_msg["role"],
-                    content=provider_msg["content"],
-                )
-
-            logger.info(
-                f"Recovered session {session_id[:8]}... " f"with {len(session.messages)} messages"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to recover session {session_id}: {e}")
-            return False
+        return success
 
     def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context messages from memory manager.
@@ -6504,6 +6500,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def shutdown(self) -> None:
         """Clean up resources and shutdown gracefully.
 
+        Delegates to LifecycleManager for core shutdown logic.
+
         Should be called when the orchestrator is no longer needed.
         Cleans up:
         - Background async tasks
@@ -6512,65 +6510,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         - Semantic selector resources
         - HTTP clients
         """
-        logger.info("Shutting down AgentOrchestrator...")
-
-        # Cancel all background tasks first
-        if self._background_tasks:
-            logger.debug("Cancelling %d background task(s)...", len(self._background_tasks))
-            for task in self._background_tasks:
-                if not task.done():
-                    task.cancel()
-
-            # Wait for all tasks to complete cancellation
-            if self._background_tasks:
-                await asyncio.gather(*self._background_tasks, return_exceptions=True)
-            self._background_tasks.clear()
-            logger.debug("Background tasks cancelled")
-
-        # Log final analytics
-        self.usage_logger.log_event(
-            "session_end",
-            {
-                "tool_calls_used": self.tool_calls_used,
-                "total_messages": self.conversation.message_count(),
-            },
-        )
-
-        # Close provider connection
-        if self.provider:
-            try:
-                await self.provider.close()
-                logger.debug("Provider connection closed")
-            except Exception as e:
-                logger.warning("Error closing provider: %s", str(e))
-
-        # Stop code execution manager (cleans up Docker containers)
-        if hasattr(self, "code_manager") and self.code_manager:
-            try:
-                self.code_manager.stop()
-                logger.debug("Code execution manager stopped")
-            except Exception as e:
-                logger.warning(f"Error stopping code manager: {e}")
-
-        # Close semantic selector
-        if self.semantic_selector:
-            try:
-                await self.semantic_selector.close()
-                logger.debug("Semantic selector closed")
-            except Exception as e:
-                logger.warning("Error closing semantic selector: %s", str(e))
-
-        # Signal shutdown to EmbeddingService singleton
-        # This prevents post-shutdown embedding operations
-        try:
-            from victor.storage.embeddings.service import EmbeddingService
-
-            if EmbeddingService._instance is not None:
-                EmbeddingService._instance.shutdown()
-                logger.debug("EmbeddingService shutdown signaled")
-        except Exception as e:
-            logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
-
+        # Delegate to LifecycleManager for shutdown
+        await self._lifecycle_manager.shutdown()
         logger.info("AgentOrchestrator shutdown complete")
 
     # =========================================================================

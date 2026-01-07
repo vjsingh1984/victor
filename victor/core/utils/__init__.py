@@ -18,5 +18,22 @@ This package contains shared utilities used across the codebase.
 """
 
 from victor.core.utils.content_hasher import ContentHasher, HasherPresets
+from victor.core.utils.text_normalizer import (
+    TextNormalizationPresets,
+    normalize_for_filename,
+    normalize_for_git_branch,
+    normalize_for_test_filename,
+    sanitize_class_name,
+    slugify,
+)
 
-__all__ = ["ContentHasher", "HasherPresets"]
+__all__ = [
+    "ContentHasher",
+    "HasherPresets",
+    "normalize_for_git_branch",
+    "normalize_for_filename",
+    "slugify",
+    "sanitize_class_name",
+    "normalize_for_test_filename",
+    "TextNormalizationPresets",
+]

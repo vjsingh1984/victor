@@ -100,7 +100,7 @@ class EventLogView(RichLog):
 
     def add_event(self, event: Event) -> None:
         """Add an event to the log."""
-        timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
+        timestamp = event.datetime.strftime("%H:%M:%S.%f")[:-3]
         category_colors = {
             "tool.": "cyan",
             "state.": "yellow",
@@ -113,7 +113,7 @@ class EventLogView(RichLog):
             "custom": "dim",
         }
         color = category_colors.get(event.category, "white")
-        category_name = event.topic.split(".")[0].upper() if event.category else "UNKNOWN"
+        category_name = event.category.upper()
 
         self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.topic}")
 
@@ -138,8 +138,8 @@ class EventTableView(DataTable):
 
     def add_event(self, event: Event) -> None:
         """Add an event row to the table."""
-        timestamp = event.timestamp.strftime("%H:%M:%S")
-        category = event.topic.split(".")[0] if event.category else "unknown"
+        timestamp = event.datetime.strftime("%H:%M:%S")
+        category = event.category
 
         # Build details string
         details = ""
@@ -229,7 +229,7 @@ class VerticalTraceView(ScrollableContainer):
         content = self.query_one("#trace-content", Static)
         data = event.data or {}
 
-        timestamp = event.timestamp.strftime("%H:%M:%S")
+        timestamp = event.datetime.strftime("%H:%M:%S")
         vertical_name = data.get("vertical", "unknown")
         action = data.get("action", event.topic)
 
@@ -304,9 +304,9 @@ class JSONLBrowser(ScrollableContainer):
 
             for event in self._events[-100:]:  # Show last 100 events
                 # TODO: Migrate
-                timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                category = event.topic.split(".")[0] if event.category else "unknown"
-                session = (event.session_id or "")[:8]
+                timestamp = event.datetime.strftime("%Y-%m-%d %H:%M:%S")
+                category = event.category
+                session = (event.correlation_id or "")[:8]
                 data_preview = str(event.data)[:50] if event.data else ""
                 table.add_row(timestamp, category, event.topic, session, data_preview)
 
@@ -334,7 +334,7 @@ class ExecutionTraceView(ScrollableContainer):
         content = self.query_one("#trace-content", Static)
         data = event.data or {}
 
-        timestamp = event.timestamp.strftime("%H:%M:%S")
+        timestamp = event.datetime.strftime("%H:%M:%S")
         span_type = data.get("span_type", "unknown")
         agent_id = data.get("agent_id", "unknown")
         parent_id = data.get("parent_id")
@@ -392,7 +392,7 @@ class ToolCallHistoryView(DataTable):
             parent_span_id = data.get("parent_span_id", "unknown")[:8]
             arguments = data.get("arguments", {})
 
-            timestamp = event.timestamp.strftime("%H:%M:%S")
+            timestamp = event.datetime.strftime("%H:%M:%S")
             args_preview = str(arguments)[:30] if arguments else ""
 
             self.add_row(
@@ -411,7 +411,7 @@ class ToolCallHistoryView(DataTable):
             parent_span_id = data.get("parent_span_id", "unknown")[:8]
             error = data.get("error", "Unknown error")
 
-            timestamp = event.timestamp.strftime("%H:%M:%S")
+            timestamp = event.datetime.strftime("%H:%M:%S")
             error_preview = error[:30] if error else ""
 
             self.add_row(
@@ -450,7 +450,7 @@ class StateTransitionView(DataTable):
         old_value = data.get("old_value")
         new_value = data.get("new_value")
 
-        timestamp = event.timestamp.strftime("%H:%M:%S")
+        timestamp = event.datetime.strftime("%H:%M:%S")
 
         # Truncate values for display
         # TODO: Migrate
@@ -675,6 +675,7 @@ class ObservabilityDashboard(App):
         self._paused = False
         self._unsubscribe: Optional[Callable[[], None]] = None
         self._event_buffer: List[Event] = []
+        self._subscription_handles: List[Any] = []  # For canonical event system subscriptions
 
         # Widget references
         self._stats: Optional[EventStats] = None
@@ -778,26 +779,25 @@ class ObservabilityDashboard(App):
             self._unsubscribe()
 
     def _subscribe_to_events(self) -> None:
-        """Subscribe to EventBus for real-time events."""
+        """Subscribe to ObservabilityBus for real-time events.
+
+        Migrated to canonical event system using pattern-based subscriptions.
+        """
         import logging
+        import asyncio
 
         logger = logging.getLogger(__name__)
 
         event_counter = [0]  # Use list to avoid nonlocal
 
-        # TODO: Migrate
+        async def handle_event(event: Event) -> None:
+            """Handle incoming event from canonical event system.
 
-        def handle_event(event: Event) -> None:
-            """Handle incoming event.
-
-            This is called synchronously from the EventBus, so we need to
-            schedule the UI update on the Textual event loop using call_from_thread.
+            This is called asynchronously from the ObservabilityBus backend.
             """
             event_counter[0] += 1
             # Use INFO level to ensure it's always visible
-            logger.info(
-                f"[Dashboard.handle_event] #{event_counter[0]}: RECEIVED [{event.category}/{event.topic}]"
-            )
+            logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: RECEIVED [{event.topic}]")
 
             if self._paused:
                 logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: PAUSED, buffering")
@@ -807,13 +807,11 @@ class ObservabilityDashboard(App):
             # Schedule UI update on Textual's event loop
             # Note: If we're already in the main thread (e.g., during on_mount()),
             # call_from_thread() will fail, so process directly
-            # TODO: Migrate
             logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: Processing event")
             try:
                 self.call_from_thread(self._process_event, event)
             except RuntimeError as e:
                 # Already in main thread, process directly
-                # TODO: Migrate
                 if "must run in a different thread" in str(e):
                     logger.info(
                         f"[Dashboard.handle_event] #{event_counter[0]}: Already in main thread, processing directly"
@@ -827,10 +825,57 @@ class ObservabilityDashboard(App):
 
                 logger.error(f"[Dashboard.handle_event] Traceback: {traceback.format_exc()}")
 
-        # Subscribe to all event categories
-        # TODO: Migrate
-        self._unsubscribe = self._event_bus.subscribe_all(handle_event)
-        logger.info("[Dashboard] Successfully subscribed to EventBus")
+        # Subscribe to all event patterns using canonical event system
+        # The canonical system uses pattern-based subscriptions (e.g., "tool.*")
+        patterns = ["tool.*", "state.*", "model.*", "error.*", "lifecycle.*", "metric.*", "trace.*"]
+
+        async def do_subscribe():
+            """Perform async subscription to ObservabilityBus."""
+            handles = []
+            for pattern in patterns:
+                try:
+                    handle = await self._event_bus.subscribe(pattern, handle_event)
+                    handles.append(handle)
+                    logger.debug(f"[Dashboard] Subscribed to pattern: {pattern}")
+                except Exception as e:
+                    logger.warning(f"[Dashboard] Failed to subscribe to {pattern}: {e}")
+
+            # Store handles for cleanup
+            self._subscription_handles = handles
+            logger.info(f"[Dashboard] Successfully subscribed to {len(handles)} event patterns")
+
+        # Run subscription in background since on_mount is sync
+        try:
+            # Try to get running loop
+            loop = asyncio.get_running_loop()
+            loop.create_task(do_subscribe())
+            logger.info("[Dashboard] Event subscription initiated")
+        except RuntimeError:
+            # No event loop yet, defer subscription
+            logger.warning("[Dashboard] No event loop yet, deferring subscription")
+            self._subscription_handles = []
+
+        # Create unsubscribe function for cleanup
+        def unsubscribe():
+            """Unsubscribe from all event patterns."""
+
+            async def do_unsubscribe():
+                for handle in self._subscription_handles:
+                    try:
+                        if hasattr(handle, "unsubscribe"):
+                            await handle.unsubscribe()
+                    except Exception as e:
+                        logger.warning(f"[Dashboard] Failed to unsubscribe: {e}")
+
+            # Run unsubscription
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(do_unsubscribe())
+            except RuntimeError:
+                logger.warning("[Dashboard] No event loop for unsubscription")
+
+        self._unsubscribe = unsubscribe
+        logger.info("[Dashboard] Subscription handler registered")
 
     def _setup_event_source(self) -> None:
         """Set up event source based on backend type.
@@ -847,14 +892,13 @@ class ObservabilityDashboard(App):
 
         logger.info(f"[Dashboard] Setting up event source for backend: {backend}")
 
-        if backend == "jsonl":
-            # Load historical events from JSONL file and start polling
-            # TODO: Migrate
+        # Load historical events from JSONL file (for both memory and jsonl backends)
+        if self._jsonl_path.exists():
+            logger.info(f"[Dashboard] Loading historical events from {self._jsonl_path}")
             self._setup_jsonl_source()
         else:
-            # In-memory backend - no historical events available
-            # TODO: Migrate
-            logger.info("[Dashboard] In-memory backend: will only see new events")
+            logger.info(f"[Dashboard] JSONL file not found: {self._jsonl_path}")
+            logger.info("[Dashboard] Will only show new events")
 
     def _setup_jsonl_source(self) -> None:
         """Set up JSONL file as event source."""
@@ -978,19 +1022,11 @@ class ObservabilityDashboard(App):
             logger = logging.getLogger(__name__)
 
             # Parse JSON
-            json.loads(line)  # Validate JSON format
+            data = json.loads(line)
 
-            # TODO: Migrate - parse Event from JSON data
-            # Need to extract: topic, timestamp, data, source, correlation_id
-            # For now, skip event parsing
-
-            # Event creation commented out until migration complete
-            # event = Event.from_dict(data)
-            # return event
-
-            return None  # TODO: Skip for now until Event parsing is implemented
-
-            # return event
+            # Create Event from dictionary
+            event = Event.from_dict(data)
+            return event
 
         except Exception as e:
             import logging

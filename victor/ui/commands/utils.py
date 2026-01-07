@@ -118,21 +118,13 @@ def configure_logging_from_config(
     # EventBus → Logging integration
     if config.event_logging:
         try:
-            from victor.core.events import ObservabilityBus as EventBus
+            from victor.core.events import get_observability_bus
             from victor.observability.exporters import LoggingExporter
 
-            event_bus = EventBus.get_instance()
-            has_logging_exporter = any(
-                isinstance(exp, LoggingExporter) for exp in event_bus._exporters
-            )
-            if not has_logging_exporter:
-                logging_exporter = LoggingExporter(
-                    "victor.events",
-                    log_level=logging.INFO,
-                    include_data=True,
-                )
-                event_bus.add_exporter(logging_exporter)
-                logger.debug("EventBus → Logging integration enabled")
+            get_observability_bus()
+            # Note: The canonical event system doesn't have exporters
+            # This is a no-op for now, but kept for compatibility
+            logger.debug("EventBus → Logging integration enabled (no-op for canonical system)")
         except Exception as e:
             logger.debug(f"Could not enable event logging: {e}")
 
@@ -266,23 +258,12 @@ def configure_logging(
     # This routes observability events to the logging system
     if event_logging:
         try:
-            from victor.core.events import ObservabilityBus as EventBus
-            from victor.observability.exporters import LoggingExporter
+            from victor.core.events import get_observability_bus
 
-            event_bus = EventBus.get_instance()
-            # Add logging exporter if not already present
-            # Check by type to avoid duplicate exporters
-            has_logging_exporter = any(
-                isinstance(exp, LoggingExporter) for exp in event_bus._exporters
-            )
-            if not has_logging_exporter:
-                logging_exporter = LoggingExporter(
-                    "victor.events",
-                    log_level=logging.INFO,
-                    include_data=True,
-                )
-                event_bus.add_exporter(logging_exporter)
-                logger.debug("EventBus → Logging integration enabled")
+            get_observability_bus()
+            # Note: The canonical event system doesn't have exporters
+            # This is a no-op for now, but kept for compatibility
+            logger.debug("EventBus → Logging integration enabled (no-op for canonical system)")
         except Exception as e:
             # Don't fail if event logging can't be set up
             logger.debug(f"Could not enable event logging: {e}")

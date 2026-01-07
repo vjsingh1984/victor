@@ -25,10 +25,12 @@ from victor.agent.provider.switcher import (
     ProviderSwitcherState,
 )
 from victor.agent.provider.tool_adapter_coordinator import ToolAdapterCoordinator
+from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
 
 __all__ = [
     "ProviderHealthMonitor",
     "ProviderSwitcher",
     "ProviderSwitcherState",
     "ToolAdapterCoordinator",
+    "ProviderSwitchCoordinator",
 ]

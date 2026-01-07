@@ -631,7 +631,6 @@ def get_team_for_task(task_type: str) -> Optional[CodingTeamSpec]:
         # Feature tasks
         "feature": "feature_team",
         "implement": "feature_team",
-        "new_feature": "feature_team",
         "add": "feature_team",
         # Bug fix tasks
         "bug": "bug_fix_team",

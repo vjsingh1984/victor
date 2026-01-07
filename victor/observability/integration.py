@@ -35,11 +35,13 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.core.events import ObservabilityBus, get_observability_bus
+from victor.core.events.emit_helper import emit_event_sync
 from victor.observability.hooks import StateHookManager, TransitionHistory
 
 if TYPE_CHECKING:
@@ -467,7 +469,9 @@ class ObservabilityIntegration:
         # Emit session start event
         data = metadata or {}
         data["category"] = "lifecycle"
-        self._bus.emit(
+
+        emit_event_sync(
+            self._bus,
             topic="lifecycle.session.start",
             data=data,
         )
@@ -486,7 +490,8 @@ class ObservabilityIntegration:
             success: Whether session completed successfully.
         """
         # Emit session end event
-        self._bus.emit(
+        emit_event_sync(
+            self._bus,
             topic="lifecycle.session.end",
             data={
                 "tool_calls": tool_calls,

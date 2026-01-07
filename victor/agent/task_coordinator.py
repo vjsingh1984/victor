@@ -25,6 +25,9 @@ Extracted from CRITICAL-001 Phase 2D: Extract TaskCoordinator
 import logging
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.core.events import ObservabilityBus
+from victor.core.events.emit_helper import emit_event_sync
+
 if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
@@ -32,8 +35,6 @@ if TYPE_CHECKING:
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
     from victor.agent.task_analyzer import TaskType
-
-from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -206,24 +207,18 @@ class TaskCoordinator:
 
         # Emit STATE event for task preparation
         if self._event_bus:
-            try:
-                import asyncio
-
-                asyncio.run(
-                    self._event_bus.emit(
-                        topic="task.prepared",
-                        data={
-                            "unified_task_type": unified_task_type.value,
-                            "complexity": task_classification.complexity.value,
-                            "confidence": task_classification.confidence,
-                            "tool_budget": complexity_tool_budget,
-                            "category": "state",  # Preserve for observability
-                        },
-                        source="TaskCoordinator",
-                    )
-                )
-            except Exception as e:
-                logger.debug(f"Failed to emit task prepared event: {e}")
+            emit_event_sync(
+                self._event_bus,
+                topic="task.prepared",
+                data={
+                    "unified_task_type": unified_task_type.value,
+                    "complexity": task_classification.complexity.value,
+                    "confidence": task_classification.confidence,
+                    "tool_budget": complexity_tool_budget,
+                    "category": "state",  # Preserve for observability
+                },
+                source="TaskCoordinator",
+            )
 
         return task_classification, complexity_tool_budget
 

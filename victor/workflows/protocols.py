@@ -10,6 +10,9 @@ Protocols defined:
 - ICheckpointStore: Interface for state persistence
 - IWorkflowExecutor: Interface for workflow execution
 - NodeRunner: Protocol for node execution strategies (ISP + DIP compliant)
+- IWorkflowCompiler: Interface for workflow compilation (DIP compliant)
+- IWorkflowLoader: Interface for loading workflow definitions (DIP compliant)
+- IWorkflowValidator: Interface for validating workflow definitions (DIP compliant)
 """
 
 from abc import abstractmethod
@@ -604,5 +607,138 @@ class NodeRunner(Protocol):
 
         Returns:
             True if this runner can execute the node type.
+        """
+        ...
+
+
+# =============================================================================
+# Workflow Compiler Protocols (DIP Compliance)
+# =============================================================================
+
+
+@runtime_checkable
+class IWorkflowCompiler(Protocol):
+    """Protocol for workflow compilers.
+
+    A workflow compiler transforms workflow definitions into executable graphs.
+    This protocol enables Dependency Inversion by allowing the compiler to
+    depend on loader and validator abstractions rather than concrete implementations.
+
+    Example:
+        class MyCompiler:
+            def __init__(
+                self,
+                loader: IWorkflowLoader,
+                validator: IWorkflowValidator
+            ):
+                self._loader = loader
+                self._validator = validator
+
+            def compile(self, workflow_def: Dict[str, Any]) -> CompiledGraph:
+                # Load and validate using injected dependencies
+                return CompiledGraph(...)
+    """
+
+    def compile(self, workflow_def: Dict[str, Any]) -> Any:
+        """Compile a workflow definition into an executable graph.
+
+        Args:
+            workflow_def: Dictionary containing workflow definition
+                           (nodes, edges, configuration, etc.)
+
+        Returns:
+            CompiledGraph instance ready for execution
+
+        Raises:
+            ValueError: If workflow definition is invalid
+            TypeError: If workflow definition has wrong structure
+        """
+        ...
+
+
+@runtime_checkable
+class IWorkflowLoader(Protocol):
+    """Protocol for workflow definition loaders.
+
+    A workflow loader loads workflow definitions from various sources
+    (files, strings, URLs, databases, etc.). This protocol enables
+    Dependency Inversion by allowing compilers to work with any loader
+    implementation.
+
+    Example:
+        class FileLoader:
+            def load(self, source: str) -> Dict[str, Any]:
+                with open(source) as f:
+                    return yaml.safe_load(f)
+
+        class DatabaseLoader:
+            def __init__(self, db_connection):
+                self._db = db_connection
+
+            def load(self, source: str) -> Dict[str, Any]:
+                # source is workflow ID
+                return self._db.get_workflow(source)
+    """
+
+    def load(self, source: str) -> Dict[str, Any]:
+        """Load a workflow definition from a source.
+
+        Args:
+            source: Source identifier (file path, URL, workflow ID, etc.)
+
+        Returns:
+            Dictionary containing workflow definition
+
+        Raises:
+            FileNotFoundError: If source doesn't exist
+            ValueError: If source is malformed
+            TypeError: If source has wrong type
+        """
+        ...
+
+
+@runtime_checkable
+class IWorkflowValidator(Protocol):
+    """Protocol for workflow definition validators.
+
+    A workflow validator checks workflow definitions for correctness
+    before compilation. This protocol enables Dependency Inversion by
+    allowing compilers to work with any validation strategy.
+
+    Example:
+        class StrictValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> ValidationResult:
+                # Check all required fields
+                errors = []
+                if "name" not in workflow_def:
+                    errors.append("Missing required field: name")
+                if "nodes" not in workflow_def:
+                    errors.append("Missing required field: nodes")
+                return ValidationResult(
+                    is_valid=len(errors) == 0,
+                    errors=errors
+                )
+
+        @dataclass
+        class ValidationResult:
+            is_valid: bool
+            errors: List[str]
+            warnings: List[str] = field(default_factory=list)
+    """
+
+    def validate(self, workflow_def: Dict[str, Any]) -> Any:
+        """Validate a workflow definition.
+
+        Args:
+            workflow_def: Dictionary containing workflow definition to validate
+
+        Returns:
+            ValidationResult or similar with:
+            - is_valid: bool indicating if definition is valid
+            - errors: List of error messages (empty if valid)
+            - warnings: Optional list of warnings
+
+        Raises:
+            Should not raise - capture all validation issues in result
         """
         ...

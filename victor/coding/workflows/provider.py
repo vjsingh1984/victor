@@ -144,7 +144,6 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
             # Feature workflows
             "feature": "feature_implementation",
             "implement": "feature_implementation",
-            "new_feature": "feature_implementation",
             "simple_feature": "quick_feature",
             "quick_feature": "quick_feature",
             # Bug fix workflows

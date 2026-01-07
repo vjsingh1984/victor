@@ -135,6 +135,28 @@ class Event:
     headers: Dict[str, str] = field(default_factory=dict)
     delivery_guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_MOST_ONCE
 
+    @property
+    def category(self) -> str:
+        """Extract category from topic (first part before the dot).
+
+        For example, "tool.call" -> "tool", "agent.message" -> "agent".
+
+        Returns:
+            Category string (first part of topic)
+        """
+        return self.topic.split(".")[0] if self.topic else "unknown"
+
+    @property
+    def datetime(self) -> "datetime":
+        """Convert timestamp to datetime object for display purposes.
+
+        Returns:
+            datetime object corresponding to the timestamp
+        """
+        from datetime import datetime
+
+        return datetime.fromtimestamp(self.timestamp)
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize event to dictionary for transport."""
         return {

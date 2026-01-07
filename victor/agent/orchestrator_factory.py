@@ -964,6 +964,84 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("StreamingController created")
         return controller
 
+    def create_streaming_coordinator(
+        self,
+        streaming_controller: Any,
+    ) -> Any:
+        """Create streaming coordinator for response processing.
+
+        Args:
+            streaming_controller: StreamingController for session management
+
+        Returns:
+            StreamingCoordinator instance for processing streaming responses
+        """
+        from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
+
+        coordinator = StreamingCoordinator(
+            streaming_controller=streaming_controller,
+        )
+        logger.debug("StreamingCoordinator created")
+        return coordinator
+
+    def create_provider_switch_coordinator(
+        self,
+        provider_switcher: Any,
+        health_monitor: Optional[Any] = None,
+    ) -> Any:
+        """Create provider switch coordinator for switching workflow.
+
+        Args:
+            provider_switcher: ProviderSwitcher for switching logic
+            health_monitor: Optional ProviderHealthMonitor for pre-switch checks
+
+        Returns:
+            ProviderSwitchCoordinator instance for coordinating switches
+        """
+        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+
+        coordinator = ProviderSwitchCoordinator(
+            provider_switcher=provider_switcher,
+            health_monitor=health_monitor,
+        )
+        logger.debug("ProviderSwitchCoordinator created")
+        return coordinator
+
+    def create_lifecycle_manager(
+        self,
+        conversation_controller: Any,
+        metrics_collector: Optional[Any] = None,
+        context_compactor: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        usage_analytics: Optional[Any] = None,
+        reminder_manager: Optional[Any] = None,
+    ) -> Any:
+        """Create lifecycle manager for session lifecycle and resource cleanup.
+
+        Args:
+            conversation_controller: Controller for conversation management
+            metrics_collector: Optional metrics collector for stats
+            context_compactor: Optional context compactor for cleanup
+            sequence_tracker: Optional sequence tracker for pattern learning
+            usage_analytics: Optional usage analytics for session tracking
+            reminder_manager: Optional reminder manager for context reminders
+
+        Returns:
+            LifecycleManager instance for managing lifecycle operations
+        """
+        from victor.agent.lifecycle_manager import LifecycleManager
+
+        lifecycle_manager = LifecycleManager(
+            conversation_controller=conversation_controller,
+            metrics_collector=metrics_collector,
+            context_compactor=context_compactor,
+            sequence_tracker=sequence_tracker,
+            usage_analytics=usage_analytics,
+            reminder_manager=reminder_manager,
+        )
+        logger.debug("LifecycleManager created")
+        return lifecycle_manager
+
     def create_tool_pipeline(
         self,
         tools: Any,
