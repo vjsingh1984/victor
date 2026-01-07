@@ -135,7 +135,7 @@ from victor.agent.conversation_state import ConversationStateMachine, Conversati
 from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
 from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType
-from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
+from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.metrics_collector import MetricsCollectorConfig
 from victor.agent.unified_task_tracker import TrackerTaskType, UnifiedTaskTracker

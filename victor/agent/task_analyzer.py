@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
-from victor.agent.complexity_classifier import (
-    ComplexityClassifier,
+from victor.framework.task import (
+    TaskComplexityService as ComplexityClassifier,
     TaskClassification,
     TaskComplexity,
 )

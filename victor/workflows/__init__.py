@@ -118,7 +118,6 @@ from victor.workflows.cache import (
 from victor.workflows.graph_dsl import (
     State,
     WorkflowGraph,  # Typed workflow graph DSL (compiles to WorkflowDefinition)
-    StateGraph,  # Deprecated alias for WorkflowGraph
     GraphNode,
     GraphNodeType,
     NodeFunc,

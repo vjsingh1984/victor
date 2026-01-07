@@ -1,4 +1,4 @@
-"""Tests for WorkflowGraph implementation.
+"""Tests for BasicWorkflowGraph implementation.
 
 These tests verify the graph structure, edge traversal, validation,
 and cycle detection capabilities.
@@ -18,7 +18,7 @@ from victor.workflows.graph import (
     WorkflowNode,
     WorkflowEdge,
     ConditionalEdge,
-    WorkflowGraph,
+    BasicWorkflowGraph,
     DuplicateNodeError,
     InvalidEdgeError,
     GraphValidationError,
@@ -180,12 +180,12 @@ class TestConditionalEdge:
         assert edge.should_traverse({"counter": 3}) is False
 
 
-class TestWorkflowGraph:
-    """Tests for WorkflowGraph class."""
+class TestBasicWorkflowGraph:
+    """Tests for BasicWorkflowGraph class."""
 
     def test_add_node_stores_node(self):
         """add_node should store the node in the graph."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="test_node", name="Test", handler=simple_handler)
 
         graph.add_node(node)
@@ -194,7 +194,7 @@ class TestWorkflowGraph:
 
     def test_add_node_fluent_interface(self):
         """add_node should return self for chaining."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="node1", name="Node 1", handler=simple_handler)
         node2 = WorkflowNode(id="node2", name="Node 2", handler=simple_handler)
 
@@ -206,7 +206,7 @@ class TestWorkflowGraph:
 
     def test_add_duplicate_node_raises_error(self):
         """add_node with duplicate ID should raise DuplicateNodeError."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="test_node", name="Test 1", handler=simple_handler)
         node2 = WorkflowNode(id="test_node", name="Test 2", handler=simple_handler)
 
@@ -219,7 +219,7 @@ class TestWorkflowGraph:
 
     def test_add_edge_validates_source_exists(self):
         """add_edge should validate source node exists."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="target_node", name="Target", handler=simple_handler)
         graph.add_node(node)
 
@@ -233,7 +233,7 @@ class TestWorkflowGraph:
 
     def test_add_edge_validates_target_exists(self):
         """add_edge should validate target node exists."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="source_node", name="Source", handler=simple_handler)
         graph.add_node(node)
 
@@ -247,7 +247,7 @@ class TestWorkflowGraph:
 
     def test_add_edge_fluent_interface(self):
         """add_edge should return self for chaining."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="node1", name="Node 1", handler=simple_handler)
         node2 = WorkflowNode(id="node2", name="Node 2", handler=simple_handler)
         node3 = WorkflowNode(id="node3", name="Node 3", handler=simple_handler)
@@ -262,7 +262,7 @@ class TestWorkflowGraph:
 
     def test_get_next_nodes_follows_edges(self):
         """get_next_nodes should return nodes connected by edges."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="node1", name="Node 1", handler=simple_handler)
         node2 = WorkflowNode(id="node2", name="Node 2", handler=simple_handler)
         node3 = WorkflowNode(id="node3", name="Node 3", handler=simple_handler)
@@ -283,7 +283,7 @@ class TestWorkflowGraph:
 
     def test_conditional_edge_evaluates_state(self):
         """get_next_nodes should respect conditional edge evaluation."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="check", name="Check", handler=simple_handler)
         node2 = WorkflowNode(id="success", name="Success", handler=simple_handler)
         node3 = WorkflowNode(id="failure", name="Failure", handler=simple_handler)
@@ -322,7 +322,7 @@ class TestWorkflowGraph:
 
     def test_set_entry_node(self):
         """set_entry_node should set the workflow entry point."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="start", name="Start", handler=simple_handler)
         graph.add_node(node)
 
@@ -332,14 +332,14 @@ class TestWorkflowGraph:
 
     def test_set_entry_node_validates_exists(self):
         """set_entry_node should validate node exists."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
 
         with pytest.raises(InvalidEdgeError):
             graph.set_entry_node("nonexistent")
 
     def test_set_exit_nodes(self):
         """set_exit_nodes should set terminal nodes."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="end1", name="End 1", handler=simple_handler)
         node2 = WorkflowNode(id="end2", name="End 2", handler=simple_handler)
         graph.add_node(node1).add_node(node2)
@@ -353,7 +353,7 @@ class TestWorkflowGraph:
 
     def test_get_node_returns_none_for_missing(self):
         """get_node should return None for non-existent node."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         assert graph.get_node("nonexistent") is None
 
 
@@ -362,7 +362,7 @@ class TestGraphValidation:
 
     def test_validate_empty_graph(self):
         """Empty graph should have validation errors."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         errors = graph.validate()
 
         assert len(errors) > 0
@@ -370,7 +370,7 @@ class TestGraphValidation:
 
     def test_validate_missing_entry_node(self):
         """Graph without entry node should have validation error."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="test", name="Test", handler=simple_handler)
         graph.add_node(node)
 
@@ -380,7 +380,7 @@ class TestGraphValidation:
 
     def test_validate_detects_orphan_nodes(self):
         """validate should detect nodes not reachable from entry."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="start", name="Start", handler=simple_handler)
         node2 = WorkflowNode(id="connected", name="Connected", handler=simple_handler)
         node3 = WorkflowNode(id="orphan", name="Orphan", handler=simple_handler)
@@ -399,7 +399,7 @@ class TestGraphValidation:
 
     def test_validate_valid_graph(self):
         """Valid graph should have no validation errors."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="start", name="Start", handler=simple_handler)
         node2 = WorkflowNode(id="process", name="Process", handler=simple_handler)
         node3 = WorkflowNode(id="end", name="End", handler=simple_handler)
@@ -424,7 +424,7 @@ class TestCycleDetection:
 
     def test_detect_simple_cycle(self):
         """validate should detect simple A->B->A cycles."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node1 = WorkflowNode(id="a", name="A", handler=simple_handler)
         node2 = WorkflowNode(id="b", name="B", handler=simple_handler)
 
@@ -442,7 +442,7 @@ class TestCycleDetection:
 
     def test_detect_self_loop(self):
         """validate should detect self-referencing nodes."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node = WorkflowNode(id="loop", name="Loop", handler=simple_handler)
         node_end = WorkflowNode(id="end", name="End", handler=simple_handler)
 
@@ -461,7 +461,7 @@ class TestCycleDetection:
 
     def test_detect_complex_cycle(self):
         """validate should detect A->B->C->A cycles."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node_a = WorkflowNode(id="a", name="A", handler=simple_handler)
         node_b = WorkflowNode(id="b", name="B", handler=simple_handler)
         node_c = WorkflowNode(id="c", name="C", handler=simple_handler)
@@ -482,7 +482,7 @@ class TestCycleDetection:
 
     def test_no_false_positive_on_dag(self):
         """validate should not report cycles on valid DAGs."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node_a = WorkflowNode(id="a", name="A", handler=simple_handler)
         node_b = WorkflowNode(id="b", name="B", handler=simple_handler)
         node_c = WorkflowNode(id="c", name="C", handler=simple_handler)
@@ -513,7 +513,7 @@ class TestGraphHelperMethods:
 
     def test_find_reachable_nodes(self):
         """_find_reachable_nodes should find all reachable nodes from entry."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node_a = WorkflowNode(id="a", name="A", handler=simple_handler)
         node_b = WorkflowNode(id="b", name="B", handler=simple_handler)
         node_c = WorkflowNode(id="c", name="C", handler=simple_handler)
@@ -538,7 +538,7 @@ class TestGraphHelperMethods:
 
     def test_add_conditional_edge(self):
         """add_conditional_edge should create conditional branching."""
-        graph = WorkflowGraph()
+        graph = BasicWorkflowGraph()
         node_router = WorkflowNode(id="router", name="Router", handler=simple_handler)
         node_path_a = WorkflowNode(id="path_a", name="Path A", handler=simple_handler)
         node_path_b = WorkflowNode(id="path_b", name="Path B", handler=simple_handler)

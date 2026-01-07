@@ -48,8 +48,8 @@ from victor.framework.multi_agent import (
     ExpertiseLevel,
 )
 
-# Import canonical TeamSpec for type compatibility
-from victor.framework.team_schema import TeamSpec as CanonicalTeamSpec
+# Import canonical TeamSpec from framework
+from victor.framework.team_schema import TeamSpec
 
 
 @dataclass
@@ -311,10 +311,11 @@ class CodingTeamSpec:
 
 
 # Pre-defined team specifications with rich personas
-CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
-    "feature_team": CodingTeamSpec(
+CODING_TEAM_SPECS: Dict[str, TeamSpec] = {
+    "feature_team": TeamSpec(
         name="Feature Implementation Team",
         description="End-to-end feature implementation with research, planning, implementation, and review",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -375,9 +376,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=100,
     ),
-    "bug_fix_team": CodingTeamSpec(
+    "bug_fix_team": TeamSpec(
         name="Bug Fix Team",
         description="Systematic bug investigation and fix with verification",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -423,9 +425,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=70,
     ),
-    "refactoring_team": CodingTeamSpec(
+    "refactoring_team": TeamSpec(
         name="Refactoring Team",
         description="Safe refactoring with analysis and testing",
+        vertical="coding",
         formation=TeamFormation.HIERARCHICAL,
         members=[
             TeamMemberSpec(
@@ -472,9 +475,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=75,
     ),
-    "review_team": CodingTeamSpec(
+    "review_team": TeamSpec(
         name="Code Review Team",
         description="Comprehensive code review with parallel analysis",
+        vertical="coding",
         formation=TeamFormation.PARALLEL,
         members=[
             TeamMemberSpec(
@@ -532,9 +536,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=55,
     ),
-    "testing_team": CodingTeamSpec(
+    "testing_team": TeamSpec(
         name="Testing Team",
         description="Comprehensive test coverage improvement",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -580,9 +585,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=70,
     ),
-    "documentation_team": CodingTeamSpec(
+    "documentation_team": TeamSpec(
         name="Documentation Team",
         description="Generate and update documentation",
+        vertical="coding",
         formation=TeamFormation.SEQUENTIAL,
         members=[
             TeamMemberSpec(
@@ -618,14 +624,14 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
 }
 
 
-def get_team_for_task(task_type: str) -> Optional[CodingTeamSpec]:
+def get_team_for_task(task_type: str) -> Optional[TeamSpec]:
     """Get appropriate team specification for task type.
 
     Args:
         task_type: Type of task (feature, bug, review, etc.)
 
     Returns:
-        CodingTeamSpec or None if no matching team
+        TeamSpec or None if no matching team
     """
     mapping = {
         # Feature tasks
@@ -693,7 +699,7 @@ def list_roles() -> List[str]:
 __all__ = [
     # Types
     "CodingRoleConfig",
-    "CodingTeamSpec",
+    "TeamSpec",  # Canonical from framework.team_schema (use this)
     # Role configurations
     "CODING_ROLES",
     # Team specifications
