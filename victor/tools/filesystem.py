@@ -1501,7 +1501,9 @@ async def read(
                         # This gives good file reading while leaving room for the rest of the conversation
                         max_tokens = context_window // 4  # Use 25% of context for file reads
                         # Estimate ~3 bytes per token (average), ~40 chars per line
-                        max_lines = min(2000, max(100, max_tokens // 3))  # Ensure at least 100 lines
+                        max_lines = min(
+                            2000, max(100, max_tokens // 3)
+                        )  # Ensure at least 100 lines
                         max_bytes = min(32768, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception:

@@ -136,14 +136,24 @@ class StateEventEmitter(IStateEventEmitter):
     ) -> None:
         """Emit a state event synchronously (for gradual migration).
 
-        This method wraps the async emit_async() method using asyncio.run().
+        This method wraps the async emit_async() method using emit_event_sync()
+        to avoid asyncio.run() errors in running event loops.
 
         Args:
             topic: Event topic (e.g., "state.transition")
             data: Event payload
         """
         try:
-            asyncio.run(self.emit_async(topic, data))
+            from victor.core.events.emit_helper import emit_event_sync
+
+            bus = self._get_bus()
+            if bus:
+                emit_event_sync(
+                    bus,
+                    topic=topic,
+                    data=data,
+                    source="StateEventEmitter",
+                )
         except Exception as e:
             logger.debug(f"Failed to emit state event: {e}")
 

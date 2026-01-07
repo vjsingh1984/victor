@@ -322,6 +322,7 @@ class MemoryProfiler(BaseProfiler):
         if self._tracemalloc_started:
             try:
                 import tracemalloc
+
                 tracemalloc.stop()
                 self._tracemalloc_started = False
             except Exception:

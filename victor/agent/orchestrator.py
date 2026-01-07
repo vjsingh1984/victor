@@ -6188,9 +6188,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
             # Note: skip_normalization=True since we already normalized above
             final_types = {k: type(v).__name__ for k, v in normalized_args.items()}
-            logger.debug(
-                f"[EXECUTE] {tool_name}: Final argument types={final_types}"
-            )
+            logger.debug(f"[EXECUTE] {tool_name}: Final argument types={final_types}")
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
                 arguments=normalized_args,
@@ -7036,15 +7034,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         # Setup JSONL exporter if enabled
-        if getattr(settings, 'enable_observability_logging', False):
+        if getattr(settings, "enable_observability_logging", False):
             from victor.observability.bridge import ObservabilityBridge
             from victor.core.events import get_observability_bus
 
             try:
                 bridge = ObservabilityBridge.get_instance()
-                log_path = getattr(settings, 'observability_log_path', None)
+                log_path = getattr(settings, "observability_log_path", None)
                 bridge.setup_jsonl_exporter(log_path=log_path)
-                logger.info(f"JSONL event logging enabled: {log_path or '~/.victor/metrics/victor.jsonl'}")
+                logger.info(
+                    f"JSONL event logging enabled: {log_path or '~/.victor/metrics/victor.jsonl'}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to setup JSONL exporter: {e}")
 

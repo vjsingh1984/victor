@@ -170,13 +170,13 @@ class JsonLineExporter(BaseExporter):
             # ensure_ascii=False handles unicode characters properly
             line = json.dumps(
                 event_dict,
-                separators=(',', ':'),  # Compact single-line output
-                ensure_ascii=False,       # Preserve unicode
-                default=str                # Fallback for unknown types
+                separators=(",", ":"),  # Compact single-line output
+                ensure_ascii=False,  # Preserve unicode
+                default=str,  # Fallback for unknown types
             )
 
             # Ensure the JSON is single-line (no embedded newlines)
-            line = line.replace('\n', ' ').replace('\r', ' ') + '\n'
+            line = line.replace("\n", " ").replace("\r", " ") + "\n"
 
             # Buffer the line
             self._buffer.append(line)

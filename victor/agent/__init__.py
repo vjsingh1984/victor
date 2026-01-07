@@ -15,11 +15,13 @@
 """Agent module - orchestrator and supporting components."""
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+
 # OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
 # Configuration is now loaded via Settings objects and composed by OrchestratorFactory
 from victor.agent.config import UnifiedAgentConfig, AgentMode
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.message_history import MessageHistory
+
 # OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
 # Observability is now handled by victor.core.events (get_observability_bus)
 from victor.agent.orchestrator import AgentOrchestrator
