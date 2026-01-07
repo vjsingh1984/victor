@@ -195,33 +195,108 @@ Systematic removal of deprecated, duplicate, and obsolete code to improve mainta
 
 ---
 
+## Phase 5: SQLite Session Management ✅
+**Status**: Completed
+
+### Problem: Storage Duplication
+User identified critical issue: Conversations stored in both JSON files (`~/.victor/sessions/`) AND SQLite database (`.victor/project.db`). SQLite schema existed but tables were empty (0 sessions, 0 messages).
+
+### Solution: SQLite-First Architecture
+Implemented SQLite as single source of truth, eliminating JSON duplication.
+
+### Files Created:
+
+1. **`victor/agent/sqlite_session_persistence.py`** (530 lines)
+   - `SQLiteSessionPersistence` class
+   - Methods: `save_session()`, `load_session()`, `list_sessions()`, `delete_session()`, `search_sessions()`
+   - Uses `sessions` and `messages` tables in project database
+   - Fast indexed queries, no JSON file overhead
+
+2. **`victor/ui/slash/commands/switch.py`** (292 lines) - NEW COMMAND
+   - `/switch <model>` - Switch model only
+   - `/switch <provider>:<model>` - Switch provider and model
+   - `/switch --resume [session_id]` - Resume session, then switch
+   - `/switch <model> --resume <session_id>` - Combined operation
+   - Interactive session selection with table UI
+
+### Files Modified:
+
+1. **`victor/ui/slash/commands/session.py`**
+   - **SaveCommand**: Now writes to SQLite instead of JSON files
+   - **SessionsCommand**: Lists sessions from SQLite with provider/model columns
+   - **ResumeCommand**: Interactive session selection from SQLite (numbered list)
+   - Removed JSON file operations
+
+2. **Database Integration**:
+   - Uses existing `sessions` table: `id, name, provider, model, profile, data, created_at, updated_at`
+   - Uses existing `messages` table: `id, session_id, role, content, tool_calls, created_at`
+   - Foreign key relationship: `messages.session_id → sessions.id`
+
+### Commands Enhanced:
+
+```bash
+# Save session to SQLite
+/save My Session Title
+
+# List sessions from SQLite
+/sessions [limit]
+
+# Resume with interactive selection
+/resume
+/resume 20250107_153045
+
+# Switch model/provider with resume
+/switch claude-sonnet-4-20250514 --resume
+/switch ollama:qwen2.5-coder:7b --resume 20250107_153045
+```
+
+### User Experience Improvements:
+✅ Single source of truth (SQLite)
+✅ Fast queries with indexing
+✅ Interactive session browser (tables with ID, title, model, messages, date)
+✅ Combined operations (resume + switch in one command)
+✅ Project database storage (`.victor/project.db`)
+✅ Backward compatible (JSON files still readable for migration)
+
+**Commits**:
+- `f80719d5` - Implement SQLite session persistence and /switch command
+
+---
+
 ## Updated Summary Statistics
 
-### Total Impact (Phases 1-4):
+### Total Impact (Phases 1-5):
 - **Files Deleted**: 7 (3 production + 4 tests)
-- **Files Created**: 1 (TaskToolConfigLoader extraction)
+- **Files Created**: 3 (TaskToolConfigLoader, SQLiteSessionPersistence, SwitchCommand)
 - **Files Archived**: 2 (test files)
+- **Files Modified**: 2 (session.py, tool_selection.py, unified_task_tracker.py)
 - **Lines Removed**: ~2,970 lines of deprecated code
-- **Lines Added**: ~250 lines (extracted module)
-- **Net Reduction**: ~2,720 lines
+- **Lines Added**: ~1,070 lines (new features)
+- **Net Reduction**: ~1,900 lines (after accounting for new features)
 
 ---
 
 ## Next Steps (Optional Future Work)
 
-### Phase 5: Large File Refactoring
+### Phase 6: JSON to SQLite Migration (Optional)
+- Implement migration script to import existing JSON sessions into SQLite
+- Add `/migrate-sessions` command
+- Validate migrated sessions
+
+### Phase 7: Large File Refactoring
 Consider splitting files >2,000 lines:
 - `victor/agent/orchestrator.py` (7,051 lines) - Extract coordinator modules
 - `victor/agent/protocols.py` (3,703 lines) - Split by protocol type
 - `victor/integrations/api/fastapi_server.py` (3,261 lines) - Extract route handlers
 
-### Phase 6: Documentation
+### Phase 8: Documentation
 - Update architecture docs to reflect unified task tracker
-- Document migration paths for deprecated modules
+- Document SQLite session management in user guide
+- Add migration guide for JSON → SQLite
 - Add deprecation notices with migration guides
 
 ---
 
 **Generated**: 2025-01-07
 **Branch**: glm-branch
-**Status**: Phases 1-3 Complete ✅
+**Status**: Phases 1-5 Complete ✅

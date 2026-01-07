@@ -14,6 +14,7 @@ This guide covers everything you need to use Victor effectively, from basic conv
 |-------|--------------|----------|
 | **Basic Usage** | [Basic Usage](../getting-started/basic-usage.md) | Your first conversation |
 | **CLI Commands** | [CLI Reference](cli-reference.md) | All commands and options |
+| **Session Management** | [Session Management](session-management.md) | Save and restore sessions |
 | **Provider Switching** | See below | Change models mid-conversation |
 | **Workflows** | [Workflow DSL →](../guides/workflow-development/) | YAML-based automation |
 | **Configuration** | [Configuration →](../reference/configuration/) | Profiles and settings |
@@ -21,6 +22,15 @@ This guide covers everything you need to use Victor effectively, from basic conv
 ## Common Tasks
 
 ### Daily Development
+
+**Session Management**
+```bash
+/save "My Session Title"        # Save current conversation
+/sessions                         # List saved sessions
+/resume                          # Interactive session restore
+/resume 20250107_153045          # Restore specific session
+```
+[Full Guide →](session-management.md)
 
 **Code Review**
 ```bash
@@ -375,6 +385,7 @@ result = await team.run("Implement user registration feature")
 
 ## Additional Resources
 
+- **Session Management**: [Session Management →](session-management.md)
 - **Troubleshooting**: [Troubleshooting Guide →](troubleshooting.md)
 - **Reference**: [Provider Reference →](../reference/providers/)
 - **Reference**: [Tool Catalog →](../reference/tools/)
