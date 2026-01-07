@@ -19,4 +19,5 @@ reference only and will be removed in a future release.
 
 Modules:
 - config_loader.py: Superseded by Settings and OrchestratorFactory
+- observability.py: Superseded by victor.core.events (ObservabilityBus)
 """

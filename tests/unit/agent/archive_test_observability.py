@@ -12,13 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for observability module."""
+# ==============================================================================
+# ARCHIVED TEST - This test is for an obsolete module
+# ==============================================================================
+#
+# This test file has been archived because the module it tests (observability.py)
+# has been moved to victor/agent/archive/obsolete/observability.py
+#
+# The observability module is superseded by:
+#   - victor.core.events (get_observability_bus)
+#   - The canonical ObservabilityBus with CQRS event sourcing
+#
+# This test file is preserved for reference but is not run as part of the
+# regular test suite. Rename to test_observability.py to run if needed.
+#
+# ==============================================================================
+
+"""Unit tests for observability module (ARCHIVED - Module is obsolete)."""
 
 import asyncio
 import pytest
 import time
 
-from victor.agent.observability import (
+from victor.agent.archive.obsolete.observability import (  # noqa: ARCHIVED
     TracingProvider,
     Span,
     SpanKind,

@@ -20,15 +20,8 @@ from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationSt
 from victor.agent.config import UnifiedAgentConfig, AgentMode
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.message_history import MessageHistory
-from victor.agent.observability import (
-    TracingProvider,
-    Span,
-    SpanKind,
-    SpanStatus,
-    get_observability,
-    set_observability,
-    traced,
-)
+# OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
+# Observability is now handled by victor.core.events (get_observability_bus)
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.stream_handler import StreamHandler, StreamResult, StreamMetrics, StreamBuffer
 from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
@@ -86,14 +79,14 @@ __all__ = [
     "ConversationController",
     "ConversationConfig",
     "ContextMetrics",
-    # Observability
-    "TracingProvider",
-    "Span",
-    "SpanKind",
-    "SpanStatus",
-    "get_observability",
-    "set_observability",
-    "traced",
+    # Observability (OBSOLETE - use victor.core.events instead)
+    # "TracingProvider",
+    # "Span",
+    # "SpanKind",
+    # "SpanStatus",
+    # "get_observability",
+    # "set_observability",
+    # "traced",
     # Streaming
     "StreamHandler",
     "StreamResult",

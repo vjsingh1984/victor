@@ -12,10 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Observability hooks for tracing, metrics, and logging.
+# ==============================================================================
+# OBSOLETE - This module has been deprecated and moved to archive/obsolete/
+# ==============================================================================
+#
+# This module (observability.py) is obsolete and no longer maintained.
+#
+# Replacement:
+#   - Use victor.core.events for the canonical event system
+#   - Import: from victor.core.events import get_observability_bus
+#   - The ObservabilityBus provides superior event sourcing, CQRS, and
+#     integration with the framework's workflow engine
+#
+# Migration path:
+#   - Old: from victor.agent.observability import get_observability, traced
+#   - New: from victor.core.events import get_observability_bus
+#
+# The old observability system provided a simple tracing/metrics layer.
+# The new event system provides:
+#   - Event sourcing with CQRS pattern
+#   - Integration with workflow state management
+#   - Better support for distributed tracing
+#   - Native integration with framework components
+#
+# This file is preserved for reference purposes only and will be removed in a
+# future version. Do not import or use this module in new code.
+#
+# ==============================================================================
+
+"""Observability hooks for tracing, metrics, and logging (OBSOLETE).
 
 Provides a lightweight observability layer that can be extended with
 OpenTelemetry, Prometheus, or other backends.
+
+NOTE: This module is superseded by victor.core.events
 """
 
 import logging
