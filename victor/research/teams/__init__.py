@@ -50,8 +50,8 @@ from typing import Dict, List, Optional, Set
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
-# Import canonical TeamSpec for type compatibility
-from victor.framework.team_schema import TeamSpec as CanonicalTeamSpec
+# Import canonical TeamSpec
+from victor.framework.team_schema import TeamSpec
 
 
 @dataclass
@@ -190,8 +190,8 @@ class ResearchTeamSpec:
 
 
 # Pre-defined team specifications with rich personas
-RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
-    "deep_research_team": ResearchTeamSpec(
+RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
+    "deep_research_team": TeamSpec(
         name="Deep Research Team",
         description="Comprehensive multi-source research with verification and synthesis",
         formation=TeamFormation.PIPELINE,
@@ -262,8 +262,9 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=95,
+        vertical="research",
     ),
-    "fact_check_team": ResearchTeamSpec(
+    "fact_check_team": TeamSpec(
         name="Fact Check Team",
         description="Rigorous verification of claims and statements",
         formation=TeamFormation.SEQUENTIAL,
@@ -317,8 +318,9 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=70,
+        vertical="research",
     ),
-    "literature_team": ResearchTeamSpec(
+    "literature_team": TeamSpec(
         name="Literature Review Team",
         description="Systematic academic and technical literature review",
         formation=TeamFormation.PIPELINE,
@@ -388,8 +390,9 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=95,
+        vertical="research",
     ),
-    "competitive_team": ResearchTeamSpec(
+    "competitive_team": TeamSpec(
         name="Competitive Analysis Team",
         description="Market research and competitive intelligence",
         formation=TeamFormation.PARALLEL,
@@ -441,8 +444,9 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=70,
+        vertical="research",
     ),
-    "synthesis_team": ResearchTeamSpec(
+    "synthesis_team": TeamSpec(
         name="Research Synthesis Team",
         description="Combine multiple research sources into cohesive insights",
         formation=TeamFormation.HIERARCHICAL,
@@ -514,8 +518,9 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=80,
+        vertical="research",
     ),
-    "technical_research_team": ResearchTeamSpec(
+    "technical_research_team": TeamSpec(
         name="Technical Research Team",
         description="Deep technical investigation and documentation",
         formation=TeamFormation.PIPELINE,
@@ -567,18 +572,19 @@ RESEARCH_TEAM_SPECS: Dict[str, ResearchTeamSpec] = {
             ),
         ],
         total_tool_budget=80,
+        vertical="research",
     ),
 }
 
 
-def get_team_for_task(task_type: str) -> Optional[ResearchTeamSpec]:
+def get_team_for_task(task_type: str) -> Optional[TeamSpec]:
     """Get appropriate team specification for task type.
 
     Args:
         task_type: Type of task (research, fact_check, literature, etc.)
 
     Returns:
-        ResearchTeamSpec or None if no matching team
+        TeamSpec or None if no matching team
     """
     mapping = {
         # Deep research tasks
@@ -686,7 +692,7 @@ class ResearchTeamSpecProvider:
 __all__ = [
     # Types
     "ResearchRoleConfig",
-    "ResearchTeamSpec",
+    "TeamSpec",  # Canonical from framework.team_schema (use this)
     # Provider
     "ResearchTeamSpecProvider",
     # Role configurations
