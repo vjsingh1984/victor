@@ -168,7 +168,7 @@ class StateTracer:
             try:
                 import asyncio
 
-                asyncio.run(
+                asyncio.create_task(
                     self._event_bus.emit(
                         topic="state.transition",
                         data={

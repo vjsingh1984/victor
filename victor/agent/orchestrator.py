@@ -3443,7 +3443,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._task_analyzer.classify_task_with_context(user_message, history)
 
-    def _determine_continuation_action(
+    async def _determine_continuation_action(
         self,
         intent_result: Any,  # IntentClassificationResult
         is_analysis_task: bool,
@@ -3476,7 +3476,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Delegate to ContinuationStrategy (extracted in Phase 2E)
         strategy = ContinuationStrategy()
-        return strategy.determine_continuation_action(
+        return await strategy.determine_continuation_action(
             intent_result=intent_result,
             is_analysis_task=is_analysis_task,
             is_action_task=is_action_task,

@@ -971,26 +971,29 @@ class VerticalIntegrationPipeline:
             if bus:
                 import asyncio
 
-                asyncio.run(
-                    bus.emit(
-                        topic="vertical.applied",
-                        data={
-                            "vertical": result.vertical_name,
-                            "tools_count": len(result.tools_applied),
-                            "middleware_count": result.middleware_count,
-                            "safety_patterns_count": result.safety_patterns_count,
-                            "prompt_hints_count": result.prompt_hints_count,
-                            "workflows_count": result.workflows_count,
-                            "rl_learners_count": result.rl_learners_count,
-                            "team_specs_count": result.team_specs_count,
-                            "success": result.success,
-                            "error_count": len(result.errors),
-                            "warning_count": len(result.warnings),
-                            "category": "vertical",  # Preserve for observability
-                        },
-                        source="VerticalIntegrationPipeline",
+                try:
+                    asyncio.create_task(
+                        bus.emit(
+                            topic="vertical.applied",
+                            data={
+                                "vertical": result.vertical_name,
+                                "tools_count": len(result.tools_applied),
+                                "middleware_count": result.middleware_count,
+                                "safety_patterns_count": result.safety_patterns_count,
+                                "prompt_hints_count": result.prompt_hints_count,
+                                "workflows_count": result.workflows_count,
+                                "rl_learners_count": result.rl_learners_count,
+                                "team_specs_count": result.team_specs_count,
+                                "success": result.success,
+                                "error_count": len(result.errors),
+                                "warning_count": len(result.warnings),
+                                "category": "vertical",  # Preserve for observability
+                            },
+                            source="VerticalIntegrationPipeline",
+                        )
                     )
-                )
+                except Exception as emit_error:
+                    logger.debug(f"Failed to create emit task: {emit_error}")
         except Exception as e:
             logger.debug(f"Failed to emit vertical_applied event: {e}")
 

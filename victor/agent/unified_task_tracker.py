@@ -48,10 +48,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 import yaml
 
 from victor.tools.tool_names import ToolNames, get_canonical_name
-from victor.agent.loop_detector import (
-    get_progress_params_for_tool,
-    is_progressive_tool,
-)
+from victor.tools.metadata_registry import get_progress_params
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
@@ -1416,7 +1413,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             "timeout",
         }
 
-        params = get_progress_params_for_tool(tool_name)
+        params = list(get_progress_params(tool_name))
         if params:
             sig_parts = [tool_name]
             for param in params:

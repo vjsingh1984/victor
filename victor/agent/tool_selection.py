@@ -1887,7 +1887,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Lazy load the config loader
         if self._task_config_loader is None:
-            from victor.agent.milestone_monitor import TaskToolConfigLoader
+            from victor.agent.task_tool_config_loader import TaskToolConfigLoader
 
             self._task_config_loader = TaskToolConfigLoader()
 
@@ -1952,7 +1952,7 @@ class ToolSelector(ModeAwareMixin):
         # Check if we need to force action tools
         if self.task_tracker.progress.task_type.value == "edit":
             # For EDIT tasks after target read, ensure edit is included
-            from victor.agent.milestone_monitor import Milestone
+            from victor.agent.unified_task_tracker import Milestone
 
             if Milestone.TARGET_READ in self.task_tracker.progress.milestones:
                 allowed.add("edit")  # edit_files → edit (canonical name)

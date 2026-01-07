@@ -343,15 +343,20 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
-        self._bus.emit(
-            topic="tool.start",
-            data={
-                "tool_name": tool_name,
-                "arguments": arguments,
-                "tool_id": tool_id,
-                "category": "tool",
-            },
-        )
+        try:
+            asyncio.create_task(
+                self._bus.emit(
+                    topic="tool.start",
+                    data={
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "tool_id": tool_id,
+                        "category": "tool",
+                    },
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit tool start event: {e}")
 
     def on_tool_end(
         self,
@@ -375,29 +380,39 @@ class ObservabilityIntegration:
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
 
         # Emit tool complete/end event
-        self._bus.emit(
-            topic="tool.end",
-            data={
-                "tool_name": tool_name,
-                "result": result,
-                "success": success,
-                "tool_id": tool_id,
-                "duration_ms": duration_ms,
-                "category": "tool",
-            },
-        )
+        try:
+            asyncio.create_task(
+                self._bus.emit(
+                    topic="tool.end",
+                    data={
+                        "tool_name": tool_name,
+                        "result": result,
+                        "success": success,
+                        "tool_id": tool_id,
+                        "duration_ms": duration_ms,
+                        "category": "tool",
+                    },
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit tool end event: {e}")
 
         if not success and error:
             # Emit tool error event
-            self._bus.emit(
-                topic=f"error.{tool_name}",
-                data={
-                    "tool_name": tool_name,
-                    "error": error,
-                    "tool_id": tool_id,
-                    "category": "error",
-                },
-            )
+            try:
+                asyncio.create_task(
+                    self._bus.emit(
+                        topic=f"error.{tool_name}",
+                        data={
+                            "tool_name": tool_name,
+                            "error": error,
+                            "tool_id": tool_id,
+                            "category": "error",
+                        },
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit tool error event: {e}")
 
     # =========================================================================
     # Model Events

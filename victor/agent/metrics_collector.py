@@ -292,7 +292,14 @@ class MetricsCollector:
                     model=self.config.model,
                     provider=self.config.provider,
                 )
-                self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                try:
+                    import asyncio
+
+                    asyncio.create_task(
+                        self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to record metrics: {e}")
 
                 # Log source of token data for debugging
                 if metrics.has_actual_usage:

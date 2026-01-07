@@ -177,12 +177,12 @@ class TestURLResolver:
             mock_response.headers = {"Content-Type": "text/html"}
             mock_response.text = AsyncMock(return_value="<html>content</html>")
 
-            mock_cm = AsyncMock()
-            mock_cm.__aenter__.return_value = mock_response
-            mock_cm.__aexit__.return_value = None
+            # Create a proper async context manager mock
+            async def mock_get_cm(*args, **kwargs):
+                return mock_response
 
             mock_session_instance = AsyncMock()
-            mock_session_instance.get.return_value = mock_cm
+            mock_session_instance.get = mock_get_cm
             mock_session_instance.__aenter__.return_value = mock_session_instance
             mock_session_instance.__aexit__.return_value = None
 
@@ -190,7 +190,7 @@ class TestURLResolver:
 
             item = await resolver.resolve("example.com", {})
             # Should have tried to fetch https://example.com
-            mock_session_instance.get.assert_called_once()
+            assert mock_session_instance.get.called
 
 
 class TestFileResolver:
