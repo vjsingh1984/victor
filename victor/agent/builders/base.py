@@ -173,9 +173,7 @@ class FactoryAwareBuilder(ComponentBuilder):
         """
         if self._factory is None:
             if provider is None or model is None:
-                raise ValueError(
-                    "provider and model are required when factory is not provided"
-                )
+                raise ValueError("provider and model are required when factory is not provided")
             from victor.agent.orchestrator_factory import OrchestratorFactory
 
             self._factory = OrchestratorFactory(

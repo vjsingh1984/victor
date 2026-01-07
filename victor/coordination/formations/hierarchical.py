@@ -51,7 +51,9 @@ class HierarchicalFormation(BaseFormationStrategy):
     ) -> List[MemberResult]:
         """Execute with manager-worker pattern."""
         if len(agents) < 2:
-            raise ValueError("Hierarchical formation requires at least 2 agents (manager + workers)")
+            raise ValueError(
+                "Hierarchical formation requires at least 2 agents (manager + workers)"
+            )
 
         # Check for explicit manager in context first
         explicit_manager_id = context.shared_state.get("explicit_manager_id")
@@ -70,15 +72,16 @@ class HierarchicalFormation(BaseFormationStrategy):
 
             # Otherwise check for manager by capability
             is_manager = False
-            if hasattr(agent, 'role') and hasattr(agent.role, 'capabilities'):
+            if hasattr(agent, "role") and hasattr(agent.role, "capabilities"):
                 from victor.framework.agent_protocols import AgentCapability
+
                 if AgentCapability.DELEGATE in agent.role.capabilities:
                     is_manager = True
 
             # Check if agent has _role attribute with manager in name
-            if not is_manager and hasattr(agent, '_role') and hasattr(agent._role, 'name'):
+            if not is_manager and hasattr(agent, "_role") and hasattr(agent._role, "name"):
                 role_name = agent._role.name.lower()
-                if 'manager' in role_name or 'lead' in role_name or 'coordinator' in role_name:
+                if "manager" in role_name or "lead" in role_name or "coordinator" in role_name:
                     is_manager = True
 
             if is_manager:
@@ -89,7 +92,9 @@ class HierarchicalFormation(BaseFormationStrategy):
 
         # If no manager found by capability, use first agent as fallback
         if manager is None:
-            logger.warning("HierarchicalFormation: no manager detected by capability, using first agent as manager")
+            logger.warning(
+                "HierarchicalFormation: no manager detected by capability, using first agent as manager"
+            )
             manager = agents[0]
             workers = agents[1:]
         else:
@@ -98,7 +103,9 @@ class HierarchicalFormation(BaseFormationStrategy):
             else:
                 logger.info(f"HierarchicalFormation: auto-detected manager={manager.id}")
 
-        logger.debug(f"HierarchicalFormation: manager={manager.id}, workers={[w.id for w in workers]}")
+        logger.debug(
+            f"HierarchicalFormation: manager={manager.id}, workers={[w.id for w in workers]}"
+        )
 
         # Phase 1: Manager plans and delegates (executes first!)
         manager_result = await manager.execute(task, context)
@@ -109,11 +116,12 @@ class HierarchicalFormation(BaseFormationStrategy):
 
         # Check if manager created delegation tasks
         if not manager_result.success or not manager_result.metadata.get("delegated_tasks"):
-            logger.info("HierarchicalFormation: manager did not delegate tasks, executing all workers with original task")
+            logger.info(
+                "HierarchicalFormation: manager did not delegate tasks, executing all workers with original task"
+            )
             # Fallback: Execute all workers with the original task
             worker_tasks = [
-                self._execute_worker(worker, task, context, i)
-                for i, worker in enumerate(workers)
+                self._execute_worker(worker, task, context, i) for i, worker in enumerate(workers)
             ]
 
             # Execute workers in parallel

@@ -56,7 +56,7 @@ from enum import Enum
 from typing import Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.observability.event_bus import EventCategory
+    # EventCategory removed - use topic-based routing
     from victor.workflows.streaming import WorkflowEventType
 
 
@@ -385,7 +385,7 @@ def map_event_category(category: "EventCategory") -> UnifiedEventType:
         A representative UnifiedEventType for the category.
 
     Example:
-        from victor.observability.event_bus import EventCategory
+        # EventCategory removed - use topic-based routing
 
         category = EventCategory.TOOL
         unified = map_event_category(category)

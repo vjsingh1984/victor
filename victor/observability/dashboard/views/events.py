@@ -29,20 +29,20 @@ from textual.containers import Container, Horizontal
 from textual.widgets import DataTable, RichLog, Select, Static, Switch
 from textual.reactive import reactive
 
-from victor.observability.event_bus import EventCategory, VictorEvent
+from victor.core.events import Event, ObservabilityBus, get_observability_bus
 
 
-# Color mapping for event categories
-CATEGORY_COLORS: Dict[EventCategory, str] = {
-    EventCategory.TOOL: "cyan",
-    EventCategory.STATE: "yellow",
-    EventCategory.MODEL: "green",
-    EventCategory.ERROR: "red",
-    EventCategory.AUDIT: "magenta",
-    EventCategory.METRIC: "blue",
-    EventCategory.LIFECYCLE: "white",
-    EventCategory.VERTICAL: "bright_magenta",
-    EventCategory.CUSTOM: "dim",
+# Color mapping for event categories (topic prefixes)
+CATEGORY_COLORS: Dict[str, str] = {
+    "tool.": "cyan",
+    "state.": "yellow",
+    "model.": "green",
+    "error.": "red",
+    "audit.": "magenta",
+    "metric.": "blue",
+    "lifecycle.": "white",
+    "vertical.": "bright_magenta",
+    "custom": "dim",
 }
 
 
@@ -76,7 +76,7 @@ class EventLogWidget(RichLog):
         self._max_data_length = max_data_length
         self._event_count = 0
 
-    def add_event(self, event: VictorEvent) -> None:
+    def add_event(self, event: Event) -> None:
         """Add an event to the log.
 
         Args:
@@ -84,11 +84,13 @@ class EventLogWidget(RichLog):
         """
         self._event_count += 1
         timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
-        color = CATEGORY_COLORS.get(event.category, "white")
-        category_name = event.category.value.upper() if event.category else "UNKNOWN"
+        color = CATEGORY_COLORS.get(event.topic.split(".")[0], "white")
+        category_name = (
+            event.topic.split(".")[0].upper() if event.topic.split(".")[0] else "UNKNOWN"
+        )
 
         # Main event line
-        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.name}[/]")
+        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.topic}[/]")
 
         # Optional data preview
         if self._show_data and event.data:
@@ -155,7 +157,7 @@ class EventTableWidget(DataTable):
         """
         super().__init__(*args, **kwargs)
         self._max_rows = max_rows
-        self._events: List[VictorEvent] = []
+        self._events: List[Event] = []
 
     def on_mount(self) -> None:
         """Set up table columns."""
@@ -163,7 +165,7 @@ class EventTableWidget(DataTable):
         self.cursor_type = "row"
         self.zebra_stripes = True
 
-    def add_event(self, event: VictorEvent) -> None:
+    def add_event(self, event: Event) -> None:
         """Add an event to the table.
 
         Args:
@@ -178,18 +180,18 @@ class EventTableWidget(DataTable):
         else:
             self._add_row(event)
 
-    def _add_row(self, event: VictorEvent) -> None:
+    def _add_row(self, event: Event) -> None:
         """Add a single row for an event."""
         timestamp = event.timestamp.strftime("%H:%M:%S")
-        category = event.category.value if event.category else "unknown"
+        category = event.topic.split(".")[0] if event.topic.split(".")[0] else "unknown"
         session = (event.session_id or "")[:8] if event.session_id else "-"
 
         # Build details
         details = self._get_event_details(event)
 
-        self.add_row(timestamp, category, event.name, session, details)
+        self.add_row(timestamp, category, event.topic, session, details)
 
-    def _get_event_details(self, event: VictorEvent) -> str:
+    def _get_event_details(self, event: Event) -> str:
         """Extract key details from event data."""
         if not event.data:
             return ""
@@ -221,7 +223,7 @@ class EventTableWidget(DataTable):
         for event in self._events:
             self._add_row(event)
 
-    def get_selected_event(self) -> Optional[VictorEvent]:
+    def get_selected_event(self) -> Optional[Event]:
         """Get the currently selected event."""
         if self.cursor_row < len(self._events):
             return self._events[self.cursor_row]
@@ -240,21 +242,25 @@ class EventFilterWidget(Container):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._enabled_categories: Set[EventCategory] = set(EventCategory)
+        # Default enabled topic prefixes (all categories enabled)
+        self._enabled_categories: Set[str] = {
+            "tool", "state", "model", "error", "audit", "metric", "lifecycle", "vertical"
+        }
 
     def compose(self) -> ComposeResult:
         yield Static("[bold]Event Filters[/]", classes="filter-title")
         with Horizontal(classes="filter-row"):
             yield Static("Categories:", classes="filter-label")
-            for category in EventCategory:
+            # Iterate over topic prefixes (was EventCategory enum)
+            for category in ["tool", "state", "model", "error", "audit", "metric", "lifecycle", "vertical"]:
                 color = CATEGORY_COLORS.get(category, "white")
                 yield Switch(
                     value=True,
-                    id=f"filter-{category.value}",
+                    id=f"filter-{category}",
                     classes="category-switch",
                 )
                 yield Static(
-                    f"[{color}]{category.value}[/]",
+                    f"[{color}]{category}[/]",
                     classes="category-label",
                 )
 
@@ -264,7 +270,8 @@ class EventFilterWidget(Container):
         if switch_id.startswith("filter-"):
             category_name = switch_id[7:]  # Remove "filter-" prefix
             try:
-                category = EventCategory(category_name)
+                # EventCategory removed - use topic-based filtering
+                category = category_name  # Just use the string directly
                 if event.value:
                     self._enabled_categories.add(category)
                 else:
@@ -272,7 +279,7 @@ class EventFilterWidget(Container):
             except ValueError:
                 pass
 
-    def should_show_event(self, event: VictorEvent) -> bool:
+    def should_show_event(self, event: Event) -> bool:
         """Check if an event should be displayed based on current filters.
 
         Args:
@@ -281,9 +288,9 @@ class EventFilterWidget(Container):
         Returns:
             True if the event should be shown
         """
-        return event.category in self._enabled_categories
+        return event.topic.split(".")[0] in self._enabled_categories
 
     @property
-    def enabled_categories(self) -> Set[EventCategory]:
-        """Get the set of enabled categories."""
+    def enabled_categories(self) -> Set[str]:
+        """Get the set of enabled categories (topic prefixes)."""
         return self._enabled_categories.copy()

@@ -20,7 +20,7 @@ This module provides adapters that:
 3. Enable gradual migration to protocol-based system
 
 Usage:
-    from victor.observability.event_bus import EventBus
+    from victor.core.events import ObservabilityBus as EventBus
     from victor.core.events import ObservabilityBus
     from victor.core.events.adapter import EventBusAdapter
 
@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 from victor.core.events.protocols import Event, DeliveryGuarantee
 
 if TYPE_CHECKING:
-    from victor.observability.event_bus import EventBus, VictorEvent, EventCategory
+    from victor.core.events import ObservabilityBus as EventBus, VictorEvent, EventCategory
     from victor.core.events.backends import ObservabilityBus, AgentMessageBus
     from victor.agent.teams.communication import TeamMessageBus
 
@@ -80,7 +80,8 @@ def event_to_victor_event(event: Event) -> "VictorEvent":
         Legacy VictorEvent for observability module
     """
     from datetime import datetime, timezone
-    from victor.observability.event_bus import VictorEvent, EventCategory, EventPriority
+
+    # VictorEvent removed - use canonical Event from victor.core.events, EventCategory, EventPriority
 
     # Parse topic to get category and name
     parts = event.topic.split(".", 1)
@@ -119,7 +120,7 @@ class EventBusAdapter:
     - Conversion between VictorEvent and Event formats
 
     Example:
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus as EventBus
         from victor.core.events import ObservabilityBus
         from victor.core.events.adapter import EventBusAdapter
 

@@ -23,6 +23,7 @@ Design Pattern:
 
 Example:
     from victor.observability.event_registry import EventCategoryRegistry
+from victor.core.events import Event, ObservabilityBus, get_observability_bus
 
     registry = EventCategoryRegistry.get_instance()
 
@@ -47,7 +48,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Optional, Set
 
-from victor.observability.event_bus import EventCategory
 
 logger = logging.getLogger(__name__)
 

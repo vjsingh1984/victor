@@ -199,6 +199,9 @@ def bootstrap_container(
     # Register core services
     _register_core_services(container, settings)
 
+    # Register event services
+    _register_event_services(container, settings)
+
     # Register analytics services
     _register_analytics_services(container, settings)
 
@@ -239,6 +242,61 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
         lambda c: InMemoryCacheService(max_size=1000),
         ServiceLifetime.SINGLETON,
     )
+
+
+def _register_event_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register event backend and observability services.
+
+    This registers the canonical event system (core/events) as the
+    primary event backend, replacing the legacy observability/event_bus.py.
+    """
+    from victor.core.events import (
+        IEventBackend,
+        ObservabilityBus,
+        AgentMessageBus,
+        BackendConfig,
+        BackendType,
+        create_event_backend,
+    )
+
+    # Create event backend configuration from settings
+    # Check for new setting, fall back to legacy setting
+    backend_type_str = getattr(settings, "event_backend_type", "in_memory")
+    if isinstance(backend_type_str, str):
+        backend_type = BackendType(backend_type_str.lower())
+    else:
+        backend_type = BackendType.IN_MEMORY
+
+    # Create backend config
+    backend_config = BackendConfig(
+        backend_type=backend_type,
+        delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
+        max_batch_size=100,
+        flush_interval_ms=1000.0,
+    )
+
+    # Register IEventBackend as singleton
+    container.register(
+        IEventBackend,
+        lambda c: create_event_backend(backend_config),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Register ObservabilityBus as singleton
+    container.register(
+        ObservabilityBus,
+        lambda c: ObservabilityBus(backend=c.get(IEventBackend)),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Register AgentMessageBus as singleton
+    container.register(
+        AgentMessageBus,
+        lambda c: AgentMessageBus(backend=c.get(IEventBackend)),
+        ServiceLifetime.SINGLETON,
+    )
+
+    logger.info(f"Registered event services with backend: {backend_type.value}")
 
 
 def _register_analytics_services(container: ServiceContainer, settings: Settings) -> None:
