@@ -224,13 +224,13 @@ class CodingTeamSpec:
             stacklevel=3,
         )
 
-    def to_canonical_team_spec(self) -> CanonicalTeamSpec:
+    def to_canonical_team_spec(self) -> TeamSpec:
         """Convert to canonical TeamSpec from victor.framework.team_schema.
 
         Returns:
-            CanonicalTeamSpec instance with vertical set to "coding"
+            TeamSpec instance with vertical set to "coding"
         """
-        return CanonicalTeamSpec(
+        return TeamSpec(
             name=self.name,
             description=self.description,
             vertical="coding",
