@@ -75,7 +75,7 @@ if TYPE_CHECKING:
     from victor.core.event_sourcing import Event as CQRSEvent
     from victor.core.event_sourcing import EventDispatcher, EventStore
     from victor.framework.agent import Agent
-    from victor.observability import EventBus, VictorEvent
+    from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -182,14 +182,16 @@ def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> Event:
     return convert_from_cqrs(data, event_type, metadata)
 
 
-def observability_event_to_framework(victor_event: "VictorEvent") -> Event:
-    """Convert an observability VictorEvent to a framework Event.
+def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadata) -> Event:
+    """Convert an observability event (topic-based) to a framework Event.
 
-    Uses category-based mapping since observability event names are dynamic
-    (e.g., "read_file.start" vs static "tool.start").
+    Uses topic-based mapping since observability events now use topics
+    (e.g., "tool.start" instead of category-based "tool.start").
 
     Args:
-        victor_event: Observability event.
+        topic: Event topic (e.g., "tool.start", "state.transition").
+        data: Event data dictionary.
+        **metadata: Additional metadata.
 
     Returns:
         Framework Event instance.
@@ -203,48 +205,49 @@ def observability_event_to_framework(victor_event: "VictorEvent") -> Event:
         tool_call_event,
         tool_result_event,
     )
-    from victor.observability import EventCategory
 
-    event_name = victor_event.name
-    event_data = victor_event.data
+    event_data = data
 
-    # Use category-based conversion since event names are dynamic
-    if victor_event.category == EventCategory.TOOL:
-        if ".start" in event_name:
+    # Extract category from topic prefix
+    topic_prefix = topic.split(".", 1)[0] if "." in topic else topic
+
+    # Use topic-based conversion
+    if topic_prefix == "tool":
+        if ".start" in topic:
             return tool_call_event(
-                tool_name=event_data.get("tool_name", event_name.replace(".start", "")),
+                tool_name=event_data.get("tool_name", topic.replace(".start", "")),
                 tool_id=event_data.get("tool_id"),
                 arguments=event_data.get("arguments", {}),
             )
-        elif ".end" in event_name:
+        elif ".end" in topic:
             return tool_result_event(
-                tool_name=event_data.get("tool_name", event_name.replace(".end", "")),
+                tool_name=event_data.get("tool_name", topic.replace(".end", "")),
                 tool_id=event_data.get("tool_id"),
                 result=str(event_data.get("result", "")),
                 success=event_data.get("success", True),
             )
         else:
             return tool_call_event(
-                tool_name=event_data.get("tool_name", event_name),
+                tool_name=event_data.get("tool_name", topic),
                 tool_id=event_data.get("tool_id"),
                 arguments=event_data.get("arguments", {}),
             )
 
-    elif victor_event.category == EventCategory.STATE:
+    elif topic_prefix == "state":
         return stage_change_event(
             old_stage=event_data.get("old_stage", "unknown"),
             new_stage=event_data.get("new_stage", "unknown"),
             metadata=event_data,
         )
 
-    elif victor_event.category == EventCategory.ERROR:
+    elif topic_prefix == "error":
         return error_event(
-            error=event_data.get("message", event_name),
+            error=event_data.get("message", topic),
             recoverable=event_data.get("recoverable", True),
         )
 
-    elif victor_event.category == EventCategory.LIFECYCLE:
-        if "start" in event_name:
+    elif topic_prefix == "lifecycle":
+        if "start" in topic:
             return stream_start_event(metadata=event_data)
         else:
             return stream_end_event(
@@ -255,7 +258,7 @@ def observability_event_to_framework(victor_event: "VictorEvent") -> Event:
     else:
         # Generic fallback
         return content_event(
-            content=f"[{victor_event.category.value}] {event_name}",
+            content=f"[{topic_prefix.upper()}] {topic}",
             metadata=event_data,
         )
 
@@ -295,7 +298,7 @@ class FrameworkEventAdapter:
     """
 
     event_dispatcher: Optional["EventDispatcher"] = None
-    event_bus: Optional["EventBus"] = None
+    event_bus: Optional["ObservabilityBus"] = None
     session_id: Optional[str] = None
     aggregate_id: Optional[str] = None
     _forwarded_count: int = field(default=0, init=False)
@@ -382,20 +385,29 @@ class FrameworkEventAdapter:
     def _forward_to_observability(self, event: Event) -> None:
         """Forward event to observability layer."""
         try:
-            from victor.observability import VictorEvent
+            from victor.core.events import get_observability_bus
 
+            # Convert framework Event to topic and data for ObservabilityBus
             obs_data = framework_event_to_observability(event)
 
-            # Create and publish VictorEvent
-            victor_event = VictorEvent(
-                category=obs_data["category"],
-                name=obs_data["name"],
-                data=obs_data["data"],
-                priority=obs_data["priority"],
-                session_id=self.session_id,
-            )
+            # Extract topic from observability data format
+            # The framework_event_to_observability should return {"category": ..., "name": ..., "data": ...}
+            # Convert to topic: "category.name" -> "category.name"
+            topic = obs_data.get("topic") or f"{obs_data['category']}.{obs_data['name']}"
 
-            self.event_bus.publish(victor_event)
+            bus = get_observability_bus()
+            if bus:
+                import asyncio
+
+                asyncio.run(
+                    bus.emit(
+                        topic=topic,
+                        data={
+                            **obs_data["data"],
+                            "category": obs_data["category"],  # Preserve for observability
+                        },
+                    )
+                )
 
         except Exception as e:
             logger.warning(f"Failed to forward event to observability: {e}")
@@ -422,7 +434,7 @@ class ObservabilityToCQRSBridge:
 
     def __init__(
         self,
-        event_bus: "EventBus",
+        event_bus: "ObservabilityBus",
         event_dispatcher: "EventDispatcher",
         aggregate_id: str = "observability",
     ) -> None:
@@ -462,8 +474,8 @@ class ObservabilityToCQRSBridge:
         self._is_running = False
         logger.debug(f"ObservabilityToCQRSBridge stopped ({self._event_count} events)")
 
-    def _handle_event(self, victor_event: "VictorEvent") -> None:
-        """Handle an observability event."""
+    def _handle_event(self, topic: str, data: Dict[str, Any], **metadata) -> None:
+        """Handle an observability event (topic-based)."""
         try:
             from victor.core.event_sourcing import (
                 Event as CQRSEvent,
@@ -473,21 +485,24 @@ class ObservabilityToCQRSBridge:
             )
 
             # Convert to framework event first
-            framework_event = observability_event_to_framework(victor_event)
+            framework_event = observability_event_to_framework(topic, data, **metadata)
 
             # Then to CQRS event data
             cqrs_data = framework_event_to_cqrs(framework_event)
             event_type = cqrs_data.pop("event_type", "unknown")
 
             # Map to concrete CQRS event classes
+            # Extract topic prefix for metadata
+            topic_prefix = topic.split(".", 1)[0] if "." in topic else topic
+
             if event_type == "tool_called":
                 cqrs_event = ToolCalledEvent(
                     task_id=self._aggregate_id,
                     tool_name=cqrs_data.get("tool_name", ""),
                     arguments=cqrs_data.get("arguments", {}),
                     metadata={
-                        "original_category": victor_event.category.value,
-                        "original_name": victor_event.name,
+                        "original_category": topic_prefix,
+                        "original_name": topic,
                         **cqrs_data.get("metadata", {}),
                     },
                 )
@@ -498,8 +513,8 @@ class ObservabilityToCQRSBridge:
                     success=cqrs_data.get("success", True),
                     result=str(cqrs_data.get("result", "")),
                     metadata={
-                        "original_category": victor_event.category.value,
-                        "original_name": victor_event.name,
+                        "original_category": topic_prefix,
+                        "original_name": topic,
                         **cqrs_data.get("metadata", {}),
                     },
                 )
@@ -510,8 +525,8 @@ class ObservabilityToCQRSBridge:
                     to_state=cqrs_data.get("new_stage", ""),
                     reason="observability_event",
                     metadata={
-                        "original_category": victor_event.category.value,
-                        "original_name": victor_event.name,
+                        "original_category": topic_prefix,
+                        "original_name": topic,
                         **cqrs_data.get("metadata", {}),
                     },
                 )
@@ -520,8 +535,8 @@ class ObservabilityToCQRSBridge:
                 cqrs_event = CQRSEvent(
                     metadata={
                         "event_type": event_type,
-                        "original_category": victor_event.category.value,
-                        "original_name": victor_event.name,
+                        "original_category": topic_prefix,
+                        "original_name": topic,
                         **cqrs_data.get("metadata", {}),
                         "data": cqrs_data,
                     }
@@ -594,7 +609,7 @@ class CQRSBridge:
         command_bus: Optional["AgentCommandBus"] = None,
         event_dispatcher: Optional["EventDispatcher"] = None,
         projection: Optional["SessionProjection"] = None,
-        event_bus: Optional["EventBus"] = None,
+        event_bus: Optional["ObservabilityBus"] = None,
     ) -> None:
         """Initialize CQRS bridge.
 
@@ -641,9 +656,9 @@ class CQRSBridge:
         event_bus = None
         if enable_observability:
             try:
-                from victor.observability import EventBus
+                from victor.core.events import get_observability_bus
 
-                event_bus = EventBus.get_instance()
+                event_bus = get_observability_bus()
             except ImportError:
                 logger.debug("Observability not available")
 
@@ -1025,7 +1040,7 @@ async def create_cqrs_bridge(
 def create_event_adapter(
     session_id: str,
     event_dispatcher: Optional["EventDispatcher"] = None,
-    event_bus: Optional["EventBus"] = None,
+    event_bus: Optional["ObservabilityBus"] = None,
 ) -> FrameworkEventAdapter:
     """Create a framework event adapter.
 
