@@ -91,8 +91,8 @@ class ObservabilityIntegration:
         self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
 
-        if session_id:
-            self._bus.set_session_id(session_id)
+        # Note: session_id is stored in self._session_id for use in event emissions
+        # The new ObservabilityBus doesn't have set_session_id() method
 
         if enable_cqrs_bridge:
             self._setup_cqrs_bridge()
@@ -230,7 +230,8 @@ class ObservabilityIntegration:
             session_id: Session identifier.
         """
         self._session_id = session_id
-        self._bus.set_session_id(session_id)
+        # Note: The new ObservabilityBus doesn't have set_session_id()
+        # Session ID is stored in self._session_id for use in event emissions
 
     def wire_orchestrator(self, orchestrator: "AgentOrchestrator") -> None:
         """Wire EventBus into an AgentOrchestrator.
