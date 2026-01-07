@@ -178,7 +178,7 @@ from victor.agent.tool_registrar import ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
 # Observability
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+# from victor.observability.event_bus import EventBus, EventCategory, VictorEvent  # DELETED
 from victor.observability.integration import ObservabilityIntegration
 from victor.agent.orchestrator_integration import IntegrationConfig
 
@@ -943,21 +943,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Callback when tool execution completes (from ToolPipeline)."""
         self._metrics_collector.on_tool_complete(result)
 
-        # Emit EventBus event for logging visibility
-        event_bus = EventBus.get_instance()
-        event_bus.publish(
-            VictorEvent(
-                category=EventCategory.TOOL,
-                name="tool.complete",
-                data={
-                    "tool_name": result.tool_name,
-                    "success": result.success,
-                    "result_length": len(str(result.result or "")) if result.result else 0,
-                    "error": str(result.error) if result.error else None,
-                },
-                source="AgentOrchestrator",
-            )
-        )
+        # TODO: Emit tool complete via canonical event system
+        # from victor.core.events import get_observability_bus
+        # bus = get_observability_bus()
+        # bus.emit(
+        #     topic="tool.complete",
+        #     data={
+        #         "tool_name": result.tool_name,
+        #         "success": result.success,
+        #         "result_length": len(str(result.result or "")) if result.result else 0,
+        #         "error": str(result.error) if result.error else None,
+        #     },
+        # )
 
         # Track read files for task completion detection
         if result.success and result.tool_name in ("read", "Read", "read_file"):
@@ -980,21 +977,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             "Agent should now produce the required output."
                         )
 
-                        # Emit event for observability (helps debug exploration vs. output)
-                        event_bus = EventBus.get_instance()
-                        event_bus.publish(
-                            VictorEvent(
-                                category=EventCategory.STATE,
-                                name="task.all_files_read_nudge",
-                                data={
-                                    "required_files": list(self._required_files),
-                                    "read_files": list(self._read_files_session),
-                                    "required_outputs": self._required_outputs,
-                                    "action": "nudge_output_production",
-                                },
-                                source="AgentOrchestrator",
-                            )
-                        )
+                        # TODO: Emit nudge event via canonical event system
+                        # from victor.core.events import get_observability_bus
+                        # event_bus = get_observability_bus()
+                        # event_bus.emit(
+                        #     topic="state.task.all_files_read_nudge",
+                        #     data={
+                        #         "required_files": list(self._required_files),
+                        #         "read_files": list(self._read_files_session),
+                        #         "required_outputs": self._required_outputs,
+                        #         "action": "nudge_output_production",
+                        #     },
+                        # )
 
                         # Inject nudge message to encourage output production
                         if self._required_outputs:
@@ -4198,7 +4192,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             conversation_depth=conversation_depth,
             planned_tools=planned_tools,
         )
-        logger.info(f"context_msg={context_msg}\nuse_semantic={self.use_semantic_selection}\nconversation_depth={conversation_depth}")
+        logger.info(
+            f"context_msg={context_msg}\nuse_semantic={self.use_semantic_selection}\nconversation_depth={conversation_depth}"
+        )
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(self, "_current_intent", None)
         tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
@@ -4408,20 +4404,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             status_msg=f"🔧 Auto-executing {tool_name} from model intent...",
         )
 
-        # Emit event for observability
-        event_bus = EventBus.get_instance()
-        event_bus.publish(
-            VictorEvent(
-                category=EventCategory.TOOL,
-                name="tool.extracted_execution",
-                data={
-                    "tool_name": tool_name,
-                    "arguments": {k: str(v)[:100] for k, v in tool_args.items()},
-                    "confidence": extracted_call.confidence,
-                },
-                source="AgentOrchestrator",
-            )
-        )
+        # TODO: Emit extracted tool execution via canonical event system
+        # from victor.core.events import get_observability_bus
+        # event_bus = get_observability_bus()
+        # event_bus.emit(
+        #     topic="tool.extracted_execution",
+        #     data={
+        #         "tool_name": tool_name,
+        #         "arguments": {k: str(v)[:100] for k, v in tool_args.items()},
+        #         "confidence": extracted_call.confidence,
+        #     },
+        # )
 
         # Execute the tool
         try:
@@ -5339,22 +5332,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             f"outputs: {self._required_outputs}"
         )
 
-        # Emit observability event for task requirements (helps debug exploration behavior)
-        if self._required_files or self._required_outputs:
-            event_bus = EventBus.get_instance()
-            event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="task.requirements_extracted",
-                    data={
-                        "required_files": self._required_files,
-                        "required_outputs": self._required_outputs,
-                        "file_count": len(self._required_files),
-                        "output_count": len(self._required_outputs),
-                    },
-                    source="AgentOrchestrator",
-                )
-            )
+        # TODO: Emit task requirements extracted via canonical event system
+        # if self._required_files or self._required_outputs:
+        #     from victor.core.events import get_observability_bus
+        #     event_bus = get_observability_bus()
+        #     event_bus.emit(
+        #         topic="state.task.requirements_extracted",
+        #         data={
+        #             "required_files": self._required_files,
+        #             "required_outputs": self._required_outputs,
+        #             "file_count": len(self._required_files),
+        #             "output_count": len(self._required_outputs),
+        #         },
+        #     )
 
         # Iteration limits - kept as read-only local references for readability
         # (These are configuration values that don't change during the loop)
