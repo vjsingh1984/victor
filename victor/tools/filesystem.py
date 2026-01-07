@@ -1472,8 +1472,8 @@ async def read(
     from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
 
     # Determine truncation limits based on model context
-    # Cloud models (Anthropic, OpenAI, etc.): 750 lines / 25KB (balanced for context efficiency)
-    # Local models (Ollama, LMStudio, vLLM): 150 lines / 6KB (conservative for smaller context)
+    # Cloud models (Anthropic, OpenAI, etc.): ~750 lines / 25KB (balanced for context efficiency)
+    # Local models (Ollama, LMStudio, vLLM): ~2000 lines / 32KB (suitable for 32K context)
     def _get_truncation_limits() -> tuple:
         """Get appropriate truncation limits based on current provider."""
         try:
@@ -1483,7 +1483,7 @@ async def read(
 
             # Check for airgapped mode or local providers
             if settings.airgapped_mode:
-                return 800, 32768  # 150 lines, 6KB for local models
+                return 2000, 32768  # ~2000 lines, 32KB for local models (airgapped)
 
             # Check provider name for local indicators
             provider = getattr(settings, "provider", "").lower()
@@ -1497,16 +1497,16 @@ async def read(
                     caps = get_model_capabilities(model)
                     context_window = caps.get("context_window", 0)
                     if context_window > 0:
-                        # Scale limits based on context window
-                        # ~10% of context for read output is reasonable
-                        max_tokens = context_window // 10
-                        # Estimate ~4 chars per token, ~40 chars per line
-                        max_lines = min(800, max(50, max_tokens // 10))
-                        max_bytes = min(32768, max(2048, max_tokens * 4))
+                        # For local models with 32K+ context, use ~25% for reads (~8K tokens)
+                        # This gives good file reading while leaving room for the rest of the conversation
+                        max_tokens = context_window // 4  # Use 25% of context for file reads
+                        # Estimate ~3 bytes per token (average), ~40 chars per line
+                        max_lines = min(2000, max(100, max_tokens // 3))  # Ensure at least 100 lines
+                        max_bytes = min(32768, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception:
                     pass
-                return 800, 32768  # Fallback for local models
+                return 2000, 32768  # Fallback for local models: 2000 lines, 32KB
 
             # Cloud models get balanced limits
             return 750, 25600  # 750 lines, 25KB
