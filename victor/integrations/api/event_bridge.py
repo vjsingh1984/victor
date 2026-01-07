@@ -347,7 +347,7 @@ class EventBusAdapter:
                     if hasattr(event_bus, "subscribe"):
                         # Check if it's the old sync API or new async API
                         import inspect
-                        sig = inspect.signature(event_bus.subscribe)
+
                         if inspect.iscoroutinefunction(event_bus.subscribe):
                             # New async API - skip for now, would need asyncio
                             logger.debug(f"Skipping async subscribe to {internal_type}")

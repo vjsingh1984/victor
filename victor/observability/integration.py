@@ -337,7 +337,15 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
-        self._bus.emit_tool_start(tool_name, arguments, tool_id)
+        self._bus.emit(
+            topic="tool.start",
+            data={
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "tool_id": tool_id,
+                "category": "tool",
+            },
+        )
 
     def on_tool_end(
         self,
@@ -360,12 +368,17 @@ class ObservabilityIntegration:
         start_time = self._tool_start_times.pop(key, None)
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
 
-        self._bus.emit_tool_end(
-            tool_name=tool_name,
-            result=result,
-            success=success,
-            tool_id=tool_id,
-            duration_ms=duration_ms,
+        # Emit tool complete/end event
+        self._bus.emit(
+            topic="tool.end",
+            data={
+                "tool_name": tool_name,
+                "result": result,
+                "success": success,
+                "tool_id": tool_id,
+                "duration_ms": duration_ms,
+                "category": "tool",
+            },
         )
 
         if not success and error:

@@ -945,6 +945,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Emit tool complete event
         from victor.core.events import get_observability_bus
+
         bus = get_observability_bus()
         bus.emit(
             topic="tool.complete",
@@ -980,6 +981,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
                         # Emit nudge event
                         from victor.core.events import get_observability_bus
+
                         event_bus = get_observability_bus()
                         event_bus.emit(
                             topic="state.task.all_files_read_nudge",
@@ -2962,11 +2964,26 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Update ProviderManager internal state directly
             # (Using sync update instead of async switch_provider for backward compatibility)
+            # Update both _current_state (legacy) and ProviderSwitcher state
             self._provider_manager._current_state = ProviderState(
                 provider=new_provider,
                 provider_name=provider_name.lower(),
                 model=new_model,
             )
+
+            # Also update ProviderSwitcher's state (the source of truth)
+            from victor.agent.provider.switcher import ProviderSwitcherState
+
+            switcher_state = self._provider_manager._provider_switcher.get_current_state()
+            old_switch_count = switcher_state.switch_count if switcher_state else 0
+
+            self._provider_manager._provider_switcher._current_state = ProviderSwitcherState(
+                provider=new_provider,
+                provider_name=provider_name.lower(),
+                model=new_model,
+                switch_count=old_switch_count + 1,
+            )
+
             self._provider_manager.initialize_tool_adapter()
 
             # Sync local attributes from ProviderManager
@@ -3030,7 +3047,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Update ProviderManager's model and reinitialize adapter
             if self._provider_manager._current_state:
+                # Update both _current_state (legacy) and ProviderSwitcher state
                 self._provider_manager._current_state.model = model
+
+                # Also update ProviderSwitcher's state (the source of truth)
+                switcher_state = self._provider_manager._provider_switcher.get_current_state()
+                if switcher_state:
+                    switcher_state.model = model
+
                 self._provider_manager.initialize_tool_adapter()
 
             # Sync local attributes from ProviderManager
@@ -4408,6 +4432,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Emit extracted tool execution event
         from victor.core.events import get_observability_bus
+
         event_bus = get_observability_bus()
         event_bus.emit(
             topic="tool.extracted_execution",
@@ -5338,6 +5363,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Emit task requirements extracted event
         if self._required_files or self._required_outputs:
             from victor.core.events import get_observability_bus
+
             event_bus = get_observability_bus()
             event_bus.emit(
                 topic="state.task.requirements_extracted",
@@ -6655,16 +6681,83 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> None:
         """Switch to a different provider/model (protocol method).
 
+        This is an async protocol method that delegates to the sync implementation.
+
         Args:
             provider: Target provider name
             model: Optional specific model
             on_switch: Optional callback(provider, model) after switch
         """
-        await self._provider_manager.switch_provider(provider, model)
-        # Sync instance attributes
+        # Import ProviderSwitcherState for state update
+        from victor.agent.provider.switcher import ProviderSwitcherState
+
+        # Get provider settings from settings if not provided
+        provider_kwargs = self.settings.get_provider_settings(provider)
+
+        # Create new provider instance
+        # Note: ProviderRegistry is already imported at module level (line 210)
+        # This ensures patches work correctly
+        new_provider = ProviderRegistry.create(provider, **provider_kwargs)
+
+        # Determine model to use
+        new_model = model or self.model
+
+        # Store old state for analytics
+        old_provider_name = self.provider_name
+        old_model = self.model
+
+        # Update ProviderManager internal state directly
+        # Update both _current_state (legacy) and ProviderSwitcher state
+        self._provider_manager._current_state = ProviderState(
+            provider=new_provider,
+            provider_name=provider.lower(),
+            model=new_model,
+        )
+
+        # Also update ProviderSwitcher's state (the source of truth)
+        switcher_state = self._provider_manager._provider_switcher.get_current_state()
+        old_switch_count = switcher_state.switch_count if switcher_state else 0
+
+        self._provider_manager._provider_switcher._current_state = ProviderSwitcherState(
+            provider=new_provider,
+            provider_name=provider.lower(),
+            model=new_model,
+            switch_count=old_switch_count + 1,
+        )
+
+        self._provider_manager.initialize_tool_adapter()
+
+        # Sync local attributes from ProviderManager
         self.provider = self._provider_manager.provider
         self.model = self._provider_manager.model
         self.provider_name = self._provider_manager.provider_name
+        self.tool_adapter = self._provider_manager.tool_adapter
+        self.tool_calling_caps = self._provider_manager.capabilities
+
+        # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
+        self._apply_post_switch_hooks(respect_sticky_budget=True)
+
+        # Log the switch
+        logger.info(
+            f"Switched provider: {old_provider_name}:{old_model} -> "
+            f"{self.provider_name}:{new_model} "
+            f"(native_tools={self.tool_calling_caps.native_tool_calls})"
+        )
+
+        # Log analytics event
+        self.usage_logger.log_event(
+            "provider_switch",
+            {
+                "old_provider": old_provider_name,
+                "old_model": old_model,
+                "new_provider": self.provider_name,
+                "new_model": new_model,
+                "native_tool_calls": self.tool_calling_caps.native_tool_calls,
+            },
+        )
+
+        # Update metrics collector with new model info
+        self._metrics_collector.update_model_info(new_model, self.provider_name)
 
         if on_switch:
             on_switch(self.provider_name, self.model)

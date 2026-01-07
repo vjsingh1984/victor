@@ -98,11 +98,12 @@ class TestEventBridgeIntegration:
 
     @pytest.mark.asyncio
     async def test_event_bridge_creation(self):
-        """Test that EventBridge can be created with EventBus."""
+        """Test that EventBridge can be created with ObservabilityBus."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
 
-        bus = EventBus()
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
         bridge = EventBridge(bus)
 
         assert bridge is not None
@@ -111,10 +112,11 @@ class TestEventBridgeIntegration:
     @pytest.mark.asyncio
     async def test_event_bridge_start_stop(self):
         """Test EventBridge start and stop lifecycle."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
 
-        bus = EventBus()
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
         bridge = EventBridge(bus)
 
         bridge.start()
@@ -126,10 +128,11 @@ class TestEventBridgeIntegration:
     @pytest.mark.asyncio
     async def test_event_bridge_broadcaster_exists(self):
         """Test that EventBridge has a broadcaster."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
 
-        bus = EventBus()
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
         bridge = EventBridge(bus)
 
         assert hasattr(bridge, "_broadcaster")
@@ -141,10 +144,11 @@ class TestEventBridgeBroadcaster:
     @pytest.mark.asyncio
     async def test_broadcaster_add_client(self):
         """Test adding a client to the broadcaster."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
 
-        bus = EventBus()
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
         bridge = EventBridge(bus)
         bridge.start()
 
@@ -159,10 +163,11 @@ class TestEventBridgeBroadcaster:
     @pytest.mark.asyncio
     async def test_broadcaster_remove_client(self):
         """Test removing a client from the broadcaster."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
 
-        bus = EventBus()
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
         bridge = EventBridge(bus)
         bridge.start()
 

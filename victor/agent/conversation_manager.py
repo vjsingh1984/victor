@@ -414,7 +414,7 @@ class ConversationManager:
 
         if metrics:
             # Calculate messages removed
-            return self.message_count - metrics.message_count
+            return self.message_count() - metrics.message_count
         return 0
 
     def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -524,7 +524,17 @@ class ConversationManager:
         # Note: ConversationSession.messages contains ConversationMessage objects
         for msg in session.messages:
             role = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-            self._controller.add_message(role, msg.content)
+
+            # Preserve tool_calls metadata for assistant messages
+            kwargs = {}
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                kwargs["tool_calls"] = msg.tool_calls
+
+            self._controller.add_message(role, msg.content, **kwargs)
+
+        # Update store's session_id to reflect recovered session
+        if hasattr(self._store, "session_id"):
+            self._store.session_id = session_id
 
         self._session = session
         self._session_id = session_id

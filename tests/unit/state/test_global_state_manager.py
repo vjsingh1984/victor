@@ -74,10 +74,11 @@ class TestGlobalStateManager:
 
     def test_set_tracer(self):
         """Test setting the state tracer."""
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus, InMemoryEventBackend
 
         global_manager = GlobalStateManager()
-        event_bus = EventBus()
+        backend = InMemoryEventBackend()
+        event_bus = ObservabilityBus(backend=backend)
         tracer = StateTracer(event_bus)
 
         global_manager.set_tracer(tracer)
@@ -303,12 +304,13 @@ class TestGlobalStateManager:
     @pytest.mark.asyncio
     async def test_operations_with_tracer(self):
         """Test operations trigger tracer when set."""
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus, InMemoryEventBackend
 
         global_manager = GlobalStateManager()
         global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
 
-        event_bus = EventBus()
+        backend = InMemoryEventBackend()
+        event_bus = ObservabilityBus(backend=backend)
         tracer = StateTracer(event_bus)
         global_manager.set_tracer(tracer)
 
@@ -413,11 +415,12 @@ class TestFactoryFunctions:
 
     def test_set_tracer(self):
         """Test set_tracer sets tracer on global manager."""
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus, InMemoryEventBackend
 
         # Create manager and tracer
         get_global_manager()
-        event_bus = EventBus()
+        backend = InMemoryEventBackend()
+        event_bus = ObservabilityBus(backend=backend)
         tracer = StateTracer(event_bus)
 
         # Set tracer
@@ -516,11 +519,12 @@ class TestGlobalStateManagerIntegration:
     @pytest.mark.asyncio
     async def test_factory_with_tracer_integration(self):
         """Test factory and tracer integration."""
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus, InMemoryEventBackend
 
         # Get manager and set tracer
         manager = get_global_manager()
-        event_bus = EventBus()
+        backend = InMemoryEventBackend()
+        event_bus = ObservabilityBus(backend=backend)
         tracer = StateTracer(event_bus)
         set_tracer(tracer)
 

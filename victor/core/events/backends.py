@@ -688,8 +688,11 @@ def get_observability_bus() -> ObservabilityBus:
     """Get the ObservabilityBus instance from DI container.
 
     This is a convenience function that retrieves the ObservabilityBus
-    from the global service container. It's the recommended way to get
-    the observability bus for application code.
+    from the global service container. If not registered, it will
+    automatically register and return a new instance using backend from settings.
+
+    The backend type is determined by settings.event_backend_type, which defaults
+    to "in_memory" if not configured.
 
     Returns:
         ObservabilityBus instance
@@ -701,8 +704,41 @@ def get_observability_bus() -> ObservabilityBus:
         >>> await bus.emit("tool.start", {"tool": "read_file"})
     """
     from victor.core.container import get_container
+    from victor.config.settings import get_settings
 
     container = get_container()
+
+    # Auto-register if not exists
+    if not container.is_registered(ObservabilityBus):
+
+        def create_bus(container):
+            # Read settings to determine backend
+            settings = get_settings()
+            backend_type_str = settings.event_backend_type.lower()
+
+            # Map string to BackendType enum
+            from victor.core.events.protocols import BackendType
+
+            backend_type_map = {
+                "in_memory": BackendType.IN_MEMORY,
+                "sqlite": BackendType.DATABASE,
+                "redis": BackendType.REDIS,
+                "kafka": BackendType.KAFKA,
+                "sqs": BackendType.SQS,
+                "rabbitmq": BackendType.RABBITMQ,
+            }
+
+            backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
+
+            # Create backend from settings
+            backend = create_event_backend(backend_type=backend_type)
+
+            return ObservabilityBus(backend=backend)
+
+        from victor.core.container import ServiceLifetime
+
+        container.register(ObservabilityBus, create_bus, ServiceLifetime.SINGLETON)
+
     return container.get(ObservabilityBus)
 
 
@@ -710,7 +746,11 @@ def get_agent_message_bus() -> AgentMessageBus:
     """Get the AgentMessageBus instance from DI container.
 
     This is a convenience function that retrieves the AgentMessageBus
-    from the global service container.
+    from the global service container. If not registered, it will
+    automatically register and return a new instance using backend from settings.
+
+    The backend type is determined by settings.event_backend_type, which defaults
+    to "in_memory" if not configured.
 
     Returns:
         AgentMessageBus instance
@@ -722,8 +762,41 @@ def get_agent_message_bus() -> AgentMessageBus:
         >>> await bus.send("task", {"action": "analyze"}, to_agent="researcher")
     """
     from victor.core.container import get_container
+    from victor.config.settings import get_settings
 
     container = get_container()
+
+    # Auto-register if not exists
+    if not container.is_registered(AgentMessageBus):
+
+        def create_bus(container):
+            # Read settings to determine backend
+            settings = get_settings()
+            backend_type_str = settings.event_backend_type.lower()
+
+            # Map string to BackendType enum
+            from victor.core.events.protocols import BackendType
+
+            backend_type_map = {
+                "in_memory": BackendType.IN_MEMORY,
+                "sqlite": BackendType.DATABASE,
+                "redis": BackendType.REDIS,
+                "kafka": BackendType.KAFKA,
+                "sqs": BackendType.SQS,
+                "rabbitmq": BackendType.RABBITMQ,
+            }
+
+            backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
+
+            # Create backend from settings
+            backend = create_event_backend(backend_type=backend_type)
+
+            return AgentMessageBus(backend=backend)
+
+        from victor.core.container import ServiceLifetime
+
+        container.register(AgentMessageBus, create_bus, ServiceLifetime.SINGLETON)
+
     return container.get(AgentMessageBus)
 
 

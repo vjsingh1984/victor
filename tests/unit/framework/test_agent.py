@@ -783,9 +783,12 @@ class TestAgentObservability:
         """subscribe_to_events should subscribe to EventBus."""
         from victor.framework.agent import Agent
 
-        mock_event_bus = MagicMock()
+        mock_backend = MagicMock()
         mock_unsubscribe = MagicMock()
-        mock_event_bus.subscribe = MagicMock(return_value=mock_unsubscribe)
+        mock_backend.subscribe = MagicMock(return_value=mock_unsubscribe)
+
+        mock_event_bus = MagicMock()
+        mock_event_bus.backend = mock_backend
 
         mock_observability = MagicMock()
         mock_observability.event_bus = mock_event_bus
@@ -797,7 +800,7 @@ class TestAgentObservability:
         unsubscribe = agent.subscribe_to_events("TOOL", handler)
 
         assert unsubscribe is mock_unsubscribe
-        mock_event_bus.subscribe.assert_called_once()
+        mock_backend.subscribe.assert_called_once_with("tool.*", handler)
 
     def test_subscribe_to_events_no_event_bus(self, mock_orchestrator):
         """subscribe_to_events should return None when no event bus."""

@@ -393,15 +393,20 @@ class StreamingRecoveryCoordinator:
         result = self.streaming_handler.handle_empty_response(ctx.streaming_context)
         if result and result.chunks:
             # Emit ERROR event for empty response
-            self._event_bus.emit_error(
-                error=RuntimeError("Empty model response"),
-                context={
-                    "iteration": ctx.iteration,
-                    "provider": ctx.provider_name,
-                    "model": ctx.model,
-                    "force_completion": ctx.streaming_context.force_completion,
+            self._event_bus.emit(
+                topic="error.raised",
+                data={
+                    "error_type": "RuntimeError",
+                    "error_message": "Empty model response",
+                    "category": "error",
+                    "recoverable": True,
+                    "context": {
+                        "iteration": ctx.iteration,
+                        "provider": ctx.provider_name,
+                        "model": ctx.model,
+                        "force_completion": ctx.streaming_context.force_completion,
+                    },
                 },
-                recoverable=True,
             )
             # Handler sets ctx.force_completion = True when threshold exceeded
             return result.chunks[0], ctx.streaming_context.force_completion
@@ -426,14 +431,19 @@ class StreamingRecoveryCoordinator:
             StreamChunk with block notification
         """
         # Emit ERROR event for blocked tool
-        self._event_bus.emit_error(
-            error=RuntimeError(f"Tool blocked: {tool_name}"),
-            context={
-                "tool_name": tool_name,
-                "block_reason": block_reason,
-                "iteration": ctx.iteration,
+        self._event_bus.emit(
+            topic="error.raised",
+            data={
+                "error_type": "RuntimeError",
+                "error_message": f"Tool blocked: {tool_name}",
+                "category": "error",
+                "recoverable": True,
+                "context": {
+                    "tool_name": tool_name,
+                    "block_reason": block_reason,
+                    "iteration": ctx.iteration,
+                },
             },
-            recoverable=True,
         )
         return self.streaming_handler.handle_blocked_tool_call(
             ctx.streaming_context, tool_name, tool_args, block_reason
@@ -666,13 +676,18 @@ class StreamingRecoveryCoordinator:
 
         if recovery_action.action == "abort":
             # Emit ERROR event for abort
-            self._event_bus.emit_error(
-                error=RuntimeError(f"Session aborted: {recovery_action.reason}"),
-                context={
-                    "failure_type": recovery_action.failure_type,
-                    "iteration": ctx.iteration,
+            self._event_bus.emit(
+                topic="error.raised",
+                data={
+                    "error_type": "RuntimeError",
+                    "error_message": f"Session aborted: {recovery_action.reason}",
+                    "category": "error",
+                    "recoverable": False,
+                    "context": {
+                        "failure_type": recovery_action.failure_type,
+                        "iteration": ctx.iteration,
+                    },
                 },
-                recoverable=False,
             )
             return StreamChunk(
                 content=f"\n[recovery] Session aborted: {recovery_action.reason}\n",
