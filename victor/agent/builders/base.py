@@ -21,10 +21,13 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from victor.config.settings import Settings
 
 import logging
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator_factory import OrchestratorFactory
 
 logger = logging.getLogger(__name__)
 

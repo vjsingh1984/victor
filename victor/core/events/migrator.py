@@ -291,33 +291,33 @@ logger = logging.getLogger(__name__)
 # # =============================================================================
 
 
-def migrate_event_list(victor_events: list[VictorEvent]) -> list[Event]:
-    """Migrate a list of VictorEvents to canonical Events.
+# def migrate_event_list(victor_events: list[VictorEvent]) -> list[Event]:
+#     """Migrate a list of VictorEvents to canonical Events.
+#
+#     Args:
+#         victor_events: List of VictorEvent instances
+#
+#     Returns:
+#         List of canonical Event instances
+#
+#     Example:
+#         >>> victor_events = [VictorEvent(...), VictorEvent(...)]
+#         >>> events = migrate_event_list(victor_events)
+#         >>> len(events)
+#         2
+#     """
+#     return [victor_event_to_event(ve) for ve in victor_events]
 
-    Args:
-        victor_events: List of VictorEvent instances
 
-    Returns:
-        List of canonical Event instances
-
-    Example:
-        >>> victor_events = [VictorEvent(...), VictorEvent(...)]
-        >>> events = migrate_event_list(victor_events)
-        >>> len(events)
-        2
-    """
-    return [victor_event_to_event(ve) for ve in victor_events]
-
-
-def get_topic_mapping() -> Dict[Tuple[EventCategory, str], str]:
-    """Get the complete topic mapping table.
-
-    Returns:
-        Dictionary mapping (category, name) tuples to topics
-
-    Example:
-        >>> mapping = get_topic_mapping()
-        >>> mapping[(EventCategory.TOOL, "tool.start")]
-        'tool.start'
-    """
-    return TOPIC_MAPPING.copy()
+# def get_topic_mapping() -> Dict[Tuple[EventCategory, str], str]:
+#     """Get the complete topic mapping table.
+#
+#     Returns:
+#         Dictionary mapping (category, name) tuples to topics
+#
+#     Example:
+#         >>> mapping = get_topic_mapping()
+#         >>> mapping[(EventCategory.TOOL, "tool.start")]
+#         'tool.start'
+#     """
+#     return TOPIC_MAPPING.copy()

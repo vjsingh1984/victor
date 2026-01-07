@@ -61,13 +61,11 @@ class HierarchicalFormation(BaseFormationStrategy):
         # Auto-detect manager: find agent with DELEGATE capability or role attribute
         manager = None
         workers = []
-        manager_index = 0  # Track original index for result ordering
 
         for i, agent in enumerate(agents):
             # If explicit manager is set, use it
             if explicit_manager_id and agent.id == explicit_manager_id:
                 manager = agent
-                manager_index = i
                 continue
 
             # Otherwise check for manager by capability
@@ -86,7 +84,6 @@ class HierarchicalFormation(BaseFormationStrategy):
 
             if is_manager:
                 manager = agent
-                manager_index = i
             else:
                 workers.append(agent)
 
