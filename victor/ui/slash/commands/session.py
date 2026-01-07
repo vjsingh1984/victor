@@ -35,8 +35,8 @@ class SaveCommand(BaseSlashCommand):
     def metadata(self) -> CommandMetadata:
         return CommandMetadata(
             name="save",
-            description="Save current conversation to a session file",
-            usage="/save [name]",
+            description="Save current conversation to SQLite session (updates active session or creates new)",
+            usage="/save [--new] [name]",
             category="session",
             requires_agent=True,
         )
@@ -48,27 +48,53 @@ class SaveCommand(BaseSlashCommand):
         from victor.agent.session import get_session_manager
         from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
-        title = " ".join(ctx.args) if ctx.args else None
+        # Check for --new flag
+        force_new = self._has_flag(ctx, "--new", "-n")
+
+        # Extract title (remove --new flag if present)
+        args = [arg for arg in ctx.args if arg not in ("--new", "-n")]
+        title = " ".join(args) if args else None
 
         try:
-            # Save to SQLite (new primary storage)
             sqlite_persistence = get_sqlite_session_persistence()
+
+            # Determine session_id to use
+            if force_new:
+                # Create new session (ignore active_session_id)
+                session_id = None
+                action = "Created new session"
+            elif getattr(ctx.agent, "active_session_id", None):
+                # Update existing active session
+                session_id = ctx.agent.active_session_id
+                action = f"Updated session {session_id}"
+            else:
+                # No active session, create new
+                session_id = None
+                action = "Created new session"
+
+            # Save to SQLite
             session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation,
                 model=ctx.agent.model,
                 provider=ctx.agent.provider_name,
                 profile=getattr(ctx.settings, "current_profile", "default"),
+                session_id=session_id,  # Use existing or None for new
                 title=title,
                 conversation_state=getattr(ctx.agent, "conversation_state", None),
             )
 
             if session_id:
+                # Set active_session_id on agent
+                ctx.agent.active_session_id = session_id
+
                 ctx.console.print(
                     Panel(
-                        f"Session saved to SQLite database!\n\n"
+                        f"{action}!\n\n"
                         f"[bold]Session ID:[/] {session_id}\n"
-                        f"[bold]Database:[/] {sqlite_persistence._db_path}\n\n"
-                        f"[dim]Use '/resume {session_id}' to restore this session[/]",
+                        f"[bold]Database:[/] {sqlite_persistence._db_path}\n"
+                        f"[bold]Title:[/] {title or 'Auto-generated'}\n\n"
+                        f"[dim]Use '/resume {session_id}' to restore[/]\n"
+                        f"[dim]Use '/save --new' to create a new session[/]",
                         title="Session Saved",
                         border_style="green",
                     )
@@ -121,6 +147,9 @@ class LoadCommand(BaseSlashCommand):
 
             # Restore conversation
             ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
+
+            # Set active session ID for parallel session support
+            ctx.agent.active_session_id = session_id
 
             # Restore conversation state machine if available
             if session.conversation_state:
@@ -308,6 +337,9 @@ class ResumeCommand(BaseSlashCommand):
             conversation_dict = session_data.get("conversation", {})
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
+
+            # Set active session ID for parallel session support
+            ctx.agent.active_session_id = session_id
 
             # Restore conversation state if available
             conversation_state_dict = session_data.get("conversation_state")

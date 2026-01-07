@@ -472,6 +472,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Store profile name for session tracking
         self._profile_name = profile_name
+        # Track active session ID for parallel session support
+        self.active_session_id: Optional[str] = None
         # Bootstrap DI container - ensures all services are available
         # This is idempotent and will only bootstrap if not already done
         self._container = ensure_bootstrapped(settings)

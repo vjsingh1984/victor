@@ -224,6 +224,9 @@ class SwitchCommand(BaseSlashCommand):
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
+            # Set active session ID for parallel session support
+            ctx.agent.active_session_id = session_id
+
             conversation_state_dict = session_data.get("conversation_state")
             if conversation_state_dict:
                 try:
