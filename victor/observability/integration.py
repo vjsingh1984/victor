@@ -344,7 +344,8 @@ class ObservabilityIntegration:
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
         try:
-            asyncio.create_task(
+            loop = asyncio.get_running_loop()
+            loop.create_task(
                 self._bus.emit(
                     topic="tool.start",
                     data={
@@ -355,6 +356,9 @@ class ObservabilityIntegration:
                     },
                 )
             )
+        except RuntimeError:
+            # No event loop running
+            logger.debug(f"No event loop, skipping tool.start event emission")
         except Exception as e:
             logger.debug(f"Failed to emit tool start event: {e}")
 
@@ -381,7 +385,8 @@ class ObservabilityIntegration:
 
         # Emit tool complete/end event
         try:
-            asyncio.create_task(
+            loop = asyncio.get_running_loop()
+            loop.create_task(
                 self._bus.emit(
                     topic="tool.end",
                     data={
@@ -394,6 +399,9 @@ class ObservabilityIntegration:
                     },
                 )
             )
+        except RuntimeError:
+            # No event loop running
+            logger.debug(f"No event loop, skipping tool.end event emission")
         except Exception as e:
             logger.debug(f"Failed to emit tool end event: {e}")
 

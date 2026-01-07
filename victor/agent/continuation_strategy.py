@@ -146,14 +146,20 @@ class ContinuationStrategy:
         if self._event_bus:
             try:
                 import asyncio
-                # Non-blocking async call in sync context
-                asyncio.create_task(
-                    self._event_bus.emit(
-                        topic=topic,
-                        data={**data, "category": "state"},  # Preserve for observability
-                        source=source,
+                # Check if there's a running event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Non-blocking async call in sync context
+                    loop.create_task(
+                        self._event_bus.emit(
+                            topic=topic,
+                            data={**data, "category": "state"},  # Preserve for observability
+                            source=source,
+                        )
                     )
-                )
+                except RuntimeError:
+                    # No event loop running, skip event emission
+                    logger.debug(f"No event loop, skipping event emission for {topic}")
             except Exception as e:
                 logger.debug(f"Failed to emit continuation event: {e}")
 

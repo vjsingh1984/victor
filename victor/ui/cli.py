@@ -41,6 +41,7 @@ from victor.ui.commands.test_provider import test_provider_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
+from victor.ui.commands.sessions import sessions_app
 from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
@@ -72,6 +73,7 @@ app.add_typer(test_provider_app)
 app.add_typer(tools_app)
 app.add_typer(scaffold_app)
 app.add_typer(scheduler_app)
+app.add_typer(sessions_app)
 app.add_typer(workflow_app)
 
 console = Console()

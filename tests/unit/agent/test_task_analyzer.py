@@ -21,7 +21,7 @@ from victor.agent.task_analyzer import (
     get_task_analyzer,
     reset_task_analyzer,
 )
-from victor.agent.complexity_classifier import TaskComplexity
+from victor.framework.task.complexity import TaskComplexity
 from victor.agent.action_authorizer import ActionIntent
 from victor.core.container import reset_container
 
