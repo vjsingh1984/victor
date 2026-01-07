@@ -371,26 +371,25 @@ def map_workflow_event(event: "WorkflowEventType") -> UnifiedEventType:
     return _WORKFLOW_EVENT_MAPPING.get(event_value, UnifiedEventType.UNKNOWN)
 
 
-def map_event_category(category: "EventCategory") -> UnifiedEventType:
-    """Map an EventCategory to a default unified event type.
+def map_event_category(category: str) -> UnifiedEventType:
+    """Map a topic prefix to a default unified event type.
 
-    This function maps event categories from victor.observability.event_bus
+    This function maps event topic prefixes from the canonical event system
     to a representative unified event type. Since categories are broader
     than specific event types, this returns a default event for the category.
 
     Args:
-        category: EventCategory enum value to map.
+        category: Topic prefix string to map (e.g., "tool", "state", "model").
 
     Returns:
         A representative UnifiedEventType for the category.
 
     Example:
-        # EventCategory removed - use topic-based routing
-
-        category = EventCategory.TOOL
-        unified = map_event_category(category)
+        topic_prefix = "tool"
+        unified = map_event_category(topic_prefix)
         assert unified == UnifiedEventType.TOOL_CALL
     """
+    # Handle both string and legacy enum-like objects
     category_value = category.value if hasattr(category, "value") else str(category)
     return _EVENT_CATEGORY_MAPPING.get(category_value, UnifiedEventType.UNKNOWN)
 

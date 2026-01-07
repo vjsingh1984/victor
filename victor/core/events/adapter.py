@@ -70,42 +70,17 @@ def victor_event_to_event(victor_event: "VictorEvent") -> Event:
     )
 
 
-def event_to_victor_event(event: Event) -> "VictorEvent":
+def event_to_victor_event(event: Event) -> None:
     """Convert Event (protocol-based) to VictorEvent (legacy).
 
-    Args:
-        event: Protocol-based Event
+    NOTE: VictorEvent has been removed. This function is kept for
+    backward compatibility but is no longer functional.
 
-    Returns:
-        Legacy VictorEvent for observability module
+    TODO: Remove this function once all migration is complete.
     """
-    from datetime import datetime, timezone
-
-    # VictorEvent removed - use canonical Event from victor.core.events, EventCategory, EventPriority
-
-    # Parse topic to get category and name
-    parts = event.topic.split(".", 1)
-    if len(parts) == 2:
-        category_str, name = parts
-    else:
-        category_str, name = "custom", event.topic
-
-    # Map category string to enum
-    try:
-        category = EventCategory(category_str)
-    except ValueError:
-        category = EventCategory.CUSTOM
-
-    return VictorEvent(
-        id=event.id,
-        timestamp=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
-        category=category,
-        name=name,
-        data=event.data,
-        trace_id=event.correlation_id,
-        source=event.source,
-        priority=EventPriority.NORMAL,
-    )
+    # VictorEvent, EventCategory, EventPriority removed - use canonical Event
+    # This conversion is no longer needed as we've migrated to Event
+    pass
 
 
 class EventBusAdapter:

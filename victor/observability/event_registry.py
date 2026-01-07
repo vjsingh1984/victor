@@ -51,6 +51,13 @@ from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
+# Built-in topic prefixes (canonical event system)
+# These are reserved and cannot be used for custom categories
+BUILTIN_TOPIC_PREFIXES = {
+    "tool", "state", "model", "error", "audit", "metric",
+    "lifecycle", "vertical", "custom"
+}
+
 
 @dataclass(frozen=True)
 class CustomEventCategory:
@@ -170,12 +177,11 @@ class EventCategoryRegistry:
                 registered_by="victor.dataanalysis",
             )
         """
-        # Check if it conflicts with built-in categories
-        builtin_names = {cat.value for cat in EventCategory}
-        if name in builtin_names:
+        # Check if it conflicts with built-in topic prefixes
+        if name in BUILTIN_TOPIC_PREFIXES:
             raise ValueError(
-                f"Category '{name}' conflicts with built-in EventCategory. "
-                f"Use EventCategory.{name.upper()} instead."
+                f"Category '{name}' conflicts with built-in topic prefix. "
+                f"Use a different name for custom categories."
             )
 
         category = CustomEventCategory(
@@ -240,9 +246,8 @@ class EventCategoryRegistry:
         Returns:
             True if category exists.
         """
-        # Check built-in categories
-        builtin_names = {cat.value for cat in EventCategory}
-        if name in builtin_names:
+        # Check built-in topic prefixes
+        if name in BUILTIN_TOPIC_PREFIXES:
             return True
 
         # Check custom categories
@@ -277,9 +282,8 @@ class EventCategoryRegistry:
         Returns:
             Set of all category names.
         """
-        builtin_names = {cat.value for cat in EventCategory}
         with self._instance_lock:
-            return builtin_names | set(self._categories.keys())
+            return BUILTIN_TOPIC_PREFIXES | set(self._categories.keys())
 
     def get_all_custom(self) -> Dict[str, CustomEventCategory]:
         """Get all custom categories as a dictionary.

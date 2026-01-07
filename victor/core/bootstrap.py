@@ -256,6 +256,7 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
         AgentMessageBus,
         BackendConfig,
         BackendType,
+        DeliveryGuarantee,
         create_event_backend,
     )
 
