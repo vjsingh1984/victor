@@ -395,9 +395,8 @@ class StreamingRecoveryCoordinator:
             # Emit ERROR event for empty response
             if self._event_bus:
                 try:
-                    import asyncio
-
-                    asyncio.create_task(
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
                         self._event_bus.emit(
                             topic="error.raised",
                             data={
@@ -414,6 +413,9 @@ class StreamingRecoveryCoordinator:
                             },
                         )
                     )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug(f"No event loop, skipping error event emission")
                 except Exception as e:
                     logger.debug(f"Failed to emit empty response error event: {e}")
             # Handler sets ctx.force_completion = True when threshold exceeded
@@ -441,9 +443,8 @@ class StreamingRecoveryCoordinator:
         # Emit ERROR event for blocked tool
         if self._event_bus:
             try:
-                import asyncio
-
-                asyncio.create_task(
+                loop = asyncio.get_running_loop()
+                loop.create_task(
                     self._event_bus.emit(
                         topic="error.raised",
                         data={
@@ -459,6 +460,9 @@ class StreamingRecoveryCoordinator:
                         },
                     )
                 )
+            except RuntimeError:
+                # No event loop running
+                logger.debug(f"No event loop, skipping error event emission")
             except Exception as e:
                 logger.debug(f"Failed to emit blocked tool error event: {e}")
         return self.streaming_handler.handle_blocked_tool_call(
@@ -694,9 +698,9 @@ class StreamingRecoveryCoordinator:
             # Emit ERROR event for abort
             if self._event_bus:
                 try:
-                    import asyncio
+                    loop = asyncio.get_running_loop()
 
-                    asyncio.create_task(
+                    loop.create_task(
                         self._event_bus.emit(
                             topic="error.raised",
                             data={
@@ -711,6 +715,9 @@ class StreamingRecoveryCoordinator:
                             },
                         )
                     )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug(f"No event loop, skipping error event emission")
                 except Exception as e:
                     logger.debug(f"Failed to emit abort error event: {e}")
             return StreamChunk(

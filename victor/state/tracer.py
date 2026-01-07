@@ -166,9 +166,8 @@ class StateTracer:
         # Publish event via ObservabilityBus for real-time monitoring
         if self._event_bus:
             try:
-                import asyncio
-
-                asyncio.create_task(
+                loop = asyncio.get_running_loop()
+                loop.create_task(
                     self._event_bus.emit(
                         topic="state.transition",
                         data={
@@ -182,6 +181,9 @@ class StateTracer:
                         },
                     )
                 )
+            except RuntimeError:
+                # No event loop running
+                logger.debug(f"No event loop, skipping state transition event emission")
             except Exception as e:
                 logger.warning(f"Failed to publish state transition event: {e}")
 

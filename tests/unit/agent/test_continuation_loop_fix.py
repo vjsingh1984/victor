@@ -667,7 +667,7 @@ class TestMiddlewareChainWiring:
 class TestVerticalIntegrationObservability:
     """Tests for vertical integration event emission."""
 
-    def test_vertical_applied_event_emitted(self):
+    async def test_vertical_applied_event_emitted(self):
         """Should emit vertical_applied event when integration completes."""
         from victor.framework.vertical_integration import (
             VerticalIntegrationPipeline,
@@ -688,7 +688,7 @@ class TestVerticalIntegrationObservability:
 
         # Emit the event using the new event system
         bus = get_observability_bus()
-        bus.emit(
+        await bus.emit(
             topic="state.vertical_applied",
             data={
                 "vertical": result.vertical_name,

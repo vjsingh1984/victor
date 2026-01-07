@@ -969,10 +969,9 @@ class VerticalIntegrationPipeline:
 
             bus = get_observability_bus()
             if bus:
-                import asyncio
-
                 try:
-                    asyncio.create_task(
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
                         bus.emit(
                             topic="vertical.applied",
                             data={
@@ -992,6 +991,9 @@ class VerticalIntegrationPipeline:
                             source="VerticalIntegrationPipeline",
                         )
                     )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug(f"No event loop, skipping vertical.applied event emission")
                 except Exception as emit_error:
                     logger.debug(f"Failed to create emit task: {emit_error}")
         except Exception as e:

@@ -293,11 +293,13 @@ class MetricsCollector:
                     provider=self.config.provider,
                 )
                 try:
-                    import asyncio
-
-                    asyncio.create_task(
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
                         self.streaming_metrics_collector.record_metrics(analytics_metrics)
                     )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug(f"No event loop, skipping metrics recording")
                 except Exception as e:
                     logger.debug(f"Failed to record metrics: {e}")
 
