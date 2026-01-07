@@ -199,11 +199,23 @@ class EventFileWatcher(Static):
                         f"[EventFileWatcher] File grew from {self._last_position} to {current_size} bytes"
                     )
 
-                    # Read new content
-                    with open(self._file_path, "r", encoding="utf-8") as f:
-                        f.seek(self._last_position)
-                        new_lines = f.readlines()
-                        self._last_position = f.tell()
+                    # Read new content with explicit cleanup
+                    new_lines = []
+                    file_handle = None
+                    try:
+                        file_handle = open(self._file_path, "r", encoding="utf-8")
+                        file_handle.seek(self._last_position)
+                        new_lines = file_handle.readlines()
+                        self._last_position = file_handle.tell()
+                    except Exception as e:
+                        logger.error(f"[EventFileWatcher] Error reading file: {e}")
+                    finally:
+                        # Ensure file handle is always closed
+                        if file_handle is not None:
+                            try:
+                                file_handle.close()
+                            except Exception:
+                                pass
 
                     logger.debug(f"[EventFileWatcher] Read {len(new_lines)} new lines")
 
