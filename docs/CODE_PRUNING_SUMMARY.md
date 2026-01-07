@@ -162,13 +162,52 @@ Systematic removal of deprecated, duplicate, and obsolete code to improve mainta
 
 ---
 
-## Next Steps (Optional Future Work)
+## Phase 4: Deprecated Module Cleanup ✅
+**Status**: Completed
 
-### Phase 4: Complete Deprecated Module Migration
-1. Migrate `victor.research.enrichment` → `victor.framework.enrichment`
-2. Migrate `victor.research.safety` → `victor.security.safety`
-3. Migrate `victor.tools.selection_common` → `registry.detect_categories_from_text()`
-4. Delete deprecated modules after migration verified
+### Files Deleted:
+1. **`victor/research/enrichment.py`** (266 lines)
+   - `ResearchEnrichmentStrategy` not exported from `__init__.py`
+   - Only used in docstring examples
+   - No production usage
+
+### Files Modified (Deprecation Notices Clarified):
+1. **`victor/tools/selection_common.py`**
+   - Changed "DEPRECATED" to "NOTE: FALLBACK" for category keywords
+   - Clarified these are fallback mechanisms when registry unavailable
+
+2. **`victor/agent/tool_selection.py`**
+   - Updated deprecation notice for `_FALLBACK_CATEGORY_KEYWORDS`
+   - Clarified fallback usage pattern
+
+### Files Analyzed and KEPT:
+1. **`victor/research/safety.py`** (135 lines)
+   - `ResearchSafetyExtension` IS exported and actively used
+   - Contains research-specific safety patterns
+   - Only old constants were deprecated, not the module
+
+2. **`victor/tools/selection_common.py`** (371 lines)
+   - `get_critical_tools()` - Actively used by keyword_tool_selector.py
+   - `get_tools_from_message()` - Actively used by keyword_tool_selector.py
+   - Module kept, only deprecation notices clarified
+
+**Commit**: `c3c72e6c`
+
+---
+
+## Updated Summary Statistics
+
+### Total Impact (Phases 1-4):
+- **Files Deleted**: 7 (3 production + 4 tests)
+- **Files Created**: 1 (TaskToolConfigLoader extraction)
+- **Files Archived**: 2 (test files)
+- **Lines Removed**: ~2,970 lines of deprecated code
+- **Lines Added**: ~250 lines (extracted module)
+- **Net Reduction**: ~2,720 lines
+
+---
+
+## Next Steps (Optional Future Work)
 
 ### Phase 5: Large File Refactoring
 Consider splitting files >2,000 lines:
