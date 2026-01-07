@@ -104,7 +104,7 @@ class TestRunWorkflow:
         }
 
         result = await workflow(
-            workflow_name="new_feature", context=context, workflow_args=workflow_args
+            workflow_name="python_feature", context=context, workflow_args=workflow_args
         )
 
         assert result["success"] is True

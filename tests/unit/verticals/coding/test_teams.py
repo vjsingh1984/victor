@@ -132,7 +132,7 @@ class TestHelperFunctions:
 
         # Also test aliases
         assert get_team_for_task("implement") is not None
-        assert get_team_for_task("new_feature") is not None
+        assert get_team_for_task("add") is not None
 
     def test_get_team_for_task_bug(self):
         """Test getting team for bug fix tasks."""

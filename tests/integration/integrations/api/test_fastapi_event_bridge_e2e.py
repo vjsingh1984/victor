@@ -192,10 +192,10 @@ class TestEventBridgeIntegration:
     async def test_event_bridge_initialization(self):
         """Test that EventBridge initializes correctly."""
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import create_event_backend
 
-        bus = EventBus()
-        bridge = EventBridge(bus)
+        backend = create_event_backend()
+        bridge = EventBridge(backend)
 
         bridge.start()
         assert bridge._running is True
@@ -208,10 +208,10 @@ class TestEventBridgeIntegration:
     async def test_event_bridge_broadcaster_lifecycle(self):
         """Test broadcaster client lifecycle."""
         from victor.integrations.api.event_bridge import EventBridge
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import create_event_backend
 
-        bus = EventBus()
-        bridge = EventBridge(bus)
+        backend = create_event_backend()
+        bridge = EventBridge(backend)
         bridge.start()
 
         # Add client

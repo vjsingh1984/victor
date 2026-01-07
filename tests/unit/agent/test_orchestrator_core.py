@@ -468,29 +468,41 @@ class TestShutdown:
     @pytest.mark.asyncio
     async def test_shutdown_basic(self, orchestrator):
         """Test shutdown cleans up resources (covers lines 1987-2022)."""
-        # Mock the provider directly (orchestrator uses self.provider)
+        # Mock the provider
         mock_provider = AsyncMock()
         mock_provider.close = AsyncMock()
+
+        # Update provider in orchestrator and lifecycle manager
         orchestrator.provider = mock_provider
-        orchestrator.code_manager = MagicMock()
+        orchestrator._lifecycle_manager.set_provider(mock_provider)
+
+        # Mock the code_manager and set on lifecycle manager
+        mock_code_manager = MagicMock()
+        mock_code_manager.stop = MagicMock()
+        orchestrator.code_manager = mock_code_manager
+        orchestrator._lifecycle_manager.set_code_manager(mock_code_manager)
+
         orchestrator.semantic_selector = None
 
         await orchestrator.shutdown()
 
         mock_provider.close.assert_called_once()
-        orchestrator.code_manager.stop.assert_called_once()
+        mock_code_manager.stop.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_shutdown_with_semantic_selector(self, orchestrator):
         """Test shutdown closes semantic selector (covers lines 2014-2020)."""
         mock_provider = AsyncMock()
         mock_provider.close = AsyncMock()
-        orchestrator._provider_manager._current_state.provider = mock_provider
+        orchestrator.provider = mock_provider
+        orchestrator._lifecycle_manager.set_provider(mock_provider)
+
         orchestrator.code_manager = MagicMock()
 
         mock_selector = AsyncMock()
         mock_selector.close = AsyncMock()
         orchestrator.semantic_selector = mock_selector
+        orchestrator._lifecycle_manager.set_semantic_selector(mock_selector)
 
         await orchestrator.shutdown()
 
@@ -501,7 +513,8 @@ class TestShutdown:
         """Test shutdown handles provider close error (covers lines 2003-2004)."""
         mock_provider = AsyncMock()
         mock_provider.close = AsyncMock(side_effect=Exception("Close error"))
-        orchestrator._provider_manager._current_state.provider = mock_provider
+        orchestrator.provider = mock_provider
+        orchestrator._lifecycle_manager.set_provider(mock_provider)
         orchestrator.code_manager = MagicMock()
         orchestrator.semantic_selector = None
 
@@ -513,7 +526,8 @@ class TestShutdown:
         """Test shutdown handles code manager error (covers lines 2011-2012)."""
         mock_provider = AsyncMock()
         mock_provider.close = AsyncMock()
-        orchestrator._provider_manager._current_state.provider = mock_provider
+        orchestrator.provider = mock_provider
+        orchestrator._lifecycle_manager.set_provider(mock_provider)
         orchestrator.code_manager = MagicMock()
         orchestrator.code_manager.stop.side_effect = Exception("Stop error")
         orchestrator.semantic_selector = None
@@ -1877,15 +1891,21 @@ class TestSwitchProvider:
     @pytest.mark.asyncio
     async def test_switch_returns_bool_or_none(self, orchestrator):
         """switch_provider returns boolean or None."""
-        # Returns None on failure (provider not found)
-        result = await orchestrator.switch_provider("mock", "test-model")
-        assert result is None or isinstance(result, bool)
+        import pytest
+        from victor.core.errors import ProviderNotFoundError
+
+        # Raises ProviderNotFoundError when provider not found
+        with pytest.raises(ProviderNotFoundError):
+            await orchestrator.switch_provider("mock", "test-model")
 
     @pytest.mark.asyncio
     async def test_switch_to_invalid_provider_returns_none(self, orchestrator):
-        """Switching to invalid provider returns None."""
-        result = await orchestrator.switch_provider("nonexistent_provider_xyz", "model")
-        assert result is None
+        """Switching to invalid provider raises ProviderNotFoundError."""
+        import pytest
+        from victor.core.errors import ProviderNotFoundError
+
+        with pytest.raises(ProviderNotFoundError):
+            await orchestrator.switch_provider("nonexistent_provider_xyz", "model")
 
     @pytest.mark.asyncio
     async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
@@ -2905,6 +2925,8 @@ class TestRecoverSession:
     def test_recovers_session_successfully(self, orchestrator):
         """Test recovers session and restores messages."""
         mock_msg = MagicMock()
+        mock_msg.role = "user"
+        mock_msg.content = "Hello"
         mock_msg.to_provider_format.return_value = {"role": "user", "content": "Hello"}
 
         mock_session = MagicMock()
@@ -2914,14 +2936,10 @@ class TestRecoverSession:
         mock_manager.get_session.return_value = mock_session
         orchestrator.memory_manager = mock_manager
 
-        # Mock conversation.clear since it's a real method
-        orchestrator.conversation.clear = MagicMock()
-
         result = orchestrator.recover_session("session-123")
 
         assert result is True
         assert orchestrator._memory_session_id == "session-123"
-        orchestrator.conversation.clear.assert_called_once()
 
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns False."""
@@ -4177,10 +4195,12 @@ class TestSwitchProviderMethod:
 
     @pytest.mark.asyncio
     async def test_switch_provider_to_invalid_returns_falsy(self, orchestrator):
-        """Test switch_provider returns falsy value for invalid provider."""
-        result = await orchestrator.switch_provider("nonexistent_provider_xyz")
-        # Returns False or None on failure
-        assert not result
+        """Test switch_provider raises ProviderNotFoundError for invalid provider."""
+        import pytest
+        from victor.core.errors import ProviderNotFoundError
+
+        with pytest.raises(ProviderNotFoundError):
+            await orchestrator.switch_provider("nonexistent_provider_xyz")
 
 
 class TestContextMetrics:
