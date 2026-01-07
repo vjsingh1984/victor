@@ -47,7 +47,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
-    from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
+    from victor.agent.milestone_monitor import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
     from victor.core.verticals.protocols import (
@@ -654,7 +654,7 @@ class ToolSelector(ModeAwareMixin):
         tools: "ToolRegistry",
         semantic_selector: Optional["SemanticToolSelector"] = None,
         conversation_state: Optional["ConversationStateMachine"] = None,
-        task_tracker: Optional[Union["TaskMilestoneMonitor", "UnifiedTaskTracker"]] = None,
+        task_tracker: Optional["UnifiedTaskTracker"] = None,
         model: str = "",
         provider_name: str = "",
         tool_selection_config: Optional[Dict[str, Any]] = None,
@@ -668,7 +668,7 @@ class ToolSelector(ModeAwareMixin):
             tools: Tool registry containing available tools
             semantic_selector: Optional semantic selector for embedding-based selection
             conversation_state: Optional conversation state machine for stage detection
-            task_tracker: Optional task progress tracker (TaskMilestoneMonitor or UnifiedTaskTracker)
+            task_tracker: Optional task progress tracker (UnifiedTaskTracker)
             model: Model name (used for adaptive thresholds)
             provider_name: Provider name (used for small model detection)
             tool_selection_config: Optional config with base_threshold, base_max_tools
@@ -1867,7 +1867,7 @@ class ToolSelector(ModeAwareMixin):
     ) -> Set[str]:
         """Get tools appropriate for the current task type and stage.
 
-        Uses TaskMilestoneMonitor to determine task type and TaskToolConfigLoader
+        Uses UnifiedTaskTracker to determine task type and TaskToolConfigLoader
         to get stage-specific tool recommendations from YAML configuration.
 
         Args:
