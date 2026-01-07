@@ -465,7 +465,7 @@ class VerticalTraceView(ScrollableContainer):
         yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
 
     def add_vertical_event(self, event: Event) -> None:
-        """Add a vertical integration event."""
+        """Add a vertical integration event (prepends for newest first)."""
         if not event.topic.startswith("vertical."):
             return
 
@@ -486,7 +486,8 @@ class VerticalTraceView(ScrollableContainer):
             config_preview = str(data["config"])[:100]
             new_entry += f"\n         [dim]{config_preview}[/]"
 
-        content.update(f"{text}\n{new_entry}" if text else new_entry)
+        # Prepend new entry (newest first)
+        content.update(f"{new_entry}\n{text}" if text else new_entry)
 
 
 class JSONLBrowser(ScrollableContainer):
@@ -545,7 +546,8 @@ class JSONLBrowser(ScrollableContainer):
             table.display = True
             table.clear()
 
-            for event in self._events[-100:]:  # Show last 100 events
+            # Iterate in reverse to show newest events first
+            for event in reversed(self._events[-100:]):  # Show last 100 events, newest first
                 # TODO: Migrate
                 timestamp = event.datetime.strftime("%Y-%m-%d %H:%M:%S")
                 category = event.category
@@ -570,7 +572,7 @@ class ExecutionTraceView(ScrollableContainer):
         yield Static("[dim]Execution trace will appear here...[/]", id="trace-content")
 
     def add_span_event(self, event: Event) -> None:
-        """Add a span event to the trace view."""
+        """Add a span event to the trace view (prepends for newest first)."""
         if not event.topic.startswith("lifecycle."):
             return
 
@@ -594,7 +596,8 @@ class ExecutionTraceView(ScrollableContainer):
             if status_msg:
                 new_entry += f" [dim]{status_msg}[/]"
 
-            content.update(f"{text}\n{new_entry}" if text else new_entry)
+            # Prepend new entry (newest first)
+            content.update(f"{new_entry}\n{text}" if text else new_entry)
         else:
             # Generic lifecycle event handling
             span_type = data.get("span_type", event.topic.split(".")[-1])
@@ -612,7 +615,8 @@ class ExecutionTraceView(ScrollableContainer):
                 duration = data["duration_ms"]
                 new_entry += f" [dim]{duration:.0f}ms[/]"
 
-            content.update(f"{text}\n{new_entry}" if text else new_entry)
+            # Prepend new entry (newest first)
+            content.update(f"{new_entry}\n{text}" if text else new_entry)
 
 
 class ToolCallHistoryView(DataTable):
