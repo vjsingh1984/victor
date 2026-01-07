@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.agent.task_analyzer import TaskType
 
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class TaskCoordinator:
         unified_tracker: "UnifiedTaskTracker",
         prompt_builder: "SystemPromptBuilder",
         settings: "Settings",
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
     ):
         """Initialize TaskCoordinator.
 
@@ -79,10 +79,10 @@ class TaskCoordinator:
             unified_tracker: Tool budget and iteration tracker
             prompt_builder: System prompt builder for task hints
             settings: Application settings
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self.task_analyzer = task_analyzer
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
         self.unified_tracker = unified_tracker
         self.prompt_builder = prompt_builder
         self.settings = settings
@@ -91,6 +91,19 @@ class TaskCoordinator:
         self._tool_budget = getattr(settings, "tool_budget", 15)
         self._observed_files = []
         self._reminder_manager = None
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
 
     # =====================================================================
     # Task Preparation
@@ -192,19 +205,25 @@ class TaskCoordinator:
             )
 
         # Emit STATE event for task preparation
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.STATE,
-                name="task.prepared",
-                data={
-                    "unified_task_type": unified_task_type.value,
-                    "complexity": task_classification.complexity.value,
-                    "confidence": task_classification.confidence,
-                    "tool_budget": complexity_tool_budget,
-                },
-                source="TaskCoordinator",
-            )
-        )
+        if self._event_bus:
+            try:
+                import asyncio
+
+                asyncio.run(
+                    self._event_bus.emit(
+                        topic="task.prepared",
+                        data={
+                            "unified_task_type": unified_task_type.value,
+                            "complexity": task_classification.complexity.value,
+                            "confidence": task_classification.confidence,
+                            "tool_budget": complexity_tool_budget,
+                            "category": "state",  # Preserve for observability
+                        },
+                        source="TaskCoordinator",
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit task prepared event: {e}")
 
         return task_classification, complexity_tool_budget
 

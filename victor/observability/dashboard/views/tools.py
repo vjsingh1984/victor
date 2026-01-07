@@ -30,7 +30,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.widgets import DataTable, RichLog, Static
 from textual.reactive import reactive
 
-from victor.observability.event_bus import EventCategory, VictorEvent
+from victor.core.events import Event
 
 
 @dataclass
@@ -120,13 +120,13 @@ class ToolStatsWidget(DataTable):
         self.cursor_type = "row"
         self.zebra_stripes = True
 
-    def add_tool_event(self, event: VictorEvent) -> None:
+    def add_tool_event(self, event: Event) -> None:
         """Process a tool event and update statistics.
 
         Args:
             event: Tool event to process
         """
-        if event.category != EventCategory.TOOL:
+        if not event.topic.startswith("tool."):
             return
 
         data = event.data or {}
@@ -139,7 +139,7 @@ class ToolStatsWidget(DataTable):
         stats = self._stats[tool_name]
 
         # Process end events for statistics
-        if event.name.endswith(".end"):
+        if event.topic.endswith(".end"):
             success = data.get("success", True)
             duration_ms = data.get("duration_ms")
             error = data.get("error") or data.get("message")
@@ -235,20 +235,20 @@ class ToolHistoryWidget(RichLog):
         self._max_entries = max_entries
         self._entry_count = 0
 
-    def add_tool_event(self, event: VictorEvent) -> None:
+    def add_tool_event(self, event: Event) -> None:
         """Add a tool event to the history.
 
         Args:
             event: Tool event to add
         """
-        if event.category != EventCategory.TOOL:
+        if not event.topic.startswith("tool."):
             return
 
         data = event.data or {}
         tool_name = data.get("tool_name", "unknown")
         timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
 
-        if event.name.endswith(".start"):
+        if event.topic.endswith(".start"):
             # Tool start
             self.write(f"[dim]{timestamp}[/] [cyan]{tool_name}[/] [yellow]STARTED[/]")
 
@@ -258,7 +258,7 @@ class ToolHistoryWidget(RichLog):
                 args_preview = self._format_arguments(args)
                 self.write(f"           [dim]args: {args_preview}[/]")
 
-        elif event.name.endswith(".end"):
+        elif event.topic.endswith(".end"):
             # Tool end
             success = data.get("success", True)
             duration_ms = data.get("duration_ms")

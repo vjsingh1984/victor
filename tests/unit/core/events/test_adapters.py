@@ -26,11 +26,8 @@ from victor.core.events.adapter import (
     victor_event_to_event,
     event_to_victor_event,
 )
-from victor.observability.event_bus import (
-    VictorEvent,
-    EventCategory,
-    EventPriority,
-)
+
+# Old event_bus imports removed - migration complete
 
 
 @pytest.mark.unit

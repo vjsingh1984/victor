@@ -179,7 +179,7 @@ class NativeMetrics:
         """Lazy-load EventBus."""
         if self._bus is None:
             try:
-                from victor.observability.event_bus import EventBus
+                from victor.core.events import ObservabilityBus as EventBus
 
                 self._bus = EventBus.get_instance()
             except ImportError:

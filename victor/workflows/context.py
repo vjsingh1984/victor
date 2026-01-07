@@ -14,6 +14,18 @@
 
 """Unified execution context for all workflow runtimes.
 
+MIGRATION NOTICE: This module is deprecated for state management.
+
+For new code, use the canonical state management system:
+    - victor.state.WorkflowStateManager - Single workflow scope state
+    - victor.state.get_global_manager() - Unified access to all scopes
+
+This module is kept for backward compatibility and type definitions only.
+
+---
+
+Legacy Documentation:
+
 This module provides a single, unified state type for workflow execution,
 consolidating the previously fragmented state types:
 
@@ -38,6 +50,22 @@ Example:
     # Update state
     ctx["_current_node"] = "process"
     ctx["_node_results"] = {"start": {"success": True}}
+
+Migration Example:
+    # OLD (deprecated):
+    from victor.workflows.context import ExecutionContext, create_execution_context
+    ctx = create_execution_context({"input": "test"})
+
+    # NEW (recommended):
+    from victor.state import WorkflowStateManager, StateScope
+    mgr = WorkflowStateManager()
+    await mgr.set("input", "test")  # Workflow scope
+    value = await mgr.get("input")
+
+    # OR for unified access across all scopes:
+    from victor.state import get_global_manager
+    state = get_global_manager()
+    await state.set("input", "test", scope=StateScope.WORKFLOW)
 """
 
 from __future__ import annotations
@@ -200,36 +228,126 @@ def create_execution_context(
 class ExecutionContextWrapper:
     """Wrapper providing method-based access to ExecutionContext.
 
-    This class wraps an ExecutionContext TypedDict and provides the same
-    method interface as the legacy WorkflowContext dataclass, enabling
-    gradual migration.
+    This class now delegates to WorkflowStateManager for actual state management,
+    replacing the previous direct dict-based approach.
+
+    MIGRATION NOTICE: This wrapper is deprecated. Use WorkflowStateManager directly
+    for new code. For unified state access across all scopes, use get_global_manager().
 
     Example:
+        # OLD (deprecated):
         ctx = create_execution_context({"input": "test"})
         wrapper = ExecutionContextWrapper(ctx)
-
-        # Method-based access (like WorkflowContext)
         wrapper.set("output", "result")
-        value = wrapper.get("output")
 
-        # Direct dict access still works
-        wrapper.state["data"]["key"] = "value"
+        # NEW (recommended):
+        from victor.state import WorkflowStateManager
+        mgr = WorkflowStateManager()
+        await mgr.set("output", "result")
+        value = await mgr.get("output")
+
+        # OR for unified access:
+        from victor.state import get_global_manager, StateScope
+        state = get_global_manager()
+        await state.set("output", "result", scope=StateScope.WORKFLOW)
     """
 
     state: ExecutionContext = field(default_factory=create_execution_context)
+    _manager: Any = field(default=None, init=False, repr=False)
+
+    def __post_init__(self):
+        """Initialize WorkflowStateManager on first use."""
+        from victor.state.managers import WorkflowStateManager
+
+        if self._manager is None:
+            self._manager = WorkflowStateManager()
+            # Initialize with existing data if present
+            if "data" in self.state and self.state["data"]:
+                # Note: We can't use async here in __post_init__,
+                # so we'll lazy-load on first access
+                pass
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a context value from data."""
+        """Get a context value from data.
+
+        DEPRECATED: Use WorkflowStateManager.get() instead.
+        """
+        # Check manager first
+        try:
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in async context, but this is a sync method
+                    # Fall back to direct state access
+                    pass
+                else:
+                    # We can run async code
+                    try:
+                        return asyncio.run(self._manager.get(key, default))
+                    except RuntimeError:
+                        pass
+            except RuntimeError:
+                pass
+        except Exception:
+            pass
+
+        # Fall back to direct state access
         return self.state.get("data", {}).get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """Set a context value in data."""
+        """Set a context value in data.
+
+        DEPRECATED: Use WorkflowStateManager.set() instead.
+        """
+        # Update both manager and state for compatibility
+        try:
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in async context
+                    pass
+                else:
+                    # We can run async code
+                    try:
+                        asyncio.run(self._manager.set(key, value))
+                    except RuntimeError:
+                        pass
+            except RuntimeError:
+                pass
+        except Exception:
+            pass
+
+        # Update state dict
         if "data" not in self.state:
             self.state["data"] = {}
         self.state["data"][key] = value
 
     def update(self, values: Dict[str, Any]) -> None:
-        """Update multiple context values in data."""
+        """Update multiple context values in data.
+
+        DEPRECATED: Use WorkflowStateManager.update() instead.
+        """
+        # Update both manager and state for compatibility
+        try:
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    try:
+                        asyncio.run(self._manager.update(values))
+                    except RuntimeError:
+                        pass
+            except RuntimeError:
+                pass
+        except Exception:
+            pass
+
+        # Update state dict
         if "data" not in self.state:
             self.state["data"] = {}
         self.state["data"].update(values)

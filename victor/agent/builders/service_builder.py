@@ -27,9 +27,13 @@ AgentOrchestrator, including:
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.core.bootstrap import ensure_bootstrapped
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator_factory import OrchestratorFactory
 
 
 class ServiceBuilder(FactoryAwareBuilder):

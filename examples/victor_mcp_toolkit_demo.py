@@ -191,7 +191,11 @@ def list_available_tools():
         for name in tool_names:
             if name in all_tools:
                 tool = all_tools[name]
-                desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
+                desc = (
+                    tool.description[:50] + "..."
+                    if len(tool.description) > 50
+                    else tool.description
+                )
                 print(f"  {name:25} {desc}")
             else:
                 print(f"  {name:25} (not loaded)")
@@ -248,8 +252,10 @@ async def run_demo():
         tool_registry=registry,
     )
     print(f"   Server: {server.name} v{server.version}")
-    print(f"   Capabilities: tools={server.info.capabilities.tools}, "
-          f"resources={server.info.capabilities.resources}")
+    print(
+        f"   Capabilities: tools={server.info.capabilities.tools}, "
+        f"resources={server.info.capabilities.resources}"
+    )
     print()
 
     # Register sample resources
@@ -279,45 +285,54 @@ async def run_demo():
     print("-" * 40)
 
     # Initialize
-    init_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "1",
-        "method": "initialize",
-        "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
-    })
+    init_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "initialize",
+            "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
+        }
+    )
     print(f"   Initialize: {init_response['result']['serverInfo']['name']}")
 
     # List tools
-    list_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "2",
-        "method": "tools/list",
-    })
+    list_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "2",
+            "method": "tools/list",
+        }
+    )
     tools_count = len(list_response["result"]["tools"])
     print(f"   List tools: {tools_count} tools available")
 
     # List resources
-    resources_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "3",
-        "method": "resources/list",
-    })
+    resources_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "3",
+            "method": "resources/list",
+        }
+    )
     resources_count = len(resources_response["result"]["resources"])
     print(f"   List resources: {resources_count} resources registered")
 
     # Ping
-    ping_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "4",
-        "method": "ping",
-    })
+    ping_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "4",
+            "method": "ping",
+        }
+    )
     print(f"   Ping: {ping_response['result']}")
     print()
 
     # Usage instructions
     print("6. USAGE INSTRUCTIONS")
     print("-" * 40)
-    print("""
+    print(
+        """
    To use Victor as an MCP server with Claude Desktop:
 
    1. Add to Claude Desktop config:
@@ -341,7 +356,8 @@ async def run_demo():
 
    For filtered tools (coding vertical only):
       python examples/victor_mcp_toolkit_demo.py --stdio --vertical coding
-""")
+"""
+    )
 
     print("=" * 70)
     print("Demo complete!")
@@ -369,12 +385,14 @@ async def run_stdio_server(
     )
 
     # Register default resources
-    server.register_resource(MCPResource(
-        uri="file://./README.md",
-        name="Victor README",
-        description="Victor project documentation",
-        mime_type="text/markdown",
-    ))
+    server.register_resource(
+        MCPResource(
+            uri="file://./README.md",
+            name="Victor README",
+            description="Victor project documentation",
+            mime_type="text/markdown",
+        )
+    )
 
     print(f"Victor MCP Server starting with {tools_count} tools", file=sys.stderr)
 
@@ -443,10 +461,12 @@ Examples:
         filter_tools = [t.strip() for t in args.tools.split(",")]
 
     if args.stdio:
-        asyncio.run(run_stdio_server(
-            filter_tools=filter_tools,
-            filter_vertical=args.vertical,
-        ))
+        asyncio.run(
+            run_stdio_server(
+                filter_tools=filter_tools,
+                filter_vertical=args.vertical,
+            )
+        )
     else:
         asyncio.run(run_demo())
 

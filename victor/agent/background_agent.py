@@ -298,9 +298,11 @@ class BackgroundAgentManager:
                     description=description or task,
                     task=task,
                     mode=mode,
-                    orchestrator=agent_wrapper._orchestrator
-                    if hasattr(agent_wrapper, "_orchestrator")
-                    else self._orchestrator,
+                    orchestrator=(
+                        agent_wrapper._orchestrator
+                        if hasattr(agent_wrapper, "_orchestrator")
+                        else self._orchestrator
+                    ),
                 )
             else:
                 # Legacy path: direct BackgroundAgent instantiation

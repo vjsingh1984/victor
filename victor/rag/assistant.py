@@ -246,9 +246,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGModeConfigProvider instance
         """
-        return cls._get_extension_factory(
-            "mode_config_provider", "victor.rag.mode_config"
-        )
+        return cls._get_extension_factory("mode_config_provider", "victor.rag.mode_config")
 
     @classmethod
     def get_tool_dependency_provider(cls):
@@ -295,6 +293,4 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGCapabilityProvider instance
         """
-        return cls._get_extension_factory(
-            "capability_provider", "victor.rag.capabilities"
-        )
+        return cls._get_extension_factory("capability_provider", "victor.rag.capabilities")

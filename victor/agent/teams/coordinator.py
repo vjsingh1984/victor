@@ -59,6 +59,7 @@ from victor.agent.subagents.orchestrator import (
     SubAgentOrchestrator,
     SubAgentTask,
 )
+
 # Import from canonical location to avoid circular dependencies
 from victor.protocols.team import ITeamCoordinator, ITeamMember
 
@@ -72,6 +73,7 @@ from victor.teams.types import (
     TeamMember,
     TeamResult,
 )
+
 # Import canonical AgentMessage from victor.teams.types
 from victor.teams.types import AgentMessage
 from victor.agent.teams.communication import (
@@ -218,15 +220,15 @@ class TeamCoordinator(ITeamCoordinator):
             team_members.append(
                 TeamMember(
                     id=member.id,
-                    role=getattr(member, 'role', SubAgentRole.EXECUTOR),
-                    name=getattr(member, 'name', f"Member {i}"),
+                    role=getattr(member, "role", SubAgentRole.EXECUTOR),
+                    name=getattr(member, "name", f"Member {i}"),
                     goal=task,  # Use task as goal
-                    tool_budget=getattr(member, 'tool_budget', 15),
-                    allowed_tools=getattr(member, 'allowed_tools', None),
+                    tool_budget=getattr(member, "tool_budget", 15),
+                    allowed_tools=getattr(member, "allowed_tools", None),
                     # Copy other attributes if available
-                    backstory=getattr(member, 'backstory', ''),
-                    expertise=getattr(member, 'expertise', []),
-                    personality=getattr(member, 'personality', ''),
+                    backstory=getattr(member, "backstory", ""),
+                    expertise=getattr(member, "expertise", []),
+                    personality=getattr(member, "personality", ""),
                 )
             )
 

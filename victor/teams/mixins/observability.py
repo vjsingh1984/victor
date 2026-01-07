@@ -131,7 +131,7 @@ class ObservabilityMixin:
             return
 
         try:
-            from victor.observability.event_bus import EventBus
+            from victor.core.events import ObservabilityBus as EventBus
 
             bus = EventBus.get_instance()
             bus.publish(

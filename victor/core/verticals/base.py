@@ -281,6 +281,7 @@ class VerticalBase(ABC):
                     "victor.coding.safety",
                 )
         """
+
         def _create():
             # Determine the class name to import
             if attribute_name is None:
@@ -288,9 +289,7 @@ class VerticalBase(ABC):
                 # Convert "CodingAssistant" → "Coding"
                 vertical_name = cls.__name__.replace("Assistant", "")
                 # Convert "safety_extension" → "SafetyExtension"
-                extension_type = (
-                    extension_key.replace("_", " ").title().replace(" ", "")
-                )
+                extension_type = extension_key.replace("_", " ").title().replace(" ", "")
                 class_name = f"{vertical_name}{extension_type}"
             else:
                 class_name = attribute_name

@@ -108,6 +108,18 @@ START = "__start__"
 class CopyOnWriteState(Generic[StateType]):
     """Copy-on-write wrapper for workflow state.
 
+    MIGRATION NOTICE: For persistent state storage across workflow executions,
+    use the canonical state management system:
+        - victor.state.WorkflowStateManager - Workflow scope state
+        - victor.state.get_global_manager() - Unified access to all scopes
+
+    CopyOnWriteState is kept as a performance optimization for workflow graphs,
+    providing copy-on-write semantics for state within a single execution.
+
+    ---
+
+    Legacy Documentation:
+
     Delays deep copy of state until the first mutation, reducing overhead
     for read-heavy workflows where nodes often only read state.
 
@@ -128,6 +140,25 @@ class CopyOnWriteState(Generic[StateType]):
 
         # Get the final state
         final_state = cow_state.get_state()
+
+    Migration Example:
+        # OLD (using CopyOnWriteState for persistent storage):
+        cow_state = CopyOnWriteState({"task_id": "task-123"})
+        cow_state["status"] = "running"
+        final_state = cow_state.get_state()
+
+        # NEW (using canonical state management):
+        from victor.state import WorkflowStateManager, StateScope
+
+        mgr = WorkflowStateManager()
+        await mgr.set("task_id", "task-123")
+        await mgr.set("status", "running")
+
+        # OR for unified access:
+        from victor.state import get_global_manager
+        state = get_global_manager()
+        await state.set("task_id", "task-123", scope=StateScope.WORKFLOW)
+        await state.set("status", "running", scope=StateScope.WORKFLOW)
 
     Performance characteristics:
         - Read operations: O(1), no copy overhead
@@ -776,7 +807,7 @@ class CompiledGraph(Generic[StateType]):
             return
 
         try:
-            from victor.observability.event_bus import get_event_bus
+            from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
             bus.emit_lifecycle_event(

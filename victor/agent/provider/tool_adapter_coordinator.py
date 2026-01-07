@@ -78,7 +78,7 @@ class ToolAdapterCoordinator(IToolAdapterCoordinator):
         if not provider_name:
             raise ValueError("No provider configured")
 
-        provider = self._provider_switcher.get_current_provider()
+        _provider = self._provider_switcher.get_current_provider()
         model = self._provider_switcher.get_current_model()
 
         # Get adapter from registry

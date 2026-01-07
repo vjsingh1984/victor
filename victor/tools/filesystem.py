@@ -1483,7 +1483,7 @@ async def read(
 
             # Check for airgapped mode or local providers
             if settings.airgapped_mode:
-                return 150, 6144  # 150 lines, 6KB for local models
+                return 800, 32768  # 150 lines, 6KB for local models
 
             # Check provider name for local indicators
             provider = getattr(settings, "provider", "").lower()
@@ -1501,12 +1501,12 @@ async def read(
                         # ~10% of context for read output is reasonable
                         max_tokens = context_window // 10
                         # Estimate ~4 chars per token, ~40 chars per line
-                        max_lines = min(300, max(50, max_tokens // 10))
-                        max_bytes = min(12288, max(2048, max_tokens * 4))
+                        max_lines = min(800, max(50, max_tokens // 10))
+                        max_bytes = min(32768, max(2048, max_tokens * 4))
                         return max_lines, max_bytes
                 except Exception:
                     pass
-                return 150, 6144  # Fallback for local models
+                return 800, 32768  # Fallback for local models
 
             # Cloud models get balanced limits
             return 750, 25600  # 750 lines, 25KB

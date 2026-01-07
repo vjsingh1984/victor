@@ -57,6 +57,11 @@ def dashboard(
         "--demo",
         help="Run in demo mode with simulated events.",
     ),
+    log_level: str = typer.Option(
+        "INFO",
+        "--log-level",
+        help="Set log level (DEBUG, INFO, WARNING, ERROR). Default: INFO",
+    ),
 ) -> None:
     """Launch the Victor observability dashboard.
 
@@ -78,8 +83,16 @@ def dashboard(
 
         # Run demo mode with simulated events
         victor dashboard --demo
+
+        # Enable debug logging to troubleshoot event loading
+        victor dashboard --log-level DEBUG
     """
     if ctx.invoked_subcommand is None:
+        # Setup logging with dashboard-specific log level
+        from victor.ui.commands.utils import setup_logging
+
+        setup_logging(command="dashboard", cli_log_level=log_level)
+
         asyncio.run(
             run_dashboard(
                 log_file=log_file,
@@ -148,11 +161,8 @@ async def run_demo_dashboard(
     from datetime import datetime, timezone
 
     from victor.observability.dashboard import ObservabilityDashboard
-    from victor.observability.event_bus import (
-        EventBus,
-        EventCategory,
-        VictorEvent,
-    )
+
+    # TODO: MIGRATION - OLD IMPORT REMOVED
 
     # Create dashboard
     app = ObservabilityDashboard(
@@ -308,7 +318,7 @@ async def run_demo_dashboard(
 def dashboard_status() -> None:
     """Show current event bus status and statistics."""
     try:
-        from victor.observability.event_bus import EventBus
+        from victor.core.events import ObservabilityBus as EventBus
     except ImportError:
         console.print("[red]Error: Could not import EventBus[/]")
         raise typer.Exit(1)

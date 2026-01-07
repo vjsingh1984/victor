@@ -66,6 +66,7 @@ from victor.teams.types import (
     MessageType,
     TeamFormation,
 )
+
 # Import protocols from canonical location to avoid circular dependencies
 from victor.protocols.team import ITeamMember, ITeamCoordinator
 
@@ -246,13 +247,9 @@ class IAgentPersona(Protocol):
 # =============================================================================
 
 
-
-
 # =============================================================================
 # Team Coordinator Protocol
 # =============================================================================
-
-
 
 
 # =============================================================================

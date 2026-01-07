@@ -84,7 +84,7 @@ class _TeamMemberAdapter:
     @property
     def role(self):
         """Expose role from underlying member for formation strategy detection."""
-        return getattr(self._member, 'role', None)
+        return getattr(self._member, "role", None)
 
     async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
         """Execute task using ITeamMember interface."""
@@ -438,9 +438,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
 
         # Convert list of MemberResults to dict
-        member_results: Dict[str, MemberResult] = {
-            r.member_id: r for r in member_results_list
-        }
+        member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
 
         # Build final output
         success = all(r.success for r in member_results_list) if member_results_list else False

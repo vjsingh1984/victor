@@ -42,10 +42,8 @@ class TestEventBusDropOldestWarning:
     def small_queue_event_bus(self):
         """Create an event bus with a small queue for testing."""
         import asyncio
-        from victor.observability.event_bus import (
-            BackpressureStrategy,
-            EventBus,
-        )
+
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         # Reset singleton for clean test
         EventBus.reset_instance()
@@ -71,7 +69,7 @@ class TestEventBusDropOldestWarning:
     @pytest.mark.asyncio
     async def test_drop_oldest_logs_warning_on_first_drop(self, small_queue_event_bus, caplog):
         """Test that DROP_OLDEST logs a WARNING on first event drop."""
-        from victor.observability.event_bus import EventCategory, VictorEvent
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         bus = small_queue_event_bus
 
@@ -95,7 +93,7 @@ class TestEventBusDropOldestWarning:
     @pytest.mark.asyncio
     async def test_drop_oldest_warning_is_rate_limited(self, small_queue_event_bus, caplog):
         """Test that DROP_OLDEST warnings are rate-limited (max 1 per minute)."""
-        from victor.observability.event_bus import EventCategory, VictorEvent
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         bus = small_queue_event_bus
 
@@ -123,7 +121,7 @@ class TestEventBusDropOldestWarning:
     @pytest.mark.asyncio
     async def test_drop_oldest_warning_interval_respected(self, small_queue_event_bus, caplog):
         """Test that warnings are emitted again after interval passes."""
-        from victor.observability.event_bus import EventCategory, VictorEvent
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         bus = small_queue_event_bus
         # Set a very short interval for testing

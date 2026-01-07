@@ -80,7 +80,7 @@ from victor.agent.conversation_state import (
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
-    from victor.observability.event_bus import EventBus
+    from victor.core.events import ObservabilityBus as EventBus
 
 logger = logging.getLogger(__name__)
 

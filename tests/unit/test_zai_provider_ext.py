@@ -265,6 +265,7 @@ async def test_chat_rate_limit_error(zai_provider):
 @pytest.mark.asyncio
 async def test_stream_basic(zai_provider):
     """Test basic streaming functionality."""
+
     # Mock streaming response
     async def mock_aiter_lines():
         yield "data: " + '{"choices":[{"delta":{"content":"Hello"},"finish_reason":null}]}'
@@ -296,6 +297,7 @@ async def test_stream_basic(zai_provider):
 @pytest.mark.asyncio
 async def test_stream_with_tools(zai_provider):
     """Test streaming with tools."""
+
     async def mock_aiter_lines():
         yield "data: " + '{"choices":[{"delta":{"content":"Using tool"},"finish_reason":null}]}'
         yield "data: [DONE]"
@@ -332,6 +334,7 @@ async def test_stream_with_tools(zai_provider):
 @pytest.mark.asyncio
 async def test_stream_error(zai_provider):
     """Test streaming error handling."""
+
     # Create a mock that raises error when __aenter__ is called (entering context)
     async def mock_aenter():
         raise httpx.HTTPStatusError(

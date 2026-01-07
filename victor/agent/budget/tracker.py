@@ -88,8 +88,12 @@ class BudgetTracker(IBudgetTracker):
     def _initialize_budgets(self) -> None:
         """Set up initial budget states from config."""
         self._budgets = {
-            BudgetType.TOOL_CALLS: BudgetState(current=0, base_maximum=self._config.base_tool_calls),
-            BudgetType.ITERATIONS: BudgetState(current=0, base_maximum=self._config.base_iterations),
+            BudgetType.TOOL_CALLS: BudgetState(
+                current=0, base_maximum=self._config.base_tool_calls
+            ),
+            BudgetType.ITERATIONS: BudgetState(
+                current=0, base_maximum=self._config.base_iterations
+            ),
             BudgetType.EXPLORATION: BudgetState(
                 current=0, base_maximum=self._config.base_exploration
             ),

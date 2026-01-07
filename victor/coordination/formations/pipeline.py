@@ -51,9 +51,7 @@ class PipelineFormation(BaseFormationStrategy):
         previous_output = None
 
         for i, agent in enumerate(agents):
-            logger.debug(
-                f"PipelineFormation: stage {i+1}/{len(agents)}: {agent.id}"
-            )
+            logger.debug(f"PipelineFormation: stage {i+1}/{len(agents)}: {agent.id}")
 
             # Add previous output to context
             if previous_output is not None:

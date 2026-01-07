@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
 
-
 __all__ = [
     "MemoryConfig",
     "TeamFormation",

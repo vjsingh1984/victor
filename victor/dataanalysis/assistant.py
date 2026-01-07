@@ -173,21 +173,15 @@ When presenting analysis:
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory(
-            "prompt_contributor", "victor.dataanalysis.prompts"
-        )
+        return cls._get_extension_factory("prompt_contributor", "victor.dataanalysis.prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory(
-            "mode_config_provider", "victor.dataanalysis.mode_config"
-        )
+        return cls._get_extension_factory("mode_config_provider", "victor.dataanalysis.mode_config")
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory(
-            "safety_extension", "victor.dataanalysis.safety"
-        )
+        return cls._get_extension_factory("safety_extension", "victor.dataanalysis.safety")
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:

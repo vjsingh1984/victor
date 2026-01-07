@@ -110,6 +110,10 @@ from victor.core.events.backends import (
     # Factory
     create_event_backend,
     register_backend_factory,
+    # Convenience functions for DI integration
+    get_observability_bus,
+    get_agent_message_bus,
+    get_event_backend,
 )
 
 # Lightweight backends (optional import - may not be needed in all contexts)
@@ -127,10 +131,21 @@ except ImportError:
 
 # Adapters for bridging with existing systems
 from victor.core.events.adapter import (
-    victor_event_to_event,
-    event_to_victor_event,
+    victor_event_to_event as victor_event_to_event_simple,
+    event_to_victor_event as event_to_victor_event_simple,
     EventBusAdapter,
     TeamMessageBusAdapter,
+)
+
+# Migration utilities - REMOVED (migration complete, no longer needed)
+# The migrator.py module caused circular imports after event_bus.py deletion
+# Use adapter.py for backward compatibility if needed
+
+# Sync wrappers for gradual migration
+from victor.core.events.sync_wrapper import (
+    SyncEventWrapper,
+    SyncObservabilityBus,
+    SyncEventHandler,
 )
 
 __all__ = [
@@ -170,12 +185,21 @@ __all__ = [
     # Protocol-based - Factory
     "create_event_backend",
     "register_backend_factory",
+    # Convenience functions for DI integration
+    "get_observability_bus",
+    "get_agent_message_bus",
+    "get_event_backend",
     # Lightweight backends (optional)
     "SQLiteEventBackend",
     "register_lightweight_backends",
-    # Adapters for bridging
-    "victor_event_to_event",
-    "event_to_victor_event",
+    # Adapters for bridging (simple versions)
+    "victor_event_to_event_simple",
+    "event_to_victor_event_simple",
     "EventBusAdapter",
     "TeamMessageBusAdapter",
+    # Migration utilities removed (migration complete)
+    # Sync wrappers for gradual migration
+    "SyncEventWrapper",
+    "SyncObservabilityBus",
+    "SyncEventHandler",
 ]

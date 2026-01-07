@@ -34,10 +34,10 @@ Example:
     from victor.observability import EventBus, VictorEvent, EventCategory
 
     # Get singleton bus
-    bus = EventBus.get_instance()
+    bus = get_observability_bus()
 
     # Subscribe to events
-    def on_tool_event(event: VictorEvent):
+    def on_tool_event(event: Event):
         print(f"Tool {event.name}: {event.data}")
 
     bus.subscribe(EventCategory.TOOL, on_tool_event)
@@ -53,11 +53,11 @@ Example:
     bus.add_exporter(JsonLineExporter("events.jsonl"))
 """
 
-from victor.observability.event_bus import (
-    EventBus,
-    EventCategory,
-    EventPriority,
-    VictorEvent,
+# Event system - using canonical core/events
+from victor.core.events import (
+    ObservabilityBus,
+    Event,
+    get_observability_bus,
 )
 from victor.observability.exporters import (
     BaseExporter,
@@ -117,6 +117,13 @@ from victor.observability.cqrs_adapter import (
     UnifiedEventBridge,
     create_unified_bridge,
 )
+from victor.observability.debugger import AgentDebugger
+from victor.observability.tracing import (
+    ExecutionSpan,
+    ExecutionTracer,
+    ToolCallRecord,
+    ToolCallTracer,
+)
 
 # Conditional OTEL exports
 try:
@@ -130,11 +137,10 @@ except ImportError:
     _OTEL_EXPORTS = []
 
 __all__ = [
-    # Core
-    "EventBus",
-    "VictorEvent",
-    "EventCategory",
-    "EventPriority",
+    # Core (canonical event system)
+    "ObservabilityBus",
+    "Event",
+    "get_observability_bus",
     # Exporters
     "BaseExporter",
     "JsonLineExporter",
@@ -162,6 +168,13 @@ __all__ = [
     "EventMappingRule",
     "UnifiedEventBridge",
     "create_unified_bridge",
+    # Tracing
+    "ExecutionTracer",
+    "ExecutionSpan",
+    "ToolCallTracer",
+    "ToolCallRecord",
+    # Debugging
+    "AgentDebugger",
     # Metrics
     "Metric",
     "Counter",

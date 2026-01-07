@@ -417,14 +417,16 @@ class ProviderManager:
             if not result:
                 # Attempt fallback if configured
                 if self.config.auto_fallback:
-                    logger.warning(f"Provider switch to {provider_name} failed, attempting fallback")
+                    logger.warning(
+                        f"Provider switch to {provider_name} failed, attempting fallback"
+                    )
                     return await self._attempt_fallback(reason)
                 return False
 
             # Sync legacy state with switcher state
             switcher_state = self._provider_switcher.get_current_state()
             if switcher_state:
-                old_switch_count = self._current_state.switch_count if self._current_state else 0
+                _old_switch_count = self._current_state.switch_count if self._current_state else 0
                 self._current_state = ProviderState(
                     provider=switcher_state.provider,
                     provider_name=switcher_state.provider_name,

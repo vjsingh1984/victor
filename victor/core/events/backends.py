@@ -680,6 +680,75 @@ class AgentMessageBus:
 
 
 # =============================================================================
+# Convenience Functions for DI Integration
+# =============================================================================
+
+
+def get_observability_bus() -> ObservabilityBus:
+    """Get the ObservabilityBus instance from DI container.
+
+    This is a convenience function that retrieves the ObservabilityBus
+    from the global service container. It's the recommended way to get
+    the observability bus for application code.
+
+    Returns:
+        ObservabilityBus instance
+
+    Example:
+        >>> from victor.core.events.backends import get_observability_bus
+        >>>
+        >>> bus = get_observability_bus()
+        >>> await bus.emit("tool.start", {"tool": "read_file"})
+    """
+    from victor.core.container import get_container
+
+    container = get_container()
+    return container.get(ObservabilityBus)
+
+
+def get_agent_message_bus() -> AgentMessageBus:
+    """Get the AgentMessageBus instance from DI container.
+
+    This is a convenience function that retrieves the AgentMessageBus
+    from the global service container.
+
+    Returns:
+        AgentMessageBus instance
+
+    Example:
+        >>> from victor.core.events.backends import get_agent_message_bus
+        >>>
+        >>> bus = get_agent_message_bus()
+        >>> await bus.send("task", {"action": "analyze"}, to_agent="researcher")
+    """
+    from victor.core.container import get_container
+
+    container = get_container()
+    return container.get(AgentMessageBus)
+
+
+def get_event_backend() -> IEventBackend:
+    """Get the IEventBackend instance from DI container.
+
+    This is a convenience function that retrieves the event backend
+    from the global service container.
+
+    Returns:
+        IEventBackend instance
+
+    Example:
+        >>> from victor.core.events.backends import get_event_backend
+        >>>
+        >>> backend = get_event_backend()
+        >>> await backend.publish(Event(topic="test", data={}))
+    """
+    from victor.core.container import get_container
+
+    container = get_container()
+    return container.get(IEventBackend)
+
+
+# =============================================================================
 # Module Exports
 # =============================================================================
 
@@ -692,4 +761,8 @@ __all__ = [
     # Factory
     "create_event_backend",
     "register_backend_factory",
+    # Convenience functions for DI integration
+    "get_observability_bus",
+    "get_agent_message_bus",
+    "get_event_backend",
 ]

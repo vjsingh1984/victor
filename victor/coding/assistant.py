@@ -320,9 +320,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Prompt contributor with task type hints
         """
-        return cls._get_extension_factory(
-            "prompt_contributor", "victor.coding.prompts"
-        )
+        return cls._get_extension_factory("prompt_contributor", "victor.coding.prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
@@ -331,9 +329,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Mode configuration provider
         """
-        return cls._get_extension_factory(
-            "mode_config_provider", "victor.coding.mode_config"
-        )
+        return cls._get_extension_factory("mode_config_provider", "victor.coding.mode_config")
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
@@ -362,9 +358,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingWorkflowProvider instance
         """
-        return cls._get_extension_factory(
-            "workflow_provider", "victor.coding.workflows"
-        )
+        return cls._get_extension_factory("workflow_provider", "victor.coding.workflows")
 
     @classmethod
     def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
@@ -373,9 +367,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Service provider for DI registration
         """
-        return cls._get_extension_factory(
-            "service_provider", "victor.coding.service_provider"
-        )
+        return cls._get_extension_factory("service_provider", "victor.coding.service_provider")
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
@@ -424,9 +416,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-        return cls._get_extension_factory(
-            "team_spec_provider", "victor.coding.teams"
-        )
+        return cls._get_extension_factory("team_spec_provider", "victor.coding.teams")
 
     @classmethod
     def get_capability_provider(cls) -> Any:
@@ -443,9 +433,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingCapabilityProvider instance
         """
-        return cls._get_extension_factory(
-            "capability_provider", "victor.coding.capabilities"
-        )
+        return cls._get_extension_factory("capability_provider", "victor.coding.capabilities")
 
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:

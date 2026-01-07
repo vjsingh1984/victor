@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from victor.tools.base import ToolDefinition
     from victor.config.settings import Settings
 
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -65,18 +65,31 @@ class ToolPlanner:
         self,
         tool_registrar: "ToolRegistrar",
         settings: "Settings",
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
     ):
         """Initialize ToolPlanner.
 
         Args:
             tool_registrar: Tool registry and dependency graph manager
             settings: Application settings
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self.tool_registrar = tool_registrar
         self.settings = settings
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
 
     # =====================================================================
     # Tool Planning
@@ -100,18 +113,24 @@ class ToolPlanner:
         planned_tools = self.tool_registrar.plan_tools(goals, available_inputs)
 
         # Emit TOOL event for planning decision
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.TOOL,
-                name="tools.planned",
-                data={
-                    "goals": goals,
-                    "planned_count": len(planned_tools),
-                    "tool_names": [t.name for t in planned_tools] if planned_tools else [],
-                },
-                source="ToolPlanner",
-            )
-        )
+        if self._event_bus:
+            try:
+                import asyncio
+
+                asyncio.run(
+                    self._event_bus.emit(
+                        topic="tool.planned",
+                        data={
+                            "goals": goals,
+                            "planned_count": len(planned_tools),
+                            "tool_names": [t.name for t in planned_tools] if planned_tools else [],
+                            "category": "tool",  # Preserve for observability
+                        },
+                        source="ToolPlanner",
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit tool planned event: {e}")
 
         return planned_tools
 
@@ -188,18 +207,24 @@ class ToolPlanner:
             )
 
             # Emit TOOL event for intent-based filtering
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.TOOL,
-                    name="tools.filtered_by_intent",
-                    data={
-                        "intent": current_intent.value,
-                        "original_count": original_count,
-                        "filtered_count": filtered_count,
-                        "blocked_tools": list(blocked_names),
-                    },
-                    source="ToolPlanner",
-                )
-            )
+            if self._event_bus:
+                try:
+                    import asyncio
+
+                    asyncio.run(
+                        self._event_bus.emit(
+                            topic="tool.filtered_by_intent",
+                            data={
+                                "intent": current_intent.value,
+                                "original_count": original_count,
+                                "filtered_count": filtered_count,
+                                "blocked_tools": list(blocked_names),
+                                "category": "tool",  # Preserve for observability
+                            },
+                            source="ToolPlanner",
+                        )
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to emit tool filtered event: {e}")
 
         return filtered

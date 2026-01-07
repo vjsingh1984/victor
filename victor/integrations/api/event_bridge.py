@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from victor.observability.event_bus import EventBus, VictorEvent
+from victor.core.events import ObservabilityBus as EventBus, VictorEvent
 
 logger = logging.getLogger(__name__)
 

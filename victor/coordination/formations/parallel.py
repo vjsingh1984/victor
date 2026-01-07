@@ -48,10 +48,7 @@ class ParallelFormation(BaseFormationStrategy):
     ) -> List[MemberResult]:
         """Execute all agents in parallel."""
         # Create independent tasks for each agent
-        tasks = [
-            self._execute_agent(agent, task, context, i)
-            for i, agent in enumerate(agents)
-        ]
+        tasks = [self._execute_agent(agent, task, context, i) for i, agent in enumerate(agents)]
 
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)

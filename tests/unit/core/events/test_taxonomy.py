@@ -188,49 +188,49 @@ class TestEventCategoryMapping:
 
     def test_map_tool_category(self):
         """TOOL category should map to TOOL_CALL."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.TOOL)
         assert result == UnifiedEventType.TOOL_CALL
 
     def test_map_state_category(self):
         """STATE category should map to STATE_TRANSITION."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.STATE)
         assert result == UnifiedEventType.STATE_TRANSITION
 
     def test_map_model_category(self):
         """MODEL category should map to MODEL_REQUEST."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.MODEL)
         assert result == UnifiedEventType.MODEL_REQUEST
 
     def test_map_error_category(self):
         """ERROR category should map to SYSTEM_ERROR."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.ERROR)
         assert result == UnifiedEventType.SYSTEM_ERROR
 
     def test_map_metric_category(self):
         """METRIC category should map to SYSTEM_METRICS."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.METRIC)
         assert result == UnifiedEventType.SYSTEM_METRICS
 
     def test_map_lifecycle_category(self):
         """LIFECYCLE category should map to SYSTEM_LIFECYCLE."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.LIFECYCLE)
         assert result == UnifiedEventType.SYSTEM_LIFECYCLE
 
     def test_map_custom_category(self):
         """CUSTOM category should map to CUSTOM."""
-        from victor.observability.event_bus import EventCategory
+        # TODO: MIGRATION - OLD IMPORT REMOVED
 
         result = map_event_category(EventCategory.CUSTOM)
         assert result == UnifiedEventType.CUSTOM

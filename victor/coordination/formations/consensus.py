@@ -65,8 +65,7 @@ class ConsensusFormation(BaseFormationStrategy):
 
             # Execute all agents in parallel for this round
             round_tasks = [
-                self._execute_agent(agent, current_task, context, round_num)
-                for agent in agents
+                self._execute_agent(agent, current_task, context, round_num) for agent in agents
             ]
 
             round_results = await asyncio.gather(*round_tasks, return_exceptions=True)
@@ -105,19 +104,21 @@ class ConsensusFormation(BaseFormationStrategy):
             current_task = AgentMessage(
                 message_type=MessageType.TASK,
                 sender_id="system",
-                content=str({
-                    "original_task": task.content,
-                    "round": round_num + 1,
-                    "previous_results": [
-                        {
-                            "agent_id": r.member_id,
-                            "output": r.output,
-                            "success": r.success,
-                        }
-                        for r in processed_results
-                    ],
-                    "instruction": "Review previous results and reach consensus",
-                }),
+                content=str(
+                    {
+                        "original_task": task.content,
+                        "round": round_num + 1,
+                        "previous_results": [
+                            {
+                                "agent_id": r.member_id,
+                                "output": r.output,
+                                "success": r.success,
+                            }
+                            for r in processed_results
+                        ],
+                        "instruction": "Review previous results and reach consensus",
+                    }
+                ),
                 data={"consensus_round": round_num + 1},
             )
 
@@ -125,7 +126,9 @@ class ConsensusFormation(BaseFormationStrategy):
         logger.warning(f"ConsensusFormation: no consensus after {self.max_rounds} rounds")
         # Return final round results (last round executed)
         final_round_num = self.max_rounds - 1
-        final_round_results = [r for r in all_results if r.metadata.get("round", 0) == final_round_num]
+        final_round_results = [
+            r for r in all_results if r.metadata.get("round", 0) == final_round_num
+        ]
         # Mark that consensus was not achieved
         for r in final_round_results:
             r.metadata["consensus_achieved"] = False

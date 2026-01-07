@@ -176,15 +176,11 @@ When creating configurations:
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory(
-            "prompt_contributor", "victor.devops.prompts"
-        )
+        return cls._get_extension_factory("prompt_contributor", "victor.devops.prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory(
-            "mode_config_provider", "victor.devops.mode_config"
-        )
+        return cls._get_extension_factory("mode_config_provider", "victor.devops.mode_config")
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
@@ -258,9 +254,7 @@ When creating configurations:
         Returns:
             DevOpsWorkflowProvider instance
         """
-        return cls._get_extension_factory(
-            "workflow_provider", "victor.devops.workflows"
-        )
+        return cls._get_extension_factory("workflow_provider", "victor.devops.workflows")
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:
@@ -310,6 +304,4 @@ When creating configurations:
         Returns:
             DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
         """
-        return cls._get_extension_factory(
-            "capability_provider", "victor.devops.capabilities"
-        )
+        return cls._get_extension_factory("capability_provider", "victor.devops.capabilities")

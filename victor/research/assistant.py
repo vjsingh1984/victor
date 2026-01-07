@@ -169,15 +169,11 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory(
-            "prompt_contributor", "victor.research.prompts"
-        )
+        return cls._get_extension_factory("prompt_contributor", "victor.research.prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory(
-            "mode_config_provider", "victor.research.mode_config"
-        )
+        return cls._get_extension_factory("mode_config_provider", "victor.research.mode_config")
 
     @classmethod
     def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:

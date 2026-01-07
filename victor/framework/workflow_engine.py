@@ -300,7 +300,7 @@ class WorkflowEngine:
             data: Event payload data
         """
         try:
-            from victor.observability.event_bus import get_event_bus
+            from victor.core.events import get_observability_bus as get_event_bus
 
             bus = get_event_bus()
             bus.emit_lifecycle_event(

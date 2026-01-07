@@ -118,7 +118,7 @@ def configure_logging_from_config(
     # EventBus → Logging integration
     if config.event_logging:
         try:
-            from victor.observability.event_bus import EventBus
+            from victor.core.events import ObservabilityBus as EventBus
             from victor.observability.exporters import LoggingExporter
 
             event_bus = EventBus.get_instance()
@@ -266,7 +266,7 @@ def configure_logging(
     # This routes observability events to the logging system
     if event_logging:
         try:
-            from victor.observability.event_bus import EventBus
+            from victor.core.events import ObservabilityBus as EventBus
             from victor.observability.exporters import LoggingExporter
 
             event_bus = EventBus.get_instance()

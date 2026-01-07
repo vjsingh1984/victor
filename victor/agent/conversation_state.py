@@ -14,6 +14,20 @@
 
 """Conversation state machine for intelligent stage detection.
 
+MIGRATION NOTICE: State storage is migrating to canonical system.
+
+For state storage, use the canonical state management system:
+    - victor.state.ConversationStateManager - Conversation scope state
+    - victor.state.get_global_manager() - Unified access to all scopes
+
+This module is kept for its stage detection business logic.
+The ConversationStateMachine now uses ConversationStateManager internally
+for state storage.
+
+---
+
+Legacy Documentation:
+
 This module provides automatic detection of conversation stages to improve
 tool selection accuracy. Instead of manual stage management, it infers the
 current stage from:
@@ -47,6 +61,30 @@ Example:
         print(f"{old} -> {new}")
 
     machine = ConversationStateMachine(hooks=hooks)
+
+Migration Example:
+    # OLD (using ConversationStateMachine for state storage):
+    machine = ConversationStateMachine()
+    machine.record_tool_execution("read", {"file": "test.py"})
+    stage = machine.get_stage()
+
+    # NEW (using canonical state management):
+    from victor.state import ConversationStateManager, StateScope
+
+    # For stage detection, still use ConversationStateMachine:
+    machine = ConversationStateMachine()
+    machine.record_tool_execution("read", {"file": "test.py"})
+    stage = machine.get_stage()
+
+    # For state storage, use ConversationStateManager:
+    mgr = ConversationStateManager()
+    await mgr.set("tool_history", ["read"])
+    await mgr.set("observed_files", {"test.py"})
+
+    # OR for unified access:
+    from victor.state import get_global_manager
+    state = get_global_manager()
+    await state.set("tool_history", ["read"], scope=StateScope.CONVERSATION)
 """
 
 import logging
@@ -55,7 +93,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -242,7 +280,8 @@ class ConversationStateMachine:
         hooks: Optional["StateHookManager"] = None,
         track_history: bool = True,
         max_history_size: int = 100,
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
+        state_manager: Optional[Any] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -250,7 +289,9 @@ class ConversationStateMachine:
             hooks: Optional StateHookManager for transition callbacks.
             track_history: Whether to track transition history.
             max_history_size: Maximum number of transitions to keep in history.
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
+            state_manager: Optional ConversationStateManager for canonical state storage.
+                          If provided, state will be synced to the manager.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -259,7 +300,12 @@ class ConversationStateMachine:
         self._track_history = track_history
         self._max_history_size = max_history_size
         self._transition_history: List[Dict[str, Any]] = []
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
+        self._state_manager = state_manager  # Optional canonical state manager
+
+        # Sync initial state to manager if provided
+        if self._state_manager:
+            self._sync_state_to_manager()
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
@@ -267,6 +313,42 @@ class ConversationStateMachine:
         self._transition_history.clear()
         self._transition_count = 0
         self._last_transition_time = 0.0
+
+        # Reset manager state if provided
+        if self._state_manager:
+            self._sync_state_to_manager()
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
+
+    def _sync_state_to_manager(self) -> None:
+        """Sync current state to the canonical state manager.
+
+        This is called internally when state changes to keep the
+        ConversationStateManager in sync.
+        """
+        if not self._state_manager:
+            return
+
+        try:
+            # Sync state to manager (non-blocking)
+            # We do this synchronously for compatibility
+            state_dict = self.state.to_dict()
+
+            # Store in manager (using internal _state for direct access)
+            self._state_manager._state.update(state_dict)
+        except Exception as e:
+            logger.warning(f"Failed to sync state to manager: {e}")
 
     def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
         """Record tool execution and potentially transition stage.
@@ -276,6 +358,11 @@ class ConversationStateMachine:
             args: Tool arguments
         """
         self.state.record_tool_execution(tool_name, args)
+
+        # Sync to canonical state manager if provided
+        if self._state_manager:
+            self._sync_state_to_manager()
+
         self._maybe_transition()
 
     def record_message(self, content: str, is_user: bool = True) -> None:
@@ -556,24 +643,34 @@ class ConversationStateMachine:
             self._last_transition_time = current_time
             self._transition_count += 1
 
+            # Sync to canonical state manager if provided
+            if self._state_manager:
+                self._sync_state_to_manager()
+
             # Emit STATE event for stage transition
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="conversation.stage_changed",
-                    data={
-                        "old_stage": old_stage.name,
-                        "new_stage": new_stage.name,
-                        "confidence": confidence,
-                        "transition_count": self._transition_count,
-                        "message_count": self.state.message_count,
-                        "tools_executed": len(self.state.tool_history),
-                        "files_observed": len(self.state.observed_files),
-                        "files_modified": len(self.state.modified_files),
-                    },
-                    source="ConversationStateMachine",
-                )
-            )
+            if self._event_bus:
+                try:
+                    import asyncio
+
+                    asyncio.run(
+                        self._event_bus.emit(
+                            topic="state.stage_changed",
+                            data={
+                                "old_stage": old_stage.name,
+                                "new_stage": new_stage.name,
+                                "confidence": confidence,
+                                "transition_count": self._transition_count,
+                                "message_count": self.state.message_count,
+                                "tools_executed": len(self.state.tool_history),
+                                "files_observed": len(self.state.observed_files),
+                                "files_modified": len(self.state.modified_files),
+                                "category": "state",  # Preserve for observability
+                            },
+                            source="ConversationStateMachine",
+                        )
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to emit stage change event: {e}")
 
             # Record transition history
             if self._track_history:

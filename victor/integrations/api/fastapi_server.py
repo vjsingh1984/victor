@@ -50,7 +50,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
-from victor.observability.event_bus import EventBus
+from victor.core.events import ObservabilityBus as EventBus
 
 logger = logging.getLogger(__name__)
 

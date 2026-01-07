@@ -84,9 +84,7 @@ def check_docker_available() -> bool:
     try:
         import subprocess
 
-        result = subprocess.run(
-            ["docker", "info"], capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["docker", "info"], capture_output=True, text=True, timeout=10)
         return result.returncode == 0
     except Exception:
         return False
@@ -204,7 +202,11 @@ async def demo_aws_mcp_direct():
         print(f"   Found {len(tools)} tools:")
         for tool in tools:
             print(f"\n   - {tool.name}")
-            print(f"     {tool.description[:80]}..." if len(tool.description) > 80 else f"     {tool.description}")
+            print(
+                f"     {tool.description[:80]}..."
+                if len(tool.description) > 80
+                else f"     {tool.description}"
+            )
 
         # List available resources
         print("\n3. Discovering available resources...")
@@ -579,7 +581,9 @@ Examples:
     print("Demo Complete!")
     print("=" * 70)
     print("\nNext steps:")
-    print("  1. Pull AWS MCP images: docker pull public.ecr.aws/aws-mcp/aws-documentation-mcp-server:latest")
+    print(
+        "  1. Pull AWS MCP images: docker pull public.ecr.aws/aws-mcp/aws-documentation-mcp-server:latest"
+    )
     print("  2. Configure AWS credentials for CDK server")
     print("  3. Add servers to Victor config (~/.victor/mcp.yaml)")
     print("  4. Use AWS tools in your Victor workflows")

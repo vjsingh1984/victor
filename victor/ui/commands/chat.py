@@ -188,6 +188,11 @@ def chat(
         "--observability/--no-observability",
         help="Enable observability integration for event tracking.",
     ),
+    log_events: bool = typer.Option(
+        False,
+        "--log-events",
+        help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
+    ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
@@ -278,6 +283,11 @@ def chat(
         )
 
         settings = load_settings()
+
+        # Apply CLI flags to settings
+        if log_events:
+            settings.enable_observability_logging = True
+
         setup_safety_confirmation()
 
         # Apply provider/model/endpoint overrides by creating a synthetic profile
