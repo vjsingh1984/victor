@@ -15,7 +15,8 @@
 """Agent module - orchestrator and supporting components."""
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
-from victor.agent.config_loader import ConfigLoader
+# OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
+# Configuration is now loaded via Settings objects and composed by OrchestratorFactory
 from victor.agent.config import UnifiedAgentConfig, AgentMode
 from victor.agent.tool_selection import get_critical_tools
 from victor.agent.message_history import MessageHistory
@@ -76,7 +77,7 @@ __all__ = [
     "AgentOrchestrator",
     "ArgumentNormalizer",
     "NormalizationStrategy",
-    "ConfigLoader",
+    # "ConfigLoader",  # OBSOLETE - moved to archive/obsolete/
     "UnifiedAgentConfig",
     "AgentMode",
     "get_critical_tools",

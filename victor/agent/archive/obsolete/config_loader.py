@@ -12,7 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Configuration loading and validation for the agent."""
+# ==============================================================================
+# OBSOLETE - This module has been deprecated and moved to archive/obsolete/
+# ==============================================================================
+#
+# This module (ConfigLoader) is obsolete and no longer maintained.
+#
+# Replacement:
+#   - Configuration is now loaded via Settings objects (victor.config.settings)
+#   - Tool configuration is handled by OrchestratorFactory during bootstrap
+#   - Use Settings.load_tool_config() directly if needed
+#
+# Migration path:
+#   - Old: ConfigLoader(settings).load_tool_config(registry)
+#   - New: Tool configuration is automatically applied during factory initialization
+#
+# This file is preserved for reference purposes only and will be removed in a
+# future version. Do not import or use this module in new code.
+#
+# ==============================================================================
+
+"""Configuration loading and validation for the agent (OBSOLETE)."""
 
 import logging
 import os

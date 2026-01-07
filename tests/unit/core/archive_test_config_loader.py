@@ -12,12 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for config_loader module."""
+# ==============================================================================
+# ARCHIVED TEST - This test is for an obsolete module
+# ==============================================================================
+#
+# This test file has been archived because the module it tests (ConfigLoader)
+# has been moved to victor/agent/archive/obsolete/config_loader.py
+#
+# The ConfigLoader module is superseded by:
+#   - Settings objects (victor.config.settings)
+#   - OrchestratorFactory for tool configuration during bootstrap
+#
+# This test file is preserved for reference but is not run as part of the
+# regular test suite. Rename to test_config_loader.py to run if needed.
+#
+# ==============================================================================
+
+"""Tests for config_loader module (ARCHIVED - Module is obsolete)."""
 
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.config_loader import ConfigLoader
+from victor.agent.archive.obsolete.config_loader import ConfigLoader  # noqa: ARCHIVED
 from victor.agent.tool_selection import get_critical_tools
 from victor.tools.base import ToolRegistry, BaseTool
 
