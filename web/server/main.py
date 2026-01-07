@@ -380,7 +380,7 @@ async def cleanup_idle_sessions() -> None:
                             session_data = SESSION_AGENTS[session_id]
                             agent = session_data["agent"]
                             if hasattr(agent, "shutdown"):
-                                agent.shutdown()
+                                await agent.shutdown()
                             # Also try closing provider if available
                             if hasattr(agent, "provider"):
                                 await agent.provider.close()
@@ -432,7 +432,7 @@ async def shutdown_event() -> None:
                 agent = session_data.get("agent")
                 if agent:
                     if hasattr(agent, "shutdown"):
-                        agent.shutdown()
+                        await agent.shutdown()
                     if hasattr(agent, "provider"):
                         await agent.provider.close()
                     logger.info(f"Closed session {session_id} during shutdown")
