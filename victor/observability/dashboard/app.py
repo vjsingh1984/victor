@@ -77,56 +77,277 @@ class EventStats(Static):
         self._update_display()
 
     def _update_display(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            f"[EventStats._update_display] Updating display: total={self.total_events}, tools={self.tool_events}, states={self.state_events}, errors={self.error_events}"
+        )
+
         content = self.query_one("#stats-content", Static)
-        content.update(
+        display_text = (
             f"[bold]Events:[/] {self.total_events}  "
             f"[cyan]Tools:[/] {self.tool_events}  "
             f"[yellow]States:[/] {self.state_events}  "
             f"[red]Errors:[/] {self.error_events}"
         )
+        content.update(display_text)
+        logger.debug(f"[EventStats._update_display] Display updated with: {display_text}")
 
     def increment(self, category: str) -> None:
         """Increment counters based on event category."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            f"[EventStats.increment] START: category={category}, current total={self.total_events}"
+        )
+
         self.total_events += 1
-        if category.startswith("tool."):  # MIGRATED from EventCategory.TOOL
+        # category is just the first part of topic (e.g., "state", "tool", "lifecycle")
+        if category == "tool":
             self.tool_events += 1
-        elif category.startswith("state."):  # MIGRATED from EventCategory.STATE
+            logger.debug(f"[EventStats.increment] Incremented tool_events to {self.tool_events}")
+        elif category == "state":
             self.state_events += 1
-        elif category.startswith("error."):  # MIGRATED from EventCategory.ERROR
+            logger.debug(f"[EventStats.increment] Incremented state_events to {self.state_events}")
+        elif category == "error":
             self.error_events += 1
+            logger.debug(f"[EventStats.increment] Incremented error_events to {self.error_events}")
+        else:
+            logger.debug(
+                f"[EventStats.increment] Category '{category}' not tracked in specific counters"
+            )
+
+        logger.debug(
+            f"[EventStats.increment] END: total={self.total_events}, tools={self.tool_events}, states={self.state_events}, errors={self.error_events}"
+        )
 
 
 class EventLogView(RichLog):
-    """Real-time event log viewer."""
+    """Real-time event log viewer with newest events on top."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._event_lines: list[str] = []  # Store lines in reverse order (newest first)
+        self._max_lines = 1000
 
     def add_event(self, event: Event) -> None:
-        """Add an event to the log."""
+        """Add an event to the log with rich details (prepends to show newest first)."""
         timestamp = event.datetime.strftime("%H:%M:%S.%f")[:-3]
+        # Map category (first part of topic) to colors
         category_colors = {
-            "tool.": "cyan",
-            "state.": "yellow",
-            "model.": "green",
-            "error.": "red",
-            "audit.": "magenta",
-            "metric.": "blue",
-            "lifecycle.": "white",
-            "vertical.": "bright_magenta",
-            "custom": "dim",
+            "tool": "cyan",
+            "state": "yellow",
+            "model": "green",
+            "error": "red",
+            "audit": "magenta",
+            "metric": "blue",
+            "lifecycle": "white",
+            "vertical": "bright_magenta",
         }
-        color = category_colors.get(event.category, "white")
+        color = category_colors.get(event.category, "dim gray")
         category_name = event.category.upper()
 
-        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.topic}")
+        # Build event header
+        lines = []
+        log_message = f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.topic}"
+        lines.append(log_message)
 
-        # Show key data fields for certain events
-        # TODO: Migrate
-        if event.topic.startswith("tool.") and event.data:
-            tool_name = event.data.get("tool_name", "")
-            if "duration_ms" in event.data:
-                duration = event.data["duration_ms"]
-                success = event.data.get("success", True)
-                status = "[green]OK[/]" if success else "[red]FAIL[/]"
-                self.write(f"         [dim]{tool_name} {status} ({duration:.0f}ms)[/]")
+        # Display rich event details based on topic and data
+        if event.data:
+            detail_lines = self._format_event_details(event)
+            lines.extend(detail_lines)
+
+        # Prepend to stored lines (newest first)
+        self._event_lines = lines + self._event_lines
+
+        # Trim to max lines
+        if len(self._event_lines) > self._max_lines:
+            self._event_lines = self._event_lines[: self._max_lines]
+
+        # Refresh display
+        self._refresh_display()
+
+    def _format_event_details(self, event: Event) -> list[str]:
+        """Format event details into lines."""
+        topic = event.topic
+        data = event.data
+        lines = []
+
+        # State transition events
+        if topic == "state.stage_changed":
+            old_stage = data.get("old_stage", "?")
+            new_stage = data.get("new_stage", "?")
+            confidence = data.get("confidence", 0.0)
+            transition_count = data.get("transition_count", 0)
+            has_cycle = data.get("has_cycle", False)
+            visit_count = data.get("visit_count", 0)
+
+            lines.append(f"         [cyan]Transition:[/] {old_stage} → {new_stage}")
+            lines.append(
+                f"         [dim]Confidence: {confidence:.1%} | Visits: {visit_count} | Transitions: {transition_count}[/]"
+            )
+            if has_cycle:
+                lines.append("         [red]⚠ Cycle detected![/]")
+
+            # Show tool history if available
+            if data.get("tool_history"):
+                tools = data["tool_history"]
+                if len(tools) <= 5:
+                    lines.append(f"         [dim]Tools: {', '.join(tools)}[/]")
+                else:
+                    lines.append(
+                        f"         [dim]Tools: {', '.join(tools[:5])}... ({len(tools)} total)[/]"
+                    )
+
+            # Show stage sequence if available
+            if data.get("stage_sequence"):
+                sequence = data["stage_sequence"]
+                if len(sequence) <= 8:
+                    lines.append(f"         [dim]Path: {' → '.join(sequence)}[/]")
+                else:
+                    lines.append(
+                        f"         [dim]Path: {' → '.join(sequence[:4])}... → {' → '.join(sequence[-4:])}[/]"
+                    )
+
+        # Tool events
+        elif topic.startswith("tool."):
+            tool_name = data.get("tool_name", "unknown")
+            lines.append(f"         [cyan]Tool:[/] {tool_name}")
+
+            # Duration and success for tool.end events
+            if "duration_ms" in data:
+                duration = data["duration_ms"]
+                success = data.get("success", True)
+                status = "[green]✓[/]" if success else "[red]✗[/]"
+                lines.append(f"         {status} [dim]{duration:.0f}ms[/]")
+
+            # Error information
+            if not data.get("success", True) and data.get("error"):
+                error_msg = data["error"]
+                if isinstance(error_msg, str) and len(error_msg) > 80:
+                    error_msg = error_msg[:77] + "..."
+                lines.append(f"         [red]Error:[/] {error_msg}")
+
+            # Arguments for tool.start events
+            if "arguments" in data:
+                args = data["arguments"]
+                if args:
+                    # Show first few arguments
+                    arg_items = list(args.items())[:3]
+                    arg_str = ", ".join(f"{k}={repr(v)[:30]}" for k, v in arg_items)
+                    if len(args) > 3:
+                        arg_str += f" ... ({len(args)} args)"
+                    lines.append(f"         [dim]Args: {arg_str}[/]")
+
+        # Lifecycle events
+        elif topic.startswith("lifecycle."):
+            # Chunk tool start events
+            if topic == "lifecycle.chunk.tool_start":
+                tool_name = data.get("tool_name", "")
+                status_msg = data.get("status_msg", "")
+                lines.append(f"         [cyan]{tool_name}[/] [dim]{status_msg}[/]")
+
+            # Session events
+            elif topic == "lifecycle.session.start":
+                if data.get("project"):
+                    lines.append(f"         [cyan]Project:[/] {data['project']}")
+                if data.get("profile"):
+                    lines.append(f"         [dim]Profile: {data['profile']}[/]")
+
+            elif topic == "lifecycle.session.end":
+                tool_calls = data.get("tool_calls", 0)
+                duration = data.get("duration_seconds", 0)
+                success = data.get("success", True)
+                status = "[green]✓[/]" if success else "[red]✗[/]"
+                lines.append(f"         {status} [dim]{tool_calls} tool calls, {duration:.1f}s[/]")
+
+        # Error events
+        elif topic.startswith("error."):
+            error_type = topic.split(".", 1)[1] if "." in topic else "error"
+            severity = data.get("severity", "error")
+
+            if severity == "warning":
+                lines.append(f"         [yellow]⚠ Warning:[/] {error_type}")
+            else:
+                lines.append(f"         [red]✗ Error:[/] {error_type}")
+
+            if data.get("error"):
+                error_msg = data["error"]
+                if isinstance(error_msg, str) and len(error_msg) > 100:
+                    error_msg = error_msg[:97] + "..."
+                lines.append(f"         [dim]{error_msg}[/]")
+
+            # Cycle warnings
+            if topic == "error.cycle_warning":
+                stage = data.get("stage", "?")
+                visit_count = data.get("visit_count", 0)
+                sequence = data.get("sequence", [])
+                lines.append(f"         [red]Stage '{stage}' visited {visit_count} times[/]")
+                if sequence:
+                    lines.append(f"         [dim]Recent: {' → '.join(sequence)}[/]")
+
+        # Model events
+        elif topic.startswith("model."):
+            provider = data.get("provider", "unknown")
+            model = data.get("model", "unknown")
+
+            if topic == "model.request":
+                message_count = data.get("message_count", 0)
+                tool_count = data.get("tool_count", 0)
+                lines.append(
+                    f"         [cyan]{provider}/{model}[/] [dim]{message_count} msgs, {tool_count} tools[/]"
+                )
+
+            elif topic == "model.response":
+                tokens = data.get("tokens_used")
+                tool_calls = data.get("tool_calls", 0)
+                latency = data.get("latency_ms")
+
+                parts = [f"[cyan]{provider}/{model}[/]"]
+                if tokens:
+                    parts.append(f"[dim]{tokens} tokens[/]")
+                if tool_calls:
+                    parts.append(f"[dim]{tool_calls} tool calls[/]")
+                if latency:
+                    parts.append(f"[dim]{latency:.0f}ms[/]")
+
+                lines.append(f"         {' '.join(parts)}")
+
+        # Continuation events
+        elif topic.startswith("state.continuation."):
+            if topic == "state.continuation.cumulative_intervention_nudge":
+                cumulative = data.get("cumulative_interventions", 0)
+                read_count = data.get("read_files_count", 0)
+                lines.append(
+                    f"         [yellow]Interventions:[/] {cumulative} [dim]| Files read: {read_count}[/]"
+                )
+
+        # Generic fallback for any event with data
+        else:
+            # Show a few key fields from the data
+            important_fields = ["name", "title", "status", "result", "value", "count"]
+            shown_fields = []
+
+            for field in important_fields:
+                if field in data:
+                    value = data[field]
+                    if isinstance(value, (str, int, float, bool)):
+                        if len(str(value)) <= 50:
+                            shown_fields.append(f"{field}={value}")
+
+            if shown_fields:
+                lines.append(f"         [dim]{', '.join(shown_fields)}[/]")
+
+        return lines
+
+    def _refresh_display(self) -> None:
+        """Refresh the display with current lines."""
+        # Clear and rewrite all content
+        self.clear()
+        for line in self._event_lines:
+            self.write(line, expand=True)
 
 
 class EventTableView(DataTable):
@@ -138,7 +359,7 @@ class EventTableView(DataTable):
         self.cursor_type = "row"
 
     def add_event(self, event: Event) -> None:
-        """Add an event row to the table."""
+        """Add an event row to the table (inserts at top for newest first)."""
         timestamp = event.datetime.strftime("%H:%M:%S")
         category = event.category
 
@@ -154,7 +375,8 @@ class EventTableView(DataTable):
             elif "message" in event.data:
                 details = str(event.data["message"])[:50]
 
-        self.add_row(timestamp, category, event.topic, details)
+        # Insert at position 0 (top of table) for newest first
+        self.add_row(timestamp, category, event.topic, details, index=0)
 
 
 class ToolExecutionView(DataTable):
@@ -171,7 +393,11 @@ class ToolExecutionView(DataTable):
 
     def add_tool_event(self, event: Event) -> None:
         """Process a tool event and update statistics."""
-        if not event.topic.startswith("tool."):
+        # Handle both tool.* and lifecycle.chunk.tool_start events
+        is_tool_event = (
+            event.topic.startswith("tool.") or event.topic == "lifecycle.chunk.tool_start"
+        )
+        if not is_tool_event:
             return
 
         data = event.data or {}
@@ -187,9 +413,14 @@ class ToolExecutionView(DataTable):
 
         stats = self._tool_stats[tool_name]
 
-        # Only count end events for stats
+        # Count lifecycle.chunk.tool_start events as tool executions
+        # For tool.* events, only count end events for stats
         # TODO: Migrate
-        if event.topic.endswith(".end"):
+        if event.topic == "lifecycle.chunk.tool_start":
+            stats["calls"] += 1
+            stats["successes"] += 1  # Assume success for start events
+            stats["last_called"] = event.timestamp
+        elif event.topic.endswith(".end"):
             stats["calls"] += 1
             if "duration_ms" in data:
                 stats["total_time"] += data["duration_ms"]
@@ -201,12 +432,23 @@ class ToolExecutionView(DataTable):
 
     def _refresh_table(self) -> None:
         """Refresh the table with current stats."""
+        from datetime import datetime
+
         self.clear()
         for tool_name, stats in sorted(self._tool_stats.items()):
             calls = stats["calls"]
             avg_time = stats["total_time"] / calls if calls > 0 else 0
             success_rate = (stats["successes"] / calls * 100) if calls > 0 else 0
-            last_called = stats["last_called"].strftime("%H:%M:%S") if stats["last_called"] else "-"
+            # Handle both datetime objects and float timestamps
+            last_called_raw = stats["last_called"]
+            if last_called_raw:
+                if isinstance(last_called_raw, datetime):
+                    last_called = last_called_raw.strftime("%H:%M:%S")
+                else:
+                    # Assume it's a float timestamp
+                    last_called = datetime.fromtimestamp(last_called_raw).strftime("%H:%M:%S")
+            else:
+                last_called = "-"
             self.add_row(
                 tool_name,
                 str(calls),
@@ -336,31 +578,41 @@ class ExecutionTraceView(ScrollableContainer):
         data = event.data or {}
 
         timestamp = event.datetime.strftime("%H:%M:%S")
-        span_type = data.get("span_type", "unknown")
-        agent_id = data.get("agent_id", "unknown")
-        parent_id = data.get("parent_id")
 
-        # Get current content
-        text = content.content
-        if text == "Execution trace will appear here...":
-            text = ""
+        # Handle lifecycle.chunk.tool_start events
+        if event.topic == "lifecycle.chunk.tool_start":
+            span_type = data.get("tool_name", "chunk_operation")
+            status_msg = data.get("status_msg", "")
 
-        # Build tree representation
-        indent = ""
-        if parent_id:
-            indent = "  └─"  # Indent for child spans
+            # Get current content
+            text = content.content
+            if text == "Execution trace will appear here...":
+                text = ""
 
-        status = ""
-        if "status" in data:
-            status_color = "green" if data["status"] == "success" else "red"
-            status = f" [{status_color}]{data['status']}[/]"
+            # Build entry
+            new_entry = f"[dim]{timestamp}[/] [cyan]{span_type}[/]"
+            if status_msg:
+                new_entry += f" [dim]{status_msg}[/]"
 
-        new_entry = f"[dim]{timestamp}[/]{indent} [{span_type}]{span_type}[/] ({agent_id}){status}"
-        if "duration_ms" in data:
-            duration = data["duration_ms"]
-            new_entry += f" [dim]{duration:.0f}ms[/]"
+            content.update(f"{text}\n{new_entry}" if text else new_entry)
+        else:
+            # Generic lifecycle event handling
+            span_type = data.get("span_type", event.topic.split(".")[-1])
+            operation = data.get("operation", "unknown")
 
-        content.update(f"{text}\n{new_entry}" if text else new_entry)
+            # Get current content
+            text = content.content
+            if text == "Execution trace will appear here...":
+                text = ""
+
+            new_entry = f"[dim]{timestamp}[/] [yellow]{span_type}[/] {operation}"
+
+            # Add duration if available
+            if "duration_ms" in data:
+                duration = data["duration_ms"]
+                new_entry += f" [dim]{duration:.0f}ms[/]"
+
+            content.update(f"{text}\n{new_entry}" if text else new_entry)
 
 
 class ToolCallHistoryView(DataTable):
@@ -386,11 +638,32 @@ class ToolCallHistoryView(DataTable):
         data = event.data or {}
         event_name = event.topic
 
-        # Process tool_call_completed events
-        if event_name == "tool_call_completed":
+        # Process tool.end events (contain duration and results)
+        if event_name == "tool.end":
             tool_name = data.get("tool_name", "unknown")
             duration_ms = data.get("duration_ms", 0)
-            parent_span_id = data.get("parent_span_id", "unknown")[:8]
+            success = data.get("success", True)
+            tool_id = data.get("tool_id", "")[:8]  # Use tool_id as span identifier
+            arguments = data.get("arguments", {})
+
+            timestamp = event.datetime.strftime("%H:%M:%S")
+            args_preview = str(arguments)[:30] if arguments else ""
+
+            status = "[green]OK[/]" if success else "[red]FAIL[/]"
+
+            self.add_row(
+                timestamp,
+                tool_name,
+                status,
+                f"{duration_ms:.0f}ms" if duration_ms else "N/A",
+                tool_id or "N/A",
+                args_preview,
+                index=0,  # Insert at top for newest first
+            )
+        # Process tool.start events (no duration yet)
+        elif event_name == "tool.start":
+            tool_name = data.get("tool_name", "unknown")
+            tool_id = data.get("tool_id", "")[:8]
             arguments = data.get("arguments", {})
 
             timestamp = event.datetime.strftime("%H:%M:%S")
@@ -399,10 +672,11 @@ class ToolCallHistoryView(DataTable):
             self.add_row(
                 timestamp,
                 tool_name,
-                "[green]OK[/]",
-                f"{duration_ms:.0f}ms",
-                parent_span_id,
+                "[dim]Running...[/]",
+                "N/A",
+                tool_id or "N/A",
                 args_preview,
+                index=0,  # Insert at top for newest first
             )
 
         # Process tool_call_failed events
@@ -422,6 +696,7 @@ class ToolCallHistoryView(DataTable):
                 f"{duration_ms:.0f}ms",
                 parent_span_id,
                 "",
+                index=0,  # Insert at top for newest first
             )
 
 
@@ -446,19 +721,27 @@ class StateTransitionView(DataTable):
             return
 
         data = event.data or {}
-        scope = data.get("scope", "unknown")
-        key = data.get("key", "unknown")
-        old_value = data.get("old_value")
-        new_value = data.get("new_value")
-
         timestamp = event.datetime.strftime("%H:%M:%S")
 
+        # Handle state.stage_changed events
+        if event.topic == "state.stage_changed":
+            scope = "conversation"  # State machine scope
+            key = "stage"  # State key
+            old_value = data.get("old_stage", "unknown")
+            new_value = data.get("new_stage", "unknown")
+        # Handle generic state events with scope/key structure
+        else:
+            scope = data.get("scope", "unknown")
+            key = data.get("key", "unknown")
+            old_value = data.get("old_value")
+            new_value = data.get("new_value")
+
         # Truncate values for display
-        # TODO: Migrate
         old_preview = str(old_value)[:30] if old_value is not None else "None"
         new_preview = str(new_value)[:30] if new_value is not None else "None"
 
-        self.add_row(timestamp, scope, key, old_preview, new_preview)
+        # Insert at position 0 (top of table) for newest first
+        self.add_row(timestamp, scope, key, old_preview, new_preview, index=0)
 
 
 class PerformanceMetricsView(Static):
@@ -595,43 +878,51 @@ class ObservabilityDashboard(App):
 
     EventLogView {
         height: 100%;
+        min-height: 30;
         border: round $primary;
         scrollbar-gutter: stable;
     }
 
     EventTableView, ToolExecutionView {
         height: 100%;
+        min-height: 30;
     }
 
     # New debugging views
     ExecutionTraceView {
         height: 100%;
+        min-height: 30;
         border: round $primary;
         padding: 1;
     }
 
     ToolCallHistoryView, StateTransitionView {
         height: 100%;
+        min-height: 30;
     }
 
     PerformanceMetricsView {
         height: 100%;
+        min-height: 30;
         border: round $primary;
         padding: 2;
     }
 
     DataTable {
         height: 100%;
+        min-height: 30;
     }
 
     VerticalTraceView {
         height: 100%;
+        min-height: 30;
         border: round $primary;
         padding: 1;
     }
 
     JSONLBrowser {
         height: 100%;
+        min-height: 30;
         border: round $primary;
         padding: 1;
     }
@@ -764,9 +1055,10 @@ class ObservabilityDashboard(App):
         self._last_position = 0
         self._event_counter = 0
 
-        # Load historical events after widgets are rendered
+        # Load historical events after widgets are fully rendered
+        # Use call_later to ensure widgets have their size calculated
         # TODO: Migrate
-        self.call_after_refresh(self._setup_event_source)
+        self.call_later(self._setup_event_source)
 
     def on_unmount(self) -> None:
         """Handle unmount event."""
@@ -806,25 +1098,9 @@ class ObservabilityDashboard(App):
                 return
 
             # Schedule UI update on Textual's event loop
-            # Note: If we're already in the main thread (e.g., during on_mount()),
-            # call_from_thread() will fail, so process directly
+            # We're in an async callback, can call UI methods directly
             logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: Processing event")
-            try:
-                self.call_from_thread(self._process_event, event)
-            except RuntimeError as e:
-                # Already in main thread, process directly
-                if "must run in a different thread" in str(e):
-                    logger.info(
-                        f"[Dashboard.handle_event] #{event_counter[0]}: Already in main thread, processing directly"
-                    )
-                    self._process_event(event)
-                else:
-                    raise
-            except Exception as e:
-                logger.error(f"[Dashboard.handle_event] #{event_counter[0]}: Exception: {e}")
-                import traceback
-
-                logger.error(f"[Dashboard.handle_event] Traceback: {traceback.format_exc()}")
+            self._process_event(event)
 
         # Subscribe to all event patterns using canonical event system
         # The canonical system uses pattern-based subscriptions (e.g., "tool.*")
@@ -921,12 +1197,13 @@ class ObservabilityDashboard(App):
             with open(self._jsonl_path, "r", encoding="utf-8") as f:
                 all_lines = f.readlines()
 
-            # Take last 100 lines
+            # Take last 100 lines and reverse for newest-first display
             # TODO: Migrate
             lines_to_process = all_lines[-100:] if len(all_lines) > 100 else all_lines
+            lines_to_process = lines_to_process[::-1]  # Reverse to show newest first
 
             logger.info(
-                f"[Dashboard] Loading {len(lines_to_process)} initial events from {len(all_lines)} total lines"
+                f"[Dashboard] Loading {len(lines_to_process)} initial events from {len(all_lines)} total lines (reversed for newest-first)"
             )
 
             for line in lines_to_process:
@@ -1000,9 +1277,9 @@ class ObservabilityDashboard(App):
                                 f"[Dashboard] New event #{self._event_counter}: [{event.category}/{event.topic}]"
                             )
 
-                            # Process in main thread
-                            # TODO: Migrate
-                            self.call_from_thread(self._process_event, event)
+                            # Process event
+                            # We're in an async worker task but can call UI methods directly
+                            self._process_event(event)
 
                 # Poll every 1 second
                 # TODO: Migrate
@@ -1062,47 +1339,83 @@ class ObservabilityDashboard(App):
     def _process_event(self, event: Event) -> None:
         """Process and display an event."""
         import logging
+        import traceback
 
         logger = logging.getLogger(__name__)
-        logger.debug(f"[Dashboard._process_event] PROCESSING [{event.category}/{event.topic}]")
+        logger.info(f"[Dashboard._process_event] PROCESSING [{event.topic}]")
 
-        # Update stats
-        # TODO: Migrate
-        self._stats.increment(event.category)
-        logger.debug("[Dashboard._process_event] Stats updated")
-
-        # Add to views
-        # TODO: Migrate
-        logger.debug("[Dashboard._process_event] Adding to EventLogView")
-        self._event_log.add_event(event)
-
-        logger.debug("[Dashboard._process_event] Adding to EventTableView")
-        self._event_table.add_event(event)
-
-        # Handle specific event types
-        # TODO: Migrate
-        if event.topic.startswith("tool."):
-            self._tool_view.add_tool_event(event)
-            # Update debugging views
+        try:
+            # Update stats
             # TODO: Migrate
-            self._tool_call_history_view.add_tool_call_event(event)
-            self._performance_metrics_view.update_from_tool_event(event)
-        elif event.topic.startswith("vertical."):
-            self._vertical_view.add_vertical_event(event)
-        elif event.topic.startswith("lifecycle."):
-            # Update execution trace view
+            self._stats.increment(event.category)
+            logger.debug("[Dashboard._process_event] Stats updated")
+        except Exception as e:
+            logger.error(
+                f"[Dashboard._process_event] Error updating stats: {e}\n{traceback.format_exc()}"
+            )
+
+        try:
+            # Add to views
             # TODO: Migrate
-            self._execution_trace_view.add_span_event(event)
-            self._performance_metrics_view.update_from_span_event(event)
-        elif event.topic.startswith("state."):
-            # Update state transition view
+            logger.debug("[Dashboard._process_event] Adding to EventLogView")
+            self._event_log.add_event(event)
+            logger.debug("[Dashboard._process_event] EventLogView updated successfully")
+        except Exception as e:
+            logger.error(
+                f"[Dashboard._process_event] Error adding to EventLogView: {e}\n{traceback.format_exc()}"
+            )
+
+        try:
+            logger.debug("[Dashboard._process_event] Adding to EventTableView")
+            self._event_table.add_event(event)
+            logger.debug("[Dashboard._process_event] EventTableView updated successfully")
+        except Exception as e:
+            logger.error(
+                f"[Dashboard._process_event] Error adding to EventTableView: {e}\n{traceback.format_exc()}"
+            )
+
+        try:
+            # Handle specific event types
             # TODO: Migrate
-            self._state_transition_view.add_state_event(event)
-            self._performance_metrics_view.update_from_state_event(event)
+            if event.topic.startswith("tool."):
+                self._tool_view.add_tool_event(event)
+                # Update debugging views
+                # TODO: Migrate
+                self._tool_call_history_view.add_tool_call_event(event)
+                self._performance_metrics_view.update_from_tool_event(event)
+            elif event.topic.startswith("vertical."):
+                self._vertical_view.add_vertical_event(event)
+            elif event.topic.startswith("lifecycle."):
+                # Update execution trace view
+                # TODO: Migrate
+                self._execution_trace_view.add_span_event(event)
+                self._performance_metrics_view.update_from_span_event(event)
+                # Also route chunk tool events to tool view
+                if event.topic == "lifecycle.chunk.tool_start":
+                    self._tool_view.add_tool_event(event)
+            elif event.topic.startswith("state."):
+                # Update state transition view
+                # TODO: Migrate
+                self._state_transition_view.add_state_event(event)
+                self._performance_metrics_view.update_from_state_event(event)
+        except Exception as e:
+            logger.error(
+                f"[Dashboard._process_event] Error updating specific views: {e}\n{traceback.format_exc()}"
+            )
 
         # Explicitly refresh display to show new events
         # TODO: Migrate
-        self.refresh()
+        try:
+            self._event_log.refresh()
+            self._event_table.refresh()
+            self._tool_view.refresh()
+            self._stats.refresh()
+        except Exception as e:
+            logger.error(
+                f"[Dashboard._process_event] Error refreshing display: {e}\n{traceback.format_exc()}"
+            )
+
+        logger.info(f"[Dashboard._process_event] COMPLETE [{event.topic}]")
 
     @work
     async def _load_historical_file(self) -> None:
@@ -1171,8 +1484,19 @@ class ObservabilityDashboard(App):
         self.notify("Events cleared (log file preserved)")
 
     def action_refresh(self) -> None:
-        """Refresh the display."""
-        self.refresh()
+        """Refresh all views in the display."""
+        # Refresh all views to ensure latest data is shown
+        self._event_log.refresh()
+        self._event_table.refresh()
+        self._tool_view.refresh()
+        self._vertical_view.refresh()
+        self._execution_trace_view.refresh()
+        self._tool_call_history_view.refresh()
+        self._state_transition_view.refresh()
+        self._performance_metrics_view.refresh()
+        self._stats.refresh()
+        self._jsonl_browser.refresh()
+        self.refresh()  # Refresh the dashboard itself
         self.notify("Display refreshed")
 
     def action_show_help(self) -> None:
