@@ -739,6 +739,7 @@ class TestPluginSignature:
 
         # Generate unique name and content to avoid conflicts with other tests
         import uuid
+
         unique_name = f"test_plugin_{uuid.uuid4().hex[:8]}"
         unique_content = f"def plugin_{uuid.uuid4().hex[:8]}(): pass"
 
@@ -773,7 +774,7 @@ class TestPluginSignature:
             # Clean up: ensure plugin is untrusted even if test fails
             try:
                 untrust_plugin(unique_name)
-            except:
+            except Exception:
                 pass
             temp_path.unlink()
 

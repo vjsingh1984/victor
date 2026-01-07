@@ -331,12 +331,6 @@ class LifecycleManager:
             # Restore messages to in-memory conversation
             self._conversation_controller.reset()
             for msg in session.messages:
-                # Convert to provider format if needed
-                if hasattr(msg, "to_provider_format"):
-                    provider_msg = msg.to_provider_format()
-                else:
-                    provider_msg = msg
-
                 # Add to conversation
                 role = getattr(msg, "role", "user")
                 content = getattr(msg, "content", "")

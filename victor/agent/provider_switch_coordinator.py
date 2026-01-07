@@ -146,7 +146,6 @@ class ProviderSwitchCoordinator:
             return False
 
         # Attempt switch with retry logic
-        last_exception = None
         for attempt in range(max_retries + 1):
             try:
                 # Perform health check if enabled
@@ -188,7 +187,6 @@ class ProviderSwitchCoordinator:
                         return False
 
             except Exception as e:
-                last_exception = e
                 logger.warning(f"Switch attempt {attempt + 1} failed: {e}")
 
                 if attempt < max_retries:
