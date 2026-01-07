@@ -111,18 +111,17 @@ class ChunkGenerator:
         # Emit LIFECYCLE event for tool execution start
         if self._event_bus:
             try:
-                import asyncio
+                from victor.core.events.emit_helper import emit_event_sync
 
-                asyncio.run(
-                    self._event_bus.emit(
-                        topic="lifecycle.chunk.tool_start",
-                        data={
-                            "tool_name": tool_name,
-                            "status_msg": status_msg,
-                            "category": "lifecycle",  # Preserve for observability
-                        },
-                        source="ChunkGenerator",
-                    )
+                emit_event_sync(
+                    self._event_bus,
+                    topic="lifecycle.chunk.tool_start",
+                    data={
+                        "tool_name": tool_name,
+                        "status_msg": status_msg,
+                        "category": "lifecycle",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit chunk tool start event: {e}")
@@ -179,16 +178,15 @@ class ChunkGenerator:
         # Emit LIFECYCLE event for streaming completion
         if self._event_bus:
             try:
-                import asyncio
+                from victor.core.events.emit_helper import emit_event_sync
 
-                asyncio.run(
-                    self._event_bus.emit(
-                        topic="lifecycle.chunk.stream_complete",
-                        data={
-                            "category": "lifecycle",  # Preserve for observability
-                        },
-                        source="ChunkGenerator",
-                    )
+                emit_event_sync(
+                    self._event_bus,
+                    topic="lifecycle.chunk.stream_complete",
+                    data={
+                        "category": "lifecycle",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit stream complete event: {e}")
@@ -217,18 +215,17 @@ class ChunkGenerator:
         # Emit METRIC event for metrics display
         if self._event_bus:
             try:
-                import asyncio
+                from victor.core.events.emit_helper import emit_event_sync
 
-                asyncio.run(
-                    self._event_bus.emit(
-                        topic="metric.chunk.metrics_generated",
-                        data={
-                            "metrics_line": metrics_line[:200],  # Truncate for event
-                            "is_final": is_final,
-                            "category": "metric",  # Preserve for observability
-                        },
-                        source="ChunkGenerator",
-                    )
+                emit_event_sync(
+                    self._event_bus,
+                    topic="metric.chunk.metrics_generated",
+                    data={
+                        "metrics_line": metrics_line[:200],  # Truncate for event
+                        "is_final": is_final,
+                        "category": "metric",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit metrics generated event: {e}")

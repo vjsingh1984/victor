@@ -1104,7 +1104,18 @@ class OrchestratorFactory(ModeAwareMixin):
         tool_pipeline: Any,
         on_chunk: Optional[Callable] = None,
     ) -> Any:
-        """Create StreamingToolAdapter for unified streaming tool execution.
+        """⚠️ OBSOLETE - NOT IN USE - DEAD CODE ⚠️
+
+        This factory method is NO LONGER CALLED in the codebase.
+
+        Analysis (January 2025):
+        - This method is defined but never invoked
+        - streaming_tool_adapter.py module is obsolete
+        - Tool execution now uses: ToolExecutionHandler -> ToolExecutor
+
+        This method is kept for backwards compatibility only.
+
+        Create StreamingToolAdapter for unified streaming tool execution.
 
         The StreamingToolAdapter wraps ToolPipeline to provide streaming output
         while preserving ALL ToolPipeline features (caching, middleware, callbacks,
@@ -1123,14 +1134,46 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             StreamingToolAdapter instance
         """
-        from victor.agent.streaming_tool_adapter import create_streaming_tool_adapter
+        # ============================================================================
+        # ⚠️  OBSOLETE - DEAD CODE - NOT IN USE ⚠️
+        # ============================================================================
+        # This entire method is obsolete and commented out.
+        #
+        # The streaming_tool_adapter.py module has been moved to:
+        #   archived/obsolete/streaming_tool_adapter.py
+        #
+        # Current tool execution path:
+        #   orchestrator._handle_tool_calls()
+        #     → argument_normalizer.normalize_arguments()
+        #     → tool_executor.execute(skip_normalization=True)
+        #       → tool.execute(**arguments)
+        #
+        # TODO: Remove this method entirely in next major version
+        # ============================================================================
 
-        adapter = create_streaming_tool_adapter(
-            tool_pipeline=tool_pipeline,
-            on_chunk=on_chunk,
+        # import warnings
+        # warnings.warn(
+        #     "create_streaming_tool_adapter() is obsolete and unused. "
+        #     "Use ToolExecutionHandler instead.",
+        #     DeprecationWarning,
+        #     stacklevel=2
+        # )
+
+        # from archived.obsolete.streaming_tool_adapter import create_streaming_tool_adapter
+
+        # adapter = create_streaming_tool_adapter(
+        #     tool_pipeline=tool_pipeline,
+        #     on_chunk=on_chunk,
+        # )
+        # logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
+        # return adapter
+
+        # TEMPORARY: Return None to maintain API compatibility
+        logger.warning(
+            "create_streaming_tool_adapter() called but is obsolete. "
+            "Returning None. Tool execution uses ToolExecutionHandler instead."
         )
-        logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
-        return adapter
+        return None
 
     def create_conversation_controller(
         self,

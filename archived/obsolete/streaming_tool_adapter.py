@@ -12,6 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+================================================================================
+⚠️  OBSOLETE - NOT IN USE - DEAD CODE ⚠️
+================================================================================
+
+This module (streaming_tool_adapter.py) is NO LONGER USED in the codebase.
+
+Analysis (January 2025):
+- The factory method `create_streaming_tool_adapter()` is defined in
+  orchestrator_factory.py but is NEVER called
+- No imports of StreamingToolAdapter exist in production code
+- This was part of an unfinished refactoring effort
+
+Current streaming tool execution path:
+- streaming/tool_execution.py:ToolExecutionHandler handles tool execution
+- orchestrator.py:_handle_tool_calls() processes tool calls
+- tool_executor.py:ToolExecutor executes tools with normalization
+
+This file is kept for reference but should be removed in future cleanup.
+================================================================================
+"""
+
 """Streaming Tool Adapter - Unified streaming interface for ToolPipeline.
 
 This module provides a streaming adapter that wraps ToolPipeline, enabling

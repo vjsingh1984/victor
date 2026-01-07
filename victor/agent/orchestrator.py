@@ -6112,9 +6112,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tool_args, tool_name
             )
 
+            # DEBUG: Log normalized arguments with types
+            original_types = {k: type(v).__name__ for k, v in tool_args.items()}
+            normalized_types = {k: type(v).__name__ for k, v in normalized_args.items()}
+            logger.debug(
+                f"[NORMALIZE] {tool_name}: Original types={original_types}, "
+                f"Normalized types={normalized_types}"
+            )
+
             # Apply adapter-based normalization for missing required parameters
             # This handles provider-specific quirks like Gemini omitting 'path' for list_directory
+            before_adapter = normalized_args.copy()
             normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
+
+            # DEBUG: Log if adapter changed the types
+            if before_adapter != normalized_args:
+                before_types = {k: type(v).__name__ for k, v in before_adapter.items()}
+                after_types = {k: type(v).__name__ for k, v in normalized_args.items()}
+                logger.debug(
+                    f"[ADAPTER] {tool_name}: Changed arguments - "
+                    f"Before={before_types}, After={after_types}"
+                )
 
             # Infer operation from alias for git tool (e.g., git_log → git with operation=log)
             normalized_args = infer_git_operation(
@@ -6139,6 +6157,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     f"Original: {tool_args} → Normalized: {normalized_args}"
                 )
                 self.console.print(f"[yellow]⚙ Normalized arguments via {strategy.value}[/]")
+            else:
+                # Log type coercion even when strategy is DIRECT
+                args_changed = tool_args != normalized_args
+                if args_changed:
+                    logger.debug(
+                        f"Type coercion applied to {tool_name} arguments. "
+                        f"Original: {tool_args} → Normalized: {normalized_args}"
+                    )
 
             self.usage_logger.log_event(
                 "tool_call", {"tool_name": tool_name, "tool_args": normalized_args}
@@ -6161,6 +6187,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
             # Note: skip_normalization=True since we already normalized above
+            final_types = {k: type(v).__name__ for k, v in normalized_args.items()}
+            logger.debug(
+                f"[EXECUTE] {tool_name}: Final argument types={final_types}"
+            )
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
                 arguments=normalized_args,
