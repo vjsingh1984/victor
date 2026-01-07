@@ -17,9 +17,9 @@
 import pytest
 
 from victor.framework.teams import TeamFormation
+from victor.framework.team_schema import TeamSpec
 from victor.coding.teams import (
     CodingRoleConfig,
-    CodingTeamSpec,
     CODING_ROLES,
     CODING_TEAM_SPECS,
     get_team_for_task,
@@ -82,7 +82,7 @@ class TestCodingTeamSpecs:
     def test_team_spec_structure(self):
         """Test team specs have required fields."""
         for name, spec in CODING_TEAM_SPECS.items():
-            assert isinstance(spec, CodingTeamSpec)
+            assert isinstance(spec, TeamSpec)
             assert spec.name
             assert spec.description
             assert isinstance(spec.formation, TeamFormation)
