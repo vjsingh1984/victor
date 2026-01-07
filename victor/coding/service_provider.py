@@ -183,11 +183,11 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
         def create_tool_deps(_):
-            from victor.coding.tool_dependencies import (
-                CodingToolDependencyProvider,
+            from victor.core.tool_dependency_loader import (
+                create_vertical_tool_dependency_provider,
             )
 
-            return CodingToolDependencyProvider()
+            return create_vertical_tool_dependency_provider("coding")
 
         container.register_or_replace(
             ToolDependencyProviderProtocol,

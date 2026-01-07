@@ -531,8 +531,8 @@ class ToolDependencyProvider(Protocol):
         class CodingVertical(VerticalBase, ToolDependencyProvider):
             @classmethod
             def get_tool_dependency_provider(cls) -> Optional[Any]:
-                from victor.coding.tools import CodingToolDependencyProvider
-                return CodingToolDependencyProvider()
+                from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+                return create_vertical_tool_dependency_provider("coding")
     """
 
     @classmethod
