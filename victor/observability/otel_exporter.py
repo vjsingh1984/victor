@@ -52,7 +52,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterator, List, Optional, Union
 
-from victor.observability.event_bus import EventCategory, VictorEvent
+from victor.core.events import Event, ObservabilityBus, get_observability_bus
 from victor.observability.exporters import BaseExporter
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,6 @@ class OpenTelemetryExporter(BaseExporter):
 
         self._tracer: Optional[Any] = None
         self._provider: Optional[Any] = None
-        self._active_spans: Dict[str, Any] = {}
 
         self._setup_tracer()
 
@@ -186,143 +185,45 @@ class OpenTelemetryExporter(BaseExporter):
         trace.set_tracer_provider(self._provider)
         self._tracer = trace.get_tracer(__name__, self._service_version)
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event as OTEL span.
 
+        Simplified generic approach - all events become spans with
+        event data as attributes. Since we're on ObservabilityBus,
+        we don't need category filtering.
+
         Args:
-            event: Victor event to export.
+            event: Victor event to export (generic Event with topic + data).
         """
         if not self._tracer:
             return
 
-        if event.category == EventCategory.TOOL:
-            self._handle_tool_event(event)
-        elif event.category == EventCategory.MODEL:
-            self._handle_model_event(event)
-        elif event.category == EventCategory.LIFECYCLE:
-            self._handle_lifecycle_event(event)
-        elif event.category == EventCategory.ERROR:
-            self._handle_error_event(event)
-        elif event.category == EventCategory.STATE:
-            self._handle_state_event(event)
+        # Create span name from topic (replace dots with underscores for OTEL compatibility)
+        span_name = event.topic.replace(".", "_")
 
-    def _handle_tool_event(self, event: VictorEvent) -> None:
-        """Handle tool execution events."""
-        if event.name.endswith(".start"):
-            tool_name = event.name.replace(".start", "")
-            tool_id = event.data.get("tool_id", tool_name)
-
-            span = self._tracer.start_span(
-                f"tool.{tool_name}",
-                attributes={
-                    "tool.name": tool_name,
-                    "tool.id": tool_id,
-                    "victor.event.category": "TOOL",
-                    "victor.session.id": event.session_id or "",
-                },
-            )
-
-            # Store arguments as attributes
-            for key, value in event.data.get("arguments", {}).items():
+        with self._tracer.start_as_current_span(span_name) as span:
+            # All event data becomes span attributes
+            for key, value in event.data.items():
                 if isinstance(value, (str, int, float, bool)):
-                    span.set_attribute(f"tool.argument.{key}", str(value)[:256])
+                    span.set_attribute(f"victor.{key}", value)
+                elif isinstance(value, list):
+                    span.set_attribute(f"victor.{key}", str(value)[:256])
 
-            self._active_spans[tool_id] = span
+            # Metadata
+            span.set_attribute("victor.topic", event.topic)
+            span.set_attribute("victor.session_id", event.session_id or "")
 
-        elif event.name.endswith(".end"):
-            tool_name = event.name.replace(".end", "")
-            tool_id = event.data.get("tool_id", tool_name)
-
-            span = self._active_spans.pop(tool_id, None)
-            if span:
-                success = event.data.get("success", True)
-                if success:
-                    span.set_status(Status(StatusCode.OK))
-                else:
-                    span.set_status(
-                        Status(StatusCode.ERROR, event.data.get("error", "Unknown error"))
-                    )
-
-                if "duration_ms" in event.data:
-                    span.set_attribute("tool.duration_ms", event.data["duration_ms"])
-
-                span.end()
-
-    def _handle_model_event(self, event: VictorEvent) -> None:
-        """Handle model events."""
-        if event.name == "request":
-            span = self._tracer.start_span(
-                "llm.request",
-                attributes={
-                    "llm.provider": event.data.get("provider", ""),
-                    "llm.model": event.data.get("model", ""),
-                    "llm.message_count": event.data.get("message_count", 0),
-                    "llm.tool_count": event.data.get("tool_count", 0),
-                    "victor.event.category": "MODEL",
-                },
-            )
-            self._active_spans["model_request"] = span
-
-        elif event.name == "response":
-            span = self._active_spans.pop("model_request", None)
-            if span:
-                span.set_attribute("llm.tokens_used", event.data.get("tokens_used") or 0)
-                span.set_attribute("llm.tool_calls", event.data.get("tool_calls", 0))
-                if "latency_ms" in event.data:
-                    span.set_attribute("llm.latency_ms", event.data["latency_ms"])
+            # Status based on error presence
+            if event.data.get("error"):
+                error_msg = str(event.data["error"])[:256]
+                span.set_status(Status(StatusCode.ERROR, error_msg))
+            elif not event.data.get("success", True):
+                span.set_status(Status(StatusCode.ERROR, "Operation failed"))
+            else:
                 span.set_status(Status(StatusCode.OK))
-                span.end()
-
-    def _handle_lifecycle_event(self, event: VictorEvent) -> None:
-        """Handle lifecycle events."""
-        if event.name == "session.start":
-            span = self._tracer.start_span(
-                "session",
-                attributes={
-                    "victor.session.id": event.session_id or "",
-                    "victor.event.category": "LIFECYCLE",
-                },
-            )
-            self._active_spans["session"] = span
-
-        elif event.name == "session.end":
-            span = self._active_spans.pop("session", None)
-            if span:
-                span.set_attribute("session.tool_calls", event.data.get("tool_calls", 0))
-                if event.data.get("duration_seconds"):
-                    span.set_attribute("session.duration_seconds", event.data["duration_seconds"])
-                success = event.data.get("success", True)
-                if success:
-                    span.set_status(Status(StatusCode.OK))
-                else:
-                    span.set_status(Status(StatusCode.ERROR))
-                span.end()
-
-    def _handle_error_event(self, event: VictorEvent) -> None:
-        """Handle error events."""
-        with self._tracer.start_as_current_span("error") as span:
-            span.set_attribute("error.type", event.name)
-            span.set_attribute("error.message", event.data.get("error", ""))
-            span.set_attribute("error.recoverable", event.data.get("recoverable", True))
-            span.set_status(Status(StatusCode.ERROR, event.data.get("error", "Unknown error")))
-
-    def _handle_state_event(self, event: VictorEvent) -> None:
-        """Handle state transition events."""
-        with self._tracer.start_as_current_span("state.transition") as span:
-            span.set_attribute("state.old", event.data.get("old_stage", ""))
-            span.set_attribute("state.new", event.data.get("new_stage", ""))
-            span.set_attribute("state.confidence", event.data.get("confidence", 1.0))
 
     def close(self) -> None:
         """Shutdown the tracer provider."""
-        # End any remaining active spans
-        for span in self._active_spans.values():
-            try:
-                span.end()
-            except Exception:
-                pass
-        self._active_spans.clear()
-
         if self._provider:
             self._provider.shutdown()
 
@@ -420,7 +321,7 @@ class AsyncBatchingExporter(BaseExporter):
         batch_size: int = 100,
         flush_interval: float = 5.0,
         max_queue_size: int = 10000,
-        on_export_error: Optional[Callable[[Exception, List[VictorEvent]], None]] = None,
+        on_export_error: Optional[Callable[[Exception, List[Event]], None]] = None,
     ) -> None:
         """Initialize async batching exporter.
 
@@ -445,7 +346,7 @@ class AsyncBatchingExporter(BaseExporter):
         self._thread = threading.Thread(target=self._export_loop, daemon=True)
         self._thread.start()
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Queue event for async export.
 
         Args:
@@ -461,7 +362,7 @@ class AsyncBatchingExporter(BaseExporter):
         """Background export loop."""
         import time
 
-        batch: List[VictorEvent] = []
+        batch: List[Event] = []
         last_flush = time.time()
 
         while not self._shutdown.is_set():
@@ -491,11 +392,11 @@ class AsyncBatchingExporter(BaseExporter):
         if batch:
             self._flush_batch(batch)
 
-    def _flush_batch(self, batch: List[VictorEvent]) -> None:
+    def _flush_batch(self, batch: List[Event]) -> None:
         """Flush batch of events to target.
 
         Args:
-            batch: Events to export.
+            batch: Events to export (generic Event objects with topic + data).
         """
         try:
             for event in batch:

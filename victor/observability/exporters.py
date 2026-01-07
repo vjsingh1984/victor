@@ -26,7 +26,7 @@ Available exporters:
 Example:
     from victor.observability import EventBus, JsonLineExporter
 
-    bus = EventBus.get_instance()
+    bus = get_observability_bus()
     bus.add_exporter(JsonLineExporter("events.jsonl"))
 """
 
@@ -35,12 +35,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
-from victor.observability.event_bus import EventCategory, VictorEvent
+from victor.core.events import Event
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class BaseExporter(ABC):
     """
 
     @abstractmethod
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export an event synchronously.
 
         Args:
@@ -68,7 +69,7 @@ class BaseExporter(ABC):
         """
         pass
 
-    async def export_async(self, event: VictorEvent) -> None:
+    async def export_async(self, event: Event) -> None:
         """Export an event asynchronously.
 
         Default implementation calls sync export.
@@ -113,8 +114,9 @@ class JsonLineExporter(BaseExporter):
         path: Union[str, Path],
         *,
         buffer_size: int = 10,
-        include_categories: Optional[Set[EventCategory]] = None,
-        exclude_categories: Optional[Set[EventCategory]] = None,
+        flush_interval_seconds: int = 60,
+        include_categories: Optional[Set[str]] = None,
+        exclude_categories: Optional[Set[str]] = None,
         append: bool = True,
     ) -> None:
         """Initialize the JSONL exporter.
@@ -122,12 +124,14 @@ class JsonLineExporter(BaseExporter):
         Args:
             path: Path to output file.
             buffer_size: Events to buffer before flush.
-            include_categories: Categories to include (None = all).
-            exclude_categories: Categories to exclude.
+            flush_interval_seconds: Flush at least this often (default: 60 seconds).
+            include_categories: Topic prefixes to include (None = all).
+            exclude_categories: Topic prefixes to exclude.
             append: Whether to append to existing file.
         """
         self.path = Path(path)
         self.buffer_size = buffer_size
+        self.flush_interval_seconds = flush_interval_seconds
         self.include_categories = include_categories
         self.exclude_categories = exclude_categories or set()
 
@@ -139,27 +143,68 @@ class JsonLineExporter(BaseExporter):
         self._file = open(self.path, mode, encoding="utf-8")
         self._buffer: List[str] = []
         self._event_count = 0
+        self._last_flush_time = time.time()
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event to JSONL file.
 
         Args:
             event: Event to export.
         """
-        # Filter by category
-        if self.include_categories and event.category not in self.include_categories:
-            return
-        if event.category in self.exclude_categories:
+        # Filter by topic prefix (was category, now topic-based)
+        if self.include_categories:
+            if not any(event.topic.startswith(prefix) for prefix in self.include_categories):
+                return
+        if any(event.topic.startswith(prefix) for prefix in self.exclude_categories):
             return
 
-        # Serialize and buffer
-        line = json.dumps(event.to_dict()) + "\n"
-        self._buffer.append(line)
-        self._event_count += 1
+        try:
+            # Serialize to dict and handle non-JSON-serializable types
+            event_dict = event.to_dict()
 
-        # Flush if buffer is full
-        if len(self._buffer) >= self.buffer_size:
-            self.flush()
+            # Convert sets to lists for JSON serialization
+            event_dict = self._make_json_serializable(event_dict)
+
+            # Serialize and buffer
+            line = json.dumps(event_dict) + "\n"
+            self._buffer.append(line)
+            self._event_count += 1
+
+            # Flush if buffer is full OR time interval elapsed
+            time_since_flush = time.time() - self._last_flush_time
+            if (
+                len(self._buffer) >= self.buffer_size
+                or time_since_flush >= self.flush_interval_seconds
+            ):
+                self.flush()
+
+        except (TypeError, ValueError) as e:
+            # Log serialization error but don't crash
+            logger.warning(
+                f"Failed to serialize event {event.category}/{event.name}: {e}. "
+                f"Event data keys: {list(event.data.keys()) if event.data else 'N/A'}"
+            )
+
+    def _make_json_serializable(self, obj: Any) -> Any:
+        """Convert non-JSON-serializable types to JSON-compatible types.
+
+        Args:
+            obj: Object to convert.
+
+        Returns:
+            JSON-serializable version of the object.
+        """
+        if isinstance(obj, set):
+            return list(obj)
+        elif isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        else:
+            # For other types, convert to string
+            return str(obj)
 
     def flush(self) -> None:
         """Flush buffered events to file."""
@@ -167,6 +212,7 @@ class JsonLineExporter(BaseExporter):
             self._file.writelines(self._buffer)
             self._file.flush()
             self._buffer.clear()
+            self._last_flush_time = time.time()
 
     def close(self) -> None:
         """Close the file, flushing any remaining events."""
@@ -190,7 +236,7 @@ class LoggingExporter(BaseExporter):
     Example:
         from victor.observability import EventBus, LoggingExporter
 
-        bus = EventBus.get_instance()
+        bus = get_observability_bus()
         bus.add_exporter(LoggingExporter("victor.events"))
 
         # Events will now appear in logs:
@@ -201,8 +247,8 @@ class LoggingExporter(BaseExporter):
         self,
         logger_name: str = "victor.events",
         *,
-        include_categories: Optional[Set[EventCategory]] = None,
-        exclude_categories: Optional[Set[EventCategory]] = None,
+        include_categories: Optional[Set[str]] = None,
+        exclude_categories: Optional[Set[str]] = None,
         log_level: int = logging.INFO,
         include_data: bool = True,
     ) -> None:
@@ -210,8 +256,8 @@ class LoggingExporter(BaseExporter):
 
         Args:
             logger_name: Name of the logger to use.
-            include_categories: Categories to include (None = all).
-            exclude_categories: Categories to exclude.
+            include_categories: Topic prefixes to include (None = all).
+            exclude_categories: Topic prefixes to exclude.
             log_level: Default log level for events.
             include_data: Whether to include event data in log message.
         """
@@ -222,28 +268,31 @@ class LoggingExporter(BaseExporter):
         self.include_data = include_data
         self._event_count = 0
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event to logging system.
 
         Args:
             event: Event to export.
         """
-        # Filter by category
-        if self.include_categories and event.category not in self.include_categories:
-            return
-        if event.category in self.exclude_categories:
+        # Filter by topic prefix
+        if self.include_categories:
+            if not any(event.topic.startswith(prefix) for prefix in self.include_categories):
+                return
+        if any(event.topic.startswith(prefix) for prefix in self.exclude_categories):
             return
 
         # Determine log level
         level = self.log_level
-        if event.category == EventCategory.ERROR:
+        if event.topic.startswith("error."):
             level = logging.ERROR
-        elif event.category == EventCategory.AUDIT:
+        elif event.topic.startswith("audit."):
             level = logging.WARNING
 
         # Format message
-        category_name = event.category.value.upper() if event.category else "UNKNOWN"
-        message = f"[{category_name}] {event.name}"
+        # Extract category from topic prefix (e.g., "tool.start" -> "TOOL")
+        topic_parts = event.topic.split(".", 1)
+        category_name = topic_parts[0].upper() if topic_parts else "UNKNOWN"
+        message = f"[{category_name}] {event.topic}"
 
         if self.include_data and event.data:
             # Include key data fields (avoid very long output)
@@ -285,10 +334,10 @@ class CallbackExporter(BaseExporter):
 
     def __init__(
         self,
-        callback: Callable[[VictorEvent], None],
+        callback: Callable[[Event], None],
         *,
-        async_callback: Optional[Callable[[VictorEvent], Any]] = None,
-        error_handler: Optional[Callable[[Exception, VictorEvent], None]] = None,
+        async_callback: Optional[Callable[[Event], Any]] = None,
+        error_handler: Optional[Callable[[Exception, Event], None]] = None,
     ) -> None:
         """Initialize callback exporter.
 
@@ -301,7 +350,7 @@ class CallbackExporter(BaseExporter):
         self._async_callback = async_callback
         self._error_handler = error_handler
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event via callback.
 
         Args:
@@ -315,7 +364,7 @@ class CallbackExporter(BaseExporter):
             else:
                 logger.warning(f"Callback error: {e}")
 
-    async def export_async(self, event: VictorEvent) -> None:
+    async def export_async(self, event: Event) -> None:
         """Export event via async callback.
 
         Args:
@@ -375,7 +424,7 @@ class CompositeExporter(BaseExporter):
         if exporter in self._exporters:
             self._exporters.remove(exporter)
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event to all child exporters.
 
         Args:
@@ -387,7 +436,7 @@ class CompositeExporter(BaseExporter):
             except Exception as e:
                 logger.warning(f"Exporter {type(exporter).__name__} error: {e}")
 
-    async def export_async(self, event: VictorEvent) -> None:
+    async def export_async(self, event: Event) -> None:
         """Export event to all child exporters asynchronously.
 
         Args:
@@ -422,10 +471,10 @@ class FilteringExporter(BaseExporter):
     to any existing exporter.
 
     Example:
-        # Only export TOOL events
+        # Only export tool events
         filtered = FilteringExporter(
             JsonLineExporter("tools.jsonl"),
-            categories={EventCategory.TOOL},
+            categories={"tool."},  # Topic prefix
         )
     """
 
@@ -433,16 +482,16 @@ class FilteringExporter(BaseExporter):
         self,
         exporter: BaseExporter,
         *,
-        categories: Optional[Set[EventCategory]] = None,
+        categories: Optional[Set[str]] = None,
         names: Optional[Set[str]] = None,
-        predicate: Optional[Callable[[VictorEvent], bool]] = None,
+        predicate: Optional[Callable[[Event], bool]] = None,
     ) -> None:
         """Initialize filtering exporter.
 
         Args:
             exporter: Underlying exporter.
-            categories: Set of categories to include.
-            names: Set of event names to include.
+            categories: Set of topic prefixes to include.
+            names: Set of event topics to include.
             predicate: Custom filter function.
         """
         self._exporter = exporter
@@ -450,7 +499,7 @@ class FilteringExporter(BaseExporter):
         self._names = names
         self._predicate = predicate
 
-    def _should_export(self, event: VictorEvent) -> bool:
+    def _should_export(self, event: Event) -> bool:
         """Check if event should be exported.
 
         Args:
@@ -459,15 +508,16 @@ class FilteringExporter(BaseExporter):
         Returns:
             True if event should be exported.
         """
-        if self._categories and event.category not in self._categories:
-            return False
-        if self._names and event.name not in self._names:
+        if self._categories:
+            if not any(event.topic.startswith(prefix) for prefix in self._categories):
+                return False
+        if self._names and event.topic not in self._names:
             return False
         if self._predicate and not self._predicate(event):
             return False
         return True
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Export event if it passes filters.
 
         Args:
@@ -476,7 +526,7 @@ class FilteringExporter(BaseExporter):
         if self._should_export(event):
             self._exporter.export(event)
 
-    async def export_async(self, event: VictorEvent) -> None:
+    async def export_async(self, event: Event) -> None:
         """Export event asynchronously if it passes filters.
 
         Args:
@@ -520,10 +570,10 @@ class BufferedExporter(BaseExporter):
         self._exporter = exporter
         self._batch_size = batch_size
         self._flush_interval = flush_interval
-        self._buffer: List[VictorEvent] = []
+        self._buffer: List[Event] = []
         self._last_flush = datetime.now(timezone.utc)
 
-    def export(self, event: VictorEvent) -> None:
+    def export(self, event: Event) -> None:
         """Buffer event for later export.
 
         Args:
