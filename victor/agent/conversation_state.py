@@ -650,24 +650,23 @@ class ConversationStateMachine:
             # Emit STATE event for stage transition
             if self._event_bus:
                 try:
-                    import asyncio
+                    from victor.core.events.emit_helper import emit_event_sync
 
-                    asyncio.run(
-                        self._event_bus.emit(
-                            topic="state.stage_changed",
-                            data={
-                                "old_stage": old_stage.name,
-                                "new_stage": new_stage.name,
-                                "confidence": confidence,
-                                "transition_count": self._transition_count,
-                                "message_count": self.state.message_count,
-                                "tools_executed": len(self.state.tool_history),
-                                "files_observed": len(self.state.observed_files),
-                                "files_modified": len(self.state.modified_files),
-                                "category": "state",  # Preserve for observability
-                            },
-                            source="ConversationStateMachine",
-                        )
+                    emit_event_sync(
+                        self._event_bus,
+                        topic="state.stage_changed",
+                        data={
+                            "old_stage": old_stage.name,
+                            "new_stage": new_stage.name,
+                            "confidence": confidence,
+                            "transition_count": self._transition_count,
+                            "message_count": self.state.message_count,
+                            "tools_executed": len(self.state.tool_history),
+                            "files_observed": len(self.state.observed_files),
+                            "files_modified": len(self.state.modified_files),
+                            "category": "state",  # Preserve for observability
+                        },
+                        source="ConversationStateMachine",
                     )
                 except Exception as e:
                     logger.debug(f"Failed to emit stage change event: {e}")
