@@ -170,27 +170,43 @@ class TestURLResolver:
     @pytest.mark.asyncio
     async def test_adds_https_scheme(self, resolver):
         """Test that https is added to URLs without scheme."""
+        from unittest.mock import MagicMock
+
         with patch("aiohttp.ClientSession") as mock_session:
+            # Create mock response
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.reason = "OK"
             mock_response.headers = {"Content-Type": "text/html"}
             mock_response.text = AsyncMock(return_value="<html>content</html>")
 
-            # Create a proper async context manager mock
-            async def mock_get_cm(*args, **kwargs):
-                return mock_response
+            # Track calls to get
+            get_calls = []
 
-            mock_session_instance = AsyncMock()
-            mock_session_instance.get = mock_get_cm
-            mock_session_instance.__aenter__.return_value = mock_session_instance
-            mock_session_instance.__aexit__.return_value = None
+            # Create an async context manager for session.get()
+            class MockGetContextManager:
+                async def __aenter__(self):
+                    return mock_response
+
+                async def __aexit__(self, *args):
+                    pass
+
+                def __init__(self, *args, **kwargs):
+                    get_calls.append(args)
+
+            # Create mock session instance
+            mock_session_instance = MagicMock()
+            mock_session_instance.get = MockGetContextManager
+            mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
+            mock_session_instance.__aexit__ = AsyncMock(return_value=None)
 
             mock_session.return_value = mock_session_instance
 
             item = await resolver.resolve("example.com", {})
             # Should have tried to fetch https://example.com
-            assert mock_session_instance.get.called
+            assert len(get_calls) > 0
+            # First arg should be the URL with https scheme
+            assert "https://example.com" in get_calls[0]
 
 
 class TestFileResolver:

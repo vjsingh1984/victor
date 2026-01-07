@@ -133,10 +133,10 @@ class ContinuationStrategy:
         except Exception:
             return None
 
-    async def _emit_event(
+    def _emit_event(
         self, topic: str, data: Dict[str, Any], source: str = "ContinuationStrategy"
     ) -> None:
-        """Emit event with error handling.
+        """Emit event with error handling (non-blocking).
 
         Args:
             topic: Event topic
@@ -145,10 +145,14 @@ class ContinuationStrategy:
         """
         if self._event_bus:
             try:
-                await self._event_bus.emit(
-                    topic=topic,
-                    data={**data, "category": "state"},  # Preserve for observability
-                    source=source,
+                import asyncio
+                # Non-blocking async call in sync context
+                asyncio.create_task(
+                    self._event_bus.emit(
+                        topic=topic,
+                        data={**data, "category": "state"},  # Preserve for observability
+                        source=source,
+                    )
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit continuation event: {e}")
@@ -240,7 +244,7 @@ class ContinuationStrategy:
 
         return True
 
-    async def determine_continuation_action(
+    def determine_continuation_action(
         self,
         intent_result: Any,  # IntentClassificationResult
         is_analysis_task: bool,
@@ -320,7 +324,7 @@ class ContinuationStrategy:
                         "Task completion detected: all required files read and "
                         "output requirements met - finishing"
                     )
-                    await self._emit_event(
+                    self._emit_event(
                         topic="state.continuation.task_complete",
                         data={
                             "reason": "task_completion_detected",
@@ -344,7 +348,7 @@ class ContinuationStrategy:
                         f"Synthesis nudge: all {len(required_files)} required files read, "
                         f"but output not yet produced (nudge {synthesis_nudge_count + 1}/3)"
                     )
-                    await self._emit_event(
+                    self._emit_event(
                         topic="state.continuation.synthesis_nudge",
                         data={
                             "required_files": list(required_files),
@@ -378,7 +382,7 @@ class ContinuationStrategy:
                     f"Stage cycling detected (cycle_count={cycle_count}) - "
                     "forcing synthesis to prevent infinite exploration"
                 )
-                await self._emit_event(
+                self._emit_event(
                     topic="state.continuation.cycle_force_synthesis",
                     data={
                         "cycle_count": cycle_count,
@@ -410,7 +414,7 @@ class ContinuationStrategy:
                     f"Cumulative prompt interventions ({cumulative_interventions}) reached threshold - "
                     "nudging synthesis"
                 )
-                await self._emit_event(
+                self._emit_event(
                     topic="state.continuation.cumulative_intervention_nudge",
                     data={
                         "cumulative_interventions": cumulative_interventions,
@@ -452,7 +456,7 @@ class ContinuationStrategy:
         if max_prompts_summary_requested:
             logger.info("Summary was already requested - finishing to prevent duplicate output")
             # Emit STATE event for continuation decision
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.finish",
                 data={
                     "reason": "summary_already_requested",
@@ -489,7 +493,7 @@ class ContinuationStrategy:
                 recoverable=True,
             )
             # Emit STATE event for continuation decision
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.request_summary",
                 data={
                     "reason": "stuck_loop_detected",
@@ -596,7 +600,7 @@ class ContinuationStrategy:
                     f"Extracted tool call: {extracted_call.tool_name} with confidence "
                     f"{extracted_call.confidence:.2f}. Will execute automatically."
                 )
-                await self._emit_event(
+                self._emit_event(
                     topic="state.continuation.execute_extracted_tool",
                     data={
                         "tool_name": extracted_call.tool_name,
@@ -630,7 +634,7 @@ class ContinuationStrategy:
                 recoverable=True,
             )
             # Emit STATE event for continuation decision
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.force_tool_execution",
                 data={
                     "reason": "hallucinated_tool_calls",
@@ -667,7 +671,7 @@ class ContinuationStrategy:
             question_result = classify_question(full_content or "")
 
             # Emit event for observability
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.question_classified",
                 data={
                     "question_type": question_result.question_type.value,
@@ -738,7 +742,7 @@ class ContinuationStrategy:
         if is_completion:
             logger.info("Model indicated completion - finishing")
             # Emit STATE event for completion
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.finish",
                 data={
                     "reason": "completion_intent",
@@ -801,7 +805,7 @@ class ContinuationStrategy:
                 },
             )
             # Emit STATE event for summary request
-            await self._emit_event(
+            self._emit_event(
                 topic="state.continuation.request_summary",
                 data={
                     "reason": "max_prompts_reached",

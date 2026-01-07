@@ -46,12 +46,14 @@ class SaveCommand(BaseSlashCommand):
             return
 
         from victor.agent.session import get_session_manager
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
         title = " ".join(ctx.args) if ctx.args else None
 
         try:
-            session_manager = get_session_manager()
-            session_id = session_manager.save_session(
+            # Save to SQLite (new primary storage)
+            sqlite_persistence = get_sqlite_session_persistence()
+            session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation,
                 model=ctx.agent.model,
                 provider=ctx.agent.provider_name,
@@ -59,16 +61,22 @@ class SaveCommand(BaseSlashCommand):
                 title=title,
                 conversation_state=getattr(ctx.agent, "conversation_state", None),
             )
-            ctx.console.print(
-                Panel(
-                    f"Session saved successfully!\n\n"
-                    f"[bold]Session ID:[/] {session_id}\n"
-                    f"[bold]Location:[/] {session_manager.session_dir / f'{session_id}.json'}\n\n"
-                    f"[dim]Use '/load {session_id}' to restore this session[/]",
-                    title="Session Saved",
-                    border_style="green",
+
+            if session_id:
+                ctx.console.print(
+                    Panel(
+                        f"Session saved to SQLite database!\n\n"
+                        f"[bold]Session ID:[/] {session_id}\n"
+                        f"[bold]Database:[/] {sqlite_persistence._db_path}\n\n"
+                        f"[dim]Use '/resume {session_id}' to restore this session[/]",
+                        title="Session Saved",
+                        border_style="green",
+                    )
                 )
-            )
+            else:
+                ctx.console.print("[red]Failed to save session to SQLite[/]")
+                logger.error("Session ID was empty after save")
+
         except Exception as e:
             ctx.console.print(f"[red]Failed to save session:[/] {e}")
             logger.exception("Error saving session")
@@ -155,46 +163,49 @@ class SessionsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        from victor.agent.session import get_session_manager
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
         limit = self._parse_int_arg(ctx, 0, default=10)
 
         try:
-            session_manager = get_session_manager()
-            sessions = session_manager.list_sessions(limit=limit)
+            persistence = get_sqlite_session_persistence()
+            sessions = persistence.list_sessions(limit=limit)
 
             if not sessions:
                 ctx.console.print("[dim]No saved sessions found[/]")
-                ctx.console.print(f"[dim]Sessions are stored in: {session_manager.session_dir}[/]")
+                ctx.console.print(f"[dim]Database: {persistence._db_path}[/]")
                 return
 
-            table = Table(title=f"Saved Sessions (last {len(sessions)})")
+            table = Table(title=f"Saved Sessions (SQLite - last {len(sessions)})")
             table.add_column("ID", style="cyan", no_wrap=True)
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
+            table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
-            table.add_column("Updated", style="dim")
+            table.add_column("Created", style="dim")
 
             for session in sessions:
                 try:
                     from datetime import datetime
 
-                    dt = datetime.fromisoformat(session.updated_at)
+                    dt = datetime.fromisoformat(session["created_at"])
                     date_str = dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
-                    date_str = session.updated_at[:16]
+                    date_str = session["created_at"][:16]
 
-                title = session.title[:40] + "..." if len(session.title) > 40 else session.title
+                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
                 table.add_row(
-                    session.session_id,
+                    session["session_id"],
                     title,
-                    session.model,
-                    str(session.message_count),
+                    session["model"],
+                    session["provider"],
+                    str(session["message_count"]),
                     date_str,
                 )
 
             ctx.console.print(table)
-            ctx.console.print("\n[dim]Use '/load <session_id>' to restore a session[/]")
+            ctx.console.print("\n[dim]Use '/resume <session_id>' to restore a session[/]")
+            ctx.console.print("[dim]Or '/switch <model> --resume <session_id>' to resume and switch[/]")
         except Exception as e:
             ctx.console.print(f"[red]Failed to list sessions:[/] {e}")
             logger.exception("Error listing sessions")
@@ -202,14 +213,14 @@ class SessionsCommand(BaseSlashCommand):
 
 @register_command
 class ResumeCommand(BaseSlashCommand):
-    """Resume the most recent session."""
+    """Resume a session with interactive selection from SQLite."""
 
     @property
     def metadata(self) -> CommandMetadata:
         return CommandMetadata(
             name="resume",
-            description="Resume the most recent session",
-            usage="/resume",
+            description="Resume a session from SQLite history",
+            usage="/resume [session_id]",
             category="session",
             requires_agent=True,
         )
@@ -220,42 +231,113 @@ class ResumeCommand(BaseSlashCommand):
 
         from victor.agent.conversation_state import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.session import get_session_manager
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
+        # If session_id provided as argument, load it directly
+        if ctx.args:
+            session_id = ctx.args[0]
+            self._load_session(ctx, session_id)
+            return
+
+        # Otherwise, show interactive selection
         try:
-            session_manager = get_session_manager()
-            sessions = session_manager.list_sessions(limit=1)
+            persistence = get_sqlite_session_persistence()
+            sessions = persistence.list_sessions(limit=20)
 
             if not sessions:
-                ctx.console.print("[yellow]No sessions to resume[/]")
+                ctx.console.print("[yellow]No sessions found in SQLite database[/]")
+                ctx.console.print("[dim]Start a conversation to create sessions[/]")
                 return
 
-            latest = sessions[0]
-            session = session_manager.load_session(latest.session_id)
+            # Display sessions with numbers
+            table = Table(title="Recent Sessions (SQLite)")
+            table.add_column("#", style="cyan", no_wrap=True, width=4)
+            table.add_column("ID", style="cyan", no_wrap=True)
+            table.add_column("Title", style="white")
+            table.add_column("Model", style="yellow")
+            table.add_column("Messages", justify="right")
+            table.add_column("Date", style="dim")
 
-            if session is None:
-                ctx.console.print("[red]Failed to load most recent session[/]")
+            for idx, session in enumerate(sessions, 1):
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(session["created_at"])
+                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    date_str = session["created_at"][:16]
+
+                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                table.add_row(
+                    str(idx),
+                    session["session_id"],
+                    title,
+                    session["model"],
+                    str(session["message_count"]),
+                    date_str,
+                )
+
+            ctx.console.print(table)
+            ctx.console.print("\n[dim]Enter session number to resume (1-{})[/]", len(sessions))
+            ctx.console.print("[dim]Or use: /resume <session_id>[/]")
+
+        except Exception as e:
+            ctx.console.print(f"[red]Failed to list sessions:[/] {e}")
+            logger.exception("Error listing sessions")
+
+    def _load_session(self, ctx: CommandContext, session_id: str) -> None:
+        """Load and restore a session.
+
+        Args:
+            ctx: Command context
+            session_id: Session ID to load
+        """
+        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.message_history import MessageHistory
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+
+        try:
+            persistence = get_sqlite_session_persistence()
+            session_data = persistence.load_session(session_id)
+
+            if session_data is None:
+                ctx.console.print(f"[red]Session not found:[/] {session_id}")
                 return
 
             # Restore conversation
-            ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
+            metadata = session_data.get("metadata", {})
+            conversation_dict = session_data.get("conversation", {})
 
-            if session.conversation_state:
-                ctx.agent.conversation_state = ConversationStateMachine.from_dict(
-                    session.conversation_state
-                )
+            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
+
+            # Restore conversation state if available
+            conversation_state_dict = session_data.get("conversation_state")
+            if conversation_state_dict:
+                try:
+                    ctx.agent.conversation_state = ConversationStateMachine.from_dict(
+                        conversation_state_dict
+                    )
+                    logger.info(
+                        f"Restored conversation state: stage={ctx.agent.conversation_state.get_stage().name}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to restore conversation state: {e}")
 
             ctx.console.print(
                 Panel(
-                    f"Resumed session: [bold]{session.metadata.title}[/]\n"
-                    f"Messages: {session.metadata.message_count}",
+                    f"Session restored from SQLite!\n\n"
+                    f"[bold]ID:[/] {metadata.get('session_id', session_id)}\n"
+                    f"[bold]Title:[/] {metadata.get('title', 'Untitled')}\n"
+                    f"[bold]Model:[/] {metadata.get('model', 'N/A')}\n"
+                    f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
+                    f"[bold]Messages:[/] {metadata.get('message_count', 0)}\n"
+                    f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}",
                     title="Session Resumed",
                     border_style="green",
                 )
             )
         except Exception as e:
-            ctx.console.print(f"[red]Failed to resume session:[/] {e}")
-            logger.exception("Error resuming session")
+            ctx.console.print(f"[red]Failed to load session:[/] {e}")
+            logger.exception("Error loading session")
 
 
 @register_command
