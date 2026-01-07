@@ -140,7 +140,7 @@ from app.api import routes
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{{settings.API_V1_STR}}/openapi.json"
 )
 
 app.include_router(routes.router, prefix=settings.API_V1_STR)
@@ -148,7 +148,7 @@ app.include_router(routes.router, prefix=settings.API_V1_STR)
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    return {{"status": "healthy"}}
 ''',
     "fastapi_routes": '''"""API routes."""
 
@@ -159,14 +159,14 @@ router = APIRouter()
 @router.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Welcome to the API"}
+    return {{"message": "Welcome to the API"}}
 
-@router.get("/items/{item_id}")
+@router.get("/items/{{item_id}}")
 async def read_item(item_id: int):
     """Get item by ID."""
     if item_id < 0:
         raise HTTPException(status_code=404, detail="Item not found")
-    return {"item_id": item_id, "name": f"Item {item_id}"}
+    return {{"item_id": item_id, "name": f"Item {{item_id}}"}}
 ''',
     "fastapi_config": '''"""Application configuration."""
 
@@ -194,7 +194,7 @@ def test_health():
     """Test health endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json() == {{"status": "healthy"}}
 
 def test_root():
     """Test root endpoint."""
@@ -261,7 +261,7 @@ def cli():
 @click.option('--name', default='World', help='Name to greet')
 def hello(name):
     """Say hello."""
-    click.echo(f'Hello, {name}!')
+    click.echo(f'Hello, {{name}}!')
 
 if __name__ == '__main__':
     cli()

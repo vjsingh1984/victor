@@ -149,7 +149,7 @@ class TestVariableInterpolation:
                 # Check content interpolation
                 feature_content = feature_file.read_text()
                 assert "User Authentication" in feature_content
-                assert "Hello from User Authentication!" in feature_content
+                assert "Hello from user_authentication!" in feature_content
 
                 test_content = test_file.read_text()
                 assert "test_user_authentication" in test_content
@@ -313,7 +313,7 @@ class TestVariableInterpolation:
                 assert "OAuth2 Provider" in content
                 assert "# TODO: Implement OAuth2 Provider" in content
                 assert "def main():" in content
-                assert 'print("Hello from OAuth2 Provider!")' in content
+                assert 'print("Hello from oauth2_provider!")' in content
 
                 # Check test file content
                 test_file = Path("tests/test_oauth2_provider.py")

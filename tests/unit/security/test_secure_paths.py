@@ -737,8 +737,13 @@ class TestPluginSignature:
             untrust_plugin,
         )
 
+        # Generate unique name and content to avoid conflicts with other tests
+        import uuid
+        unique_name = f"test_plugin_{uuid.uuid4().hex[:8]}"
+        unique_content = f"def plugin_{uuid.uuid4().hex[:8]}(): pass"
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("def trusted_plugin(): pass")
+            f.write(unique_content)
             temp_path = Path(f.name)
 
         try:
@@ -747,23 +752,29 @@ class TestPluginSignature:
             assert is_trusted is False
             assert reason == "not_trusted"
 
-            # Trust the plugin
-            result = trust_plugin(temp_path, name="test_plugin")
+            # Trust the plugin with unique name
+            result = trust_plugin(temp_path, name=unique_name)
             assert result is True
 
             # Now should be trusted
             is_trusted, reason = verify_plugin_trust(temp_path)
             assert is_trusted is True
-            assert "trusted:test_plugin" in reason
+            assert f"trusted:{unique_name}" in reason
 
             # Untrust
-            untrust_plugin("test_plugin")
+            untrust_result = untrust_plugin(unique_name)
+            assert untrust_result is True
 
             # Should be untrusted again
             is_trusted, _ = verify_plugin_trust(temp_path)
             assert is_trusted is False
 
         finally:
+            # Clean up: ensure plugin is untrusted even if test fails
+            try:
+                untrust_plugin(unique_name)
+            except:
+                pass
             temp_path.unlink()
 
     def test_list_trusted_plugins(self):

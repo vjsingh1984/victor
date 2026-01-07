@@ -299,6 +299,7 @@ class TestDashboardJSONLLoading:
     def test_dashboard_parses_jsonl_event(self):
         """Test that dashboard can parse JSONL event lines."""
         from victor.observability.dashboard.app import ObservabilityDashboard
+        from victor.core.events import Event
         import json
 
         dashboard = ObservabilityDashboard()
@@ -312,14 +313,15 @@ class TestDashboardJSONLLoading:
 
         jsonl_line = json.dumps(sample_event)
 
-        # Parse the line
-        # NOTE: _parse_jsonl_line currently returns None with a TODO comment
-        # This test will need to be updated when Event parsing is implemented
+        # Parse the line - should now successfully parse old format to new Event
         event = dashboard._parse_jsonl_line(jsonl_line)
 
-        # For now, expect None since Event parsing is not yet implemented
-        # TODO: Update this test when Event.from_dict() is implemented
-        assert event is None  # Currently returns None until migration complete
+        # Event should be parsed successfully
+        assert event is not None
+        assert isinstance(event, Event)
+        # Old format (category + name) should be converted to topic
+        assert event.topic == "tool.tool.start"
+        assert event.data == {"tool": "read_file", "path": "/test"}
 
 
 if __name__ == "__main__":
