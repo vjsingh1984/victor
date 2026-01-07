@@ -1472,8 +1472,8 @@ async def read(
     from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
 
     # Determine truncation limits based on model context
-    # Cloud models (Anthropic, OpenAI, etc.): ~750 lines / 25KB (balanced for context efficiency)
-    # Local models (Ollama, LMStudio, vLLM): ~2000 lines / 32KB (suitable for 32K context)
+    # Cloud models (Anthropic, OpenAI, etc.): ~2500 lines / 100KB (~25K tokens)
+    # Local models (Ollama, LMStudio, vLLM): ~2000 lines / 32KB (~8K tokens)
     def _get_truncation_limits() -> tuple:
         """Get appropriate truncation limits based on current provider."""
         try:
@@ -1508,11 +1508,13 @@ async def read(
                     pass
                 return 2000, 32768  # Fallback for local models: 2000 lines, 32KB
 
-            # Cloud models get balanced limits
-            return 750, 25600  # 750 lines, 25KB
+            # Cloud models get higher limits (large context windows)
+            # Anthropic: 200K tokens, GPT-4: 128K tokens
+            # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
+            return 2500, 102400  # ~2500 lines, 100KB for cloud models
         except Exception:
             # Default to cloud limits if settings unavailable
-            return 750, 25600
+            return 2500, 102400  # ~2500 lines, 100KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
 
