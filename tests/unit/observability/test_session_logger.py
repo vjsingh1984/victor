@@ -130,33 +130,36 @@ class TestSessionLoggerIntegration:
         assert "Test warning" in output
 
     def test_log_file_path_includes_session_id(self, tmp_path):
-        """Test that log file path can include session ID."""
+        """Test that log file path includes session ID via setup_logging."""
         from victor.agent.session_id import generate_session_id
+        from victor.ui.commands.utils import configure_logging
 
         session_id = generate_session_id()
 
         # Create log file path with session ID
         log_file = tmp_path / f"victor_{session_id}.log"
 
-        # Create file handler with session-specific log file
-        logger = logging.getLogger(f"victor.{session_id}")
-        handler = logging.FileHandler(log_file)
-        handler.setFormatter(logging.Formatter("[%(asctime)s] [%(name)s] %(levelname)s: %(message)s"))
+        # Use existing configure_logging which includes session_id in format
+        configure_logging(
+            log_level="INFO",
+            log_file=log_file,
+            session_id=session_id,
+        )
 
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-
-        # Log a message
+        logger = logging.getLogger("victor.test")
         logger.info("Test message to file")
 
-        # Flush and close handler
-        handler.flush()
-        handler.close()
+        # Flush handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.flush()
+                handler.close()
 
         # Verify log file exists and contains message
         assert log_file.exists()
         content = log_file.read_text()
         assert "Test message to file" in content
+        # Session ID should be in the log file format: repo-session_id - name - level - message
         assert session_id in content
 
 

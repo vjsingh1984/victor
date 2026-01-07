@@ -270,8 +270,13 @@ def chat(
             if log_level in {"DEBUG", "INFO"}:
                 renderer = "text"
 
-        # Use centralized logging config
-        setup_logging(command="chat", cli_log_level=log_level, stream=sys.stderr)
+        # Use centralized logging config with session ID if resuming
+        setup_logging(
+            command="chat",
+            cli_log_level=log_level,
+            stream=sys.stderr,
+            session_id=session_id,  # Use --sessionid flag value for logging
+        )
 
         # Handle --sessions flag (list sessions and exit)
         if list_sessions:

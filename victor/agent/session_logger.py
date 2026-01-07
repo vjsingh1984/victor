@@ -16,6 +16,9 @@
 
 Integrates session ID into logger names for better traceability.
 
+This module provides convenience functions for getting session-aware loggers
+that work with Victor's existing setup_logging infrastructure.
+
 Usage:
     # Get session-aware logger
     logger = get_session_logger("myproj-9Kx7Z2")
@@ -24,6 +27,9 @@ Usage:
     # Or from agent
     logger = get_agent_logger(agent)
     logger.info("Agent initialized")  # Uses agent.active_session_id if available
+
+Note: File logging automatically includes session_id when setup_logging() is
+called with session_id parameter (done automatically in chat command).
 """
 
 from __future__ import annotations
@@ -90,56 +96,8 @@ def get_agent_logger(agent, component: str = "") -> logging.Logger:
     return get_session_logger(session_id, component)
 
 
-def setup_session_logging(
-    session_id: Optional[str] = None,
-    log_level: str = "INFO",
-    log_file: Optional[str] = None,
-) -> None:
-    """Configure logging for a session.
-
-    Args:
-        session_id: Optional session ID
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        log_file: Optional log file path (will include session_id if provided)
-    """
-    # Get session logger
-    logger = get_session_logger(session_id)
-    logger.setLevel(getattr(logging, log_level.upper()))
-
-    # Clear existing handlers
-    logger.handlers.clear()
-
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-
-    # Format with session ID
-    if session_id:
-        format_str = f"[%(name)s] [%(asctime)s] [%(levelname)s] %(message)s"
-    else:
-        format_str = f"[%(name)s] [%(asctime)s] [%(levelname)s] %(message)s"
-
-    formatter = logging.Formatter(format_str, datefmt="%Y-%m-%d %H:%M:%S")
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # File handler (optional)
-    if log_file:
-        from pathlib import Path
-
-        log_path = Path(log_file)
-        if session_id and log_path.stem == "victor":
-            # Inject session ID into log file name
-            log_path = log_path.parent / f"victor_{session_id}.log"
-
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setLevel(getattr(logging, log_level.upper()))
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-
 __all__ = [
     "get_session_logger",
     "get_agent_logger",
-    "setup_session_logging",
 ]
+
