@@ -1268,8 +1268,9 @@ class ObservabilityDashboard(App):
 
                     logger.debug(f"[Dashboard] Read {len(new_lines)} new lines")
 
-                    # Process each new line
-                    for line in new_lines:
+                    # Process each new line in reverse order (newest first)
+                    # This ensures events are added to views in descending timestamp order
+                    for line in reversed(new_lines):
                         line = line.strip()
                         if not line:
                             continue
