@@ -190,21 +190,20 @@ class ToolCallTracer:
         self._calls[call_id] = record
 
         # Publish tool call started event
-        # TODO: Emit tool call started via canonical event system
-        # try:
-        #     self._event_bus.emit(
-        #         topic="tool.call.started",
-        #         data={
-        #             "call_id": call_id,
-        #             "parent_span_id": parent_span_id,
-        #             "tool_name": tool_name,
-        #             "arguments": arguments,
-        #             "start_time": record.start_time,
-        #         },
-        #     )
-        # except Exception as e:
-        #     logger.warning(f"Failed to publish tool_call_started event: {e}")
-        pass
+        try:
+            self._event_bus.emit(
+                topic="tool.call.started",
+                data={
+                    "call_id": call_id,
+                    "parent_span_id": parent_span_id,
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                    "start_time": record.start_time,
+                    "category": "tool",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish tool_call_started event: {e}")
 
         logger.debug(f"Tool call started: {call_id} (tool={tool_name}, span={parent_span_id})")
 
@@ -227,21 +226,20 @@ class ToolCallTracer:
         record.result = result
 
         # Publish tool call completed event
-        # TODO: Emit tool call completed via canonical event system
-        # try:
-        #     self._event_bus.emit(
-        #         topic="tool.call.completed",
-        #         data={
-        #             "call_id": call_id,
-        #             "parent_span_id": record.parent_span_id,
-        #             "tool_name": record.tool_name,
-        #             "result": str(result)[:500],
-        #             "duration_ms": record.duration_ms,
-        #         },
-        #     )
-        # except Exception as e:
-        #     logger.warning(f"Failed to publish tool_call_completed event: {e}")
-        pass
+        try:
+            self._event_bus.emit(
+                topic="tool.call.completed",
+                data={
+                    "call_id": call_id,
+                    "parent_span_id": record.parent_span_id,
+                    "tool_name": record.tool_name,
+                    "result": str(result)[:500],
+                    "duration_ms": record.duration_ms,
+                    "category": "tool",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish tool_call_completed event: {e}")
 
         logger.debug(f"Tool call completed: {call_id} (duration={record.duration_ms:.2f}ms)")
 
@@ -262,21 +260,20 @@ class ToolCallTracer:
         record.error = error
 
         # Publish tool call failed event
-        # TODO: Emit tool call failed via canonical event system
-        # try:
-        #     self._event_bus.emit(
-        #         topic="tool.call.failed",
-        #         data={
-        #             "call_id": call_id,
-        #             "parent_span_id": record.parent_span_id,
-        #             "tool_name": record.tool_name,
-        #             "error": error,
-        #             "duration_ms": record.duration_ms,
-        #         },
-        #     )
-        # except Exception as e:
-        #     logger.warning(f"Failed to publish tool_call_failed event: {e}")
-        pass
+        try:
+            self._event_bus.emit(
+                topic="tool.call.failed",
+                data={
+                    "call_id": call_id,
+                    "parent_span_id": record.parent_span_id,
+                    "tool_name": record.tool_name,
+                    "error": error,
+                    "duration_ms": record.duration_ms,
+                    "category": "tool",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish tool_call_failed event: {e}")
 
         logger.debug(f"Tool call failed: {call_id} (error={error})")
 

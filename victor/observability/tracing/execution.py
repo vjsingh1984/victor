@@ -196,22 +196,21 @@ class ExecutionTracer:
             self._root_spans.append(span_id)
 
         # Publish span started event
-        # TODO: Emit span started via canonical event system
-        # try:
-        #     self._event_bus.emit(
-        #         topic="lifecycle.span.started",
-        #         data={
-        #             "span_id": span_id,
-        #             "parent_id": parent_id,
-        #             "agent_id": agent_id,
-        #             "span_type": span_type,
-        #             "start_time": span.start_time,
-        #             **span.metadata,
-        #         },
-        #     )
-        # except Exception as e:
-        #     logger.warning(f"Failed to publish span_started event: {e}")
-        pass
+        try:
+            self._event_bus.emit(
+                topic="lifecycle.span.started",
+                data={
+                    "span_id": span_id,
+                    "parent_id": parent_id,
+                    "agent_id": agent_id,
+                    "span_type": span_type,
+                    "start_time": span.start_time,
+                    "category": "lifecycle",
+                    **span.metadata,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish span_started event: {e}")
 
         logger.debug(
             f"Span started: {span_id} (type={span_type}, agent={agent_id}, parent={parent_id})"
@@ -251,24 +250,23 @@ class ExecutionTracer:
             span.metadata["error"] = error
 
         # Publish span ended event
-        # TODO: Emit span ended via canonical event system
-        # try:
-        #     self._event_bus.emit(
-        #         topic="lifecycle.span.ended",
-        #         data={
-        #             "span_id": span_id,
-        #             "parent_id": span.parent_id,
-        #             "agent_id": span.agent_id,
-        #             "span_type": span.span_type,
-        #             "status": status,
-        #             "duration_ms": span.duration_ms,
-        #             "result": span.metadata.get("result"),
-        #             "error": error,
-        #         },
-        #     )
-        # except Exception as e:
-        #     logger.warning(f"Failed to publish span_ended event: {e}")
-        pass
+        try:
+            self._event_bus.emit(
+                topic="lifecycle.span.ended",
+                data={
+                    "span_id": span_id,
+                    "parent_id": span.parent_id,
+                    "agent_id": span.agent_id,
+                    "span_type": span.span_type,
+                    "status": status,
+                    "duration_ms": span.duration_ms,
+                    "result": span.metadata.get("result"),
+                    "error": error,
+                    "category": "lifecycle",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish span_ended event: {e}")
 
         logger.debug(f"Span ended: {span_id} (status={status}, duration={span.duration_ms:.2f}ms)")
 

@@ -54,8 +54,15 @@ logger = logging.getLogger(__name__)
 # Built-in topic prefixes (canonical event system)
 # These are reserved and cannot be used for custom categories
 BUILTIN_TOPIC_PREFIXES = {
-    "tool", "state", "model", "error", "audit", "metric",
-    "lifecycle", "vertical", "custom"
+    "tool",
+    "state",
+    "model",
+    "error",
+    "audit",
+    "metric",
+    "lifecycle",
+    "vertical",
+    "custom",
 }
 
 

@@ -299,17 +299,17 @@ class ObservabilityIntegration:
             if history.has_cycle():
                 cycle_count = history.get_stage_visit_count(new_stage)
                 if cycle_count >= 3:
-                    # TODO: Emit cycle warning via canonical event system
-                    # self._bus.emit(
-                    #     topic="error.cycle_warning",
-                    #     data={
-                    #         "stage": new_stage,
-                    #         "visit_count": cycle_count,
-                    #         "sequence": history.get_stage_sequence()[-5:],
-                    #         "severity": "warning",
-                    #     },
-                    # )
-                    pass
+                    # Emit cycle warning event
+                    self._bus.emit(
+                        topic="error.cycle_warning",
+                        data={
+                            "stage": new_stage,
+                            "visit_count": cycle_count,
+                            "sequence": history.get_stage_sequence()[-5:],
+                            "severity": "warning",
+                            "category": "error",
+                        },
+                    )
 
         if hasattr(state_machine, "set_hooks"):
             state_machine.set_hooks(hook_manager)
@@ -368,16 +368,16 @@ class ObservabilityIntegration:
         )
 
         if not success and error:
-            # TODO: Emit tool error via canonical event system
-            # self._bus.emit(
-            #     topic=f"error.{tool_name}",
-            #     data={
-            #         "tool_name": tool_name,
-            #         "error": error,
-            #         "tool_id": tool_id,
-            #     },
-            # )
-            pass
+            # Emit tool error event
+            self._bus.emit(
+                topic=f"error.{tool_name}",
+                data={
+                    "tool_name": tool_name,
+                    "error": error,
+                    "tool_id": tool_id,
+                    "category": "error",
+                },
+            )
 
     # =========================================================================
     # Model Events
@@ -398,17 +398,17 @@ class ObservabilityIntegration:
             message_count: Number of messages in request.
             tool_count: Number of tools available.
         """
-        # TODO: Emit model request via canonical event system
-        # self._bus.emit(
-        #     topic="model.request",
-        #     data={
-        #         "provider": provider,
-        #         "model": model,
-        #         "message_count": message_count,
-        #         "tool_count": tool_count,
-        #     },
-        # )
-        pass
+        # Emit model request event
+        self._bus.emit(
+            topic="model.request",
+            data={
+                "provider": provider,
+                "model": model,
+                "message_count": message_count,
+                "tool_count": tool_count,
+                "category": "model",
+            },
+        )
 
     def on_model_response(
         self,
@@ -427,18 +427,18 @@ class ObservabilityIntegration:
             tool_calls: Number of tool calls in response.
             latency_ms: Optional latency in milliseconds.
         """
-        # TODO: Emit model response via canonical event system
-        # self._bus.emit(
-        #     topic="model.response",
-        #     data={
-        #         "provider": provider,
-        #         "model": model,
-        #         "tokens_used": tokens_used,
-        #         "tool_calls": tool_calls,
-        #         "latency_ms": latency_ms,
-        #     },
-        # )
-        pass
+        # Emit model response event
+        self._bus.emit(
+            topic="model.response",
+            data={
+                "provider": provider,
+                "model": model,
+                "tokens_used": tokens_used,
+                "tool_calls": tool_calls,
+                "latency_ms": latency_ms,
+                "category": "model",
+            },
+        )
 
     # =========================================================================
     # Lifecycle Events
@@ -450,12 +450,13 @@ class ObservabilityIntegration:
         Args:
             metadata: Optional session metadata.
         """
-        # TODO: Emit session start via canonical event system
-        # self._bus.emit(
-        #     topic="lifecycle.session.start",
-        #     data=metadata or {},
-        # )
-        pass
+        # Emit session start event
+        data = metadata or {}
+        data["category"] = "lifecycle"
+        self._bus.emit(
+            topic="lifecycle.session.start",
+            data=data,
+        )
 
     def on_session_end(
         self,
@@ -470,16 +471,16 @@ class ObservabilityIntegration:
             duration_seconds: Session duration.
             success: Whether session completed successfully.
         """
-        # TODO: Emit session end via canonical event system
-        # self._bus.emit(
-        #     topic="lifecycle.session.end",
-        #     data={
-        #         "tool_calls": tool_calls,
-        #         "duration_seconds": duration_seconds,
-        #         "success": success,
-        #     },
-        # )
-        pass
+        # Emit session end event
+        self._bus.emit(
+            topic="lifecycle.session.end",
+            data={
+                "tool_calls": tool_calls,
+                "duration_seconds": duration_seconds,
+                "success": success,
+                "category": "lifecycle",
+            },
+        )
 
     # =========================================================================
     # Error Events

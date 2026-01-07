@@ -244,7 +244,14 @@ class EventFilterWidget(Container):
         super().__init__(*args, **kwargs)
         # Default enabled topic prefixes (all categories enabled)
         self._enabled_categories: Set[str] = {
-            "tool", "state", "model", "error", "audit", "metric", "lifecycle", "vertical"
+            "tool",
+            "state",
+            "model",
+            "error",
+            "audit",
+            "metric",
+            "lifecycle",
+            "vertical",
         }
 
     def compose(self) -> ComposeResult:
@@ -252,7 +259,16 @@ class EventFilterWidget(Container):
         with Horizontal(classes="filter-row"):
             yield Static("Categories:", classes="filter-label")
             # Iterate over topic prefixes (was EventCategory enum)
-            for category in ["tool", "state", "model", "error", "audit", "metric", "lifecycle", "vertical"]:
+            for category in [
+                "tool",
+                "state",
+                "model",
+                "error",
+                "audit",
+                "metric",
+                "lifecycle",
+                "vertical",
+            ]:
                 color = CATEGORY_COLORS.get(category, "white")
                 yield Switch(
                     value=True,
