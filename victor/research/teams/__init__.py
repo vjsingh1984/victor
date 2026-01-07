@@ -172,13 +172,13 @@ class ResearchTeamSpec:
             stacklevel=3,
         )
 
-    def to_canonical_team_spec(self) -> CanonicalTeamSpec:
+    def to_canonical_team_spec(self) -> TeamSpec:
         """Convert to canonical TeamSpec from victor.framework.team_schema.
 
         Returns:
-            CanonicalTeamSpec instance with vertical set to "research"
+            TeamSpec instance with vertical set to "research"
         """
-        return CanonicalTeamSpec(
+        return TeamSpec(
             name=self.name,
             description=self.description,
             vertical="research",
@@ -661,22 +661,22 @@ class ResearchTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, ResearchTeamSpec]:
+    def get_team_specs(self) -> Dict[str, TeamSpec]:
         """Get all Research team specifications.
 
         Returns:
-            Dictionary mapping team names to ResearchTeamSpec instances
+            Dictionary mapping team names to TeamSpec instances
         """
         return RESEARCH_TEAM_SPECS
 
-    def get_team_for_task(self, task_type: str) -> Optional[ResearchTeamSpec]:
+    def get_team_for_task(self, task_type: str) -> Optional[TeamSpec]:
         """Get appropriate team for a task type.
 
         Args:
             task_type: Type of task
 
         Returns:
-            ResearchTeamSpec or None if no matching team
+            TeamSpec or None if no matching team
         """
         return get_team_for_task(task_type)
 

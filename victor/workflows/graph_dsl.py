@@ -806,7 +806,7 @@ class WorkflowGraph(Generic[S]):
             metadata={
                 **self._metadata,
                 "state_type": self.state_type.__name__,
-                "compiled_from": "StateGraph",
+                "compiled_from": "WorkflowGraph",
             },
         )
 
