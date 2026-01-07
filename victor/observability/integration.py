@@ -291,11 +291,15 @@ class ObservabilityIntegration:
             if last_records and last_records[0].duration_ms is not None:
                 enhanced_context["stage_duration_ms"] = last_records[0].duration_ms
 
-            self._bus.emit_state_change(
-                old_stage=old_stage,
-                new_stage=new_stage,
-                confidence=context.get("confidence", 1.0),
-                context=enhanced_context,
+            # Emit state transition event
+            self._bus.emit(
+                topic="state.stage_changed",
+                data={
+                    "old_stage": old_stage,
+                    "new_stage": new_stage,
+                    "confidence": context.get("confidence", 1.0),
+                    **enhanced_context,
+                },
             )
 
             # Emit warning event if cycle detected (potential infinite loop)

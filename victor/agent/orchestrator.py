@@ -6993,7 +6993,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Create provider instance using registry
         provider = ProviderRegistry.create(profile.provider, **provider_settings)
 
-        return cls(
+        orchestrator = cls(
             settings=settings,
             provider=provider,
             model=profile.model,
@@ -7004,3 +7004,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             provider_name=profile.provider,
             profile_name=profile_name,
         )
+
+        # Setup JSONL exporter if enabled
+        if getattr(settings, 'enable_observability_logging', False):
+            from victor.observability.bridge import ObservabilityBridge
+            from victor.core.events import get_observability_bus
+
+            try:
+                bridge = ObservabilityBridge.get_instance()
+                log_path = getattr(settings, 'observability_log_path', None)
+                bridge.setup_jsonl_exporter(log_path=log_path)
+                logger.info(f"JSONL event logging enabled: {log_path or '~/.victor/metrics/victor.jsonl'}")
+            except Exception as e:
+                logger.warning(f"Failed to setup JSONL exporter: {e}")
+
+        return orchestrator

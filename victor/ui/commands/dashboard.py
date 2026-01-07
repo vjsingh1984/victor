@@ -245,10 +245,14 @@ async def run_demo_dashboard(
                     else:
                         new_stage = stages[0]
 
-                    bus.emit_state_change(
-                        old_stage=current_stage,
-                        new_stage=new_stage,
-                        confidence=random.uniform(0.7, 1.0),
+                    # Emit state transition event
+                    bus.emit(
+                        topic="state.stage_changed",
+                        data={
+                            "old_stage": current_stage,
+                            "new_stage": new_stage,
+                            "confidence": random.uniform(0.7, 1.0),
+                        },
                     )
                     current_stage = new_stage
 
