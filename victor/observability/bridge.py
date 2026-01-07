@@ -88,11 +88,11 @@ class ObservabilityBridge:
         # Create emitters with shared EventBus
         bus = event_bus or get_observability_bus()
 
-        self._tool_emitter = tool_emitter or ToolEventEmitter(event_bus=bus)
-        self._model_emitter = model_emitter or ModelEventEmitter(event_bus=bus)
-        self._state_emitter = state_emitter or StateEventEmitter(event_bus=bus)
-        self._lifecycle_emitter = lifecycle_emitter or LifecycleEventEmitter(event_bus=bus)
-        self._error_emitter = error_emitter or ErrorEventEmitter(event_bus=bus)
+        self._tool_emitter = tool_emitter or ToolEventEmitter(bus=bus)
+        self._model_emitter = model_emitter or ModelEventEmitter(bus=bus)
+        self._state_emitter = state_emitter or StateEventEmitter(bus=bus)
+        self._lifecycle_emitter = lifecycle_emitter or LifecycleEventEmitter(bus=bus)
+        self._error_emitter = error_emitter or ErrorEventEmitter(bus=bus)
 
         self._event_bus = bus
         self._jsonl_exporter = None
