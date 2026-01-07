@@ -47,7 +47,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
-    from victor.agent.milestone_monitor import TaskToolConfigLoader
+    from victor.agent.task_tool_config_loader import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
     from victor.core.verticals.protocols import (
