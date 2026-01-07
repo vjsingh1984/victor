@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -1015,7 +1016,7 @@ class ObservabilityDashboard(App):
                 await asyncio.sleep(1.0)
 
     def _parse_jsonl_line(self, line: str) -> Optional[Event]:
-        """Parse a JSONL event line into an Event."""
+        """Parse a JSONL event line into an Event with backward compatibility."""
         try:
             import logging
 
@@ -1023,6 +1024,27 @@ class ObservabilityDashboard(App):
 
             # Parse JSON
             data = json.loads(line)
+
+            # Backward compatibility: handle old format (category + name) vs new format (topic)
+            if "topic" not in data:
+                # Old format: construct topic from category + name
+                category_str = data.get("category", "custom")
+                name = data.get("name", "unknown")
+                data["topic"] = f"{category_str.lower()}.{name.lower()}"
+
+            # Handle timestamp format
+            if "timestamp" in data and isinstance(data["timestamp"], str):
+                from datetime import datetime
+
+                # Convert ISO format string to unix timestamp
+                try:
+                    if "T" in data["timestamp"]:
+                        dt = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
+                    else:
+                        dt = datetime.fromisoformat(data["timestamp"])
+                    data["timestamp"] = dt.timestamp()
+                except Exception:
+                    data["timestamp"] = time.time()
 
             # Create Event from dictionary
             event = Event.from_dict(data)
@@ -1032,7 +1054,8 @@ class ObservabilityDashboard(App):
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"[Dashboard] Failed to parse JSONL line: {e}")
+            # Only log at debug level to avoid spamming - these are expected for old format events
+            logger.debug(f"[Dashboard] Failed to parse JSONL line: {e}")
             logger.debug(f"[Dashboard] Line content: {line[:300]}")
             return None
 

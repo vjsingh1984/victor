@@ -165,8 +165,20 @@ class JsonLineExporter(BaseExporter):
             # Convert sets to lists for JSON serialization
             event_dict = self._make_json_serializable(event_dict)
 
-            # Serialize and buffer
-            line = json.dumps(event_dict) + "\n"
+            # Serialize to single-line JSON with no extra whitespace
+            # separators=(',', ':') removes spaces after commas and colons
+            # ensure_ascii=False handles unicode characters properly
+            line = json.dumps(
+                event_dict,
+                separators=(',', ':'),  # Compact single-line output
+                ensure_ascii=False,       # Preserve unicode
+                default=str                # Fallback for unknown types
+            )
+
+            # Ensure the JSON is single-line (no embedded newlines)
+            line = line.replace('\n', ' ').replace('\r', ' ') + '\n'
+
+            # Buffer the line
             self._buffer.append(line)
             self._event_count += 1
 
