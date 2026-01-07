@@ -40,7 +40,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.workflows.services.definition import (
@@ -185,10 +185,10 @@ class ServiceRegistry:
         # Compute startup order (topological sort)
         self._startup_order = self._compute_startup_order()
 
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         for service_name in self._startup_order:
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             remaining = timeout - elapsed
 
             if remaining <= 0:
@@ -230,7 +230,7 @@ class ServiceRegistry:
             )
 
             entry.handle = handle
-            entry.started_at = datetime.utcnow()
+            entry.started_at = datetime.now(timezone.utc)
 
             # Notify listeners
             for callback in self._on_service_started:
@@ -278,7 +278,7 @@ class ServiceRegistry:
                     timeout=grace_period + 10,
                 )
 
-            entry.stopped_at = datetime.utcnow()
+            entry.stopped_at = datetime.now(timezone.utc)
 
             # Notify listeners
             for callback in self._on_service_stopped:

@@ -195,8 +195,9 @@ def get_category_to_tools_map(
 
 
 # Fallback category keywords for goal inference.
-# DEPRECATED: Use registry.detect_categories_from_text() which builds this
-# dynamically from @tool(keywords=[...]) decorators.
+# NOTE: This is a FALLBACK when registry.detect_categories_from_text() is unavailable.
+# The registry-based approach dynamically builds categories from @tool(keywords=[...])
+# decorators and is preferred. This static list is only used when registry is None.
 _FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
     "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
     "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},

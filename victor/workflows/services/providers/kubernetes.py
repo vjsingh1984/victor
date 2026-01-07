@@ -47,7 +47,7 @@ import base64
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -332,11 +332,11 @@ class KubernetesServiceProvider(BaseServiceProvider):
     ) -> None:
         """Wait for deployment to have ready replicas."""
         loop = asyncio.get_event_loop()
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         deployment_name = handle.service_id
 
         while True:
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             if elapsed > timeout:
                 raise ServiceHealthError(
                     handle.config.name,

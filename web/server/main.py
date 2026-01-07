@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 from fastapi import (
@@ -452,7 +452,7 @@ async def health_check(_: None = Depends(_require_api_key)) -> dict[str, Any]:
     return {
         "status": "healthy",
         "active_sessions": len(SESSION_AGENTS),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
