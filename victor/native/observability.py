@@ -176,14 +176,17 @@ class NativeMetrics:
         return self._registry
 
     def _get_bus(self):
-        """Lazy-load EventBus."""
+        """Lazy-load ObservabilityBus."""
         if self._bus is None:
             try:
-                from victor.core.events import ObservabilityBus as EventBus
+                from victor.core.events import get_observability_bus
 
-                self._bus = EventBus.get_instance()
+                self._bus = get_observability_bus()
             except ImportError:
-                logger.debug("EventBus not available")
+                logger.debug("ObservabilityBus not available (import error)")
+            except Exception:
+                # ServiceNotFoundError or other errors when bus not registered
+                logger.debug("ObservabilityBus not available (service not registered)")
         return self._bus
 
     def _get_tracer(self):
