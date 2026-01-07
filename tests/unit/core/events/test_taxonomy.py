@@ -187,52 +187,52 @@ class TestEventCategoryMapping:
     """Tests for mapping EventCategory to UnifiedEventType."""
 
     def test_map_tool_category(self):
-        """TOOL category should map to TOOL_CALL."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """TOOL topic prefix should map to TOOL_CALL."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.TOOL)
+        result = map_event_category("tool")
         assert result == UnifiedEventType.TOOL_CALL
 
     def test_map_state_category(self):
-        """STATE category should map to STATE_TRANSITION."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """STATE topic prefix should map to STATE_TRANSITION."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.STATE)
+        result = map_event_category("state")
         assert result == UnifiedEventType.STATE_TRANSITION
 
     def test_map_model_category(self):
-        """MODEL category should map to MODEL_REQUEST."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """MODEL topic prefix should map to MODEL_REQUEST."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.MODEL)
+        result = map_event_category("model")
         assert result == UnifiedEventType.MODEL_REQUEST
 
     def test_map_error_category(self):
-        """ERROR category should map to SYSTEM_ERROR."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """ERROR topic prefix should map to SYSTEM_ERROR."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.ERROR)
+        result = map_event_category("error")
         assert result == UnifiedEventType.SYSTEM_ERROR
 
     def test_map_metric_category(self):
-        """METRIC category should map to SYSTEM_METRICS."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """METRIC topic prefix should map to SYSTEM_METRICS."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.METRIC)
+        result = map_event_category("metric")
         assert result == UnifiedEventType.SYSTEM_METRICS
 
     def test_map_lifecycle_category(self):
-        """LIFECYCLE category should map to SYSTEM_LIFECYCLE."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """LIFECYCLE topic prefix should map to SYSTEM_LIFECYCLE."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.LIFECYCLE)
+        result = map_event_category("lifecycle")
         assert result == UnifiedEventType.SYSTEM_LIFECYCLE
 
     def test_map_custom_category(self):
-        """CUSTOM category should map to CUSTOM."""
-        # TODO: MIGRATION - OLD IMPORT REMOVED
+        """CUSTOM topic prefix should map to CUSTOM."""
+        # EventCategory removed - use topic prefixes
 
-        result = map_event_category(EventCategory.CUSTOM)
+        result = map_event_category("custom")
         assert result == UnifiedEventType.CUSTOM
 
 
