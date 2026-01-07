@@ -8,8 +8,46 @@ Victor stores conversation sessions in the project database (`.victor/project.db
 - **Fast queries** with indexed tables
 - **Single source of truth** (no JSON file duplication)
 - **Interactive session browser** with visual selection
+- **Parallel session support** (multiple terminals, different sessions)
 - **Combined operations** (resume + switch model in one command)
 - **Project-level storage** (sessions stored per project)
+
+### Parallel Sessions
+
+Victor supports multiple terminal sessions working simultaneously with unique session IDs:
+
+**Terminal 1 (DevOps)**:
+```bash
+victor chat "Setup CI/CD pipeline"
+/save "CI/CD Pipeline"        # Creates session: 20250107_100000
+# ... continue working ...
+/save                         # UPDATES 20250107_100000 (not create new!)
+```
+
+**Terminal 2 (Testing)**:
+```bash
+victor chat "Write unit tests"
+/save "Unit Tests"            # Creates session: 20250107_100100
+# ... continue working ...
+/save                         # UPDATES 20250107_100100 (not create new!)
+```
+
+**Switch Between Sessions**:
+```bash
+# In Terminal 1, switch to testing session
+/resume 20250107_100100
+# ... work on tests ...
+/save                         # Updates 20250107_100100
+
+# Or combine resume + switch
+/switch ollama:qwen2.5-coder:7b --resume 20250107_100100
+```
+
+**Key Behavior**:
+- `/save` updates the **active session** (the one you resumed)
+- `/save --new` creates a **new session** (ignores active session)
+- `/resume <id>` sets the active session
+- `/compact` preserves the active session ID
 
 ## Database Schema
 
@@ -47,22 +85,32 @@ CREATE TABLE messages (
 Save your current conversation to SQLite.
 
 ```bash
-/save                                    # Auto-generate title
-/save "Refactoring Authentication"       # Custom title
+/save                                    # Update active session or create new
+/save "Refactoring Authentication"       # Update active with new title
+/save --new                              # Always create new session
+/save --new "New Topic"                  # Create new with custom title
 ```
+
+**Behavior**:
+- **First save**: Creates new session with auto-generated ID
+- **Subsequent saves**: Updates the active session (after `/resume`)
+- **With `--new`**: Always creates a new session (for parallel work)
 
 **Example Output**:
 ```
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃         Session Saved                ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ Session saved to SQLite database!     │
+│ Updated session 20250107_153045!      │
 │                                        │
 │ Session ID: 20250107_153045           │
 │ Database: /project/.victor/project.db │
+│ Title: Refactoring Authentication     │
 │                                        │
 │ Use '/resume 20250107_153045' to      │
 │ restore this session                   │
+│ Use '/save --new' to create a new      │
+│ session                                │
 └────────────────────────────────────────┘
 ```
 

@@ -150,9 +150,11 @@ class SQLiteSessionPersistence:
         else:
             conversation_data = {"messages": []}
 
-        # Generate session ID if not provided
+        # Generate session ID if not provided (uses new format: projectroot-base62)
         if not session_id:
-            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            from victor.agent.session_id import generate_session_id
+
+            session_id = generate_session_id()
 
         # Generate title if not provided
         if not title:
