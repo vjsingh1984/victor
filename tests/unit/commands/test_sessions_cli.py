@@ -237,3 +237,100 @@ class TestSessionsChatFlags:
         """Test 'victor chat --sessionid <id>' restores session."""
         # This will be tested with integration test since it requires full chat setup
         pass
+
+
+class TestSessionsClearCommand:
+    """Test suite for victor sessions clear command."""
+
+    def test_sessions_clear_all_with_yes_flag(self, runner_with_db, sample_persistence):
+        """Test 'victor sessions clear --yes' deletes all sessions."""
+        # Verify sessions exist
+        persistence = sample_persistence
+        sessions_before = persistence.list_sessions(limit=100)
+        # Filter to sample sessions
+        sample_count = len([s for s in sessions_before if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]])
+        assert sample_count == 2
+
+        # Clear all sessions
+        result = runner_with_db.invoke(sessions_app, ["clear", "--yes"])
+        assert result.exit_code == 0
+        assert "Cleared" in result.stdout
+        assert "session(s) from database" in result.stdout
+
+        # Verify sessions are deleted
+        sessions_after = persistence.list_sessions(limit=100)
+        # Filter to check if sample sessions are gone
+        sample_after = [s for s in sessions_after if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]]
+        assert len(sample_after) == 0
+
+    def test_sessions_clear_with_prefix(self, runner_with_db, sample_persistence):
+        """Test 'victor sessions clear <prefix>' deletes specific sessions."""
+        persistence = sample_persistence
+
+        # Clear sessions matching prefix "myproj-9Kx7" (should match myproj-9Kx7Z2)
+        result = runner_with_db.invoke(sessions_app, ["clear", "myproj-9Kx7", "--yes"])
+        assert result.exit_code == 0
+        assert "Cleared" in result.stdout
+        assert "matching prefix 'myproj-9Kx7'" in result.stdout
+
+        # Verify session with matching prefix is deleted
+        assert persistence.load_session("myproj-9Kx7Z2") is None
+
+        # Verify other session still exists
+        assert persistence.load_session("myproj-9Kx8A3B") is not None
+
+    def test_sessions_clear_prefix_too_short(self, runner_with_db, sample_persistence):
+        """Test 'victor sessions clear' with prefix < 6 chars."""
+        result = runner_with_db.invoke(sessions_app, ["clear", "short", "--yes"])
+        assert result.exit_code != 0
+        assert "Prefix must be at least 6 characters long" in result.stdout
+
+    def test_sessions_clear_prefix_not_found(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions clear' with non-matching prefix."""
+        result = runner_with_db.invoke(sessions_app, ["clear", "nomatch-999", "--yes"])
+        assert result.exit_code == 0
+        assert "No sessions found matching prefix 'nomatch-999'" in result.stdout
+
+    def test_sessions_clear_empty_database(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions clear' with empty database."""
+        # Clear any existing sessions first
+        from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        all_sessions = persistence.list_sessions(limit=10000)
+        for session in all_sessions:
+            persistence.delete_session(session["session_id"])
+
+        # Now test with empty database
+        result = runner_with_db.invoke(sessions_app, ["clear", "--yes"])
+        assert result.exit_code == 0
+        assert "No sessions found" in result.stdout
+
+
+class TestSessionsListAllFlag:
+    """Test suite for victor sessions list --all flag."""
+
+    def test_sessions_list_with_all_flag(self, runner_with_db, sample_persistence):
+        """Test 'victor sessions list --all' lists all sessions."""
+        # Create additional sessions beyond default limit
+        persistence = sample_persistence
+        for i in range(15):
+            persistence.save_session(
+                conversation={"messages": [{"role": "user", "content": f"Test {i}"}]},
+                model="claude-sonnet-4-20250514",
+                provider="anthropic",
+                profile="default",
+                title=f"Extra Session {i}",
+            )
+
+        # List with default limit
+        result_default = runner_with_db.invoke(sessions_app, ["list"])
+        assert result_default.exit_code == 0
+
+        # List with --all flag
+        result_all = runner_with_db.invoke(sessions_app, ["list", "--all"])
+        assert result_all.exit_code == 0
+
+        # --all should show more sessions than default
+        # We can't count exact sessions in table output, but can check for specific sessions
+        assert "Extra Session" in result_all.stdout

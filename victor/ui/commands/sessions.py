@@ -34,6 +34,7 @@ console = Console()
 @sessions_app.command("list")
 def sessions_list(
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of sessions to list"),
+    all: bool = typer.Option(False, "--all", help="List all sessions (no limit)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """List saved conversation sessions.
@@ -41,11 +42,14 @@ def sessions_list(
     Examples:
         victor sessions list              # List last 10 sessions
         victor sessions list --limit 20   # List last 20 sessions
+        victor sessions list --all        # List all sessions
         victor sessions list --json       # Output as JSON
     """
     try:
         persistence = get_sqlite_session_persistence()
-        sessions = persistence.list_sessions(limit=limit)
+        # If --all is specified, use a very high limit
+        actual_limit = 100000 if all else limit
+        sessions = persistence.list_sessions(limit=actual_limit)
 
         if not sessions:
             console.print("[dim]No sessions found[/]")
@@ -291,4 +295,87 @@ def sessions_export(
 
     except Exception as e:
         console.print(f"[red]Error exporting sessions:[/] {e}")
+        sys.exit(1)
+
+
+@sessions_app.command("clear")
+def sessions_clear(
+    prefix: Optional[str] = typer.Argument(None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"),
+    all: bool = typer.Option(False, "--all", help="Clear all sessions (default behavior when no prefix specified)"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+) -> None:
+    """Clear sessions from the database.
+
+    This will permanently delete conversation sessions. Use with caution!
+
+    Examples:
+        victor sessions clear                    # Clear all sessions (with confirmation)
+        victor sessions clear --all --yes        # Clear all sessions (skip confirmation)
+        victor sessions clear myproj-9Kx         # Clear sessions starting with prefix
+        victor sessions clear myproj-9Kx --yes   # Clear sessions by prefix (skip confirmation)
+    """
+    try:
+        # Validate prefix if provided
+        if prefix and len(prefix) < 6:
+            console.print("[red]Error:[/] Prefix must be at least 6 characters long.")
+            sys.exit(1)
+
+        persistence = get_sqlite_session_persistence()
+
+        # Get all sessions to show what will be deleted
+        all_sessions = persistence.list_sessions(limit=100000)
+
+        # Filter sessions by prefix if specified
+        if prefix:
+            sessions_to_delete = [s for s in all_sessions if s["session_id"].startswith(prefix)]
+            if not sessions_to_delete:
+                console.print(f"[dim]No sessions found matching prefix '{prefix}'[/]")
+                sys.exit(0)
+        else:
+            sessions_to_delete = all_sessions
+
+        count = len(sessions_to_delete)
+
+        if count == 0:
+            console.print("[dim]No sessions found. Database is already empty.[/]")
+            sys.exit(0)
+
+        # Show summary of what will be deleted
+        if prefix:
+            console.print(f"[yellow]⚠[/]  Found {count} session(s) matching prefix '{prefix}'.")
+            if not yes:
+                from rich.prompt import Confirm
+
+                if not Confirm.ask(
+                    f"Are you sure you want to delete {count} session(s) starting with '{prefix}'? This cannot be undone.",
+                    default=False,
+                ):
+                    console.print("[dim]Cancelled[/]")
+                    sys.exit(0)
+        else:
+            console.print(f"[yellow]⚠[/]  Found {count} session(s) in database.")
+            if not yes:
+                from rich.prompt import Confirm
+
+                if not Confirm.ask(
+                    f"Are you sure you want to delete ALL {count} session(s)? This cannot be undone.",
+                    default=False,
+                ):
+                    console.print("[dim]Cancelled[/]")
+                    sys.exit(0)
+
+        # Delete sessions
+        deleted_count = 0
+        for session in sessions_to_delete:
+            session_id = session["session_id"]
+            if persistence.delete_session(session_id):
+                deleted_count += 1
+
+        if prefix:
+            console.print(f"[green]✓[/] Cleared {deleted_count} session(s) matching prefix '{prefix}'.")
+        else:
+            console.print(f"[green]✓[/] Cleared {deleted_count} session(s) from database.")
+
+    except Exception as e:
+        console.print(f"[red]Error clearing sessions:[/] {e}")
         sys.exit(1)
