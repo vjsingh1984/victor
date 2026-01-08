@@ -366,15 +366,19 @@ class TestCheckNaturalCompletion:
         assert result is None
 
     def test_returns_break_with_substantial_content(self, handler):
-        """Returns break result when substantial content and no tools."""
+        """Returns None - signal-based completion handles completion, not buffer/size heuristics.
+
+        After Phase 5 cleanup, buffer/size heuristics were removed in favor of
+        TaskCompletionDetector's explicit signal-based completion (_DONE_, _TASK_DONE_, etc.).
+        """
         ctx = StreamingChatContext(
             user_message="test",
             total_accumulated_chars=600,
             substantial_content_threshold=500,
         )
         result = handler.check_natural_completion(ctx, has_tool_calls=False, content_length=0)
-        assert result is not None
-        assert result.action == IterationAction.BREAK
+        # Signal-based completion: handler returns None, TaskCompletionDetector decides
+        assert result is None
 
 
 class TestHandleEmptyResponse:
