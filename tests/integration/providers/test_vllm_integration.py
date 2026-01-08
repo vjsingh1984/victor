@@ -100,19 +100,12 @@ def vllm_server():
             # Start vLLM server
             vllm_process = subprocess.Popen(
                 [
-                    sys.executable,
-                    "-m",
-                    "vllm.entrypoints.openai.api_server",
-                    "--model",
-                    model_name,
-                    "--port",
-                    str(port),
-                    "--host",
-                    host,
-                    "--max-model-len",
-                    "2048",  # Reduce memory usage for ARM CPUs
-                    "--dtype",
-                    "float16",  # Use float16 instead of bfloat16 for better compatibility
+                    sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+                    "--model", model_name,
+                    "--port", str(port),
+                    "--host", host,
+                    "--max-model-len", "2048",  # Reduce memory usage for ARM CPUs
+                    "--dtype", "float16",  # Use float16 instead of bfloat16 for better compatibility
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
