@@ -20,6 +20,9 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 import pytest
 from unittest.mock import MagicMock, patch
 
+# Suppress deprecation warnings for complexity_classifier shim during migration
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 from victor.agent.orchestrator_factory import (
     OrchestratorFactory,
     create_orchestrator_factory,

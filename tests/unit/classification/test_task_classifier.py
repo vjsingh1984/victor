@@ -16,6 +16,9 @@
 
 import pytest
 
+# Suppress deprecation warnings for complexity_classifier shim during migration
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 
 class TestTaskClassifierSimple:
     """Tests for SIMPLE task classification."""

@@ -21,6 +21,9 @@ for AgentOrchestrator components.
 import pytest
 from unittest.mock import MagicMock
 
+# Suppress deprecation warnings for complexity_classifier shim during migration
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 from victor.core.container import ServiceContainer, ServiceLifetime
 
 

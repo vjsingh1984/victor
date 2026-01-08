@@ -23,6 +23,10 @@ Tests task complexity classification:
 - Custom patterns and classifiers
 """
 
+import pytest
+
+# Suppress deprecation warnings for complexity_classifier shim during migration
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 # Import from framework.task for core types (canonical location)
 from victor.framework.task.complexity import (
