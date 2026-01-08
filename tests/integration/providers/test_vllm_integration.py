@@ -32,13 +32,12 @@ import platform
 
 
 # Early skip for ARM CPUs (vLLM has known compatibility issues)
-_is_arm = platform.processor().startswith(("arm", "aarch64")) or platform.machine().startswith(
-    ("arm", "aarch64")
-)
+_is_arm = platform.processor().startswith(("arm", "aarch64")) or \
+          platform.machine().startswith(("arm", "aarch64"))
 if _is_arm:
     pytestmark = pytest.mark.skipif(
         True,
-        reason="Skipping vLLM tests on ARM CPU (known compatibility issues during model warm-up)",
+        reason="Skipping vLLM tests on ARM CPU (known compatibility issues during model warm-up)"
     )
 else:
     pytestmark = []
