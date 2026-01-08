@@ -121,6 +121,7 @@ class TestSessionsCLIIntegration:
 
         # Small delay to ensure different timestamp for unique ID
         import time
+
         time.sleep(0.01)
 
         # Create session 2
@@ -133,7 +134,9 @@ class TestSessionsCLIIntegration:
         )
 
         # Verify both sessions exist and have different IDs
-        assert session_id_1 != session_id_2, f"Session IDs should be unique but got: {session_id_1} == {session_id_2}"
+        assert (
+            session_id_1 != session_id_2
+        ), f"Session IDs should be unique but got: {session_id_1} == {session_id_2}"
 
         # Load both sessions
         session_1 = persistence.load_session(session_id_1)
@@ -201,6 +204,7 @@ class TestChatSessionFlagsIntegration:
 
         # Small delay to ensure different timestamp
         import time
+
         time.sleep(0.01)
 
         persistence.save_session(
@@ -258,6 +262,7 @@ class TestChatSessionFlagsIntegration:
 
         # Small delay to ensure different timestamp
         import time
+
         time.sleep(0.01)
 
         session_id_2 = persistence.save_session(
@@ -287,7 +292,7 @@ class TestChatSessionFlagsIntegration:
         # Clear sessions matching prefix
         result = runner.invoke(sessions_app, ["clear", prefix, "--yes"])
         assert result.exit_code == 0
-        assert f"Cleared" in result.stdout
+        assert "Cleared" in result.stdout
         assert f"matching prefix '{prefix}'" in result.stdout
 
         # Verify session with matching prefix is deleted
@@ -356,6 +361,7 @@ class TestChatSessionFlagsIntegration:
         # Create more than 10 sessions to test --all flag
         persistence = SQLiteSessionPersistence()
         import time
+
         for i in range(15):
             persistence.save_session(
                 conversation={"messages": [{"role": "user", "content": f"Test {i}"}]},
