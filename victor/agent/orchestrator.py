@@ -77,7 +77,7 @@ if TYPE_CHECKING:
     # Factory-created components (type hints only)
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.search_router import SearchRouter
-    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.metrics_collector import MetricsCollector
     from victor.agent.conversation_controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
@@ -576,6 +576,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.task_classifier = self._factory.create_complexity_classifier()
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
+
+        # Task Completion Detection: Signal-based completion detection
+        # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
+        from victor.agent.task_completion import TaskCompletionDetector
+
+        self._task_completion_detector = TaskCompletionDetector()
+        logger.info("TaskCompletionDetector initialized (signal-based completion)")
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes
@@ -3507,6 +3514,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_budget=self.tool_budget,
             unified_tracker_config=self.unified_tracker.config,
             task_completion_signals=None,  # Legacy caller doesn't use this
+            # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+            task_completion_detector=self._task_completion_detector,
         )
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
@@ -4163,6 +4172,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync tool tracking from orchestrator to context
         ctx.tool_budget = self.tool_budget
         ctx.tool_calls_used = self.tool_calls_used
+
+        # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+        # Make detector available to intent classification for priority checks
+        ctx.task_completion_detector = self._task_completion_detector
 
         return ctx
 
@@ -5563,6 +5576,28 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Parse, validate, and normalize tool calls (fallback parsing, filtering, arg coercion)
             tool_calls, full_content = self._parse_and_validate_tool_calls(tool_calls, full_content)
 
+            # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+            # Analyze response for explicit completion signals when feature flag is enabled
+            if self._task_completion_detector and full_content:
+                from victor.agent.task_completion import CompletionConfidence
+
+                self._task_completion_detector.analyze_response(full_content)
+                confidence = self._task_completion_detector.get_completion_confidence()
+
+                # HIGH confidence (active signal) triggers immediate completion
+                if confidence == CompletionConfidence.HIGH:
+                    logger.info(
+                        "Task completion: HIGH confidence detected (active signal), "
+                        "forcing completion after this response"
+                    )
+                    stream_ctx.force_completion = True
+
+                # MEDIUM confidence (file mods + passive) logs info but doesn't force
+                elif confidence == CompletionConfidence.MEDIUM:
+                    logger.info(
+                        "Task completion: MEDIUM confidence detected (file mods + passive signal)"
+                    )
+
             # DEBUG: Log complete tool calls from LLM for diagnosis
             if tool_calls:
                 logger.debug(f"LLM tool calls ({len(tool_calls)} total):")
@@ -5949,6 +5984,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         logger.info(
                             f"Tool '{tool_name}' succeeded on retry attempt {attempt + 1}/{max_attempts}"
                         )
+
+                    # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+                    # Record successful tool execution for completion detection
+                    if self._task_completion_detector:
+                        tool_result = {"success": True}
+                        # Include path if available
+                        if "path" in tool_args:
+                            tool_result["path"] = tool_args["path"]
+                        elif "file_path" in tool_args:
+                            tool_result["file_path"] = tool_args["file_path"]
+                        self._task_completion_detector.record_tool_result(tool_name, tool_result)
+
                     return result, True, None
                 else:
                     # Tool returned failure - check if retryable

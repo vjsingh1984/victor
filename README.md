@@ -392,38 +392,7 @@ profiles:
 
 Victor uses a **layered architecture** with clear separation of concerns:
 
-```mermaid
-flowchart TB
-    subgraph Clients["CLIENT LAYER"]
-        CLI["CLI/TUI"]
-        HTTP["HTTP API"]
-        MCP["MCP Server"]
-    end
-
-    subgraph Orchestration["ORCHESTRATION LAYER"]
-        Orch["Agent Orchestrator"]
-        Conv["Conversation Controller"]
-        ToolPipe["Tool Pipeline"]
-    end
-
-    subgraph Core["CORE LAYER"]
-        Prov["Providers (21)"]
-        Tools["Tools (55+)"]
-        Workflows["Workflows"]
-        Verts["Verticals (5)"]
-    end
-
-    subgraph Infra["INFRASTRUCTURE LAYER"]
-        DI["DI Container"]
-        Events["Event Bus"]
-        Config["Configuration"]
-        Storage["Storage"]
-    end
-
-    Clients --> Orchestration
-    Orchestration --> Core
-    Core --> Infra
-```
+![System Architecture](docs/diagrams/architecture/system-overview.svg)
 
 **Key Architectural Patterns**:
 - **Dependency Injection**: Service container for component wiring

@@ -21,6 +21,9 @@ for AgentOrchestrator components.
 import pytest
 from unittest.mock import MagicMock
 
+# Suppress deprecation warnings for complexity_classifier shim during migration
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 from victor.core.container import ServiceContainer, ServiceLifetime
 
 
@@ -330,7 +333,7 @@ class TestProtocolConformance:
 
     def test_complexity_classifier_conforms(self):
         """Test ComplexityClassifier conforms to protocol."""
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
         from victor.agent.protocols import ComplexityClassifierProtocol
 
         classifier = ComplexityClassifier()

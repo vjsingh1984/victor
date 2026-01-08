@@ -705,7 +705,7 @@ class OrchestratorServiceProvider:
 
     def _create_complexity_classifier(self) -> Any:
         """Create ComplexityClassifier instance."""
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         return ComplexityClassifier()
 

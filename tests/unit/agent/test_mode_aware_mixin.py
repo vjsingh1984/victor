@@ -151,7 +151,7 @@ class TestModeAwareMixinNoController:
     """Tests for ModeAwareMixin when mode controller is unavailable."""
 
     def test_mode_controller_returns_none_when_unavailable(self):
-        """Test that mode_controller returns None when import fails."""
+        """Test that mode_controller can be set to None manually."""
         component = TestComponent()
 
         # Patch the import location in the current module (test_mode_aware_mixin)

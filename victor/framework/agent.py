@@ -892,8 +892,6 @@ class Agent:
                 context={"data_file": "sales.csv"}
             )
         """
-        from victor.workflows.executor import WorkflowExecutor
-
         # Check if vertical is configured
         if not self._vertical:
             raise AgentError("No vertical configured. Create agent with vertical= parameter.")
@@ -903,19 +901,12 @@ class Agent:
         if not workflow_provider:
             raise AgentError(f"Vertical '{self._vertical.name}' does not provide workflows.")
 
-        # Get the workflow definition
-        workflow = workflow_provider.get_workflow(workflow_name)
-        if not workflow:
-            available = workflow_provider.get_workflow_names()
-            raise AgentError(
-                f"Workflow '{workflow_name}' not found. " f"Available: {', '.join(available)}"
-            )
+        # Use canonical API: run_compiled_workflow (uses UnifiedWorkflowCompiler internally)
+        result = await workflow_provider.run_compiled_workflow(
+            workflow_name, context or {}, timeout=timeout
+        )
 
-        # Create executor and run workflow
-        executor = WorkflowExecutor(self._orchestrator)
-        result = await executor.execute(workflow, context, timeout=timeout)
-
-        return result.to_dict()
+        return result
 
     async def run_team(
         self,
