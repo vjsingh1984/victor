@@ -129,12 +129,25 @@ class EventLogView(RichLog):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._event_lines: list[str] = []  # Store lines in reverse order (newest first)
+        self._event_lines: list[str] = []  # Store lines: newest at START (index 0), oldest at END
         self._max_lines = 1000
 
     def add_event(self, event: Event) -> None:
         """Add an event to the log with rich details (prepends to show newest first)."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         timestamp = event.datetime.strftime("%H:%M:%S.%f")[:-3]
+
+        # Debug: Log first 3 events to verify order
+        if len(self._event_lines) == 0:
+            logger.info(f"[EventLogView] FIRST event timestamp: {timestamp}")
+        elif len(self._event_lines) == 1:
+            logger.info(f"[EventLogView] SECOND event timestamp: {timestamp}")
+        elif len(self._event_lines) == 2:
+            logger.info(f"[EventLogView] THIRD event timestamp: {timestamp}")
+
         # Map category (first part of topic) to colors
         category_colors = {
             "tool": "cyan",
@@ -159,11 +172,14 @@ class EventLogView(RichLog):
             detail_lines = self._format_event_details(event)
             lines.extend(detail_lines)
 
-        # Prepend to stored lines (newest first)
-        self._event_lines = lines + self._event_lines
+        # Append to stored lines (events come in descending order from file watcher)
+        # So newest events end up at START of list (index 0), oldest at END
+        self._event_lines.extend(lines)
 
-        # Trim to max lines
+        # Trim to max lines (remove oldest from end if needed)
         if len(self._event_lines) > self._max_lines:
+            # Remove oldest events from the end of the list
+            # Keep the first _max_lines elements (the newest events)
             self._event_lines = self._event_lines[: self._max_lines]
 
         # Refresh display
@@ -345,35 +361,195 @@ class EventLogView(RichLog):
     def _refresh_display(self) -> None:
         """Refresh the display with current lines.
 
-        RichLog displays content with first write at bottom, last write at top
-        (like a terminal log). Since we want newest at top, we write in reverse
-        order (oldest first, so it ends up at bottom).
+        RichLog displays content from top to bottom in write order (first write at top,
+        last write at bottom). Events are appended in DESCENDING order (newest first),
+        so the newest event's lines are at the START of the list. We write in normal order
+        (from start to end) so newest events are written first and appear at the top.
         """
-        # Clear and rewrite all content in REVERSE order
-        # Write oldest first (appears at bottom), newest last (appears at top)
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Debug: Log first and last timestamps before refresh
+        if len(self._event_lines) > 0:
+            # First line in list (newest event - because we append in descending order)
+            first_line = self._event_lines[0]
+            # Last line in list (oldest event)
+            last_line = self._event_lines[-1]
+            # Extract timestamp from lines (format: "[dim]HH:MM:SS.mmm[/]...")
+            import re
+
+            first_ts_match = re.search(r"\d{2}:\d{2}:\d{2}", first_line)
+            last_ts_match = re.search(r"\d{2}:\d{2}:\d{2}", last_line)
+            first_ts = first_ts_match.group(0) if first_ts_match else "N/A"
+            last_ts = last_ts_match.group(0) if last_ts_match else "N/A"
+
+            # Log actual content of first 100 chars of first and last lines for debugging
+            logger.info(
+                f"[EventLogView._refresh_display] Writing {len(self._event_lines)} lines: "
+                f"first_ts={first_ts} (NEWEST, written first to appear at TOP), "
+                f"last_ts={last_ts} (OLDEST, written last to appear at BOTTOM)"
+            )
+            logger.debug(
+                f"[EventLogView._refresh_display] First line (index 0, NEWEST): {first_line[:200]!r}"
+            )
+            logger.debug(
+                f"[EventLogView._refresh_display] Last line (index -1, OLDEST): {last_line[:200]!r}"
+            )
+
+        # Clear and rewrite all content in NORMAL order (newest first)
+        # Write from start of list (newest events) towards end (oldest events)
         self.clear()
-        for line in reversed(self._event_lines):
+        for line in self._event_lines:
             self.write(line, expand=True)
 
 
-class EventTableView(DataTable):
+class TimeOrderedTableView(DataTable):
+    """Base class for DataTable views that display events in descending timestamp order.
+
+    This class provides a consistent pattern for all time-based event views:
+    - Receives events in descending order (newest first) from file watcher
+    - Appends events to list to maintain order (newest at index 0, oldest at end)
+    - Automatically trims oldest events when exceeding max_rows
+    - Rebuilds table on each update for consistent ordering
+    - Optional deduplication by event ID
+
+    Subclasses should implement:
+    - _format_event_row(event): Convert event to table row values
+    - on_mount(): Define table columns
+
+    Example:
+        class MyEventView(TimeOrderedTableView):
+            def on_mount(self):
+                self.add_columns("Time", "Type", "Details")
+
+            def _format_event_row(self, event):
+                return (event.timestamp, event.type, event.details)
+    """
+
+    def __init__(self, *args, max_rows: int = 500, enable_dedup: bool = False, **kwargs):
+        """Initialize the time-ordered table view.
+
+        Args:
+            max_rows: Maximum number of events to display (default: 500)
+            enable_dedup: Whether to track event IDs and prevent duplicates (default: False)
+        """
+        super().__init__(*args, **kwargs)
+        self._events: List[Event] = []
+        self._max_rows = max_rows
+        self._enable_dedup = enable_dedup
+        self._seen_event_ids: set = set() if enable_dedup else None
+
+    def add_event(self, event: Event) -> None:
+        """Add an event to the table.
+
+        Events are received in descending order (newest first) and we append them
+        to maintain that order. The table is then rebuilt from the list.
+
+        Args:
+            event: The event to add
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Debug: Log first few events to verify calls
+        if len(self._events) == 0:
+            logger.info(
+                f"[{self.__class__.__name__}] FIRST event at {event.datetime.strftime('%H:%M:%S')}"
+            )
+        elif len(self._events) == 1:
+            logger.info(
+                f"[{self.__class__.__name__}] SECOND event at {event.datetime.strftime('%H:%M:%S')}"
+            )
+        elif len(self._events) == 2:
+            logger.info(
+                f"[{self.__class__.__name__}] THIRD event at {event.datetime.strftime('%H:%M:%S')}"
+            )
+
+        # Prevent duplicates if enabled
+        if self._enable_dedup and event.id:
+            if event.id in self._seen_event_ids:
+                logger.debug(f"[{self.__class__.__name__}] Skipping duplicate event {event.id}")
+                return  # Skip duplicate
+            self._seen_event_ids.add(event.id)
+
+        # Append to maintain descending order (events come in newest first)
+        self._events.append(event)
+
+        # Trim if needed (remove oldest from end)
+        if len(self._events) > self._max_rows:
+            # Remove oldest from end
+            removed = self._events.pop()
+            # Clean up event ID from seen set if deduplication enabled
+            if self._enable_dedup and removed.id:
+                self._seen_event_ids.discard(removed.id)
+
+        # Rebuild table
+        self._rebuild_table()
+
+    def _rebuild_table(self) -> None:
+        """Rebuild the table from the events list.
+
+        Events are stored in descending order, so we iterate in that order.
+        Subclasses must implement _format_event_row() to convert events to rows.
+        """
+        self.clear()
+
+        for event in self._events:
+            try:
+                row_data = self._format_event_row(event)
+                self.add_row(*row_data)
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(f"[{self.__class__.__name__}] Error formatting event row: {e}")
+
+    def _format_event_row(self, event: Event) -> tuple:
+        """Format an event as a table row.
+
+        Subclasses must implement this method to convert events to row values.
+
+        Args:
+            event: The event to format
+
+        Returns:
+            Tuple of values matching the table columns
+
+        Raises:
+            NotImplementedError: If not implemented by subclass
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _format_event_row()")
+
+    def clear_events(self) -> None:
+        """Clear all stored events and reset the table."""
+        self._events.clear()
+        if self._enable_dedup:
+            self._seen_event_ids.clear()
+        self.clear()
+
+
+class EventTableView(TimeOrderedTableView):
     """Tabular view of events."""
+
+    def __init__(self, *args, max_rows: int = 500, **kwargs):
+        super().__init__(*args, max_rows=max_rows, **kwargs)
 
     def on_mount(self) -> None:
         """Set up the table columns."""
         self.add_columns("Time", "Category", "Name", "Details")
         self.cursor_type = "row"
 
-    def add_event(self, event: Event) -> None:
-        """Add an event row to the table.
+    def _format_event_row(self, event: Event) -> tuple:
+        """Format an event as a table row.
 
-        Events are processed in descending order (newest first), so we append
-        to maintain that order in the table.
+        Args:
+            event: The event to format
+
+        Returns:
+            Tuple of (timestamp, category, topic, details)
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         timestamp = event.datetime.strftime("%H:%M:%S")
         category = event.category
 
@@ -389,11 +565,7 @@ class EventTableView(DataTable):
             elif "message" in event.data:
                 details = str(event.data["message"])[:50]
 
-        # Append row (events are already processed in descending order)
-        try:
-            self.add_row(timestamp, category, event.topic, details)
-        except Exception as e:
-            logger.error(f"[EventTableView.add_event] Error adding row: {e}")
+        return (timestamp, category, event.topic, details)
 
 
 class ToolExecutionView(DataTable):
@@ -448,10 +620,15 @@ class ToolExecutionView(DataTable):
         self._refresh_table()
 
     def _refresh_table(self) -> None:
-        """Refresh the table with current stats."""
+        """Refresh the table with current stats.
+
+        Displays tools sorted alphabetically by name (not time-based).
+        This is a stats/aggregation view showing tool usage patterns.
+        """
         from datetime import datetime
 
         self.clear()
+        # Sort alphabetically by tool name for consistent stats display
         for tool_name, stats in sorted(self._tool_stats.items()):
             calls = stats["calls"]
             avg_time = stats["total_time"] / calls if calls > 0 else 0
@@ -579,72 +756,75 @@ class JSONLBrowser(ScrollableContainer):
             return 0
 
 
-class ExecutionTraceView(ScrollableContainer):
+class ExecutionTraceView(TimeOrderedTableView):
     """View showing execution span tree from ExecutionTracer.
 
     Displays hierarchical execution flow with parent-child relationships.
+    Uses TimeOrderedTableView for consistent ordering with other tabs.
     """
 
-    def compose(self) -> ComposeResult:
-        yield Static("[dim]Execution trace will appear here...[/]", id="trace-content")
+    def __init__(self, *args, max_rows: int = 300, **kwargs):
+        super().__init__(*args, max_rows=max_rows, **kwargs)
+
+    def on_mount(self) -> None:
+        """Set up the table columns."""
+        self.add_columns("Time", "Type", "Operation", "Duration")
+        self.cursor_type = "row"
 
     def add_span_event(self, event: Event) -> None:
-        """Add a span event to the trace view (prepends for newest first)."""
+        """Add a span event to the trace view.
+
+        Filters for lifecycle.* events and uses base class add_event()
+        for consistent ordering and trimming.
+        """
         if not event.topic.startswith("lifecycle."):
             return
 
-        content = self.query_one("#trace-content", Static)
-        data = event.data or {}
+        # Use base class add_event() for consistent handling
+        self.add_event(event)
 
+    def _format_event_row(self, event: Event) -> tuple:
+        """Format a lifecycle event as a table row.
+
+        Args:
+            event: The lifecycle event to format
+
+        Returns:
+            Tuple of (timestamp, type, operation, duration)
+        """
+        data = event.data or {}
         timestamp = event.datetime.strftime("%H:%M:%S")
 
         # Handle lifecycle.chunk.tool_start events
         if event.topic == "lifecycle.chunk.tool_start":
             span_type = data.get("tool_name", "chunk_operation")
-            status_msg = data.get("status_msg", "")
+            operation = data.get("status_msg", "")
+            duration = ""  # Start events don't have duration yet
 
-            # Get current content
-            text = content.content
-            if text == "Execution trace will appear here...":
-                text = ""
+            return (timestamp, span_type, operation, duration)
 
-            # Build entry
-            new_entry = f"[dim]{timestamp}[/] [cyan]{span_type}[/]"
-            if status_msg:
-                new_entry += f" [dim]{status_msg}[/]"
-
-            # Prepend new entry (newest first)
-            content.update(f"{new_entry}\n{text}" if text else new_entry)
+        # Generic lifecycle event handling
         else:
-            # Generic lifecycle event handling
             span_type = data.get("span_type", event.topic.split(".")[-1])
             operation = data.get("operation", "unknown")
 
-            # Get current content
-            text = content.content
-            if text == "Execution trace will appear here...":
-                text = ""
-
-            new_entry = f"[dim]{timestamp}[/] [yellow]{span_type}[/] {operation}"
-
             # Add duration if available
             if "duration_ms" in data:
-                duration = data["duration_ms"]
-                new_entry += f" [dim]{duration:.0f}ms[/]"
+                duration = f"{data['duration_ms']:.0f}ms"
+            else:
+                duration = ""
 
-            # Prepend new entry (newest first)
-            content.update(f"{new_entry}\n{text}" if text else new_entry)
+            return (timestamp, span_type, operation, duration)
 
 
-class ToolCallHistoryView(DataTable):
+class ToolCallHistoryView(TimeOrderedTableView):
     """View showing detailed tool call history from ToolCallTracer.
 
     Shows all tool calls with linkage to execution spans.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._calls: List[Dict[str, Any]] = []
+    def __init__(self, *args, max_rows: int = 200, **kwargs):
+        super().__init__(*args, max_rows=max_rows, **kwargs)
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -652,27 +832,42 @@ class ToolCallHistoryView(DataTable):
         self.cursor_type = "row"
 
     def add_tool_call_event(self, event: Event) -> None:
-        """Add a tool call event to the history."""
+        """Add a tool call event to the history.
+
+        Filters for tool.* events and uses base class add_event()
+        for consistent ordering and trimming.
+        """
         if not event.topic.startswith("tool."):
             return
 
+        # Use base class add_event() for consistent handling
+        self.add_event(event)
+
+    def _format_event_row(self, event: Event) -> tuple:
+        """Format a tool event as a table row.
+
+        Args:
+            event: The tool event to format
+
+        Returns:
+            Tuple of (timestamp, tool_name, status, duration, span_id, args)
+        """
         data = event.data or {}
         event_name = event.topic
+        timestamp = event.datetime.strftime("%H:%M:%S")
 
         # Process tool.end events (contain duration and results)
         if event_name == "tool.end":
             tool_name = data.get("tool_name", "unknown")
             duration_ms = data.get("duration_ms", 0)
             success = data.get("success", True)
-            tool_id = data.get("tool_id", "")[:8]  # Use tool_id as span identifier
+            tool_id = data.get("tool_id", "")[:8]
             arguments = data.get("arguments", {})
 
-            timestamp = event.datetime.strftime("%H:%M:%S")
             args_preview = str(arguments)[:30] if arguments else ""
-
             status = "[green]OK[/]" if success else "[red]FAIL[/]"
 
-            self.add_row(
+            return (
                 timestamp,
                 tool_name,
                 status,
@@ -680,16 +875,16 @@ class ToolCallHistoryView(DataTable):
                 tool_id or "N/A",
                 args_preview,
             )
+
         # Process tool.start events (no duration yet)
         elif event_name == "tool.start":
             tool_name = data.get("tool_name", "unknown")
             tool_id = data.get("tool_id", "")[:8]
             arguments = data.get("arguments", {})
 
-            timestamp = event.datetime.strftime("%H:%M:%S")
             args_preview = str(arguments)[:30] if arguments else ""
 
-            self.add_row(
+            return (
                 timestamp,
                 tool_name,
                 "[dim]Running...[/]",
@@ -705,10 +900,9 @@ class ToolCallHistoryView(DataTable):
             parent_span_id = data.get("parent_span_id", "unknown")[:8]
             error = data.get("error", "Unknown error")
 
-            timestamp = event.datetime.strftime("%H:%M:%S")
             error_preview = error[:30] if error else ""
 
-            self.add_row(
+            return (
                 timestamp,
                 tool_name,
                 f"[red]FAIL[/] ({error_preview})",
@@ -717,16 +911,19 @@ class ToolCallHistoryView(DataTable):
                 "",
             )
 
+        # Default fallback for other tool events
+        return (timestamp, data.get("tool_name", "unknown"), event_name, "N/A", "N/A", "")
 
-class StateTransitionView(DataTable):
+
+class StateTransitionView(TimeOrderedTableView):
     """View showing state transition history from StateTracer.
 
     Shows state changes across all scopes with metadata.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._transitions: List[Dict[str, Any]] = []
+    def __init__(self, *args, max_rows: int = 200, **kwargs):
+        # Enable deduplication to prevent duplicate state events
+        super().__init__(*args, max_rows=max_rows, enable_dedup=True, **kwargs)
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -734,10 +931,27 @@ class StateTransitionView(DataTable):
         self.cursor_type = "row"
 
     def add_state_event(self, event: Event) -> None:
-        """Add a state transition event."""
+        """Add a state transition event.
+
+        Filters for state.* events and uses base class add_event()
+        for proper ordering, trimming, and deduplication.
+        """
+        # Only process state events
         if not event.topic.startswith("state."):
             return
 
+        # Use base class add_event() for consistent handling
+        self.add_event(event)
+
+    def _format_event_row(self, event: Event) -> tuple:
+        """Format a state event as a table row.
+
+        Args:
+            event: The state event to format
+
+        Returns:
+            Tuple of (timestamp, scope, key, old_value, new_value)
+        """
         data = event.data or {}
         timestamp = event.datetime.strftime("%H:%M:%S")
 
@@ -758,8 +972,7 @@ class StateTransitionView(DataTable):
         old_preview = str(old_value)[:30] if old_value is not None else "None"
         new_preview = str(new_value)[:30] if new_value is not None else "None"
 
-        # Append row (events are already processed in descending order)
-        self.add_row(timestamp, scope, key, old_preview, new_preview)
+        return (timestamp, scope, key, old_preview, new_preview)
 
 
 class PerformanceMetricsView(Static):
