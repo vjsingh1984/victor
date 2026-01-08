@@ -333,6 +333,7 @@ class IntentClassificationHandler:
             mentioned_tools=mentioned_tools,
             tracking_state=tracking_state,
             task_completion_signals=task_completion_signals,
+            task_completion_detector=task_completion_detector,
         )
 
         # Step 7: Apply state updates
@@ -410,6 +411,7 @@ class IntentClassificationHandler:
         mentioned_tools: List[str],
         tracking_state: TrackingState,
         task_completion_signals: Dict[str, Any],
+        task_completion_detector: Any,
     ) -> Dict[str, Any]:
         """Determine continuation action using ContinuationStrategy."""
         from victor.agent.continuation_strategy import ContinuationStrategy
