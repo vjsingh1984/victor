@@ -343,10 +343,16 @@ class EventLogView(RichLog):
         return lines
 
     def _refresh_display(self) -> None:
-        """Refresh the display with current lines."""
-        # Clear and rewrite all content
+        """Refresh the display with current lines.
+
+        RichLog displays content with first write at bottom, last write at top
+        (like a terminal log). Since we want newest at top, we write in reverse
+        order (oldest first, so it ends up at bottom).
+        """
+        # Clear and rewrite all content in REVERSE order
+        # Write oldest first (appears at bottom), newest last (appears at top)
         self.clear()
-        for line in self._event_lines:
+        for line in reversed(self._event_lines):
             self.write(line, expand=True)
 
 
@@ -369,7 +375,6 @@ class EventTableView(DataTable):
         logger = logging.getLogger(__name__)
 
         timestamp = event.datetime.strftime("%H:%M:%S")
-        timestamp_raw = event.timestamp
         category = event.category
 
         # Build details string
@@ -384,36 +389,11 @@ class EventTableView(DataTable):
             elif "message" in event.data:
                 details = str(event.data["message"])[:50]
 
-        # Debug: Log event being added
-        try:
-            current_row_count = len(self.rows)
-        except Exception:
-            current_row_count = 0
-
-        logger.info(
-            f"[EventTableView.add_event] Adding row #{current_row_count}: timestamp={timestamp} ({timestamp_raw}), topic={event.topic}"
-        )
-
         # Append row (events are already processed in descending order)
         try:
             self.add_row(timestamp, category, event.topic, details)
-            logger.debug(
-                f"[EventTableView.add_event] Successfully added row for timestamp={timestamp}"
-            )
         except Exception as e:
             logger.error(f"[EventTableView.add_event] Error adding row: {e}")
-            return
-
-        # Debug: Log state after adding
-        try:
-            if len(self.rows) > 0:
-                first_row = self.rows[0]
-                last_row = self.rows[-1] if len(self.rows) > 1 else first_row
-                logger.info(
-                    f"[EventTableView.add_event] After add: total_rows={len(self.rows)}, first_row_time={first_row[0]}, last_row_time={last_row[0]}"
-                )
-        except Exception as e:
-            logger.debug(f"[EventTableView.add_event] Could not log row state: {e}")
 
 
 class ToolExecutionView(DataTable):
@@ -1241,23 +1221,8 @@ class ObservabilityDashboard(App):
             lines_to_process = lines_to_process[::-1]  # Reverse to show newest first
 
             logger.info(
-                f"[Dashboard] Loading {len(lines_to_process)} initial events from {len(all_lines)} total lines (reversed for newest-first)"
+                f"[Dashboard] Loading {len(lines_to_process)} initial events from {len(all_lines)} total lines"
             )
-
-            # Debug: Log first and last timestamps from file
-            if len(lines_to_process) > 0:
-                first_line = lines_to_process[0].strip()
-                last_line = lines_to_process[-1].strip()
-                try:
-                    first_event_data = json.loads(first_line)
-                    last_event_data = json.loads(last_line)
-                    first_ts = first_event_data.get("timestamp", "N/A")
-                    last_ts = last_event_data.get("timestamp", "N/A")
-                    logger.info(
-                        f"[Dashboard] Initial load timestamp range: first={first_ts}, last={last_ts}"
-                    )
-                except Exception as e:
-                    logger.debug(f"[Dashboard] Could not parse timestamps for debug: {e}")
 
             for idx, line in enumerate(lines_to_process):
                 line = line.strip()
@@ -1267,9 +1232,6 @@ class ObservabilityDashboard(App):
                 event = self._parse_jsonl_line(line)
                 if event:
                     self._event_counter += 1
-                    logger.info(
-                        f"[Dashboard] Initial event #{self._event_counter}: [{event.category}/{event.topic}]"
-                    )
                     self._process_event(event)
 
             # Update position to end of file
@@ -1304,10 +1266,6 @@ class ObservabilityDashboard(App):
 
                 # Check if file has new content
                 if current_size > self._last_position:
-                    logger.debug(
-                        f"[Dashboard] File grew from {self._last_position} to {current_size}"
-                    )
-
                     # Read new content
                     # TODO: Migrate
                     with open(self._jsonl_path, "r", encoding="utf-8") as f:
@@ -1317,24 +1275,9 @@ class ObservabilityDashboard(App):
 
                     logger.debug(f"[Dashboard] Read {len(new_lines)} new lines")
 
-                    # Debug: Log timestamp range of new events
-                    if len(new_lines) > 0:
-                        first_new = new_lines[0].strip()
-                        last_new = new_lines[-1].strip()
-                        try:
-                            first_event_data = json.loads(first_new)
-                            last_event_data = json.loads(last_new)
-                            first_ts = first_event_data.get("timestamp", "N/A")
-                            last_ts = last_event_data.get("timestamp", "N/A")
-                            logger.info(
-                                f"[Dashboard] Polling batch: {len(new_lines)} events, timestamp range: {first_ts} to {last_ts}"
-                            )
-                        except Exception as e:
-                            logger.debug(f"[Dashboard] Could not parse polling timestamps: {e}")
-
                     # Process each new line in reverse order (newest first)
                     # This ensures events are added to views in descending timestamp order
-                    for idx, line in enumerate(reversed(new_lines)):
+                    for line in reversed(new_lines):
                         line = line.strip()
                         if not line:
                             continue
@@ -1342,9 +1285,6 @@ class ObservabilityDashboard(App):
                         event = self._parse_jsonl_line(line)
                         if event:
                             self._event_counter += 1
-                            logger.info(
-                                f"[Dashboard] Polling event #{self._event_counter} (batch idx {idx}): timestamp={event.timestamp}, topic={event.topic}"
-                            )
 
                             # Process event
                             # We're in an async worker task but can call UI methods directly
@@ -1411,15 +1351,12 @@ class ObservabilityDashboard(App):
         import traceback
 
         logger = logging.getLogger(__name__)
-        logger.info(
-            f"[Dashboard._process_event] PROCESSING timestamp={event.timestamp} [{event.category}/{event.topic}]"
-        )
+        logger.info(f"[Dashboard._process_event] PROCESSING [{event.category}/{event.topic}]")
 
         try:
             # Update stats
             # TODO: Migrate
             self._stats.increment(event.category)
-            logger.debug("[Dashboard._process_event] Stats updated")
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error updating stats: {e}\n{traceback.format_exc()}"
@@ -1428,18 +1365,14 @@ class ObservabilityDashboard(App):
         try:
             # Add to views
             # TODO: Migrate
-            logger.debug("[Dashboard._process_event] Adding to EventLogView")
             self._event_log.add_event(event)
-            logger.debug("[Dashboard._process_event] EventLogView updated successfully")
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error adding to EventLogView: {e}\n{traceback.format_exc()}"
             )
 
         try:
-            logger.debug("[Dashboard._process_event] Adding to EventTableView")
             self._event_table.add_event(event)
-            logger.debug("[Dashboard._process_event] EventTableView updated successfully")
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error adding to EventTableView: {e}\n{traceback.format_exc()}"
@@ -1485,8 +1418,6 @@ class ObservabilityDashboard(App):
             logger.error(
                 f"[Dashboard._process_event] Error refreshing display: {e}\n{traceback.format_exc()}"
             )
-
-        logger.info(f"[Dashboard._process_event] COMPLETE [{event.topic}]")
 
     @work
     async def _load_historical_file(self) -> None:
