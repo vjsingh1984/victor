@@ -1123,7 +1123,7 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: Cloud models 750 lines/25KB, local models 150 lines/6KB. Always ends on complete lines.",
+        "TRUNCATION: 1500 lines/64KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
@@ -1145,8 +1145,7 @@ async def read(
     """Read text/code file. Binary files rejected.
 
     TRUNCATION LIMITS:
-    - Cloud models: Maximum 750 lines OR 25KB (whichever is reached first)
-    - Local models: Maximum 150 lines OR 6KB
+    - Maximum 1500 lines OR 64KB (whichever is reached first)
     - Always truncates at complete line boundaries (never mid-line)
     - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
 
@@ -1483,7 +1482,7 @@ async def read(
 
             # Check for airgapped mode or local providers
             if settings.airgapped_mode:
-                return 2000, 32768  # ~2000 lines, 32KB for local models (airgapped)
+                return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
 
             # Check provider name for local indicators
             provider = getattr(settings, "provider", "").lower()
@@ -1497,26 +1496,26 @@ async def read(
                     caps = get_model_capabilities(model)
                     context_window = caps.get("context_window", 0)
                     if context_window > 0:
-                        # For local models with 32K+ context, use ~25% for reads (~8K tokens)
+                        # For local models with 64K+ context, use ~25% for reads (~16K tokens)
                         # This gives good file reading while leaving room for the rest of the conversation
                         max_tokens = context_window // 4  # Use 25% of context for file reads
                         # Estimate ~3 bytes per token (average), ~40 chars per line
                         max_lines = min(
-                            2000, max(100, max_tokens // 3)
+                            1500, max(100, max_tokens // 3)
                         )  # Ensure at least 100 lines
-                        max_bytes = min(32768, max_tokens * 3)  # ~3 bytes per token average
+                        max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception:
                     pass
-                return 2000, 32768  # Fallback for local models: 2000 lines, 32KB
+                return 1500, 65536  # Fallback for local models: 1500, 64KB
 
             # Cloud models get higher limits (large context windows)
             # Anthropic: 200K tokens, GPT-4: 128K tokens
             # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
-            return 2500, 102400  # ~2500 lines, 100KB for cloud models
+            return 1500, 65536  # ~2500 lines, 100KB for cloud models
         except Exception:
             # Default to cloud limits if settings unavailable
-            return 2500, 102400  # ~2500 lines, 100KB
+            return 1500, 65536  # ~1500 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
 
