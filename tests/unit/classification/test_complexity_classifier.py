@@ -24,16 +24,22 @@ Tests task complexity classification:
 """
 
 
-from victor.agent.complexity_classifier import (
+# Import from framework.task for core types (canonical location)
+from victor.framework.task.complexity import (
     TaskComplexity,
     TaskClassification,
-    ComplexityClassifier,
+    TaskComplexityService as ComplexityClassifier,
     classify_task,
+    DEFAULT_BUDGETS,
+)
+
+# Import helper functions and constants from deprecated module (they're wrappers)
+# These will emit deprecation warnings which is expected
+from victor.agent.complexity_classifier import (
     get_task_prompt_hint,
     get_prompt_hint,
     should_force_answer,
-    DEFAULT_BUDGETS,
-    PROMPT_HINTS,
+    PROMPT_HINTS,  # Deprecated constant, kept for backward compatibility
 )
 
 
