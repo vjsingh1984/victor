@@ -385,21 +385,35 @@ class EventTableView(DataTable):
                 details = str(event.data["message"])[:50]
 
         # Debug: Log event being added
-        current_row_count = len(self.rows)
-        logger.debug(
-            f"[EventTableView.add_event] Row #{current_row_count}: timestamp={timestamp} ({timestamp_raw}), topic={event.topic}"
+        try:
+            current_row_count = len(self.rows)
+        except Exception:
+            current_row_count = 0
+
+        logger.info(
+            f"[EventTableView.add_event] Adding row #{current_row_count}: timestamp={timestamp} ({timestamp_raw}), topic={event.topic}"
         )
 
         # Append row (events are already processed in descending order)
-        self.add_row(timestamp, category, event.topic, details)
+        try:
+            self.add_row(timestamp, category, event.topic, details)
+            logger.debug(
+                f"[EventTableView.add_event] Successfully added row for timestamp={timestamp}"
+            )
+        except Exception as e:
+            logger.error(f"[EventTableView.add_event] Error adding row: {e}")
+            return
 
         # Debug: Log state after adding
-        if len(self.rows) > 0:
-            first_row_time = self.rows[0]
-            last_row_time = self.rows[-1] if len(self.rows) > 1 else first_row_time
-            logger.debug(
-                f"[EventTableView.add_event] After add: total_rows={len(self.rows)}, first_row={first_row_time}, last_row={last_row_time}"
-            )
+        try:
+            if len(self.rows) > 0:
+                first_row = self.rows[0]
+                last_row = self.rows[-1] if len(self.rows) > 1 else first_row
+                logger.info(
+                    f"[EventTableView.add_event] After add: total_rows={len(self.rows)}, first_row_time={first_row[0]}, last_row_time={last_row[0]}"
+                )
+        except Exception as e:
+            logger.debug(f"[EventTableView.add_event] Could not log row state: {e}")
 
 
 class ToolExecutionView(DataTable):
