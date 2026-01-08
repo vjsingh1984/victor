@@ -374,7 +374,9 @@ class TestCanonicalWorkflowAPI:
     def test_all_providers_have_compile_workflow(self, all_providers):
         """Test all providers implement compile_workflow (canonical API)."""
         for name, provider in all_providers:
-            assert hasattr(provider, "compile_workflow"), f"{name} provider missing compile_workflow"
+            assert hasattr(
+                provider, "compile_workflow"
+            ), f"{name} provider missing compile_workflow"
             # Verify it's callable
             assert callable(provider.compile_workflow), f"{name} compile_workflow not callable"
 
@@ -418,7 +420,9 @@ class TestCanonicalWorkflowAPI:
         ]
         for name, provider in all_providers:
             for method in canonical_methods:
-                assert hasattr(provider, method), f"{name} provider missing canonical method {method}"
+                assert hasattr(
+                    provider, method
+                ), f"{name} provider missing canonical method {method}"
 
     def test_canonical_api_consistency(self, all_providers):
         """Test all providers have consistent canonical API surface."""
@@ -432,4 +436,6 @@ class TestCanonicalWorkflowAPI:
         ]
         for name, provider in all_providers:
             for method in expected_canonical_methods:
-                assert hasattr(provider, method), f"{name} provider missing canonical method {method}"
+                assert hasattr(
+                    provider, method
+                ), f"{name} provider missing canonical method {method}"

@@ -32,12 +32,13 @@ import platform
 
 
 # Early skip for ARM CPUs (vLLM has known compatibility issues)
-_is_arm = platform.processor().startswith(("arm", "aarch64")) or \
-          platform.machine().startswith(("arm", "aarch64"))
+_is_arm = platform.processor().startswith(("arm", "aarch64")) or platform.machine().startswith(
+    ("arm", "aarch64")
+)
 if _is_arm:
     pytestmark = pytest.mark.skipif(
         True,
-        reason="Skipping vLLM tests on ARM CPU (known compatibility issues during model warm-up)"
+        reason="Skipping vLLM tests on ARM CPU (known compatibility issues during model warm-up)",
     )
 else:
     pytestmark = []
@@ -72,6 +73,7 @@ def vllm_server():
     # Check if vllm is installed
     try:
         import vllm
+
         vllm_available = True
     except ImportError:
         vllm_available = False
@@ -99,12 +101,19 @@ def vllm_server():
             # Start vLLM server
             vllm_process = subprocess.Popen(
                 [
-                    sys.executable, "-m", "vllm.entrypoints.openai.api_server",
-                    "--model", model_name,
-                    "--port", str(port),
-                    "--host", host,
-                    "--max-model-len", "2048",  # Reduce memory usage for ARM CPUs
-                    "--dtype", "float16",  # Use float16 instead of bfloat16 for better compatibility
+                    sys.executable,
+                    "-m",
+                    "vllm.entrypoints.openai.api_server",
+                    "--model",
+                    model_name,
+                    "--port",
+                    str(port),
+                    "--host",
+                    host,
+                    "--max-model-len",
+                    "2048",  # Reduce memory usage for ARM CPUs
+                    "--dtype",
+                    "float16",  # Use float16 instead of bfloat16 for better compatibility
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -135,11 +144,15 @@ def vllm_server():
                         print(f"STDERR: {stderr}")
 
                         if startup_attempt < max_startup_attempts:
-                            print(f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})...")
+                            print(
+                                f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})..."
+                            )
                             time.sleep(2)
                             break
                         else:
-                            pytest.skip(f"vLLM server failed to start after {max_startup_attempts} attempts (exit code: {poll_result})")
+                            pytest.skip(
+                                f"vLLM server failed to start after {max_startup_attempts} attempts (exit code: {poll_result})"
+                            )
 
                 time.sleep(2)
 
@@ -149,10 +162,14 @@ def vllm_server():
         except Exception as e:
             print(f"❌ Error starting vLLM server: {e}")
             if startup_attempt < max_startup_attempts:
-                print(f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})...")
+                print(
+                    f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})..."
+                )
                 time.sleep(2)
             else:
-                pytest.skip(f"vLLM server failed to start after {max_startup_attempts} attempts: {e}")
+                pytest.skip(
+                    f"vLLM server failed to start after {max_startup_attempts} attempts: {e}"
+                )
 
         if not server_ready and startup_attempt >= max_startup_attempts:
             pytest.skip(f"vLLM server did not start after {max_startup_attempts} attempts")
