@@ -300,8 +300,12 @@ def sessions_export(
 
 @sessions_app.command("clear")
 def sessions_clear(
-    prefix: Optional[str] = typer.Argument(None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"),
-    all: bool = typer.Option(False, "--all", help="Clear all sessions (default behavior when no prefix specified)"),
+    prefix: Optional[str] = typer.Argument(
+        None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"
+    ),
+    all: bool = typer.Option(
+        False, "--all", help="Clear all sessions (default behavior when no prefix specified)"
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Clear sessions from the database.
@@ -372,7 +376,9 @@ def sessions_clear(
                 deleted_count += 1
 
         if prefix:
-            console.print(f"[green]✓[/] Cleared {deleted_count} session(s) matching prefix '{prefix}'.")
+            console.print(
+                f"[green]✓[/] Cleared {deleted_count} session(s) matching prefix '{prefix}'."
+            )
         else:
             console.print(f"[green]✓[/] Cleared {deleted_count} session(s) from database.")
 

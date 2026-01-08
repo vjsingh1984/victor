@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-<<<<<<<< HEAD:victor/agent/strategies/__init__.py
 """Strategy implementations for extensibility.
 
 This package provides strategy pattern implementations for provider
@@ -29,25 +28,3 @@ __all__ = [
     "DefaultProviderClassificationStrategy",
     "ConfigurableProviderClassificationStrategy",
 ]
-========
-"""Core search types shared across verticals and storage layers."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-
-
-@dataclass
-class SearchHit:
-    """Canonical search hit representation for cross-layer interchange."""
-
-    file_path: str
-    content: str
-    score: float
-    line_number: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-__all__ = ["SearchHit"]
->>>>>>>> origin/develop:victor/core/search_types.py

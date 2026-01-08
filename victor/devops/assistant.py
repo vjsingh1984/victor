@@ -229,7 +229,9 @@ When creating configurations:
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         def _create():
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
             return create_vertical_tool_dependency_provider("devops")
+
         return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
