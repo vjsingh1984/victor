@@ -88,8 +88,8 @@ def vllm_server():
                     "--model", model_name,
                     "--port", str(port),
                     "--host", host,
-                    "--disable-log-requests",
-                    "--max-model-len", "4096",  # Reduce memory usage
+                    "--max-model-len", "2048",  # Reduce memory usage for ARM CPUs
+                    "--dtype", "float16",  # Use float16 instead of bfloat16 for better compatibility
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
