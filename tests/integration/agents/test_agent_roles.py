@@ -34,10 +34,8 @@ import pytest
 
 from victor.framework.agent_protocols import (
     AgentCapability,
-    IAgentRole,
-)
-from victor.teams.types import (
     AgentMessage,
+    IAgentRole,
     MessageType,
     TeamFormation,
 )
@@ -56,12 +54,7 @@ from victor.framework.personas import (
     list_personas,
     register_persona,
 )
-from victor.teams import (
-    create_coordinator,
-    UnifiedTeamCoordinator,
-    ITeamCoordinator,
-    TeamFormation,
-)
+from victor.teams import FrameworkTeamCoordinator
 
 
 # =============================================================================
@@ -649,7 +642,7 @@ class TestRolesWithTeamCoordinator:
     @pytest.mark.asyncio
     async def test_team_with_different_roles(self):
         """Team with different roles executes correctly."""
-        coordinator = create_coordinator(lightweight=True)
+        coordinator = FrameworkTeamCoordinator()
 
         manager = CapabilityAwareAgent("manager", ManagerRole())
         researcher = CapabilityAwareAgent("researcher", ResearcherRole())
@@ -671,7 +664,7 @@ class TestRolesWithTeamCoordinator:
     @pytest.mark.asyncio
     async def test_hierarchical_team_role_awareness(self):
         """Hierarchical team respects role-based manager selection."""
-        coordinator = create_coordinator(lightweight=True)
+        coordinator = FrameworkTeamCoordinator()
 
         # Worker added first
         worker = CapabilityAwareAgent("worker", ExecutorRole())
@@ -692,7 +685,7 @@ class TestRolesWithTeamCoordinator:
     @pytest.mark.asyncio
     async def test_pipeline_with_specialized_roles(self):
         """Pipeline with specialized roles passes context."""
-        coordinator = create_coordinator(lightweight=True)
+        coordinator = FrameworkTeamCoordinator()
 
         researcher = CapabilityAwareAgent("researcher", ResearcherRole())
         executor = CapabilityAwareAgent("executor", ExecutorRole())
@@ -712,7 +705,7 @@ class TestRolesWithTeamCoordinator:
     @pytest.mark.asyncio
     async def test_role_capabilities_preserved_in_team(self):
         """Role capabilities are preserved when used in team."""
-        coordinator = create_coordinator(lightweight=True)
+        coordinator = FrameworkTeamCoordinator()
 
         researcher = CapabilityAwareAgent("researcher", ResearcherRole())
         executor = CapabilityAwareAgent("executor", ExecutorRole())
@@ -799,7 +792,7 @@ class TestRoleAndPersonaCombination:
     @pytest.mark.asyncio
     async def test_team_with_roles_and_personas(self):
         """Team members can have both roles and personas."""
-        coordinator = create_coordinator(lightweight=True)
+        coordinator = FrameworkTeamCoordinator()
 
         agent1 = CapabilityAwareAgent(
             "senior_researcher",

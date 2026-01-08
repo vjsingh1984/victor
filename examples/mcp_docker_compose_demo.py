@@ -556,11 +556,7 @@ async def demo_multi_server_registry():
             if server_tools:
                 print(f"\n   [{server_name}]")
                 for tool in server_tools[:5]:  # Show first 5 per server
-                    desc = (
-                        tool.description[:50] + "..."
-                        if len(tool.description) > 50
-                        else tool.description
-                    )
+                    desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
                     print(f"   - {tool.name}: {desc}")
                 if len(server_tools) > 5:
                     print(f"   ... and {len(server_tools) - 5} more tools")
@@ -822,10 +818,7 @@ Examples:
         else:
             print(f"   Config file not found: {compose_path}")
             print("   Trying to stop containers directly...")
-            subprocess.run(
-                ["docker", "stop", "mcp-aws-docs", "mcp-playwright", "mcp-aws-cdk"],
-                capture_output=True,
-            )
+            subprocess.run(["docker", "stop", "mcp-aws-docs", "mcp-playwright", "mcp-aws-cdk"], capture_output=True)
 
         print("\nCleanup complete!")
         return
