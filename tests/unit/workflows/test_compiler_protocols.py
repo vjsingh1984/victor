@@ -29,11 +29,10 @@ class TestIWorkflowCompilerProtocol:
     def test_compiler_protocol_has_compile_method(self):
         """Test that compiler protocol requires compile method."""
         # This test verifies the protocol exists and has the right method signature
+        # Check for __protocol_attrs__ which contains protocol members (Python 3.10+ compatible)
         assert hasattr(IWorkflowCompiler, "__protocol_attrs__")
         # The protocol should require a compile method
-        assert "compile" in IWorkflowCompiler.__protocol_attrs__ or hasattr(
-            IWorkflowCompiler, "compile"
-        )
+        assert "compile" in IWorkflowCompiler.__protocol_attrs__
 
     def test_concrete_compiler_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
@@ -71,9 +70,10 @@ class TestIWorkflowLoaderProtocol:
 
     def test_loader_protocol_has_load_method(self):
         """Test that loader protocol requires load method."""
+        # Check for __protocol_attrs__ which contains protocol members (Python 3.10+ compatible)
         assert hasattr(IWorkflowLoader, "__protocol_attrs__")
         # The protocol should require a load method
-        assert "load" in IWorkflowLoader.__protocol_attrs__ or hasattr(IWorkflowLoader, "load")
+        assert "load" in IWorkflowLoader.__protocol_attrs__
 
     def test_concrete_loader_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
@@ -103,11 +103,10 @@ class TestIWorkflowValidatorProtocol:
 
     def test_validator_protocol_has_validate_method(self):
         """Test that validator protocol requires validate method."""
+        # Check for __protocol_attrs__ which contains protocol members (Python 3.10+ compatible)
         assert hasattr(IWorkflowValidator, "__protocol_attrs__")
         # The protocol should require a validate method
-        assert "validate" in IWorkflowValidator.__protocol_attrs__ or hasattr(
-            IWorkflowValidator, "validate"
-        )
+        assert "validate" in IWorkflowValidator.__protocol_attrs__
 
     def test_concrete_validator_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
