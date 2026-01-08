@@ -5579,7 +5579,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
             # Analyze response for explicit completion signals when feature flag is enabled
             if self._task_completion_detector and full_content:
-                from victor.agent.protocols.task_completion import CompletionConfidence
+                from victor.agent.task_completion import CompletionConfidence
 
                 self._task_completion_detector.analyze_response(full_content)
                 confidence = self._task_completion_detector.get_completion_confidence()
