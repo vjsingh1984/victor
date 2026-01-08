@@ -1,0 +1,262 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" font-family="Arial, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="registryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E3F2FD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#BBDEFB;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="protocolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F3E5F5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E1BEE7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="implGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8F5E9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C8E6C9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="wrapperGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF3E0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFE0B2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="managerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FCE4EC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F8BBD0;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="1000" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="800" y="40" text-anchor="middle" font-size="28" font-weight="bold" fill="#333">Provider System Architecture</text>
+
+  <!-- PROVIDER REGISTRY -->
+  <g transform="translate(50, 80)">
+    <rect x="0" y="0" width="350" height="200" rx="10" fill="url(#registryGradient)" stroke="#1976D2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="175" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#1976D2">Provider Registry</text>
+    <text x="175" y="50" text-anchor="middle" font-size="12" fill="#666">Singleton Pattern</text>
+
+    <g transform="translate(25, 70)">
+      <rect x="0" y="0" width="300" height="40" rx="5" fill="#ffffff" stroke="#1976D2" stroke-width="1"/>
+      <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">ProviderRegistry</text>
+    </g>
+
+    <g transform="translate(25, 120)">
+      <rect x="0" y="0" width="70" height="30" rx="3" fill="#ffffff" stroke="#1976D2" stroke-width="0.5"/>
+      <text x="35" y="20" text-anchor="middle" font-size="10" fill="#333">register()</text>
+
+      <rect x="80" y="0" width="60" height="30" rx="3" fill="#ffffff" stroke="#1976D2" stroke-width="0.5"/>
+      <text x="110" y="20" text-anchor="middle" font-size="10" fill="#333">get()</text>
+
+      <rect x="150" y="0" width="90" height="30" rx="3" fill="#ffffff" stroke="#1976D2" stroke-width="0.5"/>
+      <text x="195" y="20" text-anchor="middle" font-size="10" fill="#333">list_providers()</text>
+
+      <rect x="250" y="0" width="50" height="30" rx="3" fill="#ffffff" stroke="#1976D2" stroke-width="0.5"/>
+      <text x="275" y="20" text-anchor="middle" font-size="10" fill="#333">is_available()</text>
+    </g>
+
+    <text x="175" y="180" text-anchor="middle" font-size="11" fill="#666" font-style="italic">Central registry for all providers</text>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="400" y1="180" x2="480" y2="180" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- 21 PROVIDER IMPLEMENTATIONS -->
+  <g transform="translate(480, 80)">
+    <rect x="0" y="0" width="600" height="200" rx="10" fill="url(#implGradient)" stroke="#388E3C" stroke-width="2" filter="url(#shadow)"/>
+    <text x="300" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#388E3C">21 Provider Implementations</text>
+
+    <!-- Local Providers -->
+    <g transform="translate(30, 50)">
+      <rect x="0" y="0" width="170" height="120" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="85" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Local Providers</text>
+      <text x="85" y="45" text-anchor="middle" font-size="11" fill="#666">(4)</text>
+      <text x="85" y="70" text-anchor="middle" font-size="10" fill="#555">• Ollama</text>
+      <text x="85" y="88" text-anchor="middle" font-size="10" fill="#555">• LM Studio</text>
+      <text x="85" y="106" text-anchor="middle" font-size="10" fill="#555">• vLLM</text>
+    </g>
+
+    <!-- Cloud Providers -->
+    <g transform="translate(215, 50)">
+      <rect x="0" y="0" width="170" height="120" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="85" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Cloud Providers</text>
+      <text x="85" y="45" text-anchor="middle" font-size="11" fill="#666">(14)</text>
+      <text x="85" y="70" text-anchor="middle" font-size="10" fill="#555">• Anthropic</text>
+      <text x="85" y="88" text-anchor="middle" font-size="10" fill="#555">• OpenAI</text>
+      <text x="85" y="106" text-anchor="middle" font-size="10" fill="#555">• Google, xAI, DeepSeek...</text>
+    </g>
+
+    <!-- Enterprise Providers -->
+    <g transform="translate(400, 50)">
+      <rect x="0" y="0" width="170" height="120" rx="5" fill="#ffffff" stroke="#388E3C" stroke-width="1.5"/>
+      <text x="85" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Enterprise</text>
+      <text x="85" y="45" text-anchor="middle" font-size="11" fill="#666">(3)</text>
+      <text x="85" y="70" text-anchor="middle" font-size="10" fill="#555">• Azure OpenAI</text>
+      <text x="85" y="88" text-anchor="middle" font-size="10" fill="#555">• AWS Bedrock</text>
+      <text x="85" y="106" text-anchor="middle" font-size="10" fill="#555">• Vertex AI</text>
+    </g>
+  </g>
+
+  <!-- Arrow -->
+  <line x1="1080" y1="180" x2="1160" y2="180" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- BASE PROVIDER PROTOCOL -->
+  <g transform="translate(1160, 80)">
+    <rect x="0" y="0" width="390" height="200" rx="10" fill="url(#protocolGradient)" stroke="#7B1FA2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="195" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#7B1FA2">BaseProvider Protocol</text>
+    <text x="195" y="50" text-anchor="middle" font-size="12" fill="#666">Abstract Interface</text>
+
+    <g transform="translate(20, 70)">
+      <rect x="0" y="0" width="350" height="110" rx="5" fill="#ffffff" stroke="#7B1FA2" stroke-width="1.5"/>
+
+      <text x="175" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Required Methods:</text>
+
+      <text x="20" y="40" font-size="10" fill="#555" font-weight="bold">• name: str</text>
+      <text x="20" y="58" font-size="10" fill="#555" font-weight="bold">• chat(message, **kwargs)</text>
+      <text x="20" y="76" font-size="10" fill="#555" font-weight="bold">• stream_chat(message, **kwargs)</text>
+      <text x="20" y="94" font-size="10" fill="#555" font-weight="bold">• supports_tools(): bool</text>
+    </g>
+  </g>
+
+  <!-- Vertical arrow down -->
+  <line x1="1355" y1="280" x2="1355" y2="330" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- RESILIENT PROVIDER WRAPPER -->
+  <g transform="translate(1055, 330)">
+    <rect x="0" y="0" width="600" height="280" rx="10" fill="url(#wrapperGradient)" stroke="#F57C00" stroke-width="2" filter="url(#shadow)"/>
+    <text x="300" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#F57C00">Resilient Provider Wrapper</text>
+    <text x="300" y="50" text-anchor="middle" font-size="12" fill="#666">Fault Tolerance & Observability</text>
+
+    <!-- Circuit Breaker -->
+    <g transform="translate(30, 70)">
+      <rect x="0" y="0" width="250" height="80" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="125" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Circuit Breaker</text>
+      <text x="125" y="50" text-anchor="middle" font-size="11" fill="#666">Fault Tolerance</text>
+      <text x="125" y="68" text-anchor="middle" font-size="10" fill="#888">Prevent cascading failures</text>
+    </g>
+
+    <!-- Retry Logic -->
+    <g transform="translate(320, 70)">
+      <rect x="0" y="0" width="250" height="80" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="125" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Retry Logic</text>
+      <text x="125" y="50" text-anchor="middle" font-size="11" fill="#666">Exponential Backoff</text>
+      <text x="125" y="68" text-anchor="middle" font-size="10" fill="#888">Configurable attempts</text>
+    </g>
+
+    <!-- Timeout Handling -->
+    <g transform="translate(30, 170)">
+      <rect x="0" y="0" width="250" height="80" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="125" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Timeout Handling</text>
+      <text x="125" y="50" text-anchor="middle" font-size="11" fill="#666">Configurable Limits</text>
+      <text x="125" y="68" text-anchor="middle" font-size="10" fill="#888">Per-request timeouts</text>
+    </g>
+
+    <!-- Metrics Collection -->
+    <g transform="translate(320, 170)">
+      <rect x="0" y="0" width="250" height="80" rx="5" fill="#ffffff" stroke="#F57C00" stroke-width="1.5"/>
+      <text x="125" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Metrics Collection</text>
+      <text x="125" y="50" text-anchor="middle" font-size="11" fill="#666">Observability</text>
+      <text x="125" y="68" text-anchor="middle" font-size="10" fill="#888">Latency, errors, success rate</text>
+    </g>
+  </g>
+
+  <!-- Vertical arrow down -->
+  <line x1="1355" y1="610" x2="1355" y2="660" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- PROVIDER MANAGER -->
+  <g transform="translate(1055, 660)">
+    <rect x="0" y="0" width="600" height="220" rx="10" fill="url(#managerGradient)" stroke="#C2185B" stroke-width="2" filter="url(#shadow)"/>
+    <text x="300" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#C2185B">Provider Manager</text>
+    <text x="300" y="50" text-anchor="middle" font-size="12" fill="#666">Runtime Management</text>
+
+    <!-- Select -->
+    <g transform="translate(30, 70)">
+      <rect x="0" y="0" width="130" height="60" rx="5" fill="#ffffff" stroke="#C2185B" stroke-width="1.5"/>
+      <text x="65" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">select()</text>
+      <text x="65" y="45" text-anchor="middle" font-size="10" fill="#666">Choose provider</text>
+    </g>
+
+    <!-- Switch -->
+    <g transform="translate(175, 70)">
+      <rect x="0" y="0" width="130" height="60" rx="5" fill="#ffffff" stroke="#C2185B" stroke-width="1.5"/>
+      <text x="65" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">switch()</text>
+      <text x="65" y="45" text-anchor="middle" font-size="10" fill="#666">Change provider</text>
+    </g>
+
+    <!-- Health Check -->
+    <g transform="translate(320, 70)">
+      <rect x="0" y="0" width="130" height="60" rx="5" fill="#ffffff" stroke="#C2185B" stroke-width="1.5"/>
+      <text x="65" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">health_check()</text>
+      <text x="65" y="45" text-anchor="middle" font-size="10" fill="#666">Monitor status</text>
+    </g>
+
+    <!-- Fallback -->
+    <g transform="translate(465, 70)">
+      <rect x="0" y="0" width="100" height="60" rx="5" fill="#ffffff" stroke="#C2185B" stroke-width="1.5"/>
+      <text x="50" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">fallback</text>
+      <text x="50" y="45" text-anchor="middle" font-size="10" fill="#666">Backup list</text>
+    </g>
+
+    <!-- Key Features -->
+    <g transform="translate(30, 150)">
+      <rect x="0" y="0" width="535" height="50" rx="5" fill="#ffffff" stroke="#C2185B" stroke-width="1"/>
+      <text x="267" y="20" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Key Capabilities:</text>
+      <text x="267" y="38" text-anchor="middle" font-size="10" fill="#666">Provider switching without context loss | Health monitoring | Automatic fallback</text>
+    </g>
+  </g>
+
+  <!-- Side Panel - Context Independence -->
+  <g transform="translate(50, 330)">
+    <rect x="0" y="0" width="950" height="550" rx="10" fill="#f5f5f5" stroke="#666" stroke-width="1" filter="url(#shadow)"/>
+    <text x="475" y="35" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">Context Independence</text>
+
+    <g transform="translate(30, 60)">
+      <text x="0" y="20" font-size="13" font-weight="bold" fill="#333">Key Design Principle:</text>
+      <text x="0" y="45" font-size="12" fill="#555">Conversation history is managed by ConversationController, NOT by providers.</text>
+      <text x="0" y="65" font-size="12" fill="#555">This enables seamless provider switching without losing context.</text>
+
+      <text x="0" y="100" font-size="13" font-weight="bold" fill="#333">Benefits:</text>
+
+      <g transform="translate(20, 120)">
+        <circle cx="10" cy="10" r="5" fill="#4CAF50"/>
+        <text x="25" y="15" font-size="12" fill="#555">Switch models mid-conversation (e.g., Claude → GPT-4 → Local)</text>
+
+        <circle cx="10" cy="40" r="5" fill="#4CAF50"/>
+        <text x="25" y="45" font-size="12" fill="#555">Leverage different model strengths for different tasks</text>
+
+        <circle cx="10" cy="70" r="5" fill="#4CAF50"/>
+        <text x="25" y="75" font-size="12" fill="#555">Maintain privacy with local models while using cloud for complex tasks</text>
+
+        <circle cx="10" cy="100" r="5" fill="#4CAF50"/>
+        <text x="25" y="105" font-size="12" fill="#555">Automatic fallback on provider failures</text>
+
+        <circle cx="10" cy="130" r="5" fill="#4CAF50"/>
+        <text x="25" y="135" font-size="12" fill="#555">Cost optimization by mixing provider tiers</text>
+      </g>
+
+      <text x="0" y="290" font-size="13" font-weight="bold" fill="#333">Example Flow:</text>
+
+      <g transform="translate(20, 310)">
+        <rect x="0" y="0" width="880" height="180" rx="5" fill="#ffffff" stroke="#999" stroke-width="1"/>
+
+        <text x="20" y="30" font-size="11" font-weight="bold" fill="#1976D2">1. User: "Design a REST API"</text>
+        <text x="40" y="50" font-size="10" fill="#666">Provider: Anthropic (claude-sonnet-4-5)</text>
+
+        <text x="20" y="80" font-size="11" font-weight="bold" fill="#1976D2">2. User: /provider openai --model gpt-4</text>
+        <text x="40" y="100" font-size="10" fill="#666">→ Context preserved automatically!</text>
+
+        <text x="20" y="130" font-size="11" font-weight="bold" fill="#1976D2">3. User: "Add authentication"</text>
+        <text x="40" y="150" font-size="10" fill="#666">Provider: OpenAI (gpt-4) - Full history from Anthropic + new message</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333"/>
+    </marker>
+  </defs>
+</svg>
