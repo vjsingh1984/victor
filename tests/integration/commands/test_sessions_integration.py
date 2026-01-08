@@ -17,12 +17,19 @@
 from __future__ import annotations
 
 import pytest
+import re
 from pathlib import Path
 import tempfile
 import shutil
 
 from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
 from victor.config.settings import get_project_paths
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 @pytest.fixture
@@ -242,8 +249,9 @@ class TestChatSessionFlagsIntegration:
         # Clear all sessions with --yes flag
         result = runner.invoke(sessions_app, ["clear", "--yes"])
         assert result.exit_code == 0
-        assert "Cleared" in result.stdout
-        assert "session(s) from database" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "Cleared" in clean_output
+        assert "session(s) from database" in clean_output
 
         # Verify all sessions are deleted
         sessions_after = persistence.list_sessions(limit=100)
@@ -322,7 +330,8 @@ class TestChatSessionFlagsIntegration:
         # Try to clear with prefix shorter than 6 characters
         result = runner.invoke(sessions_app, ["clear", "abc", "--yes"])
         assert result.exit_code != 0
-        assert "Prefix must be at least 6 characters long" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "Prefix must be at least 6 characters long" in clean_output
 
     @pytest.mark.integration
     def test_sessions_clear_prefix_not_found(self, backup_db):
@@ -335,7 +344,8 @@ class TestChatSessionFlagsIntegration:
         # Try to clear with prefix that doesn't match any sessions
         result = runner.invoke(sessions_app, ["clear", "nomatch-999", "--yes"])
         assert result.exit_code == 0
-        assert "No sessions found matching prefix 'nomatch-999'" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "No sessions found matching prefix 'nomatch-999'" in clean_output
 
     @pytest.mark.integration
     def test_sessions_clear_empty_database(self, backup_db):

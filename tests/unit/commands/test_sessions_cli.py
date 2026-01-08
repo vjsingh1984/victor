@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import pytest
+import re
 from typer.testing import CliRunner
 from pathlib import Path
 import tempfile
@@ -25,6 +26,12 @@ import json
 
 from victor.ui.commands.sessions import sessions_app
 from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 @pytest.fixture
@@ -126,8 +133,9 @@ class TestSessionsCommand:
         result = runner_with_db.invoke(sessions_app, ["list", "--json"])
         assert result.exit_code == 0
 
-        # Parse JSON output
-        sessions = json.loads(result.stdout)
+        # Parse JSON output (strip ANSI codes first)
+        clean_output = strip_ansi(result.stdout)
+        sessions = json.loads(clean_output)
         assert isinstance(sessions, list)
         # Filter to only sessions created by sample_persistence fixture
         sample_sessions = [
@@ -166,7 +174,9 @@ class TestSessionsCommand:
         result = runner_with_db.invoke(sessions_app, ["search", "CI/CD", "--json"])
         assert result.exit_code == 0
 
-        sessions = json.loads(result.stdout)
+        # Strip ANSI codes before parsing JSON
+        clean_output = strip_ansi(result.stdout)
+        sessions = json.loads(clean_output)
         assert isinstance(sessions, list)
         assert len(sessions) == 1
         assert sessions[0]["title"] == "CI/CD Pipeline Setup"
@@ -185,7 +195,9 @@ class TestSessionsCommand:
         result = runner_with_db.invoke(sessions_app, ["show", "myproj-9Kx7Z2", "--json"])
         assert result.exit_code == 0
 
-        session = json.loads(result.stdout)
+        # Strip ANSI codes before parsing JSON
+        clean_output = strip_ansi(result.stdout)
+        session = json.loads(clean_output)
         assert session["metadata"]["session_id"] == "myproj-9Kx7Z2"
         assert session["metadata"]["title"] == "CI/CD Pipeline Setup"
         assert session["metadata"]["model"] == "claude-sonnet-4-20250514"
@@ -263,8 +275,9 @@ class TestSessionsClearCommand:
         # Clear all sessions
         result = runner_with_db.invoke(sessions_app, ["clear", "--yes"])
         assert result.exit_code == 0
-        assert "Cleared" in result.stdout
-        assert "session(s) from database" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "Cleared" in clean_output
+        assert "session(s) from database" in clean_output
 
         # Verify sessions are deleted
         sessions_after = persistence.list_sessions(limit=100)
@@ -281,8 +294,9 @@ class TestSessionsClearCommand:
         # Clear sessions matching prefix "myproj-9Kx7" (should match myproj-9Kx7Z2)
         result = runner_with_db.invoke(sessions_app, ["clear", "myproj-9Kx7", "--yes"])
         assert result.exit_code == 0
-        assert "Cleared" in result.stdout
-        assert "matching prefix 'myproj-9Kx7'" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "Cleared" in clean_output
+        assert "matching prefix 'myproj-9Kx7'" in clean_output
 
         # Verify session with matching prefix is deleted
         assert persistence.load_session("myproj-9Kx7Z2") is None
@@ -294,13 +308,15 @@ class TestSessionsClearCommand:
         """Test 'victor sessions clear' with prefix < 6 chars."""
         result = runner_with_db.invoke(sessions_app, ["clear", "short", "--yes"])
         assert result.exit_code != 0
-        assert "Prefix must be at least 6 characters long" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "Prefix must be at least 6 characters long" in clean_output
 
     def test_sessions_clear_prefix_not_found(self, runner_with_db, temp_db_path):
         """Test 'victor sessions clear' with non-matching prefix."""
         result = runner_with_db.invoke(sessions_app, ["clear", "nomatch-999", "--yes"])
         assert result.exit_code == 0
-        assert "No sessions found matching prefix 'nomatch-999'" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "No sessions found matching prefix 'nomatch-999'" in clean_output
 
     def test_sessions_clear_empty_database(self, runner_with_db, temp_db_path):
         """Test 'victor sessions clear' with empty database."""

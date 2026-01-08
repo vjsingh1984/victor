@@ -274,7 +274,8 @@ class TestConfigValidateCommand:
         with patch("victor.ui.commands.config.load_settings", return_value=mock_settings):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 0
-            assert "2 profile" in result.output.lower()
+            clean_output = strip_ansi(result.output)
+            assert "2 profile" in clean_output.lower()
 
 
 class TestConfigValidateHelp:
