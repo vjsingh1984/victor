@@ -30,22 +30,41 @@ import pytest
 
 # Check if LMStudio is available at module load time
 def _check_lmstudio_available():
-    """Check if LMStudio server is running."""
+    """Check if LMStudio server is running and has a model loaded."""
+    import asyncio
     import socket
 
+    # First check if server is running
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.settimeout(1)
         result = sock.connect_ex(("localhost", 1234))
-        return result == 0
+        if result != 0:
+            return False
     finally:
         sock.close()
 
+    # Then check if models are loaded
+    try:
+        import httpx
 
-# Skip entire module if LMStudio is not available
+        async def check_models():
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get("http://localhost:1234/v1/models")
+                if response.status_code != 200:
+                    return False
+                data = response.json()
+                return bool(data.get("data"))  # Has at least one model loaded
+
+        return asyncio.run(check_models())
+    except Exception:
+        return False
+
+
+# Skip entire module if LMStudio is not available or has no models
 pytestmark = pytest.mark.skipif(
     not _check_lmstudio_available(),
-    reason="LMStudio server not available at localhost:1234",
+    reason="LMStudio server not available or no models loaded at localhost:1234",
 )
 
 # These imports are intentionally after pytestmark to avoid loading if LMStudio unavailable
