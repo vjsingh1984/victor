@@ -114,23 +114,15 @@ class ToolPlanner:
 
         # Emit TOOL event for planning decision
         if self._event_bus:
-            try:
-                import asyncio
-
-                asyncio.run(
-                    self._event_bus.emit(
-                        topic="tool.planned",
-                        data={
-                            "goals": goals,
-                            "planned_count": len(planned_tools),
-                            "tool_names": [t.name for t in planned_tools] if planned_tools else [],
-                            "category": "tool",  # Preserve for observability
-                        },
-                        source="ToolPlanner",
-                    )
-                )
-            except Exception as e:
-                logger.debug(f"Failed to emit tool planned event: {e}")
+            self._safe_emit(
+                "tool.planned",
+                {
+                    "goals": goals,
+                    "planned_count": len(planned_tools),
+                    "tool_names": [t.name for t in planned_tools] if planned_tools else [],
+                    "category": "tool",  # Preserve for observability
+                },
+            )
 
         return planned_tools
 
@@ -208,23 +200,33 @@ class ToolPlanner:
 
             # Emit TOOL event for intent-based filtering
             if self._event_bus:
-                try:
-                    import asyncio
-
-                    asyncio.run(
-                        self._event_bus.emit(
-                            topic="tool.filtered_by_intent",
-                            data={
-                                "intent": current_intent.value,
-                                "original_count": original_count,
-                                "filtered_count": filtered_count,
-                                "blocked_tools": list(blocked_names),
-                                "category": "tool",  # Preserve for observability
-                            },
-                            source="ToolPlanner",
-                        )
-                    )
-                except Exception as e:
-                    logger.debug(f"Failed to emit tool filtered event: {e}")
+                self._safe_emit(
+                    "tool.filtered_by_intent",
+                    {
+                        "intent": current_intent.value,
+                        "original_count": original_count,
+                        "filtered_count": filtered_count,
+                        "blocked_tools": list(blocked_names),
+                        "category": "tool",  # Preserve for observability
+                    },
+                )
 
         return filtered
+
+    def _safe_emit(self, topic: str, data: Dict[str, Any]) -> None:
+        """Safely emit event without blocking or causing RuntimeWarning.
+
+        Uses fire-and-forget pattern to avoid asyncio issues in synchronous context.
+        """
+        try:
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+            # Fire and forget - don't await the coroutine
+            asyncio.create_task(self._event_bus.emit(topic, data, source="ToolPlanner"))
+        except RuntimeError:
+            # No running event loop - skip event emission
+            # This is acceptable in synchronous contexts
+            logger.debug(f"Skipping event emission (no event loop): {topic}")
+        except Exception as e:
+            logger.debug(f"Failed to emit event {topic}: {e}")
