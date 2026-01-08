@@ -1,0 +1,82 @@
+flowchart TB
+    subgraph Registry["Provider Registry"]
+        Reg["ProviderRegistry<br/>(Singleton)"]
+        RegMethod1["register(provider_class)"]
+        RegMethod2["get(provider_name)"]
+        RegMethod3["list_providers()"]
+        RegMethod4["is_available(provider_name)"]
+
+        Reg --> RegMethod1
+        Reg --> RegMethod2
+        Reg --> RegMethod3
+        Reg --> RegMethod4
+    end
+
+    subgraph Protocol["Base Provider Protocol"]
+        Base["BaseProvider<br/>(Protocol)"]
+        BaseMethod1["name: str"]
+        BaseMethod2["chat(message, **kwargs)"]
+        BaseMethod3["stream_chat(message, **kwargs)"]
+        BaseMethod4["supports_tools(): bool"]
+        BaseMethod5["supports_streaming(): bool"]
+
+        Base --> BaseMethod1
+        Base --> BaseMethod2
+        Base --> BaseMethod3
+        Base --> BaseMethod4
+        Base --> BaseMethod5
+    end
+
+    subgraph Implementations["21 Provider Implementations"]
+        direction LR
+        Local["Local Providers (4)<br/>Ollama, LM Studio, vLLM, llama.cpp"]
+        Cloud["Cloud Providers (14)<br/>Anthropic, OpenAI, Google, xAI..."]
+        Enterprise["Enterprise (3)<br/>Azure, AWS Bedrock, Vertex AI"]
+
+        Local --> Cloud --> Enterprise
+    end
+
+    subgraph Wrapper["Resilient Provider Wrapper"]
+        Circuit["Circuit Breaker<br/>(Fault Tolerance)"]
+        Retry["Retry Logic<br/>(with Backoff)"]
+        Timeout["Timeout Handling<br/>(Configurable)"]
+        Metrics["Metrics Collection<br/>(Observability)"]
+
+        Circuit --> Retry --> Timeout --> Metrics
+    end
+
+    subgraph Manager["Provider Manager"]
+        Select["select(provider_name)"]
+        Switch["switch(current, new_provider)"]
+        Health["health_check()"]
+        Fallback["fallback_providers"]
+
+        Select --> Switch
+        Switch --> Health
+        Health --> Fallback
+    end
+
+    %% Registry to Implementations
+    Reg --> Implementations
+
+    %% Implementations to Protocol
+    Implementations --> Base
+
+    %% Protocol to Wrapper
+    Base --> Wrapper
+
+    %% Wrapper to Manager
+    Wrapper --> Manager
+
+    %% Styling
+    classDef registryStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    classDef protocolStyle fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    classDef implStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
+    classDef wrapperStyle fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+    classDef managerStyle fill:#FCE4EC,stroke:#C2185B,stroke-width:2px
+
+    class Reg,RegMethod1,RegMethod2,RegMethod3,RegMethod4 registryStyle
+    class Base,BaseMethod1,BaseMethod2,BaseMethod3,BaseMethod4,BaseMethod5 protocolStyle
+    class Local,Cloud,Enterprise implStyle
+    class Circuit,Retry,Timeout,Metrics wrapperStyle
+    class Select,Switch,Health,Fallback managerStyle

@@ -270,27 +270,23 @@ When modifying:
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
         """Get tiered tool configuration for {{ name }}.
 
+        Recommended: Use TieredToolTemplate for consistency across verticals.
+
+        The template provides:
+        - Default mandatory tools (read, ls, grep)
+        - Pre-configured vertical_core tools for common verticals
+        - Readonly defaults for analysis-focused verticals
+
+        For custom requirements (e.g., different mandatory set, custom stage_tools),
+        you can create TieredToolConfig manually instead.
+
         Returns:
             TieredToolConfig for {{ name }} vertical
         """
-        from victor.tools.tool_names import ToolNames
+        from victor.core.vertical_types import TieredToolTemplate
 
-        return TieredToolConfig(
-            # Tier 1: Mandatory - always included for any task
-            mandatory={
-                ToolNames.READ,
-                ToolNames.LS,
-                ToolNames.GREP,
-            },
-            # Tier 2: Vertical Core - essential for {{ name }} tasks
-            vertical_core={
-                ToolNames.EDIT,
-                ToolNames.WRITE,
-                ToolNames.SHELL,
-                ToolNames.OVERVIEW,
-            },
-            readonly_only_for_analysis=False,
-        )
+        # Use template for consistency with other verticals
+        return TieredToolTemplate.for_vertical(cls.name)
 
 
 __all__ = ["{{ name_class }}Assistant"]

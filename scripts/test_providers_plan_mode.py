@@ -69,7 +69,7 @@ def test_provider(profile: str, name: str) -> dict:
 
         print(f"\nStatus: {'✓ Success' if success else '✗ Failed'}")
         print(f"Time: {elapsed:.2f}s")
-        print(f"\nResponse preview:")
+        print("\nResponse preview:")
         print("-" * 40)
         print(display_output)
         print("-" * 40)
@@ -84,7 +84,7 @@ def test_provider(profile: str, name: str) -> dict:
         }
 
     except subprocess.TimeoutExpired:
-        print(f"✗ Timeout after 120s")
+        print("✗ Timeout after 120s")
         return {
             "provider": name,
             "profile": profile,

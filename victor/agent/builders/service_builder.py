@@ -27,13 +27,16 @@ AgentOrchestrator, including:
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional
-from victor.agent.builders.base import ComponentBuilder
-from victor.agent.orchestrator_factory import OrchestratorFactory
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from victor.agent.builders.base import FactoryAwareBuilder
 from victor.core.bootstrap import ensure_bootstrapped
 
+if TYPE_CHECKING:
+    from victor.agent.orchestrator_factory import OrchestratorFactory
 
-class ServiceBuilder(ComponentBuilder):
+
+class ServiceBuilder(FactoryAwareBuilder):
     """Build core services (DI container, controllers, analytics, etc.).
 
     This builder creates all core service components that the orchestrator
@@ -71,15 +74,14 @@ class ServiceBuilder(ComponentBuilder):
         - streaming_metrics_collector: Streaming-specific metrics
     """
 
-    def __init__(self, settings, factory: Optional[OrchestratorFactory] = None):
+    def __init__(self, settings, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the ServiceBuilder.
 
         Args:
             settings: Application settings
             factory: Optional OrchestratorFactory instance (created if not provided)
         """
-        super().__init__(settings)
-        self._factory = factory
+        super().__init__(settings, factory)
         self._container = None
 
     def build(
@@ -145,19 +147,17 @@ class ServiceBuilder(ComponentBuilder):
         services["service_provider"] = self._container
 
         # Create or reuse factory
-        if self._factory is None:
-            self._factory = OrchestratorFactory(
-                settings=self.settings,
-                provider=provider,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                provider_name=provider_name,
-                profile_name=profile_name,
-                tool_selection=tool_selection,
-                thinking=thinking,
-            )
-            self._factory._container = self._container
+        self._ensure_factory(
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_name=provider_name,
+            profile_name=profile_name,
+            tool_selection=tool_selection,
+            thinking=thinking,
+        )
+        self._factory._container = self._container
 
         # Build core services via factory
         services["sanitizer"] = self._factory.create_sanitizer()
@@ -238,9 +238,7 @@ class ServiceBuilder(ComponentBuilder):
         services["task_analyzer"] = get_task_analyzer()
 
         # Register all built services
-        for name, service in services.items():
-            if service is not None:
-                self.register_component(name, service)
+        self._register_components(services)
 
         self._logger.info(
             f"ServiceBuilder built {len(services)} core services: " f"{', '.join(services.keys())}"

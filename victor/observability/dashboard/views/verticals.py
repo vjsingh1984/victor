@@ -31,7 +31,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.widgets import DataTable, RichLog, Static, Tree
 from textual.widgets.tree import TreeNode
 
-from victor.observability.event_bus import EventCategory, VictorEvent
+from victor.core.events import Event
 
 
 class VerticalTraceWidget(RichLog):
@@ -49,22 +49,22 @@ class VerticalTraceWidget(RichLog):
         self._trace_count = 0
         self._active_verticals: Dict[str, Dict[str, Any]] = {}
 
-    def add_vertical_event(self, event: VictorEvent) -> None:
+    def add_vertical_event(self, event: Event) -> None:
         """Add a vertical integration event to the trace.
 
         Args:
             event: Vertical event to add
         """
-        if event.category != EventCategory.VERTICAL:
+        if not event.topic.startswith("vertical."):
             return
 
         self._trace_count += 1
         data = event.data or {}
-        timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
+        timestamp = datetime.fromtimestamp(event.timestamp, tz=None).strftime("%H:%M:%S.%f")[:-3]
 
         # Extract key information
         vertical_name = data.get("vertical", "unknown")
-        action = data.get("action", event.name)
+        action = data.get("action", event.topic.split(".")[-1])
 
         # Color code by action type
         action_colors = {
@@ -221,7 +221,8 @@ class IntegrationResultWidget(Container):
             status.update(f"[green]Loaded {len(self._results)} results from {path.name}[/]")
 
             table.clear()
-            for result in self._results[-100:]:  # Show last 100
+            # Show last 100 results in descending order (newest first)
+            for result in reversed(self._results[-100:]):
                 self._add_result_row(result)
 
             return len(self._results)

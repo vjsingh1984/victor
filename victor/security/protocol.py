@@ -25,8 +25,17 @@ from pathlib import Path
 from typing import Optional
 
 
-class Severity(Enum):
-    """CVE severity levels (CVSS v3)."""
+class CVESeverity(Enum):
+    """CVE severity levels (CVSS v3).
+
+    This is the CANONICAL Severity enum for CVE/vulnerability classification.
+
+    Renamed from Severity to be semantically distinct from other severity types:
+    - CVESeverity (here): CVE/CVSS-based severity (NONE, LOW, MEDIUM, HIGH, CRITICAL)
+    - AuditSeverity: Audit event severity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    - IaCSeverity: IaC issue severity (CRITICAL, HIGH, MEDIUM, LOW, INFO)
+    - ReviewSeverity: Code review severity (ERROR, WARNING, INFO, HINT)
+    """
 
     NONE = "none"
     LOW = "low"
@@ -35,7 +44,7 @@ class Severity(Enum):
     CRITICAL = "critical"
 
     @classmethod
-    def from_cvss(cls, score: float) -> "Severity":
+    def from_cvss(cls, score: float) -> "CVESeverity":
         """Convert CVSS score to severity level.
 
         Args:
@@ -54,6 +63,10 @@ class Severity(Enum):
             return cls.HIGH
         else:
             return cls.CRITICAL
+
+
+# Backward compatibility alias
+Severity = CVESeverity
 
 
 class VulnerabilityStatus(Enum):
@@ -103,8 +116,13 @@ class CVE:
 
 
 @dataclass
-class Dependency:
-    """A software dependency."""
+class SecurityDependency:
+    """A software dependency for security scanning.
+
+    Renamed from Dependency to be semantically distinct:
+    - SecurityDependency (here): Security scanning with ecosystem, license, package_url
+    - PackageDependency (victor.deps.protocol): Package management with version tracking
+    """
 
     name: str
     version: str
@@ -117,6 +135,10 @@ class Dependency:
     def package_url(self) -> str:
         """Get Package URL (purl) format."""
         return f"pkg:{self.ecosystem}/{self.name}@{self.version}"
+
+
+# Backward compatibility alias
+Dependency = SecurityDependency
 
 
 @dataclass

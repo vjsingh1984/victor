@@ -19,7 +19,7 @@ This module consolidates all integration-related functionality:
 - api: HTTP API servers for IDE integrations (VS Code, JetBrains)
 - mcp: Model Context Protocol client/server implementations
 - protocol: Victor Protocol interface for unified client communication
-- protocols: SOLID-based protocol interfaces (provider adapters, grounding, quality)
+- protocols: Query enhancement protocols (core protocols live in victor.protocols)
 
 Example usage:
     # HTTP API
@@ -32,7 +32,10 @@ Example usage:
     from victor.integrations.protocol import VictorProtocol, DirectProtocolAdapter
 
     # SOLID protocols
-    from victor.integrations.protocols import IProviderAdapter, IGroundingStrategy
+    from victor.protocols import IProviderAdapter, IGroundingStrategy
+
+    # Query enhancement protocols
+    from victor.integrations.protocols.query_enhancement import EnhancementContext
 """
 
 # Expose submodules for easier access

@@ -456,6 +456,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: Optional[str] = None
 
+    # Observability Logging (JSONL export for dashboard)
+    # When enabled, writes all EventBus events to ~/.victor/metrics/victor.jsonl
+    # This allows the dashboard to show events from agent runs
+    # Off by default for performance - enable with: victor chat --log-events
+    enable_observability_logging: bool = False
+    observability_log_path: Optional[str] = None  # Defaults to ~/.victor/metrics/victor.jsonl
+
     # Privacy and Security
     airgapped_mode: bool = False
 
@@ -648,6 +655,32 @@ class Settings(BaseSettings):
     hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
 
     # ==========================================================================
+    # Workflow Definition Cache (P1 Scalability)
+    # ==========================================================================
+    # Caches parsed YAML workflow definitions to avoid redundant parsing.
+    # Uses TTL + file mtime invalidation for freshness.
+    workflow_definition_cache_enabled: bool = True
+    workflow_definition_cache_ttl: int = 3600  # seconds
+    workflow_definition_cache_max_entries: int = 100
+
+    # ==========================================================================
+    # StateGraph Copy-on-Write (P2 Scalability)
+    # ==========================================================================
+    # Enables copy-on-write state management for StateGraph workflows.
+    # Delays deep copy of state until the first mutation, reducing overhead
+    # for read-heavy workflows where nodes often only read state.
+    #
+    # Benefits:
+    # - Reduced memory allocations for read-only nodes
+    # - Lower CPU overhead from avoided deep copies
+    # - Better performance for large state objects
+    #
+    # Trade-offs:
+    # - Slightly more complex debugging (state may be shared until mutation)
+    # - First mutation incurs full deep copy cost
+    stategraph_copy_on_write_enabled: bool = True
+
+    # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
     # ==========================================================================
     # Controls automatic prompt enrichment with contextual information.
@@ -827,6 +860,53 @@ class Settings(BaseSettings):
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output
+
+    # ==========================================================================
+    # Event System Configuration (Canonical core/events)
+    # ==========================================================================
+    # Centralized configuration for the unified event system.
+    # Replaces legacy EventBus configuration (now in victor.core.events).
+    # Can be overridden via environment variables (e.g., VICTOR_EVENT_BACKEND_TYPE=redis)
+
+    # Event Backend Type: in_memory | sqlite | redis | kafka | sqs | rabbitmq
+    # - in_memory: In-memory backend (default, for same-process scenarios)
+    # - sqlite: SQLite persistent backend (for single-process persistence)
+    # - redis: Redis streams backend (for distributed systems)
+    # - kafka: Apache Kafka backend (for high-throughput distributed systems)
+    # - sqs: AWS SQS backend (for serverless AWS architectures)
+    # - rabbitmq: RabbitMQ backend (for traditional message queues)
+    #
+    # Note: Backend implementations are registered via create_event_backend() factory.
+    # External backends (kafka, sqs, rabbitmq, redis) require additional dependencies.
+    event_backend_type: str = "in_memory"
+
+    # Event delivery guarantee: at_most_once | at_least_once | exactly_once
+    # - at_most_once: Best effort (may lose events, high performance)
+    # - at_least_once: Guaranteed delivery (may duplicate, requires deduplication)
+    # - exactly_once: Exactly once delivery (requires idempotency)
+    event_delivery_guarantee: str = "at_most_once"
+
+    # Event batching configuration
+    event_max_batch_size: int = 100
+    event_flush_interval_ms: float = 1000.0
+
+    # ==========================================================================
+    # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
+    # ==========================================================================
+    # Legacy configuration migrated to canonical event system above.
+    # These settings are kept for backward compatibility during migration.
+    # TODO: Remove in v0.3.0 once all components use core/events
+
+    # Legacy EventBus Backend Type (deprecated)
+    eventbus_backend: str = "memory"  # Mapped to event_backend_type
+
+    eventbus_queue_maxsize: int = 10000  # Not used in new system
+    eventbus_backpressure_strategy: str = "drop_oldest"  # Not used in new system
+    eventbus_sampling_enabled: bool = False  # Not used in new system
+    eventbus_sampling_default_rate: float = 1.0  # Not used in new system
+    eventbus_batching_enabled: bool = False  # Mapped to event_flush_interval_ms
+    eventbus_batch_size: int = 100  # Mapped to event_max_batch_size
+    eventbus_batch_flush_interval_ms: float = 1000.0  # Mapped to event_flush_interval_ms
 
     # Analytics
     analytics_enabled: bool = True

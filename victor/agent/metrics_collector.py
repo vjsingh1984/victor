@@ -23,6 +23,7 @@ This module provides centralized metrics collection for:
 Extracted from AgentOrchestrator to improve modularity and testability.
 """
 
+import asyncio
 import logging
 import time
 import uuid
@@ -292,7 +293,16 @@ class MetricsCollector:
                     model=self.config.model,
                     provider=self.config.provider,
                 )
-                self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
+                        self.streaming_metrics_collector.record_metrics(analytics_metrics)
+                    )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug("No event loop, skipping metrics recording")
+                except Exception as e:
+                    logger.debug(f"Failed to record metrics: {e}")
 
                 # Log source of token data for debugging
                 if metrics.has_actual_usage:

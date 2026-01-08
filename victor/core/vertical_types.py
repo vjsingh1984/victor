@@ -565,6 +565,7 @@ class TieredToolTemplate:
         "research": {"web_search", "web_fetch", "overview"},
         "devops": {"shell", "git", "docker", "overview"},
         "data_analysis": {"shell", "write", "overview"},
+        "rag": {"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
     }
 
     # Vertical-specific readonly_only_for_analysis settings
@@ -573,6 +574,7 @@ class TieredToolTemplate:
         "research": True,  # Research is primarily reading
         "devops": False,  # DevOps needs execution tools
         "data_analysis": False,  # Data analysis often writes results
+        "rag": True,  # RAG is primarily reading/retrieval
     }
 
     @classmethod
@@ -609,7 +611,7 @@ class TieredToolTemplate:
         """Get pre-configured TieredToolConfig for a known vertical.
 
         Args:
-            vertical: Vertical name (coding, research, devops, data_analysis)
+            vertical: Vertical name (coding, research, devops, data_analysis, rag)
 
         Returns:
             Configured TieredToolConfig or None if vertical not known
@@ -641,6 +643,11 @@ class TieredToolTemplate:
     def for_data_analysis(cls) -> TieredToolConfig:
         """Get TieredToolConfig for data analysis vertical."""
         return cls.for_vertical("data_analysis")  # type: ignore
+
+    @classmethod
+    def for_rag(cls) -> TieredToolConfig:
+        """Get TieredToolConfig for RAG vertical."""
+        return cls.for_vertical("rag")  # type: ignore
 
     @classmethod
     def register_vertical(

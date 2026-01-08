@@ -41,11 +41,11 @@ Usage:
     print(f"This is a {result.complexity.value} task")
 """
 
-# Core task types (from original task.py)
+# Core task types
 from .core import (
     Task,
     TaskResult,
-    TaskType,
+    FrameworkTaskType,
 )
 
 # Complexity classification protocols
@@ -71,10 +71,10 @@ from .complexity import (
 )
 
 __all__ = [
-    # Core task types (backward compatibility)
+    # Core task types
     "Task",
     "TaskResult",
-    "TaskType",
+    "FrameworkTaskType",
     # Protocols
     "TaskClassifierProtocol",
     "TaskBudgetProviderProtocol",

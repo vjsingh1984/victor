@@ -34,7 +34,7 @@ Storage location: {project}/.victor/embeddings/conversations/
 
 Usage:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
     embedding_service = EmbeddingService.get_instance()
     store = ConversationEmbeddingStore(embedding_service, sqlite_db_path)
@@ -66,13 +66,13 @@ except ImportError:
     LANCEDB_AVAILABLE = False
 
 if TYPE_CHECKING:
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class EmbeddingSearchResult:
+class ConversationEmbeddingSearchResult:
     """Lean result from semantic search - just IDs and scores.
 
     Full message content should be fetched from SQLite using message_id.
@@ -84,7 +84,7 @@ class EmbeddingSearchResult:
     timestamp: Optional[datetime] = None
 
     def __repr__(self) -> str:
-        return f"EmbeddingSearchResult(id={self.message_id}, sim={self.similarity:.3f})"
+        return f"ConversationEmbeddingSearchResult(id={self.message_id}, sim={self.similarity:.3f})"
 
 
 class ConversationEmbeddingStore:
@@ -377,7 +377,7 @@ class ConversationEmbeddingStore:
         limit: int = 10,
         min_similarity: float = 0.3,
         exclude_message_ids: Optional[List[str]] = None,
-    ) -> List[EmbeddingSearchResult]:
+    ) -> List[ConversationEmbeddingSearchResult]:
         """Search for semantically similar messages.
 
         Triggers lazy embedding of any un-embedded messages first.
@@ -391,7 +391,7 @@ class ConversationEmbeddingStore:
             exclude_message_ids: Message IDs to exclude
 
         Returns:
-            List of EmbeddingSearchResult (message_id + similarity)
+            List of ConversationEmbeddingSearchResult (message_id + similarity)
         """
         if not self._initialized:
             await self.initialize()
@@ -441,7 +441,7 @@ class ConversationEmbeddingStore:
                     pass
 
             search_results.append(
-                EmbeddingSearchResult(
+                ConversationEmbeddingSearchResult(
                     message_id=message_id,
                     session_id=result.get("session_id", ""),
                     similarity=similarity,
@@ -530,8 +530,7 @@ class ConversationEmbeddingStore:
 
         try:
             logger.info("[ConversationEmbeddingStore] Auto-compacting...")
-            self._table.compact_files()
-            self._table.cleanup_old_versions(older_than=None, delete_unverified=True)
+            self._table.optimize()
             self._embeddings_added_since_compact = 0
             logger.info("[ConversationEmbeddingStore] Compaction complete")
             return True
@@ -617,7 +616,7 @@ async def get_conversation_embedding_store(
 
     if _embedding_store is None:
         if embedding_service is None:
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
 
             embedding_service = EmbeddingService.get_instance()
 

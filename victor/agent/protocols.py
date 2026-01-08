@@ -59,6 +59,116 @@ if TYPE_CHECKING:
 
 
 # =============================================================================
+# Factory Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class IAgentFactory(Protocol):
+    """Protocol for unified agent creation.
+
+    Defines interface for creating ANY agent type (foreground, background, team_member)
+    using shared infrastructure. This protocol enables:
+
+    - **Single Responsibility**: Factory only handles agent creation
+    - **Open/Closed**: Extensible for new agent types via mode parameter
+    - **Liskov Substitution**: Any IAgentFactory implementation is interchangeable
+    - **Interface Segregation**: Focused protocol with single method
+    - **Dependency Inversion**: Consumers depend on abstraction, not concrete factory
+
+    All agent entrypoints (Agent.create, BackgroundAgentManager.start_agent, etc.)
+    delegate to implementations of this protocol, ensuring consistent code maintenance
+    and eliminating code proliferation.
+
+    Usage:
+        from victor.agent.protocols import IAgentFactory
+
+        async def create_researcher(factory: IAgentFactory) -> IAgent:
+            return await factory.create_agent(
+                mode="foreground",
+                task="research",
+                config=my_config
+            )
+    """
+
+    async def create_agent(
+        self,
+        mode: str,
+        config: Optional[Any] = None,
+        task: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Create any agent type using shared infrastructure.
+
+        This is the ONLY method that should create agents. All other entrypoints
+        (Agent.create, BackgroundAgentManager.start_agent, Vertical.create_agent)
+        must delegate here to ensure consistent code maintenance.
+
+        Args:
+            mode: Agent creation mode - "foreground", "background", or "team_member"
+            config: Optional unified agent configuration (UnifiedAgentConfig)
+            task: Optional task description (for background agents)
+            **kwargs: Additional agent-specific parameters
+
+        Returns:
+            Agent instance (Agent, BackgroundAgent, or TeamMember/SubAgent)
+
+        Examples:
+            # Foreground agent
+            agent = await factory.create_agent(mode="foreground")
+
+            # Background agent with task
+            agent = await factory.create_agent(
+                mode="background",
+                task="Implement feature X"
+            )
+
+            # Team member
+            agent = await factory.create_agent(
+                mode="team_member",
+                role="researcher"
+            )
+        """
+        ...
+
+
+@runtime_checkable
+class IAgent(Protocol):
+    """Canonical agent protocol.
+
+    ALL agent types (Agent, BackgroundAgent, TeamMember, SubAgent) must implement
+    this protocol to ensure Liskov Substitution Principle compliance.
+
+    This enables:
+    - Polymorphic agent handling
+    - Type-safe agent composition
+    - Consistent agent interfaces across all contexts
+    """
+
+    @property
+    def id(self) -> str:
+        """Unique agent identifier."""
+        ...
+
+    @property
+    def orchestrator(self) -> Any:
+        """Agent orchestrator instance."""
+        ...
+
+    async def execute(self, task: str, context: Dict[str, Any]) -> str:
+        """Execute a task.
+
+        Args:
+            task: Task description
+            context: Execution context
+
+        Returns:
+            Execution result
+        """
+        ...
+
+
+# =============================================================================
 # Provider Protocols
 # =============================================================================
 
@@ -121,8 +231,13 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class ToolSelectionContext:
-    """Context for tool selection decisions.
+class AgentToolSelectionContext:
+    """Agent-level context for tool selection decisions.
+
+    Renamed from ToolSelectionContext to be semantically distinct:
+    - AgentToolSelectionContext (here): Basic agent-level context
+    - VerticalToolSelectionContext (victor.core.verticals.protocols.tool_provider): Vertical-specific
+    - CrossVerticalToolSelectionContext (victor.tools.selection.protocol): Extended cross-vertical
 
     Provides conversation history, stage info, and task metadata
     to tool selectors for intelligent tool filtering.
@@ -154,6 +269,10 @@ class ToolSelectionContext:
 
     # Additional metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# Backward compatibility alias
+ToolSelectionContext = AgentToolSelectionContext
 
 
 @dataclass
@@ -281,26 +400,82 @@ class ToolPipelineProtocol(Protocol):
 
 @runtime_checkable
 class ToolExecutorProtocol(Protocol):
-    """Protocol for tool execution.
+    """Protocol for tool execution - DIP compliant.
 
-    Handles individual tool execution with validation and retry.
+    Handles individual tool execution with validation and context support.
+    This protocol enables dependency inversion by allowing consumers to
+    depend on the abstraction rather than concrete implementations.
+
+    The protocol provides:
+    - Synchronous and asynchronous execution methods
+    - Argument validation before execution
+    - Optional context passing for execution environment
+
+    Usage:
+        from victor.agent.protocols import ToolExecutorProtocol
+
+        def run_tool(executor: ToolExecutorProtocol, tool: str, args: dict) -> Any:
+            if executor.validate_arguments(tool, args):
+                return await executor.aexecute(tool, args)
+            raise ValueError(f"Invalid arguments for {tool}")
+
+        # Mock in tests
+        mock_executor = MagicMock(spec=ToolExecutorProtocol)
+        mock_executor.validate_arguments.return_value = True
     """
 
-    async def execute(
+    def execute(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
-        tool_call_id: Optional[str] = None,
+        context: Optional[Any] = None,
     ) -> Any:
-        """Execute a single tool.
+        """Execute a tool synchronously.
 
         Args:
             tool_name: Name of tool to execute
-            arguments: Tool arguments
-            tool_call_id: Optional identifier for the call
+            arguments: Tool arguments as dictionary
+            context: Optional execution context (e.g., workspace, session info)
 
         Returns:
-            Tool result
+            Tool execution result
+        """
+        ...
+
+    async def aexecute(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Any] = None,
+    ) -> Any:
+        """Execute a tool asynchronously.
+
+        Args:
+            tool_name: Name of tool to execute
+            arguments: Tool arguments as dictionary
+            context: Optional execution context (e.g., workspace, session info)
+
+        Returns:
+            Tool execution result
+        """
+        ...
+
+    def validate_arguments(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> bool:
+        """Validate tool arguments before execution.
+
+        Checks that the provided arguments match the tool's expected schema.
+        Should be called before execute() or aexecute() to ensure valid input.
+
+        Args:
+            tool_name: Name of tool to validate against
+            arguments: Arguments to validate
+
+        Returns:
+            True if arguments are valid for the tool, False otherwise
         """
         ...
 
@@ -2161,6 +2336,9 @@ class StreamingHandlerProtocol(Protocol):
 
 
 __all__ = [
+    # Factory protocols
+    "IAgentFactory",
+    "IAgent",
     # Tool selection data classes
     "ToolSelectionContext",
     "ToolSelectorFeatures",
@@ -2249,6 +2427,8 @@ __all__ = [
     "ToolCoordinatorProtocol",
     "StateCoordinatorProtocol",
     "PromptCoordinatorProtocol",
+    # Vertical storage protocol (DIP compliance)
+    "VerticalStorageProtocol",
 ]
 
 
@@ -2937,5 +3117,587 @@ class PromptCoordinatorProtocol(Protocol):
 
         Args:
             mode: "minimal" or "extended"
+        """
+        ...
+
+
+# =============================================================================
+# Vertical Storage Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class VerticalStorageProtocol(Protocol):
+    """Protocol for storing vertical-specific data in orchestrator.
+
+    This protocol addresses the DIP (Dependency Inversion Principle) violation
+    where FrameworkStepHandler uses private attribute fallbacks on the orchestrator
+    (e.g., _vertical_middleware_storage, _safety_patterns, _team_specs).
+
+    By defining this protocol, consumers can depend on an abstraction rather than
+    concrete implementation details, enabling:
+    - Proper dependency injection
+    - Easy testing via mock substitution
+    - Clear contracts for vertical data storage
+
+    Usage:
+        from victor.agent.protocols import VerticalStorageProtocol
+
+        def configure_vertical(storage: VerticalStorageProtocol) -> None:
+            storage.set_middleware(middleware_list)
+            storage.set_safety_patterns(patterns)
+            storage.set_team_specs(specs)
+
+        # Later retrieval
+        middleware = storage.get_middleware()
+    """
+
+    def set_middleware(self, middleware: List[Any]) -> None:
+        """Store middleware configuration.
+
+        Args:
+            middleware: List of MiddlewareProtocol implementations
+        """
+        ...
+
+    def get_middleware(self) -> List[Any]:
+        """Retrieve middleware configuration.
+
+        Returns:
+            List of middleware instances, or empty list if not set
+        """
+        ...
+
+    def set_safety_patterns(self, patterns: List[Any]) -> None:
+        """Store safety patterns.
+
+        Args:
+            patterns: List of SafetyPattern instances from vertical extensions
+        """
+        ...
+
+    def get_safety_patterns(self) -> List[Any]:
+        """Retrieve safety patterns.
+
+        Returns:
+            List of safety pattern instances, or empty list if not set
+        """
+        ...
+
+    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+        """Store team specifications.
+
+        Args:
+            specs: Dictionary mapping team names to TeamSpec instances
+        """
+        ...
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Retrieve team specifications.
+
+        Returns:
+            Dictionary of team specs, or empty dict if not set
+        """
+        ...
+
+
+# =============================================================================
+# Manager/Coordinator Refactoring Protocols (SOLID-based)
+# =============================================================================
+
+
+class IProviderHealthMonitor(Protocol):
+    """Protocol for provider health monitoring.
+
+    Defines interface for monitoring provider health and triggering fallbacks.
+    Separated from IProviderSwitcher to follow ISP.
+    """
+
+    async def check_health(self, provider: Any) -> bool:
+        """Check if provider is healthy.
+
+        Args:
+            provider: Provider instance to check
+
+        Returns:
+            True if provider is healthy, False otherwise
+        """
+        ...
+
+    async def start_health_checks(
+        self,
+        interval: Optional[float] = None,
+        provider: Optional[Any] = None,
+        provider_name: Optional[str] = None,
+    ) -> None:
+        """Start periodic health checks.
+
+        Args:
+            interval: Interval between health checks in seconds
+            provider: Provider to monitor (optional)
+            provider_name: Provider name (optional)
+        """
+        ...
+
+    async def stop_health_checks(self) -> None:
+        """Stop health checks."""
+        ...
+
+    def is_monitoring(self) -> bool:
+        """Check if health monitoring is currently active.
+
+        Returns:
+            True if monitoring is active, False otherwise
+        """
+        ...
+
+
+class IProviderSwitcher(Protocol):
+    """Protocol for provider switching operations.
+
+    Defines interface for switching between providers and models.
+    Separated from IProviderHealthMonitor to follow ISP.
+    """
+
+    def get_current_provider(self) -> Optional[Any]:
+        """Get current provider instance.
+
+        Returns:
+            Current provider or None if not configured
+        """
+        ...
+
+    def get_current_model(self) -> str:
+        """Get current model name.
+
+        Returns:
+            Current model name or empty string if not configured
+        """
+        ...
+
+    def get_current_state(self) -> Optional[Any]:
+        """Get current switcher state.
+
+        Returns:
+            Current state or None if not configured
+        """
+        ...
+
+    def set_initial_state(
+        self,
+        provider: Any,
+        provider_name: str,
+        model: str,
+    ) -> None:
+        """Set initial provider state (used during initialization).
+
+        Args:
+            provider: Provider instance
+            provider_name: Provider name
+            model: Model name
+        """
+        ...
+
+    async def switch_provider(
+        self,
+        provider_name: str,
+        model: str,
+        reason: str = "manual",
+        settings: Optional[Any] = None,
+        **provider_kwargs: Any,
+    ) -> bool:
+        """Switch to a different provider/model.
+
+        Args:
+            provider_name: Name of provider to switch to
+            model: Model identifier
+            reason: Reason for switch (default "manual")
+            settings: Optional settings for provider configuration
+            **provider_kwargs: Additional provider arguments
+
+        Returns:
+            True if switch succeeded, False otherwise
+        """
+        ...
+
+    async def switch_model(self, model: str, reason: str = "manual") -> bool:
+        """Switch to a different model on current provider.
+
+        Args:
+            model: Model identifier
+            reason: Reason for the switch
+
+        Returns:
+            True if switch succeeded, False otherwise
+        """
+        ...
+
+    def get_switch_history(self) -> List[Dict[str, Any]]:
+        """Get history of provider switches.
+
+        Returns:
+            List of switch event dictionaries
+        """
+        ...
+
+
+class IToolAdapterCoordinator(Protocol):
+    """Protocol for tool adapter coordination.
+
+    Defines interface for initializing and managing tool adapters.
+    Separated to allow independent testing and mocking.
+    """
+
+    def initialize_adapter(self) -> Any:
+        """Initialize tool adapter for current provider.
+
+        Returns:
+            ToolCallingCapabilities instance
+
+        Raises:
+            ValueError: If no provider is configured
+        """
+        ...
+
+    def get_capabilities(self) -> Any:
+        """Get tool calling capabilities.
+
+        Returns:
+            ToolCallingCapabilities instance
+
+        Raises:
+            ValueError: If adapter not initialized
+        """
+        ...
+
+    def get_adapter(self) -> Any:
+        """Get current tool adapter instance.
+
+        Returns:
+            Tool adapter instance
+
+        Raises:
+            ValueError: If adapter not initialized
+        """
+        ...
+
+    def is_initialized(self) -> bool:
+        """Check if adapter has been initialized.
+
+        Returns:
+            True if adapter is initialized, False otherwise
+        """
+        ...
+
+
+class IProviderEventEmitter(Protocol):
+    """Protocol for provider-related events.
+
+    Defines interface for emitting and handling provider events.
+    Separated to support different event implementations.
+    """
+
+    def emit_switch_event(self, event: Dict[str, Any]) -> None:
+        """Emit provider switch event.
+
+        Args:
+            event: Event dictionary with switch details
+        """
+        ...
+
+    def on_switch(self, callback: Any) -> None:
+        """Register callback for provider switches.
+
+        Args:
+            callback: Callable to invoke on switch
+        """
+        ...
+
+
+class IProviderClassificationStrategy(Protocol):
+    """Protocol for provider classification.
+
+    Defines interface for classifying providers by type.
+    Supports Open/Closed Principle via strategy pattern.
+    """
+
+    def is_cloud_provider(self, provider_name: str) -> bool:
+        """Check if provider is cloud-based.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            True if cloud provider, False otherwise
+        """
+        ...
+
+    def is_local_provider(self, provider_name: str) -> bool:
+        """Check if provider is local.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            True if local provider, False otherwise
+        """
+        ...
+
+    def get_provider_type(self, provider_name: str) -> str:
+        """Get provider type category.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            Provider type ("cloud", "local", "unknown")
+        """
+        ...
+
+
+class IMessageStore(Protocol):
+    """Protocol for message storage and retrieval.
+
+    Defines interface for persisting and retrieving messages.
+    Separated from other conversation concerns to follow ISP.
+    """
+
+    def add_message(self, role: str, content: str, **metadata) -> None:
+        """Add a message to storage.
+
+        Args:
+            role: Message role (user, assistant, system, tool)
+            content: Message content
+            **metadata: Additional message metadata
+        """
+        ...
+
+    def get_messages(self, limit: Optional[int] = None) -> List[Any]:
+        """Retrieve messages.
+
+        Args:
+            limit: Optional limit on number of messages
+
+        Returns:
+            List of messages
+        """
+        ...
+
+    def persist(self) -> bool:
+        """Persist messages to storage.
+
+        Returns:
+            True if persistence succeeded, False otherwise
+        """
+        ...
+
+
+class IContextOverflowHandler(Protocol):
+    """Protocol for context overflow handling.
+
+    Defines interface for detecting and handling context overflow.
+    Separated from IMessageStore to follow ISP.
+    """
+
+    def check_overflow(self) -> bool:
+        """Check if context has overflowed.
+
+        Returns:
+            True if overflow detected, False otherwise
+        """
+        ...
+
+    def handle_compaction(self) -> Optional[Any]:
+        """Handle context compaction.
+
+        Returns:
+            Compaction result or None
+        """
+        ...
+
+
+class ISessionManager(Protocol):
+    """Protocol for session lifecycle management.
+
+    Defines interface for creating and managing sessions.
+    Separated to support different session backends.
+    """
+
+    def create_session(self) -> str:
+        """Create a new session.
+
+        Returns:
+            Session ID
+        """
+        ...
+
+    def recover_session(self, session_id: str) -> bool:
+        """Recover an existing session.
+
+        Args:
+            session_id: Session ID to recover
+
+        Returns:
+            True if recovery succeeded, False otherwise
+        """
+        ...
+
+    def persist_session(self) -> bool:
+        """Persist session state.
+
+        Returns:
+            True if persistence succeeded, False otherwise
+        """
+        ...
+
+
+class IEmbeddingManager(Protocol):
+    """Protocol for embedding and semantic search.
+
+    Defines interface for semantic search over conversations.
+    Separated because not all conversations need embeddings.
+    """
+
+    def initialize_embeddings(self) -> None:
+        """Initialize embedding store."""
+        ...
+
+    def semantic_search(self, query: str, k: int = 5) -> List[Any]:
+        """Perform semantic search.
+
+        Args:
+            query: Search query
+            k: Number of results to return
+
+        Returns:
+            List of search results
+        """
+        ...
+
+
+class IBudgetTracker(Protocol):
+    """Protocol for budget tracking.
+
+    Defines interface for tracking and consuming budget.
+    Core budget functionality, separated from other concerns.
+    """
+
+    def consume(self, budget_type: Any, amount: int) -> bool:
+        """Consume from budget.
+
+        Args:
+            budget_type: Type of budget to consume from
+            amount: Amount to consume
+
+        Returns:
+            True if consumption succeeded, False if exhausted
+        """
+        ...
+
+    def get_status(self, budget_type: Any) -> Any:
+        """Get current budget status.
+
+        Args:
+            budget_type: Type of budget to query
+
+        Returns:
+            BudgetStatus instance
+        """
+        ...
+
+    def reset(self) -> None:
+        """Reset all budgets."""
+        ...
+
+
+class IMultiplierCalculator(Protocol):
+    """Protocol for budget multiplier calculation.
+
+    Defines interface for calculating effective budget with multipliers.
+    Separated from IBudgetTracker to follow ISP.
+    """
+
+    def calculate_effective_max(self, base_max: int) -> int:
+        """Calculate effective maximum with multipliers.
+
+        Args:
+            base_max: Base maximum budget
+
+        Returns:
+            Effective maximum after applying multipliers
+        """
+        ...
+
+    def set_model_multiplier(self, multiplier: float) -> None:
+        """Set model-specific multiplier.
+
+        Args:
+            multiplier: Multiplier value (e.g., 1.0-1.5)
+        """
+        ...
+
+    def set_mode_multiplier(self, multiplier: float) -> None:
+        """Set mode-specific multiplier.
+
+        Args:
+            multiplier: Multiplier value (e.g., 1.0-3.0)
+        """
+        ...
+
+
+class IModeCompletionChecker(Protocol):
+    """Protocol for mode completion detection.
+
+    Defines interface for checking if mode should complete early.
+    Separated from budget tracking to follow ISP.
+    """
+
+    def should_early_exit(self, mode: str, response: str) -> Tuple[bool, str]:
+        """Check if should exit mode early.
+
+        Args:
+            mode: Current mode
+            response: Response to check
+
+        Returns:
+            Tuple of (should_exit, reason)
+        """
+        ...
+
+
+class IToolCallClassifier(Protocol):
+    """Protocol for classifying tool calls.
+
+    Defines interface for classifying tools by operation type.
+    Supports Open/Closed Principle via strategy pattern.
+    """
+
+    def is_write_operation(self, tool_name: str) -> bool:
+        """Check if tool is a write operation.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if write operation, False otherwise
+        """
+        ...
+
+    def classify_operation(self, tool_name: str) -> str:
+        """Classify tool operation type.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Operation type category
+        """
+        ...
+
+    def add_write_tool(self, tool_name: str) -> None:
+        """Add a tool to the write operation classification.
+
+        Args:
+            tool_name: Name of the tool to add
         """
         ...

@@ -18,7 +18,7 @@ This module defines dangerous operation patterns specific to
 software development, particularly git operations and code refactoring.
 
 This module now delegates to the core safety infrastructure at
-victor.safety.code_patterns for pattern scanning, while maintaining
+victor.security.safety.code_patterns for pattern scanning, while maintaining
 backward compatibility for existing imports.
 """
 

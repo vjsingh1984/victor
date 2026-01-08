@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .types import Language, ValidationResult
+    from .types import Language, CodeValidationResult
 
 
 class BaseCodeValidator(ABC):
@@ -35,11 +35,11 @@ class BaseCodeValidator(ABC):
             def supported_languages(self) -> set[Language]:
                 return {Language.RUBY}
 
-            def validate(self, code: str) -> ValidationResult:
+            def validate(self, code: str) -> CodeValidationResult:
                 # Ruby-specific validation
                 ...
 
-            def fix(self, code: str, validation: ValidationResult) -> str:
+            def fix(self, code: str, validation: CodeValidationResult) -> str:
                 # Ruby-specific fixes
                 ...
     """
@@ -82,19 +82,19 @@ class BaseCodeValidator(ABC):
         pass
 
     @abstractmethod
-    def validate(self, code: str) -> "ValidationResult":
+    def validate(self, code: str) -> "CodeValidationResult":
         """Validate code and return structured result.
 
         Args:
             code: Source code string to validate
 
         Returns:
-            ValidationResult with validation status and details
+            CodeValidationResult with validation status and details
         """
         pass
 
     @abstractmethod
-    def fix(self, code: str, validation: "ValidationResult") -> str:
+    def fix(self, code: str, validation: "CodeValidationResult") -> str:
         """Attempt to auto-fix issues found during validation.
 
         Args:

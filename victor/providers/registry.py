@@ -193,6 +193,7 @@ def _register_default_providers() -> None:
     from victor.providers.openai_provider import OpenAIProvider
     from victor.providers.google_provider import GoogleProvider
     from victor.providers.xai_provider import XAIProvider
+    from victor.providers.zai_provider import ZAIProvider
     from victor.providers.lmstudio_provider import LMStudioProvider
     from victor.providers.moonshot_provider import MoonshotProvider
     from victor.providers.deepseek_provider import DeepSeekProvider
@@ -222,6 +223,10 @@ def _register_default_providers() -> None:
     ProviderRegistry.register("google", GoogleProvider)
     ProviderRegistry.register("xai", XAIProvider)
     ProviderRegistry.register("grok", XAIProvider)  # Alias for xai
+    # z.ai (ZhipuAI/智谱AI) - GLM models with OpenAI-compatible API
+    ProviderRegistry.register("zai", ZAIProvider)
+    ProviderRegistry.register("zhipuai", ZAIProvider)  # Alias
+    ProviderRegistry.register("zhipu", ZAIProvider)  # Alias
     # Moonshot AI for Kimi K2 models (OpenAI-compatible with reasoning traces)
     ProviderRegistry.register("moonshot", MoonshotProvider)
     ProviderRegistry.register("kimi", MoonshotProvider)  # Alias for moonshot

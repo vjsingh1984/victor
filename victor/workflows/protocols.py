@@ -9,6 +9,10 @@ Protocols defined:
 - IWorkflowGraph: Interface for the workflow graph structure
 - ICheckpointStore: Interface for state persistence
 - IWorkflowExecutor: Interface for workflow execution
+- NodeRunner: Protocol for node execution strategies (ISP + DIP compliant)
+- IWorkflowCompiler: Interface for workflow compilation (DIP compliant)
+- IWorkflowLoader: Interface for loading workflow definitions (DIP compliant)
+- IWorkflowValidator: Interface for validating workflow definitions (DIP compliant)
 """
 
 from abc import abstractmethod
@@ -32,8 +36,13 @@ if TYPE_CHECKING:
     from victor.workflows.streaming import WorkflowStreamChunk
 
 
-class NodeStatus(Enum):
-    """Status of a workflow node execution.
+class ProtocolNodeStatus(Enum):
+    """Status of a workflow protocol node execution.
+
+    Renamed from NodeStatus to be semantically distinct:
+    - ProtocolNodeStatus (here): Workflow protocol node status
+    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
+    - ExecutorNodeStatus (victor.workflows.executor): Executor node status
 
     Attributes:
         PENDING: Node has not started execution.
@@ -78,7 +87,7 @@ class NodeResult:
         metadata: Additional metadata about the execution.
     """
 
-    status: NodeStatus
+    status: ProtocolNodeStatus
     output: Any = None
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -113,7 +122,7 @@ class IWorkflowNode(Protocol):
             ) -> NodeResult:
                 # Process state and return result
                 return NodeResult(
-                    status=NodeStatus.COMPLETED,
+                    status=ProtocolNodeStatus.COMPLETED,
                     output={"processed": True}
                 )
     """
@@ -482,5 +491,254 @@ class IStreamingWorkflowExecutor(Protocol):
             success = executor.cancel_workflow("wf_123")
             if success:
                 print("Workflow cancelled")
+        """
+        ...
+
+
+# =============================================================================
+# NodeRunner Protocol (ISP + DIP Compliant)
+# =============================================================================
+
+
+@dataclass
+class NodeRunnerResult:
+    """Result of a node runner execution.
+
+    This is a unified result type used by all NodeRunner implementations,
+    decoupling the execution result from specific executor implementations.
+
+    Attributes:
+        node_id: ID of the executed node.
+        success: Whether execution succeeded.
+        output: Output data from the node execution.
+        error: Error message if execution failed.
+        duration_seconds: Execution time in seconds.
+        metadata: Additional metadata (tool calls, retries, etc.).
+    """
+
+    node_id: str
+    success: bool
+    output: Any = None
+    error: Optional[str] = None
+    duration_seconds: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def status(self) -> ProtocolNodeStatus:
+        """Get status as ProtocolNodeStatus enum."""
+        return ProtocolNodeStatus.COMPLETED if self.success else ProtocolNodeStatus.FAILED
+
+
+@runtime_checkable
+class NodeRunner(Protocol):
+    """Protocol for node execution strategies.
+
+    This protocol enables ISP (Interface Segregation) and DIP (Dependency
+    Inversion) compliance by:
+
+    1. ISP: Each node type has a focused runner instead of one executor
+       handling all node types.
+    2. DIP: Executors depend on this protocol, not concrete implementations.
+
+    The protocol uses ExecutionContext (from victor.workflows.context) as
+    the unified state type, enabling all runners to work with a consistent
+    state model.
+
+    Example:
+        class MyCustomRunner:
+            async def execute(
+                self,
+                node_id: str,
+                node_config: Dict[str, Any],
+                context: ExecutionContext,
+            ) -> Tuple[ExecutionContext, NodeRunnerResult]:
+                # Execute node logic
+                context["data"]["result"] = "processed"
+                return context, NodeRunnerResult(
+                    node_id=node_id,
+                    success=True,
+                    output="processed",
+                )
+
+            def supports_node_type(self, node_type: str) -> bool:
+                return node_type == "custom"
+
+    Usage in executor:
+        runners: Dict[str, NodeRunner] = {
+            "agent": AgentNodeRunner(...),
+            "compute": ComputeNodeRunner(...),
+            "transform": TransformNodeRunner(...),
+            "hitl": HITLNodeRunner(...),
+        }
+
+        runner = runners.get(node.type)
+        if runner:
+            context, result = await runner.execute(node.id, node.config, context)
+    """
+
+    async def execute(
+        self,
+        node_id: str,
+        node_config: Dict[str, Any],
+        context: Dict[str, Any],  # ExecutionContext TypedDict
+    ) -> Tuple[Dict[str, Any], "NodeRunnerResult"]:
+        """Execute a node and return updated context with result.
+
+        Args:
+            node_id: Unique identifier of the node to execute.
+            node_config: Node configuration (role, goal, tools, etc.).
+            context: Current execution context (ExecutionContext TypedDict).
+
+        Returns:
+            Tuple of (updated_context, result) where:
+            - updated_context: The context with any modifications made
+            - result: NodeRunnerResult with execution outcome
+
+        Raises:
+            Should not raise - errors should be captured in NodeRunnerResult.
+        """
+        ...
+
+    def supports_node_type(self, node_type: str) -> bool:
+        """Check if this runner supports the given node type.
+
+        Args:
+            node_type: Type of node (e.g., "agent", "compute", "transform").
+
+        Returns:
+            True if this runner can execute the node type.
+        """
+        ...
+
+
+# =============================================================================
+# Workflow Compiler Protocols (DIP Compliance)
+# =============================================================================
+
+
+@runtime_checkable
+class IWorkflowCompiler(Protocol):
+    """Protocol for workflow compilers.
+
+    A workflow compiler transforms workflow definitions into executable graphs.
+    This protocol enables Dependency Inversion by allowing the compiler to
+    depend on loader and validator abstractions rather than concrete implementations.
+
+    Example:
+        class MyCompiler:
+            def __init__(
+                self,
+                loader: IWorkflowLoader,
+                validator: IWorkflowValidator
+            ):
+                self._loader = loader
+                self._validator = validator
+
+            def compile(self, workflow_def: Dict[str, Any]) -> CompiledGraph:
+                # Load and validate using injected dependencies
+                return CompiledGraph(...)
+    """
+
+    def compile(self, workflow_def: Dict[str, Any]) -> Any:
+        """Compile a workflow definition into an executable graph.
+
+        Args:
+            workflow_def: Dictionary containing workflow definition
+                           (nodes, edges, configuration, etc.)
+
+        Returns:
+            CompiledGraph instance ready for execution
+
+        Raises:
+            ValueError: If workflow definition is invalid
+            TypeError: If workflow definition has wrong structure
+        """
+        ...
+
+
+@runtime_checkable
+class IWorkflowLoader(Protocol):
+    """Protocol for workflow definition loaders.
+
+    A workflow loader loads workflow definitions from various sources
+    (files, strings, URLs, databases, etc.). This protocol enables
+    Dependency Inversion by allowing compilers to work with any loader
+    implementation.
+
+    Example:
+        class FileLoader:
+            def load(self, source: str) -> Dict[str, Any]:
+                with open(source) as f:
+                    return yaml.safe_load(f)
+
+        class DatabaseLoader:
+            def __init__(self, db_connection):
+                self._db = db_connection
+
+            def load(self, source: str) -> Dict[str, Any]:
+                # source is workflow ID
+                return self._db.get_workflow(source)
+    """
+
+    def load(self, source: str) -> Dict[str, Any]:
+        """Load a workflow definition from a source.
+
+        Args:
+            source: Source identifier (file path, URL, workflow ID, etc.)
+
+        Returns:
+            Dictionary containing workflow definition
+
+        Raises:
+            FileNotFoundError: If source doesn't exist
+            ValueError: If source is malformed
+            TypeError: If source has wrong type
+        """
+        ...
+
+
+@runtime_checkable
+class IWorkflowValidator(Protocol):
+    """Protocol for workflow definition validators.
+
+    A workflow validator checks workflow definitions for correctness
+    before compilation. This protocol enables Dependency Inversion by
+    allowing compilers to work with any validation strategy.
+
+    Example:
+        class StrictValidator:
+            def validate(self, workflow_def: Dict[str, Any]) -> ValidationResult:
+                # Check all required fields
+                errors = []
+                if "name" not in workflow_def:
+                    errors.append("Missing required field: name")
+                if "nodes" not in workflow_def:
+                    errors.append("Missing required field: nodes")
+                return ValidationResult(
+                    is_valid=len(errors) == 0,
+                    errors=errors
+                )
+
+        @dataclass
+        class ValidationResult:
+            is_valid: bool
+            errors: List[str]
+            warnings: List[str] = field(default_factory=list)
+    """
+
+    def validate(self, workflow_def: Dict[str, Any]) -> Any:
+        """Validate a workflow definition.
+
+        Args:
+            workflow_def: Dictionary containing workflow definition to validate
+
+        Returns:
+            ValidationResult or similar with:
+            - is_valid: bool indicating if definition is valid
+            - errors: List of error messages (empty if valid)
+            - warnings: Optional list of warnings
+
+        Raises:
+            Should not raise - capture all validation issues in result
         """
         ...

@@ -21,10 +21,13 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from victor.config.settings import Settings
 
 import logging
+
+if TYPE_CHECKING:
+    from victor.agent.orchestrator_factory import OrchestratorFactory
 
 logger = logging.getLogger(__name__)
 
@@ -115,3 +118,109 @@ class ComponentBuilder(ABC):
         """
         self._built_components.clear()
         self._logger.debug("Cleared component cache")
+
+
+class FactoryAwareBuilder(ComponentBuilder):
+    """Base class for builders that use OrchestratorFactory.
+
+    This class extends ComponentBuilder to provide factory management
+    capabilities, eliminating duplication across ToolBuilder, ProviderBuilder,
+    and ServiceBuilder.
+
+    Attributes:
+        settings: Application settings
+        _factory: Optional OrchestratorFactory instance (created lazily)
+    """
+
+    def __init__(self, settings: Settings, factory: Optional["OrchestratorFactory"] = None):
+        """Initialize the factory-aware builder.
+
+        Args:
+            settings: Application settings to use for component initialization
+            factory: Optional OrchestratorFactory instance (created if not provided)
+        """
+        super().__init__(settings)
+        self._factory = factory
+
+    def _ensure_factory(
+        self,
+        provider: Any = None,
+        model: str = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        provider_name: Optional[str] = None,
+        profile_name: Optional[str] = None,
+        tool_selection: Optional[Dict[str, Any]] = None,
+        thinking: bool = False,
+    ) -> "OrchestratorFactory":
+        """Ensure factory exists, creating it if necessary.
+
+        This method implements the factory creation logic that was previously
+        duplicated across ToolBuilder, ProviderBuilder, and ServiceBuilder.
+
+        Args:
+            provider: LLM provider instance
+            model: Model identifier
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            provider_name: Optional provider label from profile
+            profile_name: Optional profile name for session tracking
+            tool_selection: Optional tool selection configuration
+            thinking: Enable extended thinking mode
+
+        Returns:
+            The existing or newly created OrchestratorFactory instance
+
+        Raises:
+            ValueError: If provider and model are not provided when factory doesn't exist
+        """
+        if self._factory is None:
+            if provider is None or model is None:
+                raise ValueError("provider and model are required when factory is not provided")
+            from victor.agent.orchestrator_factory import OrchestratorFactory
+
+            self._factory = OrchestratorFactory(
+                settings=self.settings,
+                provider=provider,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                provider_name=provider_name,
+                profile_name=profile_name,
+                tool_selection=tool_selection,
+                thinking=thinking,
+            )
+            self._logger.debug(
+                f"Created OrchestratorFactory with provider={provider}, model={model}"
+            )
+
+        return self._factory
+
+    def _register_components(self, components: Dict[str, Any]) -> None:
+        """Register all non-None components from a dictionary.
+
+        This method implements the component registration pattern that was
+        duplicated across all three builders.
+
+        Args:
+            components: Dictionary of component name to component instance
+        """
+        registered_count = 0
+        for name, component in components.items():
+            if component is not None:
+                self.register_component(name, component)
+                registered_count += 1
+
+        self._logger.debug(
+            f"Registered {registered_count} components: "
+            f"{', '.join(name for name, comp in components.items() if comp is not None)}"
+        )
+
+    @property
+    def factory(self) -> Optional["OrchestratorFactory"]:
+        """Get the factory instance without creating it.
+
+        Returns:
+            The factory instance if it exists, None otherwise
+        """
+        return self._factory

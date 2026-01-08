@@ -20,7 +20,7 @@ FROM python:3.12-slim AS builder
 
 LABEL maintainer="Vijaykumar Singh <singhvjd@gmail.com>"
 LABEL description="Enterprise-Ready AI Coding Assistant"
-LABEL version="0.1.0"
+LABEL version="0.4.1"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

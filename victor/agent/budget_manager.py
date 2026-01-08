@@ -24,6 +24,12 @@ Design:
 - Mode-specific early exit criteria for graceful completion
 - Integration with UnifiedTaskTracker and prompt builder
 
+Refactored to use composition with specialized components:
+- BudgetTracker: Budget consumption and state tracking
+- MultiplierCalculator: Budget multiplier calculation
+- ToolCallClassifier: Tool operation classification
+- ModeCompletionChecker: Mode-specific completion criteria
+
 Usage:
     manager = BudgetManager(config=BudgetConfig())
     manager.set_mode_multiplier(2.5)  # PLAN mode
@@ -47,11 +53,19 @@ Issue Reference: workflow-test-issues-v2.md Issue #6
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Callable, Dict, Optional, Set
 
+from victor.agent.budget import (
+    BudgetTracker,
+    BudgetState,
+    ModeCompletionChecker,
+    ModeCompletionConfig,
+    ModeObjective,
+    MultiplierCalculator,
+    ToolCallClassifier,
+)
+from victor.agent.budget.tool_call_classifier import DEFAULT_WRITE_TOOLS
 from victor.agent.protocols import (
     BudgetConfig,
     BudgetStatus,
@@ -60,296 +74,23 @@ from victor.agent.protocols import (
 )
 from victor.protocols.mode_aware import ModeAwareMixin
 
+# Type alias for backward compatibility
+ModeCompletionCriteria = ModeCompletionChecker
+
 logger = logging.getLogger(__name__)
 
-
 # =============================================================================
-# Mode Completion Criteria (Fix #6)
-# =============================================================================
-
-
-class ModeObjective(Enum):
-    """Defines primary objectives for each mode."""
-
-    EXPLORE = "understand_codebase"
-    PLAN = "provide_implementation_plan"
-    BUILD = "create_or_modify_files"
-
-
-@dataclass
-class ModeCompletionConfig:
-    """Configuration for mode-specific completion criteria.
-
-    Attributes:
-        min_files_read: Minimum files to read before considering complete
-        min_files_written: Minimum files to write (BUILD mode)
-        max_iterations: Maximum iterations before forcing completion
-        completion_signals: Phrases indicating task completion
-        required_sections: Required sections in output (PLAN mode)
-    """
-
-    min_files_read: int = 1
-    min_files_written: int = 0
-    max_iterations: int = 20
-    completion_signals: List[str] = field(default_factory=list)
-    required_sections: List[str] = field(default_factory=list)
-
-
-@runtime_checkable
-class IModeCompletionCriteria(Protocol):
-    """Protocol for mode completion detection."""
-
-    def get_criteria(self, mode: str) -> ModeCompletionConfig:
-        """Get completion criteria for a mode."""
-        ...
-
-    def check_early_exit(
-        self,
-        mode: str,
-        files_read: int,
-        files_written: int,
-        iterations: int,
-        response_text: str,
-    ) -> tuple[bool, str]:
-        """Check if mode objectives are met for early exit."""
-        ...
-
-
-class ModeCompletionCriteria:
-    """Defines and checks completion criteria per mode.
-
-    Each mode has specific objectives and exit criteria:
-    - EXPLORE: Understand codebase, provide explanation
-    - PLAN: Analyze requirements, provide implementation plan
-    - BUILD: Create/modify files, complete implementation
-
-    Usage:
-        criteria = ModeCompletionCriteria()
-
-        # Check if can exit early
-        should_exit, reason = criteria.check_early_exit(
-            mode="PLAN",
-            files_read=3,
-            files_written=0,
-            iterations=10,
-            response_text="Here's the implementation plan..."
-        )
-    """
-
-    # Default criteria per mode
-    CRITERIA = {
-        ModeObjective.EXPLORE: ModeCompletionConfig(
-            min_files_read=1,
-            min_files_written=0,
-            max_iterations=15,
-            completion_signals=[
-                "here's what",
-                "the file",
-                "this is",
-                "here's an overview",
-                "this module",
-                "the codebase",
-                "i found",
-                "the structure",
-            ],
-            required_sections=[],
-        ),
-        ModeObjective.PLAN: ModeCompletionConfig(
-            min_files_read=1,
-            min_files_written=0,
-            max_iterations=20,
-            completion_signals=[
-                "implementation plan",
-                "steps to",
-                "here's how",
-                "here's the plan",
-                "proposed approach",
-                "implementation steps",
-                "the plan",
-            ],
-            required_sections=[
-                "step",
-                "file",
-            ],
-        ),
-        ModeObjective.BUILD: ModeCompletionConfig(
-            min_files_read=0,
-            min_files_written=1,
-            max_iterations=30,
-            completion_signals=[
-                "created",
-                "implemented",
-                "written",
-                "has been created",
-                "successfully created",
-                "file created",
-                "implementation complete",
-            ],
-            required_sections=[],
-        ),
-    }
-
-    def __init__(self, custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None):
-        """Initialize with optional custom criteria.
-
-        Args:
-            custom_criteria: Override default criteria for specific modes
-        """
-        self._custom_criteria = custom_criteria or {}
-        self._iteration_counts: Dict[str, int] = {}
-
-    def get_criteria(self, mode: str) -> ModeCompletionConfig:
-        """Get completion criteria for mode.
-
-        Args:
-            mode: Mode name (EXPLORE, PLAN, BUILD)
-
-        Returns:
-            Completion configuration for the mode
-        """
-        # Check custom criteria first
-        if mode.upper() in self._custom_criteria:
-            return self._custom_criteria[mode.upper()]
-
-        # Get from default criteria
-        try:
-            objective = ModeObjective[mode.upper()]
-            return self.CRITERIA.get(objective, ModeCompletionConfig())
-        except KeyError:
-            logger.warning(f"Unknown mode: {mode}, using default criteria")
-            return ModeCompletionConfig()
-
-    def check_early_exit(
-        self,
-        mode: str,
-        files_read: int,
-        files_written: int,
-        iterations: int,
-        response_text: str,
-    ) -> tuple[bool, str]:
-        """Check if mode objectives are met for early exit.
-
-        Args:
-            mode: Current mode (EXPLORE, PLAN, BUILD)
-            files_read: Number of files read so far
-            files_written: Number of files written so far
-            iterations: Current iteration count
-            response_text: Agent's response text
-
-        Returns:
-            Tuple of (should_exit, reason)
-        """
-        criteria = self.get_criteria(mode)
-
-        # Track iterations
-        self._iteration_counts[mode] = iterations
-
-        # Check maximum iterations exceeded
-        if iterations >= criteria.max_iterations:
-            logger.info(f"Mode {mode}: max iterations ({criteria.max_iterations}) reached")
-            return True, f"Maximum iterations ({criteria.max_iterations}) reached"
-
-        # Check minimum requirements by mode
-        mode_upper = mode.upper()
-
-        if mode_upper == "BUILD":
-            # BUILD mode requires file(s) to be written
-            if files_written < criteria.min_files_written:
-                return (
-                    False,
-                    f"Need {criteria.min_files_written - files_written} more file(s) written",
-                )
-        else:
-            # EXPLORE and PLAN require files to be read
-            if files_read < criteria.min_files_read:
-                return False, f"Need {criteria.min_files_read - files_read} more file(s) read"
-
-        # Check for completion signals in response
-        response_lower = response_text.lower()
-        signals = criteria.completion_signals
-
-        found_signal = None
-        for signal in signals:
-            if signal in response_lower:
-                found_signal = signal
-                break
-
-        if not found_signal:
-            return False, "No completion signal detected"
-
-        # For PLAN mode, check required sections
-        if mode_upper == "PLAN" and criteria.required_sections:
-            missing_sections = []
-            for section in criteria.required_sections:
-                # Check for section headers or keywords
-                if not re.search(rf"\b{section}\b", response_lower):
-                    missing_sections.append(section)
-
-            if missing_sections:
-                return False, f"Missing required sections: {missing_sections}"
-
-        reason = f"Mode objectives complete: '{found_signal}' signal detected"
-        logger.info(f"Mode {mode}: early exit - {reason}")
-        return True, reason
-
-    def reset(self, mode: Optional[str] = None) -> None:
-        """Reset iteration counts.
-
-        Args:
-            mode: Specific mode to reset, or None for all
-        """
-        if mode is None:
-            self._iteration_counts.clear()
-        elif mode.upper() in self._iteration_counts:
-            del self._iteration_counts[mode.upper()]
-
-    def get_progress(self, mode: str) -> Dict[str, Any]:
-        """Get progress towards mode completion.
-
-        Args:
-            mode: Mode to check
-
-        Returns:
-            Progress information dictionary
-        """
-        criteria = self.get_criteria(mode)
-        iterations = self._iteration_counts.get(mode.upper(), 0)
-
-        return {
-            "mode": mode,
-            "iterations": iterations,
-            "max_iterations": criteria.max_iterations,
-            "progress_pct": min(100, (iterations / criteria.max_iterations) * 100),
-            "min_files_read": criteria.min_files_read,
-            "min_files_written": criteria.min_files_written,
-        }
-
-
-# =============================================================================
-# Write Tools Detection
+# Backward Compatibility Exports
 # =============================================================================
 
-# Tools that are considered write/action operations
-WRITE_TOOLS: Set[str] = frozenset(
-    {
-        "write_file",
-        "write",
-        "edit_files",
-        "edit",
-        "shell",
-        "bash",
-        "execute_bash",
-        "git_commit",
-        "git_push",
-        "delete_file",
-        "create_directory",
-        "mkdir",
-    }
-)
+# Export for backward compatibility
+WRITE_TOOLS: Set[str] = DEFAULT_WRITE_TOOLS
 
 
 def is_write_tool(tool_name: str) -> bool:
     """Check if a tool is a write/action operation.
+
+    Backward compatibility wrapper. Use ToolCallClassifier for new code.
 
     Args:
         tool_name: Name of the tool
@@ -357,31 +98,12 @@ def is_write_tool(tool_name: str) -> bool:
     Returns:
         True if this is a write/modify operation
     """
-    return tool_name.lower() in WRITE_TOOLS
+    classifier = ToolCallClassifier()
+    return classifier.is_write_operation(tool_name)
 
 
 # =============================================================================
-# Budget State
-# =============================================================================
-
-
-@dataclass
-class BudgetState:
-    """Internal state for a budget type.
-
-    Attributes:
-        current: Current usage count
-        base_maximum: Base maximum before multipliers
-        last_tool: Last tool that consumed this budget
-    """
-
-    current: int = 0
-    base_maximum: int = 0
-    last_tool: Optional[str] = None
-
-
-# =============================================================================
-# Budget Manager Implementation
+# Budget Manager Implementation (Refactored with Composition)
 # =============================================================================
 
 
@@ -392,63 +114,47 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     Centralizes all budget tracking with consistent multiplier application:
     effective_max = base × model_multiplier × mode_multiplier × productivity_multiplier
 
-    Replaces scattered budget tracking in:
-    - unified_task_tracker.py: exploration_iterations, action_iterations
-    - orchestrator.py: tool_budget, complexity_tool_budget
-    - intelligent_prompt_builder.py: recommended_tool_budget
+    SRP Compliance: Delegates to specialized components:
+    - BudgetTracker: Budget consumption and state tracking
+    - MultiplierCalculator: Budget multiplier calculation
+    - ToolCallClassifier: Tool operation classification
+    - ModeCompletionChecker: Mode-specific completion criteria
 
     Attributes:
         config: Budget configuration with base values
-        _budgets: Internal state for each budget type
-        _model_multiplier: Model-specific multiplier (1.0-1.5)
-        _mode_multiplier: Mode-specific multiplier (1.0-3.0)
-        _productivity_multiplier: Productivity-based multiplier (0.8-2.0)
-        _on_exhausted: Optional callback when budget exhausted
+        _tracker: Budget consumption tracking component
+        _multiplier_calc: Multiplier calculation component
+        _tool_classifier: Tool call classification component
     """
 
     config: BudgetConfig = field(default_factory=BudgetConfig)
-    _budgets: Dict[BudgetType, BudgetState] = field(default_factory=dict)
-    _model_multiplier: float = 1.0
-    _mode_multiplier: float = 1.0
-    _productivity_multiplier: float = 1.0
-    _on_exhausted: Optional[Callable[[BudgetType], None]] = None
+    _tracker: Optional[BudgetTracker] = None
+    _multiplier_calc: Optional[MultiplierCalculator] = None
+    _tool_classifier: Optional[ToolCallClassifier] = None
 
     def __post_init__(self) -> None:
-        """Initialize budget states from config."""
-        self._initialize_budgets()
+        """Initialize specialized components (SRP)."""
+        # Initialize multiplier calculator first (tracker depends on it)
+        self._multiplier_calc = MultiplierCalculator(
+            model_multiplier=1.0,
+            mode_multiplier=1.0,
+            productivity_multiplier=1.0,
+        )
 
-    def _initialize_budgets(self) -> None:
-        """Set up initial budget states from config."""
-        self._budgets = {
-            BudgetType.TOOL_CALLS: BudgetState(current=0, base_maximum=self.config.base_tool_calls),
-            BudgetType.ITERATIONS: BudgetState(current=0, base_maximum=self.config.base_iterations),
-            BudgetType.EXPLORATION: BudgetState(
-                current=0, base_maximum=self.config.base_exploration
-            ),
-            BudgetType.ACTION: BudgetState(current=0, base_maximum=self.config.base_action),
-        }
+        # Initialize budget tracker with multiplier calculator
+        self._tracker = BudgetTracker(
+            config=self.config,
+            multiplier_calculator=self._multiplier_calc,
+            on_exhausted=None,  # Can be set later via set_on_exhausted
+        )
 
-    def _calculate_effective_max(self, budget_type: BudgetType) -> int:
-        """Calculate effective maximum with all multipliers applied.
-
-        Formula: effective_max = base × model × mode × productivity
-
-        Args:
-            budget_type: Type of budget
-
-        Returns:
-            Effective maximum after multipliers
-        """
-        state = self._budgets.get(budget_type)
-        if state is None:
-            return 0
-
-        base = state.base_maximum
-        combined = self._model_multiplier * self._mode_multiplier * self._productivity_multiplier
-        return max(1, int(base * combined))
+        # Initialize tool call classifier
+        self._tool_classifier = ToolCallClassifier()
 
     def get_status(self, budget_type: BudgetType) -> BudgetStatus:
         """Get current status of a budget.
+
+        Delegates to BudgetTracker (SRP).
 
         Args:
             budget_type: Type of budget to check
@@ -456,30 +162,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             BudgetStatus with current usage and limits
         """
-        state = self._budgets.get(budget_type)
-        if state is None:
-            return BudgetStatus(
-                budget_type=budget_type,
-                is_exhausted=True,
-            )
-
-        effective_max = self._calculate_effective_max(budget_type)
-        current = state.current
-        is_exhausted = current >= effective_max
-
-        return BudgetStatus(
-            budget_type=budget_type,
-            current=current,
-            base_maximum=state.base_maximum,
-            effective_maximum=effective_max,
-            is_exhausted=is_exhausted,
-            model_multiplier=self._model_multiplier,
-            mode_multiplier=self._mode_multiplier,
-            productivity_multiplier=self._productivity_multiplier,
-        )
+        return self._tracker.get_status(budget_type)
 
     def consume(self, budget_type: BudgetType, amount: int = 1) -> bool:
         """Consume budget for an operation.
+
+        Delegates to BudgetTracker (SRP).
 
         Args:
             budget_type: Type of budget to consume
@@ -488,29 +176,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             True if budget was available, False if exhausted
         """
-        state = self._budgets.get(budget_type)
-        if state is None:
-            logger.warning(f"Unknown budget type: {budget_type}")
-            return False
-
-        effective_max = self._calculate_effective_max(budget_type)
-        was_available = state.current < effective_max
-
-        state.current += amount
-
-        is_now_exhausted = state.current >= effective_max
-        if is_now_exhausted and was_available:
-            logger.info(
-                f"Budget {budget_type.value} exhausted: "
-                f"{state.current}/{effective_max} (base={state.base_maximum})"
-            )
-            if self._on_exhausted:
-                self._on_exhausted(budget_type)
-
-        return was_available
+        return self._tracker.consume(budget_type, amount)
 
     def is_exhausted(self, budget_type: BudgetType) -> bool:
         """Check if a budget is exhausted.
+
+        Delegates to BudgetTracker (SRP).
 
         Args:
             budget_type: Type of budget to check
@@ -518,11 +189,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Returns:
             True if budget is fully consumed
         """
-        status = self.get_status(budget_type)
-        return status.is_exhausted
+        return self._tracker.is_exhausted(budget_type)
 
     def set_model_multiplier(self, multiplier: float) -> None:
         """Set the model-specific multiplier.
+
+        Delegates to MultiplierCalculator (SRP).
 
         Model multipliers vary by model capability:
         - GPT-4o: 1.0 (baseline)
@@ -533,14 +205,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Model multiplier value
         """
-        old_multiplier = self._model_multiplier
-        self._model_multiplier = max(0.5, min(3.0, multiplier))
-
-        if old_multiplier != self._model_multiplier:
-            logger.debug(f"BudgetManager: model_multiplier={self._model_multiplier}")
+        self._multiplier_calc.set_model_multiplier(multiplier)
 
     def set_mode_multiplier(self, multiplier: float) -> None:
         """Set the mode-specific multiplier.
+
+        Delegates to MultiplierCalculator (SRP).
 
         Mode multipliers:
         - BUILD: 2.0 (reading before writing)
@@ -550,14 +220,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Mode multiplier value
         """
-        old_multiplier = self._mode_multiplier
-        self._mode_multiplier = max(0.5, min(5.0, multiplier))
-
-        if old_multiplier != self._mode_multiplier:
-            logger.debug(f"BudgetManager: mode_multiplier={self._mode_multiplier}")
+        self._multiplier_calc.set_mode_multiplier(multiplier)
 
     def set_productivity_multiplier(self, multiplier: float) -> None:
         """Set the productivity multiplier.
+
+        Delegates to MultiplierCalculator (SRP).
 
         Productivity multipliers (from RL learning):
         - High productivity session: 0.8 (less budget needed)
@@ -567,57 +235,33 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         Args:
             multiplier: Productivity multiplier value
         """
-        old_multiplier = self._productivity_multiplier
-        self._productivity_multiplier = max(0.5, min(3.0, multiplier))
-
-        if old_multiplier != self._productivity_multiplier:
-            logger.debug(f"BudgetManager: productivity_multiplier={self._productivity_multiplier}")
+        self._multiplier_calc.set_productivity_multiplier(multiplier)
 
     def reset(self, budget_type: Optional[BudgetType] = None) -> None:
         """Reset budget(s) to initial state.
 
+        Delegates to BudgetTracker (SRP).
+
         Args:
             budget_type: Specific budget to reset, or None for all
         """
-        if budget_type is None:
-            self._initialize_budgets()
-            logger.debug("BudgetManager: all budgets reset")
-        else:
-            state = self._budgets.get(budget_type)
-            if state:
-                state.current = 0
-                state.last_tool = None
-                logger.debug(f"BudgetManager: {budget_type.value} budget reset")
+        self._tracker.reset(budget_type)
 
     def get_prompt_budget_info(self) -> Dict[str, Any]:
         """Get budget information for system prompts.
 
+        Delegates to BudgetTracker (SRP).
+
         Returns:
             Dictionary with budget info for prompt building
         """
-        tool_status = self.get_status(BudgetType.TOOL_CALLS)
-        exploration_status = self.get_status(BudgetType.EXPLORATION)
-        action_status = self.get_status(BudgetType.ACTION)
-
-        return {
-            "tool_budget": tool_status.effective_maximum,
-            "tool_calls_used": tool_status.current,
-            "tool_calls_remaining": tool_status.remaining,
-            "exploration_budget": exploration_status.effective_maximum,
-            "exploration_used": exploration_status.current,
-            "exploration_remaining": exploration_status.remaining,
-            "action_budget": action_status.effective_maximum,
-            "action_used": action_status.current,
-            "model_multiplier": self._model_multiplier,
-            "mode_multiplier": self._mode_multiplier,
-            "productivity_multiplier": self._productivity_multiplier,
-        }
+        return self._tracker.get_prompt_budget_info()
 
     def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
         """Record a tool call and consume appropriate budget.
 
-        Automatically routes to EXPLORATION or ACTION budget based
-        on whether the operation is a write operation.
+        Uses ToolCallClassifier for classification (SRP/OCP).
+        Automatically routes to EXPLORATION or ACTION budget.
 
         Args:
             tool_name: Name of the tool called
@@ -629,7 +273,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         """
         # Auto-detect write operation if not specified
         if not is_write_operation:
-            is_write_operation = is_write_tool(tool_name)
+            is_write_operation = self._tool_classifier.is_write_operation(tool_name)
 
         # Always consume from tool calls budget
         tool_available = self.consume(BudgetType.TOOL_CALLS)
@@ -643,9 +287,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
             budget_type = BudgetType.EXPLORATION
 
         # Update last tool
-        state = self._budgets.get(budget_type)
-        if state:
-            state.last_tool = tool_name
+        self._tracker.update_last_tool(budget_type, tool_name)
 
         logger.debug(
             f"BudgetManager: tool_call={tool_name}, "
@@ -659,24 +301,23 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     def set_base_budget(self, budget_type: BudgetType, base: int) -> None:
         """Set the base budget for a type.
 
-        Useful for task-specific budget adjustments.
+        Delegates to BudgetTracker (SRP).
 
         Args:
             budget_type: Type of budget to adjust
             base: New base value
         """
-        state = self._budgets.get(budget_type)
-        if state:
-            state.base_maximum = max(1, base)
-            logger.debug(f"BudgetManager: {budget_type.value} base set to {base}")
+        self._tracker.set_base_budget(budget_type, base)
 
     def set_on_exhausted(self, callback: Callable[[BudgetType], None]) -> None:
         """Set callback for when a budget is exhausted.
 
+        Delegates to BudgetTracker (SRP).
+
         Args:
             callback: Function called with budget type when exhausted
         """
-        self._on_exhausted = callback
+        self._tracker.set_on_exhausted(callback)
 
     def update_from_mode(self) -> None:
         """Update multiplier from current mode controller.
@@ -689,35 +330,79 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     def get_diagnostics(self) -> Dict[str, Any]:
         """Get diagnostic information about all budgets.
 
+        Delegates to BudgetTracker (SRP).
+
         Returns:
             Dictionary with detailed budget state
         """
-        diagnostics: Dict[str, Any] = {
-            "multipliers": {
-                "model": self._model_multiplier,
-                "mode": self._mode_multiplier,
-                "productivity": self._productivity_multiplier,
-                "combined": (
-                    self._model_multiplier * self._mode_multiplier * self._productivity_multiplier
-                ),
-            },
-            "budgets": {},
-        }
+        return self._tracker.get_diagnostics()
 
-        for budget_type in BudgetType:
-            status = self.get_status(budget_type)
-            state = self._budgets.get(budget_type)
-            diagnostics["budgets"][budget_type.value] = {
-                "current": status.current,
-                "base_maximum": status.base_maximum,
-                "effective_maximum": status.effective_maximum,
-                "remaining": status.remaining,
-                "utilization": f"{status.utilization:.1%}",
-                "is_exhausted": status.is_exhausted,
-                "last_tool": state.last_tool if state else None,
-            }
+    # =============================================================================
+    # Backward Compatibility Properties
+    # =============================================================================
 
-        return diagnostics
+    @property
+    def _budgets(self):
+        """Backward compatibility property for _budgets.
+
+        Deprecated: Use get_status() or get_diagnostics() instead.
+        """
+        return self._tracker._budgets if self._tracker else {}
+
+    @property
+    def _model_multiplier(self) -> float:
+        """Backward compatibility property for _model_multiplier.
+
+        Deprecated: Multiplier is now managed by MultiplierCalculator.
+        """
+        return self._multiplier_calc.model_multiplier if self._multiplier_calc else 1.0
+
+    @property
+    def _mode_multiplier(self) -> float:
+        """Backward compatibility property for _mode_multiplier.
+
+        Deprecated: Multiplier is now managed by MultiplierCalculator.
+        """
+        return self._multiplier_calc.mode_multiplier if self._multiplier_calc else 1.0
+
+    @property
+    def _productivity_multiplier(self) -> float:
+        """Backward compatibility property for _productivity_multiplier.
+
+        Deprecated: Multiplier is now managed by MultiplierCalculator.
+        """
+        return self._multiplier_calc.productivity_multiplier if self._multiplier_calc else 1.0
+
+    @property
+    def _on_exhausted(self):
+        """Backward compatibility property for _on_exhausted.
+
+        Deprecated: Callback is now managed by BudgetTracker.
+        """
+        return self._tracker._on_exhausted if self._tracker else None
+
+    @_on_exhausted.setter
+    def _on_exhausted(self, value):
+        """Backward compatibility setter for _on_exhausted.
+
+        Deprecated: Use set_on_exhausted() instead.
+        """
+        if self._tracker:
+            self._tracker._on_exhausted = value
+
+    def _calculate_effective_max(self, budget_type: BudgetType) -> int:
+        """Calculate effective maximum (backward compatibility).
+
+        Deprecated: Use get_status(budget_type).effective_maximum instead.
+
+        Args:
+            budget_type: Type of budget
+
+        Returns:
+            Effective maximum after multipliers
+        """
+        status = self.get_status(budget_type)
+        return status.effective_maximum
 
 
 # =============================================================================
@@ -733,22 +418,25 @@ class ExtendedBudgetManager(BudgetManager):
     providing a unified interface for both budget tracking and mode
     completion checking.
 
+    SRP Compliance: Uses ModeCompletionChecker for mode completion logic.
+
     Attributes:
-        _mode_criteria: Mode completion criteria checker
+        _mode_checker: Mode completion criteria checker
         _files_read: Count of files read in current session
         _files_written: Count of files written in current session
+        _current_mode: Current operating mode
     """
 
-    _mode_criteria: Optional[ModeCompletionCriteria] = None
+    _mode_checker: Optional[ModeCompletionChecker] = None
     _files_read: int = 0
     _files_written: int = 0
     _current_mode: Optional[str] = None
 
     def __post_init__(self) -> None:
-        """Initialize with mode criteria."""
+        """Initialize with mode criteria checker (SRP)."""
         super().__post_init__()
-        if self._mode_criteria is None:
-            self._mode_criteria = ModeCompletionCriteria()
+        if self._mode_checker is None:
+            self._mode_checker = ModeCompletionChecker()
 
     def set_mode(self, mode: str) -> None:
         """Set current operating mode.
@@ -783,7 +471,7 @@ class ExtendedBudgetManager(BudgetManager):
         tool_lower = tool_name.lower()
         if tool_lower in {"read", "read_file"}:
             self.record_file_read()
-        elif tool_lower in WRITE_TOOLS:
+        elif self._tool_classifier.is_write_operation(tool_name):
             self.record_file_write()
 
         return super().record_tool_call(tool_name, is_write_operation)
@@ -794,6 +482,8 @@ class ExtendedBudgetManager(BudgetManager):
         mode: Optional[str] = None,
     ) -> tuple[bool, str]:
         """Check if mode objectives are met for early exit.
+
+        Delegates to ModeCompletionChecker (SRP).
 
         Args:
             response_text: Agent's response text to analyze
@@ -806,14 +496,14 @@ class ExtendedBudgetManager(BudgetManager):
         if not check_mode:
             return False, "No mode set"
 
-        if self._mode_criteria is None:
+        if self._mode_checker is None:
             return False, "No mode criteria configured"
 
         # Get current iteration from exploration budget
         exploration_status = self.get_status(BudgetType.EXPLORATION)
         iterations = exploration_status.current
 
-        return self._mode_criteria.check_early_exit(
+        return self._mode_checker.check_early_exit(
             mode=check_mode,
             files_read=self._files_read,
             files_written=self._files_written,
@@ -824,6 +514,8 @@ class ExtendedBudgetManager(BudgetManager):
     def get_mode_progress(self, mode: Optional[str] = None) -> Dict[str, Any]:
         """Get progress towards mode completion.
 
+        Delegates to ModeCompletionChecker (SRP).
+
         Args:
             mode: Mode to check (uses current mode if not specified)
 
@@ -831,16 +523,18 @@ class ExtendedBudgetManager(BudgetManager):
             Progress information dictionary
         """
         check_mode = mode or self._current_mode
-        if not check_mode or self._mode_criteria is None:
+        if not check_mode or self._mode_checker is None:
             return {}
 
-        progress = self._mode_criteria.get_progress(check_mode)
+        progress = self._mode_checker.get_progress(check_mode)
         progress["files_read"] = self._files_read
         progress["files_written"] = self._files_written
         return progress
 
     def reset(self, budget_type: Optional[BudgetType] = None) -> None:
         """Reset budgets and file counters.
+
+        Delegates to parent for budgets, resets local counters (SRP).
 
         Args:
             budget_type: Specific budget to reset, or None for all
@@ -849,8 +543,8 @@ class ExtendedBudgetManager(BudgetManager):
         if budget_type is None:
             self._files_read = 0
             self._files_written = 0
-            if self._mode_criteria:
-                self._mode_criteria.reset()
+            if self._mode_checker:
+                self._mode_checker.reset()
 
 
 # =============================================================================

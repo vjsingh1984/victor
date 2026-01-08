@@ -53,8 +53,8 @@ from victor.framework.protocols import (
     ConversationStateProtocol,
     MessagesProtocol,
     OrchestratorProtocol,
+    OrchestratorStreamChunk,
     ProviderProtocol,
-    StreamChunk,
     StreamingProtocol,
     SystemPromptProtocol,
     ToolsProtocol,
@@ -85,7 +85,7 @@ from victor.framework.events import (
     tool_result_event,
 )
 from victor.framework.state import Stage, State, StateHooks, StateObserver
-from victor.framework.task import Task, TaskResult, TaskType
+from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
 
@@ -261,9 +261,9 @@ try:
         CircuitOpenError,
         ProviderUnavailableError,
         ResilientProvider,
-        RetryConfig,
+        ProviderRetryConfig,
         RetryExhaustedError,
-        ResilientRetryStrategy,
+        ProviderRetryStrategy,
         # Unified Retry Strategies
         ExponentialBackoffStrategy,
         FixedDelayStrategy,
@@ -273,7 +273,7 @@ try:
         RetryExecutor,
         RetryOutcome,
         RetryResult,
-        RetryStrategy,
+        BaseRetryStrategy,
         connection_retry_strategy,
         provider_retry_strategy,
         tool_retry_strategy,
@@ -293,9 +293,9 @@ try:
         "CircuitOpenError",
         "ProviderUnavailableError",
         "ResilientProvider",
-        "RetryConfig",
+        "ProviderRetryConfig",
         "RetryExhaustedError",
-        "ResilientRetryStrategy",
+        "ProviderRetryStrategy",
         # Unified Retry Strategies
         "ExponentialBackoffStrategy",
         "FixedDelayStrategy",
@@ -305,7 +305,7 @@ try:
         "RetryExecutor",
         "RetryOutcome",
         "RetryResult",
-        "RetryStrategy",
+        "BaseRetryStrategy",
         "connection_retry_strategy",
         "provider_retry_strategy",
         "tool_retry_strategy",
@@ -406,21 +406,28 @@ except ImportError:
     _METRICS_EXPORTS = []
 
 # Teams (Phase 4 - Multi-Agent Teams Exposure)
+# NOTE: Canonical team types (TeamFormation, MemberResult, TeamResult, etc.)
+# are now imported from victor.teams. Framework-specific types remain in
+# victor.framework.teams.
 try:
+    from victor.teams import (
+        MemberResult,
+        TeamFormation,
+        TeamResult,
+    )
     from victor.framework.teams import (
         AgentTeam,
-        MemberResult,
-        TeamConfig,
         TeamEvent,
         TeamEventType,
-        TeamFormation,
-        TeamMember,
         TeamMemberSpec,
-        TeamResult,
         member_complete_event,
         member_start_event,
         team_complete_event,
         team_start_event,
+    )
+    from victor.teams.types import (
+        TeamConfig,
+        TeamMember,
     )
 
     _TEAMS_EXPORTS = [
@@ -501,10 +508,10 @@ try:
         Node,
         Edge,
         EdgeType,
-        NodeStatus,
+        FrameworkNodeStatus,
         ExecutionResult,
         GraphConfig,
-        Checkpoint,
+        WorkflowCheckpoint,
         CheckpointerProtocol,
         MemoryCheckpointer,
         RLCheckpointerAdapter,
@@ -522,10 +529,10 @@ try:
         "Node",
         "Edge",
         "EdgeType",
-        "NodeStatus",
+        "FrameworkNodeStatus",
         "ExecutionResult",
         "GraphConfig",
-        "Checkpoint",
+        "WorkflowCheckpoint",
         "CheckpointerProtocol",
         "MemoryCheckpointer",
         "RLCheckpointerAdapter",  # Integrates with existing RL CheckpointStore
@@ -699,7 +706,7 @@ __all__ = (
         "ChatSession",
         # Task
         "TaskResult",
-        "TaskType",
+        "FrameworkTaskType",
         # Tools
         "ToolSet",
         "ToolCategory",
@@ -716,7 +723,7 @@ __all__ = (
         "SystemPromptProtocol",
         "MessagesProtocol",
         "StreamingProtocol",
-        "StreamChunk",
+        "OrchestratorStreamChunk",
         "ChunkType",
         "verify_protocol_conformance",
         # Events
@@ -766,7 +773,43 @@ __all__ = (
     + _TOOL_NAMING_EXPORTS
     + _MIDDLEWARE_EXPORTS
     + _TASK_TYPES_EXPORTS
+    + ["discover"]  # Capability discovery function
 )
+
+
+def discover() -> dict:
+    """Discover all Victor framework capabilities programmatically.
+
+    Returns a dictionary containing all available tools, verticals, personas,
+    teams, chains, handlers, task types, providers, and events.
+
+    Example:
+        from victor.framework import discover
+
+        caps = discover()
+        print(f"Available tools: {len(caps['tools'])}")
+        print(f"Available verticals: {caps['verticals']}")
+
+    Returns:
+        dict: Capability manifest with keys:
+            - tools: List of tool names
+            - tool_categories: List of category names
+            - verticals: List of vertical names
+            - personas: List of persona names
+            - teams: List of team names
+            - chains: List of chain/workflow names
+            - handlers: List of handler names
+            - task_types: List of task type names
+            - providers: List of provider names
+            - events: List of event type names
+            - summary: Aggregated counts
+    """
+    from victor.ui.commands.capabilities import get_capability_discovery
+
+    discovery = get_capability_discovery()
+    manifest = discovery.discover_all()
+    return manifest.to_dict()
+
 
 # Vertical Integration (Phase 3.1 - Step Handlers)
 try:
@@ -824,7 +867,7 @@ try:
         ApprovalHandler,
         ApprovalRequest,
         ApprovalStatus,
-        Checkpoint,
+        HITLCheckpoint,
         HITLController,
     )
 
@@ -832,7 +875,7 @@ try:
         "ApprovalHandler",
         "ApprovalRequest",
         "ApprovalStatus",
-        "Checkpoint",
+        "HITLCheckpoint",
         "HITLController",
     ]
 
@@ -915,15 +958,16 @@ except ImportError:
     pass
 
 # Team Coordinator (Multi-Agent Coordination)
+# NOTE: FrameworkTeamCoordinator has been removed.
+# Use victor.teams.create_coordinator() instead.
+# See victor/teams/MIGRATION_GUIDE.md for migration instructions.
 try:
-    from victor.framework.team_coordinator import (
-        FrameworkTeamCoordinator,
+    from victor.teams import (
         MemberResult as CoordinatorMemberResult,  # Alias to avoid conflict
         TeamResult as CoordinatorTeamResult,  # Alias to avoid conflict
     )
 
     _TEAM_COORDINATOR_EXPORTS = [
-        "FrameworkTeamCoordinator",
         "CoordinatorMemberResult",
         "CoordinatorTeamResult",
     ]
@@ -1060,6 +1104,34 @@ try:
 except ImportError:
     pass
 
+# Stage Manager (Framework-level stage management)
+try:
+    from victor.framework.stage_manager import (
+        StageDefinition,
+        StageManager,
+        StageManagerConfig,
+        StageManagerProtocol,
+        StageTransition,
+        create_stage_manager,
+        get_coding_stages,
+        get_data_analysis_stages,
+        get_research_stages,
+    )
+
+    _STAGE_MANAGER_EXPORTS = [
+        "StageDefinition",
+        "StageManager",
+        "StageManagerConfig",
+        "StageManagerProtocol",
+        "StageTransition",
+        "create_stage_manager",
+        "get_coding_stages",
+        "get_data_analysis_stages",
+        "get_research_stages",
+    ]
+except ImportError:
+    _STAGE_MANAGER_EXPORTS = []
+
 # LSP Protocols (Cross-vertical language intelligence)
 try:
     from victor.framework.lsp_protocols import (
@@ -1090,5 +1162,36 @@ try:
 except ImportError:
     pass
 
+# Add Stage Manager exports
+if _STAGE_MANAGER_EXPORTS:
+    __all__ = list(__all__) + _STAGE_MANAGER_EXPORTS
+
+# Workflow Engine (High-level workflow execution facade)
+try:
+    from victor.framework.workflow_engine import (
+        ExecutionResult as WorkflowExecutionResult,
+        WorkflowEngine,
+        WorkflowEngineConfig,
+        WorkflowEngineProtocol,
+        WorkflowEvent,
+        create_workflow_engine,
+        run_graph_workflow,
+        run_yaml_workflow,
+    )
+
+    _WORKFLOW_ENGINE_EXPORTS = [
+        "WorkflowExecutionResult",
+        "WorkflowEngine",
+        "WorkflowEngineConfig",
+        "WorkflowEngineProtocol",
+        "WorkflowEvent",
+        "create_workflow_engine",
+        "run_graph_workflow",
+        "run_yaml_workflow",
+    ]
+    __all__ = list(__all__) + _WORKFLOW_ENGINE_EXPORTS
+except ImportError:
+    _WORKFLOW_ENGINE_EXPORTS = []
+
 # Version of the framework API
-__version__ = "0.4.0"
+__version__ = "0.4.1"

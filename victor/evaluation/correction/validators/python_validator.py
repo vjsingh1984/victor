@@ -18,7 +18,7 @@ import re
 from typing import Optional
 
 from ..base import BaseCodeValidator, ValidatorCapabilities
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class PythonCodeValidator(BaseCodeValidator):
@@ -129,14 +129,14 @@ class PythonCodeValidator(BaseCodeValidator):
         """Only handles Python."""
         return {Language.PYTHON}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Validate Python code using AST parsing.
 
         Args:
             code: Python source code
 
         Returns:
-            ValidationResult with detailed validation info
+            CodeValidationResult with detailed validation info
         """
         errors: list[str] = []
         warnings: list[str] = []
@@ -145,7 +145,7 @@ class PythonCodeValidator(BaseCodeValidator):
         # 1. Syntax validation via AST
         syntax_error = self._check_syntax(code)
         if syntax_error:
-            return ValidationResult(
+            return CodeValidationResult(
                 valid=False,
                 language=Language.PYTHON,
                 syntax_valid=False,
@@ -187,7 +187,7 @@ class PythonCodeValidator(BaseCodeValidator):
         # Build result
         imports_valid = len(missing_imports) == 0
 
-        return ValidationResult(
+        return CodeValidationResult(
             valid=imports_valid,
             language=Language.PYTHON,
             syntax_valid=True,
@@ -198,7 +198,7 @@ class PythonCodeValidator(BaseCodeValidator):
             used_ast_validation=True,
         )
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Auto-fix Python-specific issues.
 
         Args:

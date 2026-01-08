@@ -170,17 +170,19 @@ You: [Use rag_query tool with query="authentication"]
         }
 
     @classmethod
-    def get_tiered_tool_config(cls) -> TieredToolConfig:
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
         """Get tiered tool configuration for RAG.
 
-        Uses canonical tool names from victor.tools.tool_names.
-        Follows core TieredToolConfig schema (LSP compliance).
+        RAG has unique requirements:
+        - No grep tool (document-focused, not code-focused)
+        - Custom stage_tools for RAG workflow stages
 
         Returns:
             Tool configuration with tiers
         """
         return TieredToolConfig(
             # Mandatory: essential tools for any RAG task
+            # RAG is document-focused, so no grep (unlike other verticals)
             mandatory={ToolNames.READ, ToolNames.LS},
             # Vertical core: RAG-specific tools always available
             vertical_core={
@@ -205,37 +207,6 @@ You: [Use rag_query tool with query="authentication"]
             readonly_only_for_analysis=True,
         )
 
-    @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get provider hints for RAG.
-
-        RAG works best with models that follow instructions well.
-
-        Returns:
-            Provider hints dictionary
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 8000,  # Need context for retrieved chunks
-            "features": ["tool_calling"],
-            "temperature": 0.3,  # Lower temperature for factual answers
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get evaluation criteria for RAG.
-
-        Returns:
-            List of criteria for evaluating RAG performance
-        """
-        return [
-            "Answer is grounded in retrieved documents",
-            "Sources are properly cited",
-            "No hallucination of facts not in documents",
-            "Relevant documents were retrieved",
-            "Answer is coherent and well-structured",
-        ]
-
     # Extension providers delegated to base class (OCP/caching compliance)
     # RAG previously overrode get_extensions() directly, bypassing base class caching.
     # Now we implement the individual getter methods and let VerticalBase.get_extensions()
@@ -257,9 +228,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGSafetyExtension instance
         """
-        from victor.rag.safety import RAGSafetyExtension
-
-        return RAGSafetyExtension()
+        return cls._get_extension_factory("safety_extension", "victor.rag.safety")
 
     @classmethod
     def get_prompt_contributor(cls):
@@ -268,9 +237,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGPromptContributor instance
         """
-        from victor.rag.prompts import RAGPromptContributor
-
-        return RAGPromptContributor()
+        return cls._get_extension_factory("prompt_contributor", "victor.rag.prompts")
 
     @classmethod
     def get_mode_config_provider(cls):
@@ -279,9 +246,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGModeConfigProvider instance
         """
-        from victor.rag.mode_config import RAGModeConfigProvider
-
-        return RAGModeConfigProvider()
+        return cls._get_extension_factory("mode_config_provider", "victor.rag.mode_config")
 
     @classmethod
     def get_tool_dependency_provider(cls):
@@ -290,9 +255,9 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGToolDependencyProvider instance
         """
-        from victor.rag.tool_dependencies import RAGToolDependencyProvider
-
-        return RAGToolDependencyProvider()
+        return cls._get_extension_factory(
+            "tool_dependency_provider", "victor.rag.tool_dependencies"
+        )
 
     @classmethod
     def get_workflow_provider(cls):
@@ -301,9 +266,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGWorkflowProvider instance
         """
-        from victor.rag.workflows import RAGWorkflowProvider
-
-        return RAGWorkflowProvider()
+        return cls._get_extension_factory("workflow_provider", "victor.rag.workflows")
 
     @classmethod
     def get_rl_config_provider(cls):
@@ -312,9 +275,7 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGRLConfig instance
         """
-        from victor.rag.rl import RAGRLConfig
-
-        return RAGRLConfig()
+        return cls._get_extension_factory("rl_config_provider", "victor.rag.rl")
 
     @classmethod
     def get_team_spec_provider(cls):
@@ -323,28 +284,13 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             RAGTeamSpecProvider instance
         """
-        from victor.rag.teams import RAGTeamSpecProvider
-
-        return RAGTeamSpecProvider()
+        return cls._get_extension_factory("team_spec_provider", "victor.rag.teams")
 
     @classmethod
-    def get_tool_dependency_provider(cls):
-        """Get the tool dependency provider for RAG vertical.
+    def get_capability_provider(cls):
+        """Get the capability provider for RAG vertical.
 
         Returns:
-            RAGToolDependencyProvider instance
+            RAGCapabilityProvider instance
         """
-        from victor.rag.tool_dependencies import RAGToolDependencyProvider
-
-        return RAGToolDependencyProvider()
-
-    @classmethod
-    def get_safety_extension(cls):
-        """Get the safety extension for RAG vertical.
-
-        Returns:
-            RAGSafetyExtension instance
-        """
-        from victor.rag.safety import RAGSafetyExtension
-
-        return RAGSafetyExtension()
+        return cls._get_extension_factory("capability_provider", "victor.rag.capabilities")

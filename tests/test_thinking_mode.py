@@ -21,6 +21,7 @@ def create_mock_settings():
     mock_settings.use_mcp_tools = False
     mock_settings.analytics_log_file = "/tmp/test_analytics.jsonl"
     mock_settings.analytics_enabled = False
+    mock_settings.show_cost_metrics = False
     mock_settings.load_tool_config.return_value = {}
     return mock_settings
 

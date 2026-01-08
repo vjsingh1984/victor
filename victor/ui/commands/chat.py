@@ -188,6 +188,22 @@ def chat(
         "--observability/--no-observability",
         help="Enable observability integration for event tracking.",
     ),
+    log_events: bool = typer.Option(
+        False,
+        "--log-events",
+        help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
+    ),
+    # Session management options
+    list_sessions: bool = typer.Option(
+        False,
+        "--sessions",
+        help="List saved sessions and exit (top 20).",
+    ),
+    session_id: Optional[str] = typer.Option(
+        None,
+        "--sessionid",
+        help="Resume specific session by ID.",
+    ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
@@ -232,6 +248,9 @@ def chat(
 
         automation_mode = json_output or plain or code_only
 
+        # Smart TUI detection: disable if non-interactive terminal or automation mode
+        use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
+
         # Use ERROR level for automation modes (cleaner output)
         if log_level is None and automation_mode:
             log_level = "ERROR"
@@ -254,8 +273,60 @@ def chat(
             if log_level in {"DEBUG", "INFO"}:
                 renderer = "text"
 
-        # Use centralized logging config
-        setup_logging(command="chat", cli_log_level=log_level, stream=sys.stderr)
+        # Use centralized logging config with session ID if resuming
+        setup_logging(
+            command="chat",
+            cli_log_level=log_level,
+            stream=sys.stderr,
+            session_id=session_id,  # Use --sessionid flag value for logging
+        )
+
+        # Handle --sessions flag (list sessions and exit)
+        if list_sessions:
+            from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+
+            persistence = get_sqlite_session_persistence()
+            sessions = persistence.list_sessions(limit=20)
+
+            if not sessions:
+                console.print("[dim]No sessions found[/]")
+                raise typer.Exit(0)
+
+            table = Table(title="Saved Sessions (top 20)")
+            table.add_column("Session ID", style="cyan", no_wrap=True)
+            table.add_column("Title", style="white")
+            table.add_column("Model", style="yellow")
+            table.add_column("Provider", style="blue")
+            table.add_column("Messages", justify="right")
+            table.add_column("Created", style="dim")
+
+            for session in sessions:
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(session["created_at"])
+                    date_str = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    date_str = session["created_at"][:16]
+
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
+                table.add_row(
+                    session["session_id"],
+                    title,
+                    session["model"],
+                    session["provider"],
+                    str(session["message_count"]),
+                    date_str,
+                )
+
+            console.print(table)
+            console.print(f"\n[dim]Total: {len(sessions)} session(s)[/]")
+            console.print("[dim]Use 'victor chat --sessionid <id>' to resume a session[/]")
+            raise typer.Exit(0)
 
         from victor.agent.debug_logger import configure_logging_levels
 
@@ -278,6 +349,11 @@ def chat(
         )
 
         settings = load_settings()
+
+        # Apply CLI flags to settings
+        if log_events:
+            settings.enable_observability_logging = True
+
         setup_safety_confirmation()
 
         # Apply provider/model/endpoint overrides by creating a synthetic profile
@@ -354,13 +430,11 @@ def chat(
                     vertical=vertical,
                     enable_observability=enable_observability,
                     legacy_mode=legacy_mode,
-                    # Smart TUI detection: disable if non-interactive terminal or automation mode
-                    use_tui=tui
-                    and not automation_mode
-                    and sys.stdin.isatty()
-                    and sys.stdout.isatty(),
+                    use_tui=use_tui,
+                    resume_session_id=session_id,
                 )
             )
+            return
 
 
 def _run_default_interactive() -> None:
@@ -409,7 +483,7 @@ async def run_oneshot(
     task_type: Optional[str] = None
 
     try:
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         classifier = ComplexityClassifier(use_semantic=False)
         classification = classifier.classify(message)
@@ -531,6 +605,7 @@ async def run_interactive(
     enable_observability: bool = True,
     legacy_mode: bool = False,
     use_tui: bool = True,
+    resume_session_id: Optional[str] = None,
 ) -> None:
     """Run interactive CLI mode.
 
@@ -575,6 +650,43 @@ async def run_interactive(
                 session_id=session_id,
             )
             agent = await shim.create_orchestrator()
+
+            # Resume session if requested
+            if resume_session_id:
+                from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+                from victor.agent.message_history import MessageHistory
+                from victor.agent.conversation_state import ConversationStateMachine
+
+                persistence = get_sqlite_session_persistence()
+                session_data = persistence.load_session(resume_session_id)
+
+                if not session_data:
+                    console.print(f"[bold red]Error:[/ ] Session not found: {resume_session_id}")
+                    raise typer.Exit(1)
+
+                # Restore conversation
+                metadata = session_data.get("metadata", {})
+                conversation_dict = session_data.get("conversation", {})
+
+                agent.conversation = MessageHistory.from_dict(conversation_dict)
+                agent.active_session_id = resume_session_id
+
+                # Restore conversation state if available
+                conversation_state_dict = session_data.get("conversation_state")
+                if conversation_state_dict:
+                    try:
+                        agent.conversation_state = ConversationStateMachine.from_dict(
+                            conversation_state_dict
+                        )
+                    except Exception as e:
+                        console.print(
+                            f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
+                        )
+
+                console.print(
+                    f"[green]✓[/] Resumed session: {metadata.get('title', 'Untitled')} "
+                    f"({metadata.get('message_count', 0)} messages)\n"
+                )
 
             # Emit session start event if observability is enabled
             shim.emit_session_start(
@@ -676,7 +788,7 @@ async def _run_cli_repl(
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
     panel_content = (
-        f"[bold blue]Victor[/] - Enterprise-Ready AI Coding Assistant\n\n"
+        f"[bold blue]Victor[/] - Open-source AI coding assistant\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
         f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
         f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."

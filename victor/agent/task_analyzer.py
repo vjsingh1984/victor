@@ -21,20 +21,20 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
-from victor.agent.complexity_classifier import (
-    ComplexityClassifier,
+from victor.framework.task import (
+    TaskComplexityService as ComplexityClassifier,
     TaskClassification,
     TaskComplexity,
 )
 from victor.agent.unified_classifier import (
     UnifiedTaskClassifier,
     ClassificationResult,
-    TaskType as UnifiedTaskType,
+    ClassifierTaskType as UnifiedTaskType,
 )
 
 if TYPE_CHECKING:
-    from victor.embeddings.task_classifier import TaskType
-    from victor.embeddings.intent_classifier import IntentType
+    from victor.storage.embeddings.task_classifier import TaskType
+    from victor.storage.embeddings.intent_classifier import IntentType
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 
@@ -141,9 +141,9 @@ class TaskAnalyzer:
 
     def _get_complexity_hint(self, complexity: "TaskComplexity") -> str:
         """Get prompt hint for a complexity level via enricher."""
-        from victor.agent.complexity_classifier import get_prompt_hint
+        from victor.framework.enrichment.strategies import get_complexity_hint
 
-        return get_prompt_hint(complexity)
+        return get_complexity_hint(complexity)
 
     @property
     def action_authorizer(self) -> ActionAuthorizer:
@@ -163,7 +163,7 @@ class TaskAnalyzer:
     def task_classifier(self) -> Optional[TaskClassifierProtocol]:
         if self._task_classifier is None:
             try:
-                from victor.embeddings.task_classifier import TaskTypeClassifier
+                from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
                 self._task_classifier = TaskTypeClassifier.get_instance()
             except ImportError:
@@ -174,7 +174,7 @@ class TaskAnalyzer:
     def intent_classifier(self) -> Optional[IntentClassifierProtocol]:
         if self._intent_classifier is None:
             try:
-                from victor.embeddings.intent_classifier import IntentClassifier
+                from victor.storage.embeddings.intent_classifier import IntentClassifier
 
                 self._intent_classifier = IntentClassifier.get_instance()
             except ImportError:
@@ -224,7 +224,7 @@ class TaskAnalyzer:
 
         if include_task_type and self.task_classifier:
             try:
-                task_result = self.task_classifier.classify(message)
+                task_result = self.task_classifier.classify_sync(message)
                 analysis.task_type = task_result.task_type
                 analysis.task_type_confidence = task_result.confidence
                 analysis.has_file_context = task_result.has_file_context

@@ -18,13 +18,22 @@ Provides commands for validating, rendering, listing, and executing
 YAML-defined workflows.
 
 Commands:
-    validate  - Validate YAML workflow files
+    validate  - Validate YAML workflow files (with escape hatch and handler checks)
     render    - Render workflow DAG as diagram (ascii, mermaid, d2, dot, svg, png)
     list      - List available workflows in a directory
     run       - Execute a workflow
 
+Validation checks:
+    - YAML syntax and structure
+    - Node references (next_nodes, branches, parallel_nodes)
+    - Escape hatch references (CONDITIONS/TRANSFORMS in condition/transform nodes)
+    - Handler references (registered compute handlers)
+    - HITL node configuration
+    - Capability provider integration hints
+
 Example:
     victor workflow validate ./workflows/analysis.yaml
+    victor workflow validate ./workflows/analysis.yaml --check-handlers
     victor workflow render ./workflows/analysis.yaml --format svg -o diagram.svg
     victor workflow list ./workflows/
     victor workflow run ./workflows/analysis.yaml --context '{"symbol": "AAPL"}'
@@ -33,10 +42,11 @@ Example:
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional, Set
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 workflow_app = typer.Typer(
@@ -112,6 +122,245 @@ def _display_workflow_info(workflow, wf_name: str) -> None:
     console.print(table)
 
 
+def _detect_vertical_from_path(workflow_path: Path) -> Optional[str]:
+    """Detect vertical from workflow file path.
+
+    Looks for vertical names in the path structure, e.g.:
+    - victor/coding/workflows/feature.yaml -> coding
+    - victor/research/workflows/paper.yaml -> research
+    """
+    known_verticals = {"coding", "devops", "rag", "dataanalysis", "research", "benchmark"}
+    parts = workflow_path.parts
+
+    for part in parts:
+        if part in known_verticals:
+            return part
+    return None
+
+
+def _load_escape_hatches(vertical: Optional[str]) -> tuple[Set[str], Set[str]]:
+    """Load escape hatch registries (CONDITIONS and TRANSFORMS) for a vertical.
+
+    Args:
+        vertical: Vertical name (coding, research, etc.)
+
+    Returns:
+        Tuple of (condition_names, transform_names)
+    """
+    conditions: Set[str] = set()
+    transforms: Set[str] = set()
+
+    if not vertical:
+        return conditions, transforms
+
+    try:
+        # Import the escape_hatches module for the vertical
+        module_name = f"victor.{vertical}.escape_hatches"
+        import importlib
+
+        module = importlib.import_module(module_name)
+
+        if hasattr(module, "CONDITIONS"):
+            conditions = set(module.CONDITIONS.keys())
+        if hasattr(module, "TRANSFORMS"):
+            transforms = set(module.TRANSFORMS.keys())
+
+    except ImportError:
+        # No escape hatches module for this vertical
+        pass
+
+    return conditions, transforms
+
+
+def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
+    """Load registered compute handler names.
+
+    First ensures vertical handlers are registered, then returns all known handlers.
+    """
+    handlers: Set[str] = set()
+
+    # Try to register vertical handlers first
+    if vertical:
+        try:
+            module_name = f"victor.{vertical}.handlers"
+            import importlib
+
+            module = importlib.import_module(module_name)
+
+            if hasattr(module, "register_handlers"):
+                module.register_handlers()
+            if hasattr(module, "HANDLERS"):
+                handlers.update(module.HANDLERS.keys())
+        except ImportError:
+            pass
+
+    # Get all registered handlers from executor
+    try:
+        from victor.workflows.executor import list_compute_handlers
+
+        handlers.update(list_compute_handlers())
+    except ImportError:
+        pass
+
+    return handlers
+
+
+def _validate_escape_hatches_and_handlers(
+    workflow,
+    vertical: Optional[str],
+    check_handlers: bool = False,
+) -> tuple[List[str], List[str]]:
+    """Validate escape hatch and handler references in workflow.
+
+    Args:
+        workflow: WorkflowDefinition to validate
+        vertical: Vertical name for loading escape hatches
+        check_handlers: Whether to validate handler references
+
+    Returns:
+        Tuple of (errors, warnings)
+    """
+    from victor.workflows.definition import (
+        ConditionNode,
+        TransformNode,
+        ComputeNode,
+        ParallelNode,
+    )
+    from victor.workflows.hitl import HITLNode
+
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Load registries
+    conditions, transforms = _load_escape_hatches(vertical)
+    handlers = _load_registered_handlers(vertical) if check_handlers else set()
+
+    # Track what's used
+    used_conditions: Set[str] = set()
+    used_transforms: Set[str] = set()
+    used_handlers: Set[str] = set()
+
+    # Names that indicate simple/inline conditions (not escape hatch references)
+    simple_condition_names = {
+        "<lambda>",
+        "truthy_condition",
+        "condition",
+        "in_condition",
+        "literal_transform",
+        "ref_transform",
+    }
+
+    for node_id, node in workflow.nodes.items():
+        # Check condition nodes for escape hatch references
+        if isinstance(node, ConditionNode):
+            # Try to determine if this is a simple expression or escape hatch reference
+            # Simple expressions get compiled to functions with generic names
+            condition_name = getattr(node.condition, "__name__", None)
+            if condition_name and condition_name not in simple_condition_names:
+                used_conditions.add(condition_name)
+                if conditions and condition_name not in conditions:
+                    warnings.append(
+                        f"Condition node '{node_id}' uses escape hatch '{condition_name}' "
+                        f"not found in {vertical}.escape_hatches.CONDITIONS"
+                    )
+
+        # Check transform nodes for escape hatch references
+        if isinstance(node, TransformNode):
+            transform_name = getattr(node.transform, "__name__", None)
+            if transform_name and transform_name not in {
+                "<lambda>",
+                "literal_transform",
+                "ref_transform",
+            }:
+                used_transforms.add(transform_name)
+                if transforms and transform_name not in transforms:
+                    warnings.append(
+                        f"Transform node '{node_id}' uses escape hatch '{transform_name}' "
+                        f"not found in {vertical}.escape_hatches.TRANSFORMS"
+                    )
+
+        # Check compute nodes for handler references
+        if isinstance(node, ComputeNode):
+            if node.handler:
+                used_handlers.add(node.handler)
+                if check_handlers and node.handler not in handlers:
+                    errors.append(
+                        f"Compute node '{node_id}' references unregistered handler '{node.handler}'"
+                    )
+
+        # Check parallel nodes
+        if isinstance(node, ParallelNode):
+            if not node.parallel_nodes:
+                warnings.append(f"Parallel node '{node_id}' has no parallel_nodes defined")
+
+        # Check HITL nodes
+        if isinstance(node, HITLNode):
+            if not node.prompt:
+                warnings.append(f"HITL node '{node_id}' has no prompt defined")
+            if node.hitl_type.value == "choice" and not node.choices:
+                errors.append(f"HITL choice node '{node_id}' has no choices defined")
+
+    return errors, warnings
+
+
+def _display_validation_details(
+    workflow,
+    verbose: bool = False,
+    check_handlers: bool = False,
+    vertical: Optional[str] = None,
+) -> tuple[bool, List[str], List[str]]:
+    """Display detailed validation results for a workflow.
+
+    Returns:
+        Tuple of (is_valid, errors, warnings)
+    """
+    from victor.workflows.definition import (
+        AgentNode,
+        ConditionNode,
+        TransformNode,
+        ComputeNode,
+        ParallelNode,
+    )
+
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Basic validation
+    basic_errors = workflow.validate()
+    errors.extend(basic_errors)
+
+    # Extended validation for escape hatches and handlers
+    ext_errors, ext_warnings = _validate_escape_hatches_and_handlers(
+        workflow, vertical, check_handlers
+    )
+    errors.extend(ext_errors)
+    warnings.extend(ext_warnings)
+
+    if verbose:
+        console.print("\n[dim]Nodes:[/]")
+        for node_id, node in workflow.nodes.items():
+            node_type = type(node).__name__
+            next_nodes = getattr(node, "next_nodes", []) or []
+            next_str = " -> " + ", ".join(next_nodes) if next_nodes else ""
+
+            # Add additional info based on node type
+            info_parts = []
+            if isinstance(node, AgentNode):
+                info_parts.append(f"role={node.role}")
+            elif isinstance(node, ComputeNode) and node.handler:
+                info_parts.append(f"handler={node.handler}")
+            elif isinstance(node, ConditionNode):
+                branches = list(node.branches.keys())[:3]
+                info_parts.append(f"branches={branches}")
+            elif isinstance(node, ParallelNode):
+                info_parts.append(f"parallel={node.parallel_nodes}")
+
+            info_str = f" [{', '.join(info_parts)}]" if info_parts else ""
+            console.print(f"  [dim]{node_id}[/] ({node_type}){info_str}{next_str}")
+
+    return len(errors) == 0, errors, warnings
+
+
 @workflow_app.command("validate")
 def validate_workflow(
     workflow_path: str = typer.Argument(
@@ -124,15 +373,38 @@ def validate_workflow(
         "-v",
         help="Show detailed node information",
     ),
+    check_handlers: bool = typer.Option(
+        False,
+        "--check-handlers",
+        help="Validate that referenced handlers are registered",
+    ),
+    check_escape_hatches: bool = typer.Option(
+        True,
+        "--check-escape-hatches/--no-check-escape-hatches",
+        help="Validate escape hatch references against vertical registries",
+    ),
+    vertical: Optional[str] = typer.Option(
+        None,
+        "--vertical",
+        help="Vertical name for escape hatch validation (auto-detected from path if not specified)",
+    ),
 ) -> None:
     """Validate a YAML workflow file.
 
     Checks that the workflow file is valid YAML, contains valid node
     definitions, and can be compiled to a state graph.
 
+    Extended validation includes:
+    - Escape hatch references (CONDITIONS/TRANSFORMS)
+    - Handler references (when --check-handlers is specified)
+    - HITL node configuration
+    - Parallel node structure
+
     Example:
         victor workflow validate ./workflows/analysis.yaml
         victor workflow validate ./workflows/analysis.yaml -v
+        victor workflow validate ./workflows/analysis.yaml --check-handlers
+        victor workflow validate ./workflows/analysis.yaml --vertical coding
     """
     from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
 
@@ -140,33 +412,73 @@ def validate_workflow(
     console.print(f"\n[bold blue]Validating:[/] {path.name}")
     console.print("[dim]" + "─" * 50 + "[/]")
 
+    # Auto-detect vertical if not specified
+    detected_vertical = vertical or _detect_vertical_from_path(path)
+    if detected_vertical:
+        console.print(f"[dim]Vertical: {detected_vertical}[/]")
+
     workflows = _load_workflow_file(path)
 
     compiler = YAMLToStateGraphCompiler()
     all_valid = True
+    total_warnings = 0
 
     for wf_name, workflow in workflows.items():
         console.print(f"\n[bold cyan]Workflow:[/] {wf_name}")
         _display_workflow_info(workflow, wf_name)
 
-        if verbose:
-            console.print("\n[dim]Nodes:[/]")
-            for node_id, node in workflow.nodes.items():
-                node_type = type(node).__name__
-                next_nodes = getattr(node, "next_nodes", []) or []
-                next_str = " -> " + ", ".join(next_nodes) if next_nodes else ""
-                console.print(f"  [dim]{node_id}[/] ({node_type}){next_str}")
+        # Run extended validation
+        is_valid, errors, warnings = _display_validation_details(
+            workflow,
+            verbose=verbose,
+            check_handlers=check_handlers,
+            vertical=detected_vertical if check_escape_hatches else None,
+        )
 
+        # Display warnings
+        for warning in warnings:
+            console.print(f"[yellow]  Warning:[/] {warning}")
+            total_warnings += 1
+
+        # Display errors
+        for error in errors:
+            console.print(f"[red]  Error:[/] {error}")
+
+        # Try to compile to state graph
         try:
             _compiled = compiler.compile(workflow)
-            console.print("[bold green]✓[/] Validation passed")
+            if is_valid:
+                console.print("[bold green]✓[/] Validation passed")
+            else:
+                console.print("[bold yellow]✓[/] Compiled with errors")
+                all_valid = False
         except Exception as e:
-            console.print(f"[bold red]✗[/] Validation failed: {e}")
+            console.print(f"[bold red]✗[/] Compilation failed: {e}")
             all_valid = False
 
     console.print()
+
+    # Show escape hatch and handler info if verbose
+    if verbose and detected_vertical:
+        conditions, transforms = _load_escape_hatches(detected_vertical)
+        if conditions or transforms:
+            console.print(f"\n[dim]Available escape hatches for '{detected_vertical}':[/]")
+            if conditions:
+                console.print(f"  CONDITIONS: {', '.join(sorted(conditions))}")
+            if transforms:
+                console.print(f"  TRANSFORMS: {', '.join(sorted(transforms))}")
+
+        if check_handlers:
+            handlers = _load_registered_handlers(detected_vertical)
+            if handlers:
+                console.print(f"  HANDLERS: {', '.join(sorted(handlers))}")
+            console.print()
+
     if all_valid:
-        console.print("[bold green]All workflows validated successfully.[/]")
+        msg = "[bold green]All workflows validated successfully.[/]"
+        if total_warnings > 0:
+            msg += f" [yellow]({total_warnings} warning(s))[/]"
+        console.print(msg)
     else:
         console.print("[bold red]Some workflows failed validation.[/]")
         raise typer.Exit(1)
@@ -196,22 +508,37 @@ def render_workflow(
         "-n",
         help="Workflow name to render (if file contains multiple workflows)",
     ),
+    summary: bool = typer.Option(
+        False,
+        "--summary",
+        "-s",
+        help="Show workflow summary with node type counts before rendering",
+    ),
 ) -> None:
     """Render a workflow DAG as a diagram.
 
     Supports multiple output formats:
-    - ascii: Terminal-friendly ASCII art
-    - mermaid: Mermaid markdown (for docs)
-    - d2: D2 diagram language
+    - ascii: Terminal-friendly ASCII art (shows all node types with distinct icons)
+    - mermaid: Mermaid markdown (for docs, supports HITL/parallel node shapes)
+    - d2: D2 diagram language (modern styling with capability hints)
     - dot: Graphviz DOT format
-    - plantuml: PlantUML format
+    - plantuml: PlantUML format (with fork/join for parallel nodes)
     - svg: SVG image (requires d2, graphviz, or matplotlib)
     - png: PNG image (requires d2 or graphviz)
+
+    Node type visualization:
+    - AgentNode: Stadium shape, blue (@)
+    - ComputeNode: Parallelogram, green (#)
+    - ConditionNode: Diamond, orange (?)
+    - ParallelNode: Double-border subroutine, purple (=)
+    - TransformNode: Rectangle, gray (>)
+    - HITLNode: Circle, red (!)
 
     Example:
         victor workflow render ./workflows/analysis.yaml
         victor workflow render ./workflows/analysis.yaml -f mermaid
         victor workflow render ./workflows/analysis.yaml -f svg -o diagram.svg
+        victor workflow render ./workflows/analysis.yaml --summary
     """
     from victor.workflows.visualization import (
         WorkflowVisualizer,
@@ -234,6 +561,57 @@ def render_workflow(
         if len(workflows) > 1:
             console.print(f"[dim]Multiple workflows found, rendering '{workflow.name}'[/]")
             console.print(f"[dim]Use --name to specify: {', '.join(workflows.keys())}[/]")
+
+    # Show summary if requested
+    if summary:
+        from victor.workflows.definition import (
+            AgentNode,
+            ComputeNode,
+            ConditionNode,
+            ParallelNode,
+            TransformNode,
+        )
+
+        try:
+            from victor.workflows.hitl import HITLNode
+
+            has_hitl = True
+        except ImportError:
+            HITLNode = None
+            has_hitl = False
+
+        console.print(f"\n[bold cyan]Workflow:[/] {workflow.name}")
+        _display_workflow_info(workflow, workflow.name)
+
+        # Show node breakdown with icons
+        console.print("\n[dim]Node breakdown:[/]")
+        for node_id, node in workflow.nodes.items():
+            node_type = type(node).__name__
+            if node_type == "AgentNode":
+                icon = "@"
+                extra = f"role={node.role}"
+            elif node_type == "ComputeNode":
+                icon = "#"
+                extra = f"handler={node.handler}" if node.handler else f"tools={len(node.tools)}"
+            elif node_type == "ConditionNode":
+                icon = "?"
+                extra = f"branches={list(node.branches.keys())}"
+            elif node_type == "ParallelNode":
+                icon = "="
+                extra = f"parallel={node.parallel_nodes}"
+            elif node_type == "TransformNode":
+                icon = ">"
+                extra = ""
+            elif has_hitl and isinstance(node, HITLNode):
+                icon = "!"
+                extra = f"type={node.hitl_type.value}"
+            else:
+                icon = "*"
+                extra = ""
+
+            extra_str = f" [{extra}]" if extra else ""
+            console.print(f"  [{icon}] {node_id}{extra_str}")
+        console.print()
 
     # Map format string to enum
     format_map = {
@@ -462,7 +840,7 @@ def run_workflow(
         # Show execution order
         compiler = YAMLToStateGraphCompiler()
         try:
-            compiled = compiler.compile(workflow)
+            compiler.compile(workflow)  # Validate compilation
             console.print("[bold green]✓[/] Workflow can be compiled")
             console.print(f"[dim]Start node: {workflow.start_node}[/]")
         except Exception as e:

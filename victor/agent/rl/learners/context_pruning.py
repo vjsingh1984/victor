@@ -31,7 +31,7 @@ Design:
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -345,7 +345,7 @@ class ContextPruningLearner(BaseLearner):
         reward = (0.4 * normalized_savings + 0.6 * success_bonus) * 100  # Scale to 0-100
 
         cursor = self.db.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Update Q-value using Q-learning update rule
         cursor.execute(

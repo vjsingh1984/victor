@@ -4,7 +4,10 @@ This module provides concrete implementations of workflow graph components:
 - WorkflowNode: A node in the workflow graph
 - WorkflowEdge: A simple edge connecting two nodes
 - ConditionalEdge: An edge with conditional traversal logic
-- WorkflowGraph: The graph structure containing nodes and edges
+- BasicWorkflowGraph: The basic graph container for nodes and edges
+
+For typed workflow graphs with state, see victor.workflows.graph_dsl.WorkflowGraph.
+For LangGraph-compatible StateGraph, see victor.framework.graph.StateGraph.
 
 These classes implement the protocols defined in victor.workflows.protocols.
 """
@@ -15,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.workflows.protocols import (
-    NodeStatus,
+    ProtocolNodeStatus,
     RetryPolicy,
     NodeResult,
     IWorkflowNode,
@@ -68,7 +71,7 @@ class WorkflowNode:
         async def process_data(state, context=None):
             processed = transform(state["data"])
             return NodeResult(
-                status=NodeStatus.COMPLETED,
+                status=ProtocolNodeStatus.COMPLETED,
                 output={"data": processed}
             )
 
@@ -222,15 +225,18 @@ class _RouterEdge:
         return self._router(state) == self._route_key
 
 
-class WorkflowGraph:
-    """A directed graph of workflow nodes and edges.
+class BasicWorkflowGraph:
+    """A basic directed graph container for workflow nodes and edges.
 
     Provides methods for building, querying, and validating workflow graphs.
     Supports fluent interface for chaining method calls.
 
+    Note: For typed workflow graphs with state, see victor.workflows.graph_dsl.WorkflowGraph.
+    For LangGraph-compatible StateGraph, see victor.framework.graph.StateGraph.
+
     Example:
         graph = (
-            WorkflowGraph()
+            BasicWorkflowGraph()
             .add_node(start_node)
             .add_node(process_node)
             .add_node(end_node)
@@ -253,7 +259,7 @@ class WorkflowGraph:
         self._entry_node_id: Optional[str] = None
         self._exit_node_ids: Set[str] = set()
 
-    def add_node(self, node: IWorkflowNode) -> "WorkflowGraph":
+    def add_node(self, node: IWorkflowNode) -> "BasicWorkflowGraph":
         """Add a node to the graph.
 
         Args:
@@ -271,7 +277,7 @@ class WorkflowGraph:
         self._nodes[node.id] = node
         return self
 
-    def add_edge(self, edge: IWorkflowEdge) -> "WorkflowGraph":
+    def add_edge(self, edge: IWorkflowEdge) -> "BasicWorkflowGraph":
         """Add an edge to the graph.
 
         Args:
@@ -297,7 +303,7 @@ class WorkflowGraph:
         source_id: str,
         router: Callable[[Dict[str, Any]], str],
         targets: Dict[str, str],
-    ) -> "WorkflowGraph":
+    ) -> "BasicWorkflowGraph":
         """Add conditional branching edges based on a router function.
 
         Creates multiple edges from the source node, each activated
@@ -343,7 +349,7 @@ class WorkflowGraph:
 
         return self
 
-    def set_entry_node(self, node_id: str) -> "WorkflowGraph":
+    def set_entry_node(self, node_id: str) -> "BasicWorkflowGraph":
         """Set the entry point of the workflow.
 
         Args:
@@ -361,7 +367,7 @@ class WorkflowGraph:
         self._entry_node_id = node_id
         return self
 
-    def set_exit_nodes(self, node_ids: List[str]) -> "WorkflowGraph":
+    def set_exit_nodes(self, node_ids: List[str]) -> "BasicWorkflowGraph":
         """Set the exit points of the workflow.
 
         Args:
@@ -546,3 +552,21 @@ class WorkflowGraph:
                 dfs(node_id, [])
 
         return cycles
+
+
+# Deprecation alias for backward compatibility
+import warnings as _warnings
+
+
+def __getattr__(name: str):
+    """Provide deprecation warning for WorkflowGraph alias."""
+    if name == "WorkflowGraph":
+        _warnings.warn(
+            "WorkflowGraph from victor.workflows.graph is deprecated. "
+            "Use BasicWorkflowGraph instead, or for typed workflows use "
+            "victor.workflows.graph_dsl.WorkflowGraph.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BasicWorkflowGraph
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

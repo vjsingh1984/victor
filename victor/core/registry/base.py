@@ -78,6 +78,16 @@ class BaseRegistry(Generic[K, V]):
         """
         return list(self._items.keys())
 
+    def keys(self) -> Iterator[K]:
+        """Return an iterator over registry keys.
+
+        Provides dict-like API compatibility for code that expects .keys().
+
+        Returns:
+            Iterator over all keys in the registry
+        """
+        return iter(self._items.keys())
+
     def unregister(self, key: K) -> bool:
         """Unregister an item by key.
 

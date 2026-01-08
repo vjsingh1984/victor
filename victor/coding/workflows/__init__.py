@@ -14,61 +14,40 @@
 
 """Coding vertical workflows.
 
-This package provides workflow definitions for common coding tasks:
-- Feature implementation (full and quick)
-- Bug fix (systematic and quick)
-- Code review (comprehensive, quick, and PR)
+This package provides workflow definitions for common coding tasks using
+YAML-first architecture with Python escape hatches for complex conditions.
 
-Two workflow APIs are available:
+Available workflows (all YAML-defined):
+- feature_implementation: Full feature implementation workflow
+- quick_feature: Quick feature for small changes
+- bug_fix: Systematic bug investigation and fix
+- quick_fix: Quick fix for simple bugs
+- code_review: Comprehensive code review with parallel analysis
+- quick_review: Quick code review for small changes
+- pr_review: Pull request review workflow
+- tdd_cycle: Test-driven development cycle
+- refactor: Code refactoring workflow
 
-1. **WorkflowBuilder** (YAML-like DSL):
-   - Simple, declarative workflow definitions
-   - Good for linear workflows with basic conditions
-   - Example: feature_implementation_workflow, bug_fix_workflow
-
-2. **StateGraph** (LangGraph-compatible):
-   - Typed state management
-   - Cyclic execution (test-fix loops, validation cycles)
-   - Explicit retry limits and checkpoint/resume
-   - Example: create_tdd_workflow(), create_bugfix_workflow()
-
-Example (WorkflowBuilder):
+Usage:
     from victor.coding.workflows import CodingWorkflowProvider
 
     provider = CodingWorkflowProvider()
-    feature_wf = provider.get_workflow("feature_implementation")
-    print(f"Workflow: {feature_wf.name}")
 
-Example (StateGraph):
-    from victor.coding.workflows import (
-        create_tdd_workflow,
-        CodingState,
-    )
-    from victor.framework.graph import RLCheckpointerAdapter
+    # List available workflows
+    print(provider.get_workflow_names())
 
-    graph = create_tdd_workflow()
-    checkpointer = RLCheckpointerAdapter("tdd")
-    app = graph.compile(checkpointer=checkpointer)
+    # Execute with caching (recommended - uses UnifiedWorkflowCompiler)
+    result = await provider.run_compiled_workflow("code_review", {"files": ["src/"]})
 
-    result = await app.invoke({"feature_description": "Add auth", "iteration": 0})
+    # Stream with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("code_review", {}):
+        print(f"Completed: {node_id}")
+
+This package also provides LCEL-composed tool chains for fine-grained
+code operations (explore, analyze, edit, refactor, etc.).
 """
 
 from victor.coding.workflows.provider import CodingWorkflowProvider
-
-# Individual workflows for direct import (WorkflowBuilder DSL)
-from victor.coding.workflows.feature import (
-    feature_implementation_workflow,
-    quick_feature_workflow,
-)
-from victor.coding.workflows.bugfix import (
-    bug_fix_workflow,
-    quick_fix_workflow,
-)
-from victor.coding.workflows.review import (
-    code_review_workflow,
-    quick_review_workflow,
-    pr_review_workflow,
-)
 
 # LCEL-composed tool chains
 from victor.coding.composed_chains import (
@@ -95,18 +74,8 @@ from victor.coding.composed_chains import (
 )
 
 __all__ = [
-    # Provider
+    # YAML-first workflow provider
     "CodingWorkflowProvider",
-    # Feature workflows (WorkflowBuilder)
-    "feature_implementation_workflow",
-    "quick_feature_workflow",
-    # Bug fix workflows (WorkflowBuilder)
-    "bug_fix_workflow",
-    "quick_fix_workflow",
-    # Review workflows (WorkflowBuilder)
-    "code_review_workflow",
-    "quick_review_workflow",
-    "pr_review_workflow",
     # LCEL-composed chains
     "explore_file_chain",
     "analyze_function_chain",

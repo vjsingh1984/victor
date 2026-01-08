@@ -72,6 +72,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -91,7 +92,7 @@ from typing import (
 )
 
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -965,27 +966,37 @@ class VerticalIntegrationPipeline:
 
         # Emit vertical_applied event for observability
         try:
-            event_bus = EventBus.get_instance()
-            event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.VERTICAL,
-                    name="vertical_applied",
-                    data={
-                        "vertical": result.vertical_name,
-                        "tools_count": len(result.tools_applied),
-                        "middleware_count": result.middleware_count,
-                        "safety_patterns_count": result.safety_patterns_count,
-                        "prompt_hints_count": result.prompt_hints_count,
-                        "workflows_count": result.workflows_count,
-                        "rl_learners_count": result.rl_learners_count,
-                        "team_specs_count": result.team_specs_count,
-                        "success": result.success,
-                        "error_count": len(result.errors),
-                        "warning_count": len(result.warnings),
-                    },
-                    source="VerticalIntegrationPipeline",
-                )
-            )
+            from victor.core.events import get_observability_bus
+
+            bus = get_observability_bus()
+            if bus:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
+                        bus.emit(
+                            topic="vertical.applied",
+                            data={
+                                "vertical": result.vertical_name,
+                                "tools_count": len(result.tools_applied),
+                                "middleware_count": result.middleware_count,
+                                "safety_patterns_count": result.safety_patterns_count,
+                                "prompt_hints_count": result.prompt_hints_count,
+                                "workflows_count": result.workflows_count,
+                                "rl_learners_count": result.rl_learners_count,
+                                "team_specs_count": result.team_specs_count,
+                                "success": result.success,
+                                "error_count": len(result.errors),
+                                "warning_count": len(result.warnings),
+                                "category": "vertical",  # Preserve for observability
+                            },
+                            source="VerticalIntegrationPipeline",
+                        )
+                    )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug("No event loop, skipping vertical.applied event emission")
+                except Exception as emit_error:
+                    logger.debug(f"Failed to create emit task: {emit_error}")
         except Exception as e:
             logger.debug(f"Failed to emit vertical_applied event: {e}")
 

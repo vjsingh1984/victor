@@ -54,7 +54,7 @@ Example (YAML):
 
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.definition import (
-    NodeType,
+    WorkflowNodeType,
     WorkflowNode,
     AgentNode,
     ConditionNode,
@@ -71,7 +71,7 @@ from victor.workflows.registry import (
     get_global_registry,
 )
 from victor.workflows.executor import (
-    NodeStatus,
+    ExecutorNodeStatus,
     NodeResult,
     WorkflowContext,
     WorkflowResult,
@@ -85,8 +85,8 @@ from victor.workflows.protocols import (
     ICheckpointStore,
     IWorkflowExecutor,
     IStreamingWorkflowExecutor,
-    # Re-export NodeStatus and NodeResult from protocols for graph API users
-    NodeStatus as GraphNodeStatus,
+    # Re-export ProtocolNodeStatus and NodeResult from protocols for graph API users
+    ProtocolNodeStatus as GraphNodeStatus,
     NodeResult as GraphNodeResult,
 )
 from victor.workflows.streaming import (
@@ -105,6 +105,7 @@ from victor.workflows.yaml_loader import (
     load_workflow_from_yaml,
     load_workflow_from_file,
     load_workflows_from_directory,
+    load_and_validate,
 )
 from victor.workflows.cache import (
     WorkflowCacheConfig,
@@ -116,9 +117,9 @@ from victor.workflows.cache import (
 )
 from victor.workflows.graph_dsl import (
     State,
-    StateGraph,
+    WorkflowGraph,  # Typed workflow graph DSL (compiles to WorkflowDefinition)
     GraphNode,
-    NodeType as GraphNodeType,
+    GraphNodeType,
     NodeFunc,
     RouterFunc,
     Compilable,
@@ -129,7 +130,7 @@ from victor.workflows.graph import (
     WorkflowNode as GraphWorkflowNode,
     WorkflowEdge,
     ConditionalEdge,
-    WorkflowGraph,
+    BasicWorkflowGraph,  # Basic graph container
     DuplicateNodeError,
     InvalidEdgeError,
     GraphValidationError,
@@ -180,7 +181,7 @@ from victor.workflows.handlers import (
     register_framework_handlers,
 )
 from victor.workflows.batch_executor import (
-    RetryStrategy,
+    BatchRetryStrategy,
     BatchConfig,
     BatchItemResult,
     BatchProgress,
@@ -293,6 +294,51 @@ from victor.workflows.hitl_api import (
     create_hitl_app,
     run_hitl_server,
 )
+from victor.workflows.context import (
+    ExecutionContext,
+    create_execution_context,
+    ExecutionContextWrapper,
+    from_workflow_context,
+    to_workflow_context,
+    from_compiler_workflow_state,
+    to_compiler_workflow_state,
+    from_adapter_workflow_state,
+    to_adapter_workflow_state,
+)
+from victor.workflows.node_runners import (
+    BaseNodeRunner,
+    AgentNodeRunner,
+    ComputeNodeRunner,
+    TransformNodeRunner,
+    HITLNodeRunner,
+    ConditionNodeRunner,
+    ParallelNodeRunner,
+    NodeRunnerRegistry,
+)
+from victor.workflows.protocols import (
+    NodeRunner,
+    NodeRunnerResult,
+)
+from victor.workflows.graph_compiler import (
+    CompilerConfig,
+    NodeRunnerWrapper,
+    WorkflowGraphCompiler,
+    WorkflowDefinitionCompiler,
+    compile_workflow_graph,
+    compile_workflow_definition,
+)
+from victor.workflows.observability import (
+    StreamingObserver,
+    AsyncStreamingObserver,
+    FunctionObserver,
+    ObservabilityEmitter,
+    create_emitter,
+    create_logging_observer,
+)
+from victor.workflows.unified_compiler import (
+    UnifiedWorkflowCompiler,
+    create_unified_compiler,
+)
 
 # Register framework handlers on module load
 # Domain-specific handlers are registered by each vertical when loaded
@@ -302,7 +348,7 @@ __all__ = [
     # Base
     "BaseWorkflow",
     # Node types
-    "NodeType",
+    "WorkflowNodeType",
     "WorkflowNode",
     "AgentNode",
     "ComputeNode",
@@ -325,7 +371,7 @@ __all__ = [
     "WorkflowRegistry",
     "get_global_registry",
     # Executor
-    "NodeStatus",
+    "ExecutorNodeStatus",
     "NodeResult",
     "WorkflowContext",
     "WorkflowResult",
@@ -361,7 +407,7 @@ __all__ = [
     "SandboxedExecutor",
     "get_sandboxed_executor",
     # Batch Execution
-    "RetryStrategy",
+    "BatchRetryStrategy",
     "BatchConfig",
     "BatchItemResult",
     "BatchProgress",
@@ -390,6 +436,7 @@ __all__ = [
     "load_workflow_from_yaml",
     "load_workflow_from_file",
     "load_workflows_from_directory",
+    "load_and_validate",
     # Cache
     "WorkflowCacheConfig",
     "CacheEntry",
@@ -397,9 +444,10 @@ __all__ = [
     "WorkflowCacheManager",
     "get_workflow_cache_manager",
     "configure_workflow_cache",
-    # StateGraph DSL
+    # WorkflowGraph DSL (compiles to WorkflowDefinition)
     "State",
-    "StateGraph",
+    "WorkflowGraph",  # Typed workflow graph DSL
+    "StateGraph",  # Deprecated alias for WorkflowGraph
     "GraphNode",
     "GraphNodeType",
     "NodeFunc",
@@ -407,11 +455,11 @@ __all__ = [
     "Compilable",
     "create_graph",
     "compile_graph",
-    # Graph implementation (LangGraph-like API)
+    # Graph implementation (basic graph container)
     "GraphWorkflowNode",
     "WorkflowEdge",
     "ConditionalEdge",
-    "WorkflowGraph",
+    "BasicWorkflowGraph",  # Basic graph container (renamed from WorkflowGraph)
     "DuplicateNodeError",
     "InvalidEdgeError",
     "GraphValidationError",
@@ -509,4 +557,42 @@ __all__ = [
     "register_transport",
     "get_transport",
     "list_available_transports",
+    # Unified Execution Context
+    "ExecutionContext",
+    "create_execution_context",
+    "ExecutionContextWrapper",
+    "from_workflow_context",
+    "to_workflow_context",
+    "from_compiler_workflow_state",
+    "to_compiler_workflow_state",
+    "from_adapter_workflow_state",
+    "to_adapter_workflow_state",
+    # NodeRunner Protocol and Implementations (ISP + DIP)
+    "NodeRunner",
+    "NodeRunnerResult",
+    "BaseNodeRunner",
+    "AgentNodeRunner",
+    "ComputeNodeRunner",
+    "TransformNodeRunner",
+    "HITLNodeRunner",
+    "ConditionNodeRunner",
+    "ParallelNodeRunner",
+    "NodeRunnerRegistry",
+    # Graph Compilers (Single Execution Engine - Phase 4)
+    "CompilerConfig",
+    "NodeRunnerWrapper",
+    "WorkflowGraphCompiler",
+    "WorkflowDefinitionCompiler",
+    "compile_workflow_graph",
+    "compile_workflow_definition",
+    # Observability (Unified Streaming - Phase 5)
+    "StreamingObserver",
+    "AsyncStreamingObserver",
+    "FunctionObserver",
+    "ObservabilityEmitter",
+    "create_emitter",
+    "create_logging_observer",
+    # Unified Compiler (Consistent Compilation and Caching)
+    "UnifiedWorkflowCompiler",
+    "create_unified_compiler",
 ]

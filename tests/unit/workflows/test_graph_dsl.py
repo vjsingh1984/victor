@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the StateGraph DSL module."""
+"""Tests for the WorkflowGraph DSL module."""
 
 import pytest
 from dataclasses import dataclass, field
@@ -20,9 +20,9 @@ from typing import Any, Dict, List, Optional
 
 from victor.workflows.graph_dsl import (
     State,
-    StateGraph,
+    WorkflowGraph,
     GraphNode,
-    NodeType,
+    GraphNodeType,
     create_graph,
     compile_graph,
 )
@@ -160,12 +160,12 @@ class TestState:
         assert state.message == "original"  # Original unchanged
 
 
-class TestStateGraph:
-    """Tests for StateGraph class."""
+class TestWorkflowGraph:
+    """Tests for WorkflowGraph class."""
 
     def test_create_empty_graph(self):
         """Test creating an empty graph."""
-        graph = StateGraph(SimpleState, name="test")
+        graph = WorkflowGraph(SimpleState, name="test")
 
         assert graph.name == "test"
         assert graph.state_type is SimpleState
@@ -173,7 +173,7 @@ class TestStateGraph:
 
     def test_add_node(self):
         """Test adding a node."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("process", increment)
 
         assert "process" in graph._nodes
@@ -181,7 +181,7 @@ class TestStateGraph:
 
     def test_add_node_duplicate_raises(self):
         """Test that duplicate node names raise."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("process", increment)
 
         with pytest.raises(ValueError, match="already exists"):
@@ -189,7 +189,7 @@ class TestStateGraph:
 
     def test_add_agent_node(self):
         """Test adding an agent node."""
-        graph = StateGraph(CodeReviewState)
+        graph = WorkflowGraph(CodeReviewState)
         graph.add_agent_node(
             "analyze",
             role="researcher",
@@ -198,14 +198,14 @@ class TestStateGraph:
         )
 
         node = graph._nodes["analyze"]
-        assert node.node_type == NodeType.AGENT
+        assert node.node_type == GraphNodeType.AGENT
         assert node.agent_role == "researcher"
         assert node.agent_goal == "Analyze the codebase"
         assert node.tool_budget == 20
 
     def test_add_edge(self):
         """Test adding an edge."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_edge("a", "b")
@@ -214,7 +214,7 @@ class TestStateGraph:
 
     def test_add_edge_invalid_source(self):
         """Test adding edge with invalid source."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("b", double)
 
         with pytest.raises(ValueError, match="not found"):
@@ -222,7 +222,7 @@ class TestStateGraph:
 
     def test_add_edge_invalid_target(self):
         """Test adding edge with invalid target."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
 
         with pytest.raises(ValueError, match="not found"):
@@ -230,7 +230,7 @@ class TestStateGraph:
 
     def test_chain_method(self):
         """Test chaining nodes."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_node("c", set_message)
@@ -241,7 +241,7 @@ class TestStateGraph:
 
     def test_operator_chaining(self):
         """Test >> operator chaining."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_node("c", set_message)
@@ -254,25 +254,25 @@ class TestStateGraph:
 
     def test_set_entry_point(self):
         """Test setting entry point."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("start", increment)
         graph.set_entry_point("start")
 
         assert graph._entry_point == "start"
-        assert "start" in graph._edges.get(StateGraph.START, [])
+        assert "start" in graph._edges.get(WorkflowGraph.START, [])
 
     def test_set_finish_point(self):
         """Test setting finish point."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("end", set_message)
         graph.set_finish_point("end")
 
         assert "end" in graph._finish_points
-        assert StateGraph.END in graph._edges.get("end", [])
+        assert WorkflowGraph.END in graph._edges.get("end", [])
 
     def test_add_conditional_edges(self):
         """Test adding conditional edges."""
-        graph = StateGraph(CodeReviewState)
+        graph = WorkflowGraph(CodeReviewState)
         graph.add_node("analyze", analyze_code)
         graph.add_node("fix", find_issues)
         graph.add_node("report", generate_report)
@@ -290,7 +290,7 @@ class TestStateGraph:
 
     def test_branch_method(self):
         """Test branch helper method."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("split", increment)
         graph.add_node("a", double)
         graph.add_node("b", set_message)
@@ -302,7 +302,7 @@ class TestStateGraph:
 
     def test_merge_method(self):
         """Test merge helper method."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_node("join", set_message)
@@ -318,14 +318,14 @@ class TestValidation:
 
     def test_validate_empty_graph(self):
         """Test validation of empty graph."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         errors = graph.validate()
 
         assert "Graph has no nodes" in errors
 
     def test_validate_no_entry_point(self):
         """Test validation without entry point."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         errors = graph.validate()
 
@@ -333,7 +333,7 @@ class TestValidation:
 
     def test_validate_no_finish_points(self):
         """Test validation without finish points."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.set_entry_point("a")
         errors = graph.validate()
@@ -343,7 +343,7 @@ class TestValidation:
 
     def test_validate_unreachable_node(self):
         """Test validation with unreachable node."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)  # Not connected
         graph.set_entry_point("a")
@@ -354,7 +354,7 @@ class TestValidation:
 
     def test_validate_valid_graph(self):
         """Test validation of valid graph."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_edge("a", "b")
@@ -370,7 +370,7 @@ class TestCompilation:
 
     def test_compile_simple_graph(self):
         """Test compiling a simple linear graph."""
-        graph = StateGraph(SimpleState, name="simple_test")
+        graph = WorkflowGraph(SimpleState, name="simple_test")
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_edge("a", "b")
@@ -386,7 +386,7 @@ class TestCompilation:
 
     def test_compile_with_agent_node(self):
         """Test compiling graph with agent node."""
-        graph = StateGraph(CodeReviewState, name="review")
+        graph = WorkflowGraph(CodeReviewState, name="review")
         graph.add_agent_node(
             "analyze",
             role="researcher",
@@ -407,7 +407,7 @@ class TestCompilation:
 
     def test_compile_with_transform_node(self):
         """Test that function nodes become TransformNodes."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("process", increment)
         graph.set_entry_point("process")
         graph.set_finish_point("process")
@@ -418,7 +418,7 @@ class TestCompilation:
 
     def test_compile_preserves_edges(self):
         """Test that edges are preserved in compilation."""
-        graph = StateGraph(SimpleState)
+        graph = WorkflowGraph(SimpleState)
         graph.add_node("a", increment)
         graph.add_node("b", double)
         graph.add_node("c", set_message)
@@ -433,14 +433,14 @@ class TestCompilation:
 
     def test_compile_invalid_graph_raises(self):
         """Test that compiling invalid graph raises."""
-        graph = StateGraph(SimpleState)  # Empty graph
+        graph = WorkflowGraph(SimpleState)  # Empty graph
 
         with pytest.raises(ValueError, match="validation failed"):
             graph.compile()
 
     def test_compile_with_metadata(self):
         """Test that metadata is preserved."""
-        graph = StateGraph(SimpleState, description="Test workflow")
+        graph = WorkflowGraph(SimpleState, description="Test workflow")
         graph.add_node("a", increment)
         graph.set_entry_point("a")
         graph.set_finish_point("a")
@@ -450,7 +450,7 @@ class TestCompilation:
 
         assert workflow.description == "Test workflow"
         assert workflow.metadata.get("version") == "1.0"
-        assert workflow.metadata.get("compiled_from") == "StateGraph"
+        assert workflow.metadata.get("compiled_from") == "WorkflowGraph"
 
 
 class TestConvenienceFunctions:
@@ -460,7 +460,7 @@ class TestConvenienceFunctions:
         """Test create_graph function."""
         graph = create_graph(SimpleState, "test", "A test workflow")
 
-        assert isinstance(graph, StateGraph)
+        assert isinstance(graph, WorkflowGraph)
         assert graph.name == "test"
         assert graph.description == "A test workflow"
 
@@ -481,7 +481,7 @@ class TestIntegration:
 
     def test_code_review_workflow(self):
         """Test a complete code review workflow."""
-        graph = StateGraph(CodeReviewState, name="code_review")
+        graph = WorkflowGraph(CodeReviewState, name="code_review")
 
         # Add nodes
         graph.add_node("analyze", analyze_code)
@@ -504,7 +504,7 @@ class TestIntegration:
 
     def test_workflow_with_conditional_edges(self):
         """Test workflow with conditional branching."""
-        graph = StateGraph(CodeReviewState, name="conditional_review")
+        graph = WorkflowGraph(CodeReviewState, name="conditional_review")
 
         # Add nodes
         graph.add_node("analyze", analyze_code)
@@ -532,7 +532,7 @@ class TestIntegration:
 
     def test_mixed_agent_and_function_nodes(self):
         """Test workflow mixing agent and function nodes."""
-        graph = StateGraph(CodeReviewState, name="mixed_workflow")
+        graph = WorkflowGraph(CodeReviewState, name="mixed_workflow")
 
         # Agent node
         graph.add_agent_node(

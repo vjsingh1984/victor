@@ -26,11 +26,10 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 from typing import Any, Dict, Optional
-from victor.agent.builders.base import ComponentBuilder
-from victor.agent.orchestrator_factory import OrchestratorFactory
+from victor.agent.builders.base import FactoryAwareBuilder
 
 
-class ProviderBuilder(ComponentBuilder):
+class ProviderBuilder(FactoryAwareBuilder):
     """Build provider and provider-related components.
 
     This builder creates all provider-related components that the orchestrator
@@ -47,16 +46,6 @@ class ProviderBuilder(ComponentBuilder):
         - tool_calling_models: Dict of models supporting tool calling
         - tool_capabilities: Dict of model-specific capabilities
     """
-
-    def __init__(self, settings, factory: Optional[OrchestratorFactory] = None):
-        """Initialize the ProviderBuilder.
-
-        Args:
-            settings: Application settings
-            factory: Optional OrchestratorFactory instance (created if not provided)
-        """
-        super().__init__(settings)
-        self._factory = factory
 
     def build(
         self,
@@ -100,20 +89,16 @@ class ProviderBuilder(ComponentBuilder):
         provider_components = {}
 
         # Create or reuse factory
-        if self._factory is None:
-            if provider is None or model is None:
-                raise ValueError("provider and model are required when factory is not provided")
-            self._factory = OrchestratorFactory(
-                settings=self.settings,
-                provider=provider,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                provider_name=provider_name,
-                profile_name=profile_name,
-                tool_selection=tool_selection,
-                thinking=thinking,
-            )
+        self._ensure_factory(
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_name=provider_name,
+            profile_name=profile_name,
+            tool_selection=tool_selection,
+            thinking=thinking,
+        )
 
         # Build tool calling matrix
         tool_calling_models, tool_capabilities = self._factory.create_tool_calling_matrix()
@@ -149,9 +134,7 @@ class ProviderBuilder(ComponentBuilder):
         provider_components["prompt_builder"] = prompt_builder
 
         # Register all built components
-        for name, component in provider_components.items():
-            if component is not None:
-                self.register_component(name, component)
+        self._register_components(provider_components)
 
         self._logger.info(
             f"ProviderBuilder built {len(provider_components)} provider components: "

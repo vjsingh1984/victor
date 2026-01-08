@@ -1,12 +1,60 @@
 # RAG Query Workflow
 # ==================
-# Retrieval-augmented generation pipeline demonstrating:
-# - Query understanding and expansion
-# - Hybrid search (dense + sparse)
-# - Context ranking and selection
-# - Answer generation with citations
-# - Confidence assessment and fallback
-# - Feedback collection for improvement
+# Retrieval-augmented generation for answering questions from indexed documents.
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python with vector store client)                        │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - Vector store access (LanceDB/ChromaDB local, or Pinecone/Qdrant cloud)  │
+# │   - LLM API access for answer generation (Anthropic/OpenAI)                 │
+# │   - Embedding API for query embedding (same as ingestion model)             │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - REQUIRED: LLM API calls for agent nodes                                 │
+# │   - REQUIRED: Embedding API for query vectorization                         │
+# │   - OPTIONAL: Cloud vector store queries (if not using local)               │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ top_k: 10 (chunks to retrieve)                                              │
+# │ rerank_top_k: 5 (chunks after reranking)                                    │
+# │ similarity_threshold: 0.7 (minimum relevance score)                         │
+# │ max_context_tokens: 4000 (context window for answer generation)             │
+# │ answer_max_tokens: 2000 (maximum answer length)                             │
+# │ temperature: 0.3 (for answer generation - factual)                          │
+# │ citation_style: inline (e.g., "according to [1]...")                        │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - Vector search: KNN/ANN similarity search (pure math)                    │
+# │   - BM25 search: TF-IDF keyword matching (algorithm)                        │
+# │   - Result merging: RRF/score fusion (mathematical)                         │
+# │   - Citation formatting: Template-based (string manipulation)               │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - Query analysis: Understanding intent and context                        │
+# │   - Query expansion: Generating synonyms and related terms                  │
+# │   - Reranking: Semantic relevance judgment                                  │
+# │   - Answer generation: Synthesizing coherent response                       │
+# │   - Verification: Checking factual accuracy                                 │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Pipeline stages:
+# 1. Query Analysis - Understand user intent (AGENT)
+# 2. Query Expansion - Generate search variants (AGENT)
+# 3. Hybrid Search - Dense + sparse retrieval (COMPUTE)
+# 4. Reranking - Semantic relevance scoring (AGENT)
+# 5. Answer Generation - Synthesize with citations (AGENT)
+# 6. Verification - Fact-check against sources (AGENT)
 
 workflows:
   rag_query:
@@ -16,6 +64,30 @@ workflows:
       version: "1.0"
       author: "victor"
       vertical: rag
+
+    # =========================================================================
+    # SERVICE DEPENDENCIES
+    # =========================================================================
+    # Query workflow requires read access to services created by ingest workflow
+    services:
+      # Project database for metadata lookups
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          mode: readonly              # Query workflow only reads
+        lifecycle:
+          start: auto
+          cleanup: none               # Don't modify on cleanup
+
+      # Vector store for similarity search
+      vector_store:
+        type: lancedb
+        config:
+          path: $ctx.project_dir/.victor/vectors
+        lifecycle:
+          start: auto
+          cleanup: none
 
     nodes:
       # =====================================================================
@@ -74,60 +146,92 @@ workflows:
         join_strategy: all
         next: [merge_results]
 
+      # COMPUTE: Vector search is KNN/ANN algorithm (HNSW, IVF)
+      # Pure mathematical similarity: cosine/dot product/euclidean
+      # No LLM reasoning - returns top-k nearest neighbors
+      # Execution: in-process (LanceDB) or network (Pinecone/Qdrant)
+      # Constraints: NETWORK for cloud stores, FILESYSTEM for local
       - id: dense_search
         type: compute
         name: "Dense Vector Search"
-        handler: retry_with_backoff
-        tools: [shell]
+        handler: retry_with_backoff  # Handles rate limits/timeouts
+        tools: []  # Uses vector store client directly
         inputs:
           queries: $ctx.expanded_queries
           index_name: $ctx.index_name
-          top_k: 20
-          similarity_threshold: $ctx.similarity_threshold
+          top_k: 20                               # Retrieve 20 candidates
+          similarity_threshold: $ctx.similarity_threshold  # Default: 0.7
+          # metric: cosine | dot_product | euclidean
         output: dense_results
         constraints:
           llm_allowed: false
-          network_allowed: true
+          network_allowed: true   # Required for cloud vector stores
+          write_allowed: false    # Read-only search
           timeout: 30
 
+      # COMPUTE: BM25/TF-IDF is statistical keyword matching
+      # Okapi BM25 algorithm - no semantic understanding
+      # Complements dense search for exact keyword matches
+      # Execution: in-process (tantivy/whoosh) or service
+      # Constraints: SANDBOXED - pure text matching
       - id: sparse_search
         type: compute
         name: "Sparse BM25 Search"
-        tools: [shell]
+        tools: []
         inputs:
           queries: $ctx.expanded_queries
-          index_name: $ctx.sparse_index
+          index_name: $ctx.sparse_index  # Separate BM25 index
           top_k: 20
+          # BM25 parameters:
+          # k1: 1.2 (term frequency saturation)
+          # b: 0.75 (document length normalization)
         output: sparse_results
         constraints:
           llm_allowed: false
+          network_allowed: false  # Local index search
+          filesystem_allowed: true  # Index on disk
           timeout: 15
 
+      # COMPUTE: Entity search is structured query on metadata
+      # Filters by extracted entity values (ORG, PERSON, etc.)
+      # No reasoning - exact/fuzzy match on entity fields
+      # Execution: in-process (SQLite FTS or vector store filter)
       - id: entity_search
         type: compute
         name: "Entity-Based Search"
-        tools: [shell]
+        tools: []
         inputs:
           entities: $ctx.query_analysis.entities
           index_name: $ctx.entity_index
           top_k: 10
+          # match_type: exact | fuzzy | prefix
         output: entity_results
         constraints:
           llm_allowed: false
+          network_allowed: false
           timeout: 15
 
+      # COMPUTE: Result fusion is mathematical score aggregation
+      # Reciprocal Rank Fusion (RRF) or weighted combination
+      # Formula: score = sum(1 / (k + rank)) across result sets
+      # Execution: in-process (pure Python)
+      # Constraints: SANDBOXED - operates on in-memory result sets
       - id: merge_results
         type: compute
         name: "Merge and Deduplicate Results"
-        tools: [shell]
+        tools: []
         inputs:
           dense: $ctx.dense_results
           sparse: $ctx.sparse_results
           entity: $ctx.entity_results
-          fusion_method: reciprocal_rank
+          fusion_method: reciprocal_rank  # RRF with k=60
+          # Alternative: weighted_sum (weights: [0.5, 0.3, 0.2])
+          dedupe_by: chunk_id
         output: merged_results
         constraints:
           llm_allowed: false
+          network_allowed: false
+          filesystem_allowed: false
           timeout: 10
         next: [check_results]
 
@@ -142,18 +246,22 @@ workflows:
           "true": rerank
           "false": fallback_search
 
+      # COMPUTE: Fallback search with lower threshold
+      # Same vector search algorithm, just broader parameters
+      # Execution: same as dense_search
       - id: fallback_search
         type: compute
         name: "Fallback Broad Search"
-        tools: [shell]
+        tools: []
         inputs:
           query: $ctx.user_query
           index_name: $ctx.index_name
-          top_k: 50
-          similarity_threshold: 0.3
+          top_k: 50                    # More results
+          similarity_threshold: 0.3   # Lower threshold
         output: fallback_results
         constraints:
           llm_allowed: false
+          network_allowed: true
           timeout: 30
         next: [check_fallback]
 
@@ -629,3 +737,227 @@ workflows:
         name: "Complete"
         transform: |
           status = "completed"
+
+
+  # =========================================================================
+  # Index Maintenance Workflow
+  # =========================================================================
+  maintenance:
+    description: "Index maintenance and optimization"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: rag
+
+    # =========================================================================
+    # SERVICE DEPENDENCIES
+    # =========================================================================
+    # Maintenance workflow needs write access to clean/optimize stores
+    services:
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          mode: readwrite           # Need write for cleanup
+        lifecycle:
+          start: auto
+          cleanup: vacuum           # Run VACUUM after maintenance
+
+      vector_store:
+        type: lancedb
+        config:
+          path: $ctx.project_dir/.victor/vectors
+        lifecycle:
+          start: auto
+          cleanup: compact          # Compact after deletions
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Analyze Index State (Compute - pure diagnostics)
+      # =====================================================================
+      # COMPUTE: Index analysis is database queries + file stats
+      # - Vector count: SELECT COUNT(*) or collection.count()
+      # - Index size: filesystem stat on index files
+      # - Fragmentation: ratio of active vs total space
+      # No LLM reasoning - pure metric collection
+      # Execution: in-process (database queries)
+      # Constraints: FILESYSTEM read for stats
+      - id: analyze_index
+        type: compute
+        name: "Analyze Index State"
+        handler: index_analyzer
+        tools: []  # Uses database/store clients
+        inputs:
+          index_name: $ctx.index_name
+          checks:
+            statistics:
+              - vector_count        # COUNT(*) on vectors
+              - document_count      # Distinct source docs
+              - index_size          # Bytes on disk
+              - embedding_dimensions  # Vector dim check
+              - last_updated        # Max ingestion timestamp
+            health:
+              - fragmentation_level  # (total - active) / total
+              - orphaned_entries    # Vectors without metadata
+              - stale_documents     # Modified since ingest
+              - duplicate_content   # Near-duplicate chunks
+            performance:
+              - avg_query_latency   # From metrics table
+              - search_quality_score  # Hit rate tracking
+              - index_query_ratio   # Queries per document
+        output: index_analysis
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Local analysis only
+          write_allowed: false    # Read-only analysis
+          timeout: 120
+        next: [check_issues]
+
+      - id: check_issues
+        type: condition
+        name: "Check for Issues"
+        condition: "has_issues"
+        branches:
+          "true": cleanup
+          "false": check_optimization
+
+      - id: check_optimization
+        type: condition
+        name: "Check Optimization Needed"
+        condition: "needs_optimization"
+        branches:
+          "true": optimize
+          "false": generate_report
+
+      # =====================================================================
+      # Stage 2: Cleanup Operations (Compute - deterministic maintenance)
+      # =====================================================================
+      # COMPUTE: Cleanup is DELETE operations on database
+      # - Orphaned: DELETE WHERE source_id NOT IN (SELECT id FROM documents)
+      # - Stale: DELETE WHERE ingested_at < (NOW - retention_days)
+      # - Duplicates: DELETE keeping MAX(quality_score) per hash
+      # No LLM reasoning - rule-based deletions
+      # Execution: in-process (database transactions)
+      # Constraints: WRITE REQUIRED, FILESYSTEM for local stores
+      - id: cleanup
+        type: compute
+        name: "Cleanup Index"
+        handler: index_cleaner
+        tools: []
+        inputs:
+          index_name: $ctx.index_name
+          analysis: $ctx.index_analysis
+          operations:
+            remove_orphaned:
+              - vectors_without_source  # FK violation check
+              - partial_entries         # Incomplete ingestion
+              - corrupted_entries       # Invalid vector data
+            handle_stale:
+              retention_days: $ctx.retention_days  # Default: 365
+              remove_deleted_sources: true         # Source file removed
+            deduplicate:
+              similarity_threshold: 0.95  # Near-duplicates
+              keep_strategy: highest_quality  # Keep best quality score
+          log_deletions: true  # Write deletion log for audit
+        output: cleanup_result
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Local store only
+          write_allowed: true     # REQUIRED for deletions
+          timeout: 300
+
+      # =====================================================================
+      # Stage 3: Optimization
+      # =====================================================================
+      # COMPUTE: Optimization is database maintenance operations
+      # - Compact: Reclaim space from deleted entries
+      # - Rebuild HNSW: Rebalance graph index for query perf
+      # - Update stats: Refresh query planner statistics
+      # Execution: in-process (database operations)
+      # Constraints: WRITE + FILESYSTEM, may lock index
+      - id: optimize
+        type: compute
+        name: "Optimize Index"
+        handler: retry_with_backoff  # Handles lock contention
+        tools: []
+        inputs:
+          index_name: $ctx.index_name
+          operations:
+            - compact_vectors    # LanceDB: compact(), Chroma: persist()
+            - rebuild_hnsw       # Rebuild graph for better perf
+            - update_statistics  # ANALYZE in SQLite
+        output: optimization_result
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          write_allowed: true    # REQUIRED for optimization
+          timeout: 600           # May be slow for large indices
+
+      # COMPUTE: Verification is benchmark query execution
+      # Runs sample queries to measure latency/quality
+      # Execution: in-process (timed queries)
+      # Constraints: READ-ONLY verification
+      - id: verify_optimization
+        type: compute
+        name: "Verify Optimization"
+        tools: []
+        inputs:
+          index_name: $ctx.index_name
+          verify:
+            - query_latency    # P50/P95 of sample queries
+            - search_quality   # MRR on golden set
+          sample_queries: $ctx.golden_queries  # Optional: known good queries
+        output: verification
+        constraints:
+          llm_allowed: false
+          network_allowed: false
+          write_allowed: false   # Read-only benchmark
+          timeout: 60
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 4: Generate Report (Compute - templated report)
+      # =====================================================================
+      # COMPUTE: Report uses Jinja2 template - no LLM
+      # Fills template with metrics and comparison tables
+      # Execution: in-process (template rendering)
+      # Constraints: FILESYSTEM for output file
+      - id: generate_report
+        type: compute
+        name: "Generate Maintenance Report"
+        handler: report_generator
+        tools: [write]
+        inputs:
+          template: maintenance_summary  # templates/maintenance_summary.md.j2
+          output_path: $ctx.report_path  # Default: ./maintenance_report.md
+          sections:
+            health_summary:
+              current_status: $ctx.index_analysis.status
+              issues_found: $ctx.index_analysis.issues
+              issues_fixed: $ctx.cleanup_result.fixed_count
+              optimization_applied: $ctx.optimization_result.operations
+            statistics:
+              before: $ctx.index_analysis.metrics
+              after: $ctx.verification.metrics
+              space_reclaimed: $ctx.cleanup_result.space_freed
+              performance_improvement: $ctx.verification.latency_improvement
+            recommendations:
+              retention_policy: $ctx.recommended_retention
+              next_maintenance: $ctx.next_scheduled
+              capacity_notes: $ctx.capacity_forecast
+        output: report
+        constraints:
+          llm_allowed: false
+          network_allowed: false  # Local file write only
+          write_allowed: true     # REQUIRED for report output
+          timeout: 30
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Maintenance Complete"
+        transform: |
+          status = "completed"
+          maintenance_time = elapsed_time()
+          next_scheduled = calculate_next_maintenance()

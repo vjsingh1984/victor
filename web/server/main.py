@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 from fastapi import (
@@ -380,7 +380,7 @@ async def cleanup_idle_sessions() -> None:
                             session_data = SESSION_AGENTS[session_id]
                             agent = session_data["agent"]
                             if hasattr(agent, "shutdown"):
-                                agent.shutdown()
+                                await agent.shutdown()
                             # Also try closing provider if available
                             if hasattr(agent, "provider"):
                                 await agent.provider.close()
@@ -432,7 +432,7 @@ async def shutdown_event() -> None:
                 agent = session_data.get("agent")
                 if agent:
                     if hasattr(agent, "shutdown"):
-                        agent.shutdown()
+                        await agent.shutdown()
                     if hasattr(agent, "provider"):
                         await agent.provider.close()
                     logger.info(f"Closed session {session_id} during shutdown")
@@ -452,7 +452,7 @@ async def health_check(_: None = Depends(_require_api_key)) -> dict[str, Any]:
     return {
         "status": "healthy",
         "active_sessions": len(SESSION_AGENTS),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

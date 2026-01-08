@@ -40,8 +40,14 @@ class DebugState(Enum):
     DISCONNECTED = "disconnected"  # Adapter disconnected
 
 
-class StopReason(Enum):
-    """Reason why execution stopped."""
+class DebugStopReason(Enum):
+    """Reason why debugger stopped execution.
+
+    Renamed from StopReason to be semantically distinct:
+    - DebugStopReason (here): Debugger stop reasons (breakpoint, step, exception)
+    - TrackerStopReason (victor.agent.unified_task_tracker): Task tracker stop reasons enum
+    - LoopStopRecommendation (victor.agent.loop_detector): Loop detection recommendation dataclass
+    """
 
     BREAKPOINT = "breakpoint"  # Hit a breakpoint
     STEP = "step"  # Completed a step
@@ -52,6 +58,10 @@ class StopReason(Enum):
     FUNCTION_BREAKPOINT = "function breakpoint"
     DATA_BREAKPOINT = "data breakpoint"
     INSTRUCTION_BREAKPOINT = "instruction breakpoint"
+
+
+# Backward compatibility alias
+StopReason = DebugStopReason
 
 
 @dataclass

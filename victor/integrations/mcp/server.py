@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
 from victor.integrations.mcp.protocol import (
+    MCP_PROTOCOL_VERSION,
     MCPCapabilities,
     MCPMessage,
     MCPMessageType,
@@ -70,10 +71,10 @@ class MCPServer:
             name=name,
             version=version,
             capabilities=MCPCapabilities(
-                tools=True,
-                resources=True,
-                prompts=False,
-                sampling=False,
+                tools={},  # Empty object means supported
+                resources={},  # Empty object means supported
+                prompts=None,  # None means not supported (omitted from output)
+                sampling=None,  # None means not supported (omitted from output)
             ),
         )
 
@@ -213,6 +214,7 @@ class MCPServer:
         return self._create_response(
             msg_id,
             {
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "serverInfo": self.info.model_dump(),
                 "capabilities": self.info.capabilities.model_dump(),
             },
@@ -261,14 +263,22 @@ class MCPServer:
             context: Dict[str, Any] = {}
             result = await self.tool_registry.execute(tool_name, context, **tool_args)
 
-            tool_result = MCPToolCallResult(
-                tool_name=tool_name,
-                success=result.success,
-                result=result.output if result.success else None,
-                error=result.error if not result.success else None,
-            )
+            # Return standard MCP format per modelcontextprotocol.io specification:
+            # {"content": [{"type": "text", "text": "..."}], "isError": false}
+            if result.success:
+                output_text = str(result.output) if result.output is not None else ""
+                response_data = {
+                    "content": [{"type": "text", "text": output_text}],
+                    "isError": False,
+                }
+            else:
+                error_text = str(result.error) if result.error else "Unknown error"
+                response_data = {
+                    "content": [{"type": "text", "text": error_text}],
+                    "isError": True,
+                }
 
-            return self._create_response(msg_id, tool_result.model_dump())
+            return self._create_response(msg_id, response_data)
 
         except Exception as e:
             return self._create_error(msg_id, -32603, f"Tool execution error: {str(e)}")

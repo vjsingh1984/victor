@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Command-line interface for Victor - Enterprise-Ready AI Coding Assistant."""
+"""Command-line interface for Victor - Open-source AI coding assistant."""
 
 import typer
 from rich.console import Console
@@ -20,10 +20,13 @@ from typing import Optional
 
 from victor import __version__
 from victor.ui.commands.benchmark import benchmark_app
+from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
 from victor.ui.commands.config import config_app
 from victor.ui.commands.dashboard import dashboard_app
+from victor.ui.commands.docs import docs_app
 from victor.ui.commands.embeddings import embeddings_app
+from victor.ui.commands.examples import examples_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
 from victor.ui.commands.keys import keys_app
@@ -37,20 +40,25 @@ from victor.ui.commands.serve import serve_app
 from victor.ui.commands.test_provider import test_provider_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
+from victor.ui.commands.scheduler import scheduler_app
+from victor.ui.commands.sessions import sessions_app
 from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
     name="victor",
-    help="Victor - Enterprise-Ready AI Coding Assistant.",
+    help="Victor - Open-source AI coding assistant with multi-provider support.",
     add_completion=False,
 )
 
 # Register all the subcommands
 app.add_typer(benchmark_app)
+app.add_typer(capabilities_app)
 app.add_typer(chat_app)
 app.add_typer(config_app)
 app.add_typer(dashboard_app)
+app.add_typer(docs_app)
 app.add_typer(embeddings_app)
+app.add_typer(examples_app)
 app.add_typer(index_app)
 app.add_typer(init_app)
 app.add_typer(keys_app)
@@ -64,6 +72,8 @@ app.add_typer(serve_app)
 app.add_typer(test_provider_app)
 app.add_typer(tools_app)
 app.add_typer(scaffold_app)
+app.add_typer(scheduler_app)
+app.add_typer(sessions_app)
 app.add_typer(workflow_app)
 
 console = Console()
@@ -88,7 +98,7 @@ def callback(
         help="Show version and exit",
     ),
 ) -> None:
-    """Victor - Enterprise-Ready AI Coding Assistant."""
+    """Victor - Open-source AI coding assistant with multi-provider support."""
     if ctx.invoked_subcommand is None:
         _run_default_interactive()
 

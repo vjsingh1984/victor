@@ -120,6 +120,14 @@ TEMPLATES = {
             (".gitignore", "gitignore_python"),
         ],
     },
+    "python_feature": {
+        "name": "Python Feature Boilerplate",
+        "description": "New Python feature with source and test files",
+        "files": [
+            ("features/{feature_filename}", "python_feature_source"),
+            ("tests/{test_filename}", "python_feature_test"),
+        ],
+    },
 }
 
 # Template content
@@ -132,7 +140,7 @@ from app.api import routes
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{{settings.API_V1_STR}}/openapi.json"
 )
 
 app.include_router(routes.router, prefix=settings.API_V1_STR)
@@ -140,7 +148,7 @@ app.include_router(routes.router, prefix=settings.API_V1_STR)
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    return {{"status": "healthy"}}
 ''',
     "fastapi_routes": '''"""API routes."""
 
@@ -151,14 +159,14 @@ router = APIRouter()
 @router.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Welcome to the API"}
+    return {{"message": "Welcome to the API"}}
 
-@router.get("/items/{item_id}")
+@router.get("/items/{{item_id}}")
 async def read_item(item_id: int):
     """Get item by ID."""
     if item_id < 0:
         raise HTTPException(status_code=404, detail="Item not found")
-    return {"item_id": item_id, "name": f"Item {item_id}"}
+    return {{"item_id": item_id, "name": f"Item {{item_id}}"}}
 ''',
     "fastapi_config": '''"""Application configuration."""
 
@@ -186,7 +194,7 @@ def test_health():
     """Test health endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json() == {{"status": "healthy"}}
 
 def test_root():
     """Test root endpoint."""
@@ -253,7 +261,7 @@ def cli():
 @click.option('--name', default='World', help='Name to greet')
 def hello(name):
     """Say hello."""
-    click.echo(f'Hello, {name}!')
+    click.echo(f'Hello, {{name}}!')
 
 if __name__ == '__main__':
     cli()
@@ -337,6 +345,24 @@ API_V1_STR=/api/v1
 # Database (if needed)
 # DATABASE_URL=postgresql://user:password@localhost/dbname
 """,
+    "python_feature_source": '''"""Implementation for {feature_name}."""
+
+# TODO: Implement {feature_name}
+def main():
+    """Main function for {feature_name}."""
+    print("Hello from {feature_module}!")
+
+if __name__ == "__main__":
+    main()
+''',
+    "python_feature_test": '''"""Tests for {feature_name}."""
+
+import pytest
+
+def test_{feature_module}():
+    """Test {feature_name} basic functionality."""
+    assert True
+''',
 }
 
 
@@ -354,6 +380,7 @@ async def scaffold(
     path: Optional[str] = None,
     content: str = "",
     force: bool = False,
+    variables: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified project scaffolding tool.
@@ -363,12 +390,13 @@ async def scaffold(
     Consolidates all scaffolding functionality into a single interface.
 
     Args:
-        operation: Operation to perform. Options: "create", "list", "add", "init-git".
-        template: Template name (for create operation: fastapi, flask, python-cli, react-app, microservice).
+        operation: Operation to perform. Options: "create", "list", "add", "init-git", "from-template".
+        template: Template name (for create operation: fastapi, flask, python-cli, react-app, microservice, python_feature).
         name: Project name (for create operation, used as directory name).
         path: File path (for add operation).
         content: File content (for add operation, default: empty string).
         force: Overwrite existing directory (for create operation, default: False).
+        variables: Variables for template interpolation (for create and from-template operations).
 
     Returns:
         Dictionary containing:
@@ -391,6 +419,11 @@ async def scaffold(
 
         # Add file to project
         scaffold(operation="add", path="src/utils.py", content="# Utilities")
+
+        # Create with variable interpolation
+        scaffold(operation="create", template="python_feature", name="my-feature",
+                 variables={"feature_name": "User Auth", "feature_filename": "user_auth.py",
+                           "test_filename": "test_user_auth.py", "feature_module": "user_auth"})
 
         # Initialize git repository
         scaffold(operation="init-git")
@@ -431,23 +464,43 @@ async def scaffold(
         template_info = TEMPLATES[template]
         created_files = []
 
+        # Prepare interpolation context
+        interpolation_vars = variables or {}
+
         # Create all files
         for file_path, content_key in template_info["files"]:
-            full_path = project_dir / file_path
+            # Interpolate variables in file path
+            try:
+                interpolated_path = file_path.format(**interpolation_vars)
+            except KeyError as e:
+                return {
+                    "success": False,
+                    "error": f"Missing variable for path interpolation: {e}. Required variables: {interpolation_vars}",
+                }
+
+            full_path = project_dir / interpolated_path
 
             # Create parent directories
             full_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Get content
+            # Get content and interpolate variables
             if content_key:
                 file_content = TEMPLATE_CONTENT.get(content_key, "")
+                # Interpolate variables in content
+                try:
+                    file_content = file_content.format(**interpolation_vars)
+                except KeyError as e:
+                    return {
+                        "success": False,
+                        "error": f"Missing variable for content interpolation: {e}. Required variables: {interpolation_vars}",
+                    }
             else:
                 file_content = ""
 
             # Write file
             try:
                 full_path.write_text(file_content)
-                created_files.append(str(file_path))
+                created_files.append(str(interpolated_path))
             except Exception as e:
                 logger.error("Failed to create %s: %s", file_path, e)
 
@@ -574,8 +627,95 @@ async def scaffold(
         except FileNotFoundError:
             return {"success": False, "error": "Git not found. Please install git first."}
 
+    # From-template operation (variable interpolation for templates)
+    elif operation == "from-template":
+        if not template:
+            return {
+                "success": False,
+                "error": "From-template operation requires 'template' parameter",
+            }
+
+        if not variables:
+            return {
+                "success": False,
+                "error": "From-template operation requires 'variables' parameter",
+            }
+
+        if template not in TEMPLATES:
+            available = ", ".join(TEMPLATES.keys())
+            return {
+                "success": False,
+                "error": f"Unknown template: {template}. Available: {available}",
+            }
+
+        # Get template
+        template_info = TEMPLATES[template]
+        created_files = []
+
+        # Create all files with variable interpolation
+        for file_path, content_key in template_info["files"]:
+            # Interpolate variables in file path
+            try:
+                interpolated_path = file_path.format(**variables)
+            except KeyError as e:
+                return {
+                    "success": False,
+                    "error": f"Missing variable for path interpolation: {e}. Required variables: {list(variables.keys())}",
+                }
+
+            full_path = Path(interpolated_path)
+
+            # Create parent directories
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Get content and interpolate variables
+            if content_key:
+                file_content = TEMPLATE_CONTENT.get(content_key, "")
+                # Interpolate variables in content
+                try:
+                    file_content = file_content.format(**variables)
+                except KeyError as e:
+                    return {
+                        "success": False,
+                        "error": f"Missing variable for content interpolation: {e}. Required variables: {list(variables.keys())}",
+                    }
+            else:
+                file_content = ""
+
+            # Write file
+            try:
+                full_path.write_text(file_content)
+                created_files.append(str(interpolated_path))
+            except Exception as e:
+                logger.error("Failed to create %s: %s", file_path, e)
+                return {
+                    "success": False,
+                    "error": f"Failed to create file {interpolated_path}: {e}",
+                }
+
+        # Build report
+        report = []
+        report.append(f"Created files from template: {template}")
+        report.append(f"Template: {template_info['name']}")
+        report.append(f"Description: {template_info['description']}")
+        report.append("")
+        report.append("Files created:")
+        for file_path in created_files:
+            report.append(f"  ✓ {file_path}")
+
+        return {
+            "success": True,
+            "operation": "from-template",
+            "template": template,
+            "files_created": created_files,
+            "count": len(created_files),
+            "message": f"Created {len(created_files)} file(s) from template '{template}'",
+            "formatted_report": "\n".join(report),
+        }
+
+    # Unknown operation
     else:
         return {
             "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git",
+            "error": f"Unknown operation: {operation}. Valid operations: create, list, add, init-git, from-template",
         }

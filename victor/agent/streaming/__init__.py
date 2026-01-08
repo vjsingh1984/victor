@@ -20,17 +20,65 @@ providing better testability and separation of concerns.
 Components:
 - StreamingChatContext: Dataclass holding all state for a streaming session
 - StreamingChatHandler: Main handler for streaming chat iterations
+- IterationCoordinator: Loop control and decision coordination
+- StreamingCoordinator: Response processing and chunk aggregation (NEW)
+- ContinuationHandler: Handles continuation action execution (P0 SRP refactor)
+- ToolExecutionHandler: Handles tool execution phase (P0 SRP refactor)
 - IterationResult: Result of a single iteration in the streaming loop
 """
 
 from victor.agent.streaming.context import StreamingChatContext, create_stream_context
+from victor.agent.streaming.coordinator import (
+    CoordinatorConfig,
+    IterationCoordinator,
+    create_coordinator,
+)
+from victor.agent.streaming.streaming_coordinator import (
+    StreamingCoordinator,
+    create_streaming_coordinator,
+)
+from victor.agent.streaming.continuation import (
+    ContinuationHandler,
+    ContinuationResult,
+    create_continuation_handler,
+)
+from victor.agent.streaming.tool_execution import (
+    ToolExecutionHandler,
+    ToolExecutionResult,
+    create_tool_execution_handler,
+)
+from victor.agent.streaming.intent_classification import (
+    IntentClassificationHandler,
+    IntentClassificationResult,
+    TrackingState,
+    create_intent_classification_handler,
+    create_tracking_state,
+    apply_tracking_state_updates,
+)
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationResult, IterationAction
 
 __all__ = [
     "StreamingChatContext",
     "StreamingChatHandler",
+    "IterationCoordinator",
+    "StreamingCoordinator",
+    "CoordinatorConfig",
+    "ContinuationHandler",
+    "ContinuationResult",
+    "ToolExecutionHandler",
+    "ToolExecutionResult",
+    "IntentClassificationHandler",
+    "IntentClassificationResult",
+    "TrackingState",
     "IterationResult",
     "IterationAction",
     "create_stream_context",
+    "create_coordinator",
+    "create_streaming_coordinator",
+    "create_continuation_handler",
+    "create_tool_execution_handler",
+    "create_intent_classification_handler",
+    "create_tracking_state",
+    "apply_tracking_state_updates",
 ]

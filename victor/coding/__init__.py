@@ -53,13 +53,18 @@ from victor.coding.middleware import (
 from victor.coding.safety import CodingSafetyExtension
 from victor.coding.prompts import CodingPromptContributor
 from victor.coding.mode_config import CodingModeConfigProvider
-from victor.coding.tool_dependencies import CodingToolDependencyProvider
 from victor.coding.service_provider import CodingServiceProvider
 from victor.coding.capabilities import (
     CodingCapabilityProvider,
     get_coding_capabilities,
     create_coding_capability_loader,
 )
+
+# Import canonical tool dependency provider instead of deprecated class
+from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+# Create canonical provider for coding vertical
+CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding")
 
 __all__ = [
     # Main vertical
@@ -70,7 +75,7 @@ __all__ = [
     "CodingSafetyExtension",
     "CodingPromptContributor",
     "CodingModeConfigProvider",
-    "CodingToolDependencyProvider",
+    "CodingToolDependencyProvider",  # Now uses canonical provider
     "CodingServiceProvider",
     # Phase 4 - Dynamic Capabilities
     "CodingCapabilityProvider",

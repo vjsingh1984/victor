@@ -67,7 +67,7 @@ import os
 import platform
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, Type, Union
@@ -203,7 +203,7 @@ class MFAVerifier:
             return False
 
         cached_at = self._verification_cache[key]
-        if datetime.utcnow() - cached_at > timedelta(seconds=cache_duration):
+        if datetime.now(timezone.utc) - cached_at > timedelta(seconds=cache_duration):
             del self._verification_cache[key]
             return False
 
@@ -211,7 +211,7 @@ class MFAVerifier:
 
     def cache_verification(self, key: str) -> None:
         """Cache successful MFA verification."""
-        self._verification_cache[key] = datetime.utcnow()
+        self._verification_cache[key] = datetime.now(timezone.utc)
 
     # TOTP (Authenticator apps)
     def setup_totp(self, credential_name: str) -> str:
@@ -825,7 +825,7 @@ class SSOTokens:
     def is_expired(self) -> bool:
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1023,7 +1023,9 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.utcnow() + timedelta(seconds=result["expires_in"])
+                    expires_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=result["expires_in"]
+                    )
 
                 return SSOTokens(
                     access_token=result["access_token"],
@@ -1061,7 +1063,9 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.utcnow() + timedelta(seconds=result["expires_in"])
+                    expires_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=result["expires_in"]
+                    )
 
                 return SSOTokens(
                     access_token=result["access_token"],
@@ -1787,7 +1791,7 @@ class AWSCredentials:
     def is_expired(self) -> bool:
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def to_dict(self) -> Dict[str, Any]:
         return {

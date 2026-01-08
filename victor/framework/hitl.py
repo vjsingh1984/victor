@@ -158,10 +158,14 @@ ApprovalHandler = Callable[
 
 
 @dataclass
-class Checkpoint:
-    """A checkpoint for pause/resume functionality.
+class HITLCheckpoint:
+    """HITLCheckpoint for Human-in-the-Loop pause/resume functionality.
 
-    Stores the state needed to resume an interrupted workflow.
+    Renamed from Checkpoint to be semantically distinct:
+    - GitCheckpoint (victor.agent.checkpoints): Git stash-based
+    - ExecutionCheckpoint (victor.agent.time_aware_executor): Time/progress tracking
+    - WorkflowCheckpoint (victor.framework.graph): Workflow state persistence
+    - HITLCheckpoint (here): Pause/resume with context for human interaction
 
     Attributes:
         id: Unique checkpoint identifier
@@ -213,7 +217,7 @@ class HITLController:
         """
         self._approval_handler = approval_handler
         self._paused = False
-        self._checkpoints: Dict[str, Checkpoint] = {}
+        self._checkpoints: Dict[str, HITLCheckpoint] = {}
         self._requests: Dict[str, ApprovalRequest] = {}
 
         # Callbacks
@@ -240,10 +244,10 @@ class HITLController:
             context: Optional workflow state to preserve
 
         Returns:
-            Checkpoint ID for resuming later
+            HITLCheckpoint ID for resuming later
         """
         checkpoint_id = f"cp_{uuid.uuid4().hex}"
-        checkpoint = Checkpoint(
+        checkpoint = HITLCheckpoint(
             id=checkpoint_id,
             context=context or {},
         )
@@ -554,6 +558,6 @@ __all__ = [
     "ApprovalStatus",
     "ApprovalRequest",
     "ApprovalHandler",
-    "Checkpoint",
+    "HITLCheckpoint",
     "HITLController",
 ]

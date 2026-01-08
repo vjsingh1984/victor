@@ -1,0 +1,337 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Code Generation Workflow
+# ========================
+# Workflow for HumanEval/MBPP style code generation tasks:
+# - Task understanding
+# - Code generation
+# - Test execution and validation
+
+workflows:
+  code_generation:
+    description: "HumanEval/MBPP style function generation with testing"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Understand Task
+      # =====================================================================
+      - id: understand_task
+        type: agent
+        name: "Understand Task"
+        role: analyst
+        goal: |
+          Analyze the code generation task to understand:
+          1. The function signature and expected parameters
+          2. The expected return type and format
+          3. Edge cases and constraints
+          4. Example inputs and outputs if provided
+          5. Any special requirements or constraints
+
+          Create a clear specification for implementation.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        output: task_analysis
+        next: [generate_code]
+
+      # =====================================================================
+      # Stage 2: Generate Code
+      # =====================================================================
+      - id: generate_code
+        type: agent
+        name: "Generate Code"
+        role: executor
+        goal: |
+          Generate the required function/code:
+          1. Follow the exact function signature specified
+          2. Implement the core logic correctly
+          3. Handle edge cases appropriately
+          4. Write clean, readable code
+          5. Include docstrings if appropriate
+
+          Focus on correctness first, then optimize if needed.
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          analysis: task_analysis
+        output: generated_code
+        next: [test_code]
+
+      # =====================================================================
+      # Stage 3: Test Code
+      # =====================================================================
+      - id: test_code
+        type: compute
+        name: "Execute Tests"
+        handler: test_runner
+        tools: [shell]
+        inputs:
+          code: $ctx.generated_code
+          test_cases: $ctx.test_cases
+          timeout: $ctx.test_timeout
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_tests]
+
+      - id: check_tests
+        type: condition
+        name: "Check Test Results"
+        condition: "test_execution_status"
+        branches:
+          "all_pass": complete_success
+          "partial_pass": analyze_and_fix
+          "all_fail": analyze_and_fix
+          "error": handle_error
+
+      - id: handle_error
+        type: agent
+        name: "Handle Execution Error"
+        role: analyst
+        goal: |
+          Analyze the execution error:
+          1. Identify syntax or runtime errors
+          2. Determine the root cause
+          3. Prepare fix strategy
+        tool_budget: 10
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: error_analysis
+        next: [should_retry]
+
+      - id: analyze_and_fix
+        type: transform
+        name: "Analyze Failures"
+        transform: "extract_error_patterns"
+        next: [should_retry]
+
+      - id: should_retry
+        type: condition
+        name: "Should Retry"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": refine_code
+          "escalate": complete_partial
+          "submit_best_effort": complete_partial
+
+      - id: refine_code
+        type: agent
+        name: "Refine Code"
+        role: executor
+        goal: |
+          Fix the code based on test failures:
+          1. Analyze failing test cases
+          2. Identify logic errors
+          3. Fix the implementation
+          4. Ensure all edge cases are handled
+
+          Failing patterns:
+          {error_patterns}
+        tool_budget: 20
+        tools: [write, read]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          failures: failures
+          patterns: error_patterns
+          previous_code: generated_code
+        output: refined_code
+        next: [update_iteration]
+
+      - id: update_iteration
+        type: transform
+        name: "Update Iteration Count"
+        transform: |
+          fix_iterations = (fix_iterations or 0) + 1
+          generated_code = refined_code
+        next: [test_code]
+
+      # =====================================================================
+      # Stage 4: Completion
+      # =====================================================================
+      - id: complete_success
+        type: transform
+        name: "Complete Successfully"
+        transform: |
+          status = "completed"
+          success = true
+          solution = generated_code
+
+      - id: complete_partial
+        type: transform
+        name: "Complete with Partial Success"
+        transform: |
+          status = "completed"
+          success = false
+          solution = generated_code
+          notes = "Submitted with failing tests"
+
+
+  # =========================================================================
+  # Multi-Function Generation
+  # =========================================================================
+  multi_function:
+    description: "Generate multiple related functions"
+
+    metadata:
+      vertical: benchmark
+
+    nodes:
+      - id: analyze_requirements
+        type: agent
+        name: "Analyze Requirements"
+        role: analyst
+        goal: |
+          Analyze the multi-function task:
+          1. Identify all required functions
+          2. Determine dependencies between them
+          3. Plan implementation order
+        tool_budget: 10
+        llm_config:
+          temperature: 0.2
+        output: requirements
+        next: [parallel_generate]
+
+      - id: parallel_generate
+        type: parallel
+        name: "Generate Functions"
+        parallel_nodes: [generate_helpers, generate_main]
+        join_strategy: all
+        next: [integrate_test]
+
+      - id: generate_helpers
+        type: agent
+        name: "Generate Helper Functions"
+        role: executor
+        goal: "Generate helper/utility functions first."
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.1
+        output: helper_code
+
+      - id: generate_main
+        type: agent
+        name: "Generate Main Function"
+        role: executor
+        goal: "Generate the main function using helpers."
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.1
+        output: main_code
+
+      - id: integrate_test
+        type: compute
+        name: "Integrate and Test"
+        handler: test_runner
+        tools: [shell]
+        inputs:
+          code: |
+            ${helper_code}
+            ${main_code}
+          test_cases: $ctx.test_cases
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 120
+        next: [check_integration]
+
+      - id: check_integration
+        type: condition
+        name: "Check Integration"
+        condition: "test_execution_status"
+        branches:
+          "all_pass": done
+          "partial_pass": fix_integration
+          "all_fail": fix_integration
+          "error": fix_integration
+
+      - id: fix_integration
+        type: agent
+        name: "Fix Integration Issues"
+        role: executor
+        goal: "Fix integration issues between functions."
+        tool_budget: 25
+        tools: [write, read]
+        llm_config:
+          temperature: 0.1
+        output: fixed_code
+        next: [done]
+
+      - id: done
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"
+          solution = fixed_code or (helper_code + main_code)
+
+
+  # =========================================================================
+  # Simple Code Generation (No iteration)
+  # =========================================================================
+  code_generation_simple:
+    description: "Single-shot code generation without iteration"
+
+    metadata:
+      vertical: benchmark
+
+    nodes:
+      - id: generate
+        type: agent
+        name: "Generate Code"
+        role: executor
+        goal: |
+          Generate the required function in a single pass:
+          1. Carefully read the specification
+          2. Implement the function correctly
+          3. Handle all edge cases
+          4. Return clean, working code
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.0
+          max_tokens: 2000
+        output: solution
+        next: [verify]
+
+      - id: verify
+        type: compute
+        name: "Verify Syntax"
+        handler: syntax_check
+        tools: [shell]
+        inputs:
+          code: $ctx.solution
+          language: $ctx.language
+        output: syntax_result
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        next: [done]
+
+      - id: done
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"

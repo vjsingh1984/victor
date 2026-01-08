@@ -246,6 +246,64 @@ class VerticalBase(ABC):
         return cls._extensions_cache[cache_key]
 
     @classmethod
+    def _get_extension_factory(
+        cls,
+        extension_key: str,
+        import_path: str,
+        attribute_name: Optional[str] = None,
+    ) -> Any:
+        """Generic factory for lazy-loading and caching extensions.
+
+        Eliminates boilerplate across all verticals by providing a single
+        implementation of the lazy import + create + cache pattern.
+
+        Args:
+            extension_key: Cache key (e.g., "safety_extension", "prompt_contributor")
+            import_path: Full Python import path (e.g., "victor.coding.safety")
+            attribute_name: Class name to import. If None, auto-generates from vertical name
+                          (e.g., "CodingSafetyExtension" for CodingAssistant)
+
+        Returns:
+            Cached or newly created extension instance
+
+        Example:
+            # Before (13 lines)
+            def get_safety_extension(cls):
+                def _create():
+                    from victor.coding.safety import CodingSafetyExtension
+                    return CodingSafetyExtension()
+                return cls._get_cached_extension("safety_extension", _create)
+
+            # After (3 lines)
+            def get_safety_extension(cls):
+                return cls._get_extension_factory(
+                    "safety_extension",
+                    "victor.coding.safety",
+                )
+        """
+
+        def _create():
+            # Determine the class name to import
+            if attribute_name is None:
+                # Auto-generate class name
+                # Convert "CodingAssistant" → "Coding"
+                vertical_name = cls.__name__.replace("Assistant", "")
+                # Convert "safety_extension" → "SafetyExtension"
+                extension_type = extension_key.replace("_", " ").title().replace(" ", "")
+                class_name = f"{vertical_name}{extension_type}"
+            else:
+                class_name = attribute_name
+
+            # Lazy import: only loads module when first called
+            module = __import__(import_path, fromlist=[class_name])
+
+            # Import and instantiate
+            return getattr(module, class_name)()
+
+        # Use existing caching infrastructure
+        return cls._get_cached_extension(extension_key, _create)
+
+    @classmethod
     @abstractmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tool names for this vertical.
@@ -430,12 +488,22 @@ class VerticalBase(ABC):
 
         Returns:
             Dictionary with provider preferences.
+
+        Default implementation uses VerticalConfigRegistry. Override in subclasses
+        for vertical-specific requirements.
         """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-        }
+        from victor.core.verticals.config_registry import VerticalConfigRegistry
+
+        # Try to get from registry based on vertical name
+        try:
+            return VerticalConfigRegistry.get_provider_hints(cls.name)
+        except KeyError:
+            # Fallback to generic defaults
+            return {
+                "preferred_providers": ["anthropic", "openai"],
+                "min_context_window": 100000,
+                "requires_tool_calling": True,
+            }
 
     @classmethod
     def get_evaluation_criteria(cls) -> List[str]:
@@ -443,12 +511,22 @@ class VerticalBase(ABC):
 
         Returns:
             List of evaluation criteria descriptions.
+
+        Default implementation uses VerticalConfigRegistry. Override in subclasses
+        for vertical-specific requirements.
         """
-        return [
-            "Task completion accuracy",
-            "Tool usage efficiency",
-            "Response relevance",
-        ]
+        from victor.core.verticals.config_registry import VerticalConfigRegistry
+
+        # Try to get from registry based on vertical name
+        try:
+            return VerticalConfigRegistry.get_evaluation_criteria(cls.name)
+        except KeyError:
+            # Fallback to generic defaults
+            return [
+                "Task completion accuracy",
+                "Tool usage efficiency",
+                "Response relevance",
+            ]
 
     @classmethod
     def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:
@@ -627,6 +705,39 @@ class VerticalBase(ABC):
             Tool dependency provider (ToolDependencyProviderProtocol) or None
         """
         return None
+
+    @classmethod
+    def get_tool_graph(cls) -> Optional[Any]:
+        """Get tool execution graph for this vertical.
+
+        Override to provide a custom ToolExecutionGraph that defines
+        tool dependencies, transitions, and execution sequences.
+        The graph is registered with the global ToolGraphRegistry.
+
+        Returns:
+            ToolExecutionGraph instance or None (no graph registered)
+        """
+        return None
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for workflow execution.
+
+        Override to provide domain-specific handlers for workflow nodes.
+        These handlers are registered with the HandlerRegistry during
+        vertical integration, replacing the previous import-side-effect
+        registration pattern.
+
+        Example:
+            @classmethod
+            def get_handlers(cls) -> Dict[str, Any]:
+                from victor.coding.handlers import HANDLERS
+                return HANDLERS
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        return {}
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[Any]:
@@ -1091,10 +1202,22 @@ class VerticalRegistry:
         return list(cls._registry.keys())
 
     @classmethod
-    def clear(cls) -> None:
-        """Clear all registered verticals (for testing)."""
+    def clear(cls, *, reregister_builtins: bool = True) -> None:
+        """Clear all registered verticals (for testing).
+
+        Args:
+            reregister_builtins: If True (default), re-register built-in verticals
+                after clearing. This prevents test pollution where clearing in one
+                test affects other tests that expect built-ins to be available.
+        """
         cls._registry.clear()
         cls._external_discovered = False
+
+        if reregister_builtins:
+            # Re-register built-in verticals to prevent test pollution
+            from victor.core.verticals import _register_builtin_verticals
+
+            _register_builtin_verticals()
 
     @classmethod
     def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:

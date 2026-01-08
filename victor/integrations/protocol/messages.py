@@ -159,11 +159,16 @@ MessageContent = Union[
 ]
 
 
-@dataclass
-class ToolCall:
-    """Tool call with full lifecycle tracking.
+# Import canonical ToolCall for basic representation
+from victor.agent.tool_calling.base import ToolCall
 
-    Used for displaying tool execution in the UI.
+
+@dataclass
+class ToolCallExecution:
+    """Tool call execution with full lifecycle tracking.
+
+    Used for displaying tool execution in the UI with status, timing, and metadata.
+    Different from ToolCall which is just the request representation.
     """
 
     id: str = ""

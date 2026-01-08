@@ -188,7 +188,7 @@ Actions:
 
             elif action == "query":
                 from datetime import datetime, timedelta
-                from victor.audit import AuditEventType
+                from victor.security.audit import AuditEventType
 
                 days = days or 7
                 end_date = datetime.now()

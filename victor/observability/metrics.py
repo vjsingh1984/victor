@@ -610,11 +610,12 @@ class MetricsCollector:
     Subscribes to EventBus and updates metrics based on events.
 
     Example:
-        from victor.observability import EventBus
+        from victor.core.events import ObservabilityBus, get_observability_bus
         from victor.observability.metrics import MetricsCollector
 
         collector = MetricsCollector()
-        collector.wire_event_bus(EventBus.get_instance())
+        bus = get_observability_bus()
+        collector.wire_observability_bus(bus)
 
         # Metrics are now updated automatically from events
     """
@@ -686,25 +687,25 @@ class MetricsCollector:
             "Total errors",
         )
 
-    def wire_event_bus(self, event_bus: Any) -> None:
-        """Wire collector to EventBus.
+    def wire_observability_bus(self, observability_bus: Any) -> None:
+        """Wire collector to ObservabilityBus.
 
         Args:
-            event_bus: EventBus instance.
+            observability_bus: ObservabilityBus instance.
         """
-        from victor.observability.event_bus import EventCategory
-
-        event_bus.subscribe(EventCategory.TOOL, self._on_tool_event)
-        event_bus.subscribe(EventCategory.MODEL, self._on_model_event)
-        event_bus.subscribe(EventCategory.STATE, self._on_state_event)
-        event_bus.subscribe(EventCategory.LIFECYCLE, self._on_lifecycle_event)
-        event_bus.subscribe(EventCategory.ERROR, self._on_error_event)
+        # Subscribe to topic patterns for each category
+        observability_bus.subscribe("tool.*", self._on_tool_event)
+        observability_bus.subscribe("model.*", self._on_model_event)
+        observability_bus.subscribe("state.*", self._on_state_event)
+        observability_bus.subscribe("lifecycle.*", self._on_lifecycle_event)
+        observability_bus.subscribe("error.*", self._on_error_event)
 
     def _on_tool_event(self, event: Any) -> None:
         """Handle tool events."""
-        if event.name.endswith(".start"):
+        # Event has topic and data attributes
+        if event.topic.endswith(".start") or event.topic == "tool.start":
             pass  # Track start for duration
-        elif event.name.endswith(".end"):
+        elif event.topic.endswith(".result") or event.topic == "tool.result":
             self.tool_calls.increment()
             if not event.data.get("success", True):
                 self.tool_errors.increment()
@@ -713,27 +714,32 @@ class MetricsCollector:
 
     def _on_model_event(self, event: Any) -> None:
         """Handle model events."""
-        if event.name == "request":
+        if event.topic.endswith(".request") or event.topic == "model.request":
             self.model_requests.increment()
-        elif event.name == "response":
-            if "tokens_used" in event.data and event.data["tokens_used"]:
-                self.model_tokens.increment(event.data["tokens_used"])
+        elif event.topic.endswith(".response") or event.topic == "model.response":
+            if "total_tokens" in event.data and event.data["total_tokens"]:
+                self.model_tokens.increment(event.data["total_tokens"])
             if "latency_ms" in event.data and event.data["latency_ms"]:
                 self.model_latency.observe(event.data["latency_ms"])
 
     def _on_state_event(self, event: Any) -> None:
         """Handle state events."""
-        if event.name == "transition":
+        if event.topic.endswith(".transition") or event.topic == "state.transition":
             self.state_transitions.increment()
 
     def _on_lifecycle_event(self, event: Any) -> None:
         """Handle lifecycle events."""
-        if event.name == "session.start":
+        if event.topic.endswith("session.start") or event.topic == "lifecycle.session.start":
             self.active_sessions.increment()
-        elif event.name == "session.end":
+        elif event.topic.endswith("session.end") or event.topic == "lifecycle.session.end":
             self.active_sessions.decrement()
-            if "duration_seconds" in event.data and event.data["duration_seconds"]:
-                self.session_duration.observe(event.data["duration_seconds"])
+            # Check for duration in milliseconds or seconds
+            duration_ms = event.data.get("duration_ms", 0)
+            duration_sec = event.data.get("duration_seconds", 0)
+            if duration_ms:
+                self.session_duration.observe(duration_ms / 1000)  # Convert to seconds
+            elif duration_sec:
+                self.session_duration.observe(duration_sec)
 
     def _on_error_event(self, event: Any) -> None:
         """Handle error events."""

@@ -34,7 +34,7 @@ async def workflow(
     Runs a pre-defined, multi-step workflow to automate a complex task.
 
     Args:
-        workflow_name: The name of the workflow to run (e.g., 'new_feature').
+        workflow_name: The name of the workflow to run (e.g., 'python_feature').
         context: The tool context provided by the orchestrator.
         workflow_args: A dictionary of arguments required by the specific workflow.
 

@@ -167,10 +167,17 @@ class StreamDelta:
 
 
 @dataclass
-class StreamChunk:
-    """Single chunk from streaming response.
+class TypedStreamChunk:
+    """Single chunk from streaming response with type-safe nested structure.
 
-    Replaces getattr(delta, "content", "") pattern.
+    Replaces getattr(delta, "content", "") pattern. Uses nested StreamDelta
+    for structured access to streaming delta updates.
+
+    Renamed from StreamChunk to be semantically distinct from other streaming types:
+    - StreamChunk (victor.providers.base): Provider-level raw streaming
+    - OrchestratorStreamChunk: Orchestrator protocol with typed ChunkType
+    - TypedStreamChunk: Safe typed accessor with nested StreamDelta
+    - ClientStreamChunk: Protocol interface for clients (CLI/VS Code)
     """
 
     delta: StreamDelta
@@ -335,7 +342,7 @@ __all__ = [
     "ProviderUsage",
     "ProviderMessage",
     "StreamDelta",
-    "StreamChunk",
+    "TypedStreamChunk",
     # Agent models
     "AgentInfo",
     # Metrics models

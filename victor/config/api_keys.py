@@ -141,6 +141,9 @@ _PROVIDER_ENV_VARS_FALLBACK: Dict[str, str] = {
     "moonshot": "MOONSHOT_API_KEY",
     "kimi": "MOONSHOT_API_KEY",  # Alias for moonshot
     "deepseek": "DEEPSEEK_API_KEY",
+    "zai": "ZAI_API_KEY",
+    "zhipuai": "ZAI_API_KEY",  # Alias for zai
+    "zhipu": "ZAI_API_KEY",  # Alias for zai
     # Free-tier providers
     "groqcloud": "GROQCLOUD_API_KEY",
     "cerebras": "CEREBRAS_API_KEY",
@@ -396,7 +399,7 @@ def _audit_log_secret_access(
 
     # Try to log to audit system if available
     try:
-        from victor.audit import AuditManager, AuditEventType
+        from victor.security.audit import AuditManager, AuditEventType
 
         audit = AuditManager.get_instance()
         audit.log_event(
@@ -1111,6 +1114,7 @@ api_keys:
   xai: ""           # XAI_API_KEY - Grok models (grok-2, grok-beta)
   moonshot: ""      # MOONSHOT_API_KEY - Kimi K2 models (kimi-k2-0711-preview)
   deepseek: ""      # DEEPSEEK_API_KEY - DeepSeek models (deepseek-chat, deepseek-reasoner)
+  zai: ""           # ZAI_API_KEY - GLM models (glm-4.7, glm-4.6, glm-4.5) - ZhipuAI/智谱AI
 
   # ============================================================================
   # Free-Tier Providers (great for getting started)

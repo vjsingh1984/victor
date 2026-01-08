@@ -52,8 +52,15 @@ from typing import Any, Callable, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-class QualityDimension(Enum):
-    """Dimensions of response quality."""
+class ResponseQualityDimension(Enum):
+    """Dimensions of LLM response quality.
+
+    This is the CANONICAL ResponseQualityDimension for response quality scoring.
+
+    Renamed from QualityDimension to be semantically distinct:
+    - ResponseQualityDimension (here): LLM response quality (7 dimensions)
+    - ProtocolQualityDimension (victor.protocols.quality): Protocol-level quality (7 different dimensions)
+    """
 
     RELEVANCE = "relevance"  # Addresses the query
     COMPLETENESS = "completeness"  # Covers all aspects
@@ -76,7 +83,7 @@ class DimensionScore:
         evidence: Evidence supporting the score
     """
 
-    dimension: QualityDimension
+    dimension: ResponseQualityDimension
     score: float
     weight: float = 1.0
     feedback: str = ""
@@ -101,7 +108,7 @@ class QualityResult:
     improvement_suggestions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def get_dimension_score(self, dimension: QualityDimension) -> Optional[float]:
+    def get_dimension_score(self, dimension: ResponseQualityDimension) -> Optional[float]:
         """Get score for a specific dimension."""
         for ds in self.dimension_scores:
             if ds.dimension == dimension:
@@ -127,7 +134,7 @@ class ScorerConfig:
     """
 
     min_threshold: float = 0.6
-    dimension_weights: Dict[QualityDimension, float] = field(default_factory=dict)
+    dimension_weights: Dict[ResponseQualityDimension, float] = field(default_factory=dict)
     enable_code_quality: bool = True
     enable_grounding: bool = True
     strict_mode: bool = False
@@ -143,13 +150,13 @@ class ResponseQualityScorer:
 
     # Default weights for each dimension
     DEFAULT_WEIGHTS = {
-        QualityDimension.RELEVANCE: 1.5,
-        QualityDimension.COMPLETENESS: 1.2,
-        QualityDimension.ACCURACY: 1.3,
-        QualityDimension.CONCISENESS: 0.8,
-        QualityDimension.ACTIONABILITY: 1.0,
-        QualityDimension.COHERENCE: 0.9,
-        QualityDimension.CODE_QUALITY: 1.1,
+        ResponseQualityDimension.RELEVANCE: 1.5,
+        ResponseQualityDimension.COMPLETENESS: 1.2,
+        ResponseQualityDimension.ACCURACY: 1.3,
+        ResponseQualityDimension.CONCISENESS: 0.8,
+        ResponseQualityDimension.ACTIONABILITY: 1.0,
+        ResponseQualityDimension.COHERENCE: 0.9,
+        ResponseQualityDimension.CODE_QUALITY: 1.1,
     }
 
     # Patterns that indicate poor quality
@@ -337,9 +344,9 @@ class ResponseQualityScorer:
 
         if not query_terms:
             return DimensionScore(
-                dimension=QualityDimension.RELEVANCE,
+                dimension=ResponseQualityDimension.RELEVANCE,
                 score=0.7,
-                weight=self.weights[QualityDimension.RELEVANCE],
+                weight=self.weights[ResponseQualityDimension.RELEVANCE],
                 feedback="Query too short to assess relevance",
             )
 
@@ -370,9 +377,9 @@ class ResponseQualityScorer:
             evidence.append(f"Low term coverage: {term_coverage:.0%}")
 
         return DimensionScore(
-            dimension=QualityDimension.RELEVANCE,
+            dimension=ResponseQualityDimension.RELEVANCE,
             score=score,
-            weight=self.weights[QualityDimension.RELEVANCE],
+            weight=self.weights[ResponseQualityDimension.RELEVANCE],
             feedback="Improve topic coverage" if score < 0.7 else "Good relevance",
             evidence=evidence,
         )
@@ -434,9 +441,9 @@ class ResponseQualityScorer:
                 evidence.append(f"Referenced {files_mentioned} read files")
 
         return DimensionScore(
-            dimension=QualityDimension.COMPLETENESS,
+            dimension=ResponseQualityDimension.COMPLETENESS,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.COMPLETENESS],
+            weight=self.weights[ResponseQualityDimension.COMPLETENESS],
             feedback="Add more detail" if score < 0.6 else "Good completeness",
             evidence=evidence,
         )
@@ -477,9 +484,9 @@ class ResponseQualityScorer:
             evidence.append(f"High hedging language ({hedging_count} instances)")
 
         return DimensionScore(
-            dimension=QualityDimension.ACCURACY,
+            dimension=ResponseQualityDimension.ACCURACY,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.ACCURACY],
+            weight=self.weights[ResponseQualityDimension.ACCURACY],
             feedback="Verify claims" if score < 0.7 else "Good accuracy",
             evidence=evidence,
         )
@@ -532,9 +539,9 @@ class ResponseQualityScorer:
             evidence.append(f"Filler phrases: {filler_count}")
 
         return DimensionScore(
-            dimension=QualityDimension.CONCISENESS,
+            dimension=ResponseQualityDimension.CONCISENESS,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.CONCISENESS],
+            weight=self.weights[ResponseQualityDimension.CONCISENESS],
             feedback="Be more concise" if score < 0.6 else "Good conciseness",
             evidence=evidence,
         )
@@ -563,9 +570,9 @@ class ResponseQualityScorer:
 
         if not expects_action:
             return DimensionScore(
-                dimension=QualityDimension.ACTIONABILITY,
+                dimension=ResponseQualityDimension.ACTIONABILITY,
                 score=0.8,  # Not applicable, give good default
-                weight=self.weights[QualityDimension.ACTIONABILITY],
+                weight=self.weights[ResponseQualityDimension.ACTIONABILITY],
                 feedback="Action not expected for this query",
                 evidence=["Informational query"],
             )
@@ -598,9 +605,9 @@ class ResponseQualityScorer:
             evidence.append("References specific files")
 
         return DimensionScore(
-            dimension=QualityDimension.ACTIONABILITY,
+            dimension=ResponseQualityDimension.ACTIONABILITY,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.ACTIONABILITY],
+            weight=self.weights[ResponseQualityDimension.ACTIONABILITY],
             feedback="Add concrete steps" if score < 0.7 else "Good actionability",
             evidence=evidence,
         )
@@ -648,9 +655,9 @@ class ResponseQualityScorer:
             evidence.append(f"{len(code_blocks)} properly formatted code blocks")
 
         return DimensionScore(
-            dimension=QualityDimension.COHERENCE,
+            dimension=ResponseQualityDimension.COHERENCE,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.COHERENCE],
+            weight=self.weights[ResponseQualityDimension.COHERENCE],
             feedback="Improve structure" if score < 0.6 else "Good coherence",
             evidence=evidence,
         )
@@ -665,9 +672,9 @@ class ResponseQualityScorer:
 
         if not code_blocks:
             return DimensionScore(
-                dimension=QualityDimension.CODE_QUALITY,
+                dimension=ResponseQualityDimension.CODE_QUALITY,
                 score=0.5,
-                weight=self.weights[QualityDimension.CODE_QUALITY],
+                weight=self.weights[ResponseQualityDimension.CODE_QUALITY],
                 feedback="No code blocks found",
                 evidence=["Inline code only"],
             )
@@ -719,9 +726,9 @@ class ResponseQualityScorer:
         evidence.append(f"{len(code_blocks)} code block(s)")
 
         return DimensionScore(
-            dimension=QualityDimension.CODE_QUALITY,
+            dimension=ResponseQualityDimension.CODE_QUALITY,
             score=min(1.0, max(0.0, score)),
-            weight=self.weights[QualityDimension.CODE_QUALITY],
+            weight=self.weights[ResponseQualityDimension.CODE_QUALITY],
             feedback="Improve code quality" if score < 0.6 else "Good code quality",
             evidence=evidence,
         )
@@ -736,19 +743,19 @@ class ResponseQualityScorer:
 
         for ds in sorted(dimension_scores, key=lambda x: x.score):
             if ds.score < 0.6:
-                if ds.dimension == QualityDimension.RELEVANCE:
+                if ds.dimension == ResponseQualityDimension.RELEVANCE:
                     suggestions.append("Address the specific question more directly")
-                elif ds.dimension == QualityDimension.COMPLETENESS:
+                elif ds.dimension == ResponseQualityDimension.COMPLETENESS:
                     suggestions.append("Provide more comprehensive coverage of all aspects")
-                elif ds.dimension == QualityDimension.ACCURACY:
+                elif ds.dimension == ResponseQualityDimension.ACCURACY:
                     suggestions.append("Verify claims against actual codebase content")
-                elif ds.dimension == QualityDimension.CONCISENESS:
+                elif ds.dimension == ResponseQualityDimension.CONCISENESS:
                     suggestions.append("Remove filler phrases and unnecessary content")
-                elif ds.dimension == QualityDimension.ACTIONABILITY:
+                elif ds.dimension == ResponseQualityDimension.ACTIONABILITY:
                     suggestions.append("Add concrete steps or code examples")
-                elif ds.dimension == QualityDimension.COHERENCE:
+                elif ds.dimension == ResponseQualityDimension.COHERENCE:
                     suggestions.append("Improve logical flow and formatting")
-                elif ds.dimension == QualityDimension.CODE_QUALITY:
+                elif ds.dimension == ResponseQualityDimension.CODE_QUALITY:
                     suggestions.append("Fix syntax issues and remove placeholder code")
 
         return suggestions[:5]  # Top 5 suggestions
@@ -765,7 +772,7 @@ class QualityGate:
         self,
         scorer: ResponseQualityScorer,
         min_score: float = 0.6,
-        required_dimensions: Optional[List[QualityDimension]] = None,
+        required_dimensions: Optional[List[ResponseQualityDimension]] = None,
     ):
         """Initialize quality gate.
 

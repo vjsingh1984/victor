@@ -2,8 +2,38 @@
   "mcpServers": {
     "victor": {
       "command": "victor",
-      "args": ["mcp"],
+      "args": ["mcp", "--stdio"],
       "env": {}
+    },
+    "victor-coding": {
+      "command": "victor",
+      "args": ["mcp", "--stdio"],
+      "env": {
+        "VICTOR_MCP_VERTICALS": "coding"
+      }
+    },
+    "victor-safe": {
+      "command": "victor",
+      "args": ["mcp", "--stdio"],
+      "env": {
+        "VICTOR_MCP_TOOLS": "read,ls,grep,find_files,code_search,git"
+      }
+    },
+    "victor-docker": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "${HOME}:/workspace",
+        "victor-ai/mcp-server:latest"
+      ],
+      "env": {}
+    },
+    "victor-airgapped": {
+      "command": "victor",
+      "args": ["mcp", "--stdio"],
+      "env": {
+        "VICTOR_AIRGAPPED_MODE": "true"
+      }
     }
   }
 }

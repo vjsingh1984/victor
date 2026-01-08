@@ -245,7 +245,7 @@ async def run_code_gen_benchmark(
     print("=" * 70)
     print()
     print(f"Profile:     {profile}")
-    print(f"Mode:        provider (code generation)")
+    print("Mode:        provider (code generation)")
     print(f"Tasks:       {num_tasks if num_tasks else 'ALL (164)'}")
     print(f"Timestamp:   {datetime.now().isoformat()}")
     print()

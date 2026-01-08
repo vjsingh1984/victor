@@ -1,0 +1,445 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Pass@k Evaluation Workflows
+# ===========================
+# Workflows for generating multiple solution attempts and evaluating
+# pass@k metrics (pass@1, pass@10, pass@100).
+# Used for: HumanEval, MBPP, and other code generation benchmarks.
+
+workflows:
+  # ===========================================================================
+  # Pass@k Multi-Attempt Generation
+  # ===========================================================================
+  passk_generation:
+    description: "Generate k solution attempts for pass@k evaluation"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: evaluation
+      benchmark_type: passk
+      complexity: medium
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Parse Problem
+      # =====================================================================
+      - id: parse_problem
+        type: agent
+        name: "Parse Problem"
+        role: analyst
+        goal: |
+          Understand the problem specification:
+          1. Parse the function signature
+          2. Understand the expected behavior
+          3. Identify input/output types
+          4. Note constraints and edge cases
+        tool_budget: 10
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: problem_understanding
+        next: [generate_solutions]
+
+      # =====================================================================
+      # Stage 2: Generate Multiple Solutions
+      # =====================================================================
+      - id: generate_solutions
+        type: parallel
+        name: "Generate K Solutions"
+        join_strategy: all
+        parallel_nodes: [solution_1, solution_2, solution_3]
+        next: [collect_solutions]
+
+      - id: solution_1
+        type: agent
+        name: "Solution Attempt 1"
+        role: executor
+        goal: |
+          Generate a solution using approach 1:
+          Focus on correctness and clarity.
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.2
+        output: solution_1
+
+      - id: solution_2
+        type: agent
+        name: "Solution Attempt 2"
+        role: executor
+        goal: |
+          Generate a solution using approach 2:
+          Try a different algorithm or approach.
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.4
+        output: solution_2
+
+      - id: solution_3
+        type: agent
+        name: "Solution Attempt 3"
+        role: executor
+        goal: |
+          Generate a solution using approach 3:
+          Explore an alternative implementation.
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.6
+        output: solution_3
+
+      # =====================================================================
+      # Stage 3: Collect and Validate
+      # =====================================================================
+      - id: collect_solutions
+        type: transform
+        name: "Collect Solutions"
+        transform: |
+          solutions = [
+            ctx.get("solution_1", ""),
+            ctx.get("solution_2", ""),
+            ctx.get("solution_3", ""),
+          ]
+          # Filter out empty solutions
+          valid_solutions = [s for s in solutions if s.strip()]
+          solution_count = len(valid_solutions)
+        next: [validate_solutions]
+
+      - id: validate_solutions
+        type: compute
+        name: "Validate All Solutions"
+        handler: multi_solution_validator
+        inputs:
+          solutions: $ctx.valid_solutions
+          test_cases: $ctx.test_cases
+          language: $ctx.language
+          timeout_per_solution: 30
+        output: validation_results
+        constraints:
+          llm_allowed: false
+          timeout: 180
+        next: [calculate_metrics]
+
+      # =====================================================================
+      # Stage 4: Calculate Pass@k Metrics
+      # =====================================================================
+      - id: calculate_metrics
+        type: transform
+        name: "Calculate Pass@k"
+        transform: |
+          results = ctx.get("validation_results", {})
+          passed = results.get("passed_solutions", 0)
+          total = results.get("total_solutions", 0)
+
+          # Calculate pass@k metrics
+          pass_at_1 = 1.0 if passed >= 1 else 0.0
+          pass_at_k = passed / total if total > 0 else 0.0
+
+          best_solution = results.get("best_solution", "")
+          status = "completed"
+        next: [format_output]
+
+      # =====================================================================
+      # Stage 5: Format Output
+      # =====================================================================
+      - id: format_output
+        type: transform
+        name: "Format Output"
+        transform: |
+          solution_code = ctx.get("best_solution", ctx.get("solution_1", ""))
+          metrics = {
+            "pass_at_1": ctx.get("pass_at_1", 0.0),
+            "pass_at_k": ctx.get("pass_at_k", 0.0),
+            "k": ctx.get("solution_count", 0),
+            "passed": ctx.get("passed", 0),
+          }
+
+
+  # ===========================================================================
+  # High-K Generation (pass@10, pass@100)
+  # ===========================================================================
+  passk_high:
+    description: "Generate many attempts for high-k evaluation"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: evaluation
+      benchmark_type: passk_high
+      complexity: high
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Parse Problem
+      # =====================================================================
+      - id: parse_problem
+        type: agent
+        name: "Parse Problem"
+        role: analyst
+        goal: |
+          Understand the problem deeply:
+          1. Parse function signature and docstring
+          2. Extract all constraints
+          3. Identify test case patterns
+        tool_budget: 10
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: problem_understanding
+        next: [batch_generation]
+
+      # =====================================================================
+      # Stage 2: Batch Generation (multiple iterations)
+      # =====================================================================
+      - id: batch_generation
+        type: agent
+        name: "Batch Generate Solutions"
+        role: executor
+        goal: |
+          Generate multiple diverse solutions (up to 10):
+          1. Use different algorithmic approaches
+          2. Vary implementation details
+          3. Consider edge cases differently
+
+          Output each solution clearly separated.
+        tool_budget: 50
+        tools: [write]
+        llm_config:
+          temperature: 0.7
+          top_p: 0.95
+        input_mapping:
+          understanding: problem_understanding
+        output: batch_solutions
+        next: [parse_batch]
+
+      # =====================================================================
+      # Stage 3: Parse and Validate
+      # =====================================================================
+      - id: parse_batch
+        type: transform
+        name: "Parse Batch Solutions"
+        transform: |
+          # Parse multiple solutions from batch output
+          batch = ctx.get("batch_solutions", "")
+          # Split by common delimiters
+          solutions = []
+          current = []
+          for line in batch.split("\n"):
+            if line.startswith("# Solution") or line.startswith("## Solution"):
+              if current:
+                solutions.append("\n".join(current))
+              current = []
+            else:
+              current.append(line)
+          if current:
+            solutions.append("\n".join(current))
+          valid_solutions = [s for s in solutions if s.strip()]
+        next: [validate_batch]
+
+      - id: validate_batch
+        type: compute
+        name: "Validate Batch"
+        handler: multi_solution_validator
+        inputs:
+          solutions: $ctx.valid_solutions
+          test_cases: $ctx.test_cases
+          language: $ctx.language
+          timeout_per_solution: 30
+        output: validation_results
+        constraints:
+          llm_allowed: false
+          timeout: 600
+        next: [check_progress]
+
+      - id: check_progress
+        type: condition
+        name: "Check Progress"
+        condition: "passk_progress_check"
+        branches:
+          "sufficient": calculate_final_metrics
+          "need_more": generate_more
+          "max_reached": calculate_final_metrics
+
+      - id: generate_more
+        type: agent
+        name: "Generate Additional Solutions"
+        role: executor
+        goal: |
+          Generate more diverse solutions:
+          Try different approaches not yet attempted.
+        tool_budget: 30
+        tools: [write]
+        llm_config:
+          temperature: 0.8
+        output: additional_solutions
+        next: [merge_solutions]
+
+      - id: merge_solutions
+        type: transform
+        name: "Merge Solutions"
+        transform: |
+          existing = ctx.get("valid_solutions", [])
+          additional = ctx.get("additional_solutions", "").split("---")
+          all_solutions = existing + [s.strip() for s in additional if s.strip()]
+          valid_solutions = all_solutions
+          generation_iterations = ctx.get("generation_iterations", 0) + 1
+        next: [validate_batch]
+
+      # =====================================================================
+      # Stage 4: Calculate Final Metrics
+      # =====================================================================
+      - id: calculate_final_metrics
+        type: transform
+        name: "Calculate Final Pass@k"
+        transform: |
+          results = ctx.get("validation_results", {})
+          n = results.get("total_solutions", 0)
+          c = results.get("passed_solutions", 0)
+
+          # Pass@k calculation using unbiased estimator
+          # pass@k = 1 - comb(n-c, k) / comb(n, k)
+          import math
+
+          def pass_at_k(n, c, k):
+            if n - c < k:
+              return 1.0
+            return 1.0 - math.comb(n - c, k) / math.comb(n, k)
+
+          pass_at_1 = pass_at_k(n, c, 1) if n >= 1 else 0.0
+          pass_at_10 = pass_at_k(n, c, 10) if n >= 10 else pass_at_k(n, c, min(n, 10))
+          pass_at_100 = pass_at_k(n, c, min(n, 100))
+
+          best_solution = results.get("best_solution", "")
+          status = "completed"
+
+          metrics = {
+            "n": n,
+            "c": c,
+            "pass_at_1": pass_at_1,
+            "pass_at_10": pass_at_10,
+            "pass_at_100": pass_at_100,
+          }
+
+
+  # ===========================================================================
+  # Single Best Solution (with self-refinement)
+  # ===========================================================================
+  passk_refined:
+    description: "Generate and iteratively refine a single best solution"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: evaluation
+      benchmark_type: passk_refined
+      complexity: medium
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Initial Generation
+      # =====================================================================
+      - id: initial_generation
+        type: agent
+        name: "Generate Initial Solution"
+        role: executor
+        goal: |
+          Generate a high-quality initial solution:
+          1. Focus on correctness first
+          2. Handle all edge cases
+          3. Follow best practices
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.2
+        output: current_solution
+        next: [test_solution]
+
+      # =====================================================================
+      # Stage 2: Test and Refine Loop
+      # =====================================================================
+      - id: test_solution
+        type: compute
+        name: "Test Solution"
+        handler: code_tester
+        inputs:
+          code: $ctx.current_solution
+          test_cases: $ctx.test_cases
+          language: $ctx.language
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_tests]
+
+      - id: check_tests
+        type: condition
+        name: "Check Test Results"
+        condition: "test_execution_status"
+        branches:
+          "passed": finalize
+          "failed": analyze_and_refine
+          "partial": analyze_and_refine
+
+      - id: analyze_and_refine
+        type: agent
+        name: "Analyze and Refine"
+        role: executor
+        goal: |
+          Analyze failures and improve the solution:
+          1. Understand why tests failed
+          2. Fix the identified issues
+          3. Maintain overall correctness
+        tool_budget: 20
+        tools: [write, read]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          solution: current_solution
+          test_results: test_results
+        output: current_solution
+        next: [increment_refinement]
+
+      - id: increment_refinement
+        type: transform
+        name: "Track Refinements"
+        transform: |
+          refinement_count = ctx.get("refinement_count", 0) + 1
+        next: [check_refinement_limit]
+
+      - id: check_refinement_limit
+        type: condition
+        name: "Check Refinement Limit"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": test_solution
+          "submit_best_effort": finalize
+          "escalate": finalize
+
+      # =====================================================================
+      # Stage 3: Finalize
+      # =====================================================================
+      - id: finalize
+        type: transform
+        name: "Finalize Solution"
+        transform: |
+          solution_code = ctx.get("current_solution", "")
+          status = "completed"
+          passed = ctx.get("test_results", {}).get("passed", False)
+          refinements = ctx.get("refinement_count", 0)

@@ -71,7 +71,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -612,7 +612,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             from victor.agent.conversation_embedding_store import (
                 get_conversation_embedding_store,
             )
-            from victor.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import EmbeddingService
 
             embedding_service = EmbeddingService.get_instance()
             embedding_store = await get_conversation_embedding_store(embedding_service)

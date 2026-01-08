@@ -43,6 +43,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
+from victor.core.search_types import SearchHit
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,6 +73,16 @@ class HybridSearchResult:
     keyword_rank: int = -1  # -1 if not in keyword results
     line_number: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_search_hit(self) -> SearchHit:
+        """Convert to a generic SearchHit for cross-layer consumers."""
+        return SearchHit(
+            file_path=self.file_path,
+            content=self.content,
+            score=self.combined_score,
+            line_number=self.line_number or None,
+            metadata=self.metadata,
+        )
 
 
 class HybridSearchEngine:

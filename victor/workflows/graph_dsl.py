@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""StateGraph DSL for declarative workflow definitions.
+"""WorkflowGraph DSL for declarative workflow definitions.
 
 Provides a LangGraph-inspired declarative API for defining workflow graphs
 with type-safe state, operator chaining, and branch/merge patterns.
@@ -26,8 +26,12 @@ allowing workflows to be defined directly in Python with:
 - Entry/exit point declaration
 - Compilation to WorkflowDefinition for execution
 
+Note: This module provides WorkflowGraph which compiles to WorkflowDefinition.
+For the LangGraph-compatible StateGraph that compiles to CompiledGraph,
+see victor.framework.graph.StateGraph.
+
 Example - Basic linear workflow:
-    from victor.workflows.graph_dsl import StateGraph, State
+    from victor.workflows.graph_dsl import WorkflowGraph, State
     from dataclasses import dataclass
     from typing import List, Optional
 
@@ -52,7 +56,7 @@ Example - Basic linear workflow:
         return state
 
     # Build workflow using operator chaining
-    graph = StateGraph(CodeReviewState)
+    graph = WorkflowGraph(CodeReviewState)
     graph.add_node("analyze", analyze_code)
     graph.add_node("find_issues", find_issues)
     graph.add_node("report", generate_report)
@@ -197,8 +201,14 @@ NodeFunc = Callable[[S], Union[S, Awaitable[S]]]
 RouterFunc = Callable[[S], str]
 
 
-class NodeType(str, Enum):
-    """Types of graph nodes."""
+class GraphNodeType(str, Enum):
+    """Types of graph DSL nodes.
+
+    Renamed from NodeType to be semantically distinct:
+    - GraphNodeType (here): Graph DSL nodes (FUNCTION, CONDITIONAL, SUBGRAPH)
+    - WorkflowNodeType (victor.workflows.definition): Workflow definition nodes (COMPUTE, HITL, START, END)
+    - YAMLNodeType (victor.workflows.yaml_loader): YAML loader validation nodes
+    """
 
     FUNCTION = "function"  # Transform function
     AGENT = "agent"  # Agent execution
@@ -220,7 +230,7 @@ class GraphNode(Generic[S]):
 
     name: str
     func: Optional[NodeFunc[S]] = None
-    node_type: NodeType = NodeType.FUNCTION
+    node_type: GraphNodeType = GraphNodeType.FUNCTION
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     # For agent nodes
@@ -230,7 +240,7 @@ class GraphNode(Generic[S]):
     allowed_tools: Optional[List[str]] = None
 
     # For chaining (>> operator)
-    _graph: Optional["StateGraph[S]"] = field(default=None, repr=False)
+    _graph: Optional["WorkflowGraph[S]"] = field(default=None, repr=False)
 
     def __rshift__(self, other: "GraphNode[S]") -> "GraphNode[S]":
         """Chain nodes using >> operator.
@@ -267,12 +277,16 @@ class Compilable(Protocol):
         ...
 
 
-class StateGraph(Generic[S]):
-    """A typed state graph for declarative workflow definitions.
+class WorkflowGraph(Generic[S]):
+    """A typed workflow graph for declarative workflow definitions.
 
-    StateGraph provides a LangGraph-inspired API for defining workflows
+    WorkflowGraph provides a LangGraph-inspired API for defining workflows
     as directed graphs with typed state. Nodes are functions that transform
     state, and edges define the flow between nodes.
+
+    This class compiles to WorkflowDefinition for execution via WorkflowExecutor.
+    For the LangGraph-compatible StateGraph that compiles to CompiledGraph,
+    see victor.framework.graph.StateGraph.
 
     Type Parameters:
         S: The state type (must inherit from State)
@@ -290,7 +304,7 @@ class StateGraph(Generic[S]):
             state.value += 1
             return state
 
-        graph = StateGraph(MyState, name="counter")
+        graph = WorkflowGraph(MyState, name="counter")
         graph.add_node("inc", increment)
         graph.set_entry_point("inc")
         workflow = graph.compile()
@@ -329,9 +343,9 @@ class StateGraph(Generic[S]):
         name: str,
         func: Optional[NodeFunc[S]] = None,
         *,
-        node_type: NodeType = NodeType.FUNCTION,
+        node_type: GraphNodeType = GraphNodeType.FUNCTION,
         **kwargs: Any,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Add a node to the graph.
 
         Args:
@@ -375,7 +389,7 @@ class StateGraph(Generic[S]):
         tool_budget: int = 15,
         allowed_tools: Optional[List[str]] = None,
         output_key: Optional[str] = None,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Add an agent node to the graph.
 
         Agent nodes spawn sub-agents to perform tasks using the
@@ -406,7 +420,7 @@ class StateGraph(Generic[S]):
         node = GraphNode(
             name=name,
             func=None,
-            node_type=NodeType.AGENT,
+            node_type=GraphNodeType.AGENT,
             agent_role=role,
             agent_goal=goal,
             tool_budget=tool_budget,
@@ -420,7 +434,7 @@ class StateGraph(Generic[S]):
         logger.debug(f"Added agent node '{name}' (role={role}) to graph '{self.name}'")
         return self
 
-    def add_edge(self, from_node: str, to_node: str) -> "StateGraph[S]":
+    def add_edge(self, from_node: str, to_node: str) -> "WorkflowGraph[S]":
         """Add an edge between nodes.
 
         Args:
@@ -457,7 +471,7 @@ class StateGraph(Generic[S]):
         routes: Dict[str, str],
         *,
         default: Optional[str] = None,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Add conditional edges from a node.
 
         The router function examines state and returns a route key.
@@ -497,7 +511,7 @@ class StateGraph(Generic[S]):
         logger.debug(f"Added conditional edges from '{from_node}': {list(routes.keys())}")
         return self
 
-    def set_entry_point(self, node: str) -> "StateGraph[S]":
+    def set_entry_point(self, node: str) -> "WorkflowGraph[S]":
         """Set the entry point (start node) for the graph.
 
         Args:
@@ -517,7 +531,7 @@ class StateGraph(Generic[S]):
         logger.debug(f"Set entry point: {node}")
         return self
 
-    def set_finish_point(self, node: str) -> "StateGraph[S]":
+    def set_finish_point(self, node: str) -> "WorkflowGraph[S]":
         """Set a finish point (end node) for the graph.
 
         Multiple finish points can be set.
@@ -554,7 +568,7 @@ class StateGraph(Generic[S]):
             raise ValueError(f"Node '{name}' not found")
         return self._nodes[name]
 
-    def chain(self, *nodes: str) -> "StateGraph[S]":
+    def chain(self, *nodes: str) -> "WorkflowGraph[S]":
         """Chain multiple nodes in sequence.
 
         Convenience method for creating linear flows.
@@ -576,7 +590,7 @@ class StateGraph(Generic[S]):
         self,
         from_node: str,
         *branches: str,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Create branches from a node (parallel edges).
 
         All branches will be connected from the source node.
@@ -600,7 +614,7 @@ class StateGraph(Generic[S]):
         self,
         to_node: str,
         *sources: str,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Merge multiple nodes into one.
 
         Creates edges from all sources to the target.
@@ -626,7 +640,7 @@ class StateGraph(Generic[S]):
         *,
         join_strategy: str = "all",
         next_nodes: Optional[List[str]] = None,
-    ) -> "StateGraph[S]":
+    ) -> "WorkflowGraph[S]":
         """Add a parallel execution node.
 
         Executes multiple nodes concurrently and joins results.
@@ -647,7 +661,7 @@ class StateGraph(Generic[S]):
         node = GraphNode(
             name=name,
             func=None,
-            node_type=NodeType.PARALLEL,
+            node_type=GraphNodeType.PARALLEL,
             metadata={
                 "parallel_nodes": parallel,
                 "join_strategy": join_strategy,
@@ -659,7 +673,7 @@ class StateGraph(Generic[S]):
 
         return self
 
-    def set_metadata(self, key: str, value: Any) -> "StateGraph[S]":
+    def set_metadata(self, key: str, value: Any) -> "WorkflowGraph[S]":
         """Set graph metadata.
 
         Args:
@@ -792,7 +806,7 @@ class StateGraph(Generic[S]):
             metadata={
                 **self._metadata,
                 "state_type": self.state_type.__name__,
-                "compiled_from": "StateGraph",
+                "compiled_from": "WorkflowGraph",
             },
         )
 
@@ -805,7 +819,7 @@ class StateGraph(Generic[S]):
         Returns:
             Appropriate WorkflowNode subclass
         """
-        if graph_node.node_type == NodeType.AGENT:
+        if graph_node.node_type == GraphNodeType.AGENT:
             return AgentNode(
                 id=graph_node.name,
                 name=graph_node.name,
@@ -817,7 +831,7 @@ class StateGraph(Generic[S]):
                 next_nodes=[],
             )
 
-        elif graph_node.node_type == NodeType.PARALLEL:
+        elif graph_node.node_type == GraphNodeType.PARALLEL:
             return ParallelNode(
                 id=graph_node.name,
                 name=graph_node.name,
@@ -856,7 +870,7 @@ class StateGraph(Generic[S]):
     def __repr__(self) -> str:
         """String representation of the graph."""
         return (
-            f"StateGraph(name={self.name!r}, "
+            f"WorkflowGraph(name={self.name!r}, "
             f"nodes={list(self._nodes.keys())}, "
             f"entry={self._entry_point!r})"
         )
@@ -867,8 +881,8 @@ def create_graph(
     state_type: Type[S],
     name: Optional[str] = None,
     description: str = "",
-) -> StateGraph[S]:
-    """Create a new state graph.
+) -> WorkflowGraph[S]:
+    """Create a new workflow graph.
 
     Args:
         state_type: The state dataclass type
@@ -876,15 +890,15 @@ def create_graph(
         description: Optional description
 
     Returns:
-        New StateGraph instance
+        New WorkflowGraph instance
 
     Example:
         graph = create_graph(MyState, "my_workflow")
     """
-    return StateGraph(state_type, name=name, description=description)
+    return WorkflowGraph(state_type, name=name, description=description)
 
 
-def compile_graph(graph: StateGraph[S], name: Optional[str] = None) -> WorkflowDefinition:
+def compile_graph(graph: WorkflowGraph[S], name: Optional[str] = None) -> WorkflowDefinition:
     """Compile a state graph to workflow definition.
 
     Args:
@@ -897,13 +911,33 @@ def compile_graph(graph: StateGraph[S], name: Optional[str] = None) -> WorkflowD
     return graph.compile(name=name)
 
 
+# Deprecation alias for backward compatibility
+import warnings as _warnings
+
+
+def __getattr__(name: str):
+    """Provide deprecation warning for StateGraph alias."""
+    if name == "StateGraph":
+        _warnings.warn(
+            "StateGraph is deprecated and will be removed in v1.0. "
+            "Use WorkflowGraph instead (compiles to WorkflowDefinition). "
+            "For LangGraph-compatible StateGraph that compiles to CompiledGraph, "
+            "use victor.framework.graph.StateGraph.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return WorkflowGraph
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Export all public symbols
 __all__ = [
     # Core classes
     "State",
-    "StateGraph",
+    "WorkflowGraph",
+    "StateGraph",  # noqa: F822 - Deprecated alias handled by __getattr__
     "GraphNode",
-    "NodeType",
+    "GraphNodeType",
     # Type variables
     "S",
     "NodeFunc",

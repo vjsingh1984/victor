@@ -47,7 +47,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
-    from victor.agent.milestone_monitor import TaskMilestoneMonitor, TaskToolConfigLoader
+    from victor.agent.task_tool_config_loader import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
     from victor.core.verticals.protocols import (
@@ -195,8 +195,9 @@ def get_category_to_tools_map(
 
 
 # Fallback category keywords for goal inference.
-# DEPRECATED: Use registry.detect_categories_from_text() which builds this
-# dynamically from @tool(keywords=[...]) decorators.
+# NOTE: This is a FALLBACK when registry.detect_categories_from_text() is unavailable.
+# The registry-based approach dynamically builds categories from @tool(keywords=[...])
+# decorators and is preferred. This static list is only used when registry is None.
 _FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
     "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
     "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
@@ -654,7 +655,7 @@ class ToolSelector(ModeAwareMixin):
         tools: "ToolRegistry",
         semantic_selector: Optional["SemanticToolSelector"] = None,
         conversation_state: Optional["ConversationStateMachine"] = None,
-        task_tracker: Optional[Union["TaskMilestoneMonitor", "UnifiedTaskTracker"]] = None,
+        task_tracker: Optional["UnifiedTaskTracker"] = None,
         model: str = "",
         provider_name: str = "",
         tool_selection_config: Optional[Dict[str, Any]] = None,
@@ -668,7 +669,7 @@ class ToolSelector(ModeAwareMixin):
             tools: Tool registry containing available tools
             semantic_selector: Optional semantic selector for embedding-based selection
             conversation_state: Optional conversation state machine for stage detection
-            task_tracker: Optional task progress tracker (TaskMilestoneMonitor or UnifiedTaskTracker)
+            task_tracker: Optional task progress tracker (UnifiedTaskTracker)
             model: Model name (used for adaptive thresholds)
             provider_name: Provider name (used for small model detection)
             tool_selection_config: Optional config with base_threshold, base_max_tools
@@ -1867,7 +1868,7 @@ class ToolSelector(ModeAwareMixin):
     ) -> Set[str]:
         """Get tools appropriate for the current task type and stage.
 
-        Uses TaskMilestoneMonitor to determine task type and TaskToolConfigLoader
+        Uses UnifiedTaskTracker to determine task type and TaskToolConfigLoader
         to get stage-specific tool recommendations from YAML configuration.
 
         Args:
@@ -1887,7 +1888,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Lazy load the config loader
         if self._task_config_loader is None:
-            from victor.agent.milestone_monitor import TaskToolConfigLoader
+            from victor.agent.task_tool_config_loader import TaskToolConfigLoader
 
             self._task_config_loader = TaskToolConfigLoader()
 
@@ -1952,7 +1953,7 @@ class ToolSelector(ModeAwareMixin):
         # Check if we need to force action tools
         if self.task_tracker.progress.task_type.value == "edit":
             # For EDIT tasks after target read, ensure edit is included
-            from victor.agent.milestone_monitor import Milestone
+            from victor.agent.unified_task_tracker import Milestone
 
             if Milestone.TARGET_READ in self.task_tracker.progress.milestones:
                 allowed.add("edit")  # edit_files → edit (canonical name)

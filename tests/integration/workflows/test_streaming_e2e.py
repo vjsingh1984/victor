@@ -42,7 +42,7 @@ from victor.workflows.streaming_executor import (
 )
 from victor.workflows.executor import (
     WorkflowResult,
-    NodeStatus,
+    ExecutorNodeStatus,
 )
 
 

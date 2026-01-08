@@ -76,6 +76,16 @@ pytest --cov
 - [ ] Edge cases are tested
 - [ ] Integration tests pass (if applicable)
 
+### CI/CD Pipeline
+
+- [ ] All GitHub Actions checks pass
+- [ ] Unit tests pass in CI
+- [ ] Linting (Black, Ruff, MyPy) passes
+- [ ] Security scan (Trivy) passes with no critical/high vulnerabilities
+- [ ] Docker image builds successfully
+- [ ] Python package builds successfully
+- [ ] VS Code extension builds successfully (if changes affect vscode-victor/)
+
 ### Documentation
 
 - [ ] Docstrings added/updated for new functions
@@ -124,6 +134,18 @@ pytest --cov
 - [ ] Dependencies removed (list below)
 
 <!-- List dependency changes: -->
+
+## Security Considerations
+
+<!-- Has this change been reviewed for security implications? -->
+
+- [ ] No security-sensitive code changes
+- [ ] Input validation added/reviewed
+- [ ] No hardcoded credentials or secrets
+- [ ] Trivy security scan passes
+- [ ] Dependencies have no known critical vulnerabilities
+
+<!-- If security-sensitive, describe mitigations: -->
 
 ## Deployment Notes
 

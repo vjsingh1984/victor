@@ -252,8 +252,8 @@ jobs:
           context: .
           push: false
           tags: |
-            vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-            vjsingh1984/victor:latest
+            vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+            vjsingh1984/victor-ai:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           outputs: type=docker,dest=/tmp/victor-docker.tar
@@ -264,6 +264,99 @@ jobs:
           name: docker-image
           path: /tmp/victor-docker.tar
           retention-days: 1
+
+  # ==========================================================================
+  # Security scan Docker image with Trivy
+  # ==========================================================================
+  security-scan:
+    name: Security Scan (Trivy)
+    needs: build-docker
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # Required for uploading to GitHub Security tab
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/
+
+      - name: Load Docker image
+        run: docker load -i /tmp/victor-docker.tar
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'  # Fail on critical/high vulnerabilities
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()  # Upload even if scan fails
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy (table output for logs)
+        uses: aquasecurity/trivy-action@master
+        if: always()
+        with:
+          image-ref: 'vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # ==========================================================================
+  # Build and test VS Code extension
+  # ==========================================================================
+  build-vscode:
+    name: Build VS Code Extension
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-victor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: vscode-victor/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint || true  # Don't fail on lint warnings
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run tests
+        run: npm test || true  # Tests may need VS Code runtime
+        env:
+          CI: true
+
+      - name: Package extension (VSIX)
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --no-dependencies
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: vscode-victor/*.vsix
 
   # ==========================================================================
   # NOTE: All publishing jobs run AFTER all builds and release creation
@@ -353,8 +446,8 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker push vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-          docker push vjsingh1984/victor:latest
+          docker push vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+          docker push vjsingh1984/victor-ai:latest
 
   # ==========================================================================
   # Generate checksums for all artifacts
@@ -418,12 +511,12 @@ jobs:
 
           ### Using pip (recommended)
           \`\`\`bash
-          pip install victor==${{ steps.version.outputs.VERSION }}
+          pip install victor-ai==${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ### Using pipx (isolated environment)
           \`\`\`bash
-          pipx install victor==${{ steps.version.outputs.VERSION }}
+          pipx install victor-ai==${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ### Using Homebrew (macOS/Linux)
@@ -433,8 +526,8 @@ jobs:
 
           ### Using Docker
           \`\`\`bash
-          docker pull vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
-          docker run -it --rm vjsingh1984/victor:${{ steps.version.outputs.VERSION }}
+          docker pull vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
+          docker run -it --rm vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}
           \`\`\`
 
           ## Platform Binaries

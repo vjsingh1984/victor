@@ -101,8 +101,14 @@ class RecoveryState:
 
 
 @dataclass
-class RecoveryAction:
-    """Action to take after recovery analysis."""
+class OrchestratorRecoveryAction:
+    """Action to take after recovery analysis.
+
+    Renamed from RecoveryAction to be semantically distinct:
+    - ErrorRecoveryAction (victor.agent.error_recovery): Tool error recovery enum
+    - StrategyRecoveryAction (victor.agent.recovery.protocols): Recovery strategy enum
+    - OrchestratorRecoveryAction (here): Orchestrator recovery action dataclass
+    """
 
     # Action type
     action: str  # "continue", "retry", "abort", "force_summary"
@@ -132,8 +138,8 @@ class RecoveryAction:
         return self.fallback_provider is not None
 
 
-# Alias for backwards compatibility
-OrchestratorRecoveryAction = RecoveryAction
+# Backward compatibility alias
+RecoveryAction = OrchestratorRecoveryAction
 
 
 class OrchestratorRecoveryIntegration:

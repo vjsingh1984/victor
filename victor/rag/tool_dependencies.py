@@ -61,17 +61,41 @@ _YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 class RAGToolDependencyProvider(YAMLToolDependencyProvider):
     """Tool dependency provider for RAG vertical.
 
+    .. deprecated::
+        Use ``create_vertical_tool_dependency_provider('rag')`` instead.
+        This class is maintained for backward compatibility.
+
     Extends YAMLToolDependencyProvider to load RAG-specific tool
     relationships from tool_dependencies.yaml.
 
     Uses canonical ToolNames constants for consistency.
+
+    Example:
+        # Preferred (new code):
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        provider = create_vertical_tool_dependency_provider("rag")
+
+        # Deprecated (backward compatible):
+        provider = RAGToolDependencyProvider()
 
     This class maintains backward compatibility with the previous
     hand-coded Python implementation.
     """
 
     def __init__(self):
-        """Initialize the provider with RAG-specific config from YAML."""
+        """Initialize the provider with RAG-specific config from YAML.
+
+        .. deprecated::
+            Use ``create_vertical_tool_dependency_provider('rag')`` instead.
+        """
+        import warnings
+
+        warnings.warn(
+            "RAGToolDependencyProvider is deprecated. "
+            "Use create_vertical_tool_dependency_provider('rag') instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             yaml_path=_YAML_CONFIG_PATH,
             canonicalize=True,

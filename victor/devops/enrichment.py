@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -43,46 +42,19 @@ from victor.framework.enrichment import (
     EnrichmentContext,
     EnrichmentPriority,
     EnrichmentType,
+    FilePatternMatcher,
+    DEVOPS_PATTERNS,
+    KeywordClassifier,
+    INFRA_TYPES,
 )
 
 logger = logging.getLogger(__name__)
 
+# Use framework pattern matcher with DEVOPS_PATTERNS
+_file_pattern_matcher = FilePatternMatcher(DEVOPS_PATTERNS)
 
-# Infrastructure file patterns for context
-INFRA_FILE_PATTERNS = {
-    "docker": [
-        "Dockerfile",
-        "Dockerfile.*",
-        "docker-compose.yml",
-        "docker-compose.yaml",
-        ".dockerignore",
-    ],
-    "kubernetes": [
-        "*.yaml",
-        "*.yml",
-        "kustomization.yaml",
-        "Chart.yaml",
-        "values.yaml",
-    ],
-    "terraform": [
-        "*.tf",
-        "*.tfvars",
-        "terraform.tfstate",
-    ],
-    "ci_cd": [
-        ".github/workflows/*.yml",
-        ".gitlab-ci.yml",
-        "Jenkinsfile",
-        ".circleci/config.yml",
-        "azure-pipelines.yml",
-    ],
-    "ansible": [
-        "playbook.yml",
-        "inventory.ini",
-        "ansible.cfg",
-        "roles/*/tasks/*.yml",
-    ],
-}
+# Use framework keyword classifier with INFRA_TYPES
+_keyword_classifier = KeywordClassifier(INFRA_TYPES)
 
 
 def _detect_infra_context(
@@ -91,6 +63,9 @@ def _detect_infra_context(
 ) -> Dict[str, List[str]]:
     """Detect infrastructure context from file mentions and prompt.
 
+    Uses the framework's FilePatternMatcher and KeywordClassifier utilities
+    for consistent pattern matching across verticals.
+
     Args:
         file_mentions: Files mentioned in context
         prompt: The prompt text
@@ -98,40 +73,28 @@ def _detect_infra_context(
     Returns:
         Dict mapping infra type to relevant file paths
     """
+    # Initialize context with categories from DEVOPS_PATTERNS
     context: Dict[str, List[str]] = {
         "docker": [],
         "kubernetes": [],
         "terraform": [],
         "ci_cd": [],
         "ansible": [],
+        "helm": [],
     }
 
-    # Check file mentions
-    for file_path in file_mentions:
-        name = os.path.basename(file_path).lower()
-        if "dockerfile" in name or "docker-compose" in name:
-            context["docker"].append(file_path)
-        elif name.endswith(".tf") or name.endswith(".tfvars"):
-            context["terraform"].append(file_path)
-        elif "workflow" in file_path or "jenkins" in name or "gitlab-ci" in name:
-            context["ci_cd"].append(file_path)
-        elif "playbook" in name or "ansible" in name:
-            context["ansible"].append(file_path)
-        elif name.endswith((".yaml", ".yml")):
-            # Check for k8s patterns
-            if any(kw in name for kw in ["deploy", "service", "ingress", "config"]):
-                context["kubernetes"].append(file_path)
+    # Use framework FilePatternMatcher for file-based detection
+    if file_mentions:
+        matched = _file_pattern_matcher.match(file_mentions)
+        for category, files in matched.items():
+            if category in context:
+                context[category].extend(files)
 
-    # Check prompt keywords
-    prompt_lower = prompt.lower()
-    if any(kw in prompt_lower for kw in ["docker", "container", "image"]):
-        context["docker"].append("_prompt_mention")
-    if any(kw in prompt_lower for kw in ["kubernetes", "k8s", "kubectl", "helm"]):
-        context["kubernetes"].append("_prompt_mention")
-    if any(kw in prompt_lower for kw in ["terraform", "tfstate", "provider"]):
-        context["terraform"].append("_prompt_mention")
-    if any(kw in prompt_lower for kw in ["pipeline", "ci/cd", "github action", "jenkins"]):
-        context["ci_cd"].append("_prompt_mention")
+    # Use framework KeywordClassifier for prompt-based detection
+    detected_types = _keyword_classifier.classify(prompt)
+    for infra_type in detected_types:
+        if infra_type in context:
+            context[infra_type].append("_prompt_mention")
 
     return context
 

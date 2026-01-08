@@ -71,19 +71,20 @@ Example Usage:
     print(f"Total tool calls: {result.total_tool_calls}")
 """
 
-from victor.agent.teams.team import (
-    MemoryConfig,
-    TeamFormation,
-    MemberStatus,
-    TeamMember,
-    TeamConfig,
+# Import canonical types from victor.teams.types (single source of truth)
+from victor.teams.types import (
+    AgentMessage,
     MemberResult,
+    MemoryConfig,
+    MemberStatus,
+    MessageType,
+    TeamConfig,
+    TeamFormation,
+    TeamMember,
     TeamResult,
 )
 from victor.agent.teams.coordinator import TeamCoordinator
 from victor.agent.teams.communication import (
-    MessageType,
-    AgentMessage,
     TeamMessageBus,
     TeamSharedMemory,
 )

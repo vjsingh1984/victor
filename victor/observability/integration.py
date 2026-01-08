@@ -35,11 +35,13 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus, get_observability_bus
+from victor.core.events.emit_helper import emit_event_sync
 from victor.observability.hooks import StateHookManager, TransitionHistory
 
 if TYPE_CHECKING:
@@ -71,34 +73,34 @@ class ObservabilityIntegration:
 
     def __init__(
         self,
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional["ObservabilityBus"] = None,
         session_id: Optional[str] = None,
         enable_cqrs_bridge: bool = False,
     ) -> None:
         """Initialize the integration.
 
         Args:
-            event_bus: EventBus to use (default: singleton).
+            event_bus: ObservabilityBus to use (default: singleton).
             session_id: Optional session ID for correlation.
             enable_cqrs_bridge: Whether to enable CQRS event bridging.
                 When enabled, events are automatically forwarded between
-                the observability EventBus and CQRS EventDispatcher.
+                the observability ObservabilityBus and CQRS EventDispatcher.
         """
-        self._bus = event_bus or EventBus.get_instance()
+        self._bus = event_bus or get_observability_bus()
         self._session_id = session_id
         self._wired_components: List[str] = []
         self._tool_start_times: Dict[str, float] = {}
         self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
 
-        if session_id:
-            self._bus.set_session_id(session_id)
+        # Note: session_id is stored in self._session_id for use in event emissions
+        # The new ObservabilityBus doesn't have set_session_id() method
 
         if enable_cqrs_bridge:
             self._setup_cqrs_bridge()
 
     @property
-    def event_bus(self) -> EventBus:
+    def event_bus(self) -> "ObservabilityBus":
         """Get the event bus."""
         return self._bus
 
@@ -230,7 +232,8 @@ class ObservabilityIntegration:
             session_id: Session identifier.
         """
         self._session_id = session_id
-        self._bus.set_session_id(session_id)
+        # Note: The new ObservabilityBus doesn't have set_session_id()
+        # Session ID is stored in self._session_id for use in event emissions
 
     def wire_orchestrator(self, orchestrator: "AgentOrchestrator") -> None:
         """Wire EventBus into an AgentOrchestrator.
@@ -288,29 +291,50 @@ class ObservabilityIntegration:
             if last_records and last_records[0].duration_ms is not None:
                 enhanced_context["stage_duration_ms"] = last_records[0].duration_ms
 
-            self._bus.emit_state_change(
-                old_stage=old_stage,
-                new_stage=new_stage,
-                confidence=context.get("confidence", 1.0),
-                context=enhanced_context,
-            )
+            # Emit state transition event
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._bus.emit(
+                        topic="state.stage_changed",
+                        data={
+                            "old_stage": old_stage,
+                            "new_stage": new_stage,
+                            "confidence": context.get("confidence", 1.0),
+                            **enhanced_context,
+                        },
+                    )
+                )
+            except RuntimeError:
+                # No event loop running
+                logger.debug("No event loop, skipping state.stage_changed event emission")
+            except Exception as e:
+                logger.debug(f"Failed to emit state transition event: {e}")
 
             # Emit warning event if cycle detected (potential infinite loop)
             if history.has_cycle():
                 cycle_count = history.get_stage_visit_count(new_stage)
                 if cycle_count >= 3:
-                    self._bus.publish(
-                        VictorEvent(
-                            category=EventCategory.ERROR,
-                            name="state.cycle_warning",
-                            data={
-                                "stage": new_stage,
-                                "visit_count": cycle_count,
-                                "sequence": history.get_stage_sequence()[-5:],
-                                "severity": "warning",
-                            },
+                    # Emit cycle warning event
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(
+                            self._bus.emit(
+                                topic="error.cycle_warning",
+                                data={
+                                    "stage": new_stage,
+                                    "visit_count": cycle_count,
+                                    "sequence": history.get_stage_sequence()[-5:],
+                                    "severity": "warning",
+                                    "category": "error",
+                                },
+                            )
                         )
-                    )
+                    except RuntimeError:
+                        # No event loop running
+                        logger.debug("No event loop, skipping cycle_warning event emission")
+                    except Exception as e:
+                        logger.debug(f"Failed to emit cycle warning event: {e}")
 
         if hasattr(state_machine, "set_hooks"):
             state_machine.set_hooks(hook_manager)
@@ -337,7 +361,24 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
-        self._bus.emit_tool_start(tool_name, arguments, tool_id)
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="tool.start",
+                    data={
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "tool_id": tool_id,
+                        "category": "tool",
+                    },
+                )
+            )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping tool.start event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit tool start event: {e}")
 
     def on_tool_end(
         self,
@@ -360,26 +401,48 @@ class ObservabilityIntegration:
         start_time = self._tool_start_times.pop(key, None)
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
 
-        self._bus.emit_tool_end(
-            tool_name=tool_name,
-            result=result,
-            success=success,
-            tool_id=tool_id,
-            duration_ms=duration_ms,
-        )
-
-        if not success and error:
-            self._bus.publish(
-                VictorEvent(
-                    category=EventCategory.ERROR,
-                    name=f"tool.{tool_name}.error",
+        # Emit tool complete/end event
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="tool.end",
                     data={
                         "tool_name": tool_name,
-                        "error": error,
+                        "result": result,
+                        "success": success,
                         "tool_id": tool_id,
+                        "duration_ms": duration_ms,
+                        "category": "tool",
                     },
                 )
             )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping tool.end event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit tool end event: {e}")
+
+        if not success and error:
+            # Emit tool error event
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._bus.emit(
+                        topic=f"error.{tool_name}",
+                        data={
+                            "tool_name": tool_name,
+                            "error": error,
+                            "tool_id": tool_id,
+                            "category": "error",
+                        },
+                    )
+                )
+            except RuntimeError:
+                # No event loop running
+                logger.debug("No event loop, skipping tool error event emission")
+            except Exception as e:
+                logger.debug(f"Failed to emit tool error event: {e}")
 
     # =========================================================================
     # Model Events
@@ -400,18 +463,26 @@ class ObservabilityIntegration:
             message_count: Number of messages in request.
             tool_count: Number of tools available.
         """
-        self._bus.publish(
-            VictorEvent(
-                category=EventCategory.MODEL,
-                name="request",
-                data={
-                    "provider": provider,
-                    "model": model,
-                    "message_count": message_count,
-                    "tool_count": tool_count,
-                },
+        # Emit model request event
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="model.request",
+                    data={
+                        "provider": provider,
+                        "model": model,
+                        "message_count": message_count,
+                        "tool_count": tool_count,
+                        "category": "model",
+                    },
+                )
             )
-        )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping model.request event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit model request event: {e}")
 
     def on_model_response(
         self,
@@ -430,19 +501,27 @@ class ObservabilityIntegration:
             tool_calls: Number of tool calls in response.
             latency_ms: Optional latency in milliseconds.
         """
-        self._bus.publish(
-            VictorEvent(
-                category=EventCategory.MODEL,
-                name="response",
-                data={
-                    "provider": provider,
-                    "model": model,
-                    "tokens_used": tokens_used,
-                    "tool_calls": tool_calls,
-                    "latency_ms": latency_ms,
-                },
+        # Emit model response event
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="model.response",
+                    data={
+                        "provider": provider,
+                        "model": model,
+                        "tokens_used": tokens_used,
+                        "tool_calls": tool_calls,
+                        "latency_ms": latency_ms,
+                        "category": "model",
+                    },
+                )
             )
-        )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping model.response event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit model response event: {e}")
 
     # =========================================================================
     # Lifecycle Events
@@ -454,12 +533,14 @@ class ObservabilityIntegration:
         Args:
             metadata: Optional session metadata.
         """
-        self._bus.publish(
-            VictorEvent(
-                category=EventCategory.LIFECYCLE,
-                name="session.start",
-                data=metadata or {},
-            )
+        # Emit session start event
+        data = metadata or {}
+        data["category"] = "lifecycle"
+
+        emit_event_sync(
+            self._bus,
+            topic="lifecycle.session.start",
+            data=data,
         )
 
     def on_session_end(
@@ -475,16 +556,16 @@ class ObservabilityIntegration:
             duration_seconds: Session duration.
             success: Whether session completed successfully.
         """
-        self._bus.publish(
-            VictorEvent(
-                category=EventCategory.LIFECYCLE,
-                name="session.end",
-                data={
-                    "tool_calls": tool_calls,
-                    "duration_seconds": duration_seconds,
-                    "success": success,
-                },
-            )
+        # Emit session end event
+        emit_event_sync(
+            self._bus,
+            topic="lifecycle.session.end",
+            data={
+                "tool_calls": tool_calls,
+                "duration_seconds": duration_seconds,
+                "success": success,
+                "category": "lifecycle",
+            },
         )
 
     # =========================================================================

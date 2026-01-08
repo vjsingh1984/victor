@@ -31,8 +31,10 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+# Import canonical CircuitState from circuit_breaker.py
+from victor.providers.circuit_breaker import CircuitState
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -43,16 +45,8 @@ from victor.agent.recovery.protocols import (
 logger = logging.getLogger(__name__)
 
 
-class CircuitState(Enum):
-    """Circuit breaker states."""
-
-    CLOSED = auto()  # Healthy, allowing requests
-    OPEN = auto()  # Broken, rejecting requests
-    HALF_OPEN = auto()  # Testing recovery
-
-
 @dataclass
-class CircuitBreaker:
+class ModelCircuitBreaker:
     """Circuit breaker for a single model."""
 
     provider: str
@@ -135,6 +129,10 @@ class CircuitBreaker:
             f"Circuit state transition for {self.provider}/{self.model}: "
             f"{old_state.name} -> {new_state.name}"
         )
+
+
+# Backward compatibility alias
+CircuitBreaker = ModelCircuitBreaker
 
 
 @dataclass

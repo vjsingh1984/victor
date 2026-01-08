@@ -303,6 +303,7 @@ class MemoryProfiler(BaseProfiler):
         self._snapshots: list[MemorySnapshot] = []
         self._start_time: float = 0.0
         self._tracking: bool = False
+        self._tracemalloc_started: bool = False  # Track if tracemalloc was started
         self._tracemalloc_available: bool = False
 
         try:
@@ -311,6 +312,31 @@ class MemoryProfiler(BaseProfiler):
             self._tracemalloc_available = True
         except ImportError:
             logger.warning("tracemalloc not available")
+
+    def __del__(self):
+        """Cleanup tracemalloc if profiler is garbage collected.
+
+        This ensures tracemalloc is stopped even if stop() is not called explicitly,
+        preventing resource leaks and 'too many files open' errors.
+        """
+        if self._tracemalloc_started:
+            try:
+                import tracemalloc
+
+                tracemalloc.stop()
+                self._tracemalloc_started = False
+            except Exception:
+                pass  # Ignore errors during cleanup
+
+    def __enter__(self):
+        """Context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup."""
+        self.stop()
+        return False
 
     @property
     def profiler_type(self) -> ProfilerType:
@@ -326,10 +352,11 @@ class MemoryProfiler(BaseProfiler):
         self._take_snapshot()
 
         # Start tracemalloc if available
-        if self._tracemalloc_available:
+        if self._tracemalloc_available and not self._tracemalloc_started:
             import tracemalloc
 
             tracemalloc.start()
+            self._tracemalloc_started = True
 
     def stop(self) -> ProfileResult:
         """Stop memory profiling and return results."""
@@ -342,25 +369,30 @@ class MemoryProfiler(BaseProfiler):
         allocations = []
         peak_memory = 0
 
-        if self._tracemalloc_available:
+        if self._tracemalloc_available and self._tracemalloc_started:
             import tracemalloc
 
-            snapshot = tracemalloc.take_snapshot()
-            stats = snapshot.statistics("lineno")
+            try:
+                snapshot = tracemalloc.take_snapshot()
+                stats = snapshot.statistics("lineno")
 
-            for stat in stats[:50]:  # Top 50 allocations
-                allocations.append(
-                    MemoryAllocation(
-                        size=stat.size,
-                        traceback=[str(frame) for frame in stat.traceback],
-                        count=stat.count,
-                        total_size=stat.size,
+                for stat in stats[:50]:  # Top 50 allocations
+                    allocations.append(
+                        MemoryAllocation(
+                            size=stat.size,
+                            traceback=[str(frame) for frame in stat.traceback],
+                            count=stat.count,
+                            total_size=stat.size,
+                        )
                     )
-                )
 
-            current, peak = tracemalloc.get_traced_memory()
-            peak_memory = peak
-            tracemalloc.stop()
+                current, peak = tracemalloc.get_traced_memory()
+                peak_memory = peak
+                tracemalloc.stop()
+                self._tracemalloc_started = False
+            except Exception as e:
+                logger.warning(f"Error stopping tracemalloc: {e}")
+                self._tracemalloc_started = False
 
         # Detect memory hotspots
         hotspots = self._detect_memory_hotspots(allocations)

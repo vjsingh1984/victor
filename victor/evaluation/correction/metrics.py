@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from .types import Language, ValidationResult
+from .types import Language, CodeValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,8 @@ class CorrectionAttempt:
     iteration: int
     timestamp: datetime
     duration_ms: float
-    validation_before: ValidationResult
-    validation_after: Optional[ValidationResult]
+    validation_before: CodeValidationResult
+    validation_after: Optional[CodeValidationResult]
     test_passed_before: Optional[int]
     test_passed_after: Optional[int]
     test_total: Optional[int]
@@ -80,7 +80,7 @@ class CorrectionMetrics:
     def record_validation(
         self,
         language: Language,
-        result: ValidationResult,
+        result: CodeValidationResult,
     ) -> None:
         """Record a validation event."""
         self.total_validations += 1
@@ -316,7 +316,7 @@ class CorrectionMetricsCollector:
     def record_validation(
         self,
         language: Language,
-        result: ValidationResult,
+        result: CodeValidationResult,
     ) -> None:
         """Record a validation event."""
         self.metrics.record_validation(language, result)
@@ -326,7 +326,7 @@ class CorrectionMetricsCollector:
         task_id: str,
         language: Language,
         iteration: int,
-        validation_before: ValidationResult,
+        validation_before: CodeValidationResult,
         test_passed_before: Optional[int] = None,
         test_total: Optional[int] = None,
     ) -> "CorrectionTracker":
@@ -361,7 +361,7 @@ class CorrectionTracker:
         task_id: str,
         language: Language,
         iteration: int,
-        validation_before: ValidationResult,
+        validation_before: CodeValidationResult,
         test_passed_before: Optional[int] = None,
         test_total: Optional[int] = None,
     ):
@@ -373,7 +373,7 @@ class CorrectionTracker:
         self._test_passed_before = test_passed_before
         self._test_total = test_total
         self._start_time: float = 0
-        self._validation_after: Optional[ValidationResult] = None
+        self._validation_after: Optional[CodeValidationResult] = None
         self._test_passed_after: Optional[int] = None
         self._success: bool = False
         self._auto_fixed: bool = False
@@ -405,7 +405,7 @@ class CorrectionTracker:
     def set_result(
         self,
         success: bool,
-        validation_after: Optional[ValidationResult] = None,
+        validation_after: Optional[CodeValidationResult] = None,
         test_passed_after: Optional[int] = None,
         auto_fixed: bool = False,
     ) -> None:

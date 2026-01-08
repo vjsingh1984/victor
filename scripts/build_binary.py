@@ -226,7 +226,7 @@ def build_binary(
     print()
 
     try:
-        result = subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)
 
         # Find the output
         dist_dir = project_root / "dist"
@@ -277,7 +277,7 @@ set DIR=%~dp0
 """
     )
 
-    print(f"Created launcher scripts:")
+    print("Created launcher scripts:")
     print(f"  - {launcher_unix}")
     print(f"  - {launcher_win}")
 
@@ -336,7 +336,7 @@ def main():
         print()
         print("For VS Code extension:")
         print(f"  Copy dist/{args.output}/ to extension resources/")
-        print(f"  Set victor.victorPath in VS Code settings")
+        print("  Set victor.victorPath in VS Code settings")
     else:
         sys.exit(1)
 

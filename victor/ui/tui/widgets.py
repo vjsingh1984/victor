@@ -56,14 +56,14 @@ def _get_input_history_from_db(limit: int = 100) -> List[str]:
                   AND content NOT LIKE '<TOOL_OUTPUT%'  # Filter tool outputs
                   AND content NOT LIKE '<%'  # Filter XML-like tags
                   AND content NOT LIKE '{%'  # Filter JSON blobs
-                ORDER BY timestamp DESC
+                ORDER BY timestamp ASC
                 LIMIT ?
                 """,
                 (limit,),
             )
-            # Reverse to get chronological order (oldest first)
+            # Already in chronological order (oldest first) from ORDER BY timestamp ASC
             messages = [row[0] for row in cursor.fetchall()]
-            return list(reversed(messages))
+            return messages
     except Exception:
         # Silently fail if DB not available
         return []

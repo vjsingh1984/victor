@@ -15,6 +15,7 @@ from victor.dataanalysis.prompts import DataAnalysisPromptContributor
 from victor.dataanalysis.mode_config import DataAnalysisModeConfigProvider
 from victor.dataanalysis.safety import DataAnalysisSafetyExtension
 from victor.dataanalysis.tool_dependencies import DataAnalysisToolDependencyProvider
+from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
 
 __all__ = [
     "DataAnalysisAssistant",
@@ -22,4 +23,5 @@ __all__ = [
     "DataAnalysisModeConfigProvider",
     "DataAnalysisSafetyExtension",
     "DataAnalysisToolDependencyProvider",
+    "DataAnalysisCapabilityProvider",
 ]

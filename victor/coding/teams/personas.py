@@ -15,10 +15,10 @@
 """Enhanced persona definitions for coding team members.
 
 This module provides rich persona configurations for coding-specific
-team roles, extending the basic TeamMemberSpec with:
+team roles, extending the framework's PersonaTraits with:
 
 - Structured expertise categories
-- Communication style traits
+- Communication style traits (extended for coding contexts)
 - Decision-making preferences
 - Collaboration patterns
 
@@ -38,6 +38,12 @@ Example:
 
     # Apply persona to TeamMemberSpec
     enhanced_spec = apply_persona_to_spec(spec, "researcher")
+
+Note:
+    This module uses the framework's PersonaTraits as a base and extends it
+    with coding-specific traits. The CodingPersonaTraits class provides
+    additional fields for coding contexts while maintaining compatibility
+    with the framework.
 """
 
 from __future__ import annotations
@@ -45,6 +51,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
+
+# Import framework types for base functionality
+from victor.framework.multi_agent import (
+    CommunicationStyle as FrameworkCommunicationStyle,
+    ExpertiseLevel,
+    PersonaTemplate,
+    PersonaTraits as FrameworkPersonaTraits,
+)
 
 
 class ExpertiseCategory(str, Enum):
@@ -83,7 +97,15 @@ class ExpertiseCategory(str, Enum):
 
 
 class CommunicationStyle(str, Enum):
-    """Communication styles for persona characterization."""
+    """Communication styles for coding persona characterization.
+
+    This extends the framework's CommunicationStyle with additional
+    styles specific to coding team contexts.
+
+    Note:
+        For interoperability with the framework, use to_framework_style()
+        to convert to FrameworkCommunicationStyle when needed.
+    """
 
     CONCISE = "concise"  # Brief, to-the-point
     DETAILED = "detailed"  # Thorough explanations
@@ -92,6 +114,25 @@ class CommunicationStyle(str, Enum):
     COLLABORATIVE = "collaborative"  # Team-oriented
     ANALYTICAL = "analytical"  # Data-driven
     SUPPORTIVE = "supportive"  # Encouraging
+
+    def to_framework_style(self) -> FrameworkCommunicationStyle:
+        """Convert to framework CommunicationStyle.
+
+        Maps coding-specific styles to the closest framework equivalent.
+
+        Returns:
+            Corresponding FrameworkCommunicationStyle value
+        """
+        mapping = {
+            CommunicationStyle.CONCISE: FrameworkCommunicationStyle.CONCISE,
+            CommunicationStyle.DETAILED: FrameworkCommunicationStyle.FORMAL,
+            CommunicationStyle.SOCRATIC: FrameworkCommunicationStyle.TECHNICAL,
+            CommunicationStyle.ASSERTIVE: FrameworkCommunicationStyle.FORMAL,
+            CommunicationStyle.COLLABORATIVE: FrameworkCommunicationStyle.CASUAL,
+            CommunicationStyle.ANALYTICAL: FrameworkCommunicationStyle.TECHNICAL,
+            CommunicationStyle.SUPPORTIVE: FrameworkCommunicationStyle.CASUAL,
+        }
+        return mapping.get(self, FrameworkCommunicationStyle.TECHNICAL)
 
 
 class DecisionStyle(str, Enum):
@@ -105,14 +146,15 @@ class DecisionStyle(str, Enum):
 
 
 @dataclass
-class PersonaTraits:
-    """Behavioral traits for a persona.
+class CodingPersonaTraits:
+    """Coding-specific behavioral traits for a persona.
 
-    These traits influence how the agent approaches tasks
-    and interacts with other team members.
+    This class provides coding-specific trait extensions that complement
+    the framework's PersonaTraits. Use this when you need coding-specific
+    attributes like decision_style and attention_to_detail.
 
     Attributes:
-        communication_style: Primary communication approach
+        communication_style: Primary communication approach (coding-specific enum)
         decision_style: How decisions are made
         attention_to_detail: 0.0-1.0 scale of thoroughness
         risk_tolerance: 0.0-1.0 scale of risk acceptance
@@ -170,6 +212,51 @@ class PersonaTraits:
             hints.append("Don't be afraid to try unconventional solutions.")
 
         return " ".join(h for h in hints if h)
+
+    def to_framework_traits(
+        self,
+        name: str,
+        role: str,
+        description: str,
+        strengths: Optional[List[str]] = None,
+        preferred_tools: Optional[List[str]] = None,
+    ) -> FrameworkPersonaTraits:
+        """Convert to framework PersonaTraits.
+
+        Creates a framework-compatible PersonaTraits instance from
+        the coding-specific traits.
+
+        Args:
+            name: Display name for the persona
+            role: Role identifier
+            description: Description of the persona
+            strengths: Optional list of strengths
+            preferred_tools: Optional list of preferred tools
+
+        Returns:
+            FrameworkPersonaTraits instance
+        """
+        return FrameworkPersonaTraits(
+            name=name,
+            role=role,
+            description=description,
+            communication_style=self.communication_style.to_framework_style(),
+            expertise_level=ExpertiseLevel.EXPERT,
+            verbosity=self.verbosity,
+            strengths=strengths or [],
+            preferred_tools=preferred_tools or [],
+            risk_tolerance=self.risk_tolerance,
+            creativity=1.0 - self.attention_to_detail,  # Map attention to creativity
+            custom_traits={
+                "decision_style": self.decision_style.value,
+                "attention_to_detail": self.attention_to_detail,
+                "collaboration_preference": self.collaboration_preference,
+            },
+        )
+
+
+# Backward compatibility alias
+PersonaTraits = CodingPersonaTraits
 
 
 @dataclass
@@ -650,11 +737,17 @@ def list_personas() -> List[str]:
 
 
 __all__ = [
-    # Types
+    # Framework types (re-exported for convenience)
+    "FrameworkPersonaTraits",
+    "FrameworkCommunicationStyle",
+    "ExpertiseLevel",
+    "PersonaTemplate",
+    # Coding-specific types
     "ExpertiseCategory",
     "CommunicationStyle",
     "DecisionStyle",
-    "PersonaTraits",
+    "CodingPersonaTraits",
+    "PersonaTraits",  # Backward compatibility alias for CodingPersonaTraits
     "CodingPersona",
     # Pre-defined personas
     "CODING_PERSONAS",

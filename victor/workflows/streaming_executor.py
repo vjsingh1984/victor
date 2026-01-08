@@ -39,7 +39,6 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -61,10 +60,17 @@ from victor.workflows.definition import (
 )
 from victor.workflows.executor import (
     NodeResult,
-    NodeStatus,
+    ExecutorNodeStatus,
     WorkflowContext,
     WorkflowExecutor,
     WorkflowResult,
+)
+
+# Import canonical streaming types from streaming.py (DRY - Phase 5 consolidation)
+from victor.workflows.streaming import (
+    WorkflowEventType,
+    WorkflowStreamChunk,
+    WorkflowStreamContext,
 )
 
 if TYPE_CHECKING:
@@ -75,67 +81,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class WorkflowEventType(Enum):
-    """Types of workflow streaming events.
-
-    Events emitted during workflow execution to track progress
-    and provide real-time updates.
-
-    Attributes:
-        WORKFLOW_START: Workflow execution has started
-        WORKFLOW_COMPLETE: Workflow execution completed successfully
-        WORKFLOW_ERROR: Workflow execution failed with an error
-        NODE_START: A node has started executing
-        NODE_COMPLETE: A node has completed executing
-        NODE_ERROR: A node failed with an error
-        AGENT_CONTENT: Content streamed from an agent node
-    """
-
-    WORKFLOW_START = "workflow_start"
-    WORKFLOW_COMPLETE = "workflow_complete"
-    WORKFLOW_ERROR = "workflow_error"
-    NODE_START = "node_start"
-    NODE_COMPLETE = "node_complete"
-    NODE_ERROR = "node_error"
-    AGENT_CONTENT = "agent_content"
-
-
 @dataclass
-class WorkflowStreamChunk:
-    """A chunk of streaming data from workflow execution.
+class _ExecutorStreamContext:
+    """Internal context for tracking executor streaming state.
 
-    Represents a single event during workflow streaming, containing
-    event type, progress information, and optional content/error data.
-
-    Attributes:
-        event_type: The type of event
-        workflow_id: Unique identifier for this workflow execution
-        progress: Progress percentage (0.0 to 100.0)
-        node_id: ID of the current node (if applicable)
-        node_name: Name of the current node (if applicable)
-        content: Streamed content from agent (for AGENT_CONTENT events)
-        error: Error message (for ERROR events)
-        is_final: Whether this is the final chunk in the stream
-        metadata: Additional metadata about the event
-    """
-
-    event_type: WorkflowEventType
-    workflow_id: str
-    progress: float = 0.0
-    node_id: Optional[str] = None
-    node_name: Optional[str] = None
-    content: Optional[str] = None
-    error: Optional[str] = None
-    is_final: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class WorkflowStreamContext:
-    """Context for tracking workflow streaming state.
-
-    Maintains state during streaming execution, tracking progress
-    and providing cancellation support.
+    This is an executor-specific wrapper that provides percentage-based
+    progress (0-100) while the canonical WorkflowStreamContext uses
+    fraction-based progress (0.0-1.0).
 
     Attributes:
         workflow_id: Unique identifier for this workflow execution
@@ -167,8 +119,8 @@ class WorkflowStreamContext:
 class _Subscription:
     """Internal subscription data."""
 
-    event_types: List[WorkflowEventType]
-    callback: Callable[[WorkflowStreamChunk], None]
+    event_types: List["WorkflowEventType"]
+    callback: Callable[["WorkflowStreamChunk"], None]
     active: bool = True
 
 
@@ -233,8 +185,8 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
             cache_config=cache_config,
         )
 
-        # Streaming state
-        self._active_workflows: Dict[str, WorkflowStreamContext] = {}
+        # Streaming state (uses _ExecutorStreamContext for percentage-based progress)
+        self._active_workflows: Dict[str, _ExecutorStreamContext] = {}
         self._subscriptions: List[_Subscription] = []
         self._queue_poll_interval = 0.1  # 100ms poll interval
 
@@ -276,8 +228,8 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         # Count total nodes for progress tracking
         total_nodes = len(workflow.nodes)
 
-        # Create stream context
-        stream_ctx = WorkflowStreamContext(
+        # Create stream context (uses _ExecutorStreamContext for percentage-based progress)
+        stream_ctx = _ExecutorStreamContext(
             workflow_id=workflow_id,
             total_nodes=total_nodes,
         )
@@ -395,7 +347,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         self,
         workflow: WorkflowDefinition,
         context: WorkflowContext,
-        stream_ctx: WorkflowStreamContext,
+        stream_ctx: _ExecutorStreamContext,
         thread_id: str,
     ) -> AsyncIterator[WorkflowStreamChunk]:
         """Execute workflow DAG with streaming events.
@@ -507,7 +459,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
                 workflow_name=workflow.name,
                 node_id=node_id,
                 node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
-                success=result.status == NodeStatus.COMPLETED,
+                success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
 
@@ -517,7 +469,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         self,
         node: AgentNode,
         context: WorkflowContext,
-        stream_ctx: WorkflowStreamContext,
+        stream_ctx: _ExecutorStreamContext,
         start_time: float,
     ) -> NodeResult:
         """Execute agent node with streaming content.
@@ -566,7 +518,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
 
         return NodeResult(
             node_id=node.id,
-            status=NodeStatus.COMPLETED if result.success else NodeStatus.FAILED,
+            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,

@@ -257,6 +257,7 @@ class ProjectContextLoader:
         tokens_to_remove = self.context.total_tokens - target_tokens
 
         # Remove oldest non-system messages
+        # Iterate in reverse, removing oldest messages until we hit the target
         removed_tokens = 0
         messages_to_keep: List[Message] = []
 
@@ -264,7 +265,10 @@ class ProjectContextLoader:
             if removed_tokens < tokens_to_remove:
                 removed_tokens += msg.tokens
             else:
-                messages_to_keep.insert(0, msg)
+                messages_to_keep.append(msg)  # Append (will reverse once at end)
+
+        # Reverse to maintain original order
+        messages_to_keep = list(reversed(messages_to_keep))
 
         # Update context
         self.context.messages = system_messages + messages_to_keep

@@ -1,0 +1,64 @@
+flowchart LR
+    subgraph Inputs["Configuration Sources"]
+        direction TB
+        Env["Environment Variables<br/>ANTHROPIC_API_KEY<br/>OPENAI_API_KEY<br/>VICTOR_LOG_LEVEL"]
+        YAML["YAML Files<br/>~/.victor/profiles.yaml<br/>~/.victor/config.yaml<br/>~/.victor/mcp.yaml"]
+        Project["Project Context<br/>.victor.md<br/>CLAUDE.md"]
+        Defaults["Default Values<br/>Built-in constants"]
+
+        Env --> Load
+        YAML --> Load
+        Project --> Load
+        Defaults --> Load
+    end
+
+    subgraph Loader["Config Loader"]
+        Load["load()"]
+        Priority["Priority Resolution<br/>1. Defaults<br/>2. Global Config<br/>3. Profile Config<br/>4. Project Context<br/>5. Environment Vars<br/>6. CLI Flags"]
+
+        Load --> Priority
+    end
+
+    subgraph Validator["Config Validator"]
+        Validate["validate()"]
+        Schema["Schema Validation<br/>YAML Syntax<br/>Required Fields<br/>Value Types"]
+        Merge["Merge Configs<br/>Combine sources<br/>Resolve conflicts<br/>Apply overrides"]
+
+        Validate --> Schema
+        Validate --> Merge
+    end
+
+    subgraph Settings["Settings Object"]
+        ProviderSettings["Provider Settings<br/>name, model, api_key"]
+        ToolSettings["Tool Settings<br/>lazy_load, timeout"]
+        LoggingSettings["Logging Settings<br/>level, format, file"]
+        CacheSettings["Cache Settings<br/>enabled, ttl, backend"]
+        UISettings["UI Settings<br/>theme, editor, pager"]
+    end
+
+    subgraph Consumers["Config Consumers"]
+        Orchestrator["Agent Orchestrator"]
+        Providers["Provider Manager"]
+        Tools["Tool Pipeline"]
+        Workflows["Workflow Executor"]
+        Server["HTTP/MCP Server"]
+    end
+
+    %% Flow
+    Inputs --> Loader
+    Loader --> Validator
+    Validator --> Settings
+    Settings --> Consumers
+
+    %% Styling
+    classDef inputStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    classDef loaderStyle fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    classDef validatorStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
+    classDef settingsStyle fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+    classDef consumerStyle fill:#FCE4EC,stroke:#C2185B,stroke-width:2px
+
+    class Env,YAML,Project,Defaults inputStyle
+    class Load,Priority loaderStyle
+    class Validate,Schema,Merge validatorStyle
+    class ProviderSettings,ToolSettings,LoggingSettings,CacheSettings,UISettings settingsStyle
+    class Orchestrator,Providers,Tools,Workflows,Server consumerStyle

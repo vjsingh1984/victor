@@ -22,6 +22,7 @@ No external servers required!
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
 
@@ -114,7 +115,7 @@ def create_jwt_token(user_id: int, expires_delta: timedelta = None) -> str:
     '''
     payload = {
         "sub": str(user_id),
-        "exp": datetime.utcnow() + (expires_delta or timedelta(hours=24))
+        "exp": datetime.now(timezone.utc) + (expires_delta or timedelta(hours=24))
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 """,

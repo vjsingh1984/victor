@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.agent.context_project import ProjectContext
-    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
     from victor.agent.metrics_collector import MetricsCollector
@@ -429,6 +429,32 @@ class OrchestratorFactory(ModeAwareMixin):
         observability = ObservabilityIntegration()
         logger.debug("Observability integration created")
         return observability
+
+    def create_tracers(self) -> tuple:
+        """Create execution and tool call tracers for debugging.
+
+        Returns:
+            Tuple of (ExecutionTracer, ToolCallTracer) or (None, None) if disabled
+        """
+        if not getattr(self.settings, "enable_tracing", True):
+            self._execution_tracer = None
+            self._tool_call_tracer = None
+            return (None, None)
+
+        from victor.core.events import ObservabilityBus, get_observability_bus
+        from victor.observability.tracing import ExecutionTracer, ToolCallTracer
+
+        # Get ObservabilityBus from DI container
+        observability_bus = get_observability_bus()
+        execution_tracer = ExecutionTracer(observability_bus)
+        tool_call_tracer = ToolCallTracer(observability_bus)
+
+        # Store for later use in create_tool_executor
+        self._execution_tracer = execution_tracer
+        self._tool_call_tracer = tool_call_tracer
+
+        logger.debug("ExecutionTracer and ToolCallTracer created")
+        return (execution_tracer, tool_call_tracer)
 
     def create_tool_cache(self) -> Optional[Any]:
         """Create tool cache if enabled.
@@ -938,6 +964,84 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("StreamingController created")
         return controller
 
+    def create_streaming_coordinator(
+        self,
+        streaming_controller: Any,
+    ) -> Any:
+        """Create streaming coordinator for response processing.
+
+        Args:
+            streaming_controller: StreamingController for session management
+
+        Returns:
+            StreamingCoordinator instance for processing streaming responses
+        """
+        from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
+
+        coordinator = StreamingCoordinator(
+            streaming_controller=streaming_controller,
+        )
+        logger.debug("StreamingCoordinator created")
+        return coordinator
+
+    def create_provider_switch_coordinator(
+        self,
+        provider_switcher: Any,
+        health_monitor: Optional[Any] = None,
+    ) -> Any:
+        """Create provider switch coordinator for switching workflow.
+
+        Args:
+            provider_switcher: ProviderSwitcher for switching logic
+            health_monitor: Optional ProviderHealthMonitor for pre-switch checks
+
+        Returns:
+            ProviderSwitchCoordinator instance for coordinating switches
+        """
+        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+
+        coordinator = ProviderSwitchCoordinator(
+            provider_switcher=provider_switcher,
+            health_monitor=health_monitor,
+        )
+        logger.debug("ProviderSwitchCoordinator created")
+        return coordinator
+
+    def create_lifecycle_manager(
+        self,
+        conversation_controller: Any,
+        metrics_collector: Optional[Any] = None,
+        context_compactor: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        usage_analytics: Optional[Any] = None,
+        reminder_manager: Optional[Any] = None,
+    ) -> Any:
+        """Create lifecycle manager for session lifecycle and resource cleanup.
+
+        Args:
+            conversation_controller: Controller for conversation management
+            metrics_collector: Optional metrics collector for stats
+            context_compactor: Optional context compactor for cleanup
+            sequence_tracker: Optional sequence tracker for pattern learning
+            usage_analytics: Optional usage analytics for session tracking
+            reminder_manager: Optional reminder manager for context reminders
+
+        Returns:
+            LifecycleManager instance for managing lifecycle operations
+        """
+        from victor.agent.lifecycle_manager import LifecycleManager
+
+        lifecycle_manager = LifecycleManager(
+            conversation_controller=conversation_controller,
+            metrics_collector=metrics_collector,
+            context_compactor=context_compactor,
+            sequence_tracker=sequence_tracker,
+            usage_analytics=usage_analytics,
+            reminder_manager=reminder_manager,
+        )
+        logger.debug("LifecycleManager created")
+        return lifecycle_manager
+
     def create_tool_pipeline(
         self,
         tools: Any,
@@ -1000,7 +1104,18 @@ class OrchestratorFactory(ModeAwareMixin):
         tool_pipeline: Any,
         on_chunk: Optional[Callable] = None,
     ) -> Any:
-        """Create StreamingToolAdapter for unified streaming tool execution.
+        """⚠️ OBSOLETE - NOT IN USE - DEAD CODE ⚠️
+
+        This factory method is NO LONGER CALLED in the codebase.
+
+        Analysis (January 2025):
+        - This method is defined but never invoked
+        - streaming_tool_adapter.py module is obsolete
+        - Tool execution now uses: ToolExecutionHandler -> ToolExecutor
+
+        This method is kept for backwards compatibility only.
+
+        Create StreamingToolAdapter for unified streaming tool execution.
 
         The StreamingToolAdapter wraps ToolPipeline to provide streaming output
         while preserving ALL ToolPipeline features (caching, middleware, callbacks,
@@ -1019,14 +1134,46 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             StreamingToolAdapter instance
         """
-        from victor.agent.streaming_tool_adapter import create_streaming_tool_adapter
+        # ============================================================================
+        # ⚠️  OBSOLETE - DEAD CODE - NOT IN USE ⚠️
+        # ============================================================================
+        # This entire method is obsolete and commented out.
+        #
+        # The streaming_tool_adapter.py module has been moved to:
+        #   archived/obsolete/streaming_tool_adapter.py
+        #
+        # Current tool execution path:
+        #   orchestrator._handle_tool_calls()
+        #     → argument_normalizer.normalize_arguments()
+        #     → tool_executor.execute(skip_normalization=True)
+        #       → tool.execute(**arguments)
+        #
+        # TODO: Remove this method entirely in next major version
+        # ============================================================================
 
-        adapter = create_streaming_tool_adapter(
-            tool_pipeline=tool_pipeline,
-            on_chunk=on_chunk,
+        # import warnings
+        # warnings.warn(
+        #     "create_streaming_tool_adapter() is obsolete and unused. "
+        #     "Use ToolExecutionHandler instead.",
+        #     DeprecationWarning,
+        #     stacklevel=2
+        # )
+
+        # from archived.obsolete.streaming_tool_adapter import create_streaming_tool_adapter
+
+        # adapter = create_streaming_tool_adapter(
+        #     tool_pipeline=tool_pipeline,
+        #     on_chunk=on_chunk,
+        # )
+        # logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
+        # return adapter
+
+        # TEMPORARY: Return None to maintain API compatibility
+        logger.warning(
+            "create_streaming_tool_adapter() called but is obsolete. "
+            "Returning None. Tool execution uses ToolExecutionHandler instead."
         )
-        logger.debug("StreamingToolAdapter created wrapping ToolPipeline")
-        return adapter
+        return None
 
     def create_conversation_controller(
         self,
@@ -1312,6 +1459,7 @@ class OrchestratorFactory(ModeAwareMixin):
             safety_checker=safety_checker,
             code_correction_middleware=code_correction_middleware,
             enable_code_correction=getattr(self.settings, "code_correction_enabled", True),
+            tool_call_tracer=getattr(self, "_tool_call_tracer", None),  # Pass tracer for debugging
         )
 
         # Inject ToolConfig into executor context for DI-style tool configuration
@@ -1559,7 +1707,7 @@ class OrchestratorFactory(ModeAwareMixin):
         Returns:
             IntentClassifier singleton instance
         """
-        from victor.embeddings.intent_classifier import IntentClassifier
+        from victor.storage.embeddings.intent_classifier import IntentClassifier
 
         classifier = IntentClassifier.get_instance()
         logger.debug("IntentClassifier singleton retrieved")
@@ -2183,6 +2331,229 @@ class OrchestratorFactory(ModeAwareMixin):
 
         logger.debug("ResponseProcessor created")
         return processor
+
+    # =========================================================================
+    # Unified Agent Creation (Phase 4)
+    # =========================================================================
+
+    async def create_agent(
+        self,
+        mode: str = "foreground",
+        config: Optional[Any] = None,
+        task: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Create ANY agent type using shared factory infrastructure.
+
+        This is the ONLY method that should create agents. All other entrypoints
+        (Agent.create, BackgroundAgentManager.start_agent, Vertical.create_agent)
+        must delegate here to ensure consistent code maintenance and eliminate
+        code proliferation (SOLID SRP, DIP).
+
+        Args:
+            mode: Agent creation mode
+                - "foreground": Interactive Agent instance (default)
+                - "background": BackgroundAgent for async task execution
+                - "team_member": TeamMember/SubAgent for multi-agent teams
+            config: Optional unified agent configuration (UnifiedAgentConfig)
+            task: Optional task description (for background agents)
+            **kwargs: Additional agent-specific parameters
+                - For foreground: provider, model, temperature, max_tokens, tools, etc.
+                - For background: mode_type ("build", "plan", "explore"), websocket, etc.
+                - For team_member: role, capabilities, description, etc.
+
+        Returns:
+            Agent instance based on mode:
+            - mode="foreground": Agent (victor.framework.agent.Agent)
+            - mode="background": BackgroundAgent (victor.agent.background_agent.BackgroundAgent)
+            - mode="team_member": TeamMember/SubAgent (victor.teams.types.TeamMember)
+
+        Raises:
+            ValueError: If mode is invalid or required parameters are missing
+            ProviderError: If provider initialization fails
+
+        Examples:
+            # Foreground agent (simple)
+            agent = await factory.create_agent(mode="foreground")
+
+            # Foreground agent with UnifiedAgentConfig
+            from victor.agent.config import UnifiedAgentConfig
+            config = UnifiedAgentConfig.foreground(
+                provider="openai",
+                model="gpt-4-turbo",
+                tool_budget=100
+            )
+            agent = await factory.create_agent(config=config)
+
+            # Foreground agent with options (legacy)
+            agent = await factory.create_agent(
+                mode="foreground",
+                provider="openai",
+                model="gpt-4-turbo",
+                tools=ToolSet.coding()
+            )
+
+            # Background agent with task
+            agent = await factory.create_agent(
+                mode="background",
+                task="Implement feature X",
+                mode_type="build"
+            )
+
+            # Background agent with UnifiedAgentConfig
+            config = UnifiedAgentConfig.background(
+                task="Implement feature X",
+                tool_budget=100
+            )
+            agent = await factory.create_agent(config=config)
+
+            # Team member
+            agent = await factory.create_agent(
+                mode="team_member",
+                role="researcher",
+                capabilities=["search", "analyze"]
+            )
+        """
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        # Extract parameters from UnifiedAgentConfig if provided
+        if config:
+            # Import here to avoid circular dependency
+            from victor.agent.config import UnifiedAgentConfig
+
+            if isinstance(config, UnifiedAgentConfig):
+                # Apply config settings to kwargs (config takes precedence)
+                mode = config.mode
+                task = config.task or task
+
+                # Merge config settings with kwargs (kwargs override config)
+                merged_kwargs = {}
+
+                # Common settings
+                if config.provider != "anthropic":
+                    merged_kwargs["provider"] = config.provider
+                if config.model:
+                    merged_kwargs["model"] = config.model
+                if config.temperature != 0.7:
+                    merged_kwargs["temperature"] = config.temperature
+                if config.max_tokens != 4096:
+                    merged_kwargs["max_tokens"] = config.max_tokens
+
+                # Foreground-specific
+                if mode == "foreground":
+                    merged_kwargs["tool_budget"] = config.tool_budget
+                    merged_kwargs["max_iterations"] = config.max_iterations
+                    merged_kwargs["enable_parallel_tools"] = config.enable_parallel_tools
+                    merged_kwargs["max_concurrent_tools"] = config.max_concurrent_tools
+                    merged_kwargs["enable_context_compaction"] = config.enable_context_compaction
+                    merged_kwargs["enable_semantic_search"] = config.enable_semantic_search
+                    merged_kwargs["enable_analytics"] = config.enable_analytics
+
+                # Background-specific
+                elif mode == "background":
+                    merged_kwargs["task"] = config.task or task
+                    merged_kwargs["mode_type"] = config.mode_type
+                    merged_kwargs["websocket"] = config.websocket
+                    merged_kwargs["timeout_seconds"] = config.timeout_seconds
+                    merged_kwargs["tool_budget"] = config.tool_budget
+
+                # Team member-specific
+                elif mode == "team_member":
+                    merged_kwargs["role"] = config.role
+                    merged_kwargs["capabilities"] = config.capabilities
+                    merged_kwargs["description"] = config.description
+                    merged_kwargs["allowed_tools"] = config.allowed_tools
+                    merged_kwargs["can_spawn_subagents"] = config.can_spawn_subagents
+
+                # Apply extra settings
+                merged_kwargs.update(config.extra)
+
+                # Merge with provided kwargs (kwargs take precedence)
+                merged_kwargs.update(kwargs)
+                kwargs = merged_kwargs
+
+        # Create orchestrator using existing factory methods
+        # Note: We re-use the existing from_settings pattern which internally
+        # uses this factory's create_* methods
+        orchestrator = await AgentOrchestrator.from_settings(
+            self.settings,
+            profile_name=self.profile_name or "default",
+            thinking=self.thinking,
+        )
+
+        # Override provider/model if different from defaults
+        provider = kwargs.get("provider")
+        model = kwargs.get("model")
+        if provider or model:
+            if hasattr(orchestrator, "_provider_manager") or hasattr(
+                orchestrator, "provider_manager"
+            ):
+                pm = getattr(orchestrator, "_provider_manager", None) or getattr(
+                    orchestrator, "provider_manager", None
+                )
+                if pm:
+                    await pm.switch_provider(
+                        provider or pm.provider_name,
+                        model or self.model,
+                    )
+
+        # Create agent based on mode
+        if mode == "foreground":
+            # Import Agent to avoid circular dependency
+            from victor.framework.agent import Agent
+
+            # Create foreground Agent
+            agent = Agent(orchestrator)
+
+            # Apply tools if specified
+            tools = kwargs.get("tools")
+            if tools:
+                from victor.framework.tools import configure_tools
+
+                configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
+
+            # Apply vertical configuration if specified
+            vertical = kwargs.get("vertical")
+            if vertical:
+                # Apply vertical configuration
+                vertical_config = vertical.get_config()
+                if vertical_config.system_prompt:
+                    orchestrator.system_prompt = vertical_config.system_prompt
+
+            return agent
+
+        elif mode == "background":
+            # Import BackgroundAgent
+            from victor.agent.background_agent import BackgroundAgent
+
+            # Create background agent
+            agent = BackgroundAgent(
+                orchestrator=orchestrator,
+                task=task or kwargs.get("task", ""),
+                mode_type=kwargs.get("mode_type", "build"),
+                websocket=kwargs.get("websocket", False),
+                enable_observability=kwargs.get("enable_observability", True),
+            )
+            return agent
+
+        elif mode == "team_member":
+            # Import TeamMember
+            from victor.teams.types import TeamMember
+
+            # Create team member (wraps existing agent/team member)
+            member = TeamMember(
+                agent_ref=kwargs.get("agent_ref"),
+                role=kwargs.get("role", "team_member"),
+                capabilities=kwargs.get("capabilities", []),
+                description=kwargs.get("description", ""),
+            )
+            return member
+
+        else:
+            raise ValueError(
+                f"Invalid agent mode: {mode!r}. "
+                "Must be 'foreground', 'background', or 'team_member'"
+            )
 
 
 # Convenience function for creating factory

@@ -211,7 +211,7 @@ if TEXTUAL_AVAILABLE:
             """Initialize search results widget.
 
             Args:
-                results: List of SearchResult objects
+                results: List of DocumentSearchResult objects
                 query: The search query
             """
             super().__init__(*args, **kwargs)

@@ -16,13 +16,13 @@ from victor.integrations.protocol.interface import (
     VictorProtocol,
     ChatMessage,
     ChatResponse,
-    StreamChunk,
-    SearchResult,
+    ClientStreamChunk,
     ToolCall,
     UndoRedoResult,
     AgentMode,
     AgentStatus,
 )
+from victor.integrations.search_types import CodeSearchResult
 
 
 class DirectProtocolAdapter(VictorProtocol):
@@ -91,12 +91,12 @@ class DirectProtocolAdapter(VictorProtocol):
             usage=response.usage if hasattr(response, "usage") else {},
         )
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         message = messages[-1].content if messages else ""
 
         async for chunk in self._orchestrator.stream_chat(message):
-            yield StreamChunk(
+            yield ClientStreamChunk(
                 content=chunk.content or "",
                 tool_call=None,  # Tool calls handled separately
                 finish_reason=chunk.finish_reason,
@@ -106,7 +106,7 @@ class DirectProtocolAdapter(VictorProtocol):
         """Clear conversation history."""
         self._orchestrator.reset_conversation()
 
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[SearchResult]:
+    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
         from victor.tools.semantic_search import SemanticCodeSearchTool
 
@@ -120,7 +120,7 @@ class DirectProtocolAdapter(VictorProtocol):
         search_results = []
         for match in result.data.get("matches", []):
             search_results.append(
-                SearchResult(
+                CodeSearchResult(
                     file=match.get("file", ""),
                     line=match.get("line", 0),
                     content=match.get("content", ""),
@@ -136,7 +136,7 @@ class DirectProtocolAdapter(VictorProtocol):
         regex: bool = False,
         case_sensitive: bool = False,
         file_pattern: str | None = None,
-    ) -> list[SearchResult]:
+    ) -> list[CodeSearchResult]:
         """Search code by pattern."""
         from victor.tools.code_search import CodeSearchTool
 
@@ -154,7 +154,7 @@ class DirectProtocolAdapter(VictorProtocol):
         search_results = []
         for match in result.data.get("matches", []):
             search_results.append(
-                SearchResult(
+                CodeSearchResult(
                     file=match.get("file", ""),
                     line=match.get("line", 0),
                     content=match.get("content", ""),
@@ -292,7 +292,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         data = response.json()
         return ChatResponse.from_dict(data)
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         async with self._client.stream(
             "POST",
@@ -311,7 +311,7 @@ class HTTPProtocolAdapter(VictorProtocol):
                     if line.startswith("data: "):
                         try:
                             data = json.loads(line[6:])
-                            yield StreamChunk(
+                            yield ClientStreamChunk(
                                 content=data.get("content", ""),
                                 tool_call=(
                                     ToolCall.from_dict(data["tool_call"])
@@ -328,7 +328,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         response = await self._client.post("/conversation/reset")
         response.raise_for_status()
 
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[SearchResult]:
+    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
         response = await self._client.post(
             "/search/semantic",
@@ -336,7 +336,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         )
         response.raise_for_status()
         data = response.json()
-        return [SearchResult.from_dict(r) for r in data.get("results", [])]
+        return [CodeSearchResult.from_dict(r) for r in data.get("results", [])]
 
     async def code_search(
         self,
@@ -344,7 +344,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         regex: bool = False,
         case_sensitive: bool = False,
         file_pattern: str | None = None,
-    ) -> list[SearchResult]:
+    ) -> list[CodeSearchResult]:
         """Search code by pattern."""
         response = await self._client.post(
             "/search/code",
@@ -357,7 +357,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         )
         response.raise_for_status()
         data = response.json()
-        return [SearchResult.from_dict(r) for r in data.get("results", [])]
+        return [CodeSearchResult.from_dict(r) for r in data.get("results", [])]
 
     async def switch_model(self, provider: str, model: str) -> None:
         """Switch to a different model."""

@@ -22,13 +22,9 @@ from enum import Enum
 from typing import AsyncIterator, Any
 from datetime import datetime
 
-
-class AgentMode(str, Enum):
-    """Agent operation modes."""
-
-    BUILD = "build"  # Full implementation - all tools available
-    PLAN = "plan"  # Read-only analysis mode
-    EXPLORE = "explore"  # Code navigation and understanding
+# Import canonical AgentMode from mode_controller
+from victor.agent.mode_controller import AgentMode
+from victor.integrations.search_types import CodeSearchResult
 
 
 @dataclass
@@ -60,9 +56,17 @@ class ChatMessage:
         )
 
 
+# Import canonical ToolCall for basic tool call representation
+from victor.agent.tool_calling.base import ToolCall
+
+
 @dataclass
-class ToolCall:
-    """A tool invocation by the agent."""
+class ToolInvocation:
+    """A tool invocation with its result.
+
+    Different from ToolCall - this pairs a tool call with its execution result.
+    Use ToolCall for the request, ToolInvocation for request+response pair.
+    """
 
     id: str
     name: str
@@ -78,7 +82,7 @@ class ToolCall:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ToolCall":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolInvocation":
         return cls(
             id=data["id"],
             name=data["name"],
@@ -142,8 +146,17 @@ class ChatResponse:
 
 
 @dataclass
-class StreamChunk:
-    """A chunk from a streaming response."""
+class ClientStreamChunk:
+    """A chunk from a streaming response for client protocols.
+
+    Used by CLI/TUI and IDE extension clients for streaming responses.
+
+    Renamed from StreamChunk to be semantically distinct from other streaming types:
+    - StreamChunk (victor.providers.base): Provider-level raw streaming
+    - OrchestratorStreamChunk: Orchestrator protocol with typed ChunkType
+    - TypedStreamChunk: Safe typed accessor with nested StreamDelta
+    - ClientStreamChunk: Protocol interface for clients (CLI/VS Code)
+    """
 
     content: str
     tool_call: ToolCall | None = None
@@ -155,36 +168,6 @@ class StreamChunk:
             "tool_call": self.tool_call.to_dict() if self.tool_call else None,
             "finish_reason": self.finish_reason,
         }
-
-
-@dataclass
-class SearchResult:
-    """Result from a code search."""
-
-    file: str
-    line: int
-    content: str
-    score: float
-    context: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "file": self.file,
-            "line": self.line,
-            "content": self.content,
-            "score": self.score,
-            "context": self.context,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SearchResult":
-        return cls(
-            file=data["file"],
-            line=data["line"],
-            content=data["content"],
-            score=data["score"],
-            context=data.get("context", ""),
-        )
 
 
 @dataclass
@@ -250,7 +233,7 @@ class VictorProtocol(ABC):
         ...
 
     @abstractmethod
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response.
 
         Args:
@@ -271,7 +254,7 @@ class VictorProtocol(ABC):
     # =========================================================================
 
     @abstractmethod
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[SearchResult]:
+    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning.
 
         Args:
@@ -290,7 +273,7 @@ class VictorProtocol(ABC):
         regex: bool = False,
         case_sensitive: bool = False,
         file_pattern: str | None = None,
-    ) -> list[SearchResult]:
+    ) -> list[CodeSearchResult]:
         """Search code by pattern.
 
         Args:

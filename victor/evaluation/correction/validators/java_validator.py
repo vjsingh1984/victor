@@ -17,7 +17,7 @@ import re
 from typing import Optional
 
 from ..base import BaseCodeValidator, ValidatorCapabilities
-from ..types import Language, ValidationResult
+from ..types import Language, CodeValidationResult
 
 
 class JavaCodeValidator(BaseCodeValidator):
@@ -176,14 +176,14 @@ class JavaCodeValidator(BaseCodeValidator):
         """Handles Java language."""
         return {Language.JAVA}
 
-    def validate(self, code: str) -> ValidationResult:
+    def validate(self, code: str) -> CodeValidationResult:
         """Validate Java code using pattern analysis.
 
         Args:
             code: Java source code
 
         Returns:
-            ValidationResult with validation info
+            CodeValidationResult with validation info
         """
         errors: list[str] = []
         warnings: list[str] = []
@@ -192,7 +192,7 @@ class JavaCodeValidator(BaseCodeValidator):
         # 1. Check bracket/brace matching
         bracket_error = self._check_brackets(code)
         if bracket_error:
-            return ValidationResult.failure(
+            return CodeValidationResult.failure(
                 errors=[bracket_error],
                 language=Language.JAVA,
                 syntax_error=bracket_error,
@@ -221,7 +221,7 @@ class JavaCodeValidator(BaseCodeValidator):
         method_warnings = self._check_method_structure(code)
         warnings.extend(method_warnings)
 
-        return ValidationResult(
+        return CodeValidationResult(
             valid=len(errors) == 0,
             language=Language.JAVA,
             syntax_valid=len([e for e in errors if "syntax" in e.lower()]) == 0,
@@ -232,7 +232,7 @@ class JavaCodeValidator(BaseCodeValidator):
             used_ast_validation=False,
         )
 
-    def fix(self, code: str, validation: ValidationResult) -> str:
+    def fix(self, code: str, validation: CodeValidationResult) -> str:
         """Auto-fix Java-specific issues.
 
         Args:

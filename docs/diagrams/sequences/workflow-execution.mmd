@@ -1,0 +1,57 @@
+sequenceDiagram
+    participant User
+    participant Executor as Workflow Executor
+    participant Graph as Workflow Graph
+    participant Node1 as Node: Analyze
+    participant Node2 as Node: Test
+    participant Node3 as Node: Report
+    participant Provider as LLM Provider
+    participant Tool as Tool Executor
+
+    %% Workflow Execution Flow
+    User->>Executor: Run workflow "code-review"
+    Executor->>Graph: Load workflow YAML
+    Graph->>Graph: Validate graph structure
+    Graph-->>Executor: Graph loaded successfully
+
+    Executor->>Graph: Get entry node
+    Graph-->>Executor: Node: Analyze
+
+    %% Node 1: Analyze (Agent node)
+    Executor->>Node1: Execute with state
+    Node1->>Provider: chat("Analyze this PR")
+    Provider-->>Node1: Analysis result
+    Node1->>Graph: Update state with result
+    Node1-->>Executor: NodeResult(status=completed)
+
+    %% Check next nodes
+    Executor->>Graph: Get next nodes from "Analyze"
+    Graph-->>Executor: [Node: Test]
+
+    %% Node 2: Test (Compute node with tools)
+    Executor->>Node2: Execute with state
+    Node2->>Tool: Execute tool "pytest"
+    Tool->>Tool: Run pytest tests
+    Tool-->>Node2: Test results
+    Node2->>Graph: Update state with test results
+    Node2-->>Executor: NodeResult(status=completed)
+
+    %% Check next nodes
+    Executor->>Graph: Get next nodes from "Test"
+    Graph-->>Executor: [Node: Report]
+
+    %% Node 3: Report (Transform node)
+    Executor->>Node3: Execute with state
+    Note over Node3: Combines results from<br/>Analyze + Test nodes
+    Node3->>Node3: Apply template
+    Node3->>Node3: Generate report
+    Node3->>Graph: Update state with report
+    Node3-->>Executor: NodeResult(status=completed)
+
+    %% Workflow Complete
+    Executor->>Graph: Get next nodes from "Report"
+    Graph-->>Executor: No more nodes
+
+    Executor-->>User: Final state<br/>{analysis: ..., tests: ..., report: ...}
+
+    Note over User,Tool: Total time: ~5-10 seconds<br/>(depends on workflow complexity)

@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -101,7 +101,7 @@ class ExternalServiceProvider(BaseServiceProvider):
                 handle.ports[pm.container_port] = pm.container_port
 
         handle.state = ServiceState.STARTING
-        handle.started_at = datetime.utcnow()
+        handle.started_at = datetime.now(timezone.utc)
 
         logger.info(f"Connecting to external service '{config.name}' at {handle.host}")
 

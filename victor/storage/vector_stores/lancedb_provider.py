@@ -41,7 +41,7 @@ except ImportError:
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
     EmbeddingConfig,
-    SearchResult,
+    EmbeddingSearchResult,
 )
 from victor.storage.vector_stores.models import (
     BaseEmbeddingModel,
@@ -250,7 +250,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         query: str,
         limit: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+    ) -> List[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -287,7 +287,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             score = 1.0 / (1.0 + distance)  # Convert distance to similarity
 
             search_results.append(
-                SearchResult(
+                EmbeddingSearchResult(
                     file_path=result.get("file_path", ""),
                     symbol_name=result.get("symbol_name"),
                     content=result.get("content", ""),

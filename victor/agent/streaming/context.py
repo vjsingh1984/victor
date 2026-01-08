@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.agent.stream_handler import StreamMetrics
-from victor.agent.unified_classifier import TaskType
+from victor.agent.unified_classifier import ClassifierTaskType
 
 
 @dataclass
@@ -65,7 +65,7 @@ class StreamingChatContext:
     force_completion_warning_shown: bool = False  # Prevent duplicate warnings
 
     # Task classification
-    unified_task_type: TaskType = TaskType.DEFAULT
+    unified_task_type: ClassifierTaskType = ClassifierTaskType.DEFAULT
     task_classification: Optional[Dict[str, Any]] = None
     complexity_tool_budget: Optional[int] = None
     is_analysis_task: bool = False

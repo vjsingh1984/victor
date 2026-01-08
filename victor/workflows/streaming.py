@@ -93,16 +93,20 @@ class WorkflowStreamChunk:
     It can be converted to the base StreamChunk for compatibility with
     existing streaming infrastructure.
 
+    This is the CANONICAL streaming chunk type. Use this for all workflow
+    streaming operations. The streaming_executor module imports from here.
+
     Attributes:
         event_type: The type of event this chunk represents.
         workflow_id: Unique identifier for the workflow instance.
         node_id: ID of the node that generated this event (if applicable).
+        node_name: Human-readable name of the node (if applicable).
         content: Text content (for AGENT_CONTENT events).
         tool_calls: Tool call information (for AGENT_TOOL_CALL events).
         metadata: Additional event metadata.
         timestamp: When the event occurred.
         is_final: Whether this is the final chunk of the stream.
-        progress: Workflow progress (0.0 to 1.0).
+        progress: Workflow progress (0.0 to 1.0 as fraction, or 0.0 to 100.0 as percentage).
         error: Error message (for error events).
 
     Example:
@@ -110,6 +114,7 @@ class WorkflowStreamChunk:
             event_type=WorkflowEventType.AGENT_CONTENT,
             workflow_id="wf_123",
             node_id="summarize",
+            node_name="Code Summarizer",
             content="The analysis shows...",
         )
     """
@@ -117,6 +122,7 @@ class WorkflowStreamChunk:
     event_type: WorkflowEventType
     workflow_id: str
     node_id: Optional[str] = None
+    node_name: Optional[str] = None
     content: str = ""
     tool_calls: Optional[List[Dict[str, Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -169,12 +175,13 @@ def _create_queue() -> asyncio.Queue:
 class WorkflowStreamContext:
     """Context for managing workflow streaming state.
 
-    This dataclass tracks the state of a streaming workflow execution,
-    including progress, current node, and cancellation status.
+    This is the CANONICAL streaming context type. Use this for all workflow
+    streaming operations. Provides both fraction-based (get_progress) and
+    percentage-based (progress property) progress tracking for compatibility.
 
     Attributes:
         workflow_id: Unique identifier for the workflow instance.
-        workflow_name: Human-readable workflow name.
+        workflow_name: Human-readable workflow name (optional, defaults to "").
         start_time: When the workflow started.
         total_nodes: Total number of nodes in the workflow.
         completed_nodes: Number of nodes that have completed.
@@ -192,11 +199,12 @@ class WorkflowStreamContext:
 
         # Update progress as nodes complete
         context.completed_nodes += 1
-        progress = context.get_progress()  # Returns 0.2
+        fraction = context.get_progress()  # Returns 0.2
+        percentage = context.progress  # Returns 20.0
     """
 
     workflow_id: str
-    workflow_name: str
+    workflow_name: str = ""
     start_time: datetime = field(default_factory=_now_utc)
     total_nodes: int = 0
     completed_nodes: int = 0
@@ -224,6 +232,27 @@ class WorkflowStreamContext:
         if self.total_nodes == 0:
             return 0.0
         return self.completed_nodes / self.total_nodes
+
+    @property
+    def progress(self) -> float:
+        """Calculate workflow progress as a percentage.
+
+        Returns:
+            Progress value between 0.0 and 100.0.
+            Returns 0.0 if there are no nodes.
+
+        This property provides backward compatibility with code that
+        expects percentage-based progress.
+
+        Example:
+            context = WorkflowStreamContext(
+                workflow_id="wf_123",
+                total_nodes=10,
+                completed_nodes=3,
+            )
+            pct = context.progress  # Returns 30.0
+        """
+        return self.get_progress() * 100.0
 
     @property
     def is_complete(self) -> bool:

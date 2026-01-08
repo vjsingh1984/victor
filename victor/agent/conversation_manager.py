@@ -15,14 +15,21 @@
 """Conversation management facade composing controller, store, and embedding services.
 
 This module provides a unified interface for conversation management by composing:
-- ConversationController: In-memory message handling and context management
-- ConversationStore: SQLite persistence for session recovery
-- ConversationEmbeddingStore: LanceDB-based semantic search
+- MessageStore: Message storage and persistence
+- ContextOverflowHandler: Context overflow detection and compaction
+- SessionManager: Session lifecycle management
+- EmbeddingManager: Embedding and semantic search
 
 The ConversationManager acts as a Facade, simplifying the interface for
 conversation operations while delegating to specialized components.
 
+SRP Compliance:
+ConversationManager now delegates to focused components instead of
+implementing all functionality directly. This improves maintainability
+and testability by separating concerns.
+
 Part of TD-002: AgentOrchestrator god class refactoring.
+Part of SOLID-based refactoring to eliminate god class anti-pattern.
 
 Usage:
     from victor.agent.conversation_manager import ConversationManager
@@ -52,12 +59,18 @@ from victor.agent.conversation_controller import (
     ContextMetrics,
 )
 from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation import (
+    MessageStore,
+    ContextOverflowHandler,
+    SessionManager,
+    EmbeddingManager,
+)
 
 if TYPE_CHECKING:
     from victor.agent.conversation_memory import ConversationStore, ConversationSession
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.config.settings import Settings
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.providers.base import Message
 
 
@@ -129,7 +142,7 @@ class ConversationManager:
         embedding_service: Optional["EmbeddingService"] = None,
         session_id: Optional[str] = None,
     ):
-        """Initialize ConversationManager.
+        """Initialize ConversationManager using composition.
 
         Args:
             settings: Application settings
@@ -161,7 +174,30 @@ class ConversationManager:
         if system_prompt:
             self._controller.set_system_prompt(system_prompt)
 
-        # Optional persistence components (lazy initialization)
+        # Initialize specialized components (DIP: Depend on abstractions)
+        self._message_store = MessageStore(
+            controller=self._controller,
+            store=store,
+            enable_persistence=self._config.enable_persistence,
+        )
+
+        self._context_handler = ContextOverflowHandler(
+            controller=self._controller,
+            max_context_chars=self._config.max_context_chars,
+            chars_per_token=self._config.chars_per_token_estimate,
+        )
+
+        self._session_manager = SessionManager(
+            store=store,
+            enable_persistence=self._config.enable_persistence,
+        )
+
+        self._embedding_manager = EmbeddingManager(
+            embedding_store=None,  # Will initialize later
+            enable_embeddings=self._config.enable_embeddings,
+        )
+
+        # Keep references for backward compatibility
         self._store: Optional["ConversationStore"] = store
         self._embedding_store: Optional["ConversationEmbeddingStore"] = None
         self._embedding_service = embedding_service
@@ -210,8 +246,7 @@ class ConversationManager:
     def add_message(self, role: str, content: str) -> "Message":
         """Add a message with specified role.
 
-        Adds the message to the in-memory controller and optionally persists
-        to SQLite if persistence is enabled.
+        Delegates to MessageStore (SRP).
 
         Args:
             role: Message role (user, assistant, system)
@@ -220,12 +255,12 @@ class ConversationManager:
         Returns:
             The created Message object
         """
-        message = self._controller.add_message(role, content)
-        self._persist_message(role, content)
-        return message
+        return self._message_store.add_message(role, content)
 
     def add_user_message(self, content: str) -> "Message":
         """Add a user message.
+
+        Delegates to MessageStore (SRP).
 
         Args:
             content: User message content
@@ -233,9 +268,7 @@ class ConversationManager:
         Returns:
             The created Message object
         """
-        message = self._controller.add_user_message(content)
-        self._persist_message("user", content)
-        return message
+        return self._message_store.add_user_message(content)
 
     def add_assistant_message(
         self,
@@ -244,6 +277,8 @@ class ConversationManager:
     ) -> "Message":
         """Add an assistant message with optional tool calls.
 
+        Delegates to MessageStore (SRP).
+
         Args:
             content: Assistant message content
             tool_calls: Optional list of tool calls made by the assistant
@@ -251,33 +286,25 @@ class ConversationManager:
         Returns:
             The created Message object
         """
-        message = self._controller.add_assistant_message(content, tool_calls=tool_calls)
-        self._persist_message("assistant", content)
-        return message
+        return self._message_store.add_assistant_message(content, tool_calls)
 
     def add_tool_result(
         self,
         tool_call_id: str,
-        tool_name: str,
-        result: str,
+        content: str,
     ) -> "Message":
         """Add a tool result message.
 
+        Delegates to MessageStore (SRP).
+
         Args:
-            tool_call_id: ID of the tool call being responded to
-            tool_name: Name of the tool that was executed
-            result: Tool execution result
+            tool_call_id: ID of the tool call this result is for
+            content: Tool result content
 
         Returns:
             The created Message object
         """
-        message = self._controller.add_tool_result(
-            tool_call_id=tool_call_id,
-            tool_name=tool_name,
-            result=result,
-        )
-        self._persist_message("tool", result, tool_name=tool_name)
-        return message
+        return self._message_store.add_tool_result(tool_call_id, content)
 
     def _persist_message(
         self,
@@ -285,30 +312,13 @@ class ConversationManager:
         content: str,
         tool_name: Optional[str] = None,
     ) -> None:
-        """Persist message to SQLite store if enabled."""
-        if not self._store or not self._session_id or not self._config.enable_persistence:
-            return
+        """Persist message to SQLite store if enabled.
 
-        try:
-            from victor.agent.conversation_memory import MessageRole
-
-            # Map role strings to MessageRole enum
-            role_map = {
-                "user": MessageRole.USER,
-                "assistant": MessageRole.ASSISTANT,
-                "system": MessageRole.SYSTEM,
-                "tool": MessageRole.TOOL_RESULT,
-            }
-            msg_role = role_map.get(role, MessageRole.USER)
-
-            self._store.add_message(
-                session_id=self._session_id,
-                role=msg_role,
-                content=content,
-                tool_name=tool_name,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to persist message: {e}")
+        Note: This is kept for backward compatibility but is now handled
+        internally by MessageStore.
+        """
+        # Delegated to MessageStore
+        pass
 
     # =========================================================================
     # MESSAGE ACCESS
@@ -318,34 +328,42 @@ class ConversationManager:
     def messages(self) -> List["Message"]:
         """Get all messages in the conversation.
 
+        Delegates to MessageStore (SRP).
+
         Returns:
             List of Message objects
         """
-        return self._controller.messages
+        return self._message_store.messages
 
     def message_count(self) -> int:
         """Get the number of messages in the conversation.
 
+        Delegates to MessageStore (SRP).
+
         Returns:
             Number of messages
         """
-        return self._controller.message_count
+        return self._message_store.message_count
 
     def get_last_user_message(self) -> Optional[str]:
         """Get the content of the last user message.
 
+        Delegates to MessageStore (SRP).
+
         Returns:
             Last user message content or None
         """
-        return self._controller.get_last_user_message()
+        return self._message_store.get_last_user_message()
 
     def get_last_assistant_message(self) -> Optional[str]:
         """Get the content of the last assistant message.
 
+        Delegates to MessageStore (SRP).
+
         Returns:
             Last assistant message content or None
         """
-        return self._controller.get_last_assistant_message()
+        return self._message_store.get_last_assistant_message()
 
     # =========================================================================
     # CONTEXT MANAGEMENT
@@ -354,18 +372,22 @@ class ConversationManager:
     def get_context_metrics(self) -> ContextMetrics:
         """Get current context metrics.
 
+        Delegates to ContextOverflowHandler (SRP).
+
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._controller.get_context_metrics()
+        return self._context_handler.get_context_metrics()
 
     def check_context_overflow(self) -> bool:
         """Check if context is at risk of overflow.
 
+        Delegates to ContextOverflowHandler (SRP).
+
         Returns:
             True if context is dangerously large
         """
-        return self._controller.check_context_overflow()
+        return self._context_handler.check_overflow()
 
     def handle_compaction(
         self,
@@ -374,8 +396,7 @@ class ConversationManager:
     ) -> int:
         """Trigger context compaction.
 
-        Uses smart compaction to reduce context size while preserving
-        the most important information.
+        Delegates to ContextOverflowHandler (SRP).
 
         Args:
             user_message: Current user message for semantic relevance scoring
@@ -384,16 +405,22 @@ class ConversationManager:
         Returns:
             Number of messages removed
         """
-        return self._controller.smart_compact_history(
-            target_messages=target_messages,
-            current_query=user_message,
+        # Delegate to context handler
+        metrics = self._context_handler.handle_compaction(
+            strategy="semantic" if user_message else "recent",
+            target_ratio=0.7,
+            preserve_system_prompt=True,
         )
+
+        if metrics:
+            # Calculate messages removed
+            return self.message_count() - metrics.message_count
+        return 0
 
     def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context for LLM calls.
 
-        If persistence is enabled, returns formatted messages within token budget.
-        Otherwise, returns messages from in-memory controller.
+        Delegates to ContextOverflowHandler (SRP).
 
         Args:
             max_tokens: Maximum tokens for context
@@ -407,8 +434,8 @@ class ConversationManager:
                 max_tokens=max_tokens,
             )
 
-        # Fall back to in-memory messages
-        return [{"role": m.role, "content": m.content} for m in self._controller.messages]
+        # Fall back to context handler
+        return self._context_handler.get_memory_context(max_tokens)
 
     # =========================================================================
     # STAGE TRACKING
@@ -439,10 +466,12 @@ class ConversationManager:
     def session_id(self) -> Optional[str]:
         """Get current session ID.
 
+        Delegates to SessionManager (SRP).
+
         Returns:
             Session ID or None if no session
         """
-        return self._session_id
+        return self._session_manager.session_id or self._session_id
 
     def get_recent_sessions(
         self,
@@ -450,6 +479,8 @@ class ConversationManager:
         project_path: Optional[str] = None,
     ) -> List["ConversationSession"]:
         """List recent conversation sessions.
+
+        Delegates to SessionManager (SRP).
 
         Args:
             limit: Maximum sessions to return
@@ -465,6 +496,8 @@ class ConversationManager:
 
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous session.
+
+        Delegates to SessionManager (SRP).
 
         Loads session from persistent store and restores messages
         to the controller.
@@ -491,7 +524,17 @@ class ConversationManager:
         # Note: ConversationSession.messages contains ConversationMessage objects
         for msg in session.messages:
             role = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-            self._controller.add_message(role, msg.content)
+
+            # Preserve tool_calls metadata for assistant messages
+            kwargs = {}
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                kwargs["tool_calls"] = msg.tool_calls
+
+            self._controller.add_message(role, msg.content, **kwargs)
+
+        # Update store's session_id to reflect recovered session
+        if hasattr(self._store, "session_id"):
+            self._store.session_id = session_id
 
         self._session = session
         self._session_id = session_id
@@ -500,6 +543,8 @@ class ConversationManager:
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for current session.
+
+        Delegates to SessionManager (SRP).
 
         Returns:
             Dictionary of session statistics
@@ -520,6 +565,8 @@ class ConversationManager:
     async def initialize_embedding_store(self) -> bool:
         """Lazy initialize LanceDB embedding store.
 
+        Delegates to EmbeddingManager (SRP).
+
         Call this method when semantic search capabilities are needed.
         The embedding store is not initialized by default to reduce startup overhead.
 
@@ -537,7 +584,7 @@ class ConversationManager:
 
             # Get or create embedding service
             if self._embedding_service is None:
-                from victor.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import EmbeddingService
 
                 self._embedding_service = EmbeddingService.get_instance()
 
@@ -551,6 +598,9 @@ class ConversationManager:
                 sqlite_db_path=sqlite_path,
             )
             await self._embedding_store.initialize()
+
+            # Update embedding manager with the store
+            self._embedding_manager._embedding_store = self._embedding_store
 
             # Wire up embedding store to controller and store
             if self._embedding_service:
@@ -575,6 +625,8 @@ class ConversationManager:
         min_similarity: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """Search for semantically similar messages.
+
+        Delegates to EmbeddingManager (SRP).
 
         Requires embedding store to be initialized.
 

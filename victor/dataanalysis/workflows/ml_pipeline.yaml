@@ -6,6 +6,60 @@
 # - Model training with hyperparameter tuning
 # - Evaluation and model selection
 # - Deployment preparation
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python with scikit-learn/xgboost/lightgbm)             │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - scikit-learn for preprocessing, RandomForest, evaluation                │
+# │   - xgboost, lightgbm for gradient boosting                                 │
+# │   - pytorch/tensorflow for neural networks (optional)                        │
+# │   - optuna/hyperopt for hyperparameter tuning (optional)                    │
+# │                                                                              │
+# │ Docker execution:                                                            │
+# │   - Image: victor-ml:latest                                                 │
+# │   - Build: docker build -f docker/Dockerfile.ml -t victor-ml .              │
+# │   - Useful for: GPU training, reproducibility, isolated environments        │
+# │                                                                              │
+# │ GPU considerations:                                                          │
+# │   - For train_nn node, set executor=docker with nvidia runtime              │
+# │   - XGBoost/LightGBM can use GPU with gpu_hist/gpu tree method              │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ validation_score_threshold: 0.7 (data quality to proceed)                   │
+# │ cv_folds: 5 (cross-validation folds)                                        │
+# │ early_stopping_patience: 10 (epochs without improvement)                    │
+# │ best_model_threshold: 0.85 (performance to auto-deploy)                     │
+# │ model_output_format: pickle,onnx (serialization formats)                    │
+# │ hitl_timeout: 1800s (30 min for low-score approval)                         │
+# │ max_training_time: 900s (15 min per model)                                  │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - load_train_data: File I/O (pd.read_csv)                                 │
+# │   - validate_data: Boolean quality checks                                    │
+# │   - numeric/categorical/text_features: Transformers from sklearn            │
+# │   - feature_selection: MI, RFE, correlation filter algorithms               │
+# │   - train_*: Model.fit() with GridSearchCV                                  │
+# │   - evaluate_models: Metric computation (accuracy, F1, ROC-AUC)             │
+# │   - save_model: pickle.dump(), onnx.export()                                │
+# │   - create_api_spec: Template rendering                                      │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - auto_fix_data: Deciding imputation strategy                             │
+# │   - analyze_results: Interpreting metrics and trade-offs                    │
+# │   - end_with_recommendations: Writing improvement suggestions               │
+# │   - generate_docs: Writing model cards and documentation                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
 workflows:
   ml_pipeline:
@@ -15,6 +69,31 @@ workflows:
       version: "1.0"
       author: "victor"
       vertical: dataanalysis
+
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    services:
+      # Project database for experiment tracking
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      # Model artifact storage
+      model_storage:
+        type: filesystem
+        config:
+          path: $ctx.model_output_dir
+          auto_cleanup: false          # Preserve trained models
+          max_size_gb: 20              # Models can be large
+        lifecycle:
+          start: auto
+          cleanup: preserve            # Keep all artifacts
 
     batch_config:
       batch_size: 3
@@ -26,6 +105,16 @@ workflows:
       # =====================================================================
       # Stage 1: Data Preparation
       # =====================================================================
+      # COMPUTE: File I/O is deterministic parsing
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pandas file readers (read_csv, read_parquet)
+      # Loads train and test sets, validates target column exists
+      #
+      # WHY NOT AGENT: File parsing is mechanical - no judgment needed.
+      # Schema validation is boolean (column exists or doesn't).
+      #
+      # Execution: in-process (pandas)
+      # BLOCKED: [llm, network, write] - needs filesystem read
       - id: load_train_data
         type: compute
         name: "Load Training Data"
@@ -35,12 +124,23 @@ workflows:
           test_path: $ctx.test_file
           target_column: $ctx.target
         output: raw_datasets
-        constraints:
-          llm_allowed: false
-          max_cost_tier: FREE
-          timeout: 60
+        constraints: [llm, network, write]
+        timeout: 60
         next: [validate_data]
 
+      # COMPUTE: ML-specific data validation checks
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Boolean checks for ML readiness:
+      #   - check_target_present: target in df.columns
+      #   - check_class_balance: np.bincount() / len for classification
+      #   - check_missing_values: df.isna().sum() with threshold
+      #   - check_feature_types: pd.api.types checks per column
+      #
+      # WHY NOT AGENT: All checks are True/False with clear criteria.
+      # "Is there class imbalance?" = ratio > 10:1, not a judgment.
+      #
+      # Execution: in-process (pandas/numpy)
+      # BLOCKED: [llm, filesystem, network, write] - pure in-memory
       - id: validate_data
         type: compute
         name: "Validate Data Quality"
@@ -53,9 +153,8 @@ workflows:
             - check_missing_values
             - check_feature_types
         output: validation_report
-        constraints:
-          llm_allowed: false
-          timeout: 45
+        constraints: [llm, filesystem, network, write]
+        timeout: 45
         next: [check_data_quality]
 
       - id: check_data_quality
@@ -96,6 +195,19 @@ workflows:
         join_strategy: all
         next: [combine_features]
 
+      # COMPUTE: Numeric feature transformation is sklearn transformers
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: sklearn.preprocessing transformers:
+      #   - scaling: StandardScaler, MinMaxScaler, RobustScaler
+      #   - polynomial_features: PolynomialFeatures(degree=2)
+      #   - binning: KBinsDiscretizer
+      # All are fit_transform() with deterministic output.
+      #
+      # WHY NOT AGENT: Transformations are mathematical formulas.
+      # StandardScaler = (x - mean) / std - no judgment involved.
+      #
+      # Execution: in-process (scikit-learn)
+      # BLOCKED: [llm, filesystem, network, write] - pure in-memory math
       - id: numeric_features
         type: compute
         name: "Process Numeric Features"
@@ -106,10 +218,21 @@ workflows:
             - polynomial_features
             - binning
         output: numeric_transformed
-        constraints:
-          llm_allowed: false
-          timeout: 120
+        constraints: [llm, filesystem, network, write]
+        timeout: 120
 
+      # COMPUTE: Categorical encoding is lookup table construction
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: sklearn/category_encoders transformers:
+      #   - one_hot_encoding: OneHotEncoder (sparse matrix)
+      #   - target_encoding: TargetEncoder (mean target per category)
+      #   - frequency_encoding: count/total per category
+      #
+      # WHY NOT AGENT: Encoding is mechanical mapping.
+      # "red" -> [1,0,0], "blue" -> [0,1,0] - no interpretation needed.
+      #
+      # Execution: in-process (scikit-learn/category_encoders)
+      # BLOCKED: [llm, filesystem, network, write] - pure computation
       - id: categorical_features
         type: compute
         name: "Process Categorical Features"
@@ -120,10 +243,24 @@ workflows:
             - target_encoding
             - frequency_encoding
         output: categorical_transformed
-        constraints:
-          llm_allowed: false
-          timeout: 120
+        constraints: [llm, filesystem, network, write]
+        timeout: 120
 
+      # COMPUTE: Text vectorization is algorithmic transformation
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm:
+      #   - tfidf: TfidfVectorizer (term freq * inverse doc freq)
+      #   - word_embeddings: Pre-trained embeddings lookup (Word2Vec, FastText)
+      #     OR sentence-transformers for contextual embeddings
+      #
+      # WHY NOT AGENT: TF-IDF is a formula. Embeddings are vector lookups.
+      # Neither requires interpreting MEANING of text - that's done later.
+      #
+      # Execution: in-process (scikit-learn, gensim)
+      #   For large corpora or transformer embeddings, consider subprocess
+      #   to manage memory for embedding model loading
+      #
+      # BLOCKED: [llm, filesystem, write] - needs network for embedding API
       - id: text_features
         type: compute
         name: "Process Text Features"
@@ -133,9 +270,8 @@ workflows:
             - tfidf
             - word_embeddings
         output: text_transformed
-        constraints:
-          llm_allowed: false
-          timeout: 180
+        constraints: [llm, filesystem, write]
+        timeout: 180
 
       - id: combine_features
         type: transform

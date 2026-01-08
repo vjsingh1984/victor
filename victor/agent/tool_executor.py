@@ -44,9 +44,9 @@ from victor.core.errors import (
     get_error_handler,
 )
 from victor.core.retry import (
+    BaseRetryStrategy,
     RetryContext,
     RetryExecutor,
-    RetryStrategy,
     tool_retry_strategy,
 )
 from victor.tools.base import (
@@ -56,7 +56,7 @@ from victor.tools.base import (
     HookError,
     ToolRegistry,
     ToolResult,
-    ValidationResult,
+    ToolValidationResult,
 )
 
 # RL hook integration (lazy import to avoid circular dependencies)
@@ -221,7 +221,7 @@ class ToolExecutor:
         safety_checker: Optional[SafetyChecker] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        retry_strategy: Optional[RetryStrategy] = None,
+        retry_strategy: Optional[BaseRetryStrategy] = None,
         context: Optional[Dict[str, Any]] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         enable_code_correction: bool = False,
@@ -229,6 +229,7 @@ class ToolExecutor:
         error_handler: Optional[ErrorHandler] = None,
         rbac_manager: Optional["RBACManager"] = None,
         current_user: Optional[str] = None,
+        tool_call_tracer: Optional[Any] = None,  # ToolCallTracer for debugging
     ):
         """Initialize tool executor.
 
@@ -247,6 +248,7 @@ class ToolExecutor:
             error_handler: Centralized error handler for structured logging (uses global if None)
             rbac_manager: Optional RBAC manager for permission checks (disabled if None)
             current_user: Current user for RBAC checks (defaults to 'default_user')
+            tool_call_tracer: Optional ToolCallTracer for debugging tool calls
         """
         self.tools = tool_registry
         self.normalizer = argument_normalizer or ArgumentNormalizer()
@@ -266,6 +268,7 @@ class ToolExecutor:
         self.error_handler = error_handler or get_error_handler()
         self.rbac_manager = rbac_manager
         self.current_user = current_user or "default_user"
+        self._tool_call_tracer = tool_call_tracer  # Tool call tracer for debugging
 
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
@@ -380,7 +383,7 @@ class ToolExecutor:
         self,
         tool: BaseTool,
         arguments: Dict[str, Any],
-    ) -> Tuple[bool, Optional[ValidationResult]]:
+    ) -> Tuple[bool, Optional[ToolValidationResult]]:
         """Validate tool arguments against JSON Schema before execution.
 
         Performs pre-execution validation based on the configured validation_mode:
@@ -395,7 +398,7 @@ class ToolExecutor:
         Returns:
             Tuple of (should_proceed, validation_result)
             - should_proceed: True if execution should continue
-            - validation_result: ValidationResult or None if validation was skipped
+            - validation_result: ToolValidationResult or None if validation was skipped
         """
         if self.validation_mode == ValidationMode.OFF:
             return True, None
@@ -413,7 +416,7 @@ class ToolExecutor:
             self._validation_failures += 1
             logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
             if self.validation_mode == ValidationMode.STRICT:
-                return False, ValidationResult.failure([error_msg])
+                return False, ToolValidationResult.failure([error_msg])
             else:
                 logger.warning("Proceeding with unknown arguments (lenient mode)")
 
@@ -444,8 +447,27 @@ class ToolExecutor:
             logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
             if self.validation_mode == ValidationMode.STRICT:
-                return False, ValidationResult.failure([f"Validation system error: {e}"])
+                return False, ToolValidationResult.failure([f"Validation system error: {e}"])
             return True, None
+
+    def _complete_tool_call(
+        self, call_id: Optional[str], success: bool, result: Any = None, error: Optional[str] = None
+    ) -> None:
+        """Complete or fail a tool call in the tracer.
+
+        Args:
+            call_id: Tool call ID from tracer
+            success: Whether the call succeeded
+            result: Result data if successful
+            error: Error message if failed
+        """
+        if not call_id or not self._tool_call_tracer:
+            return
+
+        if success:
+            self._tool_call_tracer.complete_call(call_id, result=result)
+        else:
+            self._tool_call_tracer.fail_call(call_id, error=error)
 
     async def execute(
         self,
@@ -454,6 +476,7 @@ class ToolExecutor:
         skip_cache: bool = False,
         context: Optional[Dict[str, Any]] = None,
         skip_normalization: bool = False,
+        parent_span_id: Optional[str] = None,  # For linking to execution spans
     ) -> ToolExecutionResult:
         """Execute a tool with retry logic and caching.
 
@@ -463,10 +486,17 @@ class ToolExecutor:
             skip_cache: Skip cache lookup even for cacheable tools
             context: Optional context to pass to the tool (merged with default context)
             skip_normalization: Skip argument normalization (use when already normalized)
+            parent_span_id: Optional parent execution span ID for debugging
 
         Returns:
             ToolExecutionResult with execution outcome
         """
+        # Record tool call start for debugging
+        call_id = None
+        if self._tool_call_tracer:
+            call_id = self._tool_call_tracer.record_call(
+                tool_name=tool_name, arguments=arguments, parent_span_id=parent_span_id or "unknown"
+            )
         # Merge default context with call-specific context
         exec_context = {**self.context}
         if context:
@@ -531,32 +561,38 @@ class ToolExecutor:
             if cached_result is not None:
                 self._stats[tool_name]["cache_hits"] += 1
                 logger.log(TRACE, "Cache hit for %s", tool_name)
-                return ToolExecutionResult(
+                result = ToolExecutionResult(
                     tool_name=tool_name,
                     success=True,
                     result=cached_result,
                     cached=True,
                     normalization_strategy=strategy,
                 )
+                self._complete_tool_call(call_id, True, result=cached_result)
+                return result
 
         # Get the tool
         tool = self.tools.get(tool_name)
         if not tool:
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=f"Tool '{tool_name}' not found",
             )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
 
         # Check if tool is enabled
         if not self.tools.is_tool_enabled(tool_name):
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=f"Tool '{tool_name}' is disabled",
             )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
 
         # Pre-execution schema validation
         should_proceed, validation_result = self._validate_arguments(tool, normalized_args)
@@ -564,12 +600,14 @@ class ToolExecutor:
             error_msg = "Argument validation failed"
             if validation_result and validation_result.errors:
                 error_msg = f"Invalid arguments: {'; '.join(validation_result.errors[:3])}"
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=error_msg,
             )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
 
         # Safety check for dangerous operations
         should_proceed, rejection_reason = await self.safety_checker.check_and_confirm(
@@ -577,12 +615,14 @@ class ToolExecutor:
         )
         if not should_proceed:
             logger.info("Tool execution blocked by safety check: %s", tool_name)
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=rejection_reason or "Operation cancelled by safety check",
             )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
 
         # RBAC permission check (runs after safety check)
         rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
@@ -590,12 +630,14 @@ class ToolExecutor:
             logger.warning(
                 "Tool execution blocked by RBAC: %s for user %s", tool_name, self.current_user
             )
-            return ToolExecutionResult(
+            result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=rbac_denial or "Permission denied by RBAC",
             )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
 
         # Execute with retry
         result, success, error, retries, error_info = await self._execute_with_retry(
@@ -627,6 +669,9 @@ class ToolExecutor:
 
         # Emit RL event for tool execution (for learner activation)
         self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
+
+        # Complete tool call in tracer
+        self._complete_tool_call(call_id, success, result=result, error=error)
 
         return ToolExecutionResult(
             tool_name=tool_name,
@@ -759,7 +804,7 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         context: Dict[str, Any],
     ) -> Tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
-        """Execute a tool with retry logic from unified RetryStrategy.
+        """Execute a tool with retry logic from unified BaseRetryStrategy.
 
         Uses the configured retry strategy for exponential backoff and
         retry decisions. Hooks are run before/after each attempt. Errors

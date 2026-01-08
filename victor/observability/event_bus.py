@@ -448,6 +448,141 @@ class ExporterConfig:
         return True
 
 
+# =============================================================================
+# Centralized EventBus Configuration (P1 Scalability)
+# =============================================================================
+
+
+@dataclass
+class EventBusConfig:
+    """Centralized configuration for EventBus.
+
+    Combines backpressure, sampling, and batching configuration into a single
+    object that can be created from Settings for consistent initialization.
+
+    Attributes:
+        queue_maxsize: Maximum queue size for backpressure
+        backpressure_strategy: Strategy when queue is full
+        sampling_config: Optional sampling configuration
+        batch_config: Optional batching configuration
+    """
+
+    queue_maxsize: int = 10000
+    backpressure_strategy: BackpressureStrategy = BackpressureStrategy.DROP_OLDEST
+    sampling_config: Optional[SamplingConfig] = None
+    batch_config: Optional[BatchConfig] = None
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> "EventBusConfig":
+        """Create EventBusConfig from a Settings instance.
+
+        This factory method extracts all EventBus-related settings and
+        constructs a unified configuration object.
+
+        Args:
+            settings: Victor Settings instance
+
+        Returns:
+            Configured EventBusConfig
+
+        Example:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            config = EventBusConfig.from_settings(settings)
+            bus = EventBus(
+                queue_maxsize=config.queue_maxsize,
+                backpressure_strategy=config.backpressure_strategy,
+                sampling_config=config.sampling_config,
+                batch_config=config.batch_config,
+            )
+        """
+        # Parse backpressure strategy
+        strategy_str = getattr(settings, "eventbus_backpressure_strategy", "drop_oldest")
+        try:
+            strategy = BackpressureStrategy(strategy_str)
+        except ValueError:
+            logger.warning(f"Invalid backpressure strategy '{strategy_str}', using DROP_OLDEST")
+            strategy = BackpressureStrategy.DROP_OLDEST
+
+        # Build sampling config if enabled
+        sampling_config = None
+        if getattr(settings, "eventbus_sampling_enabled", False):
+            default_rate = getattr(settings, "eventbus_sampling_default_rate", 1.0)
+            sampling_config = SamplingConfig(
+                default_rate=default_rate,
+                preserve_errors=True,
+                preserve_critical=True,
+            )
+
+        # Build batch config if enabled
+        batch_config = None
+        if getattr(settings, "eventbus_batching_enabled", False):
+            batch_config = BatchConfig(
+                enabled=True,
+                batch_size=getattr(settings, "eventbus_batch_size", 100),
+                flush_interval_ms=getattr(settings, "eventbus_batch_flush_interval_ms", 1000.0),
+            )
+
+        return cls(
+            queue_maxsize=getattr(settings, "eventbus_queue_maxsize", 10000),
+            backpressure_strategy=strategy,
+            sampling_config=sampling_config,
+            batch_config=batch_config,
+        )
+
+    def apply_to_bus(self, bus: "EventBus") -> None:
+        """Apply this configuration to an EventBus instance.
+
+        Useful for reconfiguring an existing EventBus at runtime.
+
+        Args:
+            bus: EventBus instance to configure
+        """
+        bus.configure_backpressure(
+            strategy=self.backpressure_strategy,
+            queue_maxsize=self.queue_maxsize,
+        )
+
+        if self.sampling_config:
+            bus.configure_sampling(self.sampling_config)
+        else:
+            bus.disable_sampling()
+
+        if self.batch_config:
+            bus.configure_batching(self.batch_config)
+        else:
+            bus.disable_batching()
+
+
+def create_eventbus_from_settings(settings: Any) -> "EventBus":
+    """Create and configure an EventBus from Settings.
+
+    This is the recommended way to create an EventBus with consistent
+    configuration from the application settings.
+
+    Args:
+        settings: Victor Settings instance
+
+    Returns:
+        Configured EventBus instance
+
+    Example:
+        from victor.config.settings import load_settings
+        from victor.observability.event_bus import create_eventbus_from_settings
+
+        settings = load_settings()
+        bus = create_eventbus_from_settings(settings)
+    """
+    config = EventBusConfig.from_settings(settings)
+    return EventBus(
+        queue_maxsize=config.queue_maxsize,
+        backpressure_strategy=config.backpressure_strategy,
+        sampling_config=config.sampling_config,
+        batch_config=config.batch_config,
+    )
+
+
 @dataclass(frozen=True)
 class VictorEvent:
     """Canonical event format for all Victor observations.
@@ -1477,3 +1612,54 @@ class EventBus:
             ExporterConfig or None if not configured
         """
         return self._exporter_configs.get(id(exporter))
+
+    def emit_lifecycle_event(
+        self,
+        event_type: str,
+        data: Optional[Dict[str, Any]] = None,
+        priority: EventPriority = EventPriority.NORMAL,
+    ) -> None:
+        """Emit lifecycle events (graph_started, workflow_completed, etc.).
+
+        Lifecycle events track the start/end of major operations like
+        workflow executions, graph traversals, and session management.
+
+        Args:
+            event_type: Type of lifecycle event (e.g., "graph_started",
+                "workflow_completed", "session_started").
+            data: Optional event payload with additional context.
+            priority: Event priority (default NORMAL).
+
+        Example:
+            bus.emit_lifecycle_event("workflow_started", {
+                "workflow_id": "deep_research",
+                "inputs": {"query": "AI trends"},
+            })
+        """
+        self.publish(
+            VictorEvent(
+                category=EventCategory.LIFECYCLE,
+                name=event_type,
+                priority=priority,
+                data=data or {},
+            )
+        )
+
+
+def get_event_bus() -> EventBus:
+    """Factory function for DIP-compliant EventBus access.
+
+    This function provides a Dependency Inversion Principle (DIP) compliant
+    way to access the EventBus singleton. Use this instead of directly
+    calling EventBus.get_instance() for better testability and loose coupling.
+
+    Returns:
+        The singleton EventBus instance.
+
+    Example:
+        from victor.observability.event_bus import get_event_bus
+
+        bus = get_event_bus()
+        bus.publish(VictorEvent(...))
+    """
+    return EventBus.get_instance()

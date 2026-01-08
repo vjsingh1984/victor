@@ -48,14 +48,25 @@ class IaCPlatform(str, Enum):
     UNKNOWN = "unknown"
 
 
-class Severity(str, Enum):
-    """Issue severity levels aligned with security standards."""
+class IaCSeverity(str, Enum):
+    """Issue severity levels for IaC scanning, aligned with security standards.
+
+    Renamed from Severity to be semantically distinct from other severity types:
+    - CVESeverity (victor.security.protocol): CVE/CVSS-based severity
+    - AuditSeverity: Audit event severity (like log levels)
+    - IaCSeverity (here): IaC issue severity
+    - ReviewSeverity: Code review severity
+    """
 
     CRITICAL = "critical"  # Immediate exploitation risk
     HIGH = "high"  # Significant security weakness
     MEDIUM = "medium"  # Moderate risk or best practice violation
     LOW = "low"  # Minor issue or informational
     INFO = "info"  # Informational finding
+
+
+# Backward compatibility alias
+Severity = IaCSeverity
 
 
 class Category(str, Enum):
@@ -100,7 +111,7 @@ class IaCFinding:
     """A security or configuration finding in IaC."""
 
     rule_id: str  # Unique identifier for the rule (e.g., AWS001, K8S005)
-    severity: Severity
+    severity: IaCSeverity
     category: Category
     message: str
     description: str
@@ -136,7 +147,7 @@ class IaCFinding:
     def from_dict(cls, data: dict[str, Any]) -> "IaCFinding":
         return cls(
             rule_id=data["rule_id"],
-            severity=Severity(data["severity"]),
+            severity=IaCSeverity(data["severity"]),
             category=Category(data["category"]),
             message=data["message"],
             description=data.get("description", ""),
@@ -172,8 +183,13 @@ class IaCConfig:
 
 
 @dataclass
-class ScanResult:
-    """Complete scan result for IaC files."""
+class IaCScanResult:
+    """Complete scan result for Infrastructure-as-Code files.
+
+    Renamed from ScanResult to be semantically distinct:
+    - IaCScanResult (here): Infrastructure-as-Code scan results
+    - SafetyScanResult (victor.security.safety.code_patterns): Safety pattern matching results
+    """
 
     configs: list[IaCConfig]
     findings: list[IaCFinding]
@@ -192,13 +208,13 @@ class ScanResult:
     def __post_init__(self):
         """Calculate summary counts."""
         for finding in self.findings:
-            if finding.severity == Severity.CRITICAL:
+            if finding.severity == IaCSeverity.CRITICAL:
                 self.critical_count += 1
-            elif finding.severity == Severity.HIGH:
+            elif finding.severity == IaCSeverity.HIGH:
                 self.high_count += 1
-            elif finding.severity == Severity.MEDIUM:
+            elif finding.severity == IaCSeverity.MEDIUM:
                 self.medium_count += 1
-            elif finding.severity == Severity.LOW:
+            elif finding.severity == IaCSeverity.LOW:
                 self.low_count += 1
             else:
                 self.info_count += 1
@@ -222,15 +238,19 @@ class ScanResult:
         }
 
 
+# Backward compatibility alias
+ScanResult = IaCScanResult
+
+
 @dataclass
 class ScanPolicy:
     """Policy configuration for IaC scanning."""
 
     enabled_platforms: list[IaCPlatform] = field(default_factory=lambda: list(IaCPlatform))
-    min_severity: Severity = Severity.LOW
+    min_severity: IaCSeverity = IaCSeverity.LOW
     excluded_rules: list[str] = field(default_factory=list)
     excluded_paths: list[str] = field(default_factory=list)
-    fail_on_severity: Severity = Severity.HIGH  # Fail CI if findings above this
+    fail_on_severity: IaCSeverity = IaCSeverity.HIGH  # Fail CI if findings above this
     custom_rules: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -301,7 +321,7 @@ class SecretPattern:
         self,
         name: str,
         pattern: str,
-        severity: Severity = Severity.CRITICAL,
+        severity: IaCSeverity = IaCSeverity.CRITICAL,
         description: str = "",
     ):
         self.name = name
@@ -315,61 +335,61 @@ COMMON_SECRET_PATTERNS = [
     SecretPattern(
         "AWS Access Key",
         r"AKIA[0-9A-Z]{16}",
-        Severity.CRITICAL,
+        IaCSeverity.CRITICAL,
         "AWS Access Key ID exposed in configuration",
     ),
     SecretPattern(
         "AWS Secret Key",
         r"['\"][0-9a-zA-Z/+]{40}['\"]",
-        Severity.CRITICAL,
+        IaCSeverity.CRITICAL,
         "Potential AWS Secret Access Key in configuration",
     ),
     SecretPattern(
         "Private Key",
         r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
-        Severity.CRITICAL,
+        IaCSeverity.CRITICAL,
         "Private key embedded in configuration",
     ),
     SecretPattern(
         "Generic API Key",
         r"(?i)(api[_-]?key|apikey)\s*[:=]\s*['\"][a-zA-Z0-9]{16,}['\"]",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "API key hardcoded in configuration",
     ),
     SecretPattern(
         "Password",
         r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"][^'\"$]+['\"]",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "Password hardcoded in configuration",
     ),
     SecretPattern(
         "Bearer Token",
         r"(?i)bearer\s+[a-zA-Z0-9_\-\.=]+",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "Bearer token exposed in configuration",
     ),
     SecretPattern(
         "GitHub Token",
         r"ghp_[0-9a-zA-Z]{36}|gho_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z]{22}_[0-9a-zA-Z]{59}",
-        Severity.CRITICAL,
+        IaCSeverity.CRITICAL,
         "GitHub personal access token exposed",
     ),
     SecretPattern(
         "Slack Token",
         r"xox[baprs]-[0-9a-zA-Z]{10,48}",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "Slack token exposed in configuration",
     ),
     SecretPattern(
         "JWT Token",
         r"eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "JWT token exposed in configuration",
     ),
     SecretPattern(
         "Google API Key",
         r"AIza[0-9A-Za-z\-_]{35}",
-        Severity.HIGH,
+        IaCSeverity.HIGH,
         "Google API key exposed in configuration",
     ),
 ]

@@ -55,6 +55,7 @@ from victor.agent.subagents.base import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -199,16 +200,31 @@ class SubAgentOrchestrator:
         )
     """
 
-    def __init__(self, parent_orchestrator: "AgentOrchestrator"):
+    def __init__(
+        self,
+        parent_orchestrator: "AgentOrchestrator",
+        role_provider: Optional["RoleToolProvider"] = None,
+        vertical: Optional[str] = None,
+    ):
         """Initialize sub-agent orchestrator.
 
         Args:
             parent_orchestrator: Parent orchestrator that spawns sub-agents
+            role_provider: Optional custom role provider for vertical-specific tools.
+                          If None, uses global get_role_tool_provider().
+            vertical: Optional vertical name for context-aware tool selection.
         """
+        from victor.agent.subagents.protocols import get_role_tool_provider
+
         self.parent = parent_orchestrator
         self.active_subagents: Set[SubAgent] = set()
+        self._role_provider = role_provider or get_role_tool_provider()
+        self._vertical = vertical
 
-        logger.info("SubAgentOrchestrator initialized")
+        logger.info(
+            f"SubAgentOrchestrator initialized"
+            f"{f' for vertical: {vertical}' if vertical else ''}"
+        )
 
     async def spawn(
         self,
@@ -245,10 +261,19 @@ class SubAgentOrchestrator:
             if result.success:
                 print(result.summary)
         """
-        # Apply role-specific defaults
-        effective_budget = tool_budget or ROLE_DEFAULT_BUDGETS.get(role, 15)
-        effective_tools = allowed_tools or ROLE_DEFAULT_TOOLS.get(role, ["read", "ls"])
-        effective_context = context_limit or ROLE_DEFAULT_CONTEXT.get(role, 50000)
+        # Apply role-specific defaults using the role provider (OCP-compliant)
+        role_name = role.value if hasattr(role, "value") else str(role)
+
+        if allowed_tools is not None:
+            effective_tools = allowed_tools
+        else:
+            # Use role provider for vertical-aware tool selection
+            effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
+
+        effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
+        effective_context = context_limit or self._role_provider.get_context_limit_for_role(
+            role_name
+        )
 
         # Create configuration
         config = SubAgentConfig(

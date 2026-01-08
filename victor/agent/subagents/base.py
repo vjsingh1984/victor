@@ -49,9 +49,16 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+
+from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
+
+# Import from canonical location to avoid circular dependencies
+from victor.protocols.team import IAgent
+from victor.teams.types import AgentMessage
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -149,7 +156,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent:
+class SubAgent(IAgent):
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
@@ -183,22 +190,84 @@ class SubAgent:
     def __init__(
         self,
         config: SubAgentConfig,
-        parent_orchestrator: "AgentOrchestrator",
+        parent: Union["AgentOrchestrator", SubAgentContext],
     ):
-        """Initialize sub-agent with configuration and parent.
+        """Initialize sub-agent with configuration and parent context.
 
         Args:
             config: Sub-agent configuration
-            parent_orchestrator: Parent orchestrator that spawned this sub-agent
+            parent: Parent context providing settings, provider, model, and tools.
+                Can be either a full AgentOrchestrator (for backward compatibility)
+                or any object implementing the SubAgentContext protocol.
+
+        Note:
+            If a full AgentOrchestrator is passed, it will be automatically
+            adapted to SubAgentContext for ISP compliance. This maintains
+            backward compatibility with existing code while enabling cleaner
+            testing through protocol-based dependency injection.
         """
         self.config = config
-        self.parent = parent_orchestrator
+        self._id = uuid.uuid4().hex[:12]
+
+        # Auto-adapt full orchestrator to SubAgentContext for ISP compliance
+        # Check if it's already a SubAgentContext (including adapters)
+        if isinstance(parent, SubAgentContext):
+            self._context: SubAgentContext = parent
+        else:
+            # Wrap the orchestrator with the adapter
+            self._context = SubAgentContextAdapter(parent)
+
+        # Keep reference to parent for backward compatibility
+        # (some code may access self.parent directly)
+        self.parent = parent
         self.orchestrator: Optional["AgentOrchestrator"] = None
 
         logger.info(
             f"Created {config.role.value} sub-agent: {config.task[:50]}... "
             f"(budget={config.tool_budget}, tools={len(config.allowed_tools)})"
         )
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this agent."""
+        return self._id
+
+    @property
+    def role(self):
+        """Role of this agent (SubAgentRole)."""
+        return self.config.role
+
+    @property
+    def persona(self):
+        """Persona of this agent (None for SubAgent)."""
+        return None
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+        """Execute a task using this sub-agent.
+
+        Note: The SubAgent is configured with a specific task at creation.
+        This method executes that configured task, ignoring the passed task
+        parameter. The context parameter is also ignored as SubAgent has
+        its own isolated context.
+
+        Returns:
+            String summary of execution outcome.
+        """
+        # Execute the configured task (ignore passed task parameter)
+        result = await self.execute()
+        return result.summary if result.summary else ""
+
+    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+        """Receive a message (SubAgents don't support direct messaging).
+
+        SubAgents are isolated execution units that don't participate in
+        direct agent-to-agent communication. This method exists for protocol
+        compatibility.
+
+        Returns:
+            None, as SubAgents don't respond to messages
+        """
+        return None
 
     def _create_constrained_orchestrator(self) -> "AgentOrchestrator":
         """Create orchestrator with role-specific constraints.
@@ -207,7 +276,7 @@ class SubAgent:
         - Limited tool access (only allowed_tools)
         - Constrained budget and context
         - Role-specific system prompt
-        - Shared provider and settings from parent
+        - Shared provider and settings from parent context
 
         Returns:
             Constrained orchestrator instance
@@ -215,17 +284,19 @@ class SubAgent:
         from copy import deepcopy
         from victor.agent.orchestrator import AgentOrchestrator
 
-        # Copy settings from parent but apply constraints
-        settings = deepcopy(self.parent.settings)
+        # Copy settings from parent context but apply constraints
+        settings = deepcopy(self._context.settings)
         settings.tool_budget = self.config.tool_budget
         settings.max_context_chars = self.config.context_limit
 
         # Create new orchestrator instance with same provider
+        # Use the actual provider object (not just the name) for proper initialization
         orchestrator = AgentOrchestrator(
             settings=settings,
-            provider=self.parent.provider_name,
-            model=self.parent.model,
-            temperature=self.parent.temperature,
+            provider=self._context.provider,
+            model=self._context.model,
+            temperature=self._context.temperature,
+            provider_name=self._context.provider_name,
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
@@ -253,9 +324,9 @@ class SubAgent:
         # Clear existing tool registrations
         orchestrator.tool_registry.clear()
 
-        # Register only allowed tools from parent
+        # Register only allowed tools from parent context
         for tool_name in self.config.allowed_tools:
-            tool = self.parent.tool_registry.get(tool_name)
+            tool = self._context.tool_registry.get(tool_name)
             if tool:
                 orchestrator.tool_registry.register(tool)
             else:

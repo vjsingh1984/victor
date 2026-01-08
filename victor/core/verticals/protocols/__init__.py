@@ -116,6 +116,24 @@ from victor.core.verticals.protocols.capability_provider import (
     VerticalPersonaProviderProtocol,
 )
 
+# ISP-Compliant Vertical Providers
+from victor.core.verticals.protocols.providers import (
+    MiddlewareProvider,
+    SafetyProvider,
+    WorkflowProvider,
+    TeamProvider,
+    RLProvider,
+    EnrichmentProvider,
+    ToolProvider,
+    HandlerProvider,
+    CapabilityProvider,
+    ModeConfigProvider,
+    PromptContributorProvider,
+    ToolDependencyProvider,
+    TieredToolConfigProvider,
+    ServiceProvider,
+)
+
 # Re-export from core for backward compatibility
 from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 from victor.core.vertical_types import StageDefinition, TieredToolConfig
@@ -244,4 +262,19 @@ __all__ = [
     "TieredToolConfig",
     # Composite
     "VerticalExtensions",
+    # ISP-Compliant Vertical Providers
+    "MiddlewareProvider",
+    "SafetyProvider",
+    "WorkflowProvider",
+    "TeamProvider",
+    "RLProvider",
+    "EnrichmentProvider",
+    "ToolProvider",
+    "HandlerProvider",
+    "CapabilityProvider",
+    "ModeConfigProvider",
+    "PromptContributorProvider",
+    "ToolDependencyProvider",
+    "TieredToolConfigProvider",
+    "ServiceProvider",
 ]

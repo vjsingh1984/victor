@@ -356,6 +356,10 @@ class OllamaProvider(BaseProvider):
                 **kwargs,
             )
 
+            # Log the endpoint URL being used for connection
+            endpoint_url = f"{self.base_url}/api/chat"
+            logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
+
             # Make API call with circuit breaker protection
             response = await self._execute_with_circuit_breaker(
                 self.client.post, "/api/chat", json=payload
@@ -493,6 +497,10 @@ class OllamaProvider(BaseProvider):
             # Debug: log first tool for inspection if tools are provided
             if tools and num_tools > 0:
                 logger.debug(f"First tool schema sample: {payload.get('tools', [{}])[0]}")
+
+            # Log the endpoint URL being used for connection
+            endpoint_url = f"{self.base_url}/api/chat"
+            logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
 
             async with self.client.stream("POST", "/api/chat", json=payload) as response:
                 # Check for HTTP 400 "does not support tools" error

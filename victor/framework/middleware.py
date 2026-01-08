@@ -44,9 +44,9 @@ Example usage:
         def validate(self, content, context=None):
             try:
                 json.loads(content)
-                return ValidationResult(is_valid=True)
+                return ContentValidationResult(is_valid=True)
             except json.JSONDecodeError as e:
-                return ValidationResult(
+                return ContentValidationResult(
                     is_valid=False,
                     issues=[ValidationIssue(message=str(e))]
                 )
@@ -107,8 +107,15 @@ class ValidationIssue:
 
 
 @dataclass
-class ValidationResult:
+class ContentValidationResult:
     """Result of content validation.
+
+    Renamed from ValidationResult to be semantically distinct:
+    - ToolValidationResult (victor.tools.base): Tool parameter validation
+    - ConfigValidationResult (victor.core.validation): Configuration validation
+    - ContentValidationResult (here): Content validation with fixed_content
+    - ParameterValidationResult (victor.agent.parameter_enforcer): Parameter enforcement
+    - CodeValidationResult (victor.evaluation.correction.types): Code validation
 
     Attributes:
         is_valid: Whether the content passed validation
@@ -161,7 +168,7 @@ class ValidatorProtocol(Protocol):
         self,
         content: str,
         context: Optional[Dict[str, Any]] = None,
-    ) -> ValidationResult:
+    ) -> ContentValidationResult:
         """Validate content and return results.
 
         Args:
@@ -169,7 +176,7 @@ class ValidatorProtocol(Protocol):
             context: Optional context (tool_name, file_path, etc.)
 
         Returns:
-            ValidationResult with validation status and any issues
+            ContentValidationResult with validation status and any issues
         """
         ...
 
@@ -992,9 +999,9 @@ class OutputValidationMiddleware(MiddlewareProtocol):
                 import json
                 try:
                     json.loads(content)
-                    return ValidationResult(is_valid=True)
+                    return ContentValidationResult(is_valid=True)
                 except json.JSONDecodeError as e:
-                    return ValidationResult(
+                    return ContentValidationResult(
                         is_valid=False,
                         issues=[ValidationIssue(
                             message=f"Invalid JSON: {e.msg}",
@@ -1151,7 +1158,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         self,
         content: str,
         context: Optional[Dict[str, Any]] = None,
-    ) -> ValidationResult:
+    ) -> ContentValidationResult:
         """Validate content using the configured validator.
 
         Args:
@@ -1159,13 +1166,13 @@ class OutputValidationMiddleware(MiddlewareProtocol):
             context: Validation context
 
         Returns:
-            ValidationResult from the validator
+            ContentValidationResult from the validator
         """
         try:
             return self.validator.validate(content, context)
         except Exception as e:
             logger.warning(f"OutputValidationMiddleware: Validator error: {e}")
-            return ValidationResult(
+            return ContentValidationResult(
                 is_valid=False,
                 issues=[
                     ValidationIssue(
@@ -1250,7 +1257,7 @@ __all__ = [
     # Validation Types
     "ValidationSeverity",
     "ValidationIssue",
-    "ValidationResult",
+    "ContentValidationResult",
     "ValidatorProtocol",
     "FixableValidatorProtocol",
     # Types

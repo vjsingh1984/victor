@@ -275,7 +275,7 @@ class WorkflowExecutionLearner(BaseLearner):
 
         # Record in execution history
         cursor.execute(
-            """
+            f"""
             INSERT INTO {Tables.AGENT_WORKFLOW_RUN}
             (workflow_name, task_type, success, duration_seconds, quality_score,
              vertical, mode, executed_at)
@@ -298,7 +298,7 @@ class WorkflowExecutionLearner(BaseLearner):
 
         # Get current Q-value
         cursor.execute(
-            """
+            f"""
             SELECT q_value, execution_count, success_count, avg_duration, avg_quality
             FROM {Tables.AGENT_WORKFLOW_Q}
             WHERE workflow_name = ? AND task_type = ?
@@ -332,7 +332,7 @@ class WorkflowExecutionLearner(BaseLearner):
 
         # Upsert Q-value
         cursor.execute(
-            """
+            f"""
             INSERT INTO {Tables.AGENT_WORKFLOW_Q}
             (workflow_name, task_type, q_value, execution_count, success_count,
              avg_duration, avg_quality, last_updated)

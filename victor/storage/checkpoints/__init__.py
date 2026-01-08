@@ -28,7 +28,7 @@ Key Features:
 - Replay from any checkpoint
 
 Usage - Basic Checkpointing:
-    from victor.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+    from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
 
     backend = SQLiteCheckpointBackend(storage_path)
     manager = CheckpointManager(backend)
@@ -46,8 +46,8 @@ Usage - Basic Checkpointing:
     new_state = await manager.fork_from_checkpoint(checkpoint_id, new_session_id)
 
 Usage - Multi-Branch Workflows:
-    from victor.checkpoints import SQLiteCheckpointBackend
-    from victor.checkpoints.tree import BranchManager, CheckpointTree, MergeStrategy
+    from victor.storage.checkpoints import SQLiteCheckpointBackend
+    from victor.storage.checkpoints.tree import BranchManager, CheckpointTree, MergeStrategy
 
     backend = SQLiteCheckpointBackend(storage_path)
     branch_mgr = BranchManager(backend)

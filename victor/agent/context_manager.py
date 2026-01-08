@@ -240,6 +240,50 @@ class ContextManager:
 
         return chunk
 
+    async def handle_compaction_async(self, user_message: str) -> Optional["StreamChunk"]:
+        """Perform proactive compaction asynchronously if enabled.
+
+        Non-blocking version of handle_compaction for use in async hot paths.
+
+        Args:
+            user_message: Current user message for semantic relevance.
+
+        Returns:
+            StreamChunk with compaction notification if compaction occurred,
+            None otherwise.
+        """
+        if self._context_compactor is None:
+            return None
+
+        compaction_action = await self._context_compactor.check_and_compact_async(
+            current_query=user_message
+        )
+        if not compaction_action.action_taken:
+            return None
+
+        logger.info(
+            f"Proactive compaction (async): {compaction_action.trigger.value}, "
+            f"removed {compaction_action.messages_removed} messages, "
+            f"freed {compaction_action.chars_freed:,} chars"
+        )
+
+        # Import here to avoid circular dependency
+        from victor.providers.base import StreamChunk
+
+        chunk: Optional[StreamChunk] = None
+        if compaction_action.messages_removed > 0:
+            chunk = StreamChunk(
+                content=(
+                    f"\n[context] Proactively compacted history "
+                    f"({compaction_action.messages_removed} messages, "
+                    f"{compaction_action.chars_freed:,} chars freed).\n"
+                )
+            )
+            # Inject context reminder about compacted content
+            self._conversation_controller.inject_compaction_context()
+
+        return chunk
+
     def get_context_metrics(self) -> "ContextMetrics":
         """Get detailed context metrics.
 
@@ -262,6 +306,33 @@ class ContextManager:
     def model(self) -> str:
         """Get the model identifier."""
         return self._model
+
+    @property
+    def is_background_compaction_running(self) -> bool:
+        """Check if background compaction is currently active.
+
+        Returns:
+            True if background compaction task is running.
+        """
+        if self._context_compactor is None:
+            return False
+        return getattr(self._context_compactor, "_async_running", False)
+
+    async def start_background_compaction(self, interval_seconds: float = 30.0) -> None:
+        """Start background compaction task.
+
+        Args:
+            interval_seconds: How often to check for compaction (default 30s).
+        """
+        if self._context_compactor is None:
+            return
+        await self._context_compactor.start_background_compaction(interval_seconds)
+
+    async def stop_background_compaction(self) -> None:
+        """Stop background compaction task."""
+        if self._context_compactor is None:
+            return
+        await self._context_compactor.stop_background_compaction()
 
 
 def create_context_manager(

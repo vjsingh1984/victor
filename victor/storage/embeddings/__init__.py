@@ -28,5 +28,21 @@ Design:
 from victor.storage.embeddings.service import EmbeddingService
 from victor.storage.embeddings.collections import StaticEmbeddingCollection
 from victor.storage.embeddings.intent_classifier import IntentClassifier
+from victor.storage.embeddings.question_classifier import (
+    QuestionType,
+    QuestionTypeClassifier,
+    QuestionClassificationResult,
+    classify_question,
+    should_auto_continue,
+)
 
-__all__ = ["EmbeddingService", "StaticEmbeddingCollection", "IntentClassifier"]
+__all__ = [
+    "EmbeddingService",
+    "StaticEmbeddingCollection",
+    "IntentClassifier",
+    "QuestionType",
+    "QuestionTypeClassifier",
+    "QuestionClassificationResult",
+    "classify_question",
+    "should_auto_continue",
+]

@@ -112,11 +112,17 @@ class ChunkType(str, Enum):
 
 
 @dataclass
-class StreamChunk:
+class OrchestratorStreamChunk:
     """Standardized streaming chunk format from orchestrator.
 
     This is the canonical format returned by OrchestratorProtocol.stream_chat().
     Framework code converts these to Event instances for user consumption.
+
+    Renamed from StreamChunk to be semantically distinct from other streaming types:
+    - StreamChunk (victor.providers.base): Provider-level raw streaming
+    - OrchestratorStreamChunk: Orchestrator protocol with typed ChunkType
+    - TypedStreamChunk: Safe typed accessor with nested StreamDelta
+    - ClientStreamChunk: Protocol interface for clients (CLI/VS Code)
 
     Attributes:
         chunk_type: Type of this chunk (see ChunkType enum)
@@ -507,25 +513,25 @@ class OrchestratorProtocol(Protocol):
         message: str,
         *,
         context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[OrchestratorStreamChunk]:
         """Stream a chat response with standardized chunks.
 
         This is the primary method for interactive chat. Returns an
-        async iterator yielding StreamChunk instances.
+        async iterator yielding OrchestratorStreamChunk instances.
 
         Args:
             message: User message to process
             context: Optional additional context
 
         Yields:
-            StreamChunk instances representing response fragments
+            OrchestratorStreamChunk instances representing response fragments
 
         Raises:
             ProviderError: If LLM call fails
             ToolError: If tool execution fails critically
         """
         ...
-        yield StreamChunk()  # type: ignore (protocol stub)
+        yield OrchestratorStreamChunk()  # type: ignore (protocol stub)
 
     async def chat(
         self,

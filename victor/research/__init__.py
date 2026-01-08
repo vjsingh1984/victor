@@ -13,12 +13,17 @@ from victor.research.assistant import ResearchAssistant
 from victor.research.prompts import ResearchPromptContributor
 from victor.research.mode_config import ResearchModeConfigProvider
 from victor.research.safety import ResearchSafetyExtension
-from victor.research.tool_dependencies import ResearchToolDependencyProvider
+
+# Import canonical tool dependency provider instead of deprecated class
+from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+# Create canonical provider for research vertical
+ResearchToolDependencyProvider = create_vertical_tool_dependency_provider("research")
 
 __all__ = [
     "ResearchAssistant",
     "ResearchPromptContributor",
     "ResearchModeConfigProvider",
     "ResearchSafetyExtension",
-    "ResearchToolDependencyProvider",
+    "ResearchToolDependencyProvider",  # Now uses canonical provider
 ]

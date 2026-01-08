@@ -28,11 +28,10 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 from typing import Any, Callable, Dict, Optional
-from victor.agent.builders.base import ComponentBuilder
-from victor.agent.orchestrator_factory import OrchestratorFactory
+from victor.agent.builders.base import FactoryAwareBuilder
 
 
-class ToolBuilder(ComponentBuilder):
+class ToolBuilder(FactoryAwareBuilder):
     """Build tools and tool-related components.
 
     This builder creates all tool-related components that the orchestrator
@@ -64,16 +63,6 @@ class ToolBuilder(ComponentBuilder):
         - workflow_registry: WorkflowRegistry
         - code_manager: CodeExecutionManager
     """
-
-    def __init__(self, settings, factory: Optional[OrchestratorFactory] = None):
-        """Initialize the ToolBuilder.
-
-        Args:
-            settings: Application settings
-            factory: Optional OrchestratorFactory instance (created if not provided)
-        """
-        super().__init__(settings)
-        self._factory = factory
 
     def build(
         self,
@@ -147,20 +136,16 @@ class ToolBuilder(ComponentBuilder):
         tool_components = {}
 
         # Create or reuse factory
-        if self._factory is None:
-            if provider is None or model is None:
-                raise ValueError("provider and model are required when factory is not provided")
-            self._factory = OrchestratorFactory(
-                settings=self.settings,
-                provider=provider,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                provider_name=provider_name,
-                profile_name=profile_name,
-                tool_selection=tool_selection,
-                thinking=thinking,
-            )
+        self._ensure_factory(
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_name=provider_name,
+            profile_name=profile_name,
+            tool_selection=tool_selection,
+            thinking=thinking,
+        )
 
         # Build tool budget
         if tool_calling_caps:
@@ -290,9 +275,7 @@ class ToolBuilder(ComponentBuilder):
         tool_components["code_manager"] = code_manager
 
         # Register all built components
-        for name, component in tool_components.items():
-            if component is not None:
-                self.register_component(name, component)
+        self._register_components(tool_components)
 
         self._logger.info(
             f"ToolBuilder built {len(tool_components)} tool components: "

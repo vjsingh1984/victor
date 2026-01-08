@@ -255,42 +255,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         }
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get provider hints for coding tasks.
-
-        Returns:
-            Provider preferences for code generation.
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "preferred_models": [
-                "claude-sonnet-4-20250514",
-                "gpt-4-turbo",
-                "claude-3-5-sonnet-20241022",
-            ],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-            "prefers_extended_thinking": True,
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get evaluation criteria for coding tasks.
-
-        Returns:
-            Criteria for evaluating code quality.
-        """
-        return [
-            "Code correctness and functionality",
-            "Adherence to existing code style",
-            "Test coverage for changes",
-            "Minimal unnecessary changes",
-            "Clear commit messages",
-            "Error handling",
-            "Performance considerations",
-        ]
-
-    @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
         """Add coding-specific configuration.
 
@@ -347,13 +311,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Safety extension for git/refactoring patterns
         """
-
-        def _create() -> SafetyExtensionProtocol:
-            from victor.coding.safety import CodingSafetyExtension
-
-            return CodingSafetyExtension()
-
-        return cls._get_cached_extension("safety_extension", _create)
+        return cls._get_extension_factory("safety_extension", "victor.coding.safety")
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
@@ -362,13 +320,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Prompt contributor with task type hints
         """
-
-        def _create() -> PromptContributorProtocol:
-            from victor.coding.prompts import CodingPromptContributor
-
-            return CodingPromptContributor()
-
-        return cls._get_cached_extension("prompt_contributor", _create)
+        return cls._get_extension_factory("prompt_contributor", "victor.coding.prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
@@ -377,13 +329,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Mode configuration provider
         """
-
-        def _create() -> ModeConfigProviderProtocol:
-            from victor.coding.mode_config import CodingModeConfigProvider
-
-            return CodingModeConfigProvider()
-
-        return cls._get_cached_extension("mode_config_provider", _create)
+        return cls._get_extension_factory("mode_config_provider", "victor.coding.mode_config")
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
@@ -393,10 +339,10 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             Tool dependency provider
         """
 
-        def _create() -> ToolDependencyProviderProtocol:
-            from victor.coding.tool_dependencies import CodingToolDependencyProvider
+        def _create():
+            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
-            return CodingToolDependencyProvider()
+            return create_vertical_tool_dependency_provider("coding")
 
         return cls._get_cached_extension("tool_dependency_provider", _create)
 
@@ -416,13 +362,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingWorkflowProvider instance
         """
-
-        def _create() -> WorkflowProviderProtocol:
-            from victor.coding.workflows import CodingWorkflowProvider
-
-            return CodingWorkflowProvider()
-
-        return cls._get_cached_extension("workflow_provider", _create)
+        return cls._get_extension_factory("workflow_provider", "victor.coding.workflows")
 
     @classmethod
     def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
@@ -431,50 +371,14 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Service provider for DI registration
         """
-
-        def _create() -> ServiceProviderProtocol:
-            from victor.coding.service_provider import CodingServiceProvider
-
-            return CodingServiceProvider()
-
-        return cls._get_cached_extension("service_provider", _create)
+        return cls._get_extension_factory("service_provider", "victor.coding.service_provider")
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for coding.
+        """Get tiered tool configuration for coding."""
+        from victor.core.vertical_types import TieredToolTemplate
 
-        Simplified configuration using consolidated tool metadata:
-        - Mandatory: Core tools always included for any task
-        - Vertical Core: Essential tools for coding tasks
-        - semantic_pool: Derived from ToolMetadataRegistry.get_all_tool_names()
-        - stage_tools: Derived from @tool(stages=[...]) decorator metadata
-
-        Returns:
-            TieredToolConfig for coding vertical
-        """
-        from victor.tools.tool_names import ToolNames
-
-        return TieredToolConfig(
-            # Tier 1: Mandatory - always included for any task
-            mandatory={
-                ToolNames.READ,  # Read files - essential
-                ToolNames.LS,  # List directory - essential
-                ToolNames.GREP,  # Code search - essential for finding code
-            },
-            # Tier 2: Vertical Core - essential for coding tasks
-            vertical_core={
-                ToolNames.EDIT,  # Edit files - core coding
-                ToolNames.WRITE,  # Write files - core coding
-                ToolNames.SHELL,  # Shell commands - core for build/test
-                ToolNames.GIT,  # Git operations - core for version control
-                ToolNames.CODE_SEARCH,  # Semantic search - core for code exploration
-                ToolNames.OVERVIEW,  # Codebase overview - core for understanding
-            },
-            # semantic_pool and stage_tools are now derived from @tool decorator metadata
-            # Use get_effective_semantic_pool() and get_tools_for_stage_from_registry()
-            # For analysis queries, don't hide write tools - coding often needs them
-            readonly_only_for_analysis=False,
-        )
+        return TieredToolTemplate.for_vertical(cls.name)
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:
@@ -486,13 +390,9 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingRLConfig instance (implements RLConfigProviderProtocol)
         """
-
-        def _create() -> Any:
-            from victor.coding.rl import CodingRLConfig
-
-            return CodingRLConfig()
-
-        return cls._get_cached_extension("rl_config_provider", _create)
+        return cls._get_extension_factory(
+            "rl_config_provider", "victor.coding.rl", "CodingRLConfig"
+        )
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
@@ -503,13 +403,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingRLHooks instance
         """
-
-        def _create() -> Any:
-            from victor.coding.rl import CodingRLHooks
-
-            return CodingRLHooks()
-
-        return cls._get_cached_extension("rl_hooks", _create)
+        return cls._get_extension_factory("rl_hooks", "victor.coding.rl")
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -526,13 +420,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingTeamSpecProvider instance (implements TeamSpecProviderProtocol)
         """
-
-        def _create() -> Any:
-            from victor.coding.teams import CodingTeamSpecProvider
-
-            return CodingTeamSpecProvider()
-
-        return cls._get_cached_extension("team_spec_provider", _create)
+        return cls._get_extension_factory("team_spec_provider", "victor.coding.teams")
 
     @classmethod
     def get_capability_provider(cls) -> Any:
@@ -549,13 +437,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             CodingCapabilityProvider instance
         """
-
-        def _create() -> Any:
-            from victor.coding.capabilities import CodingCapabilityProvider
-
-            return CodingCapabilityProvider()
-
-        return cls._get_cached_extension("capability_provider", _create)
+        return cls._get_extension_factory("capability_provider", "victor.coding.capabilities")
 
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
@@ -612,6 +494,22 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             return CODING_PERSONAS
 
         return cls._get_cached_extension("personas", _create)
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for workflow execution.
+
+        Provides coding-specific handlers for workflow nodes:
+        - code_validation: Validates code changes (lint, type check)
+        - test_runner: Runs tests with timeout and reporting
+        - code_analyzer: Deep code analysis for context gathering
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        from victor.coding.handlers import HANDLERS
+
+        return HANDLERS
 
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.

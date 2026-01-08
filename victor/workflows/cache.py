@@ -51,6 +51,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from cachetools import TTLCache  # type: ignore[import-untyped]
@@ -59,11 +60,217 @@ if TYPE_CHECKING:
     from victor.workflows.definition import (
         ConditionNode,
         TransformNode,
+        WorkflowDefinition,
         WorkflowNode,
     )
     from victor.workflows.executor import NodeResult
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Dependency Graph for Cascading Cache Invalidation
+# =============================================================================
+
+
+@dataclass
+class DependencyGraph:
+    """Tracks node dependencies for cascading cache invalidation.
+
+    When a node's output changes, all downstream nodes that depend on it
+    should also be invalidated. This graph tracks those relationships.
+
+    All verticals benefit from automatic dependency-aware invalidation
+    without needing to manually track which cache entries to clear.
+
+    Attributes:
+        dependents: Maps node_id -> set of nodes that depend on it (downstream)
+        dependencies: Maps node_id -> set of nodes it depends on (upstream)
+
+    Example:
+        # Build graph from workflow
+        graph = DependencyGraph.from_workflow(workflow)
+
+        # When node 'A' changes, find all affected nodes
+        cascade = graph.get_cascade_set('A')
+        # Returns {'B', 'C', 'D'} if B->A, C->B, D->C
+    """
+
+    dependents: Dict[str, Set[str]] = field(default_factory=dict)
+    dependencies: Dict[str, Set[str]] = field(default_factory=dict)
+
+    def add_dependency(self, node_id: str, depends_on: str) -> None:
+        """Record that node_id depends on depends_on.
+
+        Args:
+            node_id: The dependent node (downstream)
+            depends_on: The dependency node (upstream)
+        """
+        if node_id not in self.dependencies:
+            self.dependencies[node_id] = set()
+        self.dependencies[node_id].add(depends_on)
+
+        if depends_on not in self.dependents:
+            self.dependents[depends_on] = set()
+        self.dependents[depends_on].add(node_id)
+
+    def get_dependencies(self, node_id: str) -> Set[str]:
+        """Get nodes that this node depends on (upstream)."""
+        return self.dependencies.get(node_id, set())
+
+    def get_dependents(self, node_id: str) -> Set[str]:
+        """Get nodes that depend on this node (downstream)."""
+        return self.dependents.get(node_id, set())
+
+    def get_cascade_set(self, node_id: str) -> Set[str]:
+        """Get all nodes that should be invalidated when node_id changes.
+
+        Performs breadth-first traversal to find all downstream dependents.
+
+        Args:
+            node_id: The node that changed
+
+        Returns:
+            Set of all node IDs that should be invalidated
+        """
+        result: Set[str] = set()
+        to_process = list(self.dependents.get(node_id, set()))
+
+        while to_process:
+            current = to_process.pop(0)
+            if current not in result:
+                result.add(current)
+                # Add all dependents of this node too
+                to_process.extend(self.dependents.get(current, set()))
+
+        return result
+
+    def get_all_upstream(self, node_id: str) -> Set[str]:
+        """Get all upstream dependencies (transitive)."""
+        result: Set[str] = set()
+        to_process = list(self.dependencies.get(node_id, set()))
+
+        while to_process:
+            current = to_process.pop(0)
+            if current not in result:
+                result.add(current)
+                to_process.extend(self.dependencies.get(current, set()))
+
+        return result
+
+    @classmethod
+    def from_workflow(cls, workflow: "WorkflowDefinition") -> "DependencyGraph":
+        """Build dependency graph from workflow definition.
+
+        Analyzes next_nodes, branches, and parallel_nodes to determine
+        which nodes depend on which.
+
+        Args:
+            workflow: The workflow definition to analyze
+
+        Returns:
+            DependencyGraph with all node relationships
+        """
+        graph = cls()
+
+        for node_id, node in workflow.nodes.items():
+            # next_nodes: subsequent nodes depend on current node
+            next_nodes = getattr(node, "next_nodes", None) or []
+            for next_id in next_nodes:
+                graph.add_dependency(next_id, node_id)
+
+            # branches: branch targets depend on condition node
+            branches = getattr(node, "branches", None) or {}
+            for branch_target in branches.values():
+                if branch_target:
+                    graph.add_dependency(branch_target, node_id)
+
+            # parallel_nodes: don't depend on each other
+            # They're executed concurrently, not sequentially
+
+        return graph
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize for debugging/storage."""
+        return {
+            "dependents": {k: list(v) for k, v in self.dependents.items()},
+            "dependencies": {k: list(v) for k, v in self.dependencies.items()},
+        }
+
+
+class CascadingInvalidator:
+    """Handles cascading cache invalidation based on dependencies.
+
+    When a node's output changes, this class automatically invalidates
+    all cache entries for dependent nodes, ensuring consistency.
+
+    All verticals benefit from automatic cascading invalidation.
+
+    Example:
+        graph = DependencyGraph.from_workflow(workflow)
+        invalidator = CascadingInvalidator(cache, graph)
+
+        # When node 'A' output changes
+        count = invalidator.invalidate_with_cascade('A')
+        # Invalidates A and all downstream dependents
+    """
+
+    def __init__(self, cache: "WorkflowCache", graph: DependencyGraph):
+        """Initialize cascading invalidator.
+
+        Args:
+            cache: The workflow cache to invalidate
+            graph: Dependency graph for cascade calculation
+        """
+        self.cache = cache
+        self.graph = graph
+
+    def invalidate_with_cascade(self, node_id: str) -> int:
+        """Invalidate node and all dependent nodes.
+
+        Args:
+            node_id: The node that changed
+
+        Returns:
+            Total number of cache entries invalidated
+        """
+        # Get all nodes to invalidate
+        to_invalidate = {node_id} | self.graph.get_cascade_set(node_id)
+        total = 0
+
+        for nid in to_invalidate:
+            count = self.cache.invalidate(nid)
+            total += count
+            if count > 0:
+                logger.debug(f"Invalidated {count} cache entries for node {nid}")
+
+        if total > 0:
+            logger.info(
+                f"Cascade invalidation from '{node_id}': "
+                f"{len(to_invalidate)} nodes, {total} entries"
+            )
+
+        return total
+
+    def invalidate_upstream(self, node_id: str) -> int:
+        """Invalidate all upstream dependencies (and their dependents).
+
+        Use when a node's inputs have become invalid.
+
+        Args:
+            node_id: The node whose inputs are invalid
+
+        Returns:
+            Total entries invalidated
+        """
+        upstream = self.graph.get_all_upstream(node_id)
+        total = 0
+
+        for nid in upstream:
+            # For each upstream, invalidate it and its cascade
+            total += self.invalidate_with_cascade(nid)
+
+        return total
 
 
 @dataclass
@@ -289,6 +496,39 @@ class WorkflowCache:
 
             return count
 
+    def set_dependency_graph(self, graph: DependencyGraph) -> None:
+        """Set dependency graph for cascading invalidation.
+
+        When a dependency graph is set, the cache gains the ability to
+        automatically invalidate all dependent cache entries when a
+        node's output changes.
+
+        Args:
+            graph: Dependency graph built from workflow definition
+        """
+        self._dependency_graph = graph
+        self._invalidator = CascadingInvalidator(self, graph)
+        logger.debug("Dependency graph set for cascading invalidation")
+
+    def invalidate_cascade(self, node_id: str) -> int:
+        """Invalidate node and all dependent nodes.
+
+        If a dependency graph has been set via `set_dependency_graph()`,
+        this method will invalidate the specified node and all nodes
+        that depend on it (cascading invalidation).
+
+        If no dependency graph is set, falls back to simple invalidation.
+
+        Args:
+            node_id: ID of the node whose output changed
+
+        Returns:
+            Total number of cache entries invalidated
+        """
+        if hasattr(self, "_invalidator") and self._invalidator is not None:
+            return self._invalidator.invalidate_with_cascade(node_id)
+        return self.invalidate(node_id)
+
     def clear(self) -> int:
         """Clear all cache entries.
 
@@ -489,6 +729,241 @@ class WorkflowCacheManager:
             return {name: cache.get_stats() for name, cache in self._caches.items()}
 
 
+# =============================================================================
+# Workflow Definition Cache (P1 - Scalability)
+# =============================================================================
+
+
+@dataclass
+class DefinitionCacheConfig:
+    """Configuration for workflow definition caching.
+
+    Attributes:
+        enabled: Whether caching is enabled
+        ttl_seconds: Time-to-live for cache entries
+        max_entries: Maximum cached definitions
+    """
+
+    enabled: bool = True
+    ttl_seconds: int = 3600
+    max_entries: int = 100
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> "DefinitionCacheConfig":
+        """Create config from Settings instance."""
+        return cls(
+            enabled=getattr(settings, "workflow_definition_cache_enabled", True),
+            ttl_seconds=getattr(settings, "workflow_definition_cache_ttl", 3600),
+            max_entries=getattr(settings, "workflow_definition_cache_max_entries", 100),
+        )
+
+
+class WorkflowDefinitionCache:
+    """TTL + mtime-based cache for parsed WorkflowDefinitions.
+
+    Caches parsed YAML workflow definitions to avoid redundant parsing.
+    Invalidation is based on both TTL and file modification time.
+
+    Example:
+        cache = WorkflowDefinitionCache(config)
+
+        # Check cache
+        definition = cache.get(path, workflow_name, config_hash)
+        if definition is None:
+            # Parse YAML and cache
+            definition = parse_workflow(path, workflow_name)
+            cache.put(path, workflow_name, config_hash, definition)
+    """
+
+    def __init__(self, config: Optional[DefinitionCacheConfig] = None):
+        """Initialize the definition cache.
+
+        Args:
+            config: Cache configuration
+        """
+        self._config = config or DefinitionCacheConfig()
+        self._lock = threading.RLock()
+
+        if self._config.enabled:
+            self._cache: Optional[TTLCache] = TTLCache(
+                maxsize=self._config.max_entries,
+                ttl=self._config.ttl_seconds,
+            )
+            logger.info(
+                f"Workflow definition cache initialized: max_entries={self._config.max_entries}, "
+                f"ttl={self._config.ttl_seconds}s"
+            )
+        else:
+            self._cache = None
+            logger.debug("Workflow definition cache disabled")
+
+        # Statistics
+        self._stats = {"hits": 0, "misses": 0, "invalidations": 0}
+
+    def _make_key(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+        mtime: float,
+    ) -> str:
+        """Generate cache key.
+
+        Key includes file path, workflow name, config hash, and mtime
+        to ensure cache invalidation on any change.
+        """
+        key_data = f"{path.resolve()}:{workflow_name}:{config_hash}:{mtime}"
+        return hashlib.sha256(key_data.encode()).hexdigest()
+
+    def get(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+    ) -> Optional["WorkflowDefinition"]:
+        """Get cached workflow definition.
+
+        Args:
+            path: Path to YAML file
+            workflow_name: Name of workflow in YAML
+            config_hash: Hash of workflow config for cache key
+
+        Returns:
+            Cached WorkflowDefinition or None if not found/stale
+        """
+        if not self._config.enabled or self._cache is None:
+            return None
+
+        try:
+            mtime = path.stat().st_mtime
+        except (OSError, FileNotFoundError):
+            return None
+
+        key = self._make_key(path, workflow_name, config_hash, mtime)
+
+        with self._lock:
+            result = self._cache.get(key)
+            if result is not None:
+                self._stats["hits"] += 1
+                logger.debug(f"Definition cache hit: {workflow_name}")
+                return result
+
+            self._stats["misses"] += 1
+            return None
+
+    def put(
+        self,
+        path: Path,
+        workflow_name: str,
+        config_hash: int,
+        definition: "WorkflowDefinition",
+    ) -> bool:
+        """Cache a workflow definition.
+
+        Args:
+            path: Path to YAML file
+            workflow_name: Name of workflow
+            config_hash: Hash of workflow config
+            definition: Parsed WorkflowDefinition to cache
+
+        Returns:
+            True if cached successfully
+        """
+        if not self._config.enabled or self._cache is None:
+            return False
+
+        try:
+            mtime = path.stat().st_mtime
+        except (OSError, FileNotFoundError):
+            return False
+
+        key = self._make_key(path, workflow_name, config_hash, mtime)
+
+        with self._lock:
+            self._cache[key] = definition
+            logger.debug(f"Definition cached: {workflow_name}")
+            return True
+
+    def invalidate(self, path: Path) -> int:
+        """Invalidate all cached definitions for a file path.
+
+        Args:
+            path: Path to invalidate
+
+        Returns:
+            Number of entries invalidated
+        """
+        if not self._config.enabled or self._cache is None:
+            return 0
+
+        path_str = str(path.resolve())
+
+        with self._lock:
+            keys_to_delete = [k for k in self._cache.keys() if path_str in k]  # Key contains path
+
+            for key in keys_to_delete:
+                del self._cache[key]
+
+            count = len(keys_to_delete)
+            if count > 0:
+                self._stats["invalidations"] += count
+                logger.info(f"Invalidated {count} definition cache entries for: {path}")
+
+            return count
+
+    def clear(self) -> int:
+        """Clear all cached definitions.
+
+        Returns:
+            Number of entries cleared
+        """
+        if not self._config.enabled or self._cache is None:
+            return 0
+
+        with self._lock:
+            count = len(self._cache)
+            self._cache.clear()
+            logger.info(f"Cleared {count} definition cache entries")
+            return count
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        with self._lock:
+            stats = self._stats.copy()
+            total = stats["hits"] + stats["misses"]
+            stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
+            stats["size"] = len(self._cache) if self._cache else 0
+            stats["enabled"] = self._config.enabled
+            return stats
+
+
+# Global definition cache instance
+_global_definition_cache: Optional[WorkflowDefinitionCache] = None
+
+
+def get_workflow_definition_cache() -> WorkflowDefinitionCache:
+    """Get the global workflow definition cache.
+
+    Returns:
+        Global WorkflowDefinitionCache instance
+    """
+    global _global_definition_cache
+    if _global_definition_cache is None:
+        _global_definition_cache = WorkflowDefinitionCache()
+    return _global_definition_cache
+
+
+def configure_workflow_definition_cache(config: DefinitionCacheConfig) -> None:
+    """Configure the global workflow definition cache.
+
+    Args:
+        config: Configuration to apply
+    """
+    global _global_definition_cache
+    _global_definition_cache = WorkflowDefinitionCache(config)
+    logger.info(f"Workflow definition cache configured: enabled={config.enabled}")
+
+
 # Global cache manager instance
 _global_cache_manager: Optional[WorkflowCacheManager] = None
 
@@ -517,10 +992,20 @@ def configure_workflow_cache(config: WorkflowCacheConfig) -> None:
 
 
 __all__ = [
+    # Dependency tracking
+    "DependencyGraph",
+    "CascadingInvalidator",
+    # Cache config and entries
     "WorkflowCacheConfig",
     "CacheEntry",
     "WorkflowCache",
     "WorkflowCacheManager",
+    # Global management
     "get_workflow_cache_manager",
     "configure_workflow_cache",
+    # Definition cache
+    "DefinitionCacheConfig",
+    "WorkflowDefinitionCache",
+    "get_workflow_definition_cache",
+    "configure_workflow_definition_cache",
 ]

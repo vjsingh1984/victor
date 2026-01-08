@@ -32,7 +32,7 @@ from victor.config.orchestrator_constants import (
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
-    from victor.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.agent.conversation_memory import ConversationStore
 
 
@@ -94,6 +94,11 @@ class ContextMetrics:
     message_count: int
     is_overflow_risk: bool = False
     max_context_chars: int = 200000
+
+    @property
+    def total_chars(self) -> int:
+        """Backward compatibility alias for char_count."""
+        return self.char_count
 
     @property
     def utilization(self) -> float:
@@ -193,7 +198,7 @@ class ConversationController:
         self._history._messages.insert(0, Message(role="system", content=self._system_prompt))
         self._system_added = True
 
-    def add_user_message(self, content: str) -> Message:
+    def add_user_message(self, content: str, **kwargs: Any) -> Message:
         """Add a user message with optional normalization.
 
         Uses PromptNormalizer to:
@@ -203,6 +208,7 @@ class ConversationController:
 
         Args:
             content: User message content
+            **kwargs: Additional metadata (ignored for user messages)
 
         Returns:
             The added Message
@@ -230,7 +236,7 @@ class ConversationController:
         return message
 
     def add_assistant_message(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None, **kwargs: Any
     ) -> Message:
         message = self._history.add_assistant_message(content, tool_calls=tool_calls)
         if self.config.enable_stage_tracking:
@@ -265,12 +271,13 @@ class ConversationController:
         )
         return message
 
-    def add_message(self, role: str, content: str) -> Message:
+    def add_message(self, role: str, content: str, **kwargs: Any) -> Message:
         """Add a message with specified role (backward compatibility).
 
         Args:
             role: Message role (user, assistant, system)
             content: Message content
+            **kwargs: Additional message metadata (e.g., tool_calls for assistant)
 
         Returns:
             The created message
@@ -278,14 +285,14 @@ class ConversationController:
         if role == "user":
             return self.add_user_message(content)
         elif role == "assistant":
-            return self.add_assistant_message(content)
+            return self.add_assistant_message(content, **kwargs)
         elif role == "system":
             self.set_system_prompt(content)
             self.ensure_system_message()
             return self.messages[0]
         else:
             # For other roles, use add_message from history
-            return self._history.add_message(role, content)
+            return self._history.add_message(role, content, **kwargs)
 
     def get_context_metrics(self) -> ContextMetrics:
         """Calculate current context metrics.

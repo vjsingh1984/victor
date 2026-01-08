@@ -24,6 +24,7 @@ NOTE: This is StreamingRecoveryCoordinator, distinct from:
 The name was changed to avoid confusion between the two different classes.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 from victor.providers.base import StreamChunk
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class StreamingRecoveryCoordinator:
         context_compactor: Optional["ContextCompactor"],
         unified_tracker: "UnifiedTaskTracker",
         settings: "Settings",
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
     ):
         """Initialize StreamingRecoveryCoordinator.
 
@@ -135,7 +136,7 @@ class StreamingRecoveryCoordinator:
             context_compactor: Context management (optional)
             unified_tracker: Task progress tracker
             settings: Application settings
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self.recovery_handler = recovery_handler
         self.recovery_integration = recovery_integration
@@ -143,7 +144,20 @@ class StreamingRecoveryCoordinator:
         self.context_compactor = context_compactor
         self.unified_tracker = unified_tracker
         self.settings = settings
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
 
     # =====================================================================
     # Condition Checking Methods
@@ -167,18 +181,25 @@ class StreamingRecoveryCoordinator:
         result = self.streaming_handler.check_time_limit(ctx.streaming_context)
         if result:
             # Emit STATE event for time limit reached
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="recovery.time_limit_reached",
-                    data={
-                        "elapsed_time": ctx.elapsed_time,
-                        "iteration": ctx.iteration,
-                        "tool_calls_used": ctx.tool_calls_used,
-                    },
-                    source="RecoveryCoordinator",
-                )
-            )
+            if self._event_bus:
+                try:
+                    import asyncio
+
+                    asyncio.run(
+                        self._event_bus.emit(
+                            topic="state.recovery.time_limit_reached",
+                            data={
+                                "elapsed_time": ctx.elapsed_time,
+                                "iteration": ctx.iteration,
+                                "tool_calls_used": ctx.tool_calls_used,
+                                "category": "state",  # Preserve for observability
+                            },
+                            source="RecoveryCoordinator",
+                        )
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to emit time limit event: {e}")
+
             # Return the chunk from the result
             if result.chunks:
                 return result.chunks[0]
@@ -204,18 +225,24 @@ class StreamingRecoveryCoordinator:
         result = self.streaming_handler.check_iteration_limit(ctx.streaming_context)
         if result and result.chunks:
             # Emit STATE event for iteration limit reached
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="recovery.iteration_limit_reached",
-                    data={
-                        "iteration": ctx.iteration,
-                        "max_iterations": ctx.max_iterations,
-                        "tool_calls_used": ctx.tool_calls_used,
-                    },
-                    source="RecoveryCoordinator",
-                )
-            )
+            if self._event_bus:
+                try:
+                    import asyncio
+
+                    asyncio.run(
+                        self._event_bus.emit(
+                            topic="state.recovery.iteration_limit_reached",
+                            data={
+                                "iteration": ctx.iteration,
+                                "max_iterations": ctx.max_iterations,
+                                "tool_calls_used": ctx.tool_calls_used,
+                                "category": "state",  # Preserve for observability
+                            },
+                            source="RecoveryCoordinator",
+                        )
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to emit iteration limit event: {e}")
             return result.chunks[0]
         return None
 
@@ -367,16 +394,31 @@ class StreamingRecoveryCoordinator:
         result = self.streaming_handler.handle_empty_response(ctx.streaming_context)
         if result and result.chunks:
             # Emit ERROR event for empty response
-            self._event_bus.emit_error(
-                error=RuntimeError("Empty model response"),
-                context={
-                    "iteration": ctx.iteration,
-                    "provider": ctx.provider_name,
-                    "model": ctx.model,
-                    "force_completion": ctx.streaming_context.force_completion,
-                },
-                recoverable=True,
-            )
+            if self._event_bus:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
+                        self._event_bus.emit(
+                            topic="error.raised",
+                            data={
+                                "error_type": "RuntimeError",
+                                "error_message": "Empty model response",
+                                "category": "error",
+                                "recoverable": True,
+                                "context": {
+                                    "iteration": ctx.iteration,
+                                    "provider": ctx.provider_name,
+                                    "model": ctx.model,
+                                    "force_completion": ctx.streaming_context.force_completion,
+                                },
+                            },
+                        )
+                    )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug("No event loop, skipping error event emission")
+                except Exception as e:
+                    logger.debug(f"Failed to emit empty response error event: {e}")
             # Handler sets ctx.force_completion = True when threshold exceeded
             return result.chunks[0], ctx.streaming_context.force_completion
         return None, False
@@ -400,15 +442,30 @@ class StreamingRecoveryCoordinator:
             StreamChunk with block notification
         """
         # Emit ERROR event for blocked tool
-        self._event_bus.emit_error(
-            error=RuntimeError(f"Tool blocked: {tool_name}"),
-            context={
-                "tool_name": tool_name,
-                "block_reason": block_reason,
-                "iteration": ctx.iteration,
-            },
-            recoverable=True,
-        )
+        if self._event_bus:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._event_bus.emit(
+                        topic="error.raised",
+                        data={
+                            "error_type": "RuntimeError",
+                            "error_message": f"Tool blocked: {tool_name}",
+                            "category": "error",
+                            "recoverable": True,
+                            "context": {
+                                "tool_name": tool_name,
+                                "block_reason": block_reason,
+                                "iteration": ctx.iteration,
+                            },
+                        },
+                    )
+                )
+            except RuntimeError:
+                # No event loop running
+                logger.debug("No event loop, skipping error event emission")
+            except Exception as e:
+                logger.debug(f"Failed to emit blocked tool error event: {e}")
         return self.streaming_handler.handle_blocked_tool_call(
             ctx.streaming_context, tool_name, tool_args, block_reason
         )
@@ -445,17 +502,23 @@ class StreamingRecoveryCoordinator:
             return None
 
         # Emit STATE event for forced completion
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.STATE,
-                name="recovery.force_completion",
-                data={
-                    "iteration": ctx.iteration,
-                    "tool_calls_used": ctx.tool_calls_used,
-                },
-                source="RecoveryCoordinator",
-            )
-        )
+        if self._event_bus:
+            try:
+                import asyncio
+
+                asyncio.run(
+                    self._event_bus.emit(
+                        topic="state.recovery.force_completion",
+                        data={
+                            "iteration": ctx.iteration,
+                            "tool_calls_used": ctx.tool_calls_used,
+                            "category": "state",  # Preserve for observability
+                        },
+                        source="RecoveryCoordinator",
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit force completion event: {e}")
 
         # Generate forced completion chunks
         chunks = []
@@ -587,20 +650,23 @@ class StreamingRecoveryCoordinator:
             return None
 
         # Emit STATE event for recovery action
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.STATE,
-                name=f"recovery.action_{recovery_action.action}",
-                data={
-                    "action": recovery_action.action,
-                    "reason": recovery_action.reason,
-                    "failure_type": recovery_action.failure_type,
-                    "strategy_name": recovery_action.strategy_name,
-                    "iteration": ctx.iteration,
-                },
-                source="RecoveryCoordinator",
-            )
-        )
+        if self._event_bus:
+            try:
+                import asyncio
+
+                asyncio.run(
+                    self._event_bus.emit(
+                        topic=f"state.recovery.action_{recovery_action.action}",
+                        data={
+                            "action": recovery_action.action,
+                            "reason": recovery_action.reason,
+                            "category": "state",  # Preserve for observability
+                        },
+                        source="RecoveryCoordinator",
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit recovery action event: {e}")
 
         if recovery_action.action == "retry":
             # Add recovery message if provided
@@ -631,14 +697,30 @@ class StreamingRecoveryCoordinator:
 
         if recovery_action.action == "abort":
             # Emit ERROR event for abort
-            self._event_bus.emit_error(
-                error=RuntimeError(f"Session aborted: {recovery_action.reason}"),
-                context={
-                    "failure_type": recovery_action.failure_type,
-                    "iteration": ctx.iteration,
-                },
-                recoverable=False,
-            )
+            if self._event_bus:
+                try:
+                    loop = asyncio.get_running_loop()
+
+                    loop.create_task(
+                        self._event_bus.emit(
+                            topic="error.raised",
+                            data={
+                                "error_type": "RuntimeError",
+                                "error_message": f"Session aborted: {recovery_action.reason}",
+                                "category": "error",
+                                "recoverable": False,
+                                "context": {
+                                    "failure_type": recovery_action.failure_type,
+                                    "iteration": ctx.iteration,
+                                },
+                            },
+                        )
+                    )
+                except RuntimeError:
+                    # No event loop running
+                    logger.debug("No event loop, skipping error event emission")
+                except Exception as e:
+                    logger.debug(f"Failed to emit abort error event: {e}")
             return StreamChunk(
                 content=f"\n[recovery] Session aborted: {recovery_action.reason}\n",
                 is_final=True,

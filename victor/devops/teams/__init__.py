@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
+from victor.framework.team_schema import TeamSpec
 
 
 @dataclass
@@ -150,31 +151,11 @@ DEVOPS_ROLES: Dict[str, DevOpsRoleConfig] = {
 }
 
 
-@dataclass
-class DevOpsTeamSpec:
-    """Specification for a DevOps team.
-
-    Attributes:
-        name: Team name
-        description: Team description
-        formation: How agents are organized
-        members: Team member specifications
-        total_tool_budget: Total tool budget for the team
-        max_iterations: Maximum iterations
-    """
-
-    name: str
-    description: str
-    formation: TeamFormation
-    members: List[TeamMemberSpec]
-    total_tool_budget: int = 100
-    max_iterations: int = 50
-
-
 # Pre-defined team specifications with rich personas
-DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
-    "deployment_team": DevOpsTeamSpec(
+DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
+    "deployment_team": TeamSpec(
         name="Infrastructure Deployment Team",
+        vertical="devops",
         description="End-to-end infrastructure deployment with assessment, planning, implementation, and validation",
         formation=TeamFormation.PIPELINE,
         members=[
@@ -254,8 +235,9 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
         ],
         total_tool_budget=95,
     ),
-    "container_team": DevOpsTeamSpec(
+    "container_team": TeamSpec(
         name="Container Management Team",
+        vertical="devops",
         description="Docker container setup, optimization, and management with security best practices",
         formation=TeamFormation.PIPELINE,
         members=[
@@ -313,8 +295,9 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
         ],
         total_tool_budget=65,
     ),
-    "monitoring_team": DevOpsTeamSpec(
+    "monitoring_team": TeamSpec(
         name="Observability Team",
+        vertical="devops",
         description="Comprehensive monitoring, logging, and alerting setup",
         formation=TeamFormation.SEQUENTIAL,
         members=[
@@ -358,8 +341,9 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
         ],
         total_tool_budget=45,
     ),
-    "cicd_team": DevOpsTeamSpec(
+    "cicd_team": TeamSpec(
         name="CI/CD Pipeline Team",
+        vertical="devops",
         description="Continuous integration and deployment pipeline setup",
         formation=TeamFormation.PIPELINE,
         members=[
@@ -429,8 +413,9 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
         ],
         total_tool_budget=70,
     ),
-    "security_audit_team": DevOpsTeamSpec(
+    "security_audit_team": TeamSpec(
         name="Security Audit Team",
+        vertical="devops",
         description="Infrastructure security assessment and hardening",
         formation=TeamFormation.PARALLEL,
         members=[
@@ -482,14 +467,14 @@ DEVOPS_TEAM_SPECS: Dict[str, DevOpsTeamSpec] = {
 }
 
 
-def get_team_for_task(task_type: str) -> Optional[DevOpsTeamSpec]:
+def get_team_for_task(task_type: str) -> Optional[TeamSpec]:
     """Get appropriate team specification for task type.
 
     Args:
         task_type: Type of task (deploy, container, monitor, cicd, security, etc.)
 
     Returns:
-        DevOpsTeamSpec or None if no matching team
+        TeamSpec or None if no matching team
     """
     mapping = {
         # Deployment tasks
@@ -566,22 +551,22 @@ class DevOpsTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, DevOpsTeamSpec]:
+    def get_team_specs(self) -> Dict[str, TeamSpec]:
         """Get all DevOps team specifications.
 
         Returns:
-            Dictionary mapping team names to DevOpsTeamSpec instances
+            Dictionary mapping team names to TeamSpec instances
         """
         return DEVOPS_TEAM_SPECS
 
-    def get_team_for_task(self, task_type: str) -> Optional[DevOpsTeamSpec]:
+    def get_team_for_task(self, task_type: str) -> Optional[TeamSpec]:
         """Get appropriate team for a task type.
 
         Args:
             task_type: Type of task
 
         Returns:
-            DevOpsTeamSpec or None if no matching team
+            TeamSpec or None if no matching team
         """
         return get_team_for_task(task_type)
 
@@ -597,7 +582,7 @@ class DevOpsTeamSpecProvider:
 __all__ = [
     # Types
     "DevOpsRoleConfig",
-    "DevOpsTeamSpec",
+    "TeamSpec",
     # Provider
     "DevOpsTeamSpecProvider",
     # Role configurations

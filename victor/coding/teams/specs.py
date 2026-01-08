@@ -17,17 +17,47 @@
 Provides pre-defined team configurations for common software development
 workflows including feature implementation, bug fixing, refactoring,
 and code review.
+
+This module uses the framework's multi-agent types (TeamTemplate, TeamSpec,
+TeamMember) while providing domain-specific team configurations for coding tasks.
+
+DEPRECATION NOTICE:
+    CodingTeamSpec is deprecated and will be removed in a future version.
+    Use TeamSpec from victor.framework.team_schema instead:
+
+        from victor.framework.team_schema import TeamSpec
+
+    CodingTeamSpec is maintained for backwards compatibility.
 """
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
+# Import framework multi-agent types for composition
+from victor.framework.multi_agent import (
+    TeamTemplate,
+    TeamSpec as FrameworkTeamSpec,
+    TeamMember as FrameworkTeamMember,
+    TeamTopology,
+    TaskAssignmentStrategy,
+    PersonaTraits,
+    CommunicationStyle,
+    ExpertiseLevel,
+)
+
+# Import canonical TeamSpec from framework
+from victor.framework.team_schema import TeamSpec
+
 
 @dataclass
 class CodingRoleConfig:
     """Configuration for a coding-specific role.
+
+    This is a domain-specific wrapper that can be converted to the framework's
+    PersonaTraits for use with multi-agent teams.
 
     Attributes:
         base_role: Base agent role (researcher, planner, executor, reviewer)
@@ -40,6 +70,24 @@ class CodingRoleConfig:
     tools: List[str]
     tool_budget: int
     description: str = ""
+
+    def to_persona_traits(self, name: Optional[str] = None) -> PersonaTraits:
+        """Convert to framework PersonaTraits.
+
+        Args:
+            name: Optional persona name (defaults to base_role title)
+
+        Returns:
+            PersonaTraits instance for use with framework multi-agent teams
+        """
+        return PersonaTraits(
+            name=name or self.base_role.replace("_", " ").title(),
+            role=self.base_role,
+            description=self.description,
+            communication_style=CommunicationStyle.TECHNICAL,
+            expertise_level=ExpertiseLevel.EXPERT,
+            preferred_tools=self.tools,
+        )
 
 
 # Coding-specific roles with tool allocations
@@ -130,9 +178,26 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
 }
 
 
+# Mapping from TeamFormation to TeamTopology
+_FORMATION_TO_TOPOLOGY: Dict[TeamFormation, TeamTopology] = {
+    TeamFormation.SEQUENTIAL: TeamTopology.PIPELINE,
+    TeamFormation.PIPELINE: TeamTopology.PIPELINE,
+    TeamFormation.PARALLEL: TeamTopology.MESH,
+    TeamFormation.HIERARCHICAL: TeamTopology.HIERARCHY,
+}
+
+
 @dataclass
 class CodingTeamSpec:
     """Specification for a coding team.
+
+    .. deprecated::
+        CodingTeamSpec is deprecated. Use TeamSpec from
+        victor.framework.team_schema instead. CodingTeamSpec is maintained
+        for backwards compatibility but will be removed in a future version.
+
+    This class provides backward-compatible team specifications while
+    supporting conversion to the framework's TeamTemplate and TeamSpec types.
 
     Attributes:
         name: Team name
@@ -150,12 +215,107 @@ class CodingTeamSpec:
     total_tool_budget: int = 100
     max_iterations: int = 50
 
+    def __post_init__(self):
+        """Emit deprecation warning on instantiation."""
+        warnings.warn(
+            "CodingTeamSpec is deprecated. Use TeamSpec from "
+            "victor.framework.team_schema instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    def to_canonical_team_spec(self) -> TeamSpec:
+        """Convert to canonical TeamSpec from victor.framework.team_schema.
+
+        Returns:
+            TeamSpec instance with vertical set to "coding"
+        """
+        return TeamSpec(
+            name=self.name,
+            description=self.description,
+            vertical="coding",
+            formation=self.formation,
+            members=self.members,
+            total_tool_budget=self.total_tool_budget,
+            max_iterations=self.max_iterations,
+        )
+
+    def to_team_template(self) -> TeamTemplate:
+        """Convert to framework TeamTemplate.
+
+        Returns:
+            TeamTemplate instance for use with framework multi-agent system
+        """
+        # Count roles for member_slots
+        role_counts: Dict[str, int] = {}
+        for member in self.members:
+            role_counts[member.role] = role_counts.get(member.role, 0) + 1
+
+        # Determine topology from formation
+        topology = _FORMATION_TO_TOPOLOGY.get(self.formation, TeamTopology.PIPELINE)
+
+        # Determine assignment strategy based on formation
+        if self.formation == TeamFormation.HIERARCHICAL:
+            assignment_strategy = TaskAssignmentStrategy.SKILL_MATCH
+        elif self.formation == TeamFormation.PARALLEL:
+            assignment_strategy = TaskAssignmentStrategy.LOAD_BALANCED
+        else:
+            assignment_strategy = TaskAssignmentStrategy.ROUND_ROBIN
+
+        return TeamTemplate(
+            name=self.name,
+            description=self.description,
+            topology=topology,
+            assignment_strategy=assignment_strategy,
+            member_slots=role_counts,
+            max_iterations=self.max_iterations,
+            config={
+                "total_tool_budget": self.total_tool_budget,
+                "formation": self.formation.value,
+            },
+        )
+
+    def to_framework_team_spec(self) -> FrameworkTeamSpec:
+        """Convert to framework TeamSpec with members.
+
+        Returns:
+            FrameworkTeamSpec instance for use with framework multi-agent system
+        """
+        template = self.to_team_template()
+
+        # Convert members to FrameworkTeamMember instances
+        framework_members: List[FrameworkTeamMember] = []
+        for member in self.members:
+            # Create PersonaTraits from TeamMemberSpec
+            persona = PersonaTraits(
+                name=member.name or f"{member.role.title()} Agent",
+                role=member.role,
+                description=member.backstory or member.goal,
+                communication_style=CommunicationStyle.TECHNICAL,
+                expertise_level=ExpertiseLevel.EXPERT,
+                strengths=member.expertise if member.expertise else [],
+            )
+
+            framework_member = FrameworkTeamMember(
+                persona=persona,
+                role_in_team=member.role,
+                is_leader=member.is_manager,
+                tool_access=[],  # Tools managed at team level
+            )
+            framework_members.append(framework_member)
+
+        return FrameworkTeamSpec(
+            template=template,
+            members=framework_members,
+        )
+
 
 # Pre-defined team specifications with rich personas
-CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
-    "feature_team": CodingTeamSpec(
+CODING_TEAM_SPECS: Dict[str, TeamSpec] = {
+    "feature_team": TeamSpec(
         name="Feature Implementation Team",
         description="End-to-end feature implementation with research, planning, implementation, and review",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -216,9 +376,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=100,
     ),
-    "bug_fix_team": CodingTeamSpec(
+    "bug_fix_team": TeamSpec(
         name="Bug Fix Team",
         description="Systematic bug investigation and fix with verification",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -264,9 +425,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=70,
     ),
-    "refactoring_team": CodingTeamSpec(
+    "refactoring_team": TeamSpec(
         name="Refactoring Team",
         description="Safe refactoring with analysis and testing",
+        vertical="coding",
         formation=TeamFormation.HIERARCHICAL,
         members=[
             TeamMemberSpec(
@@ -313,9 +475,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=75,
     ),
-    "review_team": CodingTeamSpec(
+    "review_team": TeamSpec(
         name="Code Review Team",
         description="Comprehensive code review with parallel analysis",
+        vertical="coding",
         formation=TeamFormation.PARALLEL,
         members=[
             TeamMemberSpec(
@@ -373,9 +536,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=55,
     ),
-    "testing_team": CodingTeamSpec(
+    "testing_team": TeamSpec(
         name="Testing Team",
         description="Comprehensive test coverage improvement",
+        vertical="coding",
         formation=TeamFormation.PIPELINE,
         members=[
             TeamMemberSpec(
@@ -421,9 +585,10 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
         ],
         total_tool_budget=70,
     ),
-    "documentation_team": CodingTeamSpec(
+    "documentation_team": TeamSpec(
         name="Documentation Team",
         description="Generate and update documentation",
+        vertical="coding",
         formation=TeamFormation.SEQUENTIAL,
         members=[
             TeamMemberSpec(
@@ -459,20 +624,19 @@ CODING_TEAM_SPECS: Dict[str, CodingTeamSpec] = {
 }
 
 
-def get_team_for_task(task_type: str) -> Optional[CodingTeamSpec]:
+def get_team_for_task(task_type: str) -> Optional[TeamSpec]:
     """Get appropriate team specification for task type.
 
     Args:
         task_type: Type of task (feature, bug, review, etc.)
 
     Returns:
-        CodingTeamSpec or None if no matching team
+        TeamSpec or None if no matching team
     """
     mapping = {
         # Feature tasks
         "feature": "feature_team",
         "implement": "feature_team",
-        "new_feature": "feature_team",
         "add": "feature_team",
         # Bug fix tasks
         "bug": "bug_fix_team",
@@ -535,7 +699,7 @@ def list_roles() -> List[str]:
 __all__ = [
     # Types
     "CodingRoleConfig",
-    "CodingTeamSpec",
+    "TeamSpec",  # Canonical from framework.team_schema (use this)
     # Role configurations
     "CODING_ROLES",
     # Team specifications
@@ -545,4 +709,10 @@ __all__ = [
     "get_role_config",
     "list_team_types",
     "list_roles",
+    # Re-exported framework types for convenience
+    "TeamTemplate",
+    "FrameworkTeamSpec",
+    "FrameworkTeamMember",
+    "TeamTopology",
+    "TaskAssignmentStrategy",
 ]

@@ -26,14 +26,12 @@ and transforms that cannot be expressed in YAML.
 Example:
     provider = DevOpsWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    result = await executor.execute(workflow, context)
+    # Compile and execute (recommended - uses UnifiedWorkflowCompiler with caching)
+    result = await provider.run_compiled_workflow("deploy", {"env": "prod"})
 
-    # Streaming execution
-    async for chunk in provider.astream("deploy", orchestrator, context):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Stream execution with real-time progress
+    async for node_id, state in provider.stream_compiled_workflow("deploy", context):
+        print(f"Completed: {node_id}")
 
 Available workflows (all YAML-defined):
 - deploy: Safe deployment with validation and rollback
@@ -53,8 +51,10 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
     Uses YAML-first architecture with Python escape hatches for complex
     conditions and transforms that cannot be expressed in YAML.
 
-    Includes support for streaming execution via StreamingWorkflowExecutor
-    for real-time progress updates during long-running DevOps workflows.
+    Inherits from BaseYAMLWorkflowProvider which provides:
+    - YAML workflow loading with two-level caching
+    - UnifiedWorkflowCompiler integration for consistent execution
+    - Checkpointing support for resumable workflows
 
     Example:
         provider = DevOpsWorkflowProvider()
@@ -62,9 +62,12 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream deployment execution
-        async for chunk in provider.astream("deploy", orchestrator, {}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Execute with caching (recommended)
+        result = await provider.run_compiled_workflow("deploy", {"env": "prod"})
+
+        # Stream with real-time progress
+        async for node_id, state in provider.stream_compiled_workflow("deploy", {}):
+            print(f"Completed: {node_id}")
     """
 
     def _get_escape_hatches_module(self) -> str:

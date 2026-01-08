@@ -5,6 +5,34 @@ All notable changes to Victor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Signal-Based Task Completion Detection** - Deterministic completion using explicit markers
+  - `_DONE_` for file operations (creation, modification, deletion)
+  - `_TASK_DONE_` for bug fixes and task completion
+  - `_SUMMARY_` for analysis and research tasks
+  - `_BLOCKED_` for tasks that cannot be completed
+- **Response Phase Detection** - Distinguishes between EXPLORATION, SYNTHESIS, FINAL_OUTPUT, and BLOCKED phases
+- **Completion Confidence Levels** - HIGH (active signal), MEDIUM (file mods + passive), LOW (passive only), NONE (no signal)
+- **TaskCompletionProtocol** - Protocol-based abstraction for ISP/DIP compliance
+- **Comprehensive Documentation** - User guide at `docs/guides/task_completion.md`
+
+### Changed
+- **Task Completion Detection** - Replaced buffer/size-based heuristics with explicit signal-based detection
+- **ContinuationStrategy** - Now uses TaskCompletionDetector confidence for continuation decisions
+- **IntentClassification** - Priority-based detection (Detector → Intent → Legacy)
+- **Orchestrator** - Always creates TaskCompletionDetector (removed feature flag)
+
+### Removed
+- **Buffer/Size Heuristics** - Legacy completion detection based on response length removed
+- **Feature Flag** - `use_signal_based_completion` setting removed (signal-based is now default)
+
+### Fixed
+- **False Positive Completions** - Valid output no longer consumed as "thinking content"
+- **Unnecessary Continuation Loops** - Eliminated 27+ iteration loops when completion signals present
+- **Completion Ambiguity** - Clear separation between "thinking" and "output" phases
+
 ## [0.2.3] - 2025-12-27
 
 ### Added
@@ -12,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-updating Homebrew Formula** - Polls PyPI every 6 hours for new releases
 
 ### Changed
-- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor`)
+- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor-ai`)
 - **Simplified Binary Builds** - macOS and Windows binaries only; Linux users should use `pip install victor-ai`
 
 ### Fixed
@@ -40,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PyPI Trusted Publishing** - OIDC-based publishing without API tokens
 - **GitHub Actions Release Pipeline** - Automated builds on tag push
 - **Multi-Platform Binaries** - macOS ARM64/x64, Windows x64 via PyInstaller
-- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor`
+- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor-ai`
 - **Rust Native Extensions** - PyO3 bindings for SIMD-optimized operations
 - **Homebrew Tap** - `vjsingh1984/homebrew-tap` with auto-update workflow
 

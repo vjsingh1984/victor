@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 from victor.providers.base import StreamChunk
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
 
@@ -62,18 +62,31 @@ class ChunkGenerator:
         self,
         streaming_handler: "StreamingChatHandler",
         settings: "Settings",
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
     ):
         """Initialize ChunkGenerator.
 
         Args:
             streaming_handler: Handler for streaming chunk generation
             settings: Application settings
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self.streaming_handler = streaming_handler
         self.settings = settings
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
 
     # =====================================================================
     # Tool-Related Chunks
@@ -96,17 +109,22 @@ class ChunkGenerator:
             StreamChunk with tool start metadata
         """
         # Emit LIFECYCLE event for tool execution start
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.LIFECYCLE,
-                name="chunk.tool_start",
-                data={
-                    "tool_name": tool_name,
-                    "status_msg": status_msg,
-                },
-                source="ChunkGenerator",
-            )
-        )
+        if self._event_bus:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    self._event_bus,
+                    topic="lifecycle.chunk.tool_start",
+                    data={
+                        "tool_name": tool_name,
+                        "status_msg": status_msg,
+                        "category": "lifecycle",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit chunk tool start event: {e}")
         return self.streaming_handler.generate_tool_start_chunk(tool_name, tool_args, status_msg)
 
     def generate_tool_result_chunks(
@@ -158,14 +176,20 @@ class ChunkGenerator:
             StreamChunk with is_final=True
         """
         # Emit LIFECYCLE event for streaming completion
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.LIFECYCLE,
-                name="chunk.stream_complete",
-                data={},
-                source="ChunkGenerator",
-            )
-        )
+        if self._event_bus:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    self._event_bus,
+                    topic="lifecycle.chunk.stream_complete",
+                    data={
+                        "category": "lifecycle",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit stream complete event: {e}")
         return self.streaming_handler.generate_final_marker_chunk()
 
     # =====================================================================
@@ -189,17 +213,22 @@ class ChunkGenerator:
             StreamChunk with formatted metrics content
         """
         # Emit METRIC event for metrics display
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.METRIC,
-                name="chunk.metrics_generated",
-                data={
-                    "metrics_line": metrics_line[:200],  # Truncate for event
-                    "is_final": is_final,
-                },
-                source="ChunkGenerator",
-            )
-        )
+        if self._event_bus:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    self._event_bus,
+                    topic="metric.chunk.metrics_generated",
+                    data={
+                        "metrics_line": metrics_line[:200],  # Truncate for event
+                        "is_final": is_final,
+                        "category": "metric",  # Preserve for observability
+                    },
+                    source="ChunkGenerator",
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit metrics generated event: {e}")
         return self.streaming_handler.generate_metrics_chunk(
             metrics_line, is_final=is_final, prefix=prefix
         )

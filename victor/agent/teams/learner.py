@@ -38,7 +38,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.subagents import SubAgentRole
-from victor.agent.teams.team import TeamFormation, TeamMember, TeamConfig
+
+# Import canonical types from victor.teams.types
+from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 from victor.agent.teams.metrics import (
     TaskCategory,
     TeamMetrics,

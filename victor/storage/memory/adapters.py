@@ -24,9 +24,9 @@ Adapters:
 - GraphMemoryAdapter: Wraps EntityGraph for relationship traversal
 
 Example:
-    from victor.memory import EntityMemory
-    from victor.memory.unified import get_memory_coordinator, MemoryType
-    from victor.memory.adapters import EntityMemoryAdapter
+    from victor.storage.memory import EntityMemory
+    from victor.storage.memory.unified import get_memory_coordinator, MemoryType
+    from victor.storage.memory.adapters import EntityMemoryAdapter
 
     # Create entity memory
     entity_mem = EntityMemory()

@@ -25,6 +25,9 @@ Extracted from CRITICAL-001 Phase 2D: Extract TaskCoordinator
 import logging
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.core.events import ObservabilityBus
+from victor.core.events.emit_helper import emit_event_sync
+
 if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
@@ -32,8 +35,6 @@ if TYPE_CHECKING:
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
     from victor.agent.task_analyzer import TaskType
-
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class TaskCoordinator:
         unified_tracker: "UnifiedTaskTracker",
         prompt_builder: "SystemPromptBuilder",
         settings: "Settings",
-        event_bus: Optional[EventBus] = None,
+        event_bus: Optional[ObservabilityBus] = None,
     ):
         """Initialize TaskCoordinator.
 
@@ -79,10 +80,10 @@ class TaskCoordinator:
             unified_tracker: Tool budget and iteration tracker
             prompt_builder: System prompt builder for task hints
             settings: Application settings
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self.task_analyzer = task_analyzer
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
         self.unified_tracker = unified_tracker
         self.prompt_builder = prompt_builder
         self.settings = settings
@@ -91,6 +92,19 @@ class TaskCoordinator:
         self._tool_budget = getattr(settings, "tool_budget", 15)
         self._observed_files = []
         self._reminder_manager = None
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
 
     # =====================================================================
     # Task Preparation
@@ -117,8 +131,8 @@ class TaskCoordinator:
             Tuple of (task_classification, complexity_tool_budget)
         """
         from victor.agent.prompt_builder import get_task_type_hint
-        from victor.embeddings.task_classifier import TaskTypeClassifier
-        from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
+        from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+        from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
 
         # Get granular task type for more specific hints
         granular_task_type = None
@@ -183,28 +197,28 @@ class TaskCoordinator:
 
         # Update reminder manager with task complexity and hint
         if self._reminder_manager:
-            from victor.agent.complexity_classifier import get_prompt_hint
+            from victor.framework.enrichment.strategies import get_complexity_hint
 
             self._reminder_manager.update_state(
                 task_complexity=task_classification.complexity.value,
-                task_hint=get_prompt_hint(task_classification.complexity),
+                task_hint=get_complexity_hint(task_classification.complexity),
                 tool_budget=complexity_tool_budget,
             )
 
         # Emit STATE event for task preparation
-        self._event_bus.publish(
-            VictorEvent(
-                category=EventCategory.STATE,
-                name="task.prepared",
+        if self._event_bus:
+            emit_event_sync(
+                self._event_bus,
+                topic="task.prepared",
                 data={
                     "unified_task_type": unified_task_type.value,
                     "complexity": task_classification.complexity.value,
                     "confidence": task_classification.confidence,
                     "tool_budget": complexity_tool_budget,
+                    "category": "state",  # Preserve for observability
                 },
                 source="TaskCoordinator",
             )
-        )
 
         return task_classification, complexity_tool_budget
 

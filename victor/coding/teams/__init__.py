@@ -42,10 +42,11 @@ enabling cross-vertical team discovery via:
 
 import logging
 
+from victor.framework.team_schema import TeamSpec
+
 from victor.coding.teams.specs import (
     # Types
     CodingRoleConfig,
-    CodingTeamSpec,
     # Role configurations
     CODING_ROLES,
     # Team specifications
@@ -58,11 +59,17 @@ from victor.coding.teams.specs import (
 )
 
 from victor.coding.teams.personas import (
-    # Types
+    # Framework types (re-exported for convenience)
+    FrameworkPersonaTraits,
+    FrameworkCommunicationStyle,
+    ExpertiseLevel,
+    PersonaTemplate,
+    # Coding-specific types
     ExpertiseCategory,
     CommunicationStyle,
     DecisionStyle,
-    PersonaTraits,
+    CodingPersonaTraits,
+    PersonaTraits,  # Backward compatibility alias
     CodingPersona,
     # Pre-defined personas
     CODING_PERSONAS,
@@ -77,7 +84,7 @@ from victor.coding.teams.personas import (
 __all__ = [
     # Types from specs
     "CodingRoleConfig",
-    "CodingTeamSpec",
+    "TeamSpec",  # Canonical from framework.team_schema (use this)
     # Provider
     "CodingTeamSpecProvider",
     # Role configurations
@@ -89,11 +96,17 @@ __all__ = [
     "get_role_config",
     "list_team_types",
     "list_roles",
-    # Types from personas
+    # Framework types (re-exported for convenience)
+    "FrameworkPersonaTraits",
+    "FrameworkCommunicationStyle",
+    "ExpertiseLevel",
+    "PersonaTemplate",
+    # Coding-specific types from personas
     "ExpertiseCategory",
     "CommunicationStyle",
     "DecisionStyle",
-    "PersonaTraits",
+    "CodingPersonaTraits",
+    "PersonaTraits",  # Backward compatibility alias
     "CodingPersona",
     # Pre-defined personas
     "CODING_PERSONAS",
@@ -118,22 +131,22 @@ class CodingTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, CodingTeamSpec]:
+    def get_team_specs(self) -> Dict[str, TeamSpec]:
         """Get all Coding team specifications.
 
         Returns:
-            Dictionary mapping team names to CodingTeamSpec instances
+            Dictionary mapping team names to TeamSpec instances
         """
         return CODING_TEAM_SPECS
 
-    def get_team_for_task(self, task_type: str) -> Optional[CodingTeamSpec]:
+    def get_team_for_task(self, task_type: str) -> Optional[TeamSpec]:
         """Get appropriate team for a task type.
 
         Args:
             task_type: Type of task
 
         Returns:
-            CodingTeamSpec or None if no matching team
+            TeamSpec or None if no matching team
         """
         return get_team_for_task(task_type)
 

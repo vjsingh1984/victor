@@ -14,7 +14,8 @@
 
 """Tool registry for managing available tools."""
 
-from typing import Any, Callable, Dict, List, Optional, Union
+import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
@@ -90,6 +91,14 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
         self._after_hooks: List[Union[Hook, Callable]] = []
 
+        # Schema cache: (enabled_tool_names_tuple, schemas_list) for both enabled/all modes
+        # Key is (only_enabled: bool), value is (tool_names_tuple, schemas_list)
+        self._schema_cache: Dict[bool, Optional[Tuple[Tuple[str, ...], List[Dict[str, Any]]]]] = {
+            True: None,  # Cache for only_enabled=True
+            False: None,  # Cache for only_enabled=False
+        }
+        self._schema_cache_lock = threading.RLock()
+
     @property
     def _tools(self) -> Dict[str, Any]:
         """Alias for _items to maintain backward compatibility."""
@@ -99,6 +108,16 @@ class ToolRegistry(BaseRegistry[str, Any]):
     def _tools(self, value: Dict[str, Any]) -> None:
         """Setter for _tools alias."""
         self._items = value
+
+    def _invalidate_schema_cache(self) -> None:
+        """Invalidate the schema cache.
+
+        Called when tools are registered, unregistered, enabled, or disabled.
+        Thread-safe using the schema cache lock.
+        """
+        with self._schema_cache_lock:
+            self._schema_cache[True] = None
+            self._schema_cache[False] = None
 
     def _wrap_hook(
         self, hook: Union[Hook, Callable], critical: bool = False, name: str = ""
@@ -186,6 +205,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
                 f"register() takes 1 or 2 positional arguments but {len(args)} were given"
             )
 
+        # Invalidate schema cache after registration
+        self._invalidate_schema_cache()
+
     # Alias for backwards compatibility with code using register_tool()
     def register_tool(self, tool: Any, enabled: bool = True) -> None:
         """Alias for register(tool). Kept for backwards compatibility."""
@@ -232,6 +254,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         super().register(name, DictTool())
         self._tool_enabled[name] = enabled
 
+        # Invalidate schema cache after registration
+        self._invalidate_schema_cache()
+
     def unregister(self, name: str) -> bool:  # type: ignore[override]
         """Unregister a tool.
 
@@ -242,7 +267,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
             True if the tool was found and removed, False otherwise
         """
         self._tool_enabled.pop(name, None)
-        return super().unregister(name)
+        result = super().unregister(name)
+
+        # Invalidate schema cache after unregistration
+        self._invalidate_schema_cache()
+
+        return result
 
     def enable_tool(self, name: str) -> bool:
         """Enable a tool by name.
@@ -255,6 +285,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if name in self._tools:
             self._tool_enabled[name] = True
+            # Invalidate schema cache after enabling
+            self._invalidate_schema_cache()
             return True
         return False
 
@@ -269,6 +301,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if name in self._tools:
             self._tool_enabled[name] = False
+            # Invalidate schema cache after disabling
+            self._invalidate_schema_cache()
             return True
         return False
 
@@ -289,9 +323,15 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Args:
             tool_states: Dictionary mapping tool names to enabled state
         """
+        changed = False
         for name, enabled in tool_states.items():
             if name in self._tools:
                 self._tool_enabled[name] = enabled
+                changed = True
+
+        # Invalidate schema cache if any states changed
+        if changed:
+            self._invalidate_schema_cache()
 
     def get_tool_states(self) -> Dict[str, bool]:
         """Get enabled/disabled states for all tools.
@@ -327,8 +367,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
             ]
         return list(self._tools.values())
 
-    def get_tool_schemas(self, only_enabled: bool = True) -> list[Dict[str, Any]]:
-        """Get JSON schemas for all tools.
+    def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
+        """Get JSON schemas for all tools with caching.
+
+        Uses a cache to avoid regenerating schemas when the tool set hasn't changed.
+        The cache is invalidated automatically when tools are registered, unregistered,
+        enabled, or disabled.
 
         Args:
             only_enabled: If True, only return schemas for enabled tools (default: True)
@@ -336,13 +380,39 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Returns:
             List of tool JSON schemas
         """
-        if only_enabled:
-            return [
-                tool.to_json_schema()
-                for name, tool in self._tools.items()
-                if self._tool_enabled.get(name, False)
-            ]
-        return [tool.to_json_schema() for tool in self._tools.values()]
+        with self._schema_cache_lock:
+            # Build the current tool names set for cache validation
+            if only_enabled:
+                current_tool_names = tuple(
+                    sorted(
+                        name for name in self._tools.keys() if self._tool_enabled.get(name, False)
+                    )
+                )
+            else:
+                current_tool_names = tuple(sorted(self._tools.keys()))
+
+            # Check cache
+            cache_entry = self._schema_cache.get(only_enabled)
+            if cache_entry is not None:
+                cached_names, cached_schemas = cache_entry
+                if cached_names == current_tool_names:
+                    # Cache hit - return cached schemas
+                    return cached_schemas
+
+            # Cache miss - generate schemas
+            if only_enabled:
+                schemas = [
+                    tool.to_json_schema()
+                    for name, tool in self._tools.items()
+                    if self._tool_enabled.get(name, False)
+                ]
+            else:
+                schemas = [tool.to_json_schema() for tool in self._tools.values()]
+
+            # Update cache
+            self._schema_cache[only_enabled] = (current_tool_names, schemas)
+
+            return schemas
 
     def get_tool_cost(self, name: str) -> Optional[CostTier]:
         """Get the cost tier for a tool.

@@ -31,11 +31,12 @@ from victor.framework.tools import ToolSet, ToolsInput
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.agent.teams.team import TeamFormation
+    from victor.teams import TeamFormation
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
     from victor.observability import EventBus, ObservabilityIntegration
+    from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 
@@ -331,7 +332,7 @@ class Agent:
                 formation=TeamFormation.HIERARCHICAL,
             )
         """
-        from victor.agent.teams.team import TeamFormation as TF
+        from victor.teams import TeamFormation as TF
         from victor.framework.teams import AgentTeam
 
         # Default to SEQUENTIAL if not specified
@@ -637,25 +638,24 @@ class Agent:
     # =========================================================================
 
     @property
-    def event_bus(self) -> Optional["EventBus"]:
-        """Get the EventBus for subscribing to agent events.
+    def event_bus(self) -> Optional["ObservabilityBus"]:
+        """Get the ObservabilityBus for subscribing to agent events.
 
-        The EventBus provides access to all agent events including:
+        The ObservabilityBus provides access to all agent events including:
         - Tool execution (start/end)
         - State transitions
         - Model requests/responses
         - Errors
 
         Returns:
-            EventBus instance, or None if observability is disabled
+            ObservabilityBus instance, or None if observability is disabled
 
         Example:
-            from victor.observability import EventCategory
-
             def on_tool_event(event):
-                print(f"Tool: {event.name} - {event.data}")
+                print(f"Tool: {event.topic} - {event.data}")
 
-            agent.event_bus.subscribe(EventCategory.TOOL, on_tool_event)
+            # Subscribe to all tool events
+            agent.event_bus.backend.subscribe("tool.*", on_tool_event)
         """
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
@@ -699,10 +699,23 @@ class Agent:
         if not event_bus:
             return None
 
-        from victor.observability import EventCategory
+        # Map category to topic pattern for canonical event system
+        topic_mapping = {
+            "TOOL": "tool.*",
+            "STATE": "state.*",
+            "MODEL": "model.*",
+            "ERROR": "error.*",
+            "LIFECYCLE": "lifecycle.*",
+        }
 
-        category_enum = EventCategory[category.upper()]
-        return event_bus.subscribe(category_enum, handler)
+        topic_pattern = topic_mapping.get(category.upper())
+        if not topic_pattern:
+            raise ValueError(
+                f"Unknown event category: {category}. Valid categories: {list(topic_mapping.keys())}"
+            )
+
+        # Subscribe using canonical event system
+        return event_bus.backend.subscribe(topic_pattern, handler)
 
     # =========================================================================
     # CQRS Integration
@@ -879,8 +892,6 @@ class Agent:
                 context={"data_file": "sales.csv"}
             )
         """
-        from victor.workflows.executor import WorkflowExecutor
-
         # Check if vertical is configured
         if not self._vertical:
             raise AgentError("No vertical configured. Create agent with vertical= parameter.")
@@ -890,19 +901,12 @@ class Agent:
         if not workflow_provider:
             raise AgentError(f"Vertical '{self._vertical.name}' does not provide workflows.")
 
-        # Get the workflow definition
-        workflow = workflow_provider.get_workflow(workflow_name)
-        if not workflow:
-            available = workflow_provider.get_workflow_names()
-            raise AgentError(
-                f"Workflow '{workflow_name}' not found. " f"Available: {', '.join(available)}"
-            )
+        # Use canonical API: run_compiled_workflow (uses UnifiedWorkflowCompiler internally)
+        result = await workflow_provider.run_compiled_workflow(
+            workflow_name, context or {}, timeout=timeout
+        )
 
-        # Create executor and run workflow
-        executor = WorkflowExecutor(self._orchestrator)
-        result = await executor.execute(workflow, context, timeout=timeout)
-
-        return result.to_dict()
+        return result
 
     async def run_team(
         self,

@@ -1,0 +1,548 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Agentic Benchmark Workflows
+# ===========================
+# Workflows for agentic code benchmarks that require real-time execution,
+# environment interaction, and iterative problem-solving.
+# Supports: LiveCodeBench, BigCodeBench, AIDER_POLYGLOT
+
+workflows:
+  # ===========================================================================
+  # LiveCodeBench Workflow
+  # ===========================================================================
+  live_code_bench:
+    description: "Live code execution benchmark with real-time feedback"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: agentic
+      benchmark_type: live_code_bench
+      complexity: high
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Parse Task
+      # =====================================================================
+      - id: parse_task
+        type: agent
+        name: "Parse Task Specification"
+        role: analyst
+        goal: |
+          Analyze the benchmark task specification:
+          1. Understand the problem statement
+          2. Identify input/output format
+          3. Note any constraints or edge cases
+          4. Determine programming language requirements
+          5. Extract example test cases if available
+        tool_budget: 10
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        output: task_analysis
+        next: [setup_environment]
+
+      # =====================================================================
+      # Stage 2: Environment Setup
+      # =====================================================================
+      - id: setup_environment
+        type: compute
+        name: "Setup Execution Environment"
+        handler: environment_setup
+        inputs:
+          language: $ctx.language
+          dependencies: $ctx.dependencies
+          workspace: $ctx.workspace_path
+        output: env_setup
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [plan_solution]
+
+      # =====================================================================
+      # Stage 3: Plan Solution
+      # =====================================================================
+      - id: plan_solution
+        type: agent
+        name: "Plan Solution"
+        role: planner
+        goal: |
+          Create a solution plan:
+          1. Design the algorithm or approach
+          2. Consider time/space complexity
+          3. Handle edge cases
+          4. Plan for testing strategy
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          analysis: task_analysis
+        output: solution_plan
+        next: [generate_code]
+
+      # =====================================================================
+      # Stage 4: Generate Code
+      # =====================================================================
+      - id: generate_code
+        type: agent
+        name: "Generate Solution Code"
+        role: executor
+        goal: |
+          Implement the solution according to the plan:
+          1. Write clean, efficient code
+          2. Follow language idioms
+          3. Include necessary imports
+          4. Handle edge cases
+        tool_budget: 25
+        tools: [write, edit, read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          plan: solution_plan
+          analysis: task_analysis
+        output: solution_code
+        next: [execute_live]
+
+      # =====================================================================
+      # Stage 5: Live Execution
+      # =====================================================================
+      - id: execute_live
+        type: compute
+        name: "Execute Code Live"
+        handler: live_executor
+        inputs:
+          code: $ctx.solution_code
+          language: $ctx.language
+          test_input: $ctx.test_input
+          timeout: 30
+        output: execution_result
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        next: [check_execution]
+
+      - id: check_execution
+        type: condition
+        name: "Check Execution Result"
+        condition: "test_execution_status"
+        branches:
+          "passed": submit_solution
+          "failed": analyze_error
+          "timeout": analyze_error
+          "runtime_error": analyze_error
+
+      # =====================================================================
+      # Stage 6: Error Analysis and Retry
+      # =====================================================================
+      - id: analyze_error
+        type: agent
+        name: "Analyze Execution Error"
+        role: analyst
+        goal: |
+          Analyze why the execution failed:
+          1. Parse error messages
+          2. Identify the root cause
+          3. Determine fix approach
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          result: execution_result
+          code: solution_code
+        output: error_analysis
+        next: [should_retry]
+
+      - id: should_retry
+        type: condition
+        name: "Should Retry"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": refine_code
+          "submit_best_effort": submit_solution
+          "escalate": submit_solution
+
+      - id: refine_code
+        type: agent
+        name: "Refine Code"
+        role: executor
+        goal: |
+          Fix the code based on error analysis:
+          1. Address the identified issues
+          2. Maintain algorithm correctness
+          3. Improve edge case handling
+        tool_budget: 20
+        tools: [edit, read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          error: error_analysis
+          code: solution_code
+        output: solution_code
+        next: [increment_iteration]
+
+      - id: increment_iteration
+        type: transform
+        name: "Increment Iteration"
+        transform: |
+          fix_iterations = ctx.get("fix_iterations", 0) + 1
+        next: [execute_live]
+
+      # =====================================================================
+      # Stage 7: Submit
+      # =====================================================================
+      - id: submit_solution
+        type: transform
+        name: "Submit Solution"
+        transform: |
+          status = "completed"
+          submitted_code = ctx.get("solution_code", "")
+
+
+  # ===========================================================================
+  # BigCodeBench Workflow
+  # ===========================================================================
+  big_code_bench:
+    description: "Large-scale code understanding and generation benchmark"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: agentic
+      benchmark_type: big_code_bench
+      complexity: very_high
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Understand Context
+      # =====================================================================
+      - id: understand_context
+        type: agent
+        name: "Understand Codebase Context"
+        role: researcher
+        goal: |
+          Build comprehensive understanding of the code context:
+          1. Analyze project structure
+          2. Understand existing APIs and patterns
+          3. Identify relevant modules
+          4. Note coding conventions
+        tool_budget: 40
+        tools: [read, grep, code_search, symbol, refs]
+        llm_config:
+          temperature: 0.2
+        output: context_understanding
+        next: [analyze_task]
+
+      # =====================================================================
+      # Stage 2: Analyze Task
+      # =====================================================================
+      - id: analyze_task
+        type: agent
+        name: "Analyze Task Requirements"
+        role: analyst
+        goal: |
+          Deeply analyze what needs to be done:
+          1. Parse the task description
+          2. Identify all requirements
+          3. Map to existing code locations
+          4. List dependencies to consider
+        tool_budget: 20
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          context: context_understanding
+        output: task_requirements
+        next: [check_complexity]
+
+      - id: check_complexity
+        type: condition
+        name: "Check Task Complexity"
+        condition: "code_complexity_check"
+        branches:
+          "simple": direct_implementation
+          "moderate": plan_then_implement
+          "complex": multi_step_implementation
+
+      # =====================================================================
+      # Stage 3a: Simple Path
+      # =====================================================================
+      - id: direct_implementation
+        type: agent
+        name: "Direct Implementation"
+        role: executor
+        goal: |
+          Implement the simple change directly:
+          1. Make minimal, focused changes
+          2. Follow existing patterns
+        tool_budget: 20
+        tools: [read, edit, write]
+        llm_config:
+          temperature: 0.1
+        output: implementation_result
+        next: [run_verification]
+
+      # =====================================================================
+      # Stage 3b: Moderate Path
+      # =====================================================================
+      - id: plan_then_implement
+        type: agent
+        name: "Plan and Implement"
+        role: planner
+        goal: |
+          Plan and implement the changes:
+          1. Create a focused implementation plan
+          2. Execute the plan step by step
+        tool_budget: 35
+        tools: [read, edit, write, grep]
+        llm_config:
+          temperature: 0.2
+        output: implementation_result
+        next: [run_verification]
+
+      # =====================================================================
+      # Stage 3c: Complex Path
+      # =====================================================================
+      - id: multi_step_implementation
+        type: agent
+        name: "Multi-Step Implementation"
+        role: architect
+        goal: |
+          Implement complex changes in stages:
+          1. Break down into components
+          2. Implement each component
+          3. Integrate components
+          4. Ensure consistency
+        tool_budget: 60
+        tools: [read, edit, write, grep, code_search, symbol]
+        llm_config:
+          temperature: 0.2
+        output: implementation_result
+        next: [run_verification]
+
+      # =====================================================================
+      # Stage 4: Verification
+      # =====================================================================
+      - id: run_verification
+        type: compute
+        name: "Run Verification"
+        handler: test_runner
+        inputs:
+          test_command: $ctx.test_command
+          timeout: 300
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 360
+        next: [check_verification]
+
+      - id: check_verification
+        type: condition
+        name: "Check Verification"
+        condition: "verification_status"
+        branches:
+          "passed": format_output
+          "failed": fix_issues
+          "partial": fix_issues
+
+      - id: fix_issues
+        type: agent
+        name: "Fix Issues"
+        role: executor
+        goal: |
+          Address verification failures:
+          1. Analyze failure reasons
+          2. Apply fixes
+        tool_budget: 30
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.2
+        output: implementation_result
+        next: [should_continue]
+
+      - id: should_continue
+        type: condition
+        name: "Should Continue"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": run_verification
+          "submit_best_effort": format_output
+          "escalate": format_output
+
+      # =====================================================================
+      # Stage 5: Output
+      # =====================================================================
+      - id: format_output
+        type: transform
+        name: "Format Output"
+        transform: |
+          status = "completed"
+          solution_code = ctx.get("implementation_result", "")
+
+
+  # ===========================================================================
+  # AIDER Polyglot Workflow
+  # ===========================================================================
+  aider_polyglot:
+    description: "Multi-language code modification benchmark"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: benchmark
+      category: agentic
+      benchmark_type: aider_polyglot
+      complexity: high
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Language Detection
+      # =====================================================================
+      - id: detect_language
+        type: compute
+        name: "Detect Language"
+        handler: language_detector
+        inputs:
+          files: $ctx.files
+        output: language_info
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        next: [read_context]
+
+      # =====================================================================
+      # Stage 2: Read Context
+      # =====================================================================
+      - id: read_context
+        type: agent
+        name: "Read Context"
+        role: researcher
+        goal: |
+          Understand the code context:
+          1. Read relevant files
+          2. Understand the codebase structure
+          3. Identify patterns and conventions
+        tool_budget: 25
+        tools: [read, grep, code_search]
+        llm_config:
+          temperature: 0.2
+        output: code_context
+        next: [understand_change]
+
+      # =====================================================================
+      # Stage 3: Understand Change
+      # =====================================================================
+      - id: understand_change
+        type: agent
+        name: "Understand Required Change"
+        role: analyst
+        goal: |
+          Understand what change is needed:
+          1. Parse the change request
+          2. Map to specific files/locations
+          3. Identify scope of change
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          context: code_context
+        output: change_plan
+        next: [apply_change]
+
+      # =====================================================================
+      # Stage 4: Apply Change
+      # =====================================================================
+      - id: apply_change
+        type: agent
+        name: "Apply Code Change"
+        role: executor
+        goal: |
+          Apply the required change:
+          1. Make precise, focused edits
+          2. Respect language conventions
+          3. Maintain code quality
+        tool_budget: 30
+        tools: [read, edit, write]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          plan: change_plan
+          context: code_context
+        output: changed_code
+        next: [verify_change]
+
+      # =====================================================================
+      # Stage 5: Verify Change
+      # =====================================================================
+      - id: verify_change
+        type: compute
+        name: "Verify Change"
+        handler: polyglot_verifier
+        inputs:
+          language: $ctx.language_info.primary
+          files: $ctx.files
+          test_command: $ctx.test_command
+        output: verification_result
+        constraints:
+          llm_allowed: false
+          timeout: 180
+        next: [check_result]
+
+      - id: check_result
+        type: condition
+        name: "Check Result"
+        condition: "verification_status"
+        branches:
+          "passed": complete
+          "failed": refine_change
+          "partial": refine_change
+
+      - id: refine_change
+        type: agent
+        name: "Refine Change"
+        role: executor
+        goal: |
+          Fix issues with the change:
+          1. Address verification failures
+          2. Maintain code correctness
+        tool_budget: 20
+        tools: [read, edit]
+        llm_config:
+          temperature: 0.2
+        output: changed_code
+        next: [should_retry]
+
+      - id: should_retry
+        type: condition
+        name: "Should Retry"
+        condition: "should_continue_fixing"
+        branches:
+          "continue_fixing": verify_change
+          "submit_best_effort": complete
+          "escalate": complete
+
+      # =====================================================================
+      # Stage 6: Complete
+      # =====================================================================
+      - id: complete
+        type: transform
+        name: "Complete"
+        transform: |
+          status = "completed"
+          solution_code = ctx.get("changed_code", "")

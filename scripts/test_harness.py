@@ -166,7 +166,7 @@ class SlashCommandTester:
 
         start = time.perf_counter()
         try:
-            result = await self._handler.execute(full_command)
+            await self._handler.execute(full_command)
             duration = (time.perf_counter() - start) * 1000
             output = self._capture.get_output()
 
@@ -245,7 +245,7 @@ class VerticalTester:
             vertical_cls = loader.load(vertical)
 
             # Get vertical info
-            config = loader.get_config()
+            loader.get_config()
             tools = loader.get_tools()
             prompt = loader.get_system_prompt()
 
@@ -476,20 +476,16 @@ class LiveChatTester:
 
         start = time.perf_counter()
         try:
-            response = await asyncio.wait_for(
+            await asyncio.wait_for(
                 self._agent.chat(prompt),
                 timeout=timeout,
             )
             duration = (time.perf_counter() - start) * 1000
 
-            content = getattr(response, "content", str(response))
-            if not content:
-                content = str(response)
-
             return TestResult(
                 name=f"chat: {prompt[:30]}...",
                 passed=True,
-                output=content[:500] + ("..." if len(content) > 500 else ""),
+                output="Chat completed successfully",
                 duration_ms=duration,
             )
         except asyncio.TimeoutError:
@@ -524,7 +520,7 @@ class LiveChatTester:
 
         start = time.perf_counter()
         try:
-            response = await asyncio.wait_for(
+            await asyncio.wait_for(
                 self._agent.chat(prompt),
                 timeout=timeout,
             )

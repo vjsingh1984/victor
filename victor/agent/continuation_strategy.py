@@ -27,9 +27,9 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from victor.observability.event_bus import EventBus, EventCategory, VictorEvent
+from victor.core.events import ObservabilityBus
 from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
-from victor.embeddings.question_classifier import (
+from victor.storage.embeddings.question_classifier import (
     QuestionTypeClassifier,
     QuestionType,
     classify_question,
@@ -112,13 +112,57 @@ class ContinuationStrategy:
     Extracted from CRITICAL-001 Phase 2E.
     """
 
-    def __init__(self, event_bus: Optional[EventBus] = None):
+    def __init__(self, event_bus: Optional[ObservabilityBus] = None):
         """Initialize continuation strategy.
 
         Args:
-            event_bus: Optional EventBus instance. If None, uses singleton.
+            event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
-        self._event_bus = event_bus or EventBus.get_instance()
+        self._event_bus = event_bus or self._get_default_bus()
+
+    def _get_default_bus(self) -> Optional[ObservabilityBus]:
+        """Get default ObservabilityBus from DI container.
+
+        Returns:
+            ObservabilityBus instance or None if unavailable
+        """
+        try:
+            from victor.core.events import get_observability_bus
+
+            return get_observability_bus()
+        except Exception:
+            return None
+
+    def _emit_event(
+        self, topic: str, data: Dict[str, Any], source: str = "ContinuationStrategy"
+    ) -> None:
+        """Emit event with error handling (non-blocking).
+
+        Args:
+            topic: Event topic
+            data: Event data
+            source: Event source
+        """
+        if self._event_bus:
+            try:
+                import asyncio
+
+                # Check if there's a running event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Non-blocking async call in sync context
+                    loop.create_task(
+                        self._event_bus.emit(
+                            topic=topic,
+                            data={**data, "category": "state"},  # Preserve for observability
+                            source=source,
+                        )
+                    )
+                except RuntimeError:
+                    # No event loop running, skip event emission
+                    logger.debug(f"No event loop, skipping event emission for {topic}")
+            except Exception as e:
+                logger.debug(f"Failed to emit continuation event: {e}")
 
     @staticmethod
     def detect_mentioned_tools(
@@ -226,6 +270,8 @@ class ContinuationStrategy:
         model: str,
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
+        # Task Completion Detection
+        task_completion_detector: Any,
         task_completion_signals: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
@@ -251,6 +297,7 @@ class ContinuationStrategy:
             model: Model name for RL lookups
             tool_budget: Current tool budget
             unified_tracker_config: Config dict from unified tracker
+            task_completion_detector: TaskCompletionDetector instance for signal-based completion
             task_completion_signals: Optional signals for task completion detection
 
         Returns:
@@ -262,9 +309,45 @@ class ContinuationStrategy:
             - reason: str - Human-readable reason for the action
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
         """
-        from victor.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType
+        from victor.agent.task_completion import CompletionConfidence
 
         updates: Dict[str, Any] = {}
+
+        # Task Completion Detection: Check detector confidence level for continuation decision
+        # Priority: HIGH confidence (active signal) > MEDIUM confidence > other logic
+        confidence = task_completion_detector.get_completion_confidence()
+
+        # HIGH confidence: Active signal detected - finish immediately
+        if confidence == CompletionConfidence.HIGH:
+            logger.info(
+                "ContinuationStrategy: HIGH confidence from TaskCompletionDetector - finishing"
+            )
+            self._emit_event(
+                topic="state.continuation.task_complete",
+                data={
+                    "reason": "task_completion_detector_high_confidence",
+                    "confidence": "HIGH",
+                    "source": "TaskCompletionDetector",
+                },
+            )
+            return {
+                "action": "finish",
+                "message": None,
+                "reason": "Task completion: HIGH confidence (active signal detected)",
+                "updates": updates,
+            }
+
+        # MEDIUM confidence: File modifications + passive signal - log but continue with other checks
+        if confidence == CompletionConfidence.MEDIUM:
+            logger.info(
+                "ContinuationStrategy: MEDIUM confidence from TaskCompletionDetector - "
+                "file modifications + passive signal detected"
+            )
+            # MEDIUM confidence doesn't force completion, but informs the decision
+            # Continue with other checks (intent, continuation prompts, etc.)
+
+        # LOW/NONE confidence: No completion signal - proceed with normal logic
 
         # TASK COMPLETION CHECK: If all required files read and output requirements met,
         # finish immediately to prevent prompting loop (prompting loop fix)
@@ -287,18 +370,14 @@ class ContinuationStrategy:
                         "Task completion detected: all required files read and "
                         "output requirements met - finishing"
                     )
-                    self._event_bus.publish(
-                        VictorEvent(
-                            category=EventCategory.STATE,
-                            name="continuation.task_complete",
-                            data={
-                                "reason": "task_completion_detected",
-                                "required_files": list(required_files),
-                                "read_files": list(read_files),
-                                "output_requirements": required_outputs,
-                            },
-                            source="ContinuationStrategy",
-                        )
+                    self._emit_event(
+                        topic="state.continuation.task_complete",
+                        data={
+                            "reason": "task_completion_detected",
+                            "required_files": list(required_files),
+                            "read_files": list(read_files),
+                            "output_requirements": required_outputs,
+                        },
                     )
                     return {
                         "action": "finish",
@@ -315,18 +394,14 @@ class ContinuationStrategy:
                         f"Synthesis nudge: all {len(required_files)} required files read, "
                         f"but output not yet produced (nudge {synthesis_nudge_count + 1}/3)"
                     )
-                    self._event_bus.publish(
-                        VictorEvent(
-                            category=EventCategory.STATE,
-                            name="continuation.synthesis_nudge",
-                            data={
-                                "required_files": list(required_files),
-                                "read_files": list(read_files),
-                                "required_outputs": required_outputs,
-                                "nudge_count": synthesis_nudge_count + 1,
-                            },
-                            source="ContinuationStrategy",
-                        )
+                    self._emit_event(
+                        topic="state.continuation.synthesis_nudge",
+                        data={
+                            "required_files": list(required_files),
+                            "read_files": list(read_files),
+                            "required_outputs": required_outputs,
+                            "nudge_count": synthesis_nudge_count + 1,
+                        },
                     )
                     updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
 
@@ -353,16 +428,12 @@ class ContinuationStrategy:
                     f"Stage cycling detected (cycle_count={cycle_count}) - "
                     "forcing synthesis to prevent infinite exploration"
                 )
-                self._event_bus.publish(
-                    VictorEvent(
-                        category=EventCategory.STATE,
-                        name="continuation.cycle_force_synthesis",
-                        data={
-                            "cycle_count": cycle_count,
-                            "required_outputs": required_outputs,
-                        },
-                        source="ContinuationStrategy",
-                    )
+                self._emit_event(
+                    topic="state.continuation.cycle_force_synthesis",
+                    data={
+                        "cycle_count": cycle_count,
+                        "required_outputs": required_outputs,
+                    },
                 )
                 output_hints = (
                     ", ".join(required_outputs[:3]) if required_outputs else "your findings"
@@ -389,17 +460,13 @@ class ContinuationStrategy:
                     f"Cumulative prompt interventions ({cumulative_interventions}) reached threshold - "
                     "nudging synthesis"
                 )
-                self._event_bus.publish(
-                    VictorEvent(
-                        category=EventCategory.STATE,
-                        name="continuation.cumulative_intervention_nudge",
-                        data={
-                            "cumulative_interventions": cumulative_interventions,
-                            "required_outputs": required_outputs,
-                            "read_files_count": len(read_files),
-                        },
-                        source="ContinuationStrategy",
-                    )
+                self._emit_event(
+                    topic="state.continuation.cumulative_intervention_nudge",
+                    data={
+                        "cumulative_interventions": cumulative_interventions,
+                        "required_outputs": required_outputs,
+                        "read_files_count": len(read_files),
+                    },
                 )
                 output_hints = (
                     ", ".join(required_outputs[:3]) if required_outputs else "your findings"
@@ -435,16 +502,12 @@ class ContinuationStrategy:
         if max_prompts_summary_requested:
             logger.info("Summary was already requested - finishing to prevent duplicate output")
             # Emit STATE event for continuation decision
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.finish",
-                    data={
-                        "reason": "summary_already_requested",
-                        "continuation_prompts": continuation_prompts,
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.finish",
+                data={
+                    "reason": "summary_already_requested",
+                    "continuation_prompts": continuation_prompts,
+                },
             )
             return {
                 "action": "finish",
@@ -476,16 +539,12 @@ class ContinuationStrategy:
                 recoverable=True,
             )
             # Emit STATE event for continuation decision
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.request_summary",
-                    data={
-                        "reason": "stuck_loop_detected",
-                        "continuation_prompts": 99,  # Force max
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.request_summary",
+                data={
+                    "reason": "stuck_loop_detected",
+                    "continuation_prompts": 99,  # Force max
+                },
             )
             return {
                 "action": "request_summary",
@@ -587,18 +646,14 @@ class ContinuationStrategy:
                     f"Extracted tool call: {extracted_call.tool_name} with confidence "
                     f"{extracted_call.confidence:.2f}. Will execute automatically."
                 )
-                self._event_bus.publish(
-                    VictorEvent(
-                        category=EventCategory.STATE,
-                        name="continuation.execute_extracted_tool",
-                        data={
-                            "tool_name": extracted_call.tool_name,
-                            "arguments": extracted_call.arguments,
-                            "confidence": extracted_call.confidence,
-                            "mentioned_tools": mentioned_tools,
-                        },
-                        source="ContinuationStrategy",
-                    )
+                self._emit_event(
+                    topic="state.continuation.execute_extracted_tool",
+                    data={
+                        "tool_name": extracted_call.tool_name,
+                        "arguments": extracted_call.arguments,
+                        "confidence": extracted_call.confidence,
+                        "mentioned_tools": mentioned_tools,
+                    },
                 )
                 return {
                     "action": "execute_extracted_tool",
@@ -625,17 +680,13 @@ class ContinuationStrategy:
                 recoverable=True,
             )
             # Emit STATE event for continuation decision
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.force_tool_execution",
-                    data={
-                        "reason": "hallucinated_tool_calls",
-                        "mentioned_tools": mentioned_tools,
-                        "extraction_failed": True,
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.force_tool_execution",
+                data={
+                    "reason": "hallucinated_tool_calls",
+                    "mentioned_tools": mentioned_tools,
+                    "extraction_failed": True,
+                },
             )
             return {
                 "action": "force_tool_execution",
@@ -666,18 +717,14 @@ class ContinuationStrategy:
             question_result = classify_question(full_content or "")
 
             # Emit event for observability
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.question_classified",
-                    data={
-                        "question_type": question_result.question_type.value,
-                        "confidence": question_result.confidence,
-                        "should_auto_continue": question_result.should_auto_continue,
-                        "matched_pattern": question_result.matched_pattern,
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.question_classified",
+                data={
+                    "question_type": question_result.question_type.value,
+                    "confidence": question_result.confidence,
+                    "should_auto_continue": question_result.should_auto_continue,
+                    "matched_pattern": question_result.matched_pattern,
+                },
             )
 
             # If question requires actual user input, return to user immediately
@@ -741,16 +788,12 @@ class ContinuationStrategy:
         if is_completion:
             logger.info("Model indicated completion - finishing")
             # Emit STATE event for completion
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.finish",
-                    data={
-                        "reason": "completion_intent",
-                        "intent": "COMPLETION",
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.finish",
+                data={
+                    "reason": "completion_intent",
+                    "intent": "COMPLETION",
+                },
             )
             return {
                 "action": "finish",
@@ -808,17 +851,13 @@ class ContinuationStrategy:
                 },
             )
             # Emit STATE event for summary request
-            self._event_bus.publish(
-                VictorEvent(
-                    category=EventCategory.STATE,
-                    name="continuation.request_summary",
-                    data={
-                        "reason": "max_prompts_reached",
-                        "continuation_prompts": continuation_prompts,
-                        "max_continuation_prompts": max_continuation_prompts,
-                    },
-                    source="ContinuationStrategy",
-                )
+            self._emit_event(
+                topic="state.continuation.request_summary",
+                data={
+                    "reason": "max_prompts_reached",
+                    "continuation_prompts": continuation_prompts,
+                    "max_continuation_prompts": max_continuation_prompts,
+                },
             )
             updates["max_prompts_summary_requested"] = True
             return {

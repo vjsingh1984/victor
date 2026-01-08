@@ -1,0 +1,80 @@
+flowchart TB
+    subgraph Clients["CLIENT LAYER"]
+        direction LR
+        CLI["CLI/TUI"]
+        HTTP["HTTP API<br/>victor serve"]
+        MCP["MCP Server<br/>victor mcp"]
+    end
+
+    subgraph Orchestration["ORCHESTRATION LAYER"]
+        direction LR
+        Orch["Agent Orchestrator<br/>(Facade Pattern)"]
+        Conv["Conversation Controller<br/>(History & Context)"]
+        ToolPipe["Tool Pipeline<br/>(Validation & Execution)"]
+        StreamCtrl["Streaming Controller<br/>(Async Coordination)"]
+        ProvMgr["Provider Manager<br/>(Switching & Health)"]
+    end
+
+    subgraph Core["CORE LAYER"]
+        direction LR
+        Prov["Providers (21)<br/>Anthropic, OpenAI, Ollama..."]
+        Tools["Tools (55+)<br/>File, Git, Testing..."]
+        WFs["Workflows<br/>YAML DSL & Executor"]
+        Verts["Verticals (5)<br/>Coding, DevOps, RAG..."]
+    end
+
+    subgraph Infra["INFRASTRUCTURE LAYER"]
+        direction LR
+        DI["DI Container<br/>(Service Resolution)"]
+        Events["Event Bus<br/>(Event Sourcing)"]
+        Config["Configuration<br/>(Profiles & Settings)"]
+        Storage["Storage<br/>(Cache & Conversations)"]
+        Bootstrap["Bootstrap<br/>(System Initialization)"]
+    end
+
+    %% Client to Orchestration connections
+    CLI --> Orch
+    HTTP --> Orch
+    MCP --> Orch
+
+    %% Orchestration internal connections
+    Orch --> Conv
+    Orch --> ToolPipe
+    Orch --> StreamCtrl
+    Orch --> ProvMgr
+
+    Conv --> ToolPipe
+    ProvMgr --> Prov
+
+    %% Orchestration to Core connections
+    ToolPipe --> Tools
+    ProvMgr --> Prov
+    Orch --> WFs
+    Orch --> Verts
+
+    %% Core to Infrastructure connections
+    Prov --> Events
+    Tools --> Events
+    WFs --> Events
+    Verts --> Events
+
+    Prov --> Config
+    Tools --> Config
+    WFs --> Storage
+
+    %% Infrastructure internal connections
+    Bootstrap --> DI
+    DI --> Config
+    DI --> Events
+    DI --> Storage
+
+    %% Styling
+    classDef clientStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    classDef orchestrationStyle fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    classDef coreStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
+    classDef infraStyle fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+
+    class CLI,HTTP,MCP clientStyle
+    class Orch,Conv,ToolPipe,StreamCtrl,ProvMgr orchestrationStyle
+    class Prov,Tools,WFs,Verts coreStyle
+    class DI,Events,Config,Storage,Bootstrap infraStyle

@@ -20,7 +20,7 @@ import asyncio
 import logging
 import socket
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
@@ -100,14 +100,14 @@ class BaseServiceProvider(ABC):
         """
         handle = await self._do_start(config)
         handle.state = ServiceState.STARTING
-        handle.started_at = datetime.utcnow()
+        handle.started_at = datetime.now(timezone.utc)
 
         # Wait for health check if configured
         if config.health_check:
             try:
                 await self._wait_for_healthy(handle, config.health_check)
                 handle.state = ServiceState.HEALTHY
-                handle.healthy_at = datetime.utcnow()
+                handle.healthy_at = datetime.now(timezone.utc)
             except ServiceHealthError:
                 handle.state = ServiceState.UNHEALTHY
                 # Try to cleanup
@@ -119,7 +119,7 @@ class BaseServiceProvider(ABC):
         else:
             # No health check - assume healthy immediately
             handle.state = ServiceState.HEALTHY
-            handle.healthy_at = datetime.utcnow()
+            handle.healthy_at = datetime.now(timezone.utc)
 
         # Resolve export templates
         handle.connection_info = handle.resolve_exports()
