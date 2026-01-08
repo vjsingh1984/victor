@@ -407,7 +407,7 @@ class TestCanonicalWorkflowAPI:
             try:
                 async for _ in provider.stream_compiled_workflow("nonexistent", {}):
                     pass
-                assert False, f"{name} provider should have raised ValueError"
+                pytest.fail(f"{name} provider should have raised ValueError")
             except ValueError as e:
                 assert "Unknown workflow: nonexistent" in str(e)
 

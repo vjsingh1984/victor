@@ -180,16 +180,16 @@ def vllm_server():
     finally:
         # Clean up: shut down vLLM server
         if vllm_process:
-            print(f"\n🛑 Shutting down vLLM server...")
+            print("\n🛑 Shutting down vLLM server...")
             try:
                 vllm_process.terminate()
                 vllm_process.wait(timeout=10)
-                print(f"✅ vLLM server shut down successfully")
+                print("✅ vLLM server shut down successfully")
             except subprocess.TimeoutExpired:
-                print(f"⚠️  vLLM server did not shut down gracefully, forcing...")
+                print("⚠️  vLLM server did not shut down gracefully, forcing...")
                 vllm_process.kill()
                 vllm_process.wait()
-                print(f"✅ vLLM server forcefully shut down")
+                print("✅ vLLM server forcefully shut down")
             except Exception as e:
                 print(f"❌ Error shutting down vLLM server: {e}")
 
