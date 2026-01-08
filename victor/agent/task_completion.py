@@ -599,35 +599,67 @@ class TaskCompletionDetector:
         response_lower = response_text.lower()
 
         # Check for blocked signals first
-        blocked_signals = ["_blocked_", "_cannot_complete_", "i cannot", "i'm unable to", "unable to complete"]
+        blocked_signals = [
+            "_blocked_",
+            "_cannot_complete_",
+            "i cannot",
+            "i'm unable to",
+            "unable to complete",
+        ]
         if any(signal in response_lower for signal in blocked_signals):
             return ResponsePhase.BLOCKED
 
         # Check for final output signals (active completion signals + delivery phrases)
         final_output_indicators = [
-            "_done_", "_task_done_", "_summary_",
-            "task complete:", "done:", "summary:",
-            "here's the", "here is the", "i've created", "i have created",
-            "the file is now", "the implementation is", "successfully created",
+            "_done_",
+            "_task_done_",
+            "_summary_",
+            "task complete:",
+            "done:",
+            "summary:",
+            "here's the",
+            "here is the",
+            "i've created",
+            "i have created",
+            "the file is now",
+            "the implementation is",
+            "successfully created",
         ]
         if any(indicator in response_lower for indicator in final_output_indicators):
             return ResponsePhase.FINAL_OUTPUT
 
         # Check for synthesis phase (summarizing, preparing output)
         synthesis_indicators = [
-            "in summary", "to summarize", "in conclusion",
-            "let me summarize", "here's what i found", "here is what i found",
-            "based on my analysis", "after reviewing", "having examined",
+            "in summary",
+            "to summarize",
+            "in conclusion",
+            "let me summarize",
+            "here's what i found",
+            "here is what i found",
+            "based on my analysis",
+            "after reviewing",
+            "having examined",
         ]
         if any(indicator in response_lower for indicator in synthesis_indicators):
             return ResponsePhase.SYNTHESIS
 
         # Check for exploration phase (reading, searching)
         exploration_indicators = [
-            "let me read", "let me check", "let me search", "let me look",
-            "i'll read", "i'll check", "i'll search", "i'll examine",
-            "reading", "searching", "looking at", "examining",
-            "first, i need to", "let me start by", "i'll start by",
+            "let me read",
+            "let me check",
+            "let me search",
+            "let me look",
+            "i'll read",
+            "i'll check",
+            "i'll search",
+            "i'll examine",
+            "reading",
+            "searching",
+            "looking at",
+            "examining",
+            "first, i need to",
+            "let me start by",
+            "i'll start by",
         ]
         if any(indicator in response_lower for indicator in exploration_indicators):
             return ResponsePhase.EXPLORATION
