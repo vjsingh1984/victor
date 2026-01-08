@@ -130,8 +130,12 @@ class TestSessionsCommand:
         sessions = json.loads(result.stdout)
         assert isinstance(sessions, list)
         # Filter to only sessions created by sample_persistence fixture
-        sample_sessions = [s for s in sessions if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]]
-        assert len(sample_sessions) == 2, f"Expected 2 sample sessions but found {len(sample_sessions)}. Total sessions: {len(sessions)}"
+        sample_sessions = [
+            s for s in sessions if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+        ]
+        assert (
+            len(sample_sessions) == 2
+        ), f"Expected 2 sample sessions but found {len(sample_sessions)}. Total sessions: {len(sessions)}"
 
         # Verify the sample sessions have the correct data
         for session in sample_sessions:
@@ -216,10 +220,13 @@ class TestSessionsCommand:
 
         # Filter to only sessions created by sample_persistence fixture
         sample_exported = [
-            s for s in exported
+            s
+            for s in exported
             if s["metadata"]["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
         ]
-        assert len(sample_exported) == 2, f"Expected 2 sample sessions but found {len(sample_exported)}. Total exported: {len(exported)}"
+        assert (
+            len(sample_exported) == 2
+        ), f"Expected 2 sample sessions but found {len(sample_exported)}. Total exported: {len(exported)}"
 
         # Check metadata structure
         assert sample_exported[0]["metadata"]["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
@@ -248,7 +255,9 @@ class TestSessionsClearCommand:
         persistence = sample_persistence
         sessions_before = persistence.list_sessions(limit=100)
         # Filter to sample sessions
-        sample_count = len([s for s in sessions_before if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]])
+        sample_count = len(
+            [s for s in sessions_before if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]]
+        )
         assert sample_count == 2
 
         # Clear all sessions
@@ -260,7 +269,9 @@ class TestSessionsClearCommand:
         # Verify sessions are deleted
         sessions_after = persistence.list_sessions(limit=100)
         # Filter to check if sample sessions are gone
-        sample_after = [s for s in sessions_after if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]]
+        sample_after = [
+            s for s in sessions_after if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+        ]
         assert len(sample_after) == 0
 
     def test_sessions_clear_with_prefix(self, runner_with_db, sample_persistence):
@@ -333,4 +344,5 @@ class TestSessionsListAllFlag:
 
         # --all should show more sessions than default
         # We can't count exact sessions in table output, but can check for specific sessions
-        assert "Extra Session" in result_all.stdout
+        # Note: Table wraps titles across lines, so check for "Extra" which appears in "Extra Session X"
+        assert "Extra" in result_all.stdout
