@@ -25,7 +25,10 @@ class TestTaskClassifierSimple:
 
     def test_list_files_simple(self):
         """Test that 'list files' is classified as SIMPLE."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("List all files in the directory")
@@ -35,7 +38,10 @@ class TestTaskClassifierSimple:
 
     def test_show_files_simple(self):
         """Test that 'show files' is classified as SIMPLE."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Show me the Python files in src/")
@@ -45,7 +51,10 @@ class TestTaskClassifierSimple:
 
     def test_git_status_simple(self):
         """Test that 'git status' is classified as SIMPLE."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Show me the current git status")
@@ -54,7 +63,10 @@ class TestTaskClassifierSimple:
 
     def test_what_files_simple(self):
         """Test that 'what files are in' is classified as SIMPLE."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("What files are in the victor/agent directory?")
@@ -67,7 +79,10 @@ class TestTaskClassifierMedium:
 
     def test_explain_file_medium(self):
         """Test that 'explain file' is classified as MEDIUM."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Explain the file victor/agent/orchestrator.py")
@@ -77,7 +92,10 @@ class TestTaskClassifierMedium:
 
     def test_find_classes_simple(self):
         """Test that 'find classes' is classified as SIMPLE (search task)."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Find all classes that inherit from BaseTool")
@@ -87,7 +105,10 @@ class TestTaskClassifierMedium:
 
     def test_where_is_simple(self):
         """Test that 'where is' is classified as SIMPLE (search task)."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Where is the error handling implemented?")
@@ -97,7 +118,10 @@ class TestTaskClassifierMedium:
 
     def test_how_does_work_medium(self):
         """Test that 'how does X work' is classified as MEDIUM."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("How does the caching mechanism work?")
@@ -114,7 +138,10 @@ class TestTaskClassifierComplex:
         Note: ANALYSIS is a more appropriate classification for codebase analysis
         tasks that require exploration rather than modification.
         """
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Analyze the entire codebase for improvements")
@@ -125,7 +152,10 @@ class TestTaskClassifierComplex:
 
     def test_refactor_complex(self):
         """Test that 'refactor' is classified as COMPLEX."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Refactor the authentication module")
@@ -138,7 +168,10 @@ class TestTaskClassifierComplex:
         Note: ANALYSIS is a more specific category for thorough/comprehensive analysis tasks,
         while COMPLEX is for tasks like refactoring or implementing new features.
         """
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Provide a comprehensive analysis of the project architecture")
@@ -152,7 +185,10 @@ class TestTaskClassifierGeneration:
 
     def test_create_function_generation(self):
         """Test that 'create a function' is classified as GENERATION."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Create a simple function that calculates factorial")
@@ -163,7 +199,10 @@ class TestTaskClassifierGeneration:
 
     def test_write_code_generation(self):
         """Test that 'write code' is classified as GENERATION."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("Write a Python script that parses JSON")
@@ -172,7 +211,10 @@ class TestTaskClassifierGeneration:
 
     def test_show_me_code_generation(self):
         """Test that 'show me code' is classified as GENERATION."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         # Disable semantic classification to avoid flaky behavior from shared singleton state
         classifier = ComplexityClassifier(use_semantic=False)
@@ -186,7 +228,10 @@ class TestTaskClassificationBehavior:
 
     def test_should_force_completion(self):
         """Test should_force_completion_after method."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("List files in the directory")
@@ -205,7 +250,10 @@ class TestTaskClassificationBehavior:
 
     def test_confidence_score(self):
         """Test that confidence score is reasonable."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("List all Python files")
@@ -214,7 +262,10 @@ class TestTaskClassificationBehavior:
 
     def test_matched_patterns_populated(self):
         """Test that matched patterns are captured."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("git status")
@@ -235,7 +286,9 @@ class TestConvenienceFunctions:
 
     def test_get_task_prompt_hint(self):
         """Test get_task_prompt_hint convenience function."""
-        from victor.framework.enrichment.strategies import get_complexity_hint as get_task_prompt_hint
+        from victor.framework.enrichment.strategies import (
+            get_complexity_hint as get_task_prompt_hint,
+        )
 
         hint = get_task_prompt_hint("List files")
         # Updated format uses [SIMPLE] instead of "Simple Query"
@@ -253,7 +306,10 @@ class TestCustomClassifier:
 
     def test_custom_budgets(self):
         """Test custom tool budgets."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         custom_budgets = {TaskComplexity.SIMPLE: 5, TaskComplexity.MEDIUM: 10}
         classifier = ComplexityClassifier(budgets=custom_budgets)
@@ -292,7 +348,10 @@ class TestEdgeCases:
 
     def test_empty_message(self):
         """Test classification of empty message."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("")
@@ -303,7 +362,10 @@ class TestEdgeCases:
 
     def test_unrecognized_message(self):
         """Test classification of unrecognized message."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         result = classifier.classify("xyzzy foobar baz")
@@ -314,7 +376,10 @@ class TestEdgeCases:
 
     def test_mixed_signals(self):
         """Test message with multiple complexity signals."""
-        from victor.framework.task import TaskComplexityService as ComplexityClassifier, TaskComplexity
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
         classifier = ComplexityClassifier()
         # "list files" is SIMPLE, "analyze" is COMPLEX
