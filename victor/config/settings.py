@@ -570,7 +570,9 @@ class Settings(BaseSettings):
     )
 
     # Task Completion Detection Enhancement (Phase 2 - Feature Flag)
-    use_signal_based_completion: bool = False  # Use signal-based completion (Phase 2 rollout)
+    # Enabled by default for production use (Phase 4 rollout)
+    # Set to False to fallback to legacy buffer/size heuristics
+    use_signal_based_completion: bool = True  # Use signal-based completion (enabled in Phase 4)
 
     # UI
     theme: str = "monokai"
