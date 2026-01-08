@@ -230,7 +230,7 @@ class StreamingRecoveryCoordinator:
                 try:
                     import asyncio
 
-                    asyncio.run(
+                    asyncio.create_task(
                         self._event_bus.emit(
                             topic="state.recovery.iteration_limit_reached",
                             data={
@@ -507,7 +507,7 @@ class StreamingRecoveryCoordinator:
             try:
                 import asyncio
 
-                asyncio.run(
+                asyncio.create_task(
                     self._event_bus.emit(
                         topic="state.recovery.force_completion",
                         data={
@@ -655,7 +655,7 @@ class StreamingRecoveryCoordinator:
             try:
                 import asyncio
 
-                asyncio.run(
+                asyncio.create_task(
                     self._event_bus.emit(
                         topic=f"state.recovery.action_{recovery_action.action}",
                         data={
