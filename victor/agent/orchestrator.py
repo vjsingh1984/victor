@@ -577,15 +577,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
 
-        # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-        # Create detector only when feature flag is enabled for gradual rollout
-        if settings.use_signal_based_completion:
-            from victor.agent.task_completion import TaskCompletionDetector
+        # Task Completion Detection: Signal-based completion detection
+        # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
+        from victor.agent.task_completion import TaskCompletionDetector
 
-            self._task_completion_detector = TaskCompletionDetector()
-            logger.info("TaskCompletionDetector initialized (signal-based completion enabled)")
-        else:
-            self._task_completion_detector = None  # Use legacy buffer/size completion
+        self._task_completion_detector = TaskCompletionDetector()
+        logger.info("TaskCompletionDetector initialized (signal-based completion)")
 
         # Context reminder manager for intelligent system message injection (via factory, DI)
         # Reduces token waste by consolidating reminders and only injecting when context changes

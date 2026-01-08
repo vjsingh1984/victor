@@ -212,6 +212,10 @@ class TestDetermineContinuationAction:
     @pytest.fixture
     def base_kwargs(self, mock_settings):
         """Create base kwargs for determine_continuation_action."""
+        from victor.agent.task_completion import TaskCompletionDetector
+
+        detector = TaskCompletionDetector()
+
         return {
             "is_analysis_task": False,
             "is_action_task": False,
@@ -228,6 +232,7 @@ class TestDetermineContinuationAction:
             "model": "gpt-4",
             "tool_budget": 50,
             "unified_tracker_config": {"max_total_iterations": 50},
+            "task_completion_detector": detector,
         }
 
     def test_finish_when_summary_already_requested(self, strategy, base_kwargs):
@@ -389,6 +394,8 @@ class TestRLCoordinator:
 
     def test_uses_rl_recommendations(self, strategy):
         """Test uses RL coordinator recommendations."""
+        from victor.agent.task_completion import TaskCompletionDetector
+
         mock_settings = MagicMock()
         mock_settings.max_continuation_prompts_analysis = 6
         mock_settings.max_continuation_prompts_action = 5
@@ -400,6 +407,8 @@ class TestRLCoordinator:
         mock_recommendation.value = 10
         mock_recommendation.confidence = 0.9
         mock_rl.get_recommendation.return_value = mock_recommendation
+
+        detector = TaskCompletionDetector()
 
         base_kwargs = {
             "is_analysis_task": True,
@@ -417,6 +426,7 @@ class TestRLCoordinator:
             "model": "gpt-4",
             "tool_budget": 50,
             "unified_tracker_config": {"max_total_iterations": 50},
+            "task_completion_detector": detector,
         }
 
         mock_intent = MagicMock()

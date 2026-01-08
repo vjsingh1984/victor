@@ -331,14 +331,10 @@ class StreamingChatHandler:
     ) -> Optional[IterationResult]:
         """Check if the response represents natural completion (substantial content, no tools).
 
-        When the model has provided substantial content without tool calls after
-        an empty response, treat it as natural completion rather than continuing
-        to attempt recovery.
-
-        **Task Completion Detection Enhancement (Phase 3)**:
-        When signal-based completion is enabled (ctx.task_completion_detector exists),
-        buffer/size heuristics are skipped in favor of explicit signal detection.
-        When disabled, traditional buffer/size heuristics are used (backward compatible).
+        Signal-based completion detection uses explicit markers (_DONE_, _TASK_DONE_)
+        instead of buffer/size heuristics. The TaskCompletionDetector handles all
+        completion detection based on explicit signals. This method is kept for
+        backward compatibility but always returns None.
 
         Args:
             ctx: The streaming context
@@ -348,20 +344,8 @@ class StreamingChatHandler:
         Returns:
             IterationResult to break if natural completion, None otherwise
         """
-        # Task Completion Detection Enhancement (Phase 3): Skip buffer/size heuristics
-        # when signal-based completion is enabled
-        if ctx.task_completion_detector is not None:
-            # Signal-based completion is active - let the detector decide
-            # Don't use buffer/size heuristics
-            return None
-
-        # Legacy buffer/size heuristics (only when signal-based completion disabled)
-        if not has_tool_calls and ctx.has_substantial_content():
-            logger.info(
-                f"Model returned empty after {ctx.total_accumulated_chars} chars of content - "
-                "treating as natural completion (skipping recovery)"
-            )
-            return create_break_result("")
+        # Signal-based completion is always active - TaskCompletionDetector handles
+        # completion detection based on explicit signals (_DONE_, _TASK_DONE_, _SUMMARY_)
         return None
 
     def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:

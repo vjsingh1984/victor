@@ -569,11 +569,6 @@ class Settings(BaseSettings):
         20  # Number of recent calls to track (increased for better coverage)
     )
 
-    # Task Completion Detection Enhancement (Phase 2 - Feature Flag)
-    # Enabled by default for production use (Phase 4 rollout)
-    # Set to False to fallback to legacy buffer/size heuristics
-    use_signal_based_completion: bool = True  # Use signal-based completion (enabled in Phase 4)
-
     # UI
     theme: str = "monokai"
     show_token_count: bool = True

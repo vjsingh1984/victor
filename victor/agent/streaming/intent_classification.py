@@ -280,37 +280,35 @@ class IntentClassificationHandler:
                 )
                 result.content_cleared = True
 
-        # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-        # Priority check: TaskCompletionDetector confidence > Intent classification
-        # Get detector from orchestrator if available
-        task_completion_detector = getattr(stream_ctx, "task_completion_detector", None)
-        if task_completion_detector:
-            from victor.agent.protocols.task_completion import CompletionConfidence
+        # Task Completion Detection: Priority check - detector confidence > intent classification
+        # HIGH confidence (active signal) skips intent classification for immediate completion
+        task_completion_detector = stream_ctx.task_completion_detector
+        from victor.agent.task_completion import CompletionConfidence
 
-            confidence = task_completion_detector.get_completion_confidence()
+        confidence = task_completion_detector.get_completion_confidence()
 
-            # HIGH confidence: Active signal detected - skip intent classification, finish immediately
-            if confidence == CompletionConfidence.HIGH:
-                logger.info(
-                    "IntentClassification: HIGH confidence from TaskCompletionDetector - "
-                    "skipping intent classification and finishing"
-                )
-                result.action = "finish"
-                result.action_result = {
-                    "action": "finish",
-                    "message": None,
-                    "reason": "Task completion: HIGH confidence (active signal detected)",
-                    "updates": {},
-                }
-                return result
+        # HIGH confidence: Active signal detected - skip intent classification, finish immediately
+        if confidence == CompletionConfidence.HIGH:
+            logger.info(
+                "IntentClassification: HIGH confidence from TaskCompletionDetector - "
+                "skipping intent classification and finishing"
+            )
+            result.action = "finish"
+            result.action_result = {
+                "action": "finish",
+                "message": None,
+                "reason": "Task completion: HIGH confidence (active signal detected)",
+                "updates": {},
+            }
+            return result
 
-            # MEDIUM confidence: File modifications + passive signal - log but continue
-            if confidence == CompletionConfidence.MEDIUM:
-                logger.info(
-                    "IntentClassification: MEDIUM confidence from TaskCompletionDetector - "
-                    "file modifications + passive signal detected, continuing with intent classification"
-                )
-                # Continue with normal intent classification flow
+        # MEDIUM confidence: File modifications + passive signal - log but continue
+        if confidence == CompletionConfidence.MEDIUM:
+            logger.info(
+                "IntentClassification: MEDIUM confidence from TaskCompletionDetector - "
+                "file modifications + passive signal detected, continuing with intent classification"
+            )
+            # Continue with normal intent classification flow
 
         # Step 2: Extract intent text (last 500 chars for pattern matching)
         intent_text = content_for_intent
@@ -437,6 +435,7 @@ class IntentClassificationHandler:
             tool_budget=self._tool_budget,
             unified_tracker_config=self._unified_tracker.config,
             task_completion_signals=task_completion_signals,
+            task_completion_detector=task_completion_detector,
         )
 
     def _apply_state_updates(
