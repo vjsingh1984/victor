@@ -105,8 +105,10 @@ class EventFileWatcher(Static):
                 f"[EventFileWatcher] Processing last {len(lines_to_process)} lines (max: {self._max_initial_load})"
             )
 
-            # Process each line
-            for idx, line in enumerate(lines_to_process):
+            # Process each line IN REVERSE ORDER (newest first) for correct display
+            # Reverse the lines so newest events are emitted first
+            reversed_lines = list(reversed(lines_to_process))
+            for idx, line in enumerate(reversed_lines):
                 line = line.strip()
                 if not line:
                     logger.debug(f"[EventFileWatcher] Line {idx}: Empty, skipping")
@@ -219,9 +221,10 @@ class EventFileWatcher(Static):
 
                     logger.debug(f"[EventFileWatcher] Read {len(new_lines)} new lines")
 
-                    # Process each new line
+                    # Process each new line IN REVERSE ORDER (newest first) for correct display
                     events_loaded = 0
-                    for line in new_lines:
+                    reversed_new_lines = list(reversed(new_lines))
+                    for line in reversed_new_lines:
                         line = line.strip()
                         if not line:
                             continue
