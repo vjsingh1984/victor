@@ -23,6 +23,7 @@ This module provides centralized metrics collection for:
 Extracted from AgentOrchestrator to improve modularity and testability.
 """
 
+import asyncio
 import logging
 import time
 import uuid
@@ -299,7 +300,7 @@ class MetricsCollector:
                     )
                 except RuntimeError:
                     # No event loop running
-                    logger.debug(f"No event loop, skipping metrics recording")
+                    logger.debug("No event loop, skipping metrics recording")
                 except Exception as e:
                     logger.debug(f"Failed to record metrics: {e}")
 

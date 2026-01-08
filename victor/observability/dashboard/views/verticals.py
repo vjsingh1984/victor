@@ -221,7 +221,8 @@ class IntegrationResultWidget(Container):
             status.update(f"[green]Loaded {len(self._results)} results from {path.name}[/]")
 
             table.clear()
-            for result in self._results[-100:]:  # Show last 100
+            # Show last 100 results in descending order (newest first)
+            for result in reversed(self._results[-100:]):
                 self._add_result_row(result)
 
             return len(self._results)

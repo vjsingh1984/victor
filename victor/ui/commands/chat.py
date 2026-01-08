@@ -248,6 +248,9 @@ def chat(
 
         automation_mode = json_output or plain or code_only
 
+        # Smart TUI detection: disable if non-interactive terminal or automation mode
+        use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
+
         # Use ERROR level for automation modes (cleaner output)
         if log_level is None and automation_mode:
             log_level = "ERROR"
@@ -306,7 +309,11 @@ def chat(
                 except Exception:
                     date_str = session["created_at"][:16]
 
-                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
                 table.add_row(
                     session["session_id"],
                     title,
@@ -428,16 +435,6 @@ def chat(
                 )
             )
             return
-
-        automation_mode = json_output or plain or code_only
-
-        # Smart TUI detection: disable if non-interactive terminal or automation mode
-        use_tui = (
-            tui
-            and not automation_mode
-            and sys.stdin.isatty()
-            and sys.stdout.isatty()
-        )
 
 
 def _run_default_interactive() -> None:
@@ -682,7 +679,9 @@ async def run_interactive(
                             conversation_state_dict
                         )
                     except Exception as e:
-                        console.print(f"[yellow]Warning:[/] Failed to restore conversation state: {e}")
+                        console.print(
+                            f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
+                        )
 
                 console.print(
                     f"[green]✓[/] Resumed session: {metadata.get('title', 'Untitled')} "

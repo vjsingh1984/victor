@@ -146,6 +146,7 @@ class ContinuationStrategy:
         if self._event_bus:
             try:
                 import asyncio
+
                 # Check if there's a running event loop
                 try:
                     loop = asyncio.get_running_loop()

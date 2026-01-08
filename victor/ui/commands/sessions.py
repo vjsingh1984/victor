@@ -67,12 +67,17 @@ def sessions_list(
             for session in sessions:
                 try:
                     from datetime import datetime
+
                     dt = datetime.fromisoformat(session["created_at"])
                     date_str = dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
                     date_str = session["created_at"][:16]
 
-                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
                 table.add_row(
                     session["session_id"],
                     title,
@@ -140,7 +145,9 @@ def sessions_show(
             if messages:
                 console.print("\n[bold]Recent Messages:[/]")
                 for msg in messages[-5:]:
-                    role_style = {"user": "cyan", "assistant": "green", "system": "dim"}.get(msg.get("role", ""), "white")
+                    role_style = {"user": "cyan", "assistant": "green", "system": "dim"}.get(
+                        msg.get("role", ""), "white"
+                    )
                     content = msg.get("content", "")
                     # Truncate long messages
                     if len(content) > 200:
@@ -184,7 +191,11 @@ def sessions_search(
             table.add_column("Messages", justify="right")
 
             for session in sessions:
-                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
                 table.add_row(
                     session["session_id"],
                     title,
@@ -265,6 +276,7 @@ def sessions_export(
         # Determine output path
         if not output:
             from datetime import datetime
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output = Path(f"victor_sessions_export_{timestamp}.json")
 

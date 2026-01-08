@@ -24,6 +24,7 @@ NOTE: This is StreamingRecoveryCoordinator, distinct from:
 The name was changed to avoid confusion between the two different classes.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -415,7 +416,7 @@ class StreamingRecoveryCoordinator:
                     )
                 except RuntimeError:
                     # No event loop running
-                    logger.debug(f"No event loop, skipping error event emission")
+                    logger.debug("No event loop, skipping error event emission")
                 except Exception as e:
                     logger.debug(f"Failed to emit empty response error event: {e}")
             # Handler sets ctx.force_completion = True when threshold exceeded
@@ -462,7 +463,7 @@ class StreamingRecoveryCoordinator:
                 )
             except RuntimeError:
                 # No event loop running
-                logger.debug(f"No event loop, skipping error event emission")
+                logger.debug("No event loop, skipping error event emission")
             except Exception as e:
                 logger.debug(f"Failed to emit blocked tool error event: {e}")
         return self.streaming_handler.handle_blocked_tool_call(
@@ -717,7 +718,7 @@ class StreamingRecoveryCoordinator:
                     )
                 except RuntimeError:
                     # No event loop running
-                    logger.debug(f"No event loop, skipping error event emission")
+                    logger.debug("No event loop, skipping error event emission")
                 except Exception as e:
                     logger.debug(f"Failed to emit abort error event: {e}")
             return StreamChunk(

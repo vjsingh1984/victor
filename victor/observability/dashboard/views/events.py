@@ -168,17 +168,20 @@ class EventTableWidget(DataTable):
     def add_event(self, event: Event) -> None:
         """Add an event to the table.
 
+        Events are displayed in descending order (newest first).
+
         Args:
             event: The VictorEvent to add
         """
-        self._events.append(event)
+        # Insert at beginning to maintain descending order
+        self._events.insert(0, event)
 
         # Remove old events if over limit
         if len(self._events) > self._max_rows:
-            self._events = self._events[-self._max_rows :]
-            self._rebuild_table()
-        else:
-            self._add_row(event)
+            self._events = self._events[: self._max_rows]
+
+        # Rebuild table
+        self._rebuild_table()
 
     def _add_row(self, event: Event) -> None:
         """Add a single row for an event."""
@@ -218,13 +221,22 @@ class EventTableWidget(DataTable):
         return str(data)[:50]
 
     def _rebuild_table(self) -> None:
-        """Rebuild the entire table from events list."""
+        """Rebuild the entire table from events list.
+
+        Displays events in descending order (newest first).
+        Events list is already in descending order.
+        """
         self.clear()
+        # Events are already in descending order (newest first)
         for event in self._events:
             self._add_row(event)
 
     def get_selected_event(self) -> Optional[Event]:
-        """Get the currently selected event."""
+        """Get the currently selected event.
+
+        Events list and table are both in descending order (newest first),
+        so cursor_row maps directly to list index.
+        """
         if self.cursor_row < len(self._events):
             return self._events[self.cursor_row]
         return None

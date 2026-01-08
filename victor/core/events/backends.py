@@ -469,6 +469,13 @@ class ObservabilityBus:
             cfg = config or BackendConfig.for_observability()
             self._backend = create_event_backend(cfg)
 
+        # Track exporters (for compatibility with old EventBus API)
+        self._exporters: List[Any] = []
+        self._exporter_handles: List[SubscriptionHandle] = []
+        self._pending_exporters: List[tuple[Any, EventHandler]] = (
+            []
+        )  # (exporter, handler) awaiting subscription
+
     @property
     def backend(self) -> IEventBackend:
         """Get underlying backend."""
@@ -481,6 +488,84 @@ class ObservabilityBus:
     async def disconnect(self) -> None:
         """Disconnect the backend."""
         await self._backend.disconnect()
+
+    def add_exporter(self, exporter: Any) -> None:
+        """Add an event exporter to the bus.
+
+        Exporters are handlers that write events to external systems
+        (files, databases, APIs). They receive all events emitted through the bus.
+
+        Note: The exporter will be subscribed on the next call to emit().
+
+        Args:
+            exporter: Exporter object with export(event) method
+        """
+
+        # Create handler for this exporter
+        async def _export_handler(event):
+            try:
+                if hasattr(exporter, "export"):
+                    await exporter.export(event)
+                elif callable(exporter):
+                    # Exporter is a callable function
+                    await exporter(event)
+            except Exception as e:
+                logger.debug(f"Exporter error: {e}")
+
+        # Store exporter and handler for subscription on next emit
+        self._exporters.append(exporter)
+        self._pending_exporters.append((exporter, _export_handler))
+
+    async def _subscribe_exporter(self, exporter: Any, handler: EventHandler) -> None:
+        """Subscribe an exporter to the event bus.
+
+        This is called asynchronously to handle subscription when event loop is available.
+
+        Args:
+            exporter: The exporter object
+            handler: The event handler for the exporter
+        """
+        # Subscribe to all events ("*" pattern)
+        try:
+            handle = await self.subscribe("*", handler)
+            # Store the handle so we can unsubscribe later
+            self._exporter_handles.append((exporter, handle))
+
+            # Remove from pending list
+            self._pending_exporters = [
+                (exp, h) for exp, h in self._pending_exporters if exp != exporter
+            ]
+        except Exception as e:
+            logger.debug(f"Failed to subscribe exporter: {e}")
+
+    def remove_exporter(self, exporter: Any) -> None:
+        """Remove an event exporter from the bus.
+
+        Args:
+            exporter: Exporter object to remove
+        """
+        # Remove from list
+        if exporter in self._exporters:
+            self._exporters.remove(exporter)
+
+        # Remove from pending
+        self._pending_exporters = [
+            (exp, h) for exp, h in self._pending_exporters if exp != exporter
+        ]
+
+        # Unsubscribe from backend (sync - deactivates subscription immediately)
+        for i, (exp, handle) in enumerate(self._exporter_handles):
+            if exp == exporter:
+                # Deactivate subscription directly (sync operation)
+                handle.is_active = False
+                # Remove from backend's subscription dict
+                if hasattr(self._backend, "_subscriptions"):
+                    with self._backend._lock:
+                        if handle.subscription_id in self._backend._subscriptions:
+                            del self._backend._subscriptions[handle.subscription_id]
+                # Remove from handles list
+                del self._exporter_handles[i]
+                break
 
     async def emit(
         self,
@@ -501,6 +586,12 @@ class ObservabilityBus:
         Returns:
             True if event was emitted
         """
+        # Process pending exporter subscriptions
+        if self._pending_exporters:
+            pending = list(self._pending_exporters)  # Copy to avoid modification during iteration
+            for exporter, handler in pending:
+                await self._subscribe_exporter(exporter, handler)
+
         event = Event(
             topic=topic,
             data=data,
@@ -508,7 +599,17 @@ class ObservabilityBus:
             correlation_id=correlation_id,
             delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
         )
-        return await self._backend.publish(event)
+
+        try:
+            # Auto-connect backend if not connected (lazy initialization)
+            if not self._backend._is_connected:
+                await self._backend.connect()
+
+            return await self._backend.publish(event)
+        except EventPublishError as e:
+            # Log but don't propagate - observability errors shouldn't crash the app
+            logger.debug(f"Failed to emit observability event: {e}")
+            return False
 
     async def subscribe(
         self,
@@ -517,6 +618,17 @@ class ObservabilityBus:
     ) -> SubscriptionHandle:
         """Subscribe to observability events."""
         return await self._backend.subscribe(pattern, handler)
+
+    async def unsubscribe(self, handle: SubscriptionHandle) -> bool:
+        """Unsubscribe from observability events.
+
+        Args:
+            handle: Subscription handle returned by subscribe()
+
+        Returns:
+            True if unsubscribed successfully
+        """
+        return await self._backend.unsubscribe(handle)
 
 
 class AgentMessageBus:
@@ -605,6 +717,11 @@ class AgentMessageBus:
             partition_key=to_agent,
             delivery_guarantee=DeliveryGuarantee.AT_LEAST_ONCE,
         )
+
+        # Auto-connect backend if not connected (lazy initialization)
+        if not self._backend._is_connected:
+            await self._backend.connect()
+
         return await self._backend.publish(event)
 
     async def broadcast(
@@ -637,6 +754,11 @@ class AgentMessageBus:
             correlation_id=correlation_id,
             delivery_guarantee=DeliveryGuarantee.AT_LEAST_ONCE,
         )
+
+        # Auto-connect backend if not connected (lazy initialization)
+        if not self._backend._is_connected:
+            await self._backend.connect()
+
         return await self._backend.publish(event)
 
     async def subscribe_agent(

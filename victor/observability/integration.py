@@ -292,31 +292,49 @@ class ObservabilityIntegration:
                 enhanced_context["stage_duration_ms"] = last_records[0].duration_ms
 
             # Emit state transition event
-            self._bus.emit(
-                topic="state.stage_changed",
-                data={
-                    "old_stage": old_stage,
-                    "new_stage": new_stage,
-                    "confidence": context.get("confidence", 1.0),
-                    **enhanced_context,
-                },
-            )
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._bus.emit(
+                        topic="state.stage_changed",
+                        data={
+                            "old_stage": old_stage,
+                            "new_stage": new_stage,
+                            "confidence": context.get("confidence", 1.0),
+                            **enhanced_context,
+                        },
+                    )
+                )
+            except RuntimeError:
+                # No event loop running
+                logger.debug("No event loop, skipping state.stage_changed event emission")
+            except Exception as e:
+                logger.debug(f"Failed to emit state transition event: {e}")
 
             # Emit warning event if cycle detected (potential infinite loop)
             if history.has_cycle():
                 cycle_count = history.get_stage_visit_count(new_stage)
                 if cycle_count >= 3:
                     # Emit cycle warning event
-                    self._bus.emit(
-                        topic="error.cycle_warning",
-                        data={
-                            "stage": new_stage,
-                            "visit_count": cycle_count,
-                            "sequence": history.get_stage_sequence()[-5:],
-                            "severity": "warning",
-                            "category": "error",
-                        },
-                    )
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(
+                            self._bus.emit(
+                                topic="error.cycle_warning",
+                                data={
+                                    "stage": new_stage,
+                                    "visit_count": cycle_count,
+                                    "sequence": history.get_stage_sequence()[-5:],
+                                    "severity": "warning",
+                                    "category": "error",
+                                },
+                            )
+                        )
+                    except RuntimeError:
+                        # No event loop running
+                        logger.debug("No event loop, skipping cycle_warning event emission")
+                    except Exception as e:
+                        logger.debug(f"Failed to emit cycle warning event: {e}")
 
         if hasattr(state_machine, "set_hooks"):
             state_machine.set_hooks(hook_manager)
@@ -358,7 +376,7 @@ class ObservabilityIntegration:
             )
         except RuntimeError:
             # No event loop running
-            logger.debug(f"No event loop, skipping tool.start event emission")
+            logger.debug("No event loop, skipping tool.start event emission")
         except Exception as e:
             logger.debug(f"Failed to emit tool start event: {e}")
 
@@ -401,14 +419,15 @@ class ObservabilityIntegration:
             )
         except RuntimeError:
             # No event loop running
-            logger.debug(f"No event loop, skipping tool.end event emission")
+            logger.debug("No event loop, skipping tool.end event emission")
         except Exception as e:
             logger.debug(f"Failed to emit tool end event: {e}")
 
         if not success and error:
             # Emit tool error event
             try:
-                asyncio.create_task(
+                loop = asyncio.get_running_loop()
+                loop.create_task(
                     self._bus.emit(
                         topic=f"error.{tool_name}",
                         data={
@@ -419,6 +438,9 @@ class ObservabilityIntegration:
                         },
                     )
                 )
+            except RuntimeError:
+                # No event loop running
+                logger.debug("No event loop, skipping tool error event emission")
             except Exception as e:
                 logger.debug(f"Failed to emit tool error event: {e}")
 
@@ -442,16 +464,25 @@ class ObservabilityIntegration:
             tool_count: Number of tools available.
         """
         # Emit model request event
-        self._bus.emit(
-            topic="model.request",
-            data={
-                "provider": provider,
-                "model": model,
-                "message_count": message_count,
-                "tool_count": tool_count,
-                "category": "model",
-            },
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="model.request",
+                    data={
+                        "provider": provider,
+                        "model": model,
+                        "message_count": message_count,
+                        "tool_count": tool_count,
+                        "category": "model",
+                    },
+                )
+            )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping model.request event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit model request event: {e}")
 
     def on_model_response(
         self,
@@ -471,17 +502,26 @@ class ObservabilityIntegration:
             latency_ms: Optional latency in milliseconds.
         """
         # Emit model response event
-        self._bus.emit(
-            topic="model.response",
-            data={
-                "provider": provider,
-                "model": model,
-                "tokens_used": tokens_used,
-                "tool_calls": tool_calls,
-                "latency_ms": latency_ms,
-                "category": "model",
-            },
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._bus.emit(
+                    topic="model.response",
+                    data={
+                        "provider": provider,
+                        "model": model,
+                        "tokens_used": tokens_used,
+                        "tool_calls": tool_calls,
+                        "latency_ms": latency_ms,
+                        "category": "model",
+                    },
+                )
+            )
+        except RuntimeError:
+            # No event loop running
+            logger.debug("No event loop, skipping model.response event emission")
+        except Exception as e:
+            logger.debug(f"Failed to emit model response event: {e}")
 
     # =========================================================================
     # Lifecycle Events

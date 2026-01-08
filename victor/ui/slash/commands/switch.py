@@ -166,7 +166,11 @@ class SwitchCommand(BaseSlashCommand):
             table.add_column("Messages", justify="right")
 
             for idx, session in enumerate(sessions, 1):
-                title = session["title"][:30] + "..." if len(session["title"]) > 30 else session["title"]
+                title = (
+                    session["title"][:30] + "..."
+                    if len(session["title"]) > 30
+                    else session["title"]
+                )
                 table.add_row(
                     str(idx),
                     session["session_id"],

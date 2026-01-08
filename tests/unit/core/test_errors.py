@@ -15,7 +15,7 @@
 """Tests for centralized error handling module."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from victor.core.errors import (
     ErrorCategory,

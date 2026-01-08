@@ -688,16 +688,20 @@ class TestVerticalIntegrationObservability:
 
         # Emit the event using the new event system
         bus = get_observability_bus()
-        await bus.emit(
-            topic="state.vertical_applied",
-            data={
-                "vertical": result.vertical_name,
-                "tools_count": len(result.tools_applied),
-                "middleware_count": result.middleware_count,
-                "success": result.success,
-                "category": "state",
-            },
-        )
+        await bus.connect()
+        try:
+            await bus.emit(
+                topic="state.vertical_applied",
+                data={
+                    "vertical": result.vertical_name,
+                    "tools_count": len(result.tools_applied),
+                    "middleware_count": result.middleware_count,
+                    "success": result.success,
+                    "category": "state",
+                },
+            )
+        finally:
+            await bus.disconnect()
 
         # Note: In the new event system, we can't easily assert on calls without mocking
         # The event was emitted to the bus successfully if no exception was raised

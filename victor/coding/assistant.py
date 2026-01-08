@@ -338,9 +338,13 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Tool dependency provider
         """
-        return cls._get_extension_factory(
-            "tool_dependency_provider", "victor.coding.tool_dependencies"
-        )
+
+        def _create():
+            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+            return create_vertical_tool_dependency_provider("coding")
+
+        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:

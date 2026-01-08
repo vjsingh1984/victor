@@ -46,6 +46,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -183,7 +184,7 @@ class StateTracer:
                 )
             except RuntimeError:
                 # No event loop running
-                logger.debug(f"No event loop, skipping state transition event emission")
+                logger.debug("No event loop, skipping state transition event emission")
             except Exception as e:
                 logger.warning(f"Failed to publish state transition event: {e}")
 

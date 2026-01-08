@@ -1023,7 +1023,9 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.now(timezone.utc) + timedelta(seconds=result["expires_in"])
+                    expires_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=result["expires_in"]
+                    )
 
                 return SSOTokens(
                     access_token=result["access_token"],
@@ -1061,7 +1063,9 @@ class SSOAuthenticator:
 
                 expires_at = None
                 if "expires_in" in result:
-                    expires_at = datetime.now(timezone.utc) + timedelta(seconds=result["expires_in"])
+                    expires_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=result["expires_in"]
+                    )
 
                 return SSOTokens(
                     access_token=result["access_token"],

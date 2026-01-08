@@ -66,7 +66,7 @@ def get_session_logger(session_id: Optional[str] = None, component: str = "") ->
             name = f"{name}.{component}"
     else:
         # Default logger
-        name = f"victor"
+        name = "victor"
         if component:
             name = f"{name}.{component}"
 
@@ -100,4 +100,3 @@ __all__ = [
     "get_session_logger",
     "get_agent_logger",
 ]
-

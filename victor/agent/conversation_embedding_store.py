@@ -530,8 +530,7 @@ class ConversationEmbeddingStore:
 
         try:
             logger.info("[ConversationEmbeddingStore] Auto-compacting...")
-            self._table.compact_files()
-            self._table.cleanup_old_versions(older_than=None, delete_unverified=True)
+            self._table.optimize()
             self._embeddings_added_since_compact = 0
             logger.info("[ConversationEmbeddingStore] Compaction complete")
             return True

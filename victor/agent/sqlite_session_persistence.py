@@ -182,7 +182,9 @@ class SQLiteSessionPersistence:
             },
             "conversation": conversation_data,
             "conversation_state": (
-                conversation_state.to_dict() if hasattr(conversation_state, "to_dict") else conversation_state
+                conversation_state.to_dict()
+                if hasattr(conversation_state, "to_dict")
+                else conversation_state
             ),
             "tool_selection_stats": tool_selection_stats,
         }
@@ -253,7 +255,9 @@ class SQLiteSessionPersistence:
                 return None
 
             row = rows[0]
-            session_data = json.loads(row[6])  # data column
+            session_data = json.loads(
+                row[5]
+            )  # data column (0-indexed: id=0, name=1, provider=2, model=3, profile=4, data=5)
 
             logger.info(f"Loaded session {session_id} from SQLite")
             return session_data
@@ -290,16 +294,18 @@ class SQLiteSessionPersistence:
                     )
                     message_count = count_result[0][0] if count_result else 0
 
-                    sessions.append({
-                        "session_id": row[0],
-                        "title": row[1],
-                        "provider": row[2],
-                        "model": row[3],
-                        "profile": row[4],
-                        "created_at": row[5],
-                        "updated_at": row[6],
-                        "message_count": message_count,
-                    })
+                    sessions.append(
+                        {
+                            "session_id": row[0],
+                            "title": row[1],
+                            "provider": row[2],
+                            "model": row[3],
+                            "profile": row[4],
+                            "created_at": row[5],
+                            "updated_at": row[6],
+                            "message_count": message_count,
+                        }
+                    )
 
             return sessions
 
@@ -360,16 +366,18 @@ class SQLiteSessionPersistence:
                     )
                     message_count = count_result[0][0] if count_result else 0
 
-                    sessions.append({
-                        "session_id": row[0],
-                        "title": row[1],
-                        "provider": row[2],
-                        "model": row[3],
-                        "profile": row[4],
-                        "created_at": row[5],
-                        "updated_at": row[6],
-                        "message_count": message_count,
-                    })
+                    sessions.append(
+                        {
+                            "session_id": row[0],
+                            "title": row[1],
+                            "provider": row[2],
+                            "model": row[3],
+                            "profile": row[4],
+                            "created_at": row[5],
+                            "updated_at": row[6],
+                            "message_count": message_count,
+                        }
+                    )
 
             return sessions
 
@@ -408,7 +416,7 @@ class SQLiteSessionPersistence:
                     if row[2]:
                         try:
                             msg["tool_calls"] = json.loads(row[2])
-                        except:
+                        except Exception:
                             msg["tool_calls"] = None
 
                     messages.append(msg)
@@ -439,13 +447,25 @@ class SQLiteSessionPersistence:
         return "Untitled Session"
 
 
-def get_sqlite_session_persistence() -> SQLiteSessionPersistence:
+def get_sqlite_session_persistence(db_path: Optional[Path] = None) -> SQLiteSessionPersistence:
     """Get the SQLite session persistence instance.
+
+    Args:
+        db_path: Optional database path (for testing). If not provided,
+                 uses VICTOR_TEST_DB_PATH env var or default path.
 
     Returns:
         SQLiteSessionPersistence instance
     """
-    return SQLiteSessionPersistence()
+    import os
+
+    # Support test database override via environment variable
+    if db_path is None:
+        test_db_path = os.environ.get("VICTOR_TEST_DB_PATH")
+        if test_db_path:
+            db_path = Path(test_db_path)
+
+    return SQLiteSessionPersistence(db_path=db_path)
 
 
 __all__ = [

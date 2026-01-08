@@ -72,6 +72,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -993,7 +994,7 @@ class VerticalIntegrationPipeline:
                     )
                 except RuntimeError:
                     # No event loop running
-                    logger.debug(f"No event loop, skipping vertical.applied event emission")
+                    logger.debug("No event loop, skipping vertical.applied event emission")
                 except Exception as emit_error:
                     logger.debug(f"Failed to create emit task: {emit_error}")
         except Exception as e:

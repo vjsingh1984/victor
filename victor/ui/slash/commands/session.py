@@ -222,7 +222,11 @@ class SessionsCommand(BaseSlashCommand):
                 except Exception:
                     date_str = session["created_at"][:16]
 
-                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
                 table.add_row(
                     session["session_id"],
                     title,
@@ -234,7 +238,9 @@ class SessionsCommand(BaseSlashCommand):
 
             ctx.console.print(table)
             ctx.console.print("\n[dim]Use '/resume <session_id>' to restore a session[/]")
-            ctx.console.print("[dim]Or '/switch <model> --resume <session_id>' to resume and switch[/]")
+            ctx.console.print(
+                "[dim]Or '/switch <model> --resume <session_id>' to resume and switch[/]"
+            )
         except Exception as e:
             ctx.console.print(f"[red]Failed to list sessions:[/] {e}")
             logger.exception("Error listing sessions")
@@ -290,12 +296,17 @@ class ResumeCommand(BaseSlashCommand):
             for idx, session in enumerate(sessions, 1):
                 try:
                     from datetime import datetime
+
                     dt = datetime.fromisoformat(session["created_at"])
                     date_str = dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
                     date_str = session["created_at"][:16]
 
-                title = session["title"][:40] + "..." if len(session["title"]) > 40 else session["title"]
+                title = (
+                    session["title"][:40] + "..."
+                    if len(session["title"]) > 40
+                    else session["title"]
+                )
                 table.add_row(
                     str(idx),
                     session["session_id"],

@@ -148,10 +148,10 @@ class ContextOverflowHandler(IContextOverflowHandler):
         char_limit = max_tokens * self._chars_per_token
 
         # Build context within character limit
+        # Prioritize recent messages by iterating in reverse
         context = []
         total_chars = 0
 
-        # Iterate in reverse (most recent first) to prioritize recent messages
         for message in reversed(messages):
             msg_dict = message.to_dict()
             msg_chars = len(msg_dict.get("content", ""))
@@ -160,10 +160,11 @@ class ContextOverflowHandler(IContextOverflowHandler):
                 # Would exceed limit, stop here
                 break
 
-            context.insert(0, msg_dict)  # Insert at beginning to maintain order
+            context.append(msg_dict)  # Append (will reverse once at end)
             total_chars += msg_chars
 
-        return context
+        # Reverse once to get correct order (oldest -> newest)
+        return list(reversed(context))
 
     def set_max_context_chars(self, max_chars: int) -> None:
         """Set maximum context size in characters.
