@@ -44,6 +44,24 @@ class DeliverableType(Enum):
     ERROR_REPORTED = "error_reported"
 
 
+class ResponsePhase(Enum):
+    """Phases of agent response for completion detection."""
+
+    EXPLORATION = "exploration"  # Reading files, searching codebase
+    SYNTHESIS = "synthesis"  # Summarizing, planning, preparing output
+    FINAL_OUTPUT = "final_output"  # Delivering answer, completed work
+    BLOCKED = "blocked"  # Cannot complete, needs user input
+
+
+class CompletionConfidence(Enum):
+    """Confidence levels for task completion detection."""
+
+    HIGH = "high"  # Active signal detected (_DONE_, _TASK_DONE_) - deterministic
+    MEDIUM = "medium"  # File modifications + passive signal
+    LOW = "low"  # Only passive phrase detected
+    NONE = "none"  # No completion signal detected
+
+
 @dataclass
 class TaskDeliverable:
     """Represents a completed deliverable."""
@@ -566,6 +584,89 @@ class TaskCompletionDetector:
         """
         self._state.completion_signals.add(f"forced:{reason}")
         logger.info(f"Forced task completion: {reason}")
+
+    def detect_response_phase(self, response_text: str) -> ResponsePhase:
+        """Detect the current phase of the agent's response.
+
+        This helps distinguish between "thinking" (exploration/synthesis) and "output" (final delivery).
+
+        Args:
+            response_text: The agent's response text
+
+        Returns:
+            Detected ResponsePhase
+        """
+        response_lower = response_text.lower()
+
+        # Check for blocked signals first
+        blocked_signals = ["_blocked_", "_cannot_complete_", "i cannot", "i'm unable to", "unable to complete"]
+        if any(signal in response_lower for signal in blocked_signals):
+            return ResponsePhase.BLOCKED
+
+        # Check for final output signals (active completion signals + delivery phrases)
+        final_output_indicators = [
+            "_done_", "_task_done_", "_summary_",
+            "task complete:", "done:", "summary:",
+            "here's the", "here is the", "i've created", "i have created",
+            "the file is now", "the implementation is", "successfully created",
+        ]
+        if any(indicator in response_lower for indicator in final_output_indicators):
+            return ResponsePhase.FINAL_OUTPUT
+
+        # Check for synthesis phase (summarizing, preparing output)
+        synthesis_indicators = [
+            "in summary", "to summarize", "in conclusion",
+            "let me summarize", "here's what i found", "here is what i found",
+            "based on my analysis", "after reviewing", "having examined",
+        ]
+        if any(indicator in response_lower for indicator in synthesis_indicators):
+            return ResponsePhase.SYNTHESIS
+
+        # Check for exploration phase (reading, searching)
+        exploration_indicators = [
+            "let me read", "let me check", "let me search", "let me look",
+            "i'll read", "i'll check", "i'll search", "i'll examine",
+            "reading", "searching", "looking at", "examining",
+            "first, i need to", "let me start by", "i'll start by",
+        ]
+        if any(indicator in response_lower for indicator in exploration_indicators):
+            return ResponsePhase.EXPLORATION
+
+        # Default: if no clear phase indicators, assume exploration
+        # (conservative default - better to continue than stop prematurely)
+        return ResponsePhase.EXPLORATION
+
+    def get_completion_confidence(self) -> CompletionConfidence:
+        """Get the current completion confidence level.
+
+        This provides a graded assessment of completion likelihood:
+        - HIGH: Active signal detected (deterministic)
+        - MEDIUM: File modifications + passive completion signal
+        - LOW: Only passive completion phrase detected
+        - NONE: No completion signals detected
+
+        Returns:
+            Current CompletionConfidence level
+        """
+        # Priority 1: Active signal detected (HIGH confidence - deterministic)
+        if self._state.active_signal_detected:
+            return CompletionConfidence.HIGH
+
+        # Priority 2: File modifications + any completion signal (MEDIUM confidence)
+        if self._has_file_modifications() and self._state.completion_signals:
+            return CompletionConfidence.MEDIUM
+
+        # Priority 3: Only passive completion signals (LOW confidence)
+        if self._state.completion_signals:
+            # Check if signals are only passive phrases (not active)
+            has_only_passive = all(
+                signal.startswith("passive:") for signal in self._state.completion_signals
+            )
+            if has_only_passive:
+                return CompletionConfidence.LOW
+
+        # Priority 4: No completion signals (NONE confidence)
+        return CompletionConfidence.NONE
 
 
 def create_task_completion_detector() -> TaskCompletionDetector:
