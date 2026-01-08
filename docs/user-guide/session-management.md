@@ -251,6 +251,184 @@ Compress conversation history to reduce token usage.
 └────────────────────────────────────────┘
 ```
 
+## CLI Commands
+
+Victor also provides CLI commands for managing sessions outside of the chat interface:
+
+### `victor sessions list` - List Sessions
+
+List saved sessions from the command line.
+
+```bash
+victor sessions list              # List last 10 sessions
+victor sessions list --limit 20   # List last 20 sessions
+victor sessions list --all        # List all sessions (no limit)
+victor sessions list --json       # Output as JSON
+```
+
+**Examples**:
+```bash
+# List recent sessions
+$ victor sessions list
+
+╭──────────────────────────────────────────────────────────────╮
+│                    Saved Sessions (last 5)                   │
+├────────────┬────────────────────┬─────────────┬──────────┬─────┤
+│ Session ID │ Title              │ Model       │ Provider │ ... │
+├────────────┼────────────────────┼─────────────┼──────────┼─────┤
+│ myproj-9Kx │ CI/CD Pipeline     │ claude-...  │ anthro.. │ ... │
+│ myproj-8Z3 │ Unit Tests         │ gpt-4       │ openai   │ ... │
+╰────────────┴────────────────────┴─────────────┴──────────┴─────╯
+
+# List all sessions (useful when you have many)
+$ victor sessions list --all
+
+# Output as JSON for scripting
+$ victor sessions list --json | jq '.[] | .title'
+```
+
+### `victor sessions show` - Show Session Details
+
+View detailed information about a specific session.
+
+```bash
+victor sessions show <session_id>       # Show formatted details
+victor sessions show <session_id> --json # Output as JSON
+```
+
+**Example**:
+```bash
+$ victor sessions show myproj-9Kx7Z2
+
+╭──────────────────────────────────────────╮
+│           Session Details                │
+├──────────────────────────────────────────┤
+│ Session ID: myproj-9Kx7Z2                │
+│ Title: CI/CD Pipeline Setup              │
+│ Model: claude-sonnet-4-20250514          │
+│ Provider: anthropic                      │
+│ Profile: default                         │
+│ Messages: 12                             │
+│ Created: 2025-01-07T14:30:45            │
+│ Updated: 2025-01-07T15:45:22            │
+╰──────────────────────────────────────────╯
+```
+
+### `victor sessions search` - Search Sessions
+
+Search for sessions by title or content.
+
+```bash
+victor sessions search <query>        # Search sessions
+victor sessions search CI/CD --limit 5 # Limit results
+victor sessions search test --json    # Output as JSON
+```
+
+**Example**:
+```bash
+$ victor sessions search "authentication"
+
+╭──────────────────────────────────────────────────────────────╮
+│              Sessions matching 'authentication'              │
+├────────────┬────────────────────┬─────────────┬──────────┬─────┤
+│ Session ID │ Title              │ Model       │ Provider │ ... │
+├────────────┼────────────────────┼─────────────┼──────────┼─────┤
+│ myproj-7A2 │ Auth Refactoring   │ claude-...  │ anthro.. │ ... │
+│ myproj-5B9 │ Login Bug Fix      │ gpt-4       │ openai   │ ... │
+╰────────────┴────────────────────┴─────────────┴──────────┴─────╯
+```
+
+### `victor sessions clear` - Clear Sessions
+
+Delete sessions from the database. Use with caution!
+
+```bash
+# Clear all sessions (with confirmation prompt)
+victor sessions clear
+
+# Clear all sessions (skip confirmation)
+victor sessions clear --yes
+victor sessions clear --all --yes
+
+# Clear sessions matching a prefix (min 6 characters)
+victor sessions clear myproj-9Kx
+
+# Clear sessions by prefix (skip confirmation)
+victor sessions clear myproj-9Kx --yes
+```
+
+**Safety Features**:
+- **Confirmation prompt**: Prevents accidental deletion
+- **Prefix filtering**: Delete only sessions matching a pattern
+- **Minimum prefix length**: 6 characters required to avoid accidental broad matches
+- **Dry-run feedback**: Shows how many sessions will be deleted
+
+**Examples**:
+
+1. Clear all sessions with confirmation:
+   ```bash
+   $ victor sessions clear
+
+   ⚠  Found 15 session(s) in database.
+   Are you sure you want to delete ALL 15 session(s)? This cannot be undone. [y/N]:
+   ```
+
+2. Clear sessions by prefix:
+   ```bash
+   # Clear only sessions starting with "myproj-9Kx7"
+   $ victor sessions clear myproj-9Kx7 --yes
+
+   ⚠  Found 2 session(s) matching prefix 'myproj-9Kx7'.
+   ✓ Cleared 2 session(s) matching prefix 'myproj-9Kx7'.
+   ```
+
+3. Skip confirmation for automation:
+   ```bash
+   $ victor sessions clear --yes
+
+   ⚠  Found 15 session(s) in database.
+   ✓ Cleared 15 session(s) from database.
+   ```
+
+**Use Cases**:
+- Clean up test sessions: `victor sessions clear test-1234 --yes`
+- Remove old sessions: `victor sessions clear myproj-Jan --yes`
+- Start fresh: `victor sessions clear --yes`
+
+### `victor sessions delete` - Delete Specific Session
+
+Delete a single session by ID.
+
+```bash
+victor sessions delete <session_id>        # Delete with confirmation
+victor sessions delete <session_id> --yes  # Skip confirmation
+```
+
+**Example**:
+```bash
+$ victor sessions delete myproj-9Kx7Z2
+
+Delete session myproj-9Kx7Z2? [y/N]: y
+✓ Deleted session: myproj-9Kx7Z2
+```
+
+### `victor sessions export` - Export Sessions
+
+Export all sessions to a JSON file.
+
+```bash
+victor sessions export                              # Auto-generated filename
+victor sessions export --output sessions.json      # Custom filename
+victor sessions export --no-pretty                  # Minified JSON
+```
+
+**Example**:
+```bash
+$ victor sessions export --output my_sessions.json
+
+✓ Exported 15 session(s) to my_sessions.json
+```
+
 ## Advanced Usage
 
 ### Conversation State Machine
