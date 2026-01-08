@@ -359,7 +359,11 @@ class EventTableView(DataTable):
         self.cursor_type = "row"
 
     def add_event(self, event: Event) -> None:
-        """Add an event row to the table (inserts at top for newest first)."""
+        """Add an event row to the table.
+
+        Events are processed in descending order (newest first), so we append
+        to maintain that order in the table.
+        """
         timestamp = event.datetime.strftime("%H:%M:%S")
         category = event.category
 
@@ -375,8 +379,8 @@ class EventTableView(DataTable):
             elif "message" in event.data:
                 details = str(event.data["message"])[:50]
 
-        # Insert at position 0 (top of table) for newest first
-        self.add_row(timestamp, category, event.topic, details, index=0)
+        # Append row (events are already processed in descending order)
+        self.add_row(timestamp, category, event.topic, details)
 
 
 class ToolExecutionView(DataTable):
@@ -662,7 +666,6 @@ class ToolCallHistoryView(DataTable):
                 f"{duration_ms:.0f}ms" if duration_ms else "N/A",
                 tool_id or "N/A",
                 args_preview,
-                index=0,  # Insert at top for newest first
             )
         # Process tool.start events (no duration yet)
         elif event_name == "tool.start":
@@ -680,7 +683,6 @@ class ToolCallHistoryView(DataTable):
                 "N/A",
                 tool_id or "N/A",
                 args_preview,
-                index=0,  # Insert at top for newest first
             )
 
         # Process tool_call_failed events
@@ -700,7 +702,6 @@ class ToolCallHistoryView(DataTable):
                 f"{duration_ms:.0f}ms",
                 parent_span_id,
                 "",
-                index=0,  # Insert at top for newest first
             )
 
 
@@ -744,8 +745,8 @@ class StateTransitionView(DataTable):
         old_preview = str(old_value)[:30] if old_value is not None else "None"
         new_preview = str(new_value)[:30] if new_value is not None else "None"
 
-        # Insert at position 0 (top of table) for newest first
-        self.add_row(timestamp, scope, key, old_preview, new_preview, index=0)
+        # Append row (events are already processed in descending order)
+        self.add_row(timestamp, scope, key, old_preview, new_preview)
 
 
 class PerformanceMetricsView(Static):
