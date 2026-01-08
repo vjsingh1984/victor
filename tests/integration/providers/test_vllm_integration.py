@@ -28,6 +28,19 @@ import time
 import os
 import signal
 import sys
+import platform
+
+
+# Early skip for ARM CPUs (vLLM has known compatibility issues)
+_is_arm = platform.processor().startswith(("arm", "aarch64")) or \
+          platform.machine().startswith(("arm", "aarch64"))
+if _is_arm:
+    pytestmark = pytest.mark.skipif(
+        True,
+        reason="Skipping vLLM tests on ARM CPU (known compatibility issues during model warm-up)"
+    )
+else:
+    pytestmark = []
 
 # These imports are intentionally after checking availability
 from victor.providers.base import Message, ToolDefinition  # noqa: E402
@@ -47,6 +60,8 @@ def vllm_server():
 
     In CI environments, these tests are skipped because vLLM requires
     significant resources and model downloads that may not be allowed.
+
+    Note: ARM CPU detection happens at module level for faster skipping.
     """
     # Detect CI environment
     is_ci = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
