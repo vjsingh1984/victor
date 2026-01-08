@@ -1004,16 +1004,26 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         from victor.core.events import get_observability_bus
 
         bus = get_observability_bus()
-        bus.emit(
-            topic="tool.complete",
-            data={
-                "tool_name": result.tool_name,
-                "success": result.success,
-                "result_length": len(str(result.result or "")) if result.result else 0,
-                "error": str(result.error) if result.error else None,
-                "category": "tool",
-            },
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                bus.emit(
+                    topic="tool.complete",
+                    data={
+                        "tool_name": result.tool_name,
+                        "success": result.success,
+                        "result_length": len(str(result.result or "")) if result.result else 0,
+                        "error": str(result.error) if result.error else None,
+                        "category": "tool",
+                    },
+                )
+            )
+        except RuntimeError:
+            # No event loop running
+            pass
+        except Exception:
+            # Ignore errors during event emission
+            pass
 
         # Track read files for task completion detection
         if result.success and result.tool_name in ("read", "Read", "read_file"):

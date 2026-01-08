@@ -227,9 +227,10 @@ When creating configurations:
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        return cls._get_extension_factory(
-            "tool_dependency_provider", "victor.devops.tool_dependencies"
-        )
+        def _create():
+            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+            return create_vertical_tool_dependency_provider("devops")
+        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:

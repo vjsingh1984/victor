@@ -224,7 +224,7 @@ class TaskAnalyzer:
 
         if include_task_type and self.task_classifier:
             try:
-                task_result = self.task_classifier.classify(message)
+                task_result = self.task_classifier.classify_sync(message)
                 analysis.task_type = task_result.task_type
                 analysis.task_type_confidence = task_result.confidence
                 analysis.has_file_context = task_result.has_file_context
