@@ -335,6 +335,11 @@ class StreamingChatHandler:
         an empty response, treat it as natural completion rather than continuing
         to attempt recovery.
 
+        **Task Completion Detection Enhancement (Phase 3)**:
+        When signal-based completion is enabled (ctx.task_completion_detector exists),
+        buffer/size heuristics are skipped in favor of explicit signal detection.
+        When disabled, traditional buffer/size heuristics are used (backward compatible).
+
         Args:
             ctx: The streaming context
             has_tool_calls: Whether there are pending tool calls
@@ -343,6 +348,14 @@ class StreamingChatHandler:
         Returns:
             IterationResult to break if natural completion, None otherwise
         """
+        # Task Completion Detection Enhancement (Phase 3): Skip buffer/size heuristics
+        # when signal-based completion is enabled
+        if ctx.task_completion_detector is not None:
+            # Signal-based completion is active - let the detector decide
+            # Don't use buffer/size heuristics
+            return None
+
+        # Legacy buffer/size heuristics (only when signal-based completion disabled)
         if not has_tool_calls and ctx.has_substantial_content():
             logger.info(
                 f"Model returned empty after {ctx.total_accumulated_chars} chars of content - "
