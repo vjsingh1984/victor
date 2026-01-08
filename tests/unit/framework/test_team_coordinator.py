@@ -102,67 +102,67 @@ class MockTeamMember:
 
 
 # =============================================================================
-# FrameworkTeamCoordinator Tests
+# UnifiedTeamCoordinator Tests
 # =============================================================================
 
 
-class TestFrameworkTeamCoordinatorBasics:
-    """Tests for basic FrameworkTeamCoordinator functionality."""
+class TestUnifiedTeamCoordinatorBasics:
+    """Tests for basic UnifiedTeamCoordinator functionality."""
 
     def test_coordinator_exists(self):
-        """FrameworkTeamCoordinator should be importable."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should be importable."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        assert FrameworkTeamCoordinator is not None
+        assert UnifiedTeamCoordinator is not None
 
     def test_coordinator_instantiation(self):
-        """FrameworkTeamCoordinator should be instantiable."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should be instantiable."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert coordinator is not None
 
     def test_coordinator_has_add_member(self):
-        """FrameworkTeamCoordinator should have add_member method."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should have add_member method."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert hasattr(coordinator, "add_member")
         assert callable(coordinator.add_member)
 
     def test_coordinator_has_set_formation(self):
-        """FrameworkTeamCoordinator should have set_formation method."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should have set_formation method."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert hasattr(coordinator, "set_formation")
         assert callable(coordinator.set_formation)
 
     def test_coordinator_has_execute_task(self):
-        """FrameworkTeamCoordinator should have execute_task method."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should have execute_task method."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert hasattr(coordinator, "execute_task")
         assert callable(coordinator.execute_task)
 
     def test_coordinator_has_broadcast(self):
-        """FrameworkTeamCoordinator should have broadcast method."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """UnifiedTeamCoordinator should have broadcast method."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert hasattr(coordinator, "broadcast")
         assert callable(coordinator.broadcast)
 
 
-class TestFrameworkTeamCoordinatorMemberManagement:
-    """Tests for member management in FrameworkTeamCoordinator."""
+class TestUnifiedTeamCoordinatorMemberManagement:
+    """Tests for member management in UnifiedTeamCoordinator."""
 
     def test_add_member_stores_member(self):
         """add_member should store the member."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member = MockTeamMember("agent1")
 
         coordinator.add_member(member)
@@ -172,9 +172,9 @@ class TestFrameworkTeamCoordinatorMemberManagement:
 
     def test_add_member_returns_self_for_chaining(self):
         """add_member should return self for fluent chaining."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member1 = MockTeamMember("agent1")
         member2 = MockTeamMember("agent2")
 
@@ -185,9 +185,9 @@ class TestFrameworkTeamCoordinatorMemberManagement:
 
     def test_add_multiple_members(self):
         """Multiple members can be added."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         for i in range(5):
             coordinator.add_member(MockTeamMember(f"agent{i}"))
 
@@ -195,61 +195,61 @@ class TestFrameworkTeamCoordinatorMemberManagement:
 
     def test_members_property_returns_list(self):
         """members property should return list of members."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member = MockTeamMember("agent1")
         coordinator.add_member(member)
 
         assert isinstance(coordinator.members, list)
 
 
-class TestFrameworkTeamCoordinatorFormation:
-    """Tests for formation management in FrameworkTeamCoordinator."""
+class TestUnifiedTeamCoordinatorFormation:
+    """Tests for formation management in UnifiedTeamCoordinator."""
 
     def test_set_formation_stores_formation(self):
         """set_formation should store the formation."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         coordinator.set_formation(TeamFormation.PARALLEL)
 
         assert coordinator.formation == TeamFormation.PARALLEL
 
     def test_set_formation_returns_self(self):
         """set_formation should return self for chaining."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         result = coordinator.set_formation(TeamFormation.SEQUENTIAL)
 
         assert result is coordinator
 
     def test_default_formation_is_sequential(self):
         """Default formation should be SEQUENTIAL."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert coordinator.formation == TeamFormation.SEQUENTIAL
 
     def test_set_formation_to_all_types(self):
         """set_formation should accept all TeamFormation values."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
         for formation in TeamFormation:
-            coordinator = FrameworkTeamCoordinator()
+            coordinator = UnifiedTeamCoordinator()
             coordinator.set_formation(formation)
             assert coordinator.formation == formation
 
 
-class TestFrameworkTeamCoordinatorManager:
-    """Tests for manager assignment in FrameworkTeamCoordinator."""
+class TestUnifiedTeamCoordinatorManager:
+    """Tests for manager assignment in UnifiedTeamCoordinator."""
 
     def test_set_manager_stores_manager(self):
         """set_manager should store the manager."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         manager = MockTeamMember("manager")
         coordinator.add_member(manager)
         coordinator.set_manager(manager)
@@ -258,9 +258,9 @@ class TestFrameworkTeamCoordinatorManager:
 
     def test_set_manager_returns_self(self):
         """set_manager should return self for chaining."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         manager = MockTeamMember("manager")
         result = coordinator.add_member(manager).set_manager(manager)
 
@@ -268,9 +268,9 @@ class TestFrameworkTeamCoordinatorManager:
 
     def test_manager_is_none_by_default(self):
         """Manager should be None by default."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert coordinator.manager is None
 
 
@@ -280,9 +280,9 @@ class TestSequentialExecution:
     @pytest.mark.asyncio
     async def test_sequential_execution_order(self):
         """Sequential execution should run members in order."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         execution_tracker: List[str] = []
 
         member1 = MockTeamMember("agent1", delay=0.01)
@@ -304,9 +304,9 @@ class TestSequentialExecution:
     @pytest.mark.asyncio
     async def test_sequential_passes_context(self):
         """Sequential execution should pass context to each member."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member = MockTeamMember("agent1")
         coordinator.add_member(member)
         coordinator.set_formation(TeamFormation.SEQUENTIAL)
@@ -320,9 +320,9 @@ class TestSequentialExecution:
     @pytest.mark.asyncio
     async def test_sequential_collects_results(self):
         """Sequential execution should collect results from all members."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         coordinator.add_member(MockTeamMember("agent1"))
         coordinator.add_member(MockTeamMember("agent2"))
         coordinator.set_formation(TeamFormation.SEQUENTIAL)
@@ -339,9 +339,9 @@ class TestParallelExecution:
     @pytest.mark.asyncio
     async def test_parallel_runs_concurrently(self):
         """Parallel execution should run members concurrently."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
 
         # Use delays to demonstrate parallelism - parallel should be faster
         member1 = MockTeamMember("agent1", delay=0.1)
@@ -365,9 +365,9 @@ class TestParallelExecution:
     @pytest.mark.asyncio
     async def test_parallel_collects_all_results(self):
         """Parallel execution should collect results from all members."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         coordinator.add_member(MockTeamMember("agent1"))
         coordinator.add_member(MockTeamMember("agent2"))
         coordinator.add_member(MockTeamMember("agent3"))
@@ -385,9 +385,9 @@ class TestHierarchicalExecution:
     @pytest.mark.asyncio
     async def test_hierarchical_manager_executes_first(self):
         """In hierarchical, manager should execute first to delegate."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         execution_tracker: List[str] = []
 
         manager_role = MockRole(
@@ -414,9 +414,9 @@ class TestHierarchicalExecution:
     @pytest.mark.asyncio
     async def test_hierarchical_requires_manager(self):
         """Hierarchical execution should have a manager."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         coordinator.add_member(MockTeamMember("worker1"))
         coordinator.set_formation(TeamFormation.HIERARCHICAL)
 
@@ -433,9 +433,9 @@ class TestPipelineExecution:
     @pytest.mark.asyncio
     async def test_pipeline_execution_order(self):
         """Pipeline execution should run members in sequence with output passing."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         execution_tracker: List[str] = []
 
         coordinator.add_member(MockTeamMember("stage1"))
@@ -453,9 +453,9 @@ class TestPipelineExecution:
     @pytest.mark.asyncio
     async def test_pipeline_passes_output_to_next_stage(self):
         """Pipeline should pass output of one stage to the next."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
 
         coordinator.add_member(MockTeamMember("stage1"))
         coordinator.add_member(MockTeamMember("stage2"))
@@ -473,9 +473,9 @@ class TestBroadcast:
     @pytest.mark.asyncio
     async def test_broadcast_sends_to_all_members(self):
         """broadcast should send message to all team members."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member1 = MockTeamMember("agent1")
         member2 = MockTeamMember("agent2")
         member3 = MockTeamMember("agent3")
@@ -501,9 +501,9 @@ class TestBroadcast:
     @pytest.mark.asyncio
     async def test_broadcast_returns_responses(self):
         """broadcast should return responses from all members."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         coordinator.add_member(MockTeamMember("agent1"))
         coordinator.add_member(MockTeamMember("agent2"))
 
@@ -526,9 +526,9 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_message_to_specific_member(self):
         """send_message should send to a specific member."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member1 = MockTeamMember("agent1")
         member2 = MockTeamMember("agent2")
 
@@ -551,9 +551,9 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_message_returns_response(self):
         """send_message should return the response."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         member = MockTeamMember("agent1")
         coordinator.add_member(member)
 
@@ -652,11 +652,11 @@ class TestProtocolCompliance:
     """Tests for protocol compliance."""
 
     def test_coordinator_satisfies_protocol(self):
-        """FrameworkTeamCoordinator should satisfy ITeamCoordinator protocol."""
+        """UnifiedTeamCoordinator should satisfy ITeamCoordinator protocol."""
         from victor.framework.agent_protocols import ITeamCoordinator
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        coordinator = FrameworkTeamCoordinator()
+        coordinator = UnifiedTeamCoordinator()
         assert isinstance(coordinator, ITeamCoordinator)
 
 
@@ -669,10 +669,10 @@ class TestModuleExports:
     """Tests for module-level exports."""
 
     def test_exports_coordinator(self):
-        """team_coordinator should export FrameworkTeamCoordinator."""
-        from victor.framework.team_coordinator import FrameworkTeamCoordinator
+        """team_coordinator should export UnifiedTeamCoordinator."""
+        from victor.framework.team_coordinator import UnifiedTeamCoordinator
 
-        assert FrameworkTeamCoordinator is not None
+        assert UnifiedTeamCoordinator is not None
 
     def test_exports_member_result(self):
         """team_coordinator should export MemberResult."""
