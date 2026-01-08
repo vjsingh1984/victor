@@ -14,102 +14,203 @@
 
 """Integration tests for vLLM provider.
 
-These tests require vLLM server to be running with a model loaded.
-Skip if vLLM is not available.
+These tests automatically launch a vLLM server before running tests
+and shut it down after completion.
 
-To start vLLM server:
-    python -m vllm.entrypoints.openai.api_server \
-        --model Qwen/Qwen2.5-Coder-1.5B-Instruct \
-        --port 8000
+Uses a small model (Qwen/Qwen2.5-Coder-1.5B-Instruct) for faster testing.
 """
 
 import pytest
 from httpx import ConnectError, HTTPError
 import httpx
+import subprocess
+import time
+import os
+import signal
+import sys
 
-
-# Check if vLLM is available at module load time
-def _check_vllm_available():
-    """Check if vLLM server is running by checking /v1/models endpoint."""
-    import urllib.request
-    import urllib.error
-    import json
-
-    try:
-        # vLLM specifically exposes /v1/models endpoint
-        req = urllib.request.urlopen("http://localhost:8000/v1/models", timeout=2)
-        if req.status == 200:
-            data = json.loads(req.read().decode())
-            # vLLM returns {"object": "list", "data": [...]}
-            return data.get("object") == "list" and "data" in data
-        return False
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _check_vllm_available(), reason="vLLM server not available at localhost:8000/v1/models"
-)
-
-# These imports are intentionally after pytestmark to avoid loading if vLLM unavailable
+# These imports are intentionally after checking availability
 from victor.providers.base import Message, ToolDefinition  # noqa: E402
 from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
 
 
+@pytest.fixture(scope="session")
+def vllm_server():
+    """Launch vLLM server for testing and shut it down after tests.
+
+    This fixture:
+    1. Checks if running in CI environment (GitHub Actions, etc.) - skips if true
+    2. Launches vLLM server with a small model for local testing
+    3. Waits for server to be ready (up to 120 seconds)
+    4. Yields control to tests
+    5. Shuts down server after all tests complete
+
+    In CI environments, these tests are skipped because vLLM requires
+    significant resources and model downloads that may not be allowed.
+    """
+    # Detect CI environment
+    is_ci = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
+
+    if is_ci:
+        pytest.skip("Skipping vLLM tests in CI environment (requires local model download)")
+
+    # Check if vllm is installed
+    try:
+        import vllm
+        vllm_available = True
+    except ImportError:
+        vllm_available = False
+        pytest.skip("vllm package not installed. Install with: pip install vllm")
+
+    if not vllm_available:
+        return
+
+    # Model and server configuration - using a very small model for faster testing
+    model_name = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+    port = 8000
+    host = "localhost"
+
+    # Launch vLLM server as subprocess
+    print(f"\n🚀 Launching vLLM server with model {model_name}...")
+    print("This may take a minute to download the model and start the server...")
+
+    vllm_process = None
+    startup_attempt = 0
+    max_startup_attempts = 1
+
+    while startup_attempt < max_startup_attempts:
+        startup_attempt += 1
+        try:
+            # Start vLLM server
+            vllm_process = subprocess.Popen(
+                [
+                    sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+                    "--model", model_name,
+                    "--port", str(port),
+                    "--host", host,
+                    "--disable-log-requests",
+                    "--max-model-len", "4096",  # Reduce memory usage
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            # Wait for server to be ready
+            max_wait = 120  # seconds
+            start_time = time.time()
+            server_ready = False
+
+            print(f"⏳ Waiting for vLLM server to be ready (max {max_wait}s)...")
+
+            while time.time() - start_time < max_wait:
+                try:
+                    import urllib.request
+                    import urllib.error
+
+                    req = urllib.request.urlopen(f"http://{host}:{port}/health", timeout=2)
+                    if req.status == 200:
+                        server_ready = True
+                        print(f"✅ vLLM server is ready at http://{host}:{port}")
+                        break
+                except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+                    pass
+
+                # Check if process is still running
+                poll_result = vllm_process.poll()
+                if poll_result is not None:
+                    stdout, stderr = vllm_process.communicate()
+                    print(f"❌ vLLM server exited unexpectedly with code {poll_result}")
+                    print(f"STDOUT: {stdout}")
+                    print(f"STDERR: {stderr}")
+
+                    if startup_attempt < max_startup_attempts:
+                        print(f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})...")
+                        time.sleep(2)
+                        break
+                    else:
+                        pytest.skip(f"vLLM server failed to start after {max_startup_attempts} attempts (exit code: {poll_result})")
+
+                time.sleep(2)
+
+            if server_ready:
+                break
+
+        except Exception as e:
+            print(f"❌ Error starting vLLM server: {e}")
+            if startup_attempt < max_startup_attempts:
+                print(f"🔄 Retrying startup (attempt {startup_attempt + 1}/{max_startup_attempts})...")
+                time.sleep(2)
+            else:
+                pytest.skip(f"vLLM server failed to start after {max_startup_attempts} attempts: {e}")
+
+        if not server_ready and startup_attempt >= max_startup_attempts:
+            pytest.skip(f"vLLM server did not start after {max_startup_attempts} attempts")
+
+    # Yield control to tests
+    try:
+        yield vllm_process
+    finally:
+        # Clean up: shut down server
+        if vllm_process:
+            print("\n🛑 Shutting down vLLM server...")
+            try:
+                # Try graceful shutdown first
+                vllm_process.terminate()
+                try:
+                    vllm_process.wait(timeout=10)
+                    print("✅ vLLM server shut down gracefully")
+                except subprocess.TimeoutExpired:
+                    # Force kill if graceful shutdown fails
+                    vllm_process.kill()
+                    vllm_process.wait()
+                    print("✅ vLLM server shut down forcefully")
+            except Exception as e:
+                print(f"⚠️  Error shutting down vLLM server: {e}")
+                try:
+                    vllm_process.kill()
+                except (OSError, ProcessLookupError):
+                    pass
+
+
 @pytest.fixture
-async def vllm_provider():
-    """Create vLLM provider and check if available."""
+async def vllm_provider(vllm_server):
+    """Create vLLM provider using the running server."""
     provider = OpenAIProvider(
         api_key="EMPTY",
         base_url="http://localhost:8000/v1",
         timeout=300,
     )
 
-    try:
-        # Try a simple request to check if vLLM is running
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:8000/health", timeout=5.0)
-            if response.status_code != 200:
-                pytest.skip("vLLM server not healthy")
+    yield provider
 
-        yield provider
-    except (ConnectError, HTTPError, Exception) as e:
-        pytest.skip(f"vLLM is not running: {e}")
-    finally:
-        await provider.close()
+    await provider.close()
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_vllm_server_health():
+async def test_vllm_server_health(vllm_server):
     """Test vLLM server health endpoint."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:8000/health", timeout=5.0)
-            assert response.status_code == 200
-            print(f"\nvLLM server is healthy: {response.text}")
-    except Exception as e:
-        pytest.skip(f"vLLM server not running: {e}")
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://localhost:8000/health", timeout=5.0)
+        assert response.status_code == 200
+        print(f"\nvLLM server is healthy: {response.text}")
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_vllm_models_endpoint():
+async def test_vllm_models_endpoint(vllm_server):
     """Test vLLM models endpoint."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:8000/v1/models", timeout=5.0)
-            assert response.status_code == 200
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://localhost:8000/v1/models", timeout=5.0)
+        assert response.status_code == 200
 
-            data = response.json()
-            assert "data" in data
-            assert len(data["data"]) > 0
+        data = response.json()
+        assert "data" in data
+        assert len(data["data"]) > 0
 
-            model = data["data"][0]
-            print(f"\nLoaded model: {model.get('id', 'unknown')}")
-
-    except Exception as e:
-        pytest.skip(f"vLLM server not running: {e}")
+        model = data["data"][0]
+        print(f"\nLoaded model: {model.get('id', 'unknown')}")
 
 
 @pytest.mark.asyncio
