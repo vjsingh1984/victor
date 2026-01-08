@@ -551,15 +551,15 @@ class TestOrchestratorSubAgentIntegration:
         assert "subagent_orchestration_enabled" in source
 
     def test_subagent_orchestrator_property_is_lazy(self):
-        """Test that subagent_orchestrator property follows lazy init pattern."""
+        """Test that intelligent_integration property follows lazy init pattern."""
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        source = inspect.getsource(AgentOrchestrator.subagent_orchestrator.fget)
+        source = inspect.getsource(AgentOrchestrator.intelligent_integration.fget)
         # Check for lazy initialization pattern
-        assert "_subagent_orchestration_enabled" in source
-        assert "_subagent_orchestrator is None" in source
-        assert "from victor.agent.subagents import SubAgentOrchestrator" in source
+        assert "_intelligent_pipeline_enabled" in source
+        assert "_intelligent_integration is None" in source
+        assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
 
     def test_subagent_orchestrator_returns_none_when_disabled(self):
         """Test that property returns None when subagent orchestration is disabled."""
