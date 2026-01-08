@@ -7,7 +7,9 @@ import asyncio
 from victor.tools.code_review_tool import code_review
 
 # Get project root for absolute paths
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 @pytest.mark.asyncio
