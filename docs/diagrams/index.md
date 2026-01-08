@@ -6,87 +6,85 @@ Visual documentation for Victor's architecture, workflows, and data flow.
 
 | Diagram Type | Count | Location |
 |--------------|-------|----------|
-| **Architecture** | 4 Mermaid | [Architecture →](architecture/) |
-| **Workflows** | 55 SVG | [Workflows →](workflows/) |
+| **Architecture** | 4 SVG | [Architecture →](architecture/) |
+| **Workflows** | 55 SVG | [Workflow Diagrams →](../workflow-diagrams/) |
 | **Sequences** | 3 Mermaid | [Sequences →](sequences/) |
 
 ---
 
 ## Architecture Diagrams
 
-High-level architecture and system design diagrams.
+High-level architecture and system design diagrams (SVG format).
 
 ### System Architecture
 
-**File**: [architecture/system-overview.mmd](system-overview.mmd)
+**File**: [architecture/system-overview.svg](architecture/system-overview.svg)
 
 Victor's layered architecture with clear separation of concerns.
 
 **Shows**:
-- Client Layer (CLI, TUI, HTTP API, MCP)
-- Orchestration Layer (Agent Orchestrator, Conversation Controller)
-- Core Layer (Providers, Tools, Workflows, Verticals)
-- Infrastructure Layer (DI Container, Event Bus, Config, Storage)
+- Client Layer (CLI, TUI, HTTP API, MCP Server, VS Code, API Server)
+- Orchestration Layer (Agent Orchestrator, Conversation Controller, Tool Pipeline, Streaming Controller, Provider Manager)
+- Core Layer (21 Providers, 55+ Tools, Workflows, 5 Verticals)
+- Infrastructure Layer (DI Container, Event Bus, Configuration, Storage, Bootstrap)
+
+**Preview**:
+![System Architecture](architecture/system-overview.svg)
 
 **Use when**: Understanding Victor's overall design
 
 ### Provider System
 
-**File**: [architecture/provider-system.mmd](provider-system.mmd)
+**File**: [architecture/provider-system.svg](architecture/provider-system.svg)
 
 Provider abstraction and switching mechanism.
 
 **Shows**:
-- Provider Registry
+- Provider Registry (Singleton)
 - Base Provider Protocol
-- 21 Provider Implementations
-- Circuit Breaker
-- Resilient Provider Wrapper
+- 21 Provider Implementations (Local, Cloud, Enterprise)
+- Resilient Provider Wrapper (Circuit Breaker, Retry, Timeout, Metrics)
+- Provider Manager (select, switch, health_check, fallback)
+- Context Independence principle
 
-**Use when**: Understanding how providers work
+**Preview**:
+![Provider System](architecture/provider-system.svg)
 
-### Tool Execution Flow
-
-**File**: [sequences/tool-execution.mmd](../sequences/tool-execution.mmd)
-
-Sequence diagram for tool execution.
-
-**Shows**:
-- User → Orchestrator → Tool Pipeline → Tool → File System
-- Request validation
-- Tool execution
-- Result formatting
-- Response to user
-
-**Use when**: Understanding tool execution
+**Use when**: Understanding how providers work and context independence
 
 ### Configuration System
 
-**File**: [architecture/config-system.mmd](config-system.mmd)
+**File**: [architecture/config-system.svg](architecture/config-system.svg)
 
 Configuration loading and priority.
 
 **Shows**:
-- Environment Variables
-- Config Files (YAML)
-- Defaults
-- Config Loader
-- Validator
-- Settings
+- Configuration Sources (Environment Variables, YAML Files, Project Context, Defaults)
+- Config Loader (load, Priority Resolution)
+- Config Validator (validate, Schema Validation, Merge Configs)
+- Settings Object (Provider, Tool, Logging, Cache, UI, Workflow Settings)
+- Config Consumers (Orchestrator, Providers, Tools, Workflows, Server)
+
+**Preview**:
+![Configuration System](architecture/config-system.svg)
 
 **Use when**: Understanding configuration
 
 ### Multi-Agent Coordination
 
-**File**: [architecture/multi-agent.mmd](multi-agent.mmd)
+**File**: [architecture/multi-agent.svg](architecture/multi-agent.svg)
 
 Multi-agent team formations and coordination.
 
 **Shows**:
-- Team formations (hierarchical, flat, pipeline, consensus, debate)
-- Team Message Bus
-- Shared Memory
-- Agent communication
+- Team Formations (Hierarchical, Flat, Pipeline, Consensus, Debate)
+- Team Examples (Hierarchical team, Pipeline team)
+- Team Communication (TeamMessageBus, Pub/Sub, Broadcast, Direct Message, Shared Memory)
+- Coordination Patterns (Agent Orchestrator, create_coordinator(), Lifecycle Manager, Team State)
+- Persona Traits, Team Templates, and API Integration
+
+**Preview**:
+![Multi-Agent Coordination](architecture/multi-agent.svg)
 
 **Use when**: Understanding multi-agent teams
 
@@ -94,17 +92,18 @@ Multi-agent team formations and coordination.
 
 ## Workflow Diagrams
 
-Auto-generated SVG diagrams for 55 workflows.
+Auto-generated SVG diagrams for 55 workflows across 6 verticals.
 
-**Location**: [workflows/](workflows/)
+**Location**: [workflow-diagrams/](../workflow-diagrams/)
 
-**Naming Convention**: `{workflow-name}.svg`
+**Naming Convention**: `{vertical}_{workflow_name}.svg`
 
 **Examples**:
-- `code-review.svg`
-- `testing.svg`
-- `refactoring.svg`
-- `deployment.svg`
+- `coding_feature_implementation.svg`
+- `devops_deploy.svg`
+- `rag_document_ingest.svg`
+- `research_deep_research.svg`
+- `dataanalysis_eda_pipeline.svg`
 
 **Viewing**: Open directly in browser or markdown viewer
 
@@ -112,19 +111,27 @@ Auto-generated SVG diagrams for 55 workflows.
 
 | Category | Workflows | Description |
 |----------|-----------|-------------|
-| **Development** | 15 | Code generation, refactoring, testing |
-| **DevOps** | 10 | Deployment, monitoring, CI/CD |
-| **Documentation** | 8 | Doc generation, API docs, guides |
-| **Quality** | 7 | Code review, linting, security audit |
-| **Data** | 5 | Data processing, ETL, analysis |
-| **Research** | 5 | Literature review, summarization |
-| **And 5 more...** | 5 | Various specialized workflows |
+| **Coding** | 13 | Code generation, refactoring, testing, debugging, PR review |
+| **DevOps** | 4 | Deployment, containers, CI/CD |
+| **RAG** | 5 | Document ingest, queries, conversation, maintenance |
+| **Data Analysis** | 7 | EDA, ML pipelines, data cleaning, statistical analysis |
+| **Research** | 6 | Deep research, fact checking, literature review |
+| **Benchmark** | 11 | SWE-bench, HumanEval, code generation benchmarks |
+| **Core** | 4 | Explore, Plan, Build modes |
+
+**Key Workflows**:
+- **coding_feature_implementation.svg**: Full feature development workflow
+- **coding_tdd.svg**: Test-driven development cycle
+- **devops_deploy.svg**: Infrastructure deployment workflow
+- **rag_document_ingest.svg**: Document ingestion and embedding
+- **research_deep_research.svg**: Comprehensive research workflow
+- **benchmark_swe_bench.svg**: SWE-bench benchmark execution
 
 ---
 
 ## Sequence Diagrams
 
-Detailed sequence diagrams for key operations.
+Detailed sequence diagrams for key operations (Mermaid format).
 
 ### Tool Execution Sequence
 
@@ -138,6 +145,19 @@ Detailed sequence of tool execution flow.
 - Tool Pipeline
 - Tool
 - File System
+- Provider
+
+**Shows**:
+- Task parsing and validation
+- Tool request validation
+- Tool execution with security checks
+- File system operations
+- Result formatting and LLM processing
+- Performance metrics (~2-3 seconds total)
+
+**Viewing**: Open in [Mermaid Live Editor](https://mermaid.live/) or use VS Code Mermaid Preview extension
+
+**Use when**: Understanding tool execution security and validation
 
 ### Provider Switch Sequence
 
@@ -149,8 +169,19 @@ How provider switching preserves context.
 - User
 - Agent Orchestrator
 - Conversation Controller
-- Provider A
-- Provider B
+- Provider A (Anthropic)
+- Provider B (OpenAI)
+
+**Shows**:
+- Conversation initialization
+- Context history management
+- Provider switching with preserved context
+- Message accumulation across providers
+- Context independence principle
+
+**Viewing**: Open in [Mermaid Live Editor](https://mermaid.live/) or use VS Code Mermaid Preview extension
+
+**Use when**: Understanding provider switching and context preservation
 
 ### Workflow Execution Sequence
 
@@ -160,18 +191,42 @@ End-to-end workflow execution.
 
 **Participants**:
 - User
-- Workflow Executor
-- Nodes
-- Tools
-- Providers
+- Workflow Executor (UnifiedCompiler)
+- Workflow Graph (StateGraph)
+- Nodes (Agent, Compute, Transform)
+- LLM Provider
+
+**Shows**:
+- YAML workflow loading and validation
+- Node execution (Agent, Compute, Transform nodes)
+- State management and updates
+- Graph traversal and node transitions
+- Final state compilation (~5-10 seconds depending on complexity)
+
+**Viewing**: Open in [Mermaid Live Editor](https://mermaid.live/) or use VS Code Mermaid Preview extension
+
+**Use when**: Understanding workflow execution and node types
 
 ---
 
 ## Viewing Diagrams
 
-### Mermaid Diagrams
+### Architecture Diagrams (SVG)
 
-**Online Viewer**: https://mermaid.live/
+**Browser**: Open directly in any modern browser
+
+**Markdown**: Embed in markdown
+```markdown
+![System Architecture](docs/diagrams/architecture/system-overview.svg)
+```
+
+**VS Code**: Built-in SVG preview
+
+**Image Viewers**: Most image viewers support SVG
+
+### Sequence Diagrams (Mermaid)
+
+**Online Viewer**: [Mermaid Live Editor](https://mermaid.live/)
 
 **VS Code**: Install Mermaid Preview extension
 ```bash
@@ -181,286 +236,116 @@ code --install-extension bierner.markdown-mermaid
 **CLI**: Install mermaid-cli
 ```bash
 npm install -g @mermaid-js/mermaid-cli
-mmdc -i diagram.mmd -o diagram.png
+mmdc -i diagram.mmd -o diagram.svg
 ```
 
-### SVG Diagrams
-
-**Browser**: Open directly in any modern browser
-
-**Markdown**: Embed in markdown
+**Markdown**: Embed directly in markdown
 ```markdown
-![Workflow](workflows/code-review.svg)
+```mermaid
+sequenceDiagram
+    User->>System: Request
+    System-->>User: Response
 ```
-
-**VS Code**: Built-in SVG preview
+```
 
 ---
 
-## Creating Diagrams
+## Creating New Diagrams
 
-### Mermaid Diagrams
+### Architecture Diagrams (SVG)
 
-**1. Create diagram file**:
-```bash
-# .mmd file
-touch docs/diagrams/architecture/my-diagram.mmd
-```
+Use SVG for new architecture diagrams:
 
-**2. Write Mermaid syntax**:
-```mermaid
-flowchart TB
-    A[Start] --> B[Process]
-    B --> C[End]
-```
+1. Create file: `docs/diagrams/architecture/my-diagram.svg`
+2. Use consistent styling from existing diagrams
+3. Ensure all special characters are properly escaped (`&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`)
+4. Update this index to reference the new diagram
 
-**3. Reference in documentation**:
-```markdown
-```mermaid
-flowchart TB
-    A[Start] --> B[Process]
-```
-```
+### Sequence Diagrams (Mermaid)
 
-### Best Practices
+Use Mermaid for new sequence diagrams:
 
-**1. Keep it simple**: Avoid cluttering diagrams
-**2. Use consistent styling**: Same colors for similar concepts
-**3. Add labels**: Clear, descriptive labels
-**4. Maintain readability**: Minimum font size 12px
-**5. Version control**: Commit .mmd source files
+1. Create file: `docs/diagrams/sequences/my-sequence.mmd`
+2. Write Mermaid syntax for sequence diagrams
+3. Update this index to reference the new diagram
 
-### Color Scheme
+**Benefits of Mermaid for Sequence Diagrams**:
+- Easy to read and edit
+- Text-based version control
+- Quick to modify
+- Good for showing interactions and flows
 
-**Victor Standard Colors**:
+**Benefits of SVG for Architecture Diagrams**:
+- **Scalable**: Infinite resolution without quality loss
+- **Professional**: Higher quality than mermaid for complex diagrams
+- **Editable**: Can be modified with vector graphics tools
+- **Accessible**: Supports alt text and descriptions
+- **Compact**: Smaller file sizes than raster images
+
+### Workflow Diagrams
+
+Workflow diagrams are auto-generated from YAML definitions. See [Workflow Development Guide](../guides/workflow-development/) for details.
+
+---
+
+## Best Practices
+
+**1. Consistent Styling**: Use the color scheme from existing diagrams
+**2. Clear Labels**: All components should have descriptive labels
+**3. Readable Text**: Minimum font size 10pt for readability
+**4. High Contrast**: Ensure good contrast for accessibility
+**5. Descriptive Alt Text**: Add alt text when embedding in markdown
+**6. Version Control**: Always commit SVG source files
+
+### Color Scheme (Victor Standard)
+
 ```css
-/* Primary */
-Blue: #0066CC
-Green: #009933
-Orange: #FF6600
+/* Primary Colors */
+Blue: #1976D2 (Client layer, User interactions)
+Purple: #7B1FA2 (Orchestration, Management)
+Green: #388E3C (Core components, Success)
+Orange: #F57C00 (Infrastructure, Warnings)
+Pink: #C2185B (Providers, External systems)
 
-/* Neutral */
-Gray: #666666
-Light Gray: #CCCCCC
-
-/* Semantic */
-Success: #009933
-Warning: #FF9900
-Error: #CC0000
-Info: #0066CC
+/* Gradients */
+Light Blue: #E3F2FD to #BBDEFB
+Light Purple: #F3E5F5 to #E1BEE7
+Light Green: #E8F5E9 to #C8E6C9
+Light Orange: #FFF3E0 to #FFE0B2
+Light Pink: #FCE4EC to #F8BBD0
 ```
 
 ---
 
 ## Diagram Maintenance
 
-### Updating Diagrams
+### When to Update
 
 **Architecture Diagrams**: Update when:
 - Major architectural changes
 - New components added
 - Data flow changes
-- Provider changes
-
-**Workflow Diagrams**: Auto-generated from YAML:
-```bash
-# Regenerate all workflows
-victor workflows generate-diagrams
-```
+- Provider/Tool count changes significantly
 
 **Sequence Diagrams**: Update when:
 - New interaction patterns
 - Protocol changes
 - API changes
+- New execution flows
+
+**Workflow Diagrams**: Auto-regenerate from YAML:
+```bash
+# Workflow diagrams are auto-generated
+# See workflow documentation for details
+```
 
 ### Version Control
 
-**Always commit source files** (.mmd):
+**Always commit SVG files**:
 ```bash
-git add docs/diagrams/**/*.mmd
+git add docs/diagrams/**/*.svg
 git commit -m "Update diagrams"
 ```
-
-**Generate images in CI**:
-```yaml
-# .github/workflows/diagrams.yml
-- name: Generate diagrams
-  run: |
-    pip install mermaid-cli
-    mmdc -i docs/diagrams/**/*.mmd -o docs/diagrams/**/*.png
-```
-
----
-
-## Diagram Index
-
-### Architecture Diagrams
-
-| Diagram | File | Size | Last Updated |
-|---------|------|------|--------------|
-| System Overview | architecture/system-overview.mmd | 50 KB | 2025-01-07 |
-| Provider System | architecture/provider-system.mmd | 35 KB | 2025-01-07 |
-| Config System | architecture/config-system.mmd | 25 KB | 2025-01-07 |
-| Multi-Agent | architecture/multi-agent.mmd | 40 KB | 2025-01-07 |
-
-### Sequence Diagrams
-
-| Diagram | File | Size | Last Updated |
-|---------|------|------|--------------|
-| Tool Execution | sequences/tool-execution.mmd | 30 KB | 2025-01-07 |
-| Provider Switch | sequences/provider-switch.mmd | 25 KB | 2025-01-07 |
-| Workflow Execution | sequences/workflow-execution.mmd | 35 KB | 2025-01-07 |
-
-### Workflow Diagrams (55 Total)
-
-| Category | Count | Examples |
-|----------|-------|----------|
-| Development | 15 | code-generation, refactoring, testing |
-| DevOps | 10 | deployment, monitoring, ci-cd |
-| Documentation | 8 | api-docs, guides, tutorials |
-| Quality | 7 | code-review, linting, security |
-| Data | 5 | etl, analysis, processing |
-| Research | 5 | literature-review, summarization |
-| Other | 5 | Various specialized workflows |
-
----
-
-## Export Options
-
-### Export to PNG
-
-```bash
-# Single diagram
-mmdc -i diagram.mmd -o diagram.png -w 2048 -H 1024
-
-# All diagrams
-find docs/diagrams -name "*.mmd" -exec mmdc -i {} -o {}.png \;
-```
-
-### Export to SVG
-
-```bash
-# Single diagram
-mmdc -i diagram.mmd -o diagram.svg
-
-# All diagrams
-find docs/diagrams -name "*.mmd" -exec sh -c 'mmdc -i $0 -o ${0%.mmd}.svg' {} \;
-```
-
-### Export to PDF
-
-```bash
-# Single diagram
-mmdc -i diagram.mmd -o diagram.pdf
-
-# All diagrams in one PDF
-convert *.svg diagrams.pdf
-```
-
----
-
-## Interactive Diagrams
-
-### Mermaid Live Editor
-
-**URL**: https://mermaid.live/
-
-**Features**:
-- Real-time preview
-- Syntax highlighting
-- Error checking
-- Export options (PNG, SVG)
-
-**Workflow**:
-1. Open https://mermaid.live/
-2. Paste Mermaid code
-3. View live preview
-4. Export when ready
-
-### VS Code Extension
-
-**Extension**: Mermaid Preview
-
-**Install**:
-```bash
-code --install-extension bierner.markdown-mermaid
-```
-
-**Use**:
-1. Open .mmd file
-2. Open command palette (Cmd/Ctrl+Shift+P)
-3. Run "Mermaid: Open Preview"
-4. View side-by-side
-
----
-
-## Accessibility
-
-### Alt Text
-
-Always provide alt text for diagrams:
-
-```markdown
-![System architecture diagram showing Victor's layered architecture](system-overview.mmd "System Architecture")
-```
-
-### Descriptions
-
-Add detailed descriptions for complex diagrams:
-
-```markdown
-## System Architecture
-
-The system architecture consists of four layers:
-
-1. **Client Layer**: CLI, TUI, HTTP API, MCP Server interfaces
-2. **Orchestration Layer**: Agent coordination and conversation management
-3. **Core Layer**: Providers, tools, workflows, verticals
-4. **Infrastructure Layer**: DI container, event bus, configuration
-
-[Diagram](system-overview.mmd)
-```
-
-### High Contrast
-
-Use high contrast colors for accessibility:
-- Dark text on light background (or vice versa)
-- Minimum contrast ratio 4.5:1
-- Avoid color-only information
-
----
-
-## Troubleshooting
-
-### Diagram Not Rendering
-
-**Issue**: Mermaid diagram not rendering in markdown
-
-**Solution**:
-1. Check syntax at https://mermaid.live/
-2. Ensure correct fencing: ```mermaid
-3. Check for unsupported features
-4. Verify markdown renderer supports Mermaid
-
-### SVG Not Displaying
-
-**Issue**: SVG image not displaying
-
-**Solution**:
-1. Check file path is correct
-2. Verify SVG file exists
-3. Check file permissions
-4. Try different markdown renderer
-
-### Diagram Too Large
-
-**Issue**: Diagram exceeds size limits
-
-**Solution**:
-1. Break into smaller diagrams
-2. Use subgraphs
-3. Reduce detail level
-4. Create overview + detailed views
 
 ---
 
@@ -473,4 +358,4 @@ Use high contrast colors for accessibility:
 
 ---
 
-**Next**: [Architecture Diagrams →](architecture/) | [Workflow Diagrams →](workflows/) | [Sequence Diagrams →](sequences/)
+**Next**: [Architecture Diagrams →](architecture/) | [Workflow Diagrams →](../workflow-diagrams/) | [Sequence Diagrams →](sequences/)
