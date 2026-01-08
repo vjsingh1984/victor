@@ -483,7 +483,7 @@ async def run_oneshot(
     task_type: Optional[str] = None
 
     try:
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         classifier = ComplexityClassifier(use_semantic=False)
         classification = classifier.classify(message)

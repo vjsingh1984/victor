@@ -77,7 +77,7 @@ if TYPE_CHECKING:
     # Factory-created components (type hints only)
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.search_router import SearchRouter
-    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.metrics_collector import MetricsCollector
     from victor.agent.conversation_controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
