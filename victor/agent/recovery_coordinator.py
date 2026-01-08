@@ -180,18 +180,23 @@ class StreamingRecoveryCoordinator:
         """
         result = self.streaming_handler.check_time_limit(ctx.streaming_context)
         if result:
-            # Emit STATE event for time limit reached
+            # Emit STATE event for time limit reached (fire-and-forget)
             if self._event_bus:
                 try:
-                    await self._event_bus.emit(
-                        topic="state.recovery.time_limit_reached",
-                        data={
-                            "elapsed_time": ctx.elapsed_time,
-                            "iteration": ctx.iteration,
-                            "tool_calls_used": ctx.tool_calls_used,
-                            "category": "state",  # Preserve for observability
-                        },
-                        source="RecoveryCoordinator",
+                    import asyncio
+
+                    # Schedule the coroutine without blocking - avoids RuntimeWarning
+                    asyncio.create_task(
+                        self._event_bus.emit(
+                            topic="state.recovery.time_limit_reached",
+                            data={
+                                "elapsed_time": ctx.elapsed_time,
+                                "iteration": ctx.iteration,
+                                "tool_calls_used": ctx.tool_calls_used,
+                                "category": "state",  # Preserve for observability
+                            },
+                            source="RecoveryCoordinator",
+                        )
                     )
                 except Exception as e:
                     logger.debug(f"Failed to emit time limit event: {e}")
