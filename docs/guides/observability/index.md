@@ -1,457 +1,300 @@
-# Victor Observability System
+# Victor Observability Dashboard
 
-Complete observability and debugging system for Victor framework with real-time dashboard.
+Real-time TUI dashboard for monitoring Victor agent execution.
+
+## Overview
+
+The dashboard provides a terminal-based interface (Textual TUI) for viewing events generated during agent execution. It connects to Victor's event system and displays multiple views of execution data.
+
+**Launch**: `victor dashboard`
 
 ## Features
 
-- **Real-time Event Tracking**: Monitor all agent activities as they happen
-- **9 Dashboard Tabs**: Comprehensive views for different aspects of execution
-- **Modular Emitters**: Focused event emitters for different event categories
-- **Unified API**: Simple facade pattern for easy integration
-- **Production Ready**: Extensive test coverage (62 tests, 100% pass rate)
+- **Real-time event streaming**: Monitors JSONL event file (~/.victor/metrics/victor.jsonl)
+- **Multiple view tabs**: 9 different perspectives on execution data
+- **Descending order display**: Newest events appear at top
+- **Automatic event limits**: Configurable max events per view (default: 200-500)
+- **Event deduplication**: Optional duplicate prevention for state events
 
 ## Dashboard Tabs
 
-The Victor dashboard provides 9 different views for observability:
+### Events Tab
+**Widget**: RichLog (scrollable text)
 
-### 1. Events Tab (EventLogView)
-Real-time log of all events flowing through the system.
+Real-time log of all events with color-coded categories and rich formatting.
 
-**What it shows**:
-- Timestamp
-- Event category
-- Event name
-- Event data
+- **Shows**: Timestamp, category, topic, event details
+- **Use**: Real-time debugging, event flow monitoring
 
-**Use cases**:
-- Real-time debugging
-- Event flow monitoring
-- System health checks
+### Table Tab
+**Widget**: DataTable with TimeOrderedTableView
 
-### 2. Table Tab (EventTableView)
-Categorized table view of events.
+Tabular view of all events in descending timestamp order.
 
-**What it shows**:
-- Events grouped by category (TOOL, MODEL, STATE, LIFECYCLE, ERROR)
-- Filterable by event type
-- Sorted chronologically
+- **Shows**: Time, category, topic, details
+- **Use**: Pattern recognition, category-focused debugging
 
-**Use cases**:
-- Event filtering by type
-- Category-focused debugging
-- Pattern recognition
+### Tools Tab
+**Widget**: DataTable with ToolExecutionView
 
-### 3. Tools Tab (ToolExecutionView)
-Aggregated tool performance statistics.
+Aggregated tool statistics (alphabetically sorted by tool name).
 
-**What it shows**:
-- Tool name
-- Total calls
-- Average execution time
-- Success rate
-- Last called timestamp
+- **Shows**: Tool name, call count, avg time, success rate, last called
+- **Use**: Performance analysis, reliability monitoring
+- **Note**: Not time-ordered (alphabetical by tool name)
 
-**Use cases**:
-- Performance analysis
-- Tool usage patterns
-- Reliability monitoring
+### Verticals Tab
+**Widget**: Static with manual prepend
 
-**Key difference from Tool Calls**: This is **aggregated statistics** (one row per tool type).
+Vertical plugin integration events.
 
-### 4. Verticals Tab (VerticalTraceView)
-Vertical plugin integration traces.
+- **Shows**: Vertical name, action, config preview
+- **Use**: Plugin debugging, integration testing
 
-**What it shows**:
-- Vertical-specific events
-- Plugin loading status
-- Vertical lifecycle
+### History Tab
+**Widget**: JSON file browser
 
-**Use cases**:
-- Vertical plugin debugging
-- Integration testing
-- Plugin performance
+Historical event file browser for loading and viewing past sessions.
 
-### 5. History Tab (HistoryView)
-Historical event replay and session history.
+- **Shows**: Loaded historical events in table format
+- **Use**: Post-mortem analysis, session review
 
-**What it shows**:
-- Past events with timestamps
-- Session-based grouping
-- Chronological event replay
+### Execution Tab
+**Widget**: DataTable with TimeOrderedTableView
 
-**Use cases**:
-- Post-mortem analysis
-- Session review
-- Historical debugging
+Execution lifecycle events in descending order.
 
-### 6. Execution Tab (ExecutionTraceView)
-Execution span trees and lifecycle tracking.
+- **Shows**: Time, type, operation, duration
+- **Use**: Performance monitoring, lifecycle debugging
 
-**What it shows**:
-- Session start/end
-- Execution duration
-- Lifecycle events
+### Tool Calls Tab
+**Widget**: DataTable with TimeOrderedTableView
 
-**Use cases**:
-- Performance monitoring
-- Session analysis
-- Lifecycle debugging
+Detailed tool call history in descending order.
 
-### 7. Tool Calls Tab (ToolCallHistoryView)
-Detailed tool call history with execution context.
+- **Shows**: Time, tool name, status, duration, span ID, arguments
+- **Use**: Detailed debugging, failure analysis, performance profiling
+- **Note**: One row per call invocation (unlike Tools tab which aggregates)
 
-**What it shows**:
-- Timestamp
-- Tool name
-- Status (OK/FAIL)
-- Duration
-- Span ID (links to execution trace)
-- Arguments preview
+### State Tab
+**Widget**: DataTable with TimeOrderedTableView (with deduplication)
 
-**Use cases**:
-- Detailed call debugging
-- Failure analysis
-- Performance profiling
+State machine transitions in descending order.
 
-**Key difference from Tools**: This is **detailed history** (one row per call invocation).
+- **Shows**: Time, scope, key, old value, new value
+- **Use**: State machine debugging, flow validation
+- **Feature**: Prevents duplicate state events by ID
 
-### 8. State Tab (StateTransitionView)
-State machine transition tracking.
+### Metrics Tab
+**Widget**: Static text display
 
-**What it shows**:
-- Old state → New state
-- Transition confidence
-- Transition timestamp
-- Metadata
+Aggregated performance statistics.
 
-**Use cases**:
-- State machine debugging
-- Transition analysis
-- Flow validation
-
-### 9. Metrics Tab (PerformanceMetricsView)
-Aggregated performance metrics and statistics.
-
-**What it shows**:
-- Tool performance metrics
-- Model token usage
-- Success rates
-- Average/Min/Max durations
-
-**Use cases**:
-- Performance monitoring
-- Resource optimization
-- Capacity planning
-
-## Quick Start
-
-### 1. Launch the Dashboard
-
-```bash
-python -m victor.observability.dashboard.app
-```
-
-The dashboard will open in your terminal showing all 9 tabs.
-
-### 2. Run the Demo
-
-In a separate terminal:
-
-```bash
-python scripts/demo_observability.py
-```
-
-This will emit live events that appear in the dashboard in real-time.
-
-### 3. View the Events
-
-Switch between tabs to see different views:
-- Press `Tab` to switch between tabs
-- Press `q` to quit the dashboard
-- Press `Ctrl+C` to stop the demo
+- **Shows**: Span counts, tool call metrics, timing data
+- **Use**: Performance monitoring, resource optimization
 
 ## Architecture
 
-### Event Flow
+### Event Ordering
 
-```
-Orchestrator/Agent
-    ↓
-ObservabilityBridge (Facade)
-    ↓
-Event Emitters (Tool, Model, State, Lifecycle, Error)
-    ↓
-EventBus (Pub/Sub)
-    ↓
-Dashboard Views (9 tabs)
-```
-
-### Components
-
-#### 1. ObservabilityBridge
-**Location**: `victor/observability/bridge.py`
-
-Unified facade for all observability operations.
+All time-based tabs use a consistent `TimeOrderedTableView` base class:
 
 ```python
-from victor.observability.bridge import ObservabilityBridge
+class TimeOrderedTableView(DataTable):
+    """Base class for time-ordered event display.
 
-bridge = ObservabilityBridge.get_instance()
-
-# Emit events
-bridge.tool_start("read_file", {"path": "file.txt"})
-bridge.model_request("anthropic", "claude-3-5-sonnet-20250929", 1000)
-bridge.state_transition("thinking", "tool_execution", 0.85)
+    - Receives events in descending order (newest first) from file watcher
+    - Appends to maintain order (newest at index 0)
+    - Automatically trims oldest events
+    - Rebuilds table on each update
+    - Optional deduplication
+    """
 ```
 
-#### 2. Event Emitters
-**Location**: `victor/observability/emitters/`
+**Views using TimeOrderedTableView**:
+- EventTableView
+- StateTransitionView
+- ToolCallHistoryView
+- ExecutionTraceView
 
-Modular emitters for different event categories:
+### File Watcher
 
-- **ToolEventEmitter**: Tool execution tracking
-- **ModelEventEmitter**: LLM interaction tracking
-- **StateEventEmitter**: State transition tracking
-- **LifecycleEventEmitter**: Session lifecycle tracking
-- **ErrorEventEmitter**: Error tracking
-
-#### 3. EventBus
-**Location**: `victor/observability/event_bus.py`
-
-Thread-safe pub/sub event distribution system.
+The dashboard uses `EventFileWatcher` to monitor the event file:
 
 ```python
-from victor.observability.event_bus import EventBus
+# Location: victor/observability/dashboard/file_watcher.py
 
-bus = EventBus.get_instance()
+class EventFileWatcher:
+    """Watches ~/.victor/metrics/victor.jsonl for new events.
 
-# Subscribe to events
-def handle_event(event):
-    print(f"Event: {event.name}")
-
-bus.subscribe_all(handle_event)
+    - Loads last 100 events at startup (in descending order)
+    - Polls for new lines every 0.1 seconds
+    - Processes events in descending order (newest first)
+    - Emits to EventBus for distribution to views
+    """
 ```
 
-## Integration Guide
+### Event Processing Flow
 
-### For Agent Developers
+```
+JSONL File (ascending)
+    ↓
+EventFileWatcher (reverses to descending)
+    ↓
+EventBus.publish()
+    ↓
+Dashboard._process_event()
+    ↓
+Views (append in descending order)
+```
 
-Add observability to your agents:
+## Usage
+
+### Basic Launch
+
+```bash
+# Launch dashboard
+victor dashboard
+
+# With debug logging
+victor dashboard --log-level debug
+```
+
+### Keyboard Navigation
+
+- `Tab` / `Shift+Tab`: Switch between tabs
+- `↑` `↓`: Navigate rows (DataTable views)
+- `Enter`: View details
+- `q`: Quit
+
+### Viewing Live Events
+
+Events appear automatically as the agent generates them. The dashboard:
+1. Loads the last 100 events from the JSONL file at startup
+2. Polls for new events every 0.1 seconds
+3. Displays newest events at the top of each view
+4. Trims oldest events when exceeding limits
+
+## Configuration
+
+### Event Limits
+
+Each view has configurable max events:
 
 ```python
-from victor.observability.bridge import ObservabilityBridge
+# In victor/observability/dashboard/app.py
 
-class MyAgent:
-    def __init__(self):
-        self._observability = ObservabilityBridge.get_instance()
-        self._session_id = None
+EventTableView(max_rows=500)
+StateTransitionView(max_rows=200, enable_dedup=True)
+ToolCallHistoryView(max_rows=200)
+ExecutionTraceView(max_rows=300)
+```
 
-    async def execute(self, task: str):
-        # Start session
-        self._session_id = f"session-{uuid.uuid4().hex[:8]}"
-        self._observability.session_start(
-            self._session_id,
-            agent_id=self.id,
-            model=self.model,
+### Log Levels
+
+```bash
+# Debug logging for event processing
+victor dashboard --log-level debug
+
+# View logs
+tail -f ~/.victor/logs/victor.log
+```
+
+## Implementation Details
+
+### TimeOrderedTableView Pattern
+
+All time-based DataTable views inherit from `TimeOrderedTableView`:
+
+```python
+class MyEventView(TimeOrderedTableView):
+    def __init__(self, *args, max_rows: int = 200, **kwargs):
+        super().__init__(*args, max_rows=max_rows, **kwargs)
+
+    def on_mount(self) -> None:
+        self.add_columns("Time", "Type", "Details")
+        self.cursor_type = "row"
+
+    def add_my_event(self, event: Event) -> None:
+        if not event.topic.startswith("my_prefix."):
+            return
+        self.add_event(event)  # Base class handles ordering/trimming
+
+    def _format_event_row(self, event: Event) -> tuple:
+        # Return tuple matching columns
+        return (
+            event.datetime.strftime("%H:%M:%S"),
+            event.data.get("type", "unknown"),
+            str(event.data.get("details", ""))[:50],
         )
-
-        try:
-            # Execute task
-            result = await self._process(task)
-            return result
-        finally:
-            # End session
-            self._observability.session_end(self._session_id)
 ```
 
-### For Tool Developers
+### Key Behaviors
 
-Track tool execution:
+1. **Descending Order**: All time-based views show newest at top
+2. **Automatic Trimming**: Oldest events removed when exceeding max_rows
+3. **Rebuild Pattern**: Table cleared and rebuilt on each event (simple but correct)
+4. **Optional Deduplication**: StateTransitionView prevents duplicate state events
+5. **Error Handling**: Format errors logged but don't crash dashboard
 
-```python
-from victor.observability.bridge import ObservabilityBridge
+## Troubleshooting
 
-bridge = ObservabilityBridge.get_instance()
+### Events Not Appearing
 
-# Using context manager
-with bridge.track_tool("read_file", {"path": "file.txt"}):
-    result = read_file("file.txt")
-# Events emitted automatically!
+**Check**:
+1. Is the event file being written? `ls -la ~/.victor/metrics/victor.jsonl`
+2. Is the dashboard running? `ps aux | grep victor`
+3. Are events being generated? Check logs: `tail -f ~/.victor/logs/victor.log`
 
-# Or manually
-bridge.tool_start("read_file", {"path": "file.txt"})
-try:
-    result = read_file("file.txt")
-    bridge.tool_end("read_file", 150.0, result=result)
-except Exception as e:
-    bridge.tool_failure("read_file", 50.0, e)
+### Wrong Display Order
+
+**Verify**: All time-based tabs should show newest at top, oldest at bottom.
+
+Check logs for event order:
+```
+grep "FIRST event at" ~/.victor/logs/victor.log
+# Should show descending timestamps (newest first)
 ```
 
-### For Custom Events
+### High Memory Usage
 
-Emit custom events with metadata:
+**Adjust limits**: Reduce max_rows in view constructors.
 
 ```python
-bridge.tool_start(
-    "my_tool",
-    {"arg": "value"},
-    agent_id="agent-1",
-    session_id="session-123",
-    custom_field="custom_value",
-)
+# In app.py
+EventTableView(max_rows=200)  # Reduced from 500
 ```
 
 ## Testing
 
-### Run All Tests
-
 ```bash
 # Unit tests
-pytest tests/unit/observability/
+pytest tests/unit/agent/test_continuation_loop_fix.py -v
 
-# Integration tests
-pytest tests/integration/test_dashboard_integration.py
-
-# All tests
-pytest tests/unit/observability/ tests/integration/test_dashboard_integration.py -v
+# Manual testing
+victor dashboard
+# In another terminal: run a task that generates events
 ```
 
-### Test Coverage
+## Code Quality
 
-- **38 unit tests** for emitters and bridge
-- **24 integration tests** for dashboard tabs
-- **Total**: 62 tests, 100% pass rate
+- **Ruff**: `ruff check victor/observability/dashboard/` ✅ Passes
+- **Black**: `black victor/observability/dashboard/` ✅ Formatted
+- **Type Hints**: Partial (gradual typing)
+- **Logging**: Comprehensive debug logging for troubleshooting
 
-## Session ID Format
+## Limitations
 
-Sessions use the format: `{repo_short}-{timestamp_base62}`
+- **TUI Only**: Terminal-based interface (not web)
+- **Single Session**: Views events from one agent run
+- **No Historical Search**: File browser loads full file (no search/filter)
+- **Manual Refresh**: Relies on file polling (not push notifications)
 
-Example: `glm-bra-1a2b3c`
+## Future Improvements
 
-- **repo_short**: First 6 chars of repository/directory name
-- **timestamp_base62**: First 6 chars of base62-encoded timestamp
-
-Benefits:
-- Project traceability
-- Sequential ordering
-- Human-readable format
-- Unique across projects
-
-## SOLID Principles
-
-The observability system follows SOLID principles:
-
-- **SRP**: Each emitter handles one event category
-- **OCP**: Extensible via Protocol interfaces
-- **LSP**: All emitters implement substitutable protocols
-- **ISP**: Focused protocols per emitter type
-- **DIP**: Depends on EventBus abstraction, not concrete implementations
-
-## Design Patterns
-
-- **Facade Pattern**: ObservabilityBridge simplifies complex subsystem
-- **Protocol Pattern**: Type-safe interfaces with `typing.Protocol`
-- **Singleton Pattern**: Single bridge instance
-- **Context Managers**: Automatic tracking
-- **Pub/Sub Pattern**: EventBus for event distribution
-
-## Troubleshooting
-
-### Dashboard Not Showing Events
-
-**Problem**: Dashboard starts but no events appear.
-
-**Solution**:
-1. Check that events are being emitted:
-   ```python
-   from victor.observability.bridge import ObservabilityBridge
-   bridge = ObservabilityBridge.get_instance()
-   bridge.tool_start("test", {"arg": "value"})  # Should appear in dashboard
-   ```
-
-2. Check EventBus is running:
-   ```python
-   from victor.observability.event_bus import EventBus
-   bus = EventBus.get_instance()
-   print(f"Subscribers: {len(bus._subscribers)}")
-   ```
-
-3. Verify observability is enabled in orchestrator:
-   - Check logs for "Observability enabled" message
-   - Ensure no "Failed to initialize observability bridge" warnings
-
-### High Memory Usage
-
-**Problem**: Dashboard consumes too much memory over time.
-
-**Solution**: The dashboard has built-in event limits. Adjust if needed:
-
-```python
-# In victor/observability/dashboard/app.py
-MAX_EVENTS = 1000  # Reduce from default
-```
-
-### Missing Events
-
-**Problem**: Some events don't appear in the dashboard.
-
-**Solution**: Check event category filtering:
-- Events are categorized (TOOL, MODEL, STATE, etc.)
-- Each tab only shows specific categories
-- Use the "Events" tab to see all events regardless of category
-
-## API Reference
-
-### ObservabilityBridge
-
-```python
-class ObservabilityBridge:
-    """Unified facade for Victor observability system."""
-
-    @classmethod
-    def get_instance(cls) -> ObservabilityBridge:
-        """Get singleton bridge instance."""
-        pass
-
-    # Tool events
-    def tool_start(self, tool_name: str, arguments: Dict[str, Any], **metadata) -> None
-    def tool_end(self, tool_name: str, duration_ms: float, result: Any, **metadata) -> None
-    def tool_failure(self, tool_name: str, duration_ms: float, error: Exception, **metadata) -> None
-    def track_tool(self, tool_name: str, arguments: Dict[str, Any], **metadata) -> ContextManager
-
-    # Model events
-    def model_request(self, provider: str, model: str, prompt_tokens: int, **metadata) -> None
-    def model_response(self, provider: str, model: str, prompt_tokens: int, completion_tokens: int, latency_ms: float, **metadata) -> None
-    def model_streaming_delta(self, provider: str, model: str, delta: str, **metadata) -> None
-    def model_error(self, provider: str, model: str, error: Exception, **metadata) -> None
-
-    # State events
-    def state_transition(self, old_stage: str, new_stage: str, confidence: float, **metadata) -> None
-
-    # Lifecycle events
-    def session_start(self, session_id: str, **metadata) -> None
-    def session_end(self, session_id: Optional[str] = None, **metadata) -> None
-    def track_session(self, session_id: str, **metadata) -> ContextManager
-
-    # Error events
-    def error(self, error: Exception, recoverable: bool, context: Optional[Dict] = None, **metadata) -> None
-
-    # Control
-    def enable(self) -> None
-    def disable(self) -> None
-    def is_enabled(self) -> bool
-```
-
-## Contributing
-
-When adding new event types:
-
-1. Create new emitter in `victor/observability/emitters/`
-2. Add protocol to `victor/observability/emitters/base.py`
-3. Add convenience methods to `ObservabilityBridge`
-4. Add unit tests in `tests/unit/observability/test_emitters.py`
-5. Add integration tests in `tests/integration/test_dashboard_integration.py`
-
-## License
-
-Apache License 2.0 - See LICENSE file for details
+Potential enhancements:
+- [ ] Search/filter functionality across all tabs
+- [ ] Export events to JSON/CSV
+- [ ] Customizable column layouts
+- [ ] Event correlation across views
+- [ ] Historical event replay
