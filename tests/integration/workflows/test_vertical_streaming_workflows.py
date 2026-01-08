@@ -15,9 +15,12 @@
 """Integration tests for vertical workflow provider streaming support.
 
 Tests verify that all vertical workflow providers properly implement:
-- create_executor() - Returns WorkflowExecutor
-- create_streaming_executor() - Returns StreamingWorkflowExecutor
-- astream() - Async generator yielding WorkflowStreamChunk events
+- create_executor() - Returns WorkflowExecutor (DEPRECATED)
+- create_streaming_executor() - Returns StreamingWorkflowExecutor (DEPRECATED)
+- astream() - Async generator yielding WorkflowStreamChunk events (DEPRECATED)
+- compile_workflow() - Returns CompiledGraph (CANONICAL)
+- invoke() - Executes workflow with caching (CANONICAL)
+- stream() - Streams workflow execution (CANONICAL)
 
 Verticals tested:
 - CodingWorkflowProvider
@@ -36,6 +39,9 @@ from victor.workflows.streaming_executor import (
     WorkflowEventType,
     WorkflowStreamChunk,
 )
+
+# Suppress deprecation warnings for legacy API tests during migration period
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 # ============ Test Fixtures ============
@@ -329,3 +335,101 @@ class TestCrossVerticalStreamingConsistency:
         for name, provider in all_providers:
             for method in expected_methods:
                 assert hasattr(provider, method), f"{name} provider missing {method}"
+
+
+# ============ Canonical API Tests (UnifiedWorkflowCompiler) ============
+
+
+@pytest.mark.integration
+@pytest.mark.workflows
+class TestCanonicalWorkflowAPI:
+    """Tests for canonical UnifiedWorkflowCompiler API across all verticals.
+
+    Tests verify that all vertical workflow providers properly implement:
+    - compile_workflow() - Returns CompiledGraph with caching
+    - invoke() - Executes workflow with caching
+    - stream() - Streams workflow execution with caching
+    - run_compiled_workflow() - Convenience wrapper for invoke
+    - stream_compiled_workflow() - Convenience wrapper for stream
+
+    This is the NEW canonical API that replaces deprecated create_executor/astream.
+    """
+
+    @pytest.fixture
+    def all_providers(
+        self,
+        coding_provider,
+        devops_provider,
+        research_provider,
+        dataanalysis_provider,
+    ):
+        """Fixture providing all workflow providers."""
+        return [
+            ("coding", coding_provider),
+            ("devops", devops_provider),
+            ("research", research_provider),
+            ("dataanalysis", dataanalysis_provider),
+        ]
+
+    def test_all_providers_have_compile_workflow(self, all_providers):
+        """Test all providers implement compile_workflow (canonical API)."""
+        for name, provider in all_providers:
+            assert hasattr(provider, "compile_workflow"), f"{name} provider missing compile_workflow"
+            # Verify it's callable
+            assert callable(provider.compile_workflow), f"{name} compile_workflow not callable"
+
+    def test_compile_workflow_returns_compiled_graph(self, all_providers):
+        """Test compile_workflow returns a CompiledGraph instance."""
+        for name, provider in all_providers:
+            workflows = provider.get_workflow_names()
+            if workflows:
+                workflow_name = workflows[0]
+                compiled = provider.compile_workflow(workflow_name)
+                # CompiledGraph should have invoke and stream methods
+                assert hasattr(compiled, "invoke"), f"{name} compiled graph missing invoke"
+                assert hasattr(compiled, "stream"), f"{name} compiled graph missing stream"
+                assert callable(compiled.invoke), f"{name} invoke not callable"
+                assert callable(compiled.stream), f"{name} stream not callable"
+
+    @pytest.mark.asyncio
+    async def test_run_compiled_workflow_raises_for_unknown_workflow(self, all_providers):
+        """Test run_compiled_workflow raises ValueError for unknown workflow."""
+        for name, provider in all_providers:
+            with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
+                await provider.run_compiled_workflow("nonexistent", {})
+
+    @pytest.mark.asyncio
+    async def test_stream_compiled_workflow_raises_for_unknown_workflow(self, all_providers):
+        """Test stream_compiled_workflow raises ValueError for unknown workflow."""
+        for name, provider in all_providers:
+            try:
+                async for _ in provider.stream_compiled_workflow("nonexistent", {}):
+                    pass
+                assert False, f"{name} provider should have raised ValueError"
+            except ValueError as e:
+                assert "Unknown workflow: nonexistent" in str(e)
+
+    def test_all_providers_have_canonical_convenience_methods(self, all_providers):
+        """Test all providers have canonical convenience methods."""
+        canonical_methods = [
+            "compile_workflow",
+            "run_compiled_workflow",
+            "stream_compiled_workflow",
+        ]
+        for name, provider in all_providers:
+            for method in canonical_methods:
+                assert hasattr(provider, method), f"{name} provider missing canonical method {method}"
+
+    def test_canonical_api_consistency(self, all_providers):
+        """Test all providers have consistent canonical API surface."""
+        expected_canonical_methods = [
+            "get_workflows",
+            "get_workflow",
+            "get_workflow_names",
+            "compile_workflow",
+            "run_compiled_workflow",
+            "stream_compiled_workflow",
+        ]
+        for name, provider in all_providers:
+            for method in expected_canonical_methods:
+                assert hasattr(provider, method), f"{name} provider missing canonical method {method}"
