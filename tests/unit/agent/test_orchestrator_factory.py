@@ -66,7 +66,7 @@ def mock_provider():
 def mock_container():
     """Create mock DI container."""
     from victor.agent.response_sanitizer import ResponseSanitizer
-    from victor.agent.complexity_classifier import ComplexityClassifier
+    from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
     from victor.context.project_context import ProjectContext
@@ -201,7 +201,7 @@ class TestCreateComplexityClassifier:
 
     def test_create_complexity_classifier_returns_classifier(self, factory):
         """create_complexity_classifier returns a ComplexityClassifier instance."""
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         classifier = factory.create_complexity_classifier()
         assert isinstance(classifier, ComplexityClassifier)

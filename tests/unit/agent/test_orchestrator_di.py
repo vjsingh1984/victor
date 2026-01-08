@@ -333,7 +333,7 @@ class TestProtocolConformance:
 
     def test_complexity_classifier_conforms(self):
         """Test ComplexityClassifier conforms to protocol."""
-        from victor.agent.complexity_classifier import ComplexityClassifier
+        from victor.framework.task import TaskComplexityService as ComplexityClassifier
         from victor.agent.protocols import ComplexityClassifierProtocol
 
         classifier = ComplexityClassifier()

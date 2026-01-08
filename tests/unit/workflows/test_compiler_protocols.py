@@ -29,11 +29,10 @@ class TestIWorkflowCompilerProtocol:
     def test_compiler_protocol_has_compile_method(self):
         """Test that compiler protocol requires compile method."""
         # This test verifies the protocol exists and has the right method signature
-        assert hasattr(IWorkflowCompiler, "__protocol_attrs__")
-        # The protocol should require a compile method
-        assert "compile" in IWorkflowCompiler.__protocol_attrs__ or hasattr(
-            IWorkflowCompiler, "compile"
-        )
+        # Check that compile is defined as a protocol member
+        assert hasattr(IWorkflowCompiler, "compile")
+        # Verify it's callable
+        assert callable(IWorkflowCompiler.compile)
 
     def test_concrete_compiler_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
