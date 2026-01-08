@@ -154,9 +154,9 @@ class TestModeAwareMixinNoController:
         """Test that mode_controller returns None when import fails."""
         component = TestComponent()
 
-        # Patch where ModeAwareMixin is imported in this test file
+        # Patch the import location in the current module (test_mode_aware_mixin)
         with patch(
-            "tests.unit.agent.test_mode_aware_mixin.ModeAwareMixin.mode_controller",
+            "test_mode_aware_mixin.ModeAwareMixin.mode_controller",
             new_callable=lambda: property(lambda self: None),
         ):
             # Mock the cached_property to return None
