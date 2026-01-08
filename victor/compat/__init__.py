@@ -10,7 +10,7 @@ This module remains as a placeholder for future migrations.
 from typing import Any, Dict
 
 # Version for tracking compat changes
-COMPAT_VERSION = "0.4.1"
+COMPAT_VERSION = "0.5.0"
 
 # Registry of all deprecated aliases for runtime warnings
 DEPRECATED_ALIASES: Dict[str, Dict[str, Any]] = {}

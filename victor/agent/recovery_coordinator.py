@@ -183,19 +183,15 @@ class StreamingRecoveryCoordinator:
             # Emit STATE event for time limit reached
             if self._event_bus:
                 try:
-                    import asyncio
-
-                    asyncio.run(
-                        self._event_bus.emit(
-                            topic="state.recovery.time_limit_reached",
-                            data={
-                                "elapsed_time": ctx.elapsed_time,
-                                "iteration": ctx.iteration,
-                                "tool_calls_used": ctx.tool_calls_used,
-                                "category": "state",  # Preserve for observability
-                            },
-                            source="RecoveryCoordinator",
-                        )
+                    await self._event_bus.emit(
+                        topic="state.recovery.time_limit_reached",
+                        data={
+                            "elapsed_time": ctx.elapsed_time,
+                            "iteration": ctx.iteration,
+                            "tool_calls_used": ctx.tool_calls_used,
+                            "category": "state",  # Preserve for observability
+                        },
+                        source="RecoveryCoordinator",
                     )
                 except Exception as e:
                     logger.debug(f"Failed to emit time limit event: {e}")

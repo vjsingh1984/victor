@@ -207,4 +207,4 @@ from victor.observability import profiler
 from victor.observability import telemetry
 from victor.observability import pipeline
 
-__version__ = "0.2.0"
+__version__ = "0.5.0"
