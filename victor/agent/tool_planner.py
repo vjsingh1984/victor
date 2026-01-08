@@ -221,7 +221,8 @@ class ToolPlanner:
         try:
             import asyncio
 
-            loop = asyncio.get_running_loop()
+            # Verify event loop is running
+            asyncio.get_running_loop()
             # Fire and forget - don't await the coroutine
             asyncio.create_task(self._event_bus.emit(topic, data, source="ToolPlanner"))
         except RuntimeError:
