@@ -132,7 +132,7 @@ class TaskCoordinator:
         """
         from victor.agent.prompt_builder import get_task_type_hint
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
-        from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
+        from victor.agent.complexity_classifier import TaskComplexity, DEFAULT_BUDGETS
 
         # Get granular task type for more specific hints
         granular_task_type = None
@@ -197,11 +197,11 @@ class TaskCoordinator:
 
         # Update reminder manager with task complexity and hint
         if self._reminder_manager:
-            from victor.framework.enrichment.strategies import get_complexity_hint
+            from victor.agent.complexity_classifier import get_prompt_hint
 
             self._reminder_manager.update_state(
                 task_complexity=task_classification.complexity.value,
-                task_hint=get_complexity_hint(task_classification.complexity),
+                task_hint=get_prompt_hint(task_classification.complexity),
                 tool_budget=complexity_tool_budget,
             )
 

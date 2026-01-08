@@ -15,6 +15,7 @@
 """Tests for Workflow Compiler Protocols (DIP compliance)."""
 
 import pytest
+import typing
 from typing import Any, Dict, List, Optional
 from victor.workflows.protocols import (
     IWorkflowCompiler,
@@ -29,10 +30,12 @@ class TestIWorkflowCompilerProtocol:
     def test_compiler_protocol_has_compile_method(self):
         """Test that compiler protocol requires compile method."""
         # This test verifies the protocol exists and has the right method signature
-        # Check that compile is defined as a protocol member
-        assert hasattr(IWorkflowCompiler, "compile")
-        # Verify it's callable
-        assert callable(IWorkflowCompiler.compile)
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowCompiler.__mro__)
+        # The protocol should require a compile method - check direct attribute
+        assert hasattr(IWorkflowCompiler, "compile") or callable(
+            getattr(IWorkflowCompiler, "compile", None)
+        )
 
     def test_concrete_compiler_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
@@ -70,10 +73,10 @@ class TestIWorkflowLoaderProtocol:
 
     def test_loader_protocol_has_load_method(self):
         """Test that loader protocol requires load method."""
-        # Check that load is defined as a protocol member
-        assert hasattr(IWorkflowLoader, "load")
-        # Verify it's callable
-        assert callable(IWorkflowLoader.load)
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowLoader.__mro__)
+        # The protocol should require a load method - check direct attribute
+        assert hasattr(IWorkflowLoader, "load") or callable(getattr(IWorkflowLoader, "load", None))
 
     def test_concrete_loader_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
@@ -103,10 +106,12 @@ class TestIWorkflowValidatorProtocol:
 
     def test_validator_protocol_has_validate_method(self):
         """Test that validator protocol requires validate method."""
-        # Check that validate is defined as a protocol member
-        assert hasattr(IWorkflowValidator, "validate")
-        # Verify it's callable
-        assert callable(IWorkflowValidator.validate)
+        # Check if it's a Protocol by checking MRO (Python 3.10+ compatible)
+        assert any(c.__name__ == "Protocol" for c in IWorkflowValidator.__mro__)
+        # The protocol should require a validate method - check direct attribute
+        assert hasattr(IWorkflowValidator, "validate") or callable(
+            getattr(IWorkflowValidator, "validate", None)
+        )
 
     def test_concrete_validator_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""

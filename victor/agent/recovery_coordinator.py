@@ -180,12 +180,13 @@ class StreamingRecoveryCoordinator:
         """
         result = self.streaming_handler.check_time_limit(ctx.streaming_context)
         if result:
-            # Emit STATE event for time limit reached
+            # Emit STATE event for time limit reached (fire-and-forget)
             if self._event_bus:
                 try:
                     import asyncio
 
-                    asyncio.run(
+                    # Schedule the coroutine without blocking - avoids RuntimeWarning
+                    asyncio.create_task(
                         self._event_bus.emit(
                             topic="state.recovery.time_limit_reached",
                             data={
@@ -229,7 +230,7 @@ class StreamingRecoveryCoordinator:
                 try:
                     import asyncio
 
-                    asyncio.run(
+                    asyncio.create_task(
                         self._event_bus.emit(
                             topic="state.recovery.iteration_limit_reached",
                             data={
@@ -506,7 +507,7 @@ class StreamingRecoveryCoordinator:
             try:
                 import asyncio
 
-                asyncio.run(
+                asyncio.create_task(
                     self._event_bus.emit(
                         topic="state.recovery.force_completion",
                         data={
@@ -654,7 +655,7 @@ class StreamingRecoveryCoordinator:
             try:
                 import asyncio
 
-                asyncio.run(
+                asyncio.create_task(
                     self._event_bus.emit(
                         topic=f"state.recovery.action_{recovery_action.action}",
                         data={

@@ -630,6 +630,38 @@ class ObservabilityBus:
         """
         return await self._backend.unsubscribe(handle)
 
+    def emit_error(
+        self,
+        error: Exception,
+        context: Optional[Dict[str, Any]] = None,
+        recoverable: bool = True,
+    ) -> None:
+        """Emit an error event (fire-and-forget).
+
+        This is a compatibility method for code that expects EventBus-like interface.
+        Events are emitted asynchronously without waiting for completion.
+
+        Args:
+            error: The exception.
+            context: Optional error context.
+            recoverable: Whether error is recoverable.
+        """
+        # Schedule emit as fire-and-forget task
+        import asyncio
+
+        asyncio.create_task(
+            self.emit(
+                topic="error",
+                data={
+                    "message": str(error),
+                    "type": type(error).__name__,
+                    "recoverable": recoverable,
+                    **(context or {}),
+                },
+                source="observability",
+            )
+        )
+
 
 class AgentMessageBus:
     """Specialized event bus for cross-agent communication.

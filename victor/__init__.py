@@ -40,7 +40,7 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"

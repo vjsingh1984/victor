@@ -39,11 +39,8 @@ class TestTaskCompletionDetection:
     def test_finish_when_all_files_read(self):
         """Should return 'finish' action when all required files are read."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
-        detector = TaskCompletionDetector()
 
         # Mock intent result indicating continuation
         intent_result = MagicMock()
@@ -94,7 +91,6 @@ class TestTaskCompletionDetection:
             model="claude-3-5-sonnet",
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
-            task_completion_detector=detector,
             task_completion_signals=task_completion_signals,
         )
 
@@ -104,10 +100,8 @@ class TestTaskCompletionDetection:
     def test_continue_when_files_missing(self):
         """Should continue prompting when required files are not yet read."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
 
         # Mock intent result indicating continuation
         intent_result = MagicMock()
@@ -145,7 +139,6 @@ class TestTaskCompletionDetection:
             model="claude-3-5-sonnet",
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
-            task_completion_detector=detector,
             task_completion_signals=task_completion_signals,
         )
 
@@ -155,10 +148,8 @@ class TestTaskCompletionDetection:
     def test_finish_when_output_requirements_met(self):
         """Should finish when output contains required format elements."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
 
         # Check output requirements detection
         full_content = """
@@ -190,10 +181,8 @@ class TestCumulativeInterventionTracking:
     def test_synthesis_nudge_on_cumulative_threshold(self):
         """Should nudge synthesis when cumulative interventions reach threshold."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
 
         # Mock intent result indicating continuation
         intent_result = MagicMock()
@@ -233,7 +222,6 @@ class TestCumulativeInterventionTracking:
             model="claude-3-5-sonnet",
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
-            task_completion_detector=detector,
             task_completion_signals=task_completion_signals,
         )
 
@@ -244,10 +232,8 @@ class TestCumulativeInterventionTracking:
     def test_force_synthesis_on_excessive_interventions(self):
         """Should force synthesis when cumulative interventions are excessive AND nudges exhausted."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
 
         intent_result = MagicMock()
         intent_result.intent = MagicMock()
@@ -287,7 +273,6 @@ class TestCumulativeInterventionTracking:
             model="claude-3-5-sonnet",
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
-            task_completion_detector=detector,
             task_completion_signals=task_completion_signals,
         )
 
@@ -298,11 +283,9 @@ class TestCumulativeInterventionTracking:
     def test_no_intervention_on_low_count(self):
         """Should not trigger intervention nudge when cumulative count is low."""
         from victor.agent.continuation_strategy import ContinuationStrategy
-        from victor.agent.task_completion import TaskCompletionDetector
         from victor.storage.embeddings.intent_classifier import IntentType
 
         strategy = ContinuationStrategy()
-        detector = TaskCompletionDetector()
 
         intent_result = MagicMock()
         intent_result.intent = IntentType.CONTINUATION
@@ -340,7 +323,6 @@ class TestCumulativeInterventionTracking:
             model="claude-3-5-sonnet",
             tool_budget=25,
             unified_tracker_config={"max_total_iterations": 50},
-            task_completion_detector=detector,
             task_completion_signals=task_completion_signals,
         )
 

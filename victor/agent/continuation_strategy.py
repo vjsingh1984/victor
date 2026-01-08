@@ -270,8 +270,6 @@ class ContinuationStrategy:
         model: str,
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
-        # Task Completion Detection
-        task_completion_detector: Any,
         task_completion_signals: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
@@ -297,7 +295,6 @@ class ContinuationStrategy:
             model: Model name for RL lookups
             tool_budget: Current tool budget
             unified_tracker_config: Config dict from unified tracker
-            task_completion_detector: TaskCompletionDetector instance for signal-based completion
             task_completion_signals: Optional signals for task completion detection
 
         Returns:
@@ -310,44 +307,8 @@ class ContinuationStrategy:
             - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
         """
         from victor.storage.embeddings.intent_classifier import IntentType
-        from victor.agent.task_completion import CompletionConfidence
 
         updates: Dict[str, Any] = {}
-
-        # Task Completion Detection: Check detector confidence level for continuation decision
-        # Priority: HIGH confidence (active signal) > MEDIUM confidence > other logic
-        confidence = task_completion_detector.get_completion_confidence()
-
-        # HIGH confidence: Active signal detected - finish immediately
-        if confidence == CompletionConfidence.HIGH:
-            logger.info(
-                "ContinuationStrategy: HIGH confidence from TaskCompletionDetector - finishing"
-            )
-            self._emit_event(
-                topic="state.continuation.task_complete",
-                data={
-                    "reason": "task_completion_detector_high_confidence",
-                    "confidence": "HIGH",
-                    "source": "TaskCompletionDetector",
-                },
-            )
-            return {
-                "action": "finish",
-                "message": None,
-                "reason": "Task completion: HIGH confidence (active signal detected)",
-                "updates": updates,
-            }
-
-        # MEDIUM confidence: File modifications + passive signal - log but continue with other checks
-        if confidence == CompletionConfidence.MEDIUM:
-            logger.info(
-                "ContinuationStrategy: MEDIUM confidence from TaskCompletionDetector - "
-                "file modifications + passive signal detected"
-            )
-            # MEDIUM confidence doesn't force completion, but informs the decision
-            # Continue with other checks (intent, continuation prompts, etc.)
-
-        # LOW/NONE confidence: No completion signal - proceed with normal logic
 
         # TASK COMPLETION CHECK: If all required files read and output requirements met,
         # finish immediately to prevent prompting loop (prompting loop fix)
