@@ -3517,6 +3517,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_budget=self.tool_budget,
             unified_tracker_config=self.unified_tracker.config,
             task_completion_signals=None,  # Legacy caller doesn't use this
+            # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+            task_completion_detector=self._task_completion_detector,
         )
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
@@ -4173,6 +4175,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync tool tracking from orchestrator to context
         ctx.tool_budget = self.tool_budget
         ctx.tool_calls_used = self.tool_calls_used
+
+        # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
+        # Make detector available to intent classification for priority checks
+        ctx.task_completion_detector = self._task_completion_detector
 
         return ctx
 
