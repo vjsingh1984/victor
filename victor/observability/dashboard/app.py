@@ -364,7 +364,12 @@ class EventTableView(DataTable):
         Events are processed in descending order (newest first), so we append
         to maintain that order in the table.
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         timestamp = event.datetime.strftime("%H:%M:%S")
+        timestamp_raw = event.timestamp
         category = event.category
 
         # Build details string
@@ -379,8 +384,22 @@ class EventTableView(DataTable):
             elif "message" in event.data:
                 details = str(event.data["message"])[:50]
 
+        # Debug: Log event being added
+        current_row_count = len(self.rows)
+        logger.debug(
+            f"[EventTableView.add_event] Row #{current_row_count}: timestamp={timestamp} ({timestamp_raw}), topic={event.topic}"
+        )
+
         # Append row (events are already processed in descending order)
         self.add_row(timestamp, category, event.topic, details)
+
+        # Debug: Log state after adding
+        if len(self.rows) > 0:
+            first_row_time = self.rows[0]
+            last_row_time = self.rows[-1] if len(self.rows) > 1 else first_row_time
+            logger.debug(
+                f"[EventTableView.add_event] After add: total_rows={len(self.rows)}, first_row={first_row_time}, last_row={last_row_time}"
+            )
 
 
 class ToolExecutionView(DataTable):
@@ -1211,7 +1230,22 @@ class ObservabilityDashboard(App):
                 f"[Dashboard] Loading {len(lines_to_process)} initial events from {len(all_lines)} total lines (reversed for newest-first)"
             )
 
-            for line in lines_to_process:
+            # Debug: Log first and last timestamps from file
+            if len(lines_to_process) > 0:
+                first_line = lines_to_process[0].strip()
+                last_line = lines_to_process[-1].strip()
+                try:
+                    first_event_data = json.loads(first_line)
+                    last_event_data = json.loads(last_line)
+                    first_ts = first_event_data.get("timestamp", "N/A")
+                    last_ts = last_event_data.get("timestamp", "N/A")
+                    logger.info(
+                        f"[Dashboard] Initial load timestamp range: first={first_ts}, last={last_ts}"
+                    )
+                except Exception as e:
+                    logger.debug(f"[Dashboard] Could not parse timestamps for debug: {e}")
+
+            for idx, line in enumerate(lines_to_process):
                 line = line.strip()
                 if not line:
                     continue
@@ -1269,9 +1303,24 @@ class ObservabilityDashboard(App):
 
                     logger.debug(f"[Dashboard] Read {len(new_lines)} new lines")
 
+                    # Debug: Log timestamp range of new events
+                    if len(new_lines) > 0:
+                        first_new = new_lines[0].strip()
+                        last_new = new_lines[-1].strip()
+                        try:
+                            first_event_data = json.loads(first_new)
+                            last_event_data = json.loads(last_new)
+                            first_ts = first_event_data.get("timestamp", "N/A")
+                            last_ts = last_event_data.get("timestamp", "N/A")
+                            logger.info(
+                                f"[Dashboard] Polling batch: {len(new_lines)} events, timestamp range: {first_ts} to {last_ts}"
+                            )
+                        except Exception as e:
+                            logger.debug(f"[Dashboard] Could not parse polling timestamps: {e}")
+
                     # Process each new line in reverse order (newest first)
                     # This ensures events are added to views in descending timestamp order
-                    for line in reversed(new_lines):
+                    for idx, line in enumerate(reversed(new_lines)):
                         line = line.strip()
                         if not line:
                             continue
@@ -1280,7 +1329,7 @@ class ObservabilityDashboard(App):
                         if event:
                             self._event_counter += 1
                             logger.info(
-                                f"[Dashboard] New event #{self._event_counter}: [{event.category}/{event.topic}]"
+                                f"[Dashboard] Polling event #{self._event_counter} (batch idx {idx}): timestamp={event.timestamp}, topic={event.topic}"
                             )
 
                             # Process event
@@ -1348,7 +1397,9 @@ class ObservabilityDashboard(App):
         import traceback
 
         logger = logging.getLogger(__name__)
-        logger.info(f"[Dashboard._process_event] PROCESSING [{event.topic}]")
+        logger.info(
+            f"[Dashboard._process_event] PROCESSING timestamp={event.timestamp} [{event.category}/{event.topic}]"
+        )
 
         try:
             # Update stats
