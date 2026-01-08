@@ -70,9 +70,10 @@ class TestIWorkflowLoaderProtocol:
 
     def test_loader_protocol_has_load_method(self):
         """Test that loader protocol requires load method."""
-        assert hasattr(IWorkflowLoader, "__protocol_attrs__")
-        # The protocol should require a load method
-        assert "load" in IWorkflowLoader.__protocol_attrs__ or hasattr(IWorkflowLoader, "load")
+        # Check that load is defined as a protocol member
+        assert hasattr(IWorkflowLoader, "load")
+        # Verify it's callable
+        assert callable(IWorkflowLoader.load)
 
     def test_concrete_loader_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""
@@ -102,11 +103,10 @@ class TestIWorkflowValidatorProtocol:
 
     def test_validator_protocol_has_validate_method(self):
         """Test that validator protocol requires validate method."""
-        assert hasattr(IWorkflowValidator, "__protocol_attrs__")
-        # The protocol should require a validate method
-        assert "validate" in IWorkflowValidator.__protocol_attrs__ or hasattr(
-            IWorkflowValidator, "validate"
-        )
+        # Check that validate is defined as a protocol member
+        assert hasattr(IWorkflowValidator, "validate")
+        # Verify it's callable
+        assert callable(IWorkflowValidator.validate)
 
     def test_concrete_validator_implementation(self):
         """Test that a concrete implementation can satisfy the protocol."""

@@ -289,8 +289,17 @@ class TestConvenienceFunctions:
         from victor.framework.enrichment.strategies import (
             get_complexity_hint as get_task_prompt_hint,
         )
+        from victor.framework.task import (
+            TaskComplexityService as ComplexityClassifier,
+            TaskComplexity,
+        )
 
-        hint = get_task_prompt_hint("List files")
+        # First classify the task
+        classifier = ComplexityClassifier()
+        result = classifier.classify("List files")
+
+        # Then get the hint using the complexity
+        hint = get_task_prompt_hint(result.complexity)
         # Updated format uses [SIMPLE] instead of "Simple Query"
         assert "[SIMPLE]" in hint
 
