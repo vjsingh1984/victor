@@ -41,8 +41,18 @@ def backup_db(project_db_path):
         shutil.copy(project_db_path, backup_path)
 
     # Clear the database for clean test state
+    # Also remove WAL and SHM files to avoid I/O errors
     if project_db_path.exists():
         project_db_path.unlink()
+
+    # Clean up SQLite auxiliary files
+    for ext in ["-wal", "-shm"]:
+        aux_file = project_db_path.with_suffix(f".db{ext}")
+        if aux_file.exists():
+            try:
+                aux_file.unlink()
+            except Exception:
+                pass  # Ignore errors, might not exist
 
     yield
 
