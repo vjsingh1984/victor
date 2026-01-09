@@ -331,6 +331,15 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         creating it lazily on first access. The compiler provides consistent
         caching across all workflow compilations.
 
+        **Architecture Note**: This uses UnifiedWorkflowCompiler (not the plugin API)
+        because vertical providers need:
+        - Escape hatch integration (condition_registry, transform_registry)
+        - Two-level caching (definition + execution)
+        - Cache management APIs (get_cache_stats, clear_cache)
+
+        For simple workflow compilation without these features, consider using
+        the plugin API: create_compiler("workflow.yaml", enable_caching=True)
+
         Returns:
             UnifiedWorkflowCompiler configured with escape hatches
 

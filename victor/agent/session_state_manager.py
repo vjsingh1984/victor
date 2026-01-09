@@ -82,6 +82,7 @@ class ExecutionState:
         required_files: Files required to complete the current task
         required_outputs: Outputs required to complete the current task
         token_usage: Cumulative token usage tracking for evaluation
+        disable_embeddings: Disable codebase embeddings for this session (workflow service mode)
     """
 
     tool_calls_used: int = 0
@@ -100,6 +101,7 @@ class ExecutionState:
             "cache_read_input_tokens": 0,
         }
     )
+    disable_embeddings: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize execution state to dictionary.
@@ -116,6 +118,7 @@ class ExecutionState:
             "required_files": list(self.required_files),
             "required_outputs": list(self.required_outputs),
             "token_usage": dict(self.token_usage),
+            "disable_embeddings": self.disable_embeddings,
         }
 
     @classmethod
@@ -146,6 +149,7 @@ class ExecutionState:
                     "cache_read_input_tokens": 0,
                 },
             ),
+            disable_embeddings=data.get("disable_embeddings", False),
         )
 
 

@@ -3716,6 +3716,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if self.thinking:
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
+            # Check context and compact before API call to prevent overflow
+            if self._context_compactor:
+                compaction_action = self._context_compactor.check_and_compact(
+                    current_query=user_message,
+                    force=False,
+                    tool_call_count=self.tool_calls_used,
+                    task_complexity=task_classification.complexity.value,
+                )
+                if compaction_action.action_taken:
+                    logger.info(
+                        f"Compacted context before API call: {compaction_action.messages_removed} messages removed, "
+                        f"{compaction_action.tokens_freed} tokens freed"
+                    )
+
             # Get response from provider
             response = await self.provider.chat(
                 messages=self.messages,
@@ -3741,6 +3755,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Add assistant response to history if has content
             if response.content:
                 self.add_message("assistant", response.content)
+
+                # Check compaction after adding assistant response
+                if self._context_compactor:
+                    compaction_action = self._context_compactor.check_and_compact(
+                        current_query=user_message,
+                        force=False,
+                        tool_call_count=self.tool_calls_used,
+                        task_complexity=task_classification.complexity.value,
+                    )
+                    if compaction_action.action_taken:
+                        logger.info(
+                            f"Compacted context after response: {compaction_action.messages_removed} messages removed, "
+                            f"{compaction_action.tokens_freed} tokens freed"
+                        )
 
             # Check if model wants to use tools
             if response.tool_calls:

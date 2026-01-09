@@ -905,8 +905,15 @@ class WorkflowEngine:
     def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
         """Get or create the unified compiler.
 
-        The unified compiler provides consistent compilation and caching
-        across all workflow types (YAML, WorkflowGraph, WorkflowDefinition).
+        **Architecture Note**: WorkflowEngine uses UnifiedWorkflowCompiler (not the plugin API)
+        because it requires:
+        - Two-level caching (definition + execution) for performance
+        - Cache management APIs (clear_cache, get_cache_stats, invalidate_yaml)
+        - Runner registry integration for custom node execution
+        - Escape hatch integration (condition_registry, transform_registry)
+
+        The plugin API (create_compiler) provides a simpler facade for basic use cases
+        but doesn't support these advanced features needed by WorkflowEngine.
 
         Returns:
             UnifiedWorkflowCompiler instance with shared caches.

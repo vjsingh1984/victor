@@ -83,6 +83,7 @@ class ExecutorConfig:
     max_iterations: int = 25
     timeout: Optional[float] = None
     interrupt_nodes: List[str] = field(default_factory=list)
+    default_profile: Optional[str] = None  # Default profile for nodes without explicit profile
 
 
 @dataclass
@@ -165,17 +166,32 @@ class StateGraphExecutor:
     def __init__(
         self,
         orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[ExecutorConfig] = None,
     ):
         """Initialize the workflow executor.
 
         Args:
-            orchestrator: Agent orchestrator for agent nodes
+            orchestrator: Single agent orchestrator for all agent nodes (legacy)
+            orchestrators: Dict mapping profile names to orchestrators (new)
             tool_registry: Tool registry for compute nodes
             config: Execution configuration
         """
-        self.orchestrator = orchestrator
+        # Support both single orchestrator (legacy) and multiple orchestrators (new)
+        if orchestrator is not None and orchestrators is not None:
+            raise ValueError("Cannot specify both orchestrator and orchestrators")
+
+        if orchestrators:
+            self.orchestrators = orchestrators
+            self.orchestrator = orchestrators.get(config.default_profile if config and config.default_profile else next(iter(orchestrators)))
+        elif orchestrator:
+            self.orchestrators = {"default": orchestrator}
+            self.orchestrator = orchestrator
+        else:
+            self.orchestrators = {}
+            self.orchestrator = None
+
         self.tool_registry = tool_registry or self._get_default_tool_registry()
         self.config = config or ExecutorConfig()
         self._compiler: Optional["YAMLToStateGraphCompiler"] = None
@@ -205,6 +221,7 @@ class StateGraphExecutor:
             )
             self._compiler = YAMLToStateGraphCompiler(
                 orchestrator=self.orchestrator,
+                orchestrators=self.orchestrators,
                 tool_registry=self.tool_registry,
                 config=compiler_config,
             )

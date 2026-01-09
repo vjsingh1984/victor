@@ -26,6 +26,7 @@ References:
 
 import json
 import logging
+import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -44,6 +45,9 @@ from victor.providers.base import (
 from victor.providers.openai_compat import convert_tools_to_openai_format
 
 logger = logging.getLogger(__name__)
+
+# Default xAI API endpoint
+DEFAULT_BASE_URL = "https://api.x.ai/v1"
 
 # Available xAI Grok models
 # Reference: https://docs.x.ai/docs/models
@@ -95,8 +99,8 @@ class XAIProvider(BaseProvider):
 
     def __init__(
         self,
-        api_key: str,
-        base_url: str = "https://api.x.ai/v1",
+        api_key: Optional[str] = None,
+        base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         **kwargs: Any,
@@ -104,19 +108,35 @@ class XAIProvider(BaseProvider):
         """Initialize xAI provider.
 
         Args:
-            api_key: xAI API key
+            api_key: xAI API key (or set XAI_API_KEY env var, or use keyring)
             base_url: xAI API base URL
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
+        # Get API key from parameter, environment, or keyring
+        self._api_key = api_key or os.environ.get("XAI_API_KEY", "")
+        if not self._api_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                # Try "xai" first, then "grok" alias
+                self._api_key = get_api_key("xai") or get_api_key("grok") or ""
+            except ImportError:
+                pass
+        if not self._api_key:
+            logger.warning(
+                "xAI API key not provided. Set XAI_API_KEY environment variable, "
+                "use 'victor keys --set xai --keyring', or pass api_key parameter."
+            )
+
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=self._api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
         )
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
             timeout=httpx.Timeout(timeout),

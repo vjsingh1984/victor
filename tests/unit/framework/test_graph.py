@@ -40,6 +40,14 @@ from victor.framework.graph import (
     create_graph,
 )
 
+from victor.framework.config import (
+    ExecutionConfig,
+    CheckpointConfig,
+    InterruptConfig,
+    PerformanceConfig,
+    ObservabilityConfig,
+)
+
 
 # =============================================================================
 # Test State Types
@@ -661,27 +669,42 @@ class TestGraphConfig:
         """GraphConfig should have sensible defaults."""
         config = GraphConfig()
 
-        assert config.max_iterations == 25
-        assert config.timeout is None
-        assert config.checkpointer is None
-        assert config.recursion_limit == 100
-        assert config.interrupt_before == []
-        assert config.interrupt_after == []
+        # Test focused config structure (ISP compliance)
+        assert config.execution.max_iterations == 25
+        assert config.execution.timeout is None
+        assert config.execution.recursion_limit == 100
+        assert config.checkpoint.checkpointer is None
+        assert config.interrupt.interrupt_before == []
+        assert config.interrupt.interrupt_after == []
 
     def test_custom_values(self):
-        """GraphConfig should accept custom values."""
+        """GraphConfig should accept custom values via focused configs (ISP compliant)."""
         checkpointer = MemoryCheckpointer()
         config = GraphConfig(
+            execution=ExecutionConfig(max_iterations=50, timeout=300.0),
+            checkpoint=CheckpointConfig(checkpointer=checkpointer),
+            interrupt=InterruptConfig(interrupt_before=["review"]),
+        )
+
+        assert config.execution.max_iterations == 50
+        assert config.execution.timeout == 300.0
+        assert config.checkpoint.checkpointer == checkpointer
+        assert config.interrupt.interrupt_before == ["review"]
+
+    def test_from_legacy_migration(self):
+        """GraphConfig.from_legacy() should migrate from legacy format."""
+        checkpointer = MemoryCheckpointer()
+        config = GraphConfig.from_legacy(
             max_iterations=50,
             timeout=300.0,
             checkpointer=checkpointer,
             interrupt_before=["review"],
         )
 
-        assert config.max_iterations == 50
-        assert config.timeout == 300.0
-        assert config.checkpointer == checkpointer
-        assert config.interrupt_before == ["review"]
+        assert config.execution.max_iterations == 50
+        assert config.execution.timeout == 300.0
+        assert config.checkpoint.checkpointer == checkpointer
+        assert config.interrupt.interrupt_before == ["review"]
 
 
 # =============================================================================

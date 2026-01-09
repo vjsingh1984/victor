@@ -159,22 +159,33 @@ class AzureOpenAIProvider(BaseProvider):
         """Initialize Azure OpenAI provider.
 
         Args:
-            api_key: Azure OpenAI API key (or set AZURE_OPENAI_API_KEY)
+            api_key: Azure OpenAI API key (or set AZURE_OPENAI_API_KEY env var, or use keyring)
             endpoint: Azure OpenAI endpoint URL (or set AZURE_OPENAI_ENDPOINT)
             deployment_name: Default deployment name (or set AZURE_OPENAI_DEPLOYMENT)
             api_version: API version to use
             timeout: Request timeout
             **kwargs: Additional configuration
         """
-        self._api_key = api_key or os.environ.get("AZURE_OPENAI_API_KEY", "")
+        # Resolution order: parameter → env var → keyring → warning
+        resolved_key = api_key or os.environ.get("AZURE_OPENAI_API_KEY", "")
+        if not resolved_key:
+            try:
+                from victor.config.api_keys import get_api_key
+                resolved_key = get_api_key("azure_openai") or get_api_key("azure") or ""
+            except ImportError:
+                pass
+
+        if not resolved_key:
+            logger.warning(
+                "Azure OpenAI API key not provided. Set AZURE_OPENAI_API_KEY environment variable, "
+                "use 'victor keys --set azure_openai --keyring', or pass api_key parameter."
+            )
+
+        self._api_key = resolved_key
         self._endpoint = endpoint or os.environ.get("AZURE_OPENAI_ENDPOINT", "")
         self._default_deployment = deployment_name or os.environ.get("AZURE_OPENAI_DEPLOYMENT", "")
         self._api_version = api_version
 
-        if not self._api_key:
-            logger.warning(
-                "Azure OpenAI API key not provided. Set AZURE_OPENAI_API_KEY environment variable."
-            )
         if not self._endpoint:
             logger.warning(
                 "Azure OpenAI endpoint not provided. Set AZURE_OPENAI_ENDPOINT environment variable."

@@ -177,6 +177,8 @@ class ToolCallExtractor:
             return self._extract_search_call(text, context)
         elif tool_lower in ("ls", "list", "list_directory"):
             return self._extract_ls_call(text, context)
+        elif tool_lower in ("graph", "graph_search", "query_graph"):
+            return self._extract_graph_call(text, context)
 
         # Generic extraction attempt
         return self._extract_generic_call(text, tool_name, context)
@@ -391,6 +393,64 @@ class ToolCallExtractor:
             confidence=0.8,
             source_text=text[:100],
         )
+
+    def _extract_graph_call(
+        self, text: str, context: Optional[Dict[str, Any]] = None
+    ) -> Optional[ExtractedToolCall]:
+        """Extract graph query call."""
+        # Try to find graph query patterns
+        patterns = [
+            # graph: "query" or graph("query")
+            r'(?:graph|query_graph|graph_search)[\s:]*["\'\(]([^"\'\)]+)["\'\)]',
+            # "search the graph for X"
+            r'(?:search|find|show|query)\s+the\s+graph\s+(?:for|about|with)?\s+["\']?([^"\']+)["\']?',
+            # "in the graph: X"
+            r'in\s+the\s+graph[:\s]+["\']?([^"\']+)["\']?',
+        ]
+
+        query = None
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                query = match.group(1).strip()
+                break
+
+        # If no specific pattern matched, extract context around "graph" mention
+        if not query and "graph" in text.lower():
+            # Extract context around "graph" mention
+            idx = text.lower().find("graph")
+            start = max(0, idx - 50)
+            end = min(len(text), idx + 100)
+            query = text[start:end].strip()
+
+            # Clean up common phrases
+            query = re.sub(r'^(?:let me|I will|I\'ll|I\'d|can|could|please|can you|could you)\s+(?:check|see|query|search|look at|examine|explore|find|show)\s+(the\s+)?graph\s+(for|about)?\s*', '', query, flags=re.IGNORECASE)
+            query = query.strip()
+
+        if query:
+            # Determine graph mode based on keywords
+            mode = "find"  # default
+            if any(word in query.lower() for word in ["neighbor", "connected", "related", "calls", "callee", "caller"]):
+                mode = "neighbors"
+            elif any(word in query.lower() for word in ["path", "between", "connection"]):
+                mode = "path"
+            elif any(word in query.lower() for word in ["important", "rank", "central", "hub"]):
+                mode = "pagerank"
+            elif any(word in query.lower() for word in ["cluster", "group", "couple"]):
+                mode = "clusters"
+
+            return ExtractedToolCall(
+                tool_name="graph",
+                arguments={
+                    "mode": mode,
+                    "query": query[:200],  # Limit query length
+                },
+                confidence=0.8,  # Higher confidence for specific pattern match
+                source_text=text[:200],
+            )
+
+        # Fallback: generic graph call without query
+        return None
 
     def _extract_generic_call(
         self,

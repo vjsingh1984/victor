@@ -28,6 +28,7 @@ References:
 
 import json
 import logging
+import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -109,7 +110,7 @@ class ZAIProvider(BaseProvider):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str] = None,
         base_url: str = "https://api.z.ai/api/paas/v4/",
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
@@ -118,19 +119,35 @@ class ZAIProvider(BaseProvider):
         """Initialize z.ai provider.
 
         Args:
-            api_key: z.ai API key
+            api_key: z.ai API key (or set ZAI_API_KEY env var, or use keyring)
             base_url: z.ai API base URL (default: https://api.z.ai/api/paas/v4/)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
+        # Resolution order: parameter → env var → keyring → warning
+        resolved_key = api_key or os.environ.get("ZAI_API_KEY", "")
+        if not resolved_key:
+            try:
+                from victor.config.api_keys import get_api_key
+                # Try multiple aliases: zai, zhipuai, zhipu
+                resolved_key = get_api_key("zai") or get_api_key("zhipuai") or get_api_key("zhipu") or ""
+            except ImportError:
+                pass
+
+        if not resolved_key:
+            logger.warning(
+                "ZhipuAI API key not provided. Set ZAI_API_KEY environment variable, "
+                "use 'victor keys --set zai --keyring', or pass api_key parameter."
+            )
+
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=resolved_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
         )
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {resolved_key}",
                 "Content-Type": "application/json",
             },
             timeout=httpx.Timeout(timeout),

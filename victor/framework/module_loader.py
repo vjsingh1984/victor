@@ -764,11 +764,8 @@ class EntryPointCache:
         import hashlib
 
         try:
-            # Get installed packages
-            if sys.version_info >= (3, 10):
-                from importlib.metadata import distributions
-            else:
-                from importlib_metadata import distributions
+            # Get installed packages (Python 3.10+)
+            from importlib.metadata import distributions
 
             # Build sorted list of package:version pairs
             packages = []
@@ -910,14 +907,10 @@ class EntryPointCache:
         entries = {}
 
         try:
-            if sys.version_info >= (3, 10):
-                from importlib.metadata import entry_points
+            # Load entry points (Python 3.10+)
+            from importlib.metadata import entry_points
 
-                eps = entry_points(group=group)
-            else:
-                from importlib_metadata import entry_points
-
-                eps = entry_points(group=group)
+            eps = entry_points(group=group)
 
             for ep in eps:
                 # Store as "module:attr" format

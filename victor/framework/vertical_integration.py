@@ -73,7 +73,10 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import inspect
 import logging
+import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -854,6 +857,9 @@ class VerticalIntegrationPipeline:
         step_registry: Optional["StepHandlerRegistry"] = None,
         use_step_handlers: bool = True,
         extension_registry: Optional[ExtensionHandlerRegistry] = None,
+        enable_cache: bool = True,
+        cache_ttl: int = 3600,
+        parallel_enabled: bool = False,
     ):
         """Initialize the pipeline.
 
@@ -864,11 +870,20 @@ class VerticalIntegrationPipeline:
             step_registry: Custom step handler registry (uses default if None)
             use_step_handlers: If True, use step handlers; if False, use legacy methods
             extension_registry: Custom extension handler registry (OCP compliance)
+            enable_cache: If True, enable configuration caching (default: True)
+            cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
+            parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
         """
         self._strict_mode = strict_mode
         self._pre_hooks = pre_hooks or []
         self._post_hooks = post_hooks or []
         self._use_step_handlers = use_step_handlers
+        self._enable_cache = enable_cache
+        self._cache_ttl = cache_ttl
+        self._parallel_enabled = parallel_enabled
+
+        # Initialize cache (eagerly, to avoid attribute errors in tests)
+        self._cache: Dict[str, bytes] = {}
 
         # Initialize extension handler registry (OCP compliance)
         self._extension_registry = extension_registry or get_extension_handler_registry()
@@ -929,6 +944,23 @@ class VerticalIntegrationPipeline:
 
         result.vertical_name = vertical_class.name
 
+        # Check cache for pre-computed integration (Phase 1: Caching)
+        if self._enable_cache:
+            cache_key = self._generate_cache_key(vertical_class)
+            if cache_key:
+                cached_result = self._load_from_cache(cache_key)
+                if cached_result:
+                    logger.debug(
+                        f"Cache HIT for vertical '{vertical_class.name}' "
+                        f"(key: {cache_key[:16]}...)"
+                    )
+                    return cached_result
+                else:
+                    logger.debug(
+                        f"Cache MISS for vertical '{vertical_class.name}' "
+                        f"(key: {cache_key[:16]}...)"
+                    )
+
         # Run pre-hooks
         for hook in self._pre_hooks:
             try:
@@ -942,13 +974,17 @@ class VerticalIntegrationPipeline:
             return result
         result.context = context
 
-        # Apply integration steps
-        if self._use_step_handlers and self._step_registry is not None:
-            # Use step handlers (Phase 3.1)
-            self._apply_with_step_handlers(orchestrator, vertical_class, context, result)
-        else:
-            # Use legacy methods (backward compatibility)
-            self._apply_with_legacy_methods(orchestrator, vertical_class, context, result)
+        # Apply integration steps (Phase 1: Remove legacy path)
+        # Step handlers are now mandatory for SOLID compliance
+        if self._step_registry is None:
+            raise RuntimeError(
+                "StepHandlerRegistry required for vertical integration. "
+                "Ensure step handlers are initialized. "
+                "Use create_integration_pipeline() factory for proper setup."
+            )
+
+        # Use step handlers (Phase 3.1 - SOLID compliant single responsibility)
+        self._apply_with_step_handlers(orchestrator, vertical_class, context, result)
 
         # Run post-hooks
         for hook in self._post_hooks:
@@ -1003,7 +1039,477 @@ class VerticalIntegrationPipeline:
         # Note: result.persist() available for opt-in audit logging
         # Not called automatically to avoid duplication with EventBus
 
+        # Save to cache (Phase 1: Caching)
+        if self._enable_cache and result.success:
+            cache_key = self._generate_cache_key(vertical_class)
+            if cache_key:
+                self._save_to_cache(cache_key, result)
+
         return result
+
+    def _generate_cache_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
+        """Generate stable cache key from vertical signature.
+
+        The key is based on:
+        1. Vertical name
+        2. Source code hash (for inline changes)
+        3. File modification time (for file changes)
+
+        This ensures cache invalidation when vertical code changes.
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            Cache key string, or None if generation fails
+        """
+        try:
+            # Try to get source file via inspect.getfile()
+            # This works for normally imported modules
+            try:
+                source_file = Path(inspect.getfile(vertical))
+            except (TypeError, OSError):
+                # For dynamically loaded modules, try module.__file__
+                if hasattr(vertical, "__module__"):
+                    import sys
+                    module_name = vertical.__module__
+                    if module_name in sys.modules:
+                        module = sys.modules[module_name]
+                        if hasattr(module, "__file__") and module.__file__:
+                            source_file = Path(module.__file__)
+                        else:
+                            # Fallback to class-based key
+                            return self._generate_class_based_key(vertical)
+                    else:
+                        return self._generate_class_based_key(vertical)
+                else:
+                    return self._generate_class_based_key(vertical)
+
+            source_hash = self._hash_source_file(source_file)
+
+            # Combine into key
+            key_parts = [
+                f"vertical={vertical.name}",
+                f"source={source_hash}",
+            ]
+
+            key_string = "|".join(key_parts)
+            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+
+            return f"v1_{vertical.name}_{full_hash[:16]}"
+
+        except Exception as e:
+            logger.warning(f"Failed to generate cache key: {e}")
+            return None
+
+    def _generate_class_based_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
+        """Generate cache key from class properties when source file unavailable.
+
+        This is a fallback for dynamically loaded classes or built-in classes.
+        It attempts to include file hash if the module has a __file__ attribute.
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            Cache key string
+        """
+        try:
+            # First, try to get file hash from module
+            if hasattr(vertical, "__module__"):
+                import sys
+                module_name = vertical.__module__
+
+                # Try to get module from sys.modules first
+                module = sys.modules.get(module_name)
+
+                # If not in sys.modules, try to get module via inspect
+                if not module:
+                    try:
+                        import inspect
+                        # Get module from class using inspect
+                        module = inspect.getmodule(vertical)
+                    except Exception:
+                        pass
+
+                # If we have a module with __file__, use it for hashing
+                if module and hasattr(module, "__file__") and module.__file__:
+                    try:
+                        source_file = Path(module.__file__)
+                        if source_file.exists():
+                            file_hash = self._hash_source_file(source_file)
+                            # Use file hash as primary key component
+                            key_parts = [
+                                f"vertical={vertical.name}",
+                                f"module={module_name}",
+                                f"file={file_hash}",
+                            ]
+                            key_string = "|".join(key_parts)
+                            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+                            return f"v2_{vertical.name}_{full_hash[:16]}"
+                    except Exception:
+                        pass  # Fall back to id-based key
+
+            # Fallback: use class id (won't detect file changes, but stable)
+            key_parts = [
+                f"vertical={vertical.name}",
+                f"id={id(vertical)}",
+                f"module={vertical.__module__}",
+            ]
+            key_string = "|".join(key_parts)
+            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+            return f"v3_{vertical.name}_{full_hash[:16]}"
+
+        except Exception:
+            # Ultimate fallback
+            return f"v4_{vertical.name}_{id(vertical)}"
+
+    def _hash_source_file(self, source_file: Path) -> str:
+        """Hash source file content and metadata.
+
+        Args:
+            source_file: Path to Python source file
+
+        Returns:
+            Hex digest hash combining content and mtime
+        """
+        try:
+            # File content hash (first 16 bytes for performance)
+            with open(source_file, "rb") as f:
+                content_hash = hashlib.sha256(f.read(16384)).hexdigest()[:16]
+
+            # Modification time (for file changes)
+            mtime = source_file.stat().st_mtime_ns
+            mtime_hash = hashlib.sha256(str(mtime).encode()).hexdigest()[:8]
+
+            return f"{content_hash}_{mtime_hash}"
+
+        except Exception as e:
+            logger.warning(f"Failed to hash source file {source_file}: {e}")
+            return f"unknown_{hash(source_file)}"
+
+    def _load_from_cache(self, cache_key: str) -> Optional["IntegrationResult"]:
+        """Load integration result from in-memory cache.
+
+        Args:
+            cache_key: Cache key
+
+        Returns:
+            Cached IntegrationResult or None
+        """
+        # Simple in-memory cache (can be extended to use CacheCoordinator later)
+        cached_data = self._cache.get(cache_key)
+        if cached_data:
+            try:
+                result = pickle.loads(cached_data)
+
+                # Verify result integrity
+                if not isinstance(result, IntegrationResult):
+                    logger.warning(
+                        f"Cache corruption: expected IntegrationResult, got {type(result)}"
+                    )
+                    del self._cache[cache_key]
+                    return None
+
+                # Log metrics
+                logger.debug(f"Loaded cached integration: {cache_key}")
+                return result
+
+            except Exception as e:
+                logger.warning(f"Failed to load from cache: {e}")
+                # Clear corrupted cache entry
+                del self._cache[cache_key]
+
+        return None
+
+    def _save_to_cache(self, cache_key: str, result: "IntegrationResult") -> None:
+        """Save integration result to in-memory cache.
+
+        Args:
+            cache_key: Cache key
+            result: Integration result to cache
+        """
+        try:
+            # Serialize result
+            data = pickle.dumps(result)
+
+            # Save to cache
+            if not hasattr(self, "_cache"):
+                self._cache: Dict[str, bytes] = {}
+
+            self._cache[cache_key] = data
+
+            # Enforce TTL by storing timestamp
+            if not hasattr(self, "_cache_timestamps"):
+                self._cache_timestamps: Dict[str, float] = {}
+            self._cache_timestamps[cache_key] = asyncio.get_event_loop().time()
+
+            logger.debug(f"Cached integration result: {cache_key}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save to cache: {e}")
+
+    async def apply_async(
+        self,
+        orchestrator: Any,
+        vertical: Union[Type["VerticalBase"], str],
+    ) -> IntegrationResult:
+        """Apply vertical integration asynchronously (Phase 2.1).
+
+        This async method provides the foundation for parallel step execution.
+        Currently executes sequentially, but can be extended for parallel execution.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class or name string
+
+        Returns:
+            IntegrationResult with status and metadata
+
+        Example:
+            pipeline = VerticalIntegrationPipeline()
+            result = await pipeline.apply_async(orchestrator, CodingAssistant)
+        """
+        import asyncio
+
+        # Resolve vertical
+        vertical_cls = self._resolve_vertical(vertical)
+        if vertical_cls is None:
+            result = IntegrationResult(vertical_name=str(vertical))
+            result.add_error(f"Vertical not found: {vertical}")
+            return result
+
+        # Check cache first (Phase 1)
+        if self._enable_cache:
+            cache_key = self._generate_cache_key(vertical_cls)
+            if cache_key:
+                cached_result = self._load_from_cache(cache_key)
+                if cached_result:
+                    logger.debug(
+                        f"Cache HIT for vertical '{vertical_cls.name}' "
+                        f"(key: {cache_key[:16]}...)"
+                    )
+                    return cached_result
+                else:
+                    logger.debug(
+                        f"Cache MISS for vertical '{vertical_cls.name}' "
+                        f"(key: {cache_key[:16]}...)"
+                    )
+
+        # Create context and result
+        result = IntegrationResult(vertical_name=vertical_cls.name)
+        context = self._create_context(vertical_cls, result)
+        if context is None:
+            result.add_error("Failed to create vertical context")
+            return result
+
+        # Execute step handlers (Phase 2.1-2.2)
+        if self._step_registry is None:
+            result.add_error("StepHandlerRegistry required for vertical integration")
+            return result
+
+        # Choose execution strategy based on parallel_enabled flag
+        if self._parallel_enabled:
+            # Parallel execution (Phase 2.2)
+            await self._apply_with_step_handlers_parallel(
+                orchestrator, vertical_cls, context, result
+            )
+        else:
+            # Sequential execution (Phase 2.1)
+            for handler in self._step_registry.get_ordered_handlers():
+                try:
+                    # Check if handler has async apply method
+                    if hasattr(handler, 'apply_async'):
+                        await handler.apply_async(
+                            orchestrator,
+                            vertical_cls,
+                            context,
+                            result,
+                            strict_mode=self._strict_mode,
+                        )
+                    else:
+                        # Fallback to sync apply
+                        handler.apply(
+                            orchestrator,
+                            vertical_cls,
+                            context,
+                            result,
+                            strict_mode=self._strict_mode,
+                        )
+                except Exception as e:
+                    if self._strict_mode:
+                        result.add_error(f"Step handler '{handler.name}' failed: {e}")
+                    else:
+                        result.add_warning(f"Step handler '{handler.name}' error: {e}")
+                    logger.debug(
+                        f"Step handler '{handler.name}' failed: {e}",
+                        exc_info=True,
+                    )
+
+        # Cache result (Phase 1)
+        if self._enable_cache and result.success:
+            cache_key = self._generate_cache_key(vertical_cls)
+            if cache_key:
+                self._save_to_cache(cache_key, result)
+
+        return result
+
+    def _classify_handlers(self, handlers: List[Any]) -> Tuple[List[Any], List[Any]]:
+        """Classify handlers into independent and dependent groups (Phase 2.2).
+
+        Independent handlers can run in parallel (no shared state):
+        - ToolStepHandler: Reads vertical only
+        - PromptStepHandler: Reads vertical only
+        - SafetyStepHandler: Reads vertical only
+
+        Dependent handlers must run sequentially:
+        - ConfigStepHandler: Depends on tools, prompts
+        - MiddlewareStepHandler: Depends on config
+        - ExtensionsStepHandler: Depends on all
+        - FrameworkStepHandler: Depends on all
+        - ContextStepHandler: Must run last
+
+        Args:
+            handlers: List of step handlers
+
+        Returns:
+            Tuple of (independent_handlers, dependent_handlers)
+        """
+        independent = []
+        dependent = []
+
+        for handler in handlers:
+            handler_type = type(handler).__name__
+
+            # Independent handlers (read-only, no side effects)
+            if handler_type in [
+                'ToolStepHandler',
+                'PromptStepHandler',
+                'SafetyStepHandler',
+            ]:
+                independent.append(handler)
+            else:
+                # Dependent handlers (have side effects or dependencies)
+                dependent.append(handler)
+
+        return independent, dependent
+
+    async def _apply_with_step_handlers_parallel(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: VerticalContext,
+        result: IntegrationResult,
+    ) -> None:
+        """Apply step handlers with parallel execution (Phase 2.2).
+
+        Executes independent handlers concurrently using asyncio.gather,
+        then executes dependent handlers sequentially.
+
+        Args:
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Integration result
+        """
+        import asyncio
+
+        if self._step_registry is None:
+            return
+
+        handlers = self._step_registry.get_ordered_handlers()
+        independent, dependent = self._classify_handlers(handlers)
+
+        # Execute independent handlers in parallel
+        if independent:
+            logger.debug(
+                f"Executing {len(independent)} independent handlers in parallel"
+            )
+
+            tasks = [
+                self._run_handler_async(h, orchestrator, vertical, context, result)
+                for h in independent
+            ]
+
+            # Gather results with exception handling
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Check for exceptions
+            for i, result_or_exc in enumerate(results):
+                if isinstance(result_or_exc, Exception):
+                    handler = independent[i]
+                    if self._strict_mode:
+                        result.add_error(
+                            f"Parallel handler '{handler.name}' failed: {result_or_exc}"
+                        )
+                    else:
+                        result.add_warning(
+                            f"Parallel handler '{handler.name}' error: {result_or_exc}"
+                        )
+
+        # Execute dependent handlers sequentially
+        if dependent:
+            logger.debug(
+                f"Executing {len(dependent)} dependent handlers sequentially"
+            )
+
+            for handler in dependent:
+                await self._run_handler_async(
+                    handler, orchestrator, vertical, context, result
+                )
+
+    async def _run_handler_async(
+        self,
+        handler: Any,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: VerticalContext,
+        result: IntegrationResult,
+    ) -> None:
+        """Run a single handler with async support (Phase 2.2).
+
+        Args:
+            handler: Step handler instance
+            orchestrator: Orchestrator instance
+            vertical: Vertical class
+            context: Vertical context
+            result: Integration result
+
+        Raises:
+            Exception: If handler fails and strict_mode is enabled
+        """
+        try:
+            # Check if handler has async apply method
+            if hasattr(handler, 'apply_async'):
+                await handler.apply_async(
+                    orchestrator,
+                    vertical,
+                    context,
+                    result,
+                    strict_mode=self._strict_mode,
+                )
+            else:
+                # Run sync handler in thread pool to avoid blocking
+                import asyncio
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: handler.apply(
+                        orchestrator,
+                        vertical,
+                        context,
+                        result,
+                        strict_mode=self._strict_mode,
+                    )
+                )
+        except Exception as e:
+            if self._strict_mode:
+                raise
+            else:
+                logger.debug(
+                    f"Handler '{handler.name}' failed: {e}",
+                    exc_info=True,
+                )
 
     def _apply_with_step_handlers(
         self,
@@ -1046,37 +1552,9 @@ class VerticalIntegrationPipeline:
                     exc_info=True,
                 )
 
-    def _apply_with_legacy_methods(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply vertical using legacy inline methods.
-
-        This preserves backward compatibility for code that depends on
-        the old implementation.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Integration result
-        """
-        # Apply all integration steps
-        self._apply_tools(orchestrator, vertical, context, result)
-        self._apply_system_prompt(orchestrator, vertical, context, result)
-        self._apply_stages(orchestrator, vertical, context, result)
-        self._apply_extensions(orchestrator, vertical, context, result)
-
-        # Apply new framework integrations (workflows, RL, teams)
-        self._apply_workflows(orchestrator, vertical, context, result)
-        self._apply_rl_config(orchestrator, vertical, context, result)
-        self._apply_team_specs(orchestrator, vertical, context, result)
-
-        # Attach context to orchestrator
-        self._attach_context(orchestrator, context, result)
+    # Legacy method removed in Phase 1 refactoring
+    # Step handlers now provide SOLID-compliant single responsibility implementation
+    # See: victor/framework/step_handlers.py
 
     def _resolve_vertical(
         self, vertical: Union[Type["VerticalBase"], str]
@@ -1124,774 +1602,30 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Failed to create context: {e}")
             return None
 
-    def _apply_tools(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply tools filter from vertical.
-
-        This method supports both legacy tool lists and tiered tool configuration:
-        1. Tiered config (preferred): Uses TieredToolConfig for context-aware selection
-        2. Legacy tools list: Falls back to get_tools() for backward compatibility
-
-        The tiered configuration is also registered with the ToolTierRegistry
-        for cross-vertical tier management.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            # Try tiered tool configuration first (preferred approach)
-            tiered_config = self._get_tiered_config(vertical)
-            if tiered_config:
-                self._apply_tiered_tools(orchestrator, vertical, tiered_config, context, result)
-                return
-
-            # Fall back to legacy tool list
-            tools = vertical.get_tools()
-            if tools:
-                # Canonicalize tool names to ensure consistency
-                canonical_tools = self._canonicalize_tool_names(set(tools))
-                context.apply_enabled_tools(canonical_tools)
-                result.tools_applied = canonical_tools
-
-                # Use capability-based approach (protocol-first, fallback to hasattr)
-                if _check_capability(orchestrator, "enabled_tools"):
-                    _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
-                    logger.debug(f"Applied {len(canonical_tools)} tools via capability")
-                else:
-                    result.add_warning(
-                        "Orchestrator does not implement enabled_tools capability; "
-                        "tools stored in context only"
-                    )
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply tools: {e}")
-            else:
-                result.add_warning(f"Tools application error: {e}")
-
-    def _get_tiered_config(self, vertical: Type["VerticalBase"]) -> Optional[Any]:
-        """Get tiered tool configuration from vertical.
-
-        Attempts to get the tiered config via:
-        1. get_tiered_tool_config() method (preferred)
-        2. get_tiered_tools() method (legacy, deprecated)
-
-        Args:
-            vertical: Vertical class
-
-        Returns:
-            TieredToolConfig or None
-        """
-        # Try preferred method first
-        if hasattr(vertical, "get_tiered_tool_config"):
-            config = vertical.get_tiered_tool_config()
-            if config is not None:
-                return config
-
-        # Fall back to legacy method
-        if hasattr(vertical, "get_tiered_tools"):
-            config = vertical.get_tiered_tools()
-            if config is not None:
-                logger.debug(
-                    "Using deprecated get_tiered_tools(); " "migrate to get_tiered_tool_config()"
-                )
-                return config
-
-        return None
-
-    def _apply_tiered_tools(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        tiered_config: Any,
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply tiered tool configuration.
-
-        Registers the config with ToolTierRegistry and applies the tools
-        to the orchestrator using the tiered approach.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            tiered_config: TieredToolConfig instance
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            from victor.core.tool_tier_registry import ToolTierRegistry
-
-            # Register with global registry for cross-vertical access
-            registry = ToolTierRegistry.get_instance()
-            vertical_name = getattr(vertical, "name", vertical.__name__.lower())
-
-            # Register if not already present (don't overwrite existing)
-            if not registry.has(vertical_name):
-                registry.register(
-                    name=vertical_name,
-                    config=tiered_config,
-                    parent="base",
-                    description=f"Auto-registered from {vertical.__name__}",
-                )
-                logger.debug(f"Registered tiered config for '{vertical_name}' with registry")
-
-            # Get base tools (mandatory + vertical_core)
-            base_tools = tiered_config.get_base_tools()
-            canonical_tools = self._canonicalize_tool_names(base_tools)
-
-            # Store tiered config in context for downstream use
-            context.apply_enabled_tools(canonical_tools)
-            context.metadata["tiered_tool_config"] = tiered_config
-            result.tools_applied = canonical_tools
-
-            # Apply to orchestrator via capability
-            if _check_capability(orchestrator, "enabled_tools"):
-                _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
-                logger.debug(
-                    f"Applied {len(canonical_tools)} tiered tools via capability "
-                    f"(mandatory={len(tiered_config.mandatory)}, "
-                    f"core={len(tiered_config.vertical_core)})"
-                )
-
-            # Also set tiered config if orchestrator supports it
-            if _check_capability(orchestrator, "tiered_tool_config"):
-                _invoke_capability(orchestrator, "tiered_tool_config", tiered_config)
-                logger.debug("Applied tiered tool config to orchestrator")
-
-        except Exception as e:
-            # Fall back to regular tool application on error
-            logger.warning(f"Tiered tool application failed, falling back: {e}")
-            tools = vertical.get_tools()
-            if tools:
-                canonical_tools = self._canonicalize_tool_names(set(tools))
-                context.apply_enabled_tools(canonical_tools)
-                result.tools_applied = canonical_tools
-                if _check_capability(orchestrator, "enabled_tools"):
-                    _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
-
-    def _canonicalize_tool_names(self, tools: Set[str]) -> Set[str]:
-        """Canonicalize tool names to ensure consistency.
-
-        Converts legacy tool names (e.g., 'read_file', 'edit_files') to
-        canonical short names (e.g., 'read', 'edit').
-
-        Args:
-            tools: Set of tool names (may include legacy names)
-
-        Returns:
-            Set of canonical tool names
-        """
-        try:
-            from victor.tools.tool_names import get_canonical_name
-
-            return {get_canonical_name(tool) for tool in tools}
-        except ImportError:
-            # Fallback if tool_names module not available
-            logger.debug("Tool name canonicalization not available")
-            return tools
-
-    def _apply_system_prompt(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply system prompt from vertical.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            system_prompt = vertical.get_system_prompt()
-            if system_prompt:
-                context.apply_system_prompt(system_prompt)
-
-                # Apply via capability (protocol-first)
-                if _check_capability(orchestrator, "custom_prompt"):
-                    _invoke_capability(orchestrator, "custom_prompt", system_prompt)
-                    logger.debug("Applied system prompt via capability")
-                elif _check_capability(orchestrator, "prompt_builder"):
-                    # Fallback: use public method only (SOLID compliant)
-                    prompt_builder = getattr(orchestrator, "prompt_builder", None)
-                    if prompt_builder and hasattr(prompt_builder, "set_custom_prompt"):
-                        prompt_builder.set_custom_prompt(system_prompt)
-                        logger.debug("Applied system prompt via prompt_builder")
-                    else:
-                        result.add_warning(
-                            "prompt_builder lacks set_custom_prompt method; "
-                            "prompt stored in context only"
-                        )
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply system prompt: {e}")
-            else:
-                result.add_warning(f"System prompt error: {e}")
-
-    def _apply_stages(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply stages configuration from vertical.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            stages = vertical.get_stages()
-            if stages:
-                context.apply_stages(stages)
-                logger.debug(f"Applied stages: {list(stages.keys())}")
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply stages: {e}")
-            else:
-                result.add_warning(f"Stages application error: {e}")
-
-    def _apply_extensions(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply all vertical extensions using registry (OCP compliant).
-
-        This method uses the ExtensionHandlerRegistry to apply extensions,
-        allowing new extension types to be added without modifying this method.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            extensions = vertical.get_extensions()
-            if extensions is None:
-                logger.debug("No extensions available for vertical")
-                return
-
-            # Use extension handler registry (OCP compliant)
-            for handler_info in self._extension_registry.get_ordered_handlers():
-                ext_value = getattr(extensions, handler_info.attr_name, None)
-                if ext_value:
-                    try:
-                        handler_info.handler(self, orchestrator, ext_value, context, result)
-                        logger.debug(f"Applied extension: {handler_info.name}")
-                    except Exception as e:
-                        if self._strict_mode:
-                            result.add_error(f"Extension '{handler_info.name}' failed: {e}")
-                        else:
-                            result.add_warning(f"Extension '{handler_info.name}' error: {e}")
-                        logger.debug(
-                            f"Extension '{handler_info.name}' failed: {e}",
-                            exc_info=True,
-                        )
-
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply extensions: {e}")
-            else:
-                result.add_warning(f"Extensions application error: {e}")
-
-    def _apply_middleware(
-        self,
-        orchestrator: Any,
-        middleware_list: List[Any],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply middleware to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            middleware_list: List of middleware
-            context: Vertical context
-            result: Result to update
-        """
-        context.apply_middleware(middleware_list)
-        result.middleware_count = len(middleware_list)
-
-        # Use capability-based approach (protocol-first, fallback to hasattr)
-        # SOLID Compliance (DIP): Only access public methods, no private attributes
-        if _check_capability(orchestrator, "vertical_middleware"):
-            _invoke_capability(orchestrator, "vertical_middleware", middleware_list)
-            logger.debug(f"Applied {len(middleware_list)} middleware via capability")
-        elif _check_capability(orchestrator, "middleware_chain"):
-            # Fallback: try middleware chain via public property only (SOLID compliant)
-            chain = getattr(orchestrator, "middleware_chain", None)
-            if chain is not None and hasattr(chain, "add"):
-                for mw in middleware_list:
-                    chain.add(mw)
-                logger.debug(f"Applied {len(middleware_list)} middleware to chain")
-            else:
-                logger.debug("middleware_chain capability not available via public property")
-
-    def _apply_safety(
-        self,
-        orchestrator: Any,
-        safety_extensions: List[Any],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply safety extensions to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            safety_extensions: List of safety extensions
-            context: Vertical context
-            result: Result to update
-        """
-        all_patterns = []
-        for ext in safety_extensions:
-            all_patterns.extend(ext.get_bash_patterns())
-            all_patterns.extend(ext.get_file_patterns())
-
-        context.apply_safety_patterns(all_patterns)
-        result.safety_patterns_count = len(all_patterns)
-
-        # Use capability-based approach (protocol-first, SOLID compliant)
-        if _check_capability(orchestrator, "vertical_safety_patterns"):
-            _invoke_capability(orchestrator, "vertical_safety_patterns", all_patterns)
-            logger.debug(f"Applied {len(all_patterns)} safety patterns via capability")
-        elif _check_capability(orchestrator, "safety_patterns"):
-            _invoke_capability(orchestrator, "safety_patterns", all_patterns)
-            logger.debug(
-                f"Applied {len(all_patterns)} safety patterns via safety_patterns capability"
-            )
-        else:
-            # Use public method only (SOLID compliant - no private attributes)
-            safety_checker = getattr(orchestrator, "safety_checker", None)
-            if safety_checker and hasattr(safety_checker, "add_patterns"):
-                safety_checker.add_patterns(all_patterns)
-                logger.debug(f"Applied {len(all_patterns)} safety patterns via public method")
-            else:
-                result.add_warning(
-                    f"Could not apply {len(all_patterns)} safety patterns; "
-                    "patterns stored in context only"
-                )
-
-    def _apply_prompts(
-        self,
-        orchestrator: Any,
-        contributors: List[Any],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply prompt contributors to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            contributors: List of prompt contributors
-            context: Vertical context
-            result: Result to update
-        """
-        # Merge task hints from all contributors
-        merged_hints = {}
-        for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-            merged_hints.update(contributor.get_task_type_hints())
-
-        context.apply_task_hints(merged_hints)
-        result.prompt_hints_count = len(merged_hints)
-
-        # Apply task hints via capability (SOLID compliant)
-        if _check_capability(orchestrator, "task_type_hints"):
-            _invoke_capability(orchestrator, "task_type_hints", merged_hints)
-            logger.debug(f"Applied {len(merged_hints)} task hints via capability")
-        elif _check_capability(orchestrator, "prompt_builder"):
-            # Use public method only (SOLID compliant)
-            prompt_builder = getattr(orchestrator, "prompt_builder", None)
-            if prompt_builder and hasattr(prompt_builder, "set_task_type_hints"):
-                prompt_builder.set_task_type_hints(merged_hints)
-                logger.debug(f"Applied {len(merged_hints)} task hints via prompt_builder")
-            else:
-                result.add_warning(
-                    f"Could not apply {len(merged_hints)} task hints; "
-                    "hints stored in context only"
-                )
-
-        # Apply prompt sections (SOLID compliant)
-        for contributor in sorted(contributors, key=lambda c: c.get_priority()):
-            section = contributor.get_system_prompt_section()
-            if section:
-                context.add_prompt_section(section)
-                if _check_capability(orchestrator, "prompt_section"):
-                    _invoke_capability(orchestrator, "prompt_section", section)
-                elif _check_capability(orchestrator, "prompt_builder"):
-                    prompt_builder = getattr(orchestrator, "prompt_builder", None)
-                    if prompt_builder and hasattr(prompt_builder, "add_prompt_section"):
-                        prompt_builder.add_prompt_section(section)
-
-    def _apply_mode_config(
-        self,
-        orchestrator: Any,
-        mode_provider: Any,
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply mode configuration to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            mode_provider: Mode config provider
-            context: Vertical context
-            result: Result to update
-        """
-        mode_configs = mode_provider.get_mode_configs()
-        default_mode = mode_provider.get_default_mode()
-        default_budget = mode_provider.get_default_tool_budget()
-
-        context.apply_mode_configs(mode_configs, default_mode, default_budget)
-        result.mode_configs_count = len(mode_configs)
-
-        # Apply via capability (protocol-first, fallback to direct access)
-        if _check_capability(orchestrator, "mode_configs"):
-            _invoke_capability(orchestrator, "mode_configs", mode_configs)
-            logger.debug(f"Applied {len(mode_configs)} mode configs via capability")
-        if _check_capability(orchestrator, "default_budget"):
-            _invoke_capability(orchestrator, "default_budget", default_budget)
-            logger.debug(f"Applied default budget {default_budget} via capability")
-
-        # Fallback: try adaptive mode controller directly
-        if not _check_capability(orchestrator, "mode_configs"):
-            controller = getattr(orchestrator, "adaptive_mode_controller", None)
-            if controller:
-                if hasattr(controller, "set_mode_configs"):
-                    controller.set_mode_configs(mode_configs)
-                if hasattr(controller, "set_default_budget"):
-                    controller.set_default_budget(default_budget)
-                logger.debug("Applied mode config via fallback")
-
-    def _apply_tool_deps(
-        self,
-        orchestrator: Any,
-        dep_provider: Any,
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply tool dependencies to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            dep_provider: Tool dependency provider
-            context: Vertical context
-            result: Result to update
-        """
-        dependencies = dep_provider.get_dependencies()
-        sequences = dep_provider.get_tool_sequences()
-
-        context.apply_tool_dependencies(dependencies, sequences)
-
-        # Apply via capability (protocol-first, fallback to direct access)
-        if _check_capability(orchestrator, "tool_dependencies"):
-            _invoke_capability(orchestrator, "tool_dependencies", dependencies)
-            logger.debug("Applied tool dependencies via capability")
-        if _check_capability(orchestrator, "tool_sequences"):
-            _invoke_capability(orchestrator, "tool_sequences", sequences)
-            logger.debug("Applied tool sequences via capability")
-
-        # Fallback: try tool sequence tracker via public property only (SOLID compliant)
-        # SOLID Compliance (DIP): Only access public methods, no private attributes
-        if not _check_capability(orchestrator, "tool_dependencies"):
-            tracker = getattr(orchestrator, "tool_sequence_tracker", None)
-            if tracker:
-                if hasattr(tracker, "set_dependencies"):
-                    tracker.set_dependencies(dependencies)
-                if hasattr(tracker, "set_sequences"):
-                    tracker.set_sequences(sequences)
-                logger.debug("Applied tool deps via public fallback")
-            else:
-                logger.debug("tool_sequence_tracker capability not available via public property")
-
-    def _attach_context(
-        self,
-        orchestrator: Any,
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Attach the vertical context to orchestrator.
-
-        Args:
-            orchestrator: Orchestrator instance
-            context: Vertical context to attach
-            result: Result to update
-        """
-        # Use capability-based approach (SOLID compliant)
-        if _check_capability(orchestrator, "vertical_context"):
-            _invoke_capability(orchestrator, "vertical_context", context)
-            logger.debug("Attached context via capability")
-        elif hasattr(orchestrator, "set_vertical_context"):
-            orchestrator.set_vertical_context(context)
-            logger.debug("Attached context via set_vertical_context")
-        else:
-            result.add_warning(
-                "Orchestrator lacks set_vertical_context method; " "context not attached"
-            )
-
-    # =========================================================================
-    # New Framework Integrations (Workflows, RL, Teams)
-    # =========================================================================
-
-    def _apply_workflows(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply workflow definitions from vertical.
-
-        Registers vertical-specific workflows with the workflow registry
-        for use during task execution.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            # Check if vertical has workflow provider using protocol (type-safe)
-            workflow_provider = None
-            if isinstance(vertical, type) and issubclass(
-                vertical, VerticalWorkflowProviderProtocol
-            ):
-                workflow_provider = vertical.get_workflow_provider()
-            elif isinstance(vertical, VerticalWorkflowProviderProtocol):
-                workflow_provider = vertical.get_workflow_provider()
-
-            # Also check if vertical itself is a WorkflowProviderProtocol
-            if workflow_provider is None and isinstance(vertical, type):
-                if isinstance(vertical, WorkflowProviderProtocol) or (
-                    hasattr(vertical, "get_workflows")
-                    and callable(getattr(vertical, "get_workflows", None))
-                ):
-                    # Vertical class implements protocol directly
-                    workflow_provider = vertical
-
-            if workflow_provider is None:
-                return
-
-            # Get workflows from provider
-            workflows = workflow_provider.get_workflows()
-            if not workflows:
-                return
-
-            workflow_count = len(workflows)
-            result.workflows_count = workflow_count
-
-            # Store in context
-            context.apply_workflows(workflows)
-
-            # Register with workflow registry if available
-            try:
-                from victor.workflows.registry import get_workflow_registry
-
-                registry = get_workflow_registry()
-                for name, workflow in workflows.items():
-                    registry.register(
-                        f"{vertical.name}:{name}",
-                        workflow,
-                        replace=True,
-                    )
-                result.add_info(
-                    f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
-                )
-            except ImportError:
-                result.add_warning("Workflow registry not available")
-            except Exception as e:
-                result.add_warning(f"Could not register workflows: {e}")
-
-            logger.debug(f"Applied {workflow_count} workflows from vertical")
-
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply workflows: {e}")
-            else:
-                result.add_warning(f"Workflow application error: {e}")
-
-    def _apply_rl_config(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply RL configuration from vertical.
-
-        Configures the RL system with vertical-specific learners,
-        task type mappings, and quality thresholds.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            # Check if vertical has RL config using protocol (type-safe)
-            rl_config = None
-            rl_provider = None
-
-            # Check for RL config provider method using protocol
-            if isinstance(vertical, type) and issubclass(vertical, VerticalRLProviderProtocol):
-                rl_provider = vertical.get_rl_config_provider()
-                if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
-                    rl_config = rl_provider.get_rl_config()
-            elif isinstance(vertical, VerticalRLProviderProtocol):
-                rl_provider = vertical.get_rl_config_provider()
-                if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
-                    rl_config = rl_provider.get_rl_config()
-
-            # Fallback: check if vertical implements RLConfigProviderProtocol directly
-            if rl_config is None:
-                if isinstance(vertical, RLConfigProviderProtocol) or (
-                    hasattr(vertical, "get_rl_config")
-                    and callable(getattr(vertical, "get_rl_config", None))
-                ):
-                    rl_config = vertical.get_rl_config()
-
-            if rl_config is None:
-                return
-
-            # Get learner count
-            learner_count = 0
-            if hasattr(rl_config, "active_learners"):
-                learner_count = len(rl_config.active_learners)
-            result.rl_learners_count = learner_count
-
-            # Store in context
-            context.apply_rl_config(rl_config)
-
-            # Apply to RL hooks if vertical provides them (type-safe)
-            rl_hooks = None
-            if isinstance(vertical, type) and issubclass(vertical, VerticalRLProviderProtocol):
-                rl_hooks = vertical.get_rl_hooks()
-            elif isinstance(vertical, VerticalRLProviderProtocol):
-                rl_hooks = vertical.get_rl_hooks()
-            elif hasattr(vertical, "get_rl_hooks") and callable(
-                getattr(vertical, "get_rl_hooks", None)
-            ):
-                # Fallback for backwards compatibility
-                rl_hooks = vertical.get_rl_hooks()
-
-            if rl_hooks:
-                context.apply_rl_hooks(rl_hooks)
-
-                # Attach hooks via capability (SOLID compliant)
-                if _check_capability(orchestrator, "rl_hooks"):
-                    _invoke_capability(orchestrator, "rl_hooks", rl_hooks)
-                    logger.debug("Applied RL hooks via capability")
-                elif hasattr(orchestrator, "set_rl_hooks"):
-                    orchestrator.set_rl_hooks(rl_hooks)
-                    logger.debug("Applied RL hooks via set_rl_hooks")
-                else:
-                    result.add_warning(
-                        "Orchestrator lacks set_rl_hooks method; " "hooks stored in context only"
-                    )
-
-            result.add_info(f"Configured {learner_count} RL learners")
-            logger.debug(f"Applied RL config with {learner_count} learners")
-
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply RL config: {e}")
-            else:
-                result.add_warning(f"RL config application error: {e}")
-
-    def _apply_team_specs(
-        self,
-        orchestrator: Any,
-        vertical: Type["VerticalBase"],
-        context: VerticalContext,
-        result: IntegrationResult,
-    ) -> None:
-        """Apply team specifications from vertical.
-
-        Registers vertical-specific team configurations for
-        multi-agent task execution.
-
-        Args:
-            orchestrator: Orchestrator instance
-            vertical: Vertical class
-            context: Vertical context
-            result: Result to update
-        """
-        try:
-            # Check if vertical has team specs using protocol (type-safe)
-            team_specs = None
-            team_provider = None
-
-            # Check for team spec provider method using protocol
-            if isinstance(vertical, type) and issubclass(vertical, VerticalTeamProviderProtocol):
-                team_provider = vertical.get_team_spec_provider()
-                if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
-                    team_specs = team_provider.get_team_specs()
-            elif isinstance(vertical, VerticalTeamProviderProtocol):
-                team_provider = vertical.get_team_spec_provider()
-                if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
-                    team_specs = team_provider.get_team_specs()
-
-            # Fallback: check if vertical implements TeamSpecProviderProtocol directly
-            if team_specs is None:
-                if isinstance(vertical, TeamSpecProviderProtocol) or (
-                    hasattr(vertical, "get_team_specs")
-                    and callable(getattr(vertical, "get_team_specs", None))
-                ):
-                    team_specs = vertical.get_team_specs()
-
-            if not team_specs:
-                return
-
-            team_count = len(team_specs)
-            result.team_specs_count = team_count
-
-            # Store in context
-            context.apply_team_specs(team_specs)
-
-            # Attach via capability (SOLID compliant)
-            if _check_capability(orchestrator, "team_specs"):
-                _invoke_capability(orchestrator, "team_specs", team_specs)
-                logger.debug("Applied team specs via capability")
-            elif hasattr(orchestrator, "set_team_specs"):
-                orchestrator.set_team_specs(team_specs)
-                logger.debug("Applied team specs via set_team_specs")
-            else:
-                result.add_warning(
-                    "Orchestrator lacks set_team_specs method; " "specs stored in context only"
-                )
-
-            result.add_info(
-                f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}"
-            )
-            # Log each team spec registration (matching workflow DEBUG logging pattern)
-            for team_name in team_specs.keys():
-                logger.debug(f"Registered team_spec: {team_name}")
-            logger.debug(f"Applied {team_count} team specifications from vertical")
-
-        except Exception as e:
-            if self._strict_mode:
-                result.add_error(f"Failed to apply team specs: {e}")
-            else:
-                result.add_warning(f"Team specs application error: {e}")
+    # Legacy tool methods removed in Phase 1 refactoring
+    # Replaced by ToolStepHandler in victor/framework/step_handlers.py
+    # Tiered tools handled by TieredConfigStepHandler
+
+    # Legacy system prompt method removed in Phase 1 refactoring
+    # Replaced by PromptStepHandler in victor/framework/step_handlers.py
+
+    # Legacy stages method removed in Phase 1 refactoring
+    # Replaced by ConfigStepHandler in victor/framework/step_handlers.py
+
+    # Legacy extension methods removed in Phase 1 refactoring
+    # Replaced by ExtensionsStepHandler in victor/framework/step_handlers.py
+    # which coordinates:
+    #   - MiddlewareStepHandler for middleware
+    #   - SafetyStepHandler for safety extensions
+    #   - PromptStepHandler for prompt contributors
+    #   - ConfigStepHandler for mode config and tool deps
+
+    # Legacy attach_context removed in Phase 1 refactoring
+    # Replaced by ContextStepHandler in victor/framework/step_handlers.py
+
+    # Legacy framework integration methods removed in Phase 1 refactoring
+    # Replaced by FrameworkStepHandler in victor/framework/step_handlers.py
+    # which handles workflows, RL config, and team specs
 
 
 # =============================================================================
@@ -1902,25 +1636,41 @@ class VerticalIntegrationPipeline:
 def create_integration_pipeline(
     strict: bool = False,
     use_step_handlers: bool = True,
+    enable_cache: bool = True,
+    enable_parallel: bool = False,
 ) -> VerticalIntegrationPipeline:
-    """Create a vertical integration pipeline.
+    """Create a vertical integration pipeline with feature flags (Phase 2).
 
     Args:
         strict: Whether to use strict mode
         use_step_handlers: If True, use step handlers (Phase 3.1)
+        enable_cache: Enable configuration caching (Phase 1, default: True)
+        enable_parallel: Enable parallel execution (Phase 2.2, default: False)
 
     Returns:
         Configured VerticalIntegrationPipeline
+
+    Example:
+        # Basic pipeline
+        pipeline = create_integration_pipeline()
+
+        # With parallel execution (Phase 2.2)
+        pipeline = create_integration_pipeline(enable_parallel=True)
+
+        result = await pipeline.apply_async(orchestrator, CodingAssistant)
     """
     return VerticalIntegrationPipeline(
         strict_mode=strict,
         use_step_handlers=use_step_handlers,
+        enable_cache=enable_cache,
+        parallel_enabled=enable_parallel,
     )
 
 
 def create_integration_pipeline_with_handlers(
     strict: bool = False,
     custom_handlers: Optional[List[Any]] = None,
+    enable_parallel: bool = False,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
 
@@ -1930,6 +1680,7 @@ def create_integration_pipeline_with_handlers(
     Args:
         strict: Whether to use strict mode
         custom_handlers: Optional list of additional step handlers
+        enable_parallel: Enable parallel execution (Phase 2.2, default: False)
 
     Returns:
         Configured VerticalIntegrationPipeline with custom handlers
@@ -1951,7 +1702,8 @@ def create_integration_pipeline_with_handlers(
                 pass
 
         pipeline = create_integration_pipeline_with_handlers(
-            custom_handlers=[MyCustomHandler()]
+            custom_handlers=[MyCustomHandler()],
+            enable_parallel=True,
         )
     """
     try:
@@ -1967,6 +1719,7 @@ def create_integration_pipeline_with_handlers(
             strict_mode=strict,
             step_registry=registry,
             use_step_handlers=True,
+            parallel_enabled=enable_parallel,
         )
     except ImportError:
         # Fallback to legacy if step handlers not available

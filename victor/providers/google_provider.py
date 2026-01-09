@@ -21,6 +21,7 @@ the deprecated google-generativeai package.
 """
 
 import logging
+import os
 import warnings
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -97,7 +98,7 @@ class GoogleProvider(BaseProvider):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str] = None,
         timeout: int = 60,
         safety_level: str = "block_none",
         **kwargs: Any,
@@ -105,7 +106,7 @@ class GoogleProvider(BaseProvider):
         """Initialize Google provider.
 
         Args:
-            api_key: Google API key
+            api_key: Google API key (or set GOOGLE_API_KEY env var, or use keyring)
             timeout: Request timeout in seconds
             safety_level: Safety filter level - "block_none", "block_few",
                          "block_some", or "block_most" (default: "block_none")
@@ -114,14 +115,29 @@ class GoogleProvider(BaseProvider):
         Raises:
             ImportError: If google-genai package is not installed
         """
+        # Resolution order: parameter → env var → keyring → warning
+        resolved_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
+        if not resolved_key:
+            try:
+                from victor.config.api_keys import get_api_key
+                resolved_key = get_api_key("google") or ""
+            except ImportError:
+                pass
+
+        if not resolved_key:
+            logger.warning(
+                "Google API key not provided. Set GOOGLE_API_KEY environment variable, "
+                "use 'victor keys --set google --keyring', or pass api_key parameter."
+            )
+
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
                 "google-genai package not installed. " "Install with: pip install google-genai"
             )
-        super().__init__(api_key=api_key, timeout=timeout, **kwargs)
+        super().__init__(api_key=resolved_key, timeout=timeout, **kwargs)
 
         # Initialize client with API key (new SDK pattern)
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=resolved_key)
 
         # Configure safety settings using string-based thresholds
         threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")

@@ -125,7 +125,15 @@ class YAMLWorkflowCoordinator:
         return self._definition_cache
 
     def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
-        """Get or create unified compiler with caching enabled."""
+        """Get or create unified compiler with caching enabled.
+
+        **Architecture Note**: Uses UnifiedWorkflowCompiler for YAML workflow execution
+        to support escape hatches (condition_registry, transform_registry) and
+        two-level caching, which are important for workflow coordinator functionality.
+
+        For simple YAML workflow compilation without these features, consider using
+        the plugin API: create_compiler("workflow.yaml", enable_caching=True)
+        """
         if self._unified_compiler is None:
             from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 

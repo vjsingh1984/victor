@@ -361,6 +361,16 @@ class ToolCoordinator:
                 "executed_tools": context.executed_tools,
             }
 
+        # Add settings to execution context (needed for code_search disable_embeddings check)
+        if hasattr(self, "_orchestrator") and self._orchestrator:
+            if hasattr(self._orchestrator, "_settings"):
+                execution_context["settings"] = self._orchestrator._settings
+
+        # Add disable_embeddings flag if set (from workflow agent nodes)
+        # This allows workflow-level service mode where embeddings are pre-loaded
+        if hasattr(context, "disable_embeddings"):
+            execution_context["disable_embeddings"] = context.disable_embeddings
+
         # Execute through pipeline
         result = await self._pipeline.execute_tool_calls(
             tool_calls=tool_calls,

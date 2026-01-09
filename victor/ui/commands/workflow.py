@@ -775,6 +775,11 @@ def run_workflow(
         "--dry-run",
         help="Validate and show execution plan without running",
     ),
+    log_level: Optional[str] = typer.Option(
+        None,
+        "--log-level",
+        help="Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    ),
 ) -> None:
     """Execute a workflow.
 
@@ -785,6 +790,7 @@ def run_workflow(
         victor workflow run ./workflows/analysis.yaml -c '{"symbol": "AAPL"}'
         victor workflow run ./workflows/analysis.yaml -f context.json
         victor workflow run ./workflows/analysis.yaml --dry-run
+        victor workflow run ./workflows/analysis.yaml --log-level DEBUG
     """
     from victor.workflows import StateGraphExecutor, ExecutorConfig
     from victor.workflows.definition import AgentNode
@@ -792,6 +798,25 @@ def run_workflow(
     from victor.config.settings import load_settings
     from victor.agent import AgentOrchestrator
     from victor.ui.commands.utils import graceful_shutdown
+
+    # Set log level if specified
+    if log_level:
+        import logging
+        level = getattr(logging, log_level.upper(), None)
+        if not isinstance(level, int):
+            console.print(f"[bold red]Error:[/] Invalid log level: {log_level}")
+            raise typer.Exit(1)
+
+        # Configure logging
+        logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
+
+        # Filter out noisy HTTP third-party logs at DEBUG level
+        # Only show WARNING and above for HTTP libraries
+        if level <= logging.DEBUG:
+            for http_logger in ['httpcore', 'httpx', 'urllib3']:
+                logging.getLogger(http_logger).setLevel(logging.WARNING)
+
+        console.print(f"[dim]Log level set to: {log_level}[/]")
 
     path = Path(workflow_path)
     workflows = _load_workflow_file(path)
@@ -850,30 +875,100 @@ def run_workflow(
 
     # Execute workflow
     async def _execute():
+        from victor.framework.shim import FrameworkShim
+        import logging
+
+        logger = logging.getLogger(__name__)
         settings = load_settings()
 
-        # Create orchestrator if agent nodes exist
-        orchestrator = None
+        # Create orchestrators if agent nodes exist
+        orchestrators = {}
         has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
 
         if has_agent_nodes:
-            orchestrator = await AgentOrchestrator.create(
-                profile=profile,
-                settings=settings,
-            )
+            # Collect all unique profiles from agent nodes
+            node_profiles = set()
+            profile_to_nodes = {}  # Map profile to list of nodes using it
+
+            for node in workflow.nodes.values():
+                if isinstance(node, AgentNode) and hasattr(node, 'profile') and node.profile:
+                    node_profiles.add(node.profile)
+                    if node.profile not in profile_to_nodes:
+                        profile_to_nodes[node.profile] = []
+                    profile_to_nodes[node.profile].append(node.id)
+                elif isinstance(node, AgentNode):
+                    # Nodes without explicit profile use default
+                    if "default" not in profile_to_nodes:
+                        profile_to_nodes["default"] = []
+                    profile_to_nodes["default"].append(node.id)
+
+            # Always include the default profile
+            all_profiles = node_profiles | {profile}
+
+            console.print(f"[dim]Creating orchestrators for profiles: {', '.join(sorted(all_profiles))}[/]")
+
+            # Debug: Show profile to node mapping
+            for prof, nodes in sorted(profile_to_nodes.items()):
+                logger.debug(f"Profile '{prof}' assigned to nodes: {', '.join(nodes)}")
+
+            # Create an orchestrator for each unique profile
+            for profile_name in sorted(all_profiles):
+                try:
+                    logger.debug(f"Creating orchestrator for profile: {profile_name}")
+                    shim = FrameworkShim(
+                        settings,
+                        profile_name=profile_name,
+                        vertical=None,  # Workflows may use different verticals per node
+                    )
+                    orchestrator = await shim.create_orchestrator()
+                    orchestrators[profile_name] = orchestrator
+                    logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
+                    console.print(f"  [dim]✓ Profile '{profile_name}' initialized[/]")
+                except Exception as e:
+                    logger.error(f"Failed to create orchestrator for profile '{profile_name}': {e}", exc_info=True)
+                    console.print(f"  [red]✗ Profile '{profile_name}' failed: {e}[/]")
+                    if profile_name == profile:
+                        # If default profile fails, we can't continue
+                        raise
 
         executor = StateGraphExecutor(
             config=ExecutorConfig(
-                max_parallel=4,
-                timeout_seconds=3600,
+                enable_checkpointing=True,
+                max_iterations=workflow.max_iterations or 15,
+                timeout=workflow.max_execution_timeout_seconds or 3600.0,
+                default_profile=profile,
             ),
-            orchestrator=orchestrator,
+            orchestrators=orchestrators,
         )
 
+        # Set project root from workflow metadata if specified
+        project_root_override = workflow.metadata.get("project_root")
+        if project_root_override:
+            from pathlib import Path
+            from victor.config.settings import set_project_root
+
+            project_path = Path(project_root_override).expanduser().resolve()
+            set_project_root(project_path)
+            console.print(f"[dim]📁 Project root set to: {project_path}[/]\n")
+            logger.debug(f"Project root set from workflow metadata: {project_path}")
+
         console.print(f"\n[bold]Executing workflow '{workflow.name}'...[/]\n")
+        logger.debug(f"\n{'='*80}")
+        logger.debug(f"🚀 WORKFLOW EXECUTION START: {workflow.name}")
+        logger.debug(f"   Initial Context: {list(initial_context.keys())}")
+        logger.debug(f"   Total Nodes: {len(workflow.nodes)}")
+        logger.debug(f"   Node IDs: {', '.join(workflow.nodes.keys())}")
+        logger.debug(f"{'='*80}\n")
 
         try:
             result = await executor.execute(workflow, initial_context)
+            logger.debug(f"\n{'='*80}")
+            logger.debug(f"✅ WORKFLOW EXECUTION COMPLETE: {workflow.name}")
+            logger.debug(f"   Success: {result.success}")
+            logger.debug(f"   Duration: {result.duration_seconds:.2f}s")
+            logger.debug(f"   Nodes Executed: {len(result.nodes_executed)}")
+            logger.debug(f"   Final State Keys: {list(result.state.keys())}")
+            logger.debug(f"{'='*80}\n")
 
             console.print("[dim]" + "─" * 50 + "[/]")
 
@@ -883,12 +978,12 @@ def run_workflow(
                 console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
 
                 # Show final state summary
-                if result.final_state:
+                if result.state:
                     console.print("\n[bold]Final State:[/]")
                     # Filter out large/internal keys
                     display_state = {
                         k: v
-                        for k, v in result.final_state.items()
+                        for k, v in result.state.items()
                         if not k.startswith("_") and k not in {"messages", "history"}
                     }
                     console.print(json.dumps(display_state, indent=2, default=str)[:2000])
@@ -899,8 +994,14 @@ def run_workflow(
                 raise typer.Exit(1)
 
         finally:
-            if orchestrator:
-                await graceful_shutdown(orchestrator)
+            # Shutdown all orchestrators
+            if orchestrators:
+                for orch_name, orch in orchestrators.items():
+                    try:
+                        await graceful_shutdown(orch)
+                        console.print(f"[dim]✓ Shut down orchestrator '{orch_name}'[/]")
+                    except Exception as e:
+                        console.print(f"[red]✗ Failed to shutdown '{orch_name}': {e}[/]")
 
     asyncio.run(_execute())
 

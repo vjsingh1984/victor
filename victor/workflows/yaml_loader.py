@@ -927,6 +927,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
           type: agent
           role: researcher
           goal: "Analyze data patterns"
+          profile: openai  # Optional: use specific provider profile
           llm_config:
             temperature: 0.3
             model_hint: claude-3-sonnet
@@ -954,6 +955,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
         output_key=node_data.get("output", node_id),
         llm_config=llm_config,
         timeout_seconds=timeout_seconds,
+        profile=node_data.get("profile"),  # Per-node provider profile
         next_nodes=node_data.get("next", []),
     )
 

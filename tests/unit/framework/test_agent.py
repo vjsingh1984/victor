@@ -1030,8 +1030,10 @@ class TestAgentWorkflows:
         from victor.framework.errors import AgentError
 
         mock_provider = MagicMock()
-        mock_provider.get_workflow = MagicMock(return_value=None)
-        mock_provider.get_workflow_names = MagicMock(return_value=["wf1", "wf2"])
+        # Mock run_compiled_workflow to raise error for not found workflow
+        mock_provider.run_compiled_workflow = AsyncMock(
+            side_effect=AgentError("Workflow 'unknown_workflow' not found")
+        )
         mock_vertical.get_workflow_provider = MagicMock(return_value=mock_provider)
 
         agent = Agent(mock_orchestrator, vertical=mock_vertical)
@@ -1044,24 +1046,19 @@ class TestAgentWorkflows:
         """run_workflow should execute workflow and return result."""
         from victor.framework.agent import Agent
 
-        mock_workflow = MagicMock()
         mock_provider = MagicMock()
-        mock_provider.get_workflow = MagicMock(return_value=mock_workflow)
+        # Mock run_compiled_workflow to return a successful result
+        expected_result = {"success": True, "output": "done"}
+        mock_provider.run_compiled_workflow = AsyncMock(return_value=expected_result)
         mock_vertical.get_workflow_provider = MagicMock(return_value=mock_provider)
 
-        mock_result = MagicMock()
-        mock_result.to_dict = MagicMock(return_value={"success": True, "output": "done"})
+        agent = Agent(mock_orchestrator, vertical=mock_vertical)
+        result = await agent.run_workflow("test_workflow", context={"key": "value"})
 
-        with patch("victor.workflows.executor.WorkflowExecutor") as mock_executor_class:
-            mock_executor = MagicMock()
-            mock_executor.execute = AsyncMock(return_value=mock_result)
-            mock_executor_class.return_value = mock_executor
-
-            agent = Agent(mock_orchestrator, vertical=mock_vertical)
-            result = await agent.run_workflow("test_workflow", context={"key": "value"})
-
-        assert result == {"success": True, "output": "done"}
-        mock_executor.execute.assert_called_once()
+        assert result == expected_result
+        mock_provider.run_compiled_workflow.assert_called_once_with(
+            "test_workflow", {"key": "value"}, timeout=None
+        )
 
     def test_get_available_workflows_no_vertical(self, mock_orchestrator):
         """get_available_workflows should return empty list when no vertical."""

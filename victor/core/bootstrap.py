@@ -208,11 +208,20 @@ def bootstrap_container(
     # Register embedding services
     _register_embedding_services(container, settings)
 
+    # Register coding services (language plugins, indexing)
+    _register_coding_services(container, settings)
+
     # Register signature store
     _register_signature_store(container, settings)
 
     # Register orchestrator services (Phase 10 DI Migration)
     _register_orchestrator_services(container, settings)
+
+    # Register workflow services (SOLID Refactoring)
+    _register_workflow_services(container, settings)
+
+    # Register workflow compiler plugins (Plugin Architecture)
+    _register_workflow_compiler_plugins(container, settings)
 
     # Register vertical services
     _register_vertical_services(container, settings, vertical)
@@ -336,6 +345,25 @@ def _register_embedding_services(container: ServiceContainer, settings: Settings
     )
 
 
+def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register coding services (language plugins, indexing).
+
+    This ensures language plugins are discovered at startup, not mid-conversation.
+    """
+    try:
+        from victor.coding.languages.registry import get_language_registry
+
+        registry = get_language_registry()
+        # Only discover if not already discovered (check if plugins list is empty)
+        if not registry._plugins:
+            count = registry.discover_plugins()
+            logger.info(f"Discovered {count} language plugins at startup")
+        else:
+            logger.debug(f"Language plugins already discovered: {len(registry._plugins)} plugins")
+    except Exception as e:
+        logger.warning(f"Failed to discover language plugins: {e}")
+
+
 def _register_signature_store(container: ServiceContainer, settings: Settings) -> None:
     """Register failed signature store service."""
 
@@ -415,6 +443,65 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         # Don't fail bootstrap if orchestrator services can't be registered
         # The orchestrator will fall back to direct instantiation
         logger.warning(f"Failed to register orchestrator services: {e}")
+
+
+def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register workflow-related services.
+
+    Part of SOLID Refactoring - registers services used by the workflow system.
+    This enables:
+    - Type-safe dependency injection for workflow components
+    - Protocol-based architecture (ISP, DIP compliance)
+    - Proper lifecycle management (singleton vs scoped vs transient)
+
+    Services registered:
+    - Singleton: YAMLWorkflowLoader, WorkflowValidator, NodeExecutorFactory
+    - Scoped: ExecutionContext, OrchestratorPool
+    - Transient: WorkflowCompiler, WorkflowExecutor
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+    """
+    try:
+        from victor.workflows.services.workflow_service_provider import configure_workflow_services
+
+        configure_workflow_services(container, settings)
+        logger.debug("Registered workflow services")
+    except Exception as e:
+        # Don't fail bootstrap if workflow services can't be registered
+        # The workflow system will fall back to direct instantiation
+        logger.warning(f"Failed to register workflow services: {e}")
+
+
+def _register_workflow_compiler_plugins(
+    container: ServiceContainer,
+    settings: Settings,
+) -> None:
+    """Register workflow compiler plugins.
+
+    Part of Plugin Architecture - registers built-in compiler plugins.
+    This enables:
+    - URI-based compiler creation (create_compiler("yaml://"))
+    - Third-party plugin registration via entry points
+    - Gradual migration from legacy to SOLID architecture
+
+    Plugins registered:
+    - YamlCompilerPlugin: YAML workflow compilation
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+    """
+    try:
+        from victor.workflows.plugins import register_builtin_plugins
+
+        register_builtin_plugins()
+        logger.debug("Registered workflow compiler plugins")
+    except Exception as e:
+        # Don't fail bootstrap if plugins can't be registered
+        # The plugin system will fall back to direct instantiation
+        logger.warning(f"Failed to register workflow compiler plugins: {e}")
 
 
 def _register_vertical_services(

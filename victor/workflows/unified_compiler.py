@@ -1069,6 +1069,19 @@ class UnifiedWorkflowCompiler:
     ) -> None:
         """Initialize the unified compiler.
 
+        .. deprecated::
+            Consider using the plugin architecture instead:
+                from victor.workflows.create import create_compiler
+                compiler = create_compiler("yaml://", enable_caching=True)
+
+            The plugin architecture provides:
+            - Third-party friendly extensibility
+            - URI-based compiler selection (like SQLAlchemy)
+            - Consistent protocol-based API
+
+            UnifiedWorkflowCompiler continues to work and will be supported
+            through v0.7.0. Migration guide: see MIGRATION_GUIDE.md
+
         Args:
             definition_cache: Cache for parsed YAML definitions
             execution_cache: Cache for execution results
@@ -1080,6 +1093,20 @@ class UnifiedWorkflowCompiler:
             cache_ttl: Cache TTL in seconds (default: 3600)
             config: Full compiler configuration (overrides other params)
         """
+        import warnings
+
+        warnings.warn(
+            "UnifiedWorkflowCompiler is deprecated but remains supported. "
+            "Consider migrating to the plugin architecture for better extensibility: "
+            "from victor.workflows.create import create_compiler; "
+            "compiler = create_compiler('yaml://', enable_caching=True). "
+            "See MIGRATION_GUIDE.md for details. "
+            "This deprecation is informational only - UnifiedWorkflowCompiler will "
+            "continue to work through v0.7.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # Use config if provided, otherwise build from params
         if config:
             self._config = config

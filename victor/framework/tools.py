@@ -21,6 +21,7 @@ Example:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set, Union
@@ -187,6 +188,8 @@ class ToolCategoryRegistry:
         # Cache for merged results
         self._cache: dict[str, set[str]] = {}
         self._cache_valid = False
+        # Thread safety lock (reentrant for nested calls)
+        self._lock = threading.RLock()
 
     @classmethod
     def get_instance(cls) -> "ToolCategoryRegistry":
@@ -255,7 +258,7 @@ class ToolCategoryRegistry:
         self._invalidate_cache()
 
     def get_tools(self, category: str) -> Set[str]:
-        """Get all tools in a category (merged from all sources).
+        """Get all tools in a category (merged from all sources, thread-safe).
 
         Lookup priority:
         1. ToolMetadataRegistry (decorator-driven)
@@ -271,42 +274,45 @@ class ToolCategoryRegistry:
         """
         category_lower = category.lower()
 
-        # Check cache first
-        if self._cache_valid and category_lower in self._cache:
-            return self._cache[category_lower].copy()
+        # Check cache first (atomic check-and-get under lock)
+        with self._lock:
+            if self._cache_valid and category_lower in self._cache:
+                return self._cache[category_lower].copy()
 
-        result: Set[str] = set()
+            # Build result under lock to ensure atomicity
+            result: Set[str] = set()
 
-        # 1. Try ToolMetadataRegistry first (decorator-driven)
-        try:
-            from victor.tools.metadata_registry import ToolMetadataRegistry
-
-            metadata_registry = ToolMetadataRegistry.get_instance()
-            registry_tools = metadata_registry.get_tools_by_category(category_lower)
-            if registry_tools:
-                result.update(registry_tools)
-        except (ImportError, Exception):
-            pass  # Registry not available, continue with fallbacks
-
-        # 2. Try custom registrations
-        if category_lower in self._custom_categories:
-            result.update(self._custom_categories[category_lower])
-
-        # 3. Try built-in defaults (if no results yet from above sources)
-        if not result:
+            # 1. Try ToolMetadataRegistry first (decorator-driven)
             try:
-                cat_enum = ToolCategory(category_lower)
-                result.update(_get_builtin_category_tools().get(cat_enum, set()))
-            except ValueError:
-                pass  # Unknown category
+                from victor.tools.metadata_registry import ToolMetadataRegistry
 
-        # 4. Add extensions
-        if category_lower in self._category_extensions:
-            result.update(self._category_extensions[category_lower])
+                metadata_registry = ToolMetadataRegistry.get_instance()
+                registry_tools = metadata_registry.get_tools_by_category(category_lower)
+                if registry_tools:
+                    result.update(registry_tools)
+            except (ImportError, Exception):
+                pass  # Registry not available, continue with fallbacks
 
-        # Cache the result
-        self._cache[category_lower] = result.copy()
-        return result.copy()
+            # 2. Try custom registrations
+            if category_lower in self._custom_categories:
+                result.update(self._custom_categories[category_lower])
+
+            # 3. Try built-in defaults (if no results yet from above sources)
+            if not result:
+                try:
+                    cat_enum = ToolCategory(category_lower)
+                    result.update(_get_builtin_category_tools().get(cat_enum, set()))
+                except ValueError:
+                    pass  # Unknown category
+
+            # 4. Add extensions
+            if category_lower in self._category_extensions:
+                result.update(self._category_extensions[category_lower])
+
+            # Cache the result
+            self._cache[category_lower] = result.copy()
+            self._cache_valid = True
+            return result.copy()
 
     def get_all_categories(self) -> Set[str]:
         """Get all available category names.
@@ -353,9 +359,10 @@ class ToolCategoryRegistry:
             return False
 
     def _invalidate_cache(self) -> None:
-        """Invalidate the category cache."""
-        self._cache.clear()
-        self._cache_valid = False
+        """Invalidate the category cache (thread-safe)."""
+        with self._lock:
+            self._cache.clear()
+            self._cache_valid = False
 
 
 def get_category_registry() -> ToolCategoryRegistry:

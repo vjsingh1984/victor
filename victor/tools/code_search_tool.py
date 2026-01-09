@@ -428,6 +428,12 @@ async def code_search(
         if settings is None:
             return {"success": False, "error": "Settings not available in tool context."}
 
+        # Check if embeddings are disabled for this agent (workflow-level service mode)
+        disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
+        if disable_embeddings:
+            logger.info("Embeddings disabled for this agent, falling back to literal search")
+            return await _literal_search(query, path, k, exts)
+
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []

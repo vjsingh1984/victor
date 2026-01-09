@@ -401,4 +401,183 @@ __all__ = [
     "HIGH",
     "MEDIUM",
     "LOW",
+    # New framework-based safety rules
+    "create_rag_deletion_safety_rules",
+    "create_rag_ingestion_safety_rules",
+    "create_all_rag_safety_rules",
 ]
+
+
+# =============================================================================
+# Framework-Based Safety Rules (New)
+# =============================================================================
+
+"""Framework-based safety rules for RAG operations.
+
+This section provides factory functions that register safety rules
+with the framework-level SafetyEnforcer. This is the new recommended
+approach for safety enforcement in RAG workflows.
+
+Example:
+    from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+    from victor.rag.safety import create_all_rag_safety_rules
+
+    enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+    create_all_rag_safety_rules(enforcer)
+
+    # Check operations
+    allowed, reason = enforcer.check_operation("rag_delete --all")
+    if not allowed:
+        print(f"Blocked: {reason}")
+"""
+
+from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+
+
+def create_rag_deletion_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    block_bulk_delete: bool = True,
+    block_delete_all: bool = True,
+    protected_collections: list[str] | None = None,
+) -> None:
+    """Register RAG deletion-specific safety rules.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        block_bulk_delete: Block bulk deletion operations with wildcards
+        block_delete_all: Block deleting all documents
+        protected_collections: List of protected collection names
+
+    Example:
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+        create_rag_deletion_safety_rules(
+            enforcer,
+            block_bulk_delete=True,
+            protected_collections=["production", "main"]
+        )
+    """
+    if block_bulk_delete:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_block_bulk_delete",
+                description="Block bulk deletion with wildcards (rag_delete *)",
+                check_fn=lambda op: "rag_delete" in op
+                and ("*" in op or "--all" in op or "WHERE 1=1" in op),
+                level=SafetyLevel.HIGH,
+                allow_override=False,
+            )
+        )
+
+    if block_delete_all:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_block_delete_all",
+                description="Block deleting all documents from knowledge base",
+                check_fn=lambda op: "rag_delete" in op and "--all" in op,
+                level=SafetyLevel.HIGH,
+                allow_override=True,
+            )
+        )
+
+
+def create_rag_ingestion_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    block_executable_files: bool = True,
+    block_system_files: bool = True,
+    require_https: bool = True,
+    warn_large_batches: bool = True,
+) -> None:
+    """Register RAG ingestion-specific safety rules.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        block_executable_files: Block ingestion of executable files (.exe, .dll, .sh)
+        block_system_files: Block ingestion of system files (/etc/, ~/.ssh/)
+        require_https: Require HTTPS URLs for ingestion
+        warn_large_batches: Warn for large batch ingestion (1000+ files)
+
+    Example:
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+        create_rag_ingestion_safety_rules(
+            enforcer,
+            block_executable_files=True,
+            require_https=True
+        )
+    """
+    if block_executable_files:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_block_executable_ingestion",
+                description="Block ingestion of executable files",
+                check_fn=lambda op: "rag_ingest" in op
+                and any(ext in op.lower() for ext in [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1"]),
+                level=SafetyLevel.HIGH,
+                allow_override=False,
+            )
+        )
+
+    if block_system_files:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_block_system_files",
+                description="Block ingestion of system files (/etc/, ~/.ssh/)",
+                check_fn=lambda op: "rag_ingest" in op
+                and any(path in op for path in ["/etc/", "/.ssh/", "~/.ssh/", "passwd", "shadow"]),
+                level=SafetyLevel.HIGH,
+                allow_override=True,
+            )
+        )
+
+    if require_https:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_require_https",
+                description="Require HTTPS for remote ingestion (block http://)",
+                check_fn=lambda op: "rag_ingest" in op
+                and "http://" in op
+                and "https://" not in op
+                and "localhost" not in op,
+                level=SafetyLevel.MEDIUM,
+                allow_override=True,
+            )
+        )
+
+    if warn_large_batches:
+        enforcer.add_rule(
+            SafetyRule(
+                name="rag_warn_large_batches",
+                description="Warn for large batch ingestion (1000+ files)",
+                check_fn=lambda op: "rag_ingest" in op and "--batch" in op,
+                level=SafetyLevel.LOW,  # Warn only
+                allow_override=True,
+            )
+        )
+
+
+def create_all_rag_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    protected_collections: list[str] | None = None,
+) -> None:
+    """Register all RAG safety rules at once.
+
+    This is a convenience function that registers all RAG-specific
+    safety rules with appropriate defaults.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        protected_collections: Protected collection names
+
+    Example:
+        from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+        create_all_rag_safety_rules(enforcer)
+
+        # Now all operations are checked
+        allowed, reason = enforcer.check_operation("rag_delete --all")
+    """
+    create_rag_deletion_safety_rules(enforcer, protected_collections=protected_collections)
+    create_rag_ingestion_safety_rules(enforcer)

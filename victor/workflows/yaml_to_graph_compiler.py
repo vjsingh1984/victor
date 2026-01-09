@@ -176,15 +176,18 @@ class NodeExecutorFactory:
     def __init__(
         self,
         orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
         """Initialize the factory.
 
         Args:
-            orchestrator: Agent orchestrator for executing agent nodes
+            orchestrator: Default agent orchestrator for executing agent nodes
+            orchestrators: Dict mapping profile names to orchestrators
             tool_registry: Tool registry for executing compute nodes
         """
         self.orchestrator = orchestrator
+        self.orchestrators = orchestrators or {}
         self.tool_registry = tool_registry
 
     def create_executor(
@@ -223,30 +226,84 @@ class NodeExecutorFactory:
         Spawns a sub-agent with the specified role and goal to process
         the task using LLM inference and tool execution.
         """
-        orchestrator = self.orchestrator
+        # Select orchestrator based on node profile
+        def get_orchestrator_for_node(node: AgentNode):
+            """Get the appropriate orchestrator for a node based on its profile."""
+            if hasattr(node, 'profile') and node.profile and node.profile in self.orchestrators:
+                return self.orchestrators[node.profile]
+            return self.orchestrator
 
         async def execute_agent(state: WorkflowState) -> WorkflowState:
             start_time = time.time()
             state = dict(state)  # Make mutable copy
 
             try:
+                logger.debug(f"\n{'='*80}")
+                logger.debug(f"🤖 AGENT NODE START: {node.id}")
+                logger.debug(f"   Profile: {getattr(node, 'profile', 'default')}")
+                logger.debug(f"   Role: {node.role}")
+                logger.debug(f"   Tool Budget: {node.tool_budget}")
+                logger.debug(f"   Timeout: {node.timeout_seconds or 300}s")
+
                 # Build input context from input_mapping
                 input_context = {}
                 for param_name, context_key in node.input_mapping.items():
                     if context_key in state:
                         input_context[param_name] = state[context_key]
 
+                if input_context:
+                    logger.debug(f"   Input Context: {list(input_context.keys())}")
+
                 # Build the goal with context substitution
                 goal = node.goal
-                for key, value in state.items():
-                    if not key.startswith("_"):
-                        goal = goal.replace(f"${{{key}}}", str(value))
-                        goal = goal.replace(f"$ctx.{key}", str(value))
+                original_goal = goal
 
-                if orchestrator is None:
+                logger.debug(f"   Original Goal (first 200 chars): {goal[:200]}...")
+
+                # First pass: Handle dict values (agent results) - extract response field
+                substitutions = []
+                for key, value in state.items():
+                    if not key.startswith("_") and isinstance(value, dict):
+                        # If value is a dict (e.g., agent result), extract response field
+                        if "response" in value:
+                            response_text = value["response"]
+                            # Substitute {{key}} with the response content (not the whole dict)
+                            if f"{{{{{key}}}}}" in goal or f"${{{key}}}" in goal:
+                                goal = goal.replace(f"{{{{{key}}}}}", str(response_text))
+                                goal = goal.replace(f"${{{key}}}", str(response_text))
+                                substitutions.append(f"{key}=<dict with response>")
+
+                # Second pass: Handle non-dict values (primitives like user_task)
+                for key, value in state.items():
+                    if not key.startswith("_") and not isinstance(value, dict):
+                        # Jinja-style: {{key}}
+                        goal = goal.replace(f"{{{{{key}}}}}", str(value))
+                        # Dollar-style: ${key}
+                        goal = goal.replace(f"${{{key}}}", str(value))
+                        # Context-style: $ctx.key
+                        goal = goal.replace(f"$ctx.{key}", str(value))
+                        if f"{{{{{key}}}}}" in original_goal or f"${{{key}}}" in original_goal:
+                            substitutions.append(f"{key}={str(value)[:50]}")
+
+                if substitutions:
+                    logger.debug(f"   Context Substitutions: {', '.join(substitutions)}")
+                logger.debug(f"   Substituted Goal (first 300 chars): {goal[:300]}...")
+
+                # Execute via SubAgentOrchestrator
+                from victor.agent.subagents import (
+                    SubAgentOrchestrator,
+                    SubAgentRole,
+                )
+
+                # Get orchestrator for this node based on profile
+                node_orchestrator = get_orchestrator_for_node(node)
+                profile_used = getattr(node, 'profile', 'default')
+                logger.debug(f"   Using orchestrator: {profile_used}")
+
+                if node_orchestrator is None:
                     # Fallback: store placeholder result
                     logger.warning(
-                        f"No orchestrator available for agent node '{node.id}', "
+                        f"No orchestrator available for agent node '{node.id}' with profile '{getattr(node, 'profile', None)}', "
                         "using placeholder execution"
                     )
                     output = {
@@ -257,11 +314,6 @@ class NodeExecutorFactory:
                         "input_context": input_context,
                     }
                 else:
-                    # Execute via SubAgentOrchestrator
-                    from victor.agent.subagents import (
-                        SubAgentOrchestrator,
-                        SubAgentRole,
-                    )
 
                     # Map role string to SubAgentRole enum
                     role_map = {
@@ -269,30 +321,53 @@ class NodeExecutorFactory:
                         "planner": SubAgentRole.PLANNER,
                         "executor": SubAgentRole.EXECUTOR,
                         "reviewer": SubAgentRole.REVIEWER,
-                        "writer": SubAgentRole.WRITER,
+                        "tester": SubAgentRole.TESTER,
+                        "writer": SubAgentRole.EXECUTOR,  # Writer maps to executor
+                        "senior_architect": SubAgentRole.PLANNER,  # Architect uses planner
+                        "practical_engineer": SubAgentRole.EXECUTOR,
+                        "code_specialist": SubAgentRole.REVIEWER,
+                        "consensus_facilitator": SubAgentRole.PLANNER,
+                        "lead_reviewer": SubAgentRole.REVIEWER,
                         "analyst": SubAgentRole.RESEARCHER,  # Alias
                     }
                     role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
 
                     # Create and execute sub-agent
-                    sub_orchestrator = SubAgentOrchestrator(orchestrator)
-                    result = await sub_orchestrator.execute_task(
+                    sub_orchestrator = SubAgentOrchestrator(node_orchestrator)
+                    logger.debug(f"   ⚙️  Spawning sub-agent with role: {role.value}")
+
+                    result = await sub_orchestrator.spawn(
                         role=role,
                         task=goal,
-                        context=input_context,
                         tool_budget=node.tool_budget,
                         allowed_tools=node.allowed_tools,
+                        timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
+                        disable_embeddings=getattr(node, 'disable_embeddings', False),
                     )
 
                     output = {
-                        "response": result.response if result else None,
+                        "response": result.summary if result else "",
                         "success": result.success if result else False,
                         "tool_calls": result.tool_calls_used if result else 0,
+                        "error": result.error if result else None,
                     }
+
+                    # Log result summary
+                    duration = time.time() - start_time
+                    logger.debug(f"\n{'='*80}")
+                    logger.debug(f"✅ AGENT NODE COMPLETE: {node.id}")
+                    logger.debug(f"   Success: {output['success']}")
+                    logger.debug(f"   Tool Calls Used: {output['tool_calls']}/{node.tool_budget}")
+                    logger.debug(f"   Duration: {duration:.2f}s")
+                    if output['error']:
+                        logger.debug(f"   Error: {output['error']}")
+                    logger.debug(f"   Response Preview (first 200 chars): {str(output['response'])[:200]}...")
+                    logger.debug(f"{'='*80}\n")
 
                 # Store output in state
                 output_key = node.output_key or node.id
                 state[output_key] = output
+                logger.debug(f"   Stored result in state key: {output_key}")
 
                 # Update node results
                 if "_node_results" not in state:
@@ -695,20 +770,23 @@ class YAMLToStateGraphCompiler:
     def __init__(
         self,
         orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[CompilerConfig] = None,
     ):
         """Initialize the compiler.
 
         Args:
-            orchestrator: Agent orchestrator for executing agent nodes
+            orchestrator: Default agent orchestrator for executing agent nodes
+            orchestrators: Dict mapping profile names to orchestrators
             tool_registry: Tool registry for executing compute nodes
             config: Compiler configuration
         """
         self.orchestrator = orchestrator
+        self.orchestrators = orchestrators or {}
         self.tool_registry = tool_registry or self._get_default_tool_registry()
         self.config = config or CompilerConfig()
-        self._executor_factory = NodeExecutorFactory(orchestrator, self.tool_registry)
+        self._executor_factory = NodeExecutorFactory(orchestrator, orchestrators, self.tool_registry)
 
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""

@@ -148,6 +148,10 @@ class AgentNode(WorkflowNode):
         output_key: Key to store agent output in context
         llm_config: Optional LLM configuration (temperature, model_hint, etc.)
         timeout_seconds: Maximum execution time in seconds (None = no timeout)
+        profile: Optional provider profile for this node (None = use workflow default)
+        disable_embeddings: Disable codebase embeddings for this agent (default: False).
+            When True, tools like code_search will use keyword search instead of semantic search.
+            Useful for workflow agents that use shared services to avoid duplicate index loading.
     """
 
     role: str = "executor"
@@ -158,6 +162,8 @@ class AgentNode(WorkflowNode):
     output_key: Optional[str] = None
     llm_config: Optional[Dict[str, Any]] = None
     timeout_seconds: Optional[float] = None
+    profile: Optional[str] = None
+    disable_embeddings: bool = False
 
     @property
     def node_type(self) -> WorkflowNodeType:
@@ -175,6 +181,8 @@ class AgentNode(WorkflowNode):
                 "output_key": self.output_key,
                 "llm_config": self.llm_config,
                 "timeout_seconds": self.timeout_seconds,
+                "profile": self.profile,
+                "disable_embeddings": self.disable_embeddings,
             }
         )
         return d
