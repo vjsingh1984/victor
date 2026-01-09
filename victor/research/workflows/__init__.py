@@ -80,6 +80,14 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.research.escape_hatches"
 
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the research capability provider.
+
+        Returns:
+            Module path string for ResearchCapabilityProvider
+        """
+        return "victor.research.capabilities"
+
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 

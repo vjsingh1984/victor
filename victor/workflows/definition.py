@@ -88,6 +88,7 @@ class WorkflowNodeType(Enum):
     PARALLEL = "parallel"  # Execute multiple nodes in parallel
     TRANSFORM = "transform"  # Transform context data
     HITL = "hitl"  # Human-in-the-loop interrupt
+    TEAM = "team"  # Spawn ad-hoc multi-agent team (Phase 3.1)
     START = "start"  # Entry point
     END = "end"  # Terminal node
 
@@ -260,6 +261,64 @@ class TransformNode(WorkflowNode):
     @property
     def node_type(self) -> WorkflowNodeType:
         return WorkflowNodeType.TRANSFORM
+
+
+@dataclass
+class TeamNodeWorkflow(WorkflowNode):
+    """Node that spawns an ad-hoc multi-agent team.
+
+    This node type enables hybrid orchestration by spawning teams within
+    workflow graphs. Teams use the victor/teams/ infrastructure.
+
+    Attributes:
+        goal: Overall goal for the team
+        team_formation: How to organize the team (sequential, parallel, etc.)
+        members: List of team member configurations
+        timeout_seconds: Maximum execution time (None = no limit)
+        merge_strategy: How to merge team state ("dict", "list", "custom")
+        merge_mode: Conflict resolution mode ("team_wins", "graph_wins", etc.)
+        output_key: Key to store team result
+        continue_on_error: Whether to continue if team fails
+        shared_context: Initial context for team
+        max_iterations: Maximum team iterations
+        total_tool_budget: Total tool calls across all members
+    """
+
+    goal: str = ""
+    team_formation: str = "sequential"
+    members: List[Dict[str, Any]] = field(default_factory=list)
+    timeout_seconds: Optional[float] = None
+    merge_strategy: str = "dict"
+    merge_mode: str = "team_wins"
+    output_key: str = "team_result"
+    continue_on_error: bool = True
+    shared_context: Dict[str, Any] = field(default_factory=dict)
+    max_iterations: int = 50
+    total_tool_budget: int = 100
+
+    @property
+    def node_type(self) -> WorkflowNodeType:
+        return WorkflowNodeType.TEAM
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize node to dictionary."""
+        d = super().to_dict()
+        d.update(
+            {
+                "goal": self.goal,
+                "team_formation": self.team_formation,
+                "members": self.members,
+                "timeout_seconds": self.timeout_seconds,
+                "merge_strategy": self.merge_strategy,
+                "merge_mode": self.merge_mode,
+                "output_key": self.output_key,
+                "continue_on_error": self.continue_on_error,
+                "shared_context": self.shared_context,
+                "max_iterations": self.max_iterations,
+                "total_tool_budget": self.total_tool_budget,
+            }
+        )
+        return d
 
 
 class ConstraintsProtocol(ABC):

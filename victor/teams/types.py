@@ -611,6 +611,39 @@ class TeamMember:
         """
         self.memory_coordinator = coordinator
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert TeamMember to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the member
+
+        Example:
+            member_dict = member.to_dict()
+        """
+        return {
+            "id": self.id,
+            "role": self.role.value,
+            "name": self.name,
+            "goal": self.goal,
+            "tool_budget": self.tool_budget,
+            "allowed_tools": self.allowed_tools,
+            "can_delegate": self.can_delegate,
+            "delegation_targets": self.delegation_targets,
+            "reports_to": self.reports_to,
+            "is_manager": self.is_manager,
+            "priority": self.priority,
+            # Rich persona attributes (CrewAI-compatible)
+            "backstory": self.backstory,
+            "expertise": self.expertise,
+            "personality": self.personality,
+            "max_delegation_depth": self.max_delegation_depth,
+            "memory": self.memory,
+            "memory_config": self.memory_config.to_dict() if self.memory_config else None,
+            "cache": self.cache,
+            "verbose": self.verbose,
+            "max_iterations": self.max_iterations,
+        }
+
 
 @dataclass
 class TeamConfig:

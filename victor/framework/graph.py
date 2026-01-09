@@ -1824,6 +1824,224 @@ class StateGraph(Generic[StateType]):
 
         return reachable
 
+    @classmethod
+    def from_schema(
+        cls,
+        schema: Union[Dict[str, Any], str],
+        state_schema: Optional[Type[StateType]] = None,
+        node_registry: Optional[Dict[str, Callable]] = None,
+        condition_registry: Optional[Dict[str, Callable]] = None,
+    ) -> "StateGraph[StateType]":
+        """Create StateGraph from schema dictionary or YAML string.
+
+        This enables dynamic graph generation from serialized schemas,
+        supporting Phase 3.0 requirements for workflow persistence and
+        external graph definition.
+
+        Args:
+            schema: Either a dictionary schema or YAML string containing:
+                - nodes: List of node definitions with id and type
+                - edges: List of edge definitions with source, target, type
+                - entry_point: Starting node ID
+                - Optional: state_schema, metadata
+            state_schema: Optional TypedDict type for state validation
+            node_registry: Registry of node functions (for 'function' type nodes)
+                Maps node function names to callable functions
+            condition_registry: Registry of condition functions (for conditional edges)
+                Maps condition function names to callable functions
+
+        Returns:
+            StateGraph instance ready for compilation
+
+        Raises:
+            ValueError: If schema is invalid or missing required fields
+            TypeError: If node/condition types are unsupported
+
+        Example:
+            # Define schema
+            schema = {
+                "nodes": [
+                    {"id": "analyze", "type": "function", "func": "analyze_task"},
+                    {"id": "execute", "type": "function", "func": "execute_task"},
+                ],
+                "edges": [
+                    {"source": "analyze", "target": "execute", "type": "normal"},
+                    {
+                        "source": "execute",
+                        "target": {"retry": "analyze", "done": "__end__"},
+                        "type": "conditional",
+                        "condition": "should_retry"
+                    }
+                ],
+                "entry_point": "analyze"
+            }
+
+            # Create registries
+            node_registry = {
+                "analyze_task": analyze_task_func,
+                "execute_task": execute_task_func,
+            }
+            condition_registry = {
+                "should_retry": should_retry_func,
+            }
+
+            # Deserialize
+            graph = StateGraph.from_schema(
+                schema,
+                state_schema=AgentState,
+                node_registry=node_registry,
+                condition_registry=condition_registry
+            )
+
+            # Compile and execute
+            app = graph.compile()
+            result = await app.invoke(initial_state)
+
+        Example with YAML:
+            yaml_schema = \"""
+            nodes:
+              - id: analyze
+                type: function
+                func: analyze_task
+              - id: execute
+                type: function
+                func: execute_task
+            edges:
+              - source: analyze
+                target: execute
+                type: normal
+              - source: execute
+                target:
+                  retry: analyze
+                  done: __end__
+                type: conditional
+                condition: should_retry
+            entry_point: analyze
+            \"""
+
+            graph = StateGraph.from_schema(
+                yaml_schema,
+                node_registry=node_registry,
+                condition_registry=condition_registry
+            )
+        """
+        import yaml
+
+        # Parse YAML if string input
+        if isinstance(schema, str):
+            try:
+                schema_dict = yaml.safe_load(schema)
+            except yaml.YAMLError as e:
+                raise ValueError(f"Invalid YAML schema: {e}") from e
+        else:
+            schema_dict = schema
+
+        # Validate required fields
+        required_fields = ["nodes", "edges", "entry_point"]
+        missing_fields = [f for f in required_fields if f not in schema_dict]
+        if missing_fields:
+            raise ValueError(f"Schema missing required fields: {missing_fields}")
+
+        # Initialize registries with defaults
+        node_registry = node_registry or {}
+        condition_registry = condition_registry or {}
+
+        # Create StateGraph instance
+        graph = cls(state_schema=state_schema)
+
+        # Add nodes
+        for node_def in schema_dict["nodes"]:
+            if not isinstance(node_def, dict):
+                raise ValueError(f"Invalid node definition: {node_def}")
+
+            node_id = node_def.get("id")
+            if not node_id:
+                raise ValueError("Node definition must have 'id' field")
+
+            node_type = node_def.get("type", "function")
+
+            if node_type == "function":
+                # Function node - look up in registry
+                func_name = node_def.get("func")
+                if not func_name:
+                    raise ValueError(f"Function node '{node_id}' must specify 'func'")
+
+                if func_name not in node_registry:
+                    raise ValueError(
+                        f"Node function '{func_name}' not found in node_registry. "
+                        f"Available: {list(node_registry.keys())}"
+                    )
+
+                node_func = node_registry[func_name]
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type", "func"]}
+                graph.add_node(node_id, node_func, **metadata)
+
+            elif node_type == "passthrough":
+                # Passthrough node (identity function)
+                def passthrough_func(state):
+                    return state
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, passthrough_func, **metadata)
+
+            else:
+                raise TypeError(f"Unsupported node type: {node_type}")
+
+        # Add edges
+        for edge_def in schema_dict["edges"]:
+            if not isinstance(edge_def, dict):
+                raise ValueError(f"Invalid edge definition: {edge_def}")
+
+            source = edge_def.get("source")
+            if not source:
+                raise ValueError("Edge definition must have 'source' field")
+
+            target = edge_def.get("target")
+            if target is None:
+                raise ValueError("Edge definition must have 'target' field")
+
+            edge_type = edge_def.get("type", "normal")
+
+            if edge_type == "normal":
+                graph.add_edge(source, target)
+
+            elif edge_type == "conditional":
+                condition_name = edge_def.get("condition")
+                if not condition_name:
+                    raise ValueError(
+                        f"Conditional edge from '{source}' must specify 'condition'"
+                    )
+
+                if condition_name not in condition_registry:
+                    raise ValueError(
+                        f"Condition function '{condition_name}' not found in "
+                        f"condition_registry. Available: {list(condition_registry.keys())}"
+                    )
+
+                if not isinstance(target, dict):
+                    raise ValueError(
+                        f"Conditional edge target must be dict mapping branches to nodes, "
+                        f"got: {type(target)}"
+                    )
+
+                condition_func = condition_registry[condition_name]
+                graph.add_conditional_edge(source, condition_func, target)
+
+            else:
+                raise TypeError(f"Unsupported edge type: {edge_type}")
+
+        # Set entry point
+        entry_point = schema_dict["entry_point"]
+        if entry_point not in graph._nodes:
+            raise ValueError(
+                f"Entry point '{entry_point}' not found in nodes. "
+                f"Available nodes: {list(graph._nodes.keys())}"
+            )
+
+        graph.set_entry_point(entry_point)
+
+        return graph
+
 
 # Convenience factory functions
 def create_graph(

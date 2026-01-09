@@ -81,6 +81,14 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.dataanalysis.escape_hatches"
 
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the DataAnalysis capability provider.
+
+        Returns:
+            Module path string for DataAnalysisCapabilityProvider
+        """
+        return "victor.dataanalysis.capabilities"
+
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 

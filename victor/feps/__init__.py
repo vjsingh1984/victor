@@ -29,6 +29,7 @@ from victor.feps.schema import (
     parse_fep_metadata,
     validate_fep,
 )
+from victor.feps.manager import FEPManager, create_fep_manager
 
 __all__ = [
     "FEPType",
@@ -40,4 +41,6 @@ __all__ = [
     "FEPSection",
     "parse_fep_metadata",
     "validate_fep",
+    "FEPManager",
+    "create_fep_manager",
 ]

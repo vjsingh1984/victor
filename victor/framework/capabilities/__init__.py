@@ -24,6 +24,7 @@ Capabilities:
 - CapabilityMetadata: Metadata for capability registration
 - FileOperationsCapability: Common file operation tools (read, write, edit, grep)
 - PromptContributionCapability: Common prompt hints for task types
+- PrivacyCapabilityProvider: Framework-level privacy and PII management (cross-vertical)
 """
 
 # Base classes for capability providers
@@ -32,6 +33,7 @@ from .base import BaseCapabilityProvider, CapabilityMetadata
 # Concrete capability implementations
 from .file_operations import FileOperationsCapability
 from .prompt_contributions import PromptContributionCapability
+from .privacy import PrivacyCapabilityProvider
 
 __all__ = [
     # Base classes
@@ -40,4 +42,5 @@ __all__ = [
     # Concrete implementations
     'FileOperationsCapability',
     'PromptContributionCapability',
+    'PrivacyCapabilityProvider',
 ]

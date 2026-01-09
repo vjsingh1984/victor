@@ -43,6 +43,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.feps import FEPType, FEPStatus, FEPValidator, parse_fep_metadata
+from victor.feps.manager import FEPManager
 
 fep_app = typer.Typer(
     name="fep",
@@ -445,16 +446,24 @@ def list_feps(
     fep_type: Optional[str] = typer.Option(
         None, "--type", "-t", help="Filter by type"
     ),
+    sort_by: str = typer.Option(
+        "number", "--sort", help="Sort by field (number, created, modified, title)"
+    ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show more details"
     ),
 ) -> None:
-    """List all FEPs with optional filtering.
+    """List all FEPs with optional filtering and sorting.
 
     Displays a table of all FEPs with filtering by status and type.
+
+    Example:
+        victor fep list
+        victor fep list --status accepted
+        victor fep list --type standards --sort modified
     """
     feps_dir = _get_feps_dir()
-    validator = FEPValidator(feps_dir=feps_dir)
+    manager = FEPManager(feps_dir=feps_dir)
 
     # Parse filters
     status_filter = None
@@ -484,7 +493,11 @@ def list_feps(
         type_filter = FEPType.PROCESS
 
     # List FEPs
-    feps = validator.list_feps(status_filter=status_filter, type_filter=type_filter)
+    feps = manager.list_feps(
+        status_filter=status_filter,
+        type_filter=type_filter,
+        sort_by=sort_by,
+    )
 
     if not feps:
         console.print("[yellow]No FEPs found[/]")
@@ -614,3 +627,142 @@ def view_fep(
         if "Summary" in sections:
             console.print("[bold]Summary:[/]")
             console.print(sections["Summary"].content)
+
+
+@fep_app.command("status")
+def update_fep_status(
+    fep_number: int = typer.Argument(..., help="FEP number"),
+    status: str = typer.Option(..., "--status", "-s", help="New status (draft, review, accepted, rejected, deferred, withdrawn, implemented)"),
+) -> None:
+    """Update FEP status.
+
+    Updates the status of a FEP in its YAML frontmatter.
+
+    Example:
+        victor fep status 1 --status review
+    """
+    feps_dir = _get_feps_dir()
+
+    # Parse status
+    try:
+        status_map = {
+            "draft": FEPStatus.DRAFT,
+            "review": FEPStatus.REVIEW,
+            "accepted": FEPStatus.ACCEPTED,
+            "rejected": FEPStatus.REJECTED,
+            "deferred": FEPStatus.DEFERRED,
+            "withdrawn": FEPStatus.WITHDRAWN,
+            "implemented": FEPStatus.IMPLEMENTED,
+        }
+        new_status = status_map[status.lower()]
+    except KeyError:
+        console.print(f"[bold red]Error:[/] Invalid status: {status}")
+        console.print(f"Valid statuses: {', '.join(status_map.keys())}")
+        raise typer.Exit(1)
+
+    # Update status using manager
+    manager = FEPManager(feps_dir=feps_dir)
+    success, message = manager.update_fep_status(fep_number, new_status)
+
+    if success:
+        console.print(f"[green]✓[/] {message}")
+    else:
+        console.print(f"[bold red]Error:[/] {message}")
+        raise typer.Exit(1)
+
+
+@fep_app.command("stats")
+def show_fep_stats() -> None:
+    """Show FEP statistics.
+
+    Displays statistics about all FEPs including counts by status and type.
+    """
+    feps_dir = _get_feps_dir()
+    manager = FEPManager(feps_dir=feps_dir)
+
+    stats = manager.get_statistics()
+
+    console.print()
+    console.print(Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan"))
+    console.print()
+
+    # Status breakdown
+    console.print("[bold]By Status:[/]")
+    for status_value, count in stats["by_status"].items():
+        if count > 0:
+            console.print(f"  {status_value}: {count}")
+    console.print()
+
+    # Type breakdown
+    console.print("[bold]By Type:[/]")
+    for type_value, count in stats["by_type"].items():
+        if count > 0:
+            console.print(f"  {type_value}: {count}")
+    console.print()
+
+    # Recent FEPs
+    if stats["recent"]:
+        console.print("[bold]Recently Modified:[/]")
+        for fep in stats["recent"]:
+            console.print(f"  FEP-{fep.fep:04d}: {fep.title} ({fep.modified})")
+    console.print()
+
+
+@fep_app.command("search")
+def search_feps(
+    query: str = typer.Argument(..., help="Search query"),
+    search_in: Optional[str] = typer.Option(
+        None,
+        "--in",
+        "-i",
+        help="Fields to search in (comma-separated: title,authors)"
+    ),
+) -> None:
+    """Search FEPs by query string.
+
+    Searches through FEP titles and authors matching the query.
+
+    Example:
+        victor fep search "workflow"
+        victor fep search "vijay" --in authors
+    """
+    feps_dir = _get_feps_dir()
+    manager = FEPManager(feps_dir=feps_dir)
+
+    # Parse search fields
+    fields = None
+    if search_in:
+        fields = [f.strip() for f in search_in.split(",")]
+
+    # Search
+    results = manager.search_feps(query, search_in=fields)
+
+    if not results:
+        console.print(f"[yellow]No FEPs found matching '{query}'[/]")
+        raise typer.Exit(0)
+
+    # Display results
+    table = Table(title=f"Search Results: '{query}'", show_header=True)
+    table.add_column("FEP", style="cyan", no_wrap=True)
+    table.add_column("Title", style="white")
+    table.add_column("Type", style="magenta")
+    table.add_column("Status", style="green")
+    table.add_column("Authors", style="blue")
+
+    for fep in results[:10]:  # Limit to 10 results
+        authors = ", ".join([a.get("name", "") for a in fep.authors[:2]])
+        if len(fep.authors) > 2:
+            authors += f" (+{len(fep.authors) - 2})"
+
+        table.add_row(
+            f"FEP-{fep.fep:04d}",
+            fep.title,
+            fep.type.value,
+            fep.status.value,
+            authors,
+        )
+
+    console.print(table)
+    console.print()
+    console.print(f"[dim]Found {len(results)} result(s)[/]")
+    console.print()

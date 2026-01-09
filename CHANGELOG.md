@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Vertical Registry & Discovery System** (Phase 2, Item 2) - Complete vertical package management
+  - `victor vertical install <package>` - Install verticals from PyPI, git, or local paths
+  - `victor vertical list` - Enhanced with `--category`, `--tags`, and `--verbose` filtering
+  - `victor vertical search <query>` - Search by name, description, or tags
+  - `victor vertical info <name>` - Show detailed vertical metadata
+  - `victor-vertical.toml` specification - Standardized package metadata format
+  - Built-in vertical metadata files for all 6 core verticals
+  - Package validation with version compatibility checking
+  - Automatic discovery via entry points
+  - 51 comprehensive tests (100% passing)
+  - Complete specification document at `docs/feps/vertical-package-spec.md`
+
 ### Changed
 - **Plugin Architecture Simplification** - Simplified plugin infrastructure following KISS principle
   - Removed YamlCompilerPlugin (unnecessary wrapper)

@@ -285,6 +285,8 @@ def configure_data_privacy(
 ) -> None:
     """Configure data privacy settings.
 
+    Delegates to framework PrivacyCapabilityProvider for cross-vertical privacy management.
+
     Args:
         orchestrator: Target orchestrator
         anonymize_pii: Whether to anonymize PII columns
@@ -292,19 +294,22 @@ def configure_data_privacy(
         hash_identifiers: Hash identifier columns
         log_access: Log data access for audit trail
     """
-    if hasattr(orchestrator, "privacy_config"):
-        orchestrator.privacy_config = {
-            "anonymize_pii": anonymize_pii,
-            "pii_columns": pii_columns or [],
-            "hash_identifiers": hash_identifiers,
-            "log_access": log_access,
-        }
+    # Delegate to framework privacy capability
+    from victor.framework.capabilities.privacy import configure_data_privacy as framework_privacy
 
-    logger.info(f"Configured data privacy: anonymize={anonymize_pii}")
+    framework_privacy(
+        orchestrator,
+        anonymize_pii=anonymize_pii,
+        pii_columns=pii_columns,
+        hash_identifiers=hash_identifiers,
+        log_access=log_access,
+    )
 
 
 def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     """Get current privacy configuration.
+
+    Delegates to framework PrivacyCapabilityProvider for cross-vertical privacy management.
 
     Args:
         orchestrator: Target orchestrator
@@ -312,16 +317,10 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Privacy configuration dict
     """
-    return getattr(
-        orchestrator,
-        "privacy_config",
-        {
-            "anonymize_pii": True,
-            "pii_columns": [],
-            "hash_identifiers": True,
-            "log_access": True,
-        },
-    )
+    # Delegate to framework privacy capability
+    from victor.framework.capabilities.privacy import get_privacy_config as framework_get_privacy
+
+    return framework_get_privacy(orchestrator)
 
 
 # =============================================================================

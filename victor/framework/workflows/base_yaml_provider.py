@@ -131,6 +131,89 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         """
         ...
 
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the capability provider.
+
+        This optional method allows subclasses to specify their capability
+        provider module for automatic registration. This enables workflows
+        to access vertical-specific capabilities without manual configuration.
+
+        Returns:
+            Fully qualified module path string or None if not applicable
+
+        Example:
+            def _get_capability_provider_module(self) -> Optional[str]:
+                return "victor.research.capabilities"
+
+        Note:
+            Returning None indicates this vertical doesn't have a capability
+            provider or doesn't want automatic registration.
+        """
+        return None
+
+    def get_capability_provider(self) -> Optional[Any]:
+        """Get the capability provider for this vertical.
+
+        This convenience method loads and returns the capability provider
+        if the vertical has defined one via _get_capability_provider_module().
+
+        Returns:
+            Capability provider instance or None if not configured
+
+        Raises:
+            ImportError: If the capability provider module cannot be imported
+            AttributeError: If the module doesn't have the expected provider
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            capabilities = provider.get_capability_provider()
+            if capabilities:
+                print(f"Capabilities: {list(capabilities.get_capabilities().keys())}")
+        """
+        module_path = self._get_capability_provider_module()
+        if not module_path:
+            return None
+
+        try:
+            module = importlib.import_module(module_path)
+            # Look for concrete capability provider classes (not abstract base)
+            for attr_name in dir(module):
+                # Skip private attributes and the abstract base
+                if attr_name.startswith("_"):
+                    continue
+                if attr_name == "BaseCapabilityProvider":
+                    continue
+
+                attr = getattr(module, attr_name)
+                # Check if it's a concrete class (not abstract) with "CapabilityProvider" in the name
+                if (
+                    isinstance(attr, type)
+                    and "CapabilityProvider" in attr_name
+                    and not attr_name.startswith("Base")
+                    and hasattr(attr, "get_capabilities")
+                    and hasattr(attr, "get_capability_metadata")
+                ):
+                    try:
+                        # Try to instantiate - this will fail for abstract classes
+                        instance = attr()
+                        # Verify it has the required methods
+                        if hasattr(instance, "get_capabilities") and hasattr(instance, "get_capability_metadata"):
+                            return instance
+                    except TypeError:
+                        # Abstract class or can't be instantiated, skip
+                        continue
+
+            logger.warning(
+                f"No concrete capability provider class found in {module_path}"
+            )
+            return None
+        except ImportError as e:
+            logger.warning(f"Failed to import capability provider from {module_path}: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to instantiate capability provider from {module_path}: {e}")
+            return None
+
     def _get_workflows_directory(self) -> Path:
         """Return the directory containing YAML workflow files.
 

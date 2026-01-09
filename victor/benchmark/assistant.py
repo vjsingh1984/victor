@@ -198,35 +198,40 @@ You are being evaluated on:
         ]
 
     @classmethod
-    def get_tiered_tools(cls) -> Optional[Dict[str, Any]]:
+    def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:
         """Tiered tool configuration for benchmark evaluation.
 
         Returns tool tiers optimized for benchmark task execution:
         - Mandatory: Always available (read, ls, grep)
         - Core: Vertical-specific essentials (code_search, edit)
         - Semantic: Selected based on task similarity
+
+        Returns:
+            TieredToolConfig with proper tool tiers for benchmark evaluation
         """
-        return {
-            "mandatory": {
+        from victor.core.vertical_types import TieredToolConfig
+
+        return TieredToolConfig(
+            mandatory={
                 ToolNames.READ,
                 ToolNames.LS,
                 ToolNames.GREP,
             },
-            "vertical_core": {
+            vertical_core={
                 ToolNames.CODE_SEARCH,
                 ToolNames.EDIT,
                 ToolNames.WRITE,
                 ToolNames.SHELL,
             },
-            "semantic_pool": {
+            semantic_pool={
                 ToolNames.SYMBOL,
                 ToolNames.REFS,
                 ToolNames.TEST,
                 ToolNames.GIT,
                 ToolNames.DIFF,
             },
-            "readonly_only_for_analysis": False,
-        }
+            readonly_only_for_analysis=False,
+        )
 
     @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:

@@ -576,12 +576,12 @@ class TestVerticalFiltering:
             ),
             InstalledVertical(
                 name="coding",
-                version="builtin",
+                version="0.5.1",
                 location=Path("/fake"),
                 is_builtin=True,
                 metadata=VerticalPackageMetadata(
                     name="coding",
-                    version="builtin",
+                    version="0.5.1",
                     description="Coding assistant",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
@@ -671,12 +671,12 @@ class TestVerticalFiltering:
         mock_list.return_value = [
             InstalledVertical(
                 name="coding",
-                version="builtin",
+                version="0.5.1",
                 location=Path("/fake"),
                 is_builtin=True,
                 metadata=VerticalPackageMetadata(
                     name="coding",
-                    version="builtin",
+                    version="0.5.1",
                     description="Coding assistant",
                     authors=[AuthorInfo(name="Test")],
                     license="Apache-2.0",
