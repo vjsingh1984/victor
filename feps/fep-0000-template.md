@@ -1,15 +1,3 @@
-# FEP-{number}: {Title}
-
-- **FEP**: {number}
-- **Title**: {Brief, descriptive title}
-- **Type**: Standards Track / Informational / Process
-- **Status**: Draft / Review / Accepted / Rejected / Deferred / Withdrawn
-- **Authors**: {Name} <{email}> (@{github})
-- **Created**: {YYYY-MM-DD}
-- **Modified**: {YYYY-MM-DD}
-
----
-
 ## Table of Contents
 
 1. [Summary](#summary)
@@ -22,6 +10,8 @@
 8. [Migration Path](#migration-path)
 9. [Compatibility](#compatibility)
 10. [References](#references)
+11. [Review Process](#review-process)
+12. [Acceptance Criteria](#acceptance-criteria)
 
 ---
 
@@ -283,6 +273,119 @@ new_feature:
 - [Discussion](link)
 - [Relevant documentation](link)
 - [Inspired by](link)
+
+## Review Process
+
+{This section tracks the FEP through the review process. Maintained by FEP shepherds.}
+
+### Submission
+
+- **Submitted by**: {Author name}
+- **Date**: {YYYY-MM-DD}
+- **Pull Request**: #{number}
+
+### Review Timeline
+
+- **Initial review period**: 14 days minimum
+- **Reviewers assigned**: {Reviewer names}
+- **Discussion thread**: [Link to GitHub issue/discussion]
+
+### Review Checklist
+
+#### Technical Review
+
+- [ ] Specification is clear and complete
+- [ ] API design follows Victor conventions
+- [ ] Error handling is well-defined
+- [ ] Testing strategy is adequate
+- [ ] Documentation plan is included
+
+#### Community Review
+
+- [ ] Use cases are well-understood
+- [ ] Benefits outweigh drawbacks
+- [ ] Migration path is clear (if breaking)
+- [ ] Alternative approaches were considered
+- [ ] Community feedback is addressed
+
+### Decisions
+
+- **Recommendation**: [Accept/Reject/Request Changes]
+- **Decision date**: {YYYY-MM-DD}
+- **Approved by**: {Maintainer names}
+- **Rationale**: {Brief explanation of decision}
+
+### Revision History
+
+1. **v1.0** ({YYYY-MM-DD}): Initial submission
+2. **v1.1** ({YYYY-MM-DD}): Addressed reviewer feedback - {summary of changes}
+3. **v2.0** ({YYYY-MM-DD}): Major revision - {summary of changes}
+
+## Acceptance Criteria
+
+{This section defines the criteria for accepting this FEP. All criteria must be met before implementation begins.}
+
+### Must-Have Criteria
+
+{These criteria MUST be satisfied for the FEP to be accepted:}
+
+1. **[Criterion 1]**: {Description}
+   - Success metric: {How to measure}
+   - Verification method: {How to verify}
+
+2. **[Criterion 2]**: {Description}
+   - Success metric: {How to measure}
+   - Verification method: {How to verify}
+
+3. **[Criterion 3]**: {Description}
+   - Success metric: {How to measure}
+   - Verification method: {How to verify}
+
+### Should-Have Criteria
+
+{These criteria SHOULD be satisfied if feasible:}
+
+1. **[Criterion 1]**: {Description}
+   - Success metric: {How to measure}
+   - Priority: {High/Medium/Low}
+
+2. **[Criterion 2]**: {Description}
+   - Success metric: {How to measure}
+   - Priority: {High/Medium/Low}
+
+### Implementation Requirements
+
+{Before this FEP can be marked as "Implemented", the following must be completed:}
+
+- [ ] Code implementation following the specification
+- [ ] Comprehensive test coverage (>80% for new code)
+- [ ] API documentation updated
+- [ ] User guide updated (if user-facing)
+- [ ] Migration guide completed (if breaking change)
+- [ ] Changelog entry added
+- [ ] Release notes prepared
+- [ ] Backward compatibility verified (if applicable)
+- [ ] Performance benchmarks run (if performance-sensitive)
+- [ ] Security review completed (if security-sensitive)
+
+### Validation Process
+
+{How acceptance criteria will be validated:}
+
+1. **Automated validation**: {CI checks, test coverage, etc.}
+2. **Manual review**: {Code review, documentation review, etc.}
+3. **Community testing**: {Beta testing period, etc.}
+4. **Final approval**: {Who gives final approval}
+
+### Success Metrics
+
+{Quantifiable metrics to measure success:}
+
+- Metric 1: {Description} - Target: {value}
+- Metric 2: {Description} - Target: {value}
+- Metric 3: {Description} - Target: {value}
+
+---
 
 ## Copyright
 
