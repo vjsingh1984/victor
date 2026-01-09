@@ -200,7 +200,7 @@ class VerticalRegistryManager:
     ]
 
     # Default registry URL (can be overridden via settings)
-    DEFAULT_REGISTRY_URL = "https://registry.victor.dev/api/v1/verticals"
+    DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/vjsingh1984/victor-registry/main/index.json"
 
     def __init__(
         self,
