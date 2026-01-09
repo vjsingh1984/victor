@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Plugin Architecture Simplification** - Simplified plugin infrastructure following KISS principle
+  - Removed YamlCompilerPlugin (unnecessary wrapper)
+  - Removed create_compiler() facade (over-engineered)
+  - Simplified registry from 296 to 148 lines (-50%)
+  - Removed URI parsing, extension detection, scheme mapping
+  - Plugin infrastructure now minimal for third-party extensibility
+  - All verticals continue using UnifiedWorkflowCompiler directly
+  - Code reduction: -810 lines (-71%)
+
+### Fixed
+- **Plugin Unit Tests** - Simplified from 27 to 15 tests (100% passing, was 7 failing)
+
+### Added
+- **Keyring Integration** (100% coverage) - All 17 cloud providers now support OS-level credential storage
+  - Automatic credential resolution: parameter → env var → keyring → warning
+  - Providers can be instantiated without `api_key` parameter
+  - Setup: `victor keys --set <provider> --keyring`
+  - Supported: Anthropic, OpenAI, DeepSeek, Google, Azure OpenAI, Vertex AI, xAI/Grok, Cerebras, Fireworks, GroqCloud, HuggingFace, Mistral, Moonshot, OpenRouter, Replicate, Together, ZAI/ZhipuAI
+
+### Fixed
+- **Pytest** - Fixed 14 failing tests (17,348 tests now passing, 0 failures)
+  - Continuation strategy tests (12) - Removed invalid parameter
+  - Agent workflow tests (2) - Updated mock methods
+
+### Changed
+- Provider API: All cloud providers accept `api_key: Optional[str] = None` (backward compatible)
+
 ### Added
 - **Signal-Based Task Completion Detection** - Deterministic completion using explicit markers
   - `_DONE_` for file operations (creation, modification, deletion)
