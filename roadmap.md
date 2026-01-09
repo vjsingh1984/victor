@@ -46,7 +46,7 @@ This document outlines a strategic roadmap for the continued development of the 
 
 **Objective:** Make it easier for developers to build, share, and discover new verticals, turning the framework into a thriving ecosystem.
 
-**Status:** In Progress (1 of 3 complete, 2 in progress as of January 9, 2025)
+**Status:** In Progress (1 of 3 complete, 2 nearly complete as of January 9, 2025)
 
 **Completed Initiatives:**
 
@@ -74,23 +74,37 @@ This document outlines a strategic roadmap for the continued development of the 
 
 **In Progress Initiatives:**
 
-2.  **⏳ Vertical Registry and Discovery (50% Complete):**
-    - **Status:** IN PROGRESS - Schema complete, CLI commands pending
+2.  **⏳ Vertical Registry and Discovery (90% Complete):**
+    - **Status:** NEARLY COMPLETE - CLI commands implemented, central registry pending
     - **Completed (January 9, 2025):**
       - victor-vertical.toml specification with Pydantic validation
       - VerticalPackageMetadata schema (package_schema.py)
       - Package metadata validation: authors, dependencies, compatibility, security
       - Template for victor-vertical.toml files
+      - **NEW**: VerticalRegistryManager (673 lines)
+        - PackageSpec parser (PyPI, git, local paths)
+        - Discovery (built-in, installed, remote)
+        - Installation logic via pip
+        - Metadata caching (1-hour TTL)
+        - Search functionality
+        - Uninstallation support
+      - **NEW**: CLI commands (victor/ui/commands/vertical.py, 460 lines)
+        - `victor vertical install <package>` - Install from PyPI, git, or local
+        - `victor vertical uninstall <name>` - Remove vertical
+        - `victor vertical list [--source]` - List with filtering
+        - `victor vertical search <query>` - Search registry
+        - `victor vertical info <name>` - Show details
+        - `victor vertical create` - Alias to scaffold
+      - **NEW**: 36 unit tests (all passing)
     - **Pending:**
-      - `victor vertical install` command (PyPI, git, local)
-      - `victor vertical list/search` commands
       - Central registry client (GitHub-based MVP)
       - victor-registry repository setup
-    - **Implementation:** Package metadata foundation complete. Next: CLI commands for install/list/search and registry integration.
+      - GitHub Actions for FEP validation
+    - **Implementation:** CLI fully functional. Next: Central registry hosting.
     - **Benefit:** Creates a marketplace of ideas and reusable components, allowing users to easily find and install pre-built solutions for their needs.
 
-3.  **⏳ Framework Enhancement Proposal Process (30% Complete):**
-    - **Status:** IN PROGRESS - Process documentation complete, CLI tooling pending
+3.  **⏳ Framework Enhancement Proposal Process (80% Complete):**
+    - **Status:** NEARLY COMPLETE - CLI tooling implemented, examples pending
     - **Completed (January 9, 2025):**
       - FEP-0001: Framework Enhancement Proposal process (meta-FEP)
       - FEP template (fep-0000-template.md) with all required sections
@@ -98,13 +112,28 @@ This document outlines a strategic roadmap for the continued development of the 
       - Governance model: rough consensus, 14-day review period
       - FEP types: Standards Track, Informational, Process
       - Numbering scheme and repository structure defined
+      - **NEW**: FEP schema and validation (victor/feps/schema.py)
+        - FEPType, FEPStatus enums
+        - FEPMetadata, FEPSection dataclasses
+        - FEPValidator with comprehensive validation
+        - YAML frontmatter parsing
+        - Section content quality checks
+      - **NEW**: FEPManager (victor/feps/manager.py)
+        - List FEPs with filtering
+        - View specific FEP details
+        - Metadata extraction
+      - **NEW**: CLI commands (victor/ui/commands/fep.py)
+        - `victor fep create --title "Title" --type standards` - Create from template
+        - `victor fep validate <path>` - Validate structure and content
+        - `victor fep submit <path>` - Submit via GitHub PR (gh CLI)
+        - `victor fep list [--status] [--type]` - List with filtering
+        - `victor fep view <number>` - Display details
+      - **NEW**: 17 unit tests (all passing)
     - **Pending:**
-      - `victor fep create/validate/submit/list/view` CLI commands
-      - FEP validation schema implementation
-      - GitHub Actions workflow for FEP validation
       - Example FEPs (FEP-0002: Informational, FEP-0003: Standards Track)
       - Integration with CONTRIBUTING.md
-    - **Implementation:** Process foundation established. Next: CLI tooling and examples.
+      - GitHub Actions workflow for automatic FEP validation
+    - **Implementation:** CLI fully functional. Next: Example FEPs and CI integration.
     - **Benefit:** Ensures that the framework evolves based on the real-world needs of its users, while maintaining a high standard of quality and architectural coherence.
 
 ## Phase 3: Advanced Orchestration and Intelligence (12-18 Months)
