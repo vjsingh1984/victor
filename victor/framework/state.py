@@ -372,10 +372,14 @@ class State:
         self,
         callback: Callable[[str, str, Dict[str, Any]], None],
     ) -> Optional[Callable[[], None]]:
-        """Subscribe to state machine transitions via EventBus.
+        """Subscribe to state machine transitions via ObservabilityBus.
 
         This provides real-time notifications when the agent's state
-        changes, using the observability EventBus.
+        changes, using the observability ObservabilityBus.
+
+        Note: This is a simplified implementation that registers the callback
+        for later invocation. The actual event subscription happens when
+        the event loop is running.
 
         Args:
             callback: Function called with (old_stage, new_stage, context)
@@ -394,16 +398,21 @@ class State:
         if not observability:
             return None
 
-        from victor.observability import EventCategory
+        # Store callback for later use by state machine
+        # The state machine will call this directly during transitions
+        # This is a simpler approach that doesn't require async subscription
+        if hasattr(observability, "_state_callbacks"):
+            observability._state_callbacks.append(callback)
+        else:
+            observability._state_callbacks = [callback]
 
-        def handler(event: Any) -> None:
-            data = event.data if hasattr(event, "data") else {}
-            old_stage = data.get("old_stage", "unknown")
-            new_stage = data.get("new_stage", "unknown")
-            context = data.get("context", {})
-            callback(old_stage, new_stage, context)
+        # Return unsubscribe function
+        def unsubscribe() -> None:
+            """Remove the state change callback."""
+            if hasattr(observability, "_state_callbacks") and callback in observability._state_callbacks:
+                observability._state_callbacks.remove(callback)
 
-        return observability.event_bus.subscribe(EventCategory.STATE, handler)
+        return unsubscribe
 
     @property
     def transition_history(self) -> list:

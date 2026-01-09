@@ -104,7 +104,6 @@ from victor.framework.events import (
 
 if TYPE_CHECKING:
     from victor.core.event_sourcing import Event as CQRSEvent
-    from victor.observability import EventCategory, VictorEvent
 
 logger = logging.getLogger(__name__)
 

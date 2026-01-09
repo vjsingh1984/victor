@@ -222,6 +222,32 @@ class UnifiedEventType(str, Enum):
     """Exited a state."""
 
     # =========================================================================
+    # Debug Events
+    # Events related to workflow debugging and breakpoints
+    # =========================================================================
+
+    DEBUG_BREAKPOINT_SET = "debug.breakpoint.set"
+    """Breakpoint was set."""
+
+    DEBUG_BREAKPOINT_CLEARED = "debug.breakpoint.cleared"
+    """Breakpoint was cleared."""
+
+    DEBUG_BREAKPOINT_HIT = "debug.breakpoint.hit"
+    """Breakpoint was hit during execution."""
+
+    DEBUG_PAUSED = "debug.paused"
+    """Execution paused at breakpoint."""
+
+    DEBUG_RESUMED = "debug.resumed"
+    """Execution resumed after pause."""
+
+    DEBUG_STEP = "debug.step"
+    """Execution step (step over/into/out)."""
+
+    DEBUG_STATE_INSPECTED = "debug.state.inspected"
+    """State was inspected for debugging."""
+
+    # =========================================================================
     # Custom/Extension Events
     # =========================================================================
 

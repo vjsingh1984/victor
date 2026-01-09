@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
-    from victor.observability import EventBus, ObservabilityIntegration
+    from victor.observability.integration import ObservabilityIntegration
     from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
 

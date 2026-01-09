@@ -52,7 +52,8 @@ if TYPE_CHECKING:
         EventRegistryService,
         ToolConfiguratorService,
     )
-    from victor.observability import EventBus, ObservabilityIntegration
+    from victor.observability.integration import ObservabilityIntegration
+    from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 

@@ -1177,6 +1177,15 @@ class CompiledGraph(Generic[StateType]):
         self._entry_point = entry_point
         self._state_schema = state_schema
         self._config = config or GraphConfig()
+        self._debug_hook: Optional[Any] = None  # DebugHook for debugging
+
+    def set_debug_hook(self, hook: Optional[Any]) -> None:
+        """Set debug hook for execution.
+
+        Args:
+            hook: DebugHook instance or None to disable debugging
+        """
+        self._debug_hook = hook
 
     def _should_use_cow(self, exec_config: GraphConfig) -> bool:
         """Determine if copy-on-write should be used.
@@ -1241,6 +1250,7 @@ class CompiledGraph(Generic[StateType]):
         *,
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
+        debug_hook: Optional[Any] = None,
     ) -> ExecutionResult[StateType]:
         """Execute the graph (SRP: Orchestrates focused helpers).
 
@@ -1251,11 +1261,13 @@ class CompiledGraph(Generic[StateType]):
         - NodeExecutor: node execution with COW optimization
         - CheckpointManager: state persistence
         - GraphEventEmitter: observability events
+        - DebugHook: breakpoint and execution control (optional)
 
         Args:
             input_state: Initial state
             config: Override execution config
             thread_id: Thread ID for checkpointing
+            debug_hook: Optional DebugHook for debugging
 
         Returns:
             ExecutionResult with final state
@@ -1264,6 +1276,9 @@ class CompiledGraph(Generic[StateType]):
         thread_id = thread_id or uuid.uuid4().hex
         use_cow = self._should_use_cow(exec_config)
         graph_id = exec_config.observability.graph_id or thread_id
+
+        # Use parameter debug hook or instance debug hook
+        hook = debug_hook or self._debug_hook
 
         # Create helper instances (Dependency Injection)
         iteration_controller = IterationController(
@@ -1326,6 +1341,10 @@ class CompiledGraph(Generic[StateType]):
                         node_history=node_history,
                     )
 
+                # Debug hook - before node
+                if hook:
+                    await hook.before_node(current_node, state)
+
                 # Emit node start event
                 node_start_time = time.time()
                 event_emitter.emit_node_start(
@@ -1339,6 +1358,12 @@ class CompiledGraph(Generic[StateType]):
                     state=state,
                     timeout_manager=timeout_manager,
                 )
+
+                # Debug hook - after node
+                if hook:
+                    await hook.after_node(
+                        current_node, state, error if not success else None
+                    )
 
                 if not success:
                     return ExecutionResult(
