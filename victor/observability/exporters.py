@@ -24,7 +24,8 @@ Available exporters:
 - FilteringExporter: Filters events before delegation
 
 Example:
-    from victor.observability import EventBus, JsonLineExporter
+    from victor.core.events import get_observability_bus
+    from victor.observability import JsonLineExporter
 
     bus = get_observability_bus()
     bus.add_exporter(JsonLineExporter("events.jsonl"))
@@ -193,7 +194,7 @@ class JsonLineExporter(BaseExporter):
         except (TypeError, ValueError) as e:
             # Log serialization error but don't crash
             logger.warning(
-                f"Failed to serialize event {event.category}/{event.name}: {e}. "
+                f"Failed to serialize event {event.topic}: {e}. "
                 f"Event data keys: {list(event.data.keys()) if event.data else 'N/A'}"
             )
 
@@ -246,13 +247,14 @@ class LoggingExporter(BaseExporter):
     Events are logged at INFO level by default, with ERROR events at ERROR level.
 
     Example:
-        from victor.observability import EventBus, LoggingExporter
+        from victor.core.events import get_observability_bus
+        from victor.observability import LoggingExporter
 
         bus = get_observability_bus()
         bus.add_exporter(LoggingExporter("victor.events"))
 
         # Events will now appear in logs:
-        # 2025-01-01 12:00:00 - victor.events - INFO - [TOOL] read: success
+        # 2025-01-01 12:00:00 - victor.events - INFO - [TOOL] tool.read.start
     """
 
     def __init__(
@@ -339,7 +341,7 @@ class CallbackExporter(BaseExporter):
 
     Example:
         def my_handler(event):
-            print(f"Event: {event.name}")
+            print(f"Event: {event.topic}")
 
         exporter = CallbackExporter(my_handler)
     """

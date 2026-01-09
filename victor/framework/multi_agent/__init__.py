@@ -62,6 +62,7 @@ from victor.framework.multi_agent.personas import (
     PersonaTemplate,
     PersonaTraits,
 )
+from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
 from victor.framework.multi_agent.teams import (
     TaskAssignmentStrategy,
     TeamMember,
@@ -76,6 +77,7 @@ __all__ = [
     "ExpertiseLevel",
     "PersonaTemplate",
     "PersonaTraits",
+    "FrameworkPersonaProvider",
     # Teams
     "TaskAssignmentStrategy",
     "TeamMember",

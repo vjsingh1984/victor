@@ -18,7 +18,7 @@ This module provides a centralized event bus for all Victor observations,
 implementing the Pub/Sub pattern for decoupled event handling.
 
 Architecture:
-    EventBus (Singleton)
+    ObservabilityBus (Singleton) from victor.core.events
         │
         ├── Subscribers (Observer Pattern)
         │   ├── LoggingSubscriber
@@ -31,23 +31,21 @@ Architecture:
             └── OpenTelemetryExporter
 
 Example:
-    from victor.observability import EventBus, VictorEvent, EventCategory
+    from victor.core.events import get_observability_bus, Event
+    from victor.observability import JsonLineExporter
 
     # Get singleton bus
     bus = get_observability_bus()
+    await bus.connect()
 
     # Subscribe to events
-    def on_tool_event(event: Event):
-        print(f"Tool {event.name}: {event.data}")
+    async def on_tool_event(event: Event):
+        print(f"Tool {event.topic}: {event.data}")
 
-    bus.subscribe(EventCategory.TOOL, on_tool_event)
+    bus.subscribe("tool.*", on_tool_event)
 
-    # Publish events
-    bus.publish(VictorEvent(
-        category=EventCategory.TOOL,
-        name="read",
-        data={"path": "/tmp/test.txt"}
-    ))
+    # Emit events
+    await bus.emit("tool.read", {"path": "/tmp/test.txt"})
 
     # Add exporters for persistence
     bus.add_exporter(JsonLineExporter("events.jsonl"))

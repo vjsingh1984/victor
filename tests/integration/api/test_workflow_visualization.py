@@ -24,7 +24,7 @@ Tests the complete workflow visualization feature including:
 import asyncio
 import json
 import pytest
-from httpx import AsyncClient, WSClient
+from httpx import AsyncClient
 from datetime import datetime, timezone
 
 from victor.integrations.api.fastapi_server import VictorFastAPIServer

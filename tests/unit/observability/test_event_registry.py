@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for EventCategoryRegistry and related event system fixes (Workstream C)."""
+"""Tests for EventCategoryRegistry and related event system (Workstream C).
+
+Updated to use canonical ObservabilityBus from victor.core.events instead of
+deprecated EventBus from victor.observability.event_bus.
+"""
 
 from unittest.mock import MagicMock
+import asyncio
 
 import pytest
 
-from victor.observability.event_bus import (
-    EventBus,
-    EventCategory,
-    EventPriority,
-    VictorEvent,
-    get_event_bus,
+from victor.core.events import (
+    ObservabilityBus,
+    Event,
+    get_observability_bus,
 )
 from victor.observability.event_registry import (
     CustomEventCategory,
@@ -34,132 +37,58 @@ from victor.observability.event_registry import (
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset singletons before and after each test."""
-    EventBus.reset_instance()
+    # Reset registry before tests
     EventCategoryRegistry.reset_instance()
+
     yield
-    EventBus.reset_instance()
+
+    # Reset registry after tests
     EventCategoryRegistry.reset_instance()
 
 
 # =============================================================================
-# C.1: get_event_bus() Factory Function Tests
+# C.1: get_observability_bus() Factory Function Tests
 # =============================================================================
 
 
-class TestGetEventBusFactory:
-    """Tests for get_event_bus() factory function (C.1)."""
+class TestGetObservabilityBusFactory:
+    """Tests for get_observability_bus() factory function (C.1)."""
 
-    def test_get_event_bus_returns_singleton(self):
-        """get_event_bus should return the EventBus singleton."""
-        bus = get_event_bus()
-        assert bus is EventBus.get_instance()
+    @pytest.mark.asyncio
+    async def test_get_observability_bus_returns_singleton(self):
+        """get_observability_bus should return the ObservabilityBus singleton."""
+        bus = get_observability_bus()
+        assert isinstance(bus, ObservabilityBus)
 
-    def test_get_event_bus_returns_same_instance(self):
+    @pytest.mark.asyncio
+    async def test_get_observability_bus_returns_same_instance(self):
         """Multiple calls should return the same instance."""
-        bus1 = get_event_bus()
-        bus2 = get_event_bus()
+        bus1 = get_observability_bus()
+        bus2 = get_observability_bus()
         assert bus1 is bus2
 
-    def test_get_event_bus_is_functional(self):
-        """The returned EventBus should be fully functional."""
-        bus = get_event_bus()
-        handler = MagicMock()
+    @pytest.mark.asyncio
+    async def test_get_observability_bus_is_functional(self):
+        """The returned ObservabilityBus should be fully functional."""
+        bus = get_observability_bus()
+        await bus.connect()
 
-        bus.subscribe(EventCategory.TOOL, handler)
-        event = VictorEvent(category=EventCategory.TOOL, name="test_event")
-        bus.publish(event)
-
-        handler.assert_called_once()
-        args = handler.call_args[0]
-        assert args[0].name == "test_event"
-
-
-# =============================================================================
-# C.2: emit_lifecycle_event() Method Tests
-# =============================================================================
-
-
-class TestEmitLifecycleEvent:
-    """Tests for emit_lifecycle_event() method (C.2)."""
-
-    def test_emit_lifecycle_event_basic(self):
-        """emit_lifecycle_event should publish LIFECYCLE category events."""
-        bus = get_event_bus()
-        handler = MagicMock()
-
-        bus.subscribe(EventCategory.LIFECYCLE, handler)
-        bus.emit_lifecycle_event("graph_started")
-
-        handler.assert_called_once()
-        event = handler.call_args[0][0]
-        assert event.category == EventCategory.LIFECYCLE
-        assert event.name == "graph_started"
-        assert event.data == {}
-
-    def test_emit_lifecycle_event_with_data(self):
-        """emit_lifecycle_event should include provided data."""
-        bus = get_event_bus()
-        handler = MagicMock()
-
-        bus.subscribe(EventCategory.LIFECYCLE, handler)
-        bus.emit_lifecycle_event(
-            "workflow_completed",
-            data={"workflow_id": "deep_research", "duration_ms": 1234},
-        )
-
-        event = handler.call_args[0][0]
-        assert event.name == "workflow_completed"
-        assert event.data["workflow_id"] == "deep_research"
-        assert event.data["duration_ms"] == 1234
-
-    def test_emit_lifecycle_event_with_priority(self):
-        """emit_lifecycle_event should respect priority parameter."""
-        bus = get_event_bus()
-        handler = MagicMock()
-
-        bus.subscribe(EventCategory.LIFECYCLE, handler)
-        bus.emit_lifecycle_event(
-            "session_error",
-            data={"error": "Connection lost"},
-            priority=EventPriority.HIGH,
-        )
-
-        event = handler.call_args[0][0]
-        assert event.priority == EventPriority.HIGH
-
-    def test_emit_lifecycle_event_default_priority(self):
-        """emit_lifecycle_event should default to NORMAL priority."""
-        bus = get_event_bus()
-        handler = MagicMock()
-
-        bus.subscribe(EventCategory.LIFECYCLE, handler)
-        bus.emit_lifecycle_event("session_started")
-
-        event = handler.call_args[0][0]
-        assert event.priority == EventPriority.NORMAL
-
-    def test_emit_lifecycle_event_common_events(self):
-        """Common lifecycle event types should work correctly."""
-        bus = get_event_bus()
         events_received = []
 
-        def capture_event(event):
-            events_received.append(event.name)
+        async def handler(event: Event):
+            events_received.append(event)
 
-        bus.subscribe(EventCategory.LIFECYCLE, capture_event)
+        await bus.subscribe("tool.*", handler)
+        await bus.emit("tool.test_event", {"data": "test"})
 
-        # Emit common lifecycle events
-        bus.emit_lifecycle_event("graph_started", {"graph_id": "main"})
-        bus.emit_lifecycle_event("workflow_completed", {"status": "success"})
-        bus.emit_lifecycle_event("session_started", {"session_id": "abc123"})
-        bus.emit_lifecycle_event("checkpoint_saved", {"thread_id": "t1"})
+        # Give async events time to process
+        await asyncio.sleep(0.5)
 
-        assert events_received == [
-            "graph_started",
-            "workflow_completed",
-            "session_started",
-            "checkpoint_saved",
-        ]
+        assert len(events_received) > 0
+        assert events_received[0].topic == "tool.test_event"
+
+        # Cleanup
+        await bus.disconnect()
 
 
 # =============================================================================
@@ -297,7 +226,7 @@ class TestEventCategoryRegistry:
         """Registering name that conflicts with built-in should raise."""
         registry = EventCategoryRegistry.get_instance()
 
-        # "tool" is a built-in EventCategory
+        # "tool" is a built-in topic prefix
         with pytest.raises(ValueError, match="conflicts with built-in"):
             registry.register(
                 name="tool",
@@ -475,26 +404,14 @@ class TestEventCategoryRegistry:
 
 
 class TestEventSystemIntegration:
-    """Integration tests for the event system fixes."""
+    """Integration tests for the event system with canonical ObservabilityBus."""
 
-    def test_factory_with_lifecycle_event(self):
-        """get_event_bus and emit_lifecycle_event should work together."""
-        bus = get_event_bus()
-        events = []
+    @pytest.mark.asyncio
+    async def test_observability_bus_with_custom_topics(self):
+        """ObservabilityBus should work with custom topic categories."""
+        bus = get_observability_bus()
+        await bus.connect()
 
-        bus.subscribe(EventCategory.LIFECYCLE, lambda e: events.append(e))
-
-        bus.emit_lifecycle_event("workflow_started", {"id": "test_workflow"})
-        bus.emit_lifecycle_event("workflow_completed", {"id": "test_workflow", "status": "success"})
-
-        assert len(events) == 2
-        assert events[0].name == "workflow_started"
-        assert events[1].name == "workflow_completed"
-        assert events[1].data["status"] == "success"
-
-    def test_custom_category_with_event_bus(self):
-        """Custom categories should be usable with EventBus CUSTOM category."""
-        bus = get_event_bus()
         registry = EventCategoryRegistry.get_instance()
 
         # Register custom category
@@ -504,22 +421,98 @@ class TestEventSystemIntegration:
             registered_by="victor.security",
         )
 
-        # Use CUSTOM category with custom_category field
-        events = []
-        bus.subscribe(EventCategory.CUSTOM, lambda e: events.append(e))
+        # Use custom topic prefix
+        events_received = []
 
-        bus.publish(
-            VictorEvent(
-                category=EventCategory.CUSTOM,
-                name="vulnerability_found",
-                data={
-                    "custom_category": "security_scan",
-                    "severity": "high",
-                    "file": "config.py",
-                },
-            )
+        async def handler(event: Event):
+            events_received.append(event)
+
+        await bus.subscribe("security_scan.*", handler)
+        await bus.emit(
+            "security_scan.vulnerability_found",
+            {"severity": "high", "file": "config.py"},
         )
 
-        assert len(events) == 1
-        assert events[0].data["custom_category"] == "security_scan"
-        assert registry.has_category(events[0].data["custom_category"])
+        # Give async events time to process
+        await asyncio.sleep(0.5)
+
+        assert len(events_received) > 0
+        assert events_received[0].topic == "security_scan.vulnerability_found"
+        assert events_received[0].data["severity"] == "high"
+        assert registry.has_category("security_scan")
+
+        # Cleanup
+        await bus.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_lifecycle_events(self):
+        """Test lifecycle-related events with canonical event system."""
+        bus = get_observability_bus()
+        await bus.connect()
+
+        events_received = []
+
+        async def handler(event: Event):
+            events_received.append(event)
+
+        await bus.subscribe("lifecycle.*", handler)
+
+        # Emit lifecycle events
+        await bus.emit("lifecycle.graph_started", {"graph_id": "main"})
+        await bus.emit("lifecycle.workflow_completed", {"status": "success"})
+        await bus.emit("lifecycle.session_started", {"session_id": "abc123"})
+
+        # Give async events time to process
+        await asyncio.sleep(0.5)
+
+        assert len(events_received) == 3
+        topics = [e.topic for e in events_received]
+        assert "lifecycle.graph_started" in topics
+        assert "lifecycle.workflow_completed" in topics
+        assert "lifecycle.session_started" in topics
+
+        # Cleanup
+        await bus.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_custom_category_integration_with_bus(self):
+        """Custom categories should integrate with ObservabilityBus topics."""
+        bus = get_observability_bus()
+        await bus.connect()
+
+        registry = EventCategoryRegistry.get_instance()
+
+        # Register multiple custom categories
+        registry.register(
+            name="ml_pipeline",
+            description="ML pipeline events",
+            registered_by="victor.ml",
+        )
+        registry.register(
+            name="data_processing",
+            description="Data processing events",
+            registered_by="victor.data",
+        )
+
+        # Subscribe to all custom categories
+        events_received = []
+
+        async def handler(event: Event):
+            events_received.append(event)
+
+        await bus.subscribe("ml_pipeline.*", handler)
+        await bus.subscribe("data_processing.*", handler)
+
+        # Emit events to both custom categories
+        await bus.emit("ml_pipeline.training_started", {"model": "classifier"})
+        await bus.emit("data_processing.batch_complete", {"batch_id": 123})
+
+        # Give async events time to process
+        await asyncio.sleep(0.5)
+
+        assert len(events_received) == 2
+        assert registry.has_category("ml_pipeline")
+        assert registry.has_category("data_processing")
+
+        # Cleanup
+        await bus.disconnect()

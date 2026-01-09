@@ -27,6 +27,7 @@ from victor.ui.commands.dashboard import dashboard_app
 from victor.ui.commands.docs import docs_app
 from victor.ui.commands.embeddings import embeddings_app
 from victor.ui.commands.examples import examples_app
+from victor.ui.commands.experiments import experiment_app
 from victor.ui.commands.fep import fep_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
@@ -61,6 +62,7 @@ app.add_typer(dashboard_app)
 app.add_typer(docs_app)
 app.add_typer(embeddings_app)
 app.add_typer(examples_app)
+app.add_typer(experiment_app)
 app.add_typer(fep_app)
 app.add_typer(index_app)
 app.add_typer(init_app)
