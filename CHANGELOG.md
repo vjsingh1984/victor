@@ -13,9 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed create_compiler() facade (over-engineered)
   - Simplified registry from 296 to 148 lines (-50%)
   - Removed URI parsing, extension detection, scheme mapping
-  - Plugin infrastructure now minimal for third-party extensibility
-  - All verticals continue using UnifiedWorkflowCompiler directly
-  - Code reduction: -810 lines (-71%)
+  - Plugin infrastructure now minimal for third-party extensibility (827 lines total)
+    - Registry: 148 lines
+    - Protocol: 109 lines
+    - Tests: 178 lines (15 tests, 100% passing)
+    - Examples: 392 lines (S3, JSON compilers)
+  - All verticals continue using UnifiedWorkflowCompiler directly (1,728 lines)
 
 ### Fixed
 - **Plugin Unit Tests** - Simplified from 27 to 15 tests (100% passing, was 7 failing)
@@ -28,9 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supported: Anthropic, OpenAI, DeepSeek, Google, Azure OpenAI, Vertex AI, xAI/Grok, Cerebras, Fireworks, GroqCloud, HuggingFace, Mistral, Moonshot, OpenRouter, Replicate, Together, ZAI/ZhipuAI
 
 ### Fixed
-- **Pytest** - Fixed 14 failing tests (17,348 tests now passing, 0 failures)
+- **Pytest** - Fixed 14 failing tests in core framework (~1,557 core tests passing)
   - Continuation strategy tests (12) - Removed invalid parameter
   - Agent workflow tests (2) - Updated mock methods
+  - Note: 476 collection errors remain in workflow/agent tests (known issues, not blocking)
 
 ### Changed
 - Provider API: All cloud providers accept `api_key: Optional[str] = None` (backward compatible)
