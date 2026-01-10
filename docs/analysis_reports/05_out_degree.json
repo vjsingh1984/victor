@@ -1,0 +1,402 @@
+[
+  {
+    "rank": 1,
+    "node_id": "file:victor/agent/orchestrator.py",
+    "out_degree": 876,
+    "name": "orchestrator.py",
+    "type": "file",
+    "module": "victor.agent.orchestrator"
+  },
+  {
+    "rank": 2,
+    "node_id": "file:victor/agent/protocols.py",
+    "out_degree": 604,
+    "name": "protocols.py",
+    "type": "file",
+    "module": "victor.agent.protocols"
+  },
+  {
+    "rank": 3,
+    "node_id": "file:victor/integrations/api/fastapi_server.py",
+    "out_degree": 361,
+    "name": "fastapi_server.py",
+    "type": "file",
+    "module": "victor.integrations.api"
+  },
+  {
+    "rank": 4,
+    "node_id": "file:victor/agent/service_provider.py",
+    "out_degree": 350,
+    "name": "service_provider.py",
+    "type": "file",
+    "module": "victor.agent.service_provider"
+  },
+  {
+    "rank": 5,
+    "node_id": "file:victor/framework/__init__.py",
+    "out_degree": 332,
+    "name": "__init__.py",
+    "type": "file",
+    "module": "victor.framework.__init__"
+  },
+  {
+    "rank": 6,
+    "node_id": "file:victor/agent/orchestrator_factory.py",
+    "out_degree": 332,
+    "name": "orchestrator_factory.py",
+    "type": "file",
+    "module": "victor.agent.orchestrator_factory"
+  },
+  {
+    "rank": 7,
+    "node_id": "file:victor/integrations/api/server.py",
+    "out_degree": 236,
+    "name": "server.py",
+    "type": "file",
+    "module": "victor.integrations.api"
+  },
+  {
+    "rank": 8,
+    "node_id": "file:victor/workflows/__init__.py",
+    "out_degree": 220,
+    "name": "__init__.py",
+    "type": "file",
+    "module": "victor.workflows.__init__"
+  },
+  {
+    "rank": 9,
+    "node_id": "file:victor/framework/step_handlers.py",
+    "out_degree": 214,
+    "name": "step_handlers.py",
+    "type": "file",
+    "module": "victor.framework.step_handlers"
+  },
+  {
+    "rank": 10,
+    "node_id": "file:victor/agent/coordinators/chat_coordinator.py",
+    "out_degree": 208,
+    "name": "chat_coordinator.py",
+    "type": "file",
+    "module": "victor.agent.coordinators"
+  },
+  {
+    "rank": 11,
+    "node_id": "file:victor/coding/codebase/indexer.py",
+    "out_degree": 206,
+    "name": "indexer.py",
+    "type": "file",
+    "module": "victor.coding.codebase"
+  },
+  {
+    "rank": 12,
+    "node_id": "file:victor/core/__init__.py",
+    "out_degree": 201,
+    "name": "__init__.py",
+    "type": "file",
+    "module": "victor.core.__init__"
+  },
+  {
+    "rank": 13,
+    "node_id": "file:victor/framework/agent_components.py",
+    "out_degree": 196,
+    "name": "agent_components.py",
+    "type": "file",
+    "module": "victor.framework.agent_components"
+  },
+  {
+    "rank": 14,
+    "node_id": "file:victor/workflows/executor.py",
+    "out_degree": 195,
+    "name": "executor.py",
+    "type": "file",
+    "module": "victor.workflows.executor"
+  },
+  {
+    "rank": 15,
+    "node_id": "file:victor/framework/graph.py",
+    "out_degree": 193,
+    "name": "graph.py",
+    "type": "file",
+    "module": "victor.framework.graph"
+  },
+  {
+    "rank": 16,
+    "node_id": "file:victor/workflows/services/credentials.py",
+    "out_degree": 193,
+    "name": "credentials.py",
+    "type": "file",
+    "module": "victor.workflows.services"
+  },
+  {
+    "rank": 17,
+    "node_id": "file:victor/workflows/unified_compiler.py",
+    "out_degree": 185,
+    "name": "unified_compiler.py",
+    "type": "file",
+    "module": "victor.workflows.unified_compiler"
+  },
+  {
+    "rank": 18,
+    "node_id": "file:victor/processing/native/__init__.py",
+    "out_degree": 182,
+    "name": "__init__.py",
+    "type": "file",
+    "module": "victor.processing.native"
+  },
+  {
+    "rank": 19,
+    "node_id": "file:victor/agent/unified_task_tracker.py",
+    "out_degree": 172,
+    "name": "unified_task_tracker.py",
+    "type": "file",
+    "module": "victor.agent.unified_task_tracker"
+  },
+  {
+    "rank": 20,
+    "node_id": "file:victor/context/codebase_analyzer.py",
+    "out_degree": 166,
+    "name": "codebase_analyzer.py",
+    "type": "file",
+    "module": "victor.context.codebase_analyzer"
+  },
+  {
+    "rank": 21,
+    "node_id": "file:victor/tools/metadata_registry.py",
+    "out_degree": 165,
+    "name": "metadata_registry.py",
+    "type": "file",
+    "module": "victor.tools.metadata_registry"
+  },
+  {
+    "rank": 22,
+    "node_id": "file:victor/agent/tool_selection.py",
+    "out_degree": 165,
+    "name": "tool_selection.py",
+    "type": "file",
+    "module": "victor.agent.tool_selection"
+  },
+  {
+    "rank": 23,
+    "node_id": "file:victor/agent/streaming/handler.py",
+    "out_degree": 151,
+    "name": "handler.py",
+    "type": "file",
+    "module": "victor.agent.streaming"
+  },
+  {
+    "rank": 24,
+    "node_id": "file:victor/tools/semantic_selector.py",
+    "out_degree": 149,
+    "name": "semantic_selector.py",
+    "type": "file",
+    "module": "victor.tools.semantic_selector"
+  },
+  {
+    "rank": 25,
+    "node_id": "file:victor/framework/agent.py",
+    "out_degree": 148,
+    "name": "agent.py",
+    "type": "file",
+    "module": "victor.framework.agent"
+  },
+  {
+    "rank": 26,
+    "node_id": "file:victor/agent/conversation_memory.py",
+    "out_degree": 148,
+    "name": "conversation_memory.py",
+    "type": "file",
+    "module": "victor.agent.conversation_memory"
+  },
+  {
+    "rank": 27,
+    "node_id": "file:victor/observability/dashboard/app.py",
+    "out_degree": 147,
+    "name": "app.py",
+    "type": "file",
+    "module": "victor.observability.dashboard"
+  },
+  {
+    "rank": 28,
+    "node_id": "file:victor/workflows/yaml_loader.py",
+    "out_degree": 142,
+    "name": "yaml_loader.py",
+    "type": "file",
+    "module": "victor.workflows.yaml_loader"
+  },
+  {
+    "rank": 29,
+    "node_id": "file:victor/agent/tool_executor.py",
+    "out_degree": 142,
+    "name": "tool_executor.py",
+    "type": "file",
+    "module": "victor.agent.tool_executor"
+  },
+  {
+    "rank": 30,
+    "node_id": "file:victor/agent/tool_pipeline.py",
+    "out_degree": 137,
+    "name": "tool_pipeline.py",
+    "type": "file",
+    "module": "victor.agent.tool_pipeline"
+  },
+  {
+    "rank": 31,
+    "node_id": "file:vscode-victor/src/victorClient.ts",
+    "out_degree": 135,
+    "name": "victorClient.ts",
+    "type": "file",
+    "module": "unknown"
+  },
+  {
+    "rank": 32,
+    "node_id": "file:victor/agent/teams/coordinator.py",
+    "out_degree": 134,
+    "name": "coordinator.py",
+    "type": "file",
+    "module": "victor.agent.teams"
+  },
+  {
+    "rank": 33,
+    "node_id": "file:victor/agent/tool_registrar.py",
+    "out_degree": 133,
+    "name": "tool_registrar.py",
+    "type": "file",
+    "module": "victor.agent.tool_registrar"
+  },
+  {
+    "rank": 34,
+    "node_id": "file:victor/workflows/yaml_to_graph_compiler.py",
+    "out_degree": 126,
+    "name": "yaml_to_graph_compiler.py",
+    "type": "file",
+    "module": "victor.workflows.yaml_to_graph_compiler"
+  },
+  {
+    "rank": 35,
+    "node_id": "file:victor/core/bootstrap.py",
+    "out_degree": 125,
+    "name": "bootstrap.py",
+    "type": "file",
+    "module": "victor.core.bootstrap"
+  },
+  {
+    "rank": 36,
+    "node_id": "file:victor/framework/vertical_integration.py",
+    "out_degree": 125,
+    "name": "vertical_integration.py",
+    "type": "file",
+    "module": "victor.framework.vertical_integration"
+  },
+  {
+    "rank": 37,
+    "node_id": "file:victor/framework/cqrs_bridge.py",
+    "out_degree": 125,
+    "name": "cqrs_bridge.py",
+    "type": "file",
+    "module": "victor.framework.cqrs_bridge"
+  },
+  {
+    "rank": 38,
+    "node_id": "file:victor/agent/coordinators/tool_coordinator.py",
+    "out_degree": 125,
+    "name": "tool_coordinator.py",
+    "type": "file",
+    "module": "victor.agent.coordinators"
+  },
+  {
+    "rank": 39,
+    "node_id": "file:victor/evaluation/harness.py",
+    "out_degree": 124,
+    "name": "harness.py",
+    "type": "file",
+    "module": "victor.evaluation.harness"
+  },
+  {
+    "rank": 40,
+    "node_id": "file:victor/tools/filesystem.py",
+    "out_degree": 122,
+    "name": "filesystem.py",
+    "type": "file",
+    "module": "victor.tools.filesystem"
+  },
+  {
+    "rank": 41,
+    "node_id": "file:victor/agent/rl/coordinator.py",
+    "out_degree": 122,
+    "name": "coordinator.py",
+    "type": "file",
+    "module": "victor.agent.rl"
+  },
+  {
+    "rank": 42,
+    "node_id": "file:victor/ui/commands/chat.py",
+    "out_degree": 118,
+    "name": "chat.py",
+    "type": "file",
+    "module": "victor.ui.commands"
+  },
+  {
+    "rank": 43,
+    "node_id": "file:victor/observability/debug/adapters/python.py",
+    "out_degree": 115,
+    "name": "python.py",
+    "type": "file",
+    "module": "victor.observability.debug"
+  },
+  {
+    "rank": 44,
+    "node_id": "file:victor/core/validation.py",
+    "out_degree": 113,
+    "name": "validation.py",
+    "type": "file",
+    "module": "victor.core.validation"
+  },
+  {
+    "rank": 45,
+    "node_id": "file:victor/ui/commands/workflow.py",
+    "out_degree": 113,
+    "name": "workflow.py",
+    "type": "file",
+    "module": "victor.ui.commands"
+  },
+  {
+    "rank": 46,
+    "node_id": "file:victor/agent/conversation_controller.py",
+    "out_degree": 111,
+    "name": "conversation_controller.py",
+    "type": "file",
+    "module": "victor.agent.conversation_controller"
+  },
+  {
+    "rank": 47,
+    "node_id": "file:victor/core/agent_commands.py",
+    "out_degree": 106,
+    "name": "agent_commands.py",
+    "type": "file",
+    "module": "victor.core.agent_commands"
+  },
+  {
+    "rank": 48,
+    "node_id": "file:victor/ui/tui/widgets.py",
+    "out_degree": 106,
+    "name": "widgets.py",
+    "type": "file",
+    "module": "victor.ui.tui"
+  },
+  {
+    "rank": 49,
+    "node_id": "file:victor/agent/task_analyzer.py",
+    "out_degree": 105,
+    "name": "task_analyzer.py",
+    "type": "file",
+    "module": "victor.agent.task_analyzer"
+  },
+  {
+    "rank": 50,
+    "node_id": "file:victor/agent/usage_analytics.py",
+    "out_degree": 105,
+    "name": "usage_analytics.py",
+    "type": "file",
+    "module": "victor.agent.usage_analytics"
+  }
+]
