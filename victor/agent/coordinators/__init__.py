@@ -51,16 +51,17 @@ from victor.agent.coordinators.tool_coordinator import (
     ToolCoordinator,
     ToolCoordinatorConfig,
     TaskContext,
-    ToolExecutionResult,
     IToolCoordinator,
     create_tool_coordinator,
 )
+
+# ToolExecutionResult is canonical in victor.agent.tool_executor
+# Import from there: from victor.agent.tool_executor import ToolExecutionResult
 
 __all__ = [
     "ToolCoordinator",
     "ToolCoordinatorConfig",
     "TaskContext",
-    "ToolExecutionResult",
     "IToolCoordinator",
     "create_tool_coordinator",
 ]

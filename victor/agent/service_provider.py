@@ -1479,7 +1479,7 @@ class OrchestratorServiceProvider:
         Returns:
             ToolCoordinator instance
         """
-        from victor.agent.tool_coordinator import (
+        from victor.agent.coordinators import (
             ToolCoordinator,
             ToolCoordinatorConfig,
         )

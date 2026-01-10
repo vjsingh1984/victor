@@ -138,25 +138,8 @@ class ToolCoordinatorConfig:
     retry_max_delay: float = 10.0
 
 
-@dataclass
-class ToolExecutionResult:
-    """Result of tool execution.
-
-    Attributes:
-        tool_name: Name of the tool executed
-        success: Whether execution succeeded
-        result: The tool result (if successful)
-        error: Error message (if failed)
-        arguments: Arguments passed to the tool
-        elapsed_ms: Execution time in milliseconds
-    """
-
-    tool_name: str
-    success: bool
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    arguments: Dict[str, Any] = field(default_factory=dict)
-    elapsed_ms: float = 0.0
+# ToolExecutionResult is now canonical in victor.agent.tool_executor
+# Import from there: from victor.agent.tool_executor import ToolExecutionResult
 
 
 @runtime_checkable

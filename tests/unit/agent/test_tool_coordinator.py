@@ -23,7 +23,7 @@ Tests the tool coordination functionality including:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.tool_coordinator import (
+from victor.agent.coordinators import (
     ToolCoordinator,
     ToolCoordinatorConfig,
     TaskContext,
@@ -110,26 +110,39 @@ class TestToolCoordinator:
         return selector
 
     @pytest.fixture
-    def coordinator(self, mock_pipeline, mock_selector):
+    def mock_registry(self):
+        """Create mock tool registry."""
+        registry = MagicMock()
+        registry.get_tool = MagicMock(return_value=None)
+        registry.list_tools = MagicMock(return_value=[])
+        return registry
+
+    @pytest.fixture
+    def coordinator(self, mock_pipeline, mock_registry, mock_selector):
         """Create coordinator with mocks."""
         return ToolCoordinator(
             tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
             tool_selector=mock_selector,
         )
 
-    def test_init_default_config(self, mock_pipeline):
+    def test_init_default_config(self, mock_pipeline, mock_registry):
         """Test initialization with default config."""
-        coordinator = ToolCoordinator(tool_pipeline=mock_pipeline)
+        coordinator = ToolCoordinator(
+            tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
+        )
 
         assert coordinator.budget == 25
         assert coordinator.budget_used == 0
         assert coordinator.execution_count == 0
 
-    def test_init_custom_config(self, mock_pipeline):
+    def test_init_custom_config(self, mock_pipeline, mock_registry):
         """Test initialization with custom config."""
         config = ToolCoordinatorConfig(default_budget=50)
         coordinator = ToolCoordinator(
             tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
             config=config,
         )
 
@@ -194,9 +207,12 @@ class TestToolCoordinator:
         mock_selector.select_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_select_tools_no_selector(self, mock_pipeline):
+    async def test_select_tools_no_selector(self, mock_pipeline, mock_registry):
         """Test tool selection without selector configured."""
-        coordinator = ToolCoordinator(tool_pipeline=mock_pipeline)
+        coordinator = ToolCoordinator(
+            tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
+        )
 
         context = TaskContext(message="search for file")
         result = await coordinator.select_tools(context)
@@ -237,7 +253,7 @@ class TestToolCoordinator:
         assert stats["budget_total"] == 25
         assert stats["budget_remaining"] == 20
 
-    def test_budget_warning_callback(self, mock_pipeline):
+    def test_budget_warning_callback(self, mock_pipeline, mock_registry):
         """Test budget warning callback."""
         warning_called = []
 
@@ -246,6 +262,7 @@ class TestToolCoordinator:
 
         coordinator = ToolCoordinator(
             tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
             on_budget_warning=on_warning,
         )
 
@@ -262,7 +279,11 @@ class TestCreateToolCoordinator:
     def test_create_basic(self):
         """Test basic factory creation."""
         mock_pipeline = MagicMock()
-        coordinator = create_tool_coordinator(tool_pipeline=mock_pipeline)
+        mock_registry = MagicMock()
+        coordinator = create_tool_coordinator(
+            tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
+        )
 
         assert isinstance(coordinator, ToolCoordinator)
         assert coordinator.budget == 25
@@ -270,10 +291,12 @@ class TestCreateToolCoordinator:
     def test_create_with_config(self):
         """Test factory creation with config."""
         mock_pipeline = MagicMock()
+        mock_registry = MagicMock()
         config = ToolCoordinatorConfig(default_budget=100)
 
         coordinator = create_tool_coordinator(
             tool_pipeline=mock_pipeline,
+            tool_registry=mock_registry,
             config=config,
         )
 
