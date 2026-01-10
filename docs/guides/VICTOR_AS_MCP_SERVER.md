@@ -569,6 +569,6 @@ bus.subscribe(EventCategory.TOOL, on_tool_call)
 ## Related Documentation
 
 - [MCP Integration Guide](MCP_INTEGRATION.md) - Complete MCP integration documentation
-- [Tool Catalog](../TOOL_CATALOG.md) - Full list of available tools
+- [Tool Catalog](../reference/tools/catalog.md) - Full list of available tools
 - [Observability Guide](OBSERVABILITY.md) - Monitoring and logging
-- [Local Models Guide](LOCAL_MODELS.md) - Using local LLM providers
+- [Local Models Guide](development/local-models.md) - Using local LLM providers

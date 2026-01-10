@@ -27,7 +27,7 @@ Start
 | Task | Go to |
 |------|-------|
 | Install and run | [Installation](getting-started/installation.md) |
-| Switch providers | [Provider switching](user-guide/provider-switching.md) |
+| Switch providers | [Provider switching](user-guide/index.md#1-provider-switching) |
 | Build workflows | [Workflow development](guides/workflow-development/) |
 | Build multi-agent teams | [Multi-agent](guides/multi-agent/) |
 | Configure providers | [Configuration](reference/configuration/) |

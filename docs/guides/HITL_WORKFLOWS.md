@@ -583,6 +583,6 @@ replay_handler = ReplayHandler(
 
 ## Related Resources
 
-- [Workflow DSL Guide](WORKFLOW_DSL.md) - Workflow syntax
+- [Workflow DSL Guide](workflow-development/dsl.md) - Workflow syntax
 - [Workflow Scheduler Guide](WORKFLOW_SCHEDULER.md) - Scheduled workflows
 - [Observability Guide](OBSERVABILITY.md) - HITL event monitoring

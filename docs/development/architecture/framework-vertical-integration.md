@@ -37,7 +37,7 @@ Victor's architecture follows SOLID principles with a protocol-first design that
 
 ### 1. VerticalIntegrationPipeline
 
-**Location**: [`victor/framework/vertical_integration.py`](../../victor/framework/vertical_integration.py)
+**Location**: [`victor/framework/vertical_integration.py`](../../../victor/framework/vertical_integration.py)
 
 Facade that applies vertical configurations to orchestrators via step handlers.
 
@@ -55,7 +55,7 @@ result = pipeline.apply(orchestrator, CodingAssistant)
 
 ### 2. StepHandler System
 
-**Location**: [`victor/framework/step_handlers.py`](../../victor/framework/step_handlers.py)
+**Location**: [`victor/framework/step_handlers.py`](../../../victor/framework/step_handlers.py)
 
 Single Responsibility Principle: each handler manages one integration concern.
 
@@ -83,7 +83,7 @@ def _check_capability(obj: Any, capability_name: str) -> bool:
 
 ### 3. VerticalBase
 
-**Location**: [`victor/core/verticals/base.py`](../../victor/core/verticals/base.py)
+**Location**: [`victor/core/verticals/base.py`](../../../victor/core/verticals/base.py)
 
 Abstract base class for all verticals with built-in caching.
 
@@ -114,7 +114,7 @@ def get_safety_extension(cls):
 
 ### Capability Registry Protocol
 
-**Location**: [`victor/framework/protocols.py`](../../victor/framework/protocols.py)
+**Location**: [`victor/framework/protocols.py`](../../../victor/framework/protocols.py)
 
 Replaces `hasattr` duck-typing with explicit capability contracts.
 
@@ -141,7 +141,7 @@ class OrchestratorVerticalProtocol(Protocol):
 
 ### Framework Capabilities
 
-**Location**: [`victor/framework/capabilities/`](../../victor/framework/capabilities/)
+**Location**: [`victor/framework/capabilities/`](../../../victor/framework/capabilities/)
 
 Reusable capabilities across verticals following DRY:
 
@@ -178,11 +178,11 @@ class CodingCapabilityProvider(BaseCapabilityProvider):
 
 | Principle | Implementation | File |
 |-----------|----------------|------|
-| **SRP** | Each StepHandler handles one concern | [`step_handlers.py`](../../victor/framework/step_handlers.py) |
-| **OCP** | ExtensionHandlerRegistry for pluggable handlers | [`vertical_integration.py:287`](../../victor/framework/vertical_integration.py#L287) |
-| **LSP** | StepHandlerProtocol ensures substitutability | [`step_handlers.py:278`](../../victor/framework/step_handlers.py#L278) |
-| **ISP** | Focused protocols (CapabilityRegistry, SubAgentContext) | [`protocols.py`](../../victor/framework/protocols.py) |
-| **DIP** | `_check_capability`/`_invoke_capability` use protocols | [`step_handlers.py:120`](../../victor/framework/step_handlers.py#L120) |
+| **SRP** | Each StepHandler handles one concern | [`step_handlers.py`](../../../victor/framework/step_handlers.py) |
+| **OCP** | ExtensionHandlerRegistry for pluggable handlers | [`vertical_integration.py:287`](../../../victor/framework/vertical_integration.py#L287) |
+| **LSP** | StepHandlerProtocol ensures substitutability | [`step_handlers.py:278`](../../../victor/framework/step_handlers.py#L278) |
+| **ISP** | Focused protocols (CapabilityRegistry, SubAgentContext) | [`protocols.py`](../../../victor/framework/protocols.py) |
+| **DIP** | `_check_capability`/`_invoke_capability` use protocols | [`step_handlers.py:120`](../../../victor/framework/step_handlers.py#L120) |
 
 ## Extension Points
 
@@ -254,9 +254,9 @@ Response
 
 | Component | File |
 |-----------|------|
-| Pipeline | [`victor/framework/vertical_integration.py`](../../victor/framework/vertical_integration.py) |
-| Step Handlers | [`victor/framework/step_handlers.py`](../../victor/framework/step_handlers.py) |
-| Protocols | [`victor/framework/protocols.py`](../../victor/framework/protocols.py) |
-| Vertical Base | [`victor/core/verticals/base.py`](../../victor/core/verticals/base.py) |
-| Framework Capabilities | [`victor/framework/capabilities/`](../../victor/framework/capabilities/) |
-| WorkflowEngine | [`victor/framework/workflow_engine.py`](../../victor/framework/workflow_engine.py) |
+| Pipeline | [`victor/framework/vertical_integration.py`](../../../victor/framework/vertical_integration.py) |
+| Step Handlers | [`victor/framework/step_handlers.py`](../../../victor/framework/step_handlers.py) |
+| Protocols | [`victor/framework/protocols.py`](../../../victor/framework/protocols.py) |
+| Vertical Base | [`victor/core/verticals/base.py`](../../../victor/core/verticals/base.py) |
+| Framework Capabilities | [`victor/framework/capabilities/`](../../../victor/framework/capabilities/) |
+| WorkflowEngine | [`victor/framework/workflow_engine.py`](../../../victor/framework/workflow_engine.py) |

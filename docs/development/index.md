@@ -29,7 +29,6 @@ docs/
 ├── user-guide/                        # Daily usage
 ├── development/                       # Developer docs
 │   ├── index.md                       # This file
-│   ├── setup.md                       # Environment setup
 │   ├── architecture/                  # System design
 │   │   ├── overview.md                # High-level architecture
 │   │   ├── components.md              # Component reference
@@ -38,10 +37,9 @@ docs/
 │   │   └── data-flow.md               # EventBus patterns
 │   ├── extending/                     # Extension guides
 │   │   ├── verticals.md               # Vertical development
-│   │   ├── plugins.md                 # Plugin system
-│   │   ├── providers.md               # Adding providers
-│   │   └── tools.md                   # Adding tools
-│   └── testing/                       # Testing strategy
+│   │   └── plugins.md                 # Plugin system
+│   ├── testing/                       # Testing strategy
+│   └── releasing/                     # Release process
 ├── guides/                            # How-to guides
 │   ├── vertical-quickstart.md         # Vertical quick reference
 │   ├── tool-reference.md              # Tool catalog
@@ -119,7 +117,7 @@ class MyProvider(BaseProvider):
         pass
 ```
 
-[Provider Guide →](extending/providers.md)
+[Provider Reference →](../reference/providers/)
 
 ### Add a Tool
 
@@ -135,7 +133,7 @@ class MyTool(BaseTool):
         pass
 ```
 
-[Tool Guide →](extending/tools.md)
+[Tool Catalog →](../reference/tools/catalog.md)
 
 ### Create a Vertical
 
@@ -196,7 +194,7 @@ workflows:
 5. Commit with conventional commits
 6. Push and create PR
 
-[Contribution Workflow →](contributing/workflow.md)
+[Contribution Workflow →](../../CONTRIBUTING.md)
 
 ## Resources
 

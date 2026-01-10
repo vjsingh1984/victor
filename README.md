@@ -44,7 +44,7 @@
 
 | Capability | What it means | Docs |
 |------------|---------------|------|
-| **Provider switching** | Change models mid-thread without losing context | [Provider switching](docs/user-guide/provider-switching.md) |
+| **Provider switching** | Change models mid-thread without losing context | [Provider switching](docs/user-guide/index.md#1-provider-switching) |
 | **Workflows** | YAML DSL for multi-step automation | [Workflow development](docs/guides/workflow-development/) |
 | **Multi-agent teams** | Coordinate specialized agents | [Multi-agent](docs/guides/multi-agent/) |
 | **Tooling** | File ops, git, tests, search, web | [Tool catalog](docs/reference/tools/) |

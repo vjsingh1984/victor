@@ -352,4 +352,4 @@ pip install -e ".[build]"
 
 - [Installation Guide →](../../getting-started/installation.md)
 - [Development Guide →](../index.md)
-- [GitHub Actions Workflow](../../.github/workflows/release.yml)
+- [GitHub Actions Workflow](../../../.github/workflows/release.yml)

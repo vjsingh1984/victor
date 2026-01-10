@@ -48,7 +48,7 @@ victor chat
 - **vLLM**: High-throughput, requires GPU
 - **llama.cpp**: CPU-friendly, GGUF models
 
-See [reference/PROVIDERS.md](reference/PROVIDERS.md) for detailed setup.
+See [provider setup](../reference/providers/setup.md) for detailed setup.
 
 ### Cloud Providers
 
