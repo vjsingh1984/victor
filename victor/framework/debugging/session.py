@@ -151,7 +151,9 @@ class DebugSession:
         """
         self.config = config
         self._event_bus = event_bus
-        self.created_at = asyncio.get_event_loop().time()
+        # Use time.time() instead of event loop time to avoid "no event loop" errors
+        import time
+        self.created_at = time.time()
 
         # Create components
         self.breakpoint_mgr = BreakpointManager(event_bus)
