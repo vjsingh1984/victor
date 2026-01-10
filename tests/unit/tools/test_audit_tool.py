@@ -19,7 +19,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from datetime import datetime
 
+import victor.tools.audit_tool as audit_tool_module
 from victor.tools.audit_tool import AuditTool
+from victor.agent.presentation import NullPresentationAdapter
 from victor.tools.base import CostTier
 from victor.security.audit import (
     AuditEvent,
@@ -35,6 +37,14 @@ from victor.security.audit import (
 # =============================================================================
 # FIXTURES
 # =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def use_null_presentation_adapter():
+    """Use NullPresentationAdapter for predictable test output."""
+    audit_tool_module._presentation = NullPresentationAdapter()
+    yield
+    audit_tool_module._presentation = None
 
 
 @pytest.fixture
@@ -235,7 +245,7 @@ class TestSummaryAction:
             result = await tool.execute(action="summary")
 
             assert result.success is True
-            assert "⚠️" in result.output
+            assert "!" in result.output  # warning icon
             assert "**Violations:** 5" in result.output
 
 
@@ -286,7 +296,7 @@ class TestReportAction:
             result = await tool.execute(action="report")
 
             assert "Violations" in result.output
-            assert "⚠️" in result.output
+            assert "!" in result.output  # warning icon
 
     @pytest.mark.asyncio
     async def test_report_no_violations(self, tool):
@@ -307,7 +317,7 @@ class TestReportAction:
 
             result = await tool.execute(action="report")
 
-            assert "✅ None" in result.output
+            assert "+ None" in result.output  # success icon + None
 
 
 # =============================================================================
@@ -412,7 +422,7 @@ class TestComplianceAction:
             result = await tool.execute(action="compliance", framework="soc2")
 
             assert result.success is True
-            assert "✅" in result.output
+            assert "+" in result.output  # success icon
             assert "Compliant" in result.output
 
     @pytest.mark.asyncio
@@ -437,7 +447,7 @@ class TestComplianceAction:
             result = await tool.execute(action="compliance", framework="hipaa")
 
             assert result.success is True
-            assert "❌" in result.output
+            assert "x" in result.output  # error icon
             assert "Non-Compliant" in result.output
             assert "Violations" in result.output
 
@@ -551,7 +561,7 @@ class TestFormatMethods:
         assert "Audit Activity Summary" in output
         assert "Last 7 days" in output
         assert "250" in output
-        assert "✅" in output  # compliant status
+        assert "+" in output  # compliant status (text alternative for success)
 
     def test_format_summary_with_violations(self, tool):
         """Test formatting summary with violations."""
@@ -565,7 +575,7 @@ class TestFormatMethods:
         }
         output = tool._format_summary(summary)
 
-        assert "⚠️" in output
+        assert "!" in output  # warning icon (text alternative)
         assert "**Violations:** 5" in output
 
     def test_format_summary_with_severity(self, tool, sample_summary):
@@ -613,7 +623,7 @@ class TestFormatMethods:
 
         assert "Audit Events" in output
         assert "file_read" in output
-        assert "🔵" in output  # info severity
+        assert "[I]" in output  # info severity (text alternative for level_info)
 
     def test_format_events_empty(self, tool):
         """Test formatting empty events list."""
@@ -649,7 +659,7 @@ class TestFormatMethods:
         }
         output = tool._format_compliance(status)
 
-        assert "✅" in output
+        assert "+" in output  # success icon
         assert "Compliant" in output
         assert "GDPR" in output
 
@@ -667,7 +677,7 @@ class TestFormatMethods:
         }
         output = tool._format_compliance(status)
 
-        assert "❌" in output
+        assert "x" in output  # error icon
         assert "Non-Compliant" in output
         assert "Violations" in output
         assert "encryption" in output

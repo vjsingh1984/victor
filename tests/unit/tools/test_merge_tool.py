@@ -18,7 +18,9 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import victor.tools.merge_tool as merge_tool_module
 from victor.tools.merge_tool import MergeConflictTool
+from victor.agent.presentation import NullPresentationAdapter
 from victor.tools.base import CostTier
 from victor.processing.merge import (
     ConflictComplexity,
@@ -34,6 +36,14 @@ from victor.processing.merge import (
 # =============================================================================
 # FIXTURES
 # =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def use_null_presentation_adapter():
+    """Use NullPresentationAdapter for predictable test output."""
+    merge_tool_module._presentation = NullPresentationAdapter()
+    yield
+    merge_tool_module._presentation = None
 
 
 @pytest.fixture
@@ -549,10 +559,10 @@ class TestFormatMethods:
 
         output = tool._format_conflicts(conflicts)
 
-        assert "🟢" in output  # trivial
-        assert "🟡" in output  # simple
-        assert "🟠" in output  # moderate
-        assert "🔴" in output  # complex
+        assert "[L]" in output  # trivial (level_low)
+        assert "[M]" in output  # simple (level_medium)
+        assert "[H]" in output  # moderate (level_high)
+        assert "[!]" in output  # complex (level_critical)
 
     def test_format_analysis_no_conflicts(self, tool):
         """Test formatting analysis with no conflicts."""
@@ -566,7 +576,7 @@ class TestFormatMethods:
         output = tool._format_analysis(sample_summary)
 
         assert "Effort Required" in output
-        assert "🟡" in output  # medium effort
+        assert "[M]" in output  # medium effort (level_medium)
 
     def test_format_analysis_low_effort(self, tool):
         """Test formatting analysis with low effort."""
@@ -582,7 +592,7 @@ class TestFormatMethods:
         }
         output = tool._format_analysis(summary)
 
-        assert "🟢" in output  # low effort
+        assert "[L]" in output  # low effort (level_low)
 
     def test_format_analysis_high_effort(self, tool):
         """Test formatting analysis with high effort."""
@@ -598,7 +608,7 @@ class TestFormatMethods:
         }
         output = tool._format_analysis(summary)
 
-        assert "🔴" in output  # high effort
+        assert "[!]" in output  # high effort (level_critical)
 
     def test_format_resolutions_empty(self, tool):
         """Test formatting empty resolutions."""
@@ -611,7 +621,7 @@ class TestFormatMethods:
 
         assert "Resolution Results" in output
         assert "**Fully Resolved:** 1" in output
-        assert "✅" in output
+        assert "+" in output  # success icon
         assert "85%" in output  # confidence
 
     def test_format_resolutions_partial(self, tool):
@@ -632,7 +642,7 @@ class TestFormatMethods:
         )
         output = tool._format_resolutions([partial])
 
-        assert "⚠️" in output
+        assert "!" in output  # warning icon
         assert "Partial" in output
         assert "requires manual resolution" in output
 
