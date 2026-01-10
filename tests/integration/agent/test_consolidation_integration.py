@@ -183,7 +183,7 @@ class TestCoordinatorIntegration:
 
     def test_tool_coordinator_importable(self):
         """Test ToolCoordinator can be imported."""
-        from victor.agent.tool_coordinator import ToolCoordinator
+        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
 
         assert ToolCoordinator is not None
 
@@ -201,7 +201,7 @@ class TestCoordinatorIntegration:
 
     def test_tool_coordinator_config_importable(self):
         """Test ToolCoordinatorConfig can be imported."""
-        from victor.agent.tool_coordinator import ToolCoordinatorConfig
+        from victor.agent.coordinators.tool_coordinator import ToolCoordinatorConfig
 
         config = ToolCoordinatorConfig()
         assert config.default_budget > 0
@@ -502,7 +502,7 @@ class TestEndToEndIntegration:
             StateCoordinator,
             StateCoordinatorConfig,
         )
-        from victor.agent.tool_coordinator import (
+        from victor.agent.coordinators.tool_coordinator import (
             ToolCoordinator,
             ToolCoordinatorConfig,
         )
@@ -512,6 +512,7 @@ class TestEndToEndIntegration:
         tool_config = ToolCoordinatorConfig(default_budget=25)
         tool_coord = ToolCoordinator(
             tool_pipeline=None,  # Optional dependency
+            tool_registry=None,  # Optional dependency
             config=tool_config,
         )
         assert tool_coord.get_remaining_budget() == 25
