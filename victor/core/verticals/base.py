@@ -740,6 +740,33 @@ class VerticalBase(ABC):
         return {}
 
     @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Get capability configurations for this vertical.
+
+        Override to provide vertical-specific capability configurations
+        that will be stored in VerticalContext instead of direct
+        orchestrator attribute assignment.
+
+        This replaces the previous pattern of setting attributes like:
+        - orchestrator.rag_config = {...}
+        - orchestrator.source_verification_config = {...}
+
+        Example:
+            @classmethod
+            def get_capability_configs(cls) -> Dict[str, Any]:
+                return {
+                    "rag_config": {
+                        "indexing": {"chunk_size": 512, ...},
+                        "retrieval": {"top_k": 5, ...},
+                    },
+                }
+
+        Returns:
+            Dict mapping config names to configuration values
+        """
+        return {}
+
+    @classmethod
     def get_tiered_tools(cls) -> Optional[Any]:
         """Get tiered tool configuration for intelligent selection.
 

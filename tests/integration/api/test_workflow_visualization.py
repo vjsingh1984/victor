@@ -24,7 +24,7 @@ Tests the complete workflow visualization feature including:
 import asyncio
 import json
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from datetime import datetime, timezone
 
 from victor.integrations.api.fastapi_server import VictorFastAPIServer
@@ -37,18 +37,32 @@ from victor.integrations.api.graph_export import (
     WorkflowExecutionState,
     ExecutionNodeState,
 )
+from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
 
 
 @pytest.fixture
 async def fastapi_server():
-    """Create a FastAPI server for testing."""
+    """Create a FastAPI server for testing.
+
+    Note: This fixture uses function scope to ensure proper cleanup
+    between tests. The server is started and stopped for each test class.
+    """
     server = VictorFastAPIServer(
         host="localhost",
         port=8765,
         enable_cors=True,
     )
     await server.start_async()
+
+    # Manually initialize the event bridge if not already initialized
+    # This is needed because start_async() doesn't trigger the lifespan
+    if server._workflow_event_bridge is None:
+        event_bus = get_observability_bus()
+        await event_bus.connect()
+        server._workflow_event_bridge = WorkflowEventBridge(event_bus)
+        await server._workflow_event_bridge.start()
+
     yield server
     await server.shutdown()
 
@@ -56,7 +70,8 @@ async def fastapi_server():
 @pytest.fixture
 async def http_client(fastapi_server):
     """Create an HTTP client for testing."""
-    async with AsyncClient(app=fastapi_server.app, base_url="http://test") as client:
+    transport = ASGITransport(app=fastapi_server.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 
@@ -244,17 +259,20 @@ class TestWorkflowVisualizationEventStreaming:
     @pytest.mark.asyncio
     async def test_workflow_event_bridge_initialization(self, fastapi_server):
         """Test that workflow event bridge is initialized."""
-        assert fastapi_server._workflow_event_bridge is not None
-        assert fastapi_server._workflow_event_bridge._running is True
+        assert fastapi_server._workflow_event_bridge is not None, "Event bridge should be initialized"
+        assert fastapi_server._workflow_event_bridge._running is True, "Event bridge should be running"
 
     @pytest.mark.asyncio
     async def test_workflow_event_bridge_subscribe(self, fastapi_server):
         """Test subscribing to workflow events."""
         bridge = fastapi_server._workflow_event_bridge
+        assert bridge is not None, "Event bridge should be initialized"
+
         workflow_id = "test_workflow"
 
         # Mock send function
-        send_mock = asyncio.coroutine(lambda msg: None)
+        async def send_mock(msg):
+            pass
 
         # Subscribe
         await bridge.subscribe_workflow(
@@ -274,6 +292,8 @@ class TestWorkflowVisualizationEventStreaming:
     async def test_broadcast_workflow_event(self, fastapi_server):
         """Test broadcasting workflow events."""
         bridge = fastapi_server._workflow_event_bridge
+        assert bridge is not None, "Event bridge should be initialized"
+
         workflow_id = "test_workflow"
 
         # Track received messages

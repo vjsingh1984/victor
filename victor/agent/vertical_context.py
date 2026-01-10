@@ -165,6 +165,20 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
         """Apply custom system prompt."""
         ...
 
+    def set_capability_config(self, name: str, config: Any) -> None:
+        """Store a capability configuration."""
+        ...
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any:
+        """Retrieve a capability configuration."""
+        ...
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+        """Apply multiple capability configurations at once."""
+        ...
+        """Apply custom system prompt."""
+        ...
+
 
 # =============================================================================
 # Vertical Context Data Class
@@ -253,6 +267,12 @@ class VerticalContext:
     # Tool selection strategy (SOLID: vertical-specific tool selection)
     tool_selection_strategy: Optional[Any] = None
 
+    # Capability configurations (SOLID: centralized config storage)
+    # Replaces direct orchestrator attribute assignment patterns like:
+    # orchestrator.rag_config = {...}
+    # orchestrator.source_verification_config = {...}
+    capability_configs: Dict[str, Any] = field(default_factory=dict)
+
     # ==========================================================================
     # Property Accessors
     # ==========================================================================
@@ -321,6 +341,11 @@ class VerticalContext:
     def has_tool_selection_strategy(self) -> bool:
         """Check if tool selection strategy is configured."""
         return self.tool_selection_strategy is not None
+
+    @property
+    def has_capability_configs(self) -> bool:
+        """Check if capability configs are stored."""
+        return len(self.capability_configs) > 0
 
     # ==========================================================================
     # Mutation Methods (implements MutableVerticalContextProtocol)
@@ -491,6 +516,39 @@ class VerticalContext:
             strategy: ToolSelectionStrategyProtocol implementation from the vertical
         """
         self.tool_selection_strategy = strategy
+
+    def set_capability_config(self, name: str, config: Any) -> None:
+        """Store a capability configuration.
+
+        Replaces direct orchestrator attribute assignment pattern:
+        - OLD: orchestrator.rag_config = {...}
+        - NEW: context.set_capability_config("rag_config", {...})
+
+        Args:
+            name: Config name (e.g., "rag_config", "code_style")
+            config: Configuration value
+        """
+        self.capability_configs[name] = config
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any:
+        """Retrieve a capability configuration.
+
+        Args:
+            name: Config name
+            default: Default value if not found
+
+        Returns:
+            Configuration value or default
+        """
+        return self.capability_configs.get(name, default)
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+        """Apply multiple capability configurations at once.
+
+        Args:
+            configs: Dict mapping config names to configuration values
+        """
+        self.capability_configs.update(configs)
 
     # ==========================================================================
     # Query Methods
