@@ -68,6 +68,14 @@ _TEXT_ICONS = {
     "stop": "[!]",
     "clock": "[T]",
     "stop_sign": "[X]",
+    # Severity/complexity indicators
+    "level_low": "[L]",
+    "level_medium": "[M]",
+    "level_high": "[H]",
+    "level_critical": "[!]",
+    "level_info": "[I]",
+    "level_unknown": "[?]",
+    "person": "[P]",
 }
 
 

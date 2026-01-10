@@ -133,6 +133,14 @@ ICONS = {
     "stop": IconSet("⛔", "[!]", "red"),
     "clock": IconSet("⏰", "[T]", "yellow"),
     "stop_sign": IconSet("🛑", "[X]", "red"),
+    # Severity/complexity indicators
+    "level_low": IconSet("🟢", "[L]", "green"),
+    "level_medium": IconSet("🟡", "[M]", "yellow"),
+    "level_high": IconSet("🟠", "[H]", "yellow"),
+    "level_critical": IconSet("🔴", "[!]", "red"),
+    "level_info": IconSet("🔵", "[I]", "blue"),
+    "level_unknown": IconSet("⚪", "[?]", None),
+    "person": IconSet("👤", "[P]", None),
 }
 
 

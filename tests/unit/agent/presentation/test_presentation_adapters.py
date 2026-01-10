@@ -269,6 +269,14 @@ class TestAllIconNames:
         "stop",
         "clock",
         "stop_sign",
+        # Severity/complexity indicators
+        "level_low",
+        "level_medium",
+        "level_high",
+        "level_critical",
+        "level_info",
+        "level_unknown",
+        "person",
     ]
 
     @pytest.fixture
