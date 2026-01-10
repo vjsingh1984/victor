@@ -49,7 +49,7 @@ Example:
 from victor.framework.patterns.types import (
     PatternStatus,
     PatternCategory,
-    ValidationResult,
+    PatternValidationResult,
     PatternMetrics,
     TaskContext,
     CollaborationPattern,
@@ -78,7 +78,7 @@ __all__ = [
     # Types
     "PatternStatus",
     "PatternCategory",
-    "ValidationResult",
+    "PatternValidationResult",
     "PatternMetrics",
     "TaskContext",
     "CollaborationPattern",

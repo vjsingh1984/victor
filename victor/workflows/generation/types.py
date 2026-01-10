@@ -25,20 +25,20 @@ Design Principles (SOLID):
     - DIP: High-level modules depend on these abstractions
 
 Key Types:
-    - ValidationError: Base error with location and suggestions
-    - ValidationResult: Aggregated result from all validation layers
+    - WorkflowValidationError: Error with location and suggestions for workflow definitions
+    - WorkflowGenerationValidationResult: Aggregated result from all validation layers
     - RefinementResult: Result from automated refinement
     - RefinementHistory: Track refinement iterations
 
 Example:
     from victor.workflows.generation.types import (
-        ValidationError,
-        ValidationResult,
+        WorkflowValidationError,
+        WorkflowGenerationValidationResult,
         ErrorSeverity,
         ErrorCategory,
     )
 
-    error = ValidationError(
+    error = WorkflowValidationError(
         category=ErrorCategory.SCHEMA,
         severity=ErrorSeverity.ERROR,
         message="Missing required field: 'type'",
@@ -91,8 +91,8 @@ class ErrorCategory(Enum):
 
 
 @dataclass
-class ValidationError:
-    """Base validation error with context and suggestions.
+class WorkflowValidationError:
+    """Validation error for workflow definitions with context and suggestions.
 
     Attributes:
         category: Type of error (schema/structure/semantic/security)
@@ -105,7 +105,7 @@ class ValidationError:
         context: Optional additional context (node data, etc.)
 
     Example:
-        error = ValidationError(
+        error = WorkflowValidationError(
             category=ErrorCategory.SCHEMA,
             severity=ErrorSeverity.ERROR,
             message="Missing required field: 'type'",
@@ -147,8 +147,8 @@ class ValidationError:
 
 
 @dataclass
-class ValidationResult:
-    """Aggregated result from all validation layers.
+class WorkflowGenerationValidationResult:
+    """Aggregated result from all workflow validation layers.
 
     Attributes:
         is_valid: True if no critical or error-level issues
@@ -160,7 +160,7 @@ class ValidationResult:
         workflow_name: Optional name of workflow validated
 
     Example:
-        result = ValidationResult(
+        result = WorkflowGenerationValidationResult(
             is_valid=False,
             schema_errors=[schema_error],
             structure_errors=[structure_error]
@@ -173,15 +173,15 @@ class ValidationResult:
     """
 
     is_valid: bool
-    schema_errors: List[ValidationError] = field(default_factory=list)
-    structure_errors: List[ValidationError] = field(default_factory=list)
-    semantic_errors: List[ValidationError] = field(default_factory=list)
-    security_errors: List[ValidationError] = field(default_factory=list)
+    schema_errors: List[WorkflowValidationError] = field(default_factory=list)
+    structure_errors: List[WorkflowValidationError] = field(default_factory=list)
+    semantic_errors: List[WorkflowValidationError] = field(default_factory=list)
+    security_errors: List[WorkflowValidationError] = field(default_factory=list)
     validation_timestamp: datetime = field(default_factory=datetime.now)
     workflow_name: Optional[str] = None
 
     @property
-    def all_errors(self) -> List[ValidationError]:
+    def all_errors(self) -> List[WorkflowValidationError]:
         """Get all errors from all categories."""
         return (
             self.schema_errors +
@@ -191,7 +191,7 @@ class ValidationResult:
         )
 
     @property
-    def critical_errors(self) -> List[ValidationError]:
+    def critical_errors(self) -> List[WorkflowValidationError]:
         """Get only critical errors."""
         return [e for e in self.all_errors if e.severity == ErrorSeverity.CRITICAL]
 
@@ -253,9 +253,9 @@ class ValidationResult:
             "workflow_name": self.workflow_name,
         }
 
-    def group_by_node(self) -> Dict[str, List[ValidationError]]:
+    def group_by_node(self) -> Dict[str, List[WorkflowValidationError]]:
         """Group errors by node ID for focused reporting."""
-        grouped: Dict[str, List[ValidationError]] = {}
+        grouped: Dict[str, List[WorkflowValidationError]] = {}
 
         for error in self.all_errors:
             node_id = self._extract_node_id(error.location)
@@ -305,9 +305,9 @@ class RefinementResult:
     refined_schema: Any
     iterations: int
     fixes_applied: List[str] = field(default_factory=list)
-    validation_result: Optional[ValidationResult] = None
-    original_errors: List[ValidationError] = field(default_factory=list)
-    remaining_errors: List[ValidationError] = field(default_factory=list)
+    validation_result: Optional[WorkflowGenerationValidationResult] = None
+    original_errors: List[WorkflowValidationError] = field(default_factory=list)
+    remaining_errors: List[WorkflowValidationError] = field(default_factory=list)
     convergence_achieved: bool = False
 
     @property
@@ -372,7 +372,7 @@ class RefinementIteration:
 
     iteration_number: int
     workflow_schema: Any
-    validation_result: ValidationResult
+    validation_result: WorkflowGenerationValidationResult
     refinement_type: str = "unknown"
     changes_made: List[str] = field(default_factory=list)
     duration_ms: Optional[float] = None
@@ -502,8 +502,8 @@ __all__ = [
     "ErrorSeverity",
     "ErrorCategory",
     # Core types
-    "ValidationError",
-    "ValidationResult",
+    "WorkflowValidationError",
+    "WorkflowGenerationValidationResult",
     "RefinementResult",
     "RefinementIteration",
     "RefinementHistory",

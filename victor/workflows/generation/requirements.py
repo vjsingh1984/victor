@@ -634,8 +634,8 @@ class WorkflowRequirements:
 
 
 @dataclass
-class ValidationError:
-    """A validation error or warning.
+class RequirementValidationError:
+    """A validation error or warning for workflow requirements.
 
     Represents an issue found during requirement validation.
 
@@ -646,7 +646,7 @@ class ValidationError:
         suggestion: Optional suggestion for fixing
 
     Example:
-        error = ValidationError(
+        error = RequirementValidationError(
             field="functional.tasks.0.role",
             message="Agent task missing role",
             severity="critical",
@@ -670,7 +670,7 @@ class ValidationError:
 
 
 @dataclass
-class ValidationResult:
+class RequirementValidationResult:
     """Result of requirement validation.
 
     Contains the outcome of requirement validation with errors,
@@ -684,7 +684,7 @@ class ValidationResult:
         score: Overall quality score (0.0-1.0)
 
     Example:
-        result = ValidationResult(
+        result = RequirementValidationResult(
             is_valid=True,
             errors=[],
             warnings=[warning],
@@ -694,8 +694,8 @@ class ValidationResult:
     """
 
     is_valid: bool
-    errors: List[ValidationError]
-    warnings: List[ValidationError]
+    errors: List[RequirementValidationError]
+    warnings: List[RequirementValidationError]
     recommendations: List[str]
     score: float
 

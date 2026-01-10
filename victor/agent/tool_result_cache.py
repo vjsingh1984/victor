@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CacheEntry:
+class ToolResultCacheEntry:
     """A cached tool result with metadata."""
 
     tool_name: str
@@ -202,7 +202,7 @@ class ToolResultCache:
         self.stats = CacheStats()
 
         # Core data structures
-        self._entries: OrderedDict[str, CacheEntry] = OrderedDict()
+        self._entries: OrderedDict[str, ToolResultCacheEntry] = OrderedDict()
         self._embeddings: List[np.ndarray] = []
         self._hash_to_idx: Dict[str, int] = {}
         self._faiss_index = None
@@ -392,7 +392,7 @@ class ToolResultCache:
         query_vec: np.ndarray,
         tool_name: str,
         threshold: float,
-    ) -> Optional[CacheEntry]:
+    ) -> Optional[ToolResultCacheEntry]:
         """Search for similar entry using FAISS or numpy."""
         if self._faiss_index is not None and self._faiss_index.ntotal > 0:
             try:
@@ -477,7 +477,7 @@ class ToolResultCache:
                 except OSError:
                     pass
 
-            entry = CacheEntry(
+            entry = ToolResultCacheEntry(
                 tool_name=tool_name,
                 args_hash=args_hash,
                 arguments=arguments,

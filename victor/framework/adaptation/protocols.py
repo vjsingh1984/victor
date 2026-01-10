@@ -78,8 +78,8 @@ class GraphModification:
         self.id = f"{modification_type}_{id(self)}"
 
 
-class ValidationResult:
-    """Result of validation operation."""
+class AdaptationValidationResult:
+    """Result of adaptation validation operation."""
 
     def __init__(
         self,
@@ -201,7 +201,7 @@ class GraphValidator(Protocol):
         self,
         graph: CompiledGraph,
         modification: GraphModification,
-    ) -> ValidationResult:
+    ) -> AdaptationValidationResult:
         """Validate modification against graph.
 
         Args:
@@ -209,21 +209,21 @@ class GraphValidator(Protocol):
             modification: Proposed modification
 
         Returns:
-            ValidationResult with is_valid flag and any errors
+            AdaptationValidationResult with is_valid flag and any errors
         """
         ...
 
     async def validate_syntax(
         self,
         modification: GraphModification,
-    ) -> ValidationResult:
+    ) -> AdaptationValidationResult:
         """Validate syntax of modification data.
 
         Args:
             modification: Modification to validate
 
         Returns:
-            ValidationResult for syntax only
+            AdaptationValidationResult for syntax only
         """
         ...
 
@@ -231,7 +231,7 @@ class GraphValidator(Protocol):
         self,
         graph: CompiledGraph,
         modification: GraphModification,
-    ) -> ValidationResult:
+    ) -> AdaptationValidationResult:
         """Validate semantic correctness.
 
         Args:
@@ -239,7 +239,7 @@ class GraphValidator(Protocol):
             modification: Modification to validate
 
         Returns:
-            ValidationResult for semantic validation
+            AdaptationValidationResult for semantic validation
         """
         ...
 

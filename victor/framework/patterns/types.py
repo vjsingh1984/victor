@@ -50,7 +50,7 @@ class PatternCategory(Enum):
 
 
 @dataclass
-class ValidationResult:
+class PatternValidationResult:
     """Result of pattern validation.
 
     Attributes:
@@ -265,7 +265,7 @@ class WorkflowExecutionTrace:
 __all__ = [
     "PatternStatus",
     "PatternCategory",
-    "ValidationResult",
+    "PatternValidationResult",
     "PatternMetrics",
     "TaskContext",
     "CollaborationPattern",

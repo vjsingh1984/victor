@@ -126,4 +126,4 @@ research_team = TeamSpec(
 ## See Also
 
 - [Multi-Agent Teams Guide](MULTI_AGENT_TEAMS.md) - Comprehensive guide
-- [Persona Reference](../reference/multi-agent/personas.md) - Persona types
+- [Multi-Agent Teams](MULTI_AGENT_TEAMS.md) - Team patterns

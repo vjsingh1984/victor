@@ -72,7 +72,7 @@ from victor.workflows.generation.extractor import RequirementExtractor
 from victor.workflows.generation.refiner import WorkflowRefiner
 from victor.workflows.generation.requirements import WorkflowRequirements
 from victor.workflows.generation.types import (
-    ValidationResult,
+    WorkflowGenerationValidationResult,
     RefinementResult,
 )
 
@@ -122,7 +122,7 @@ class PipelineResult:
     graph: Optional[StateGraph] = None
     schema: Optional[Dict[str, Any]] = None
     requirements: Optional[WorkflowRequirements] = None
-    validation: Optional[ValidationResult] = None
+    validation: Optional[WorkflowGenerationValidationResult] = None
     metadata: Optional[GenerationMetadata] = None
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -412,7 +412,7 @@ class WorkflowGenerationPipeline:
     # Private Methods
     # =============================================================================
 
-    async def _validate_schema(self, schema: Dict[str, Any]) -> ValidationResult:
+    async def _validate_schema(self, schema: Dict[str, Any]) -> WorkflowGenerationValidationResult:
         """Validate workflow schema.
 
         Performs multi-layer validation:
@@ -425,7 +425,7 @@ class WorkflowGenerationPipeline:
             schema: Workflow schema to validate
 
         Returns:
-            ValidationResult with all errors and warnings
+            WorkflowGenerationValidationResult with all errors and warnings
         """
         # Import here to avoid circular dependency
         from victor.workflows.generation.validator import WorkflowValidator
@@ -434,7 +434,7 @@ class WorkflowGenerationPipeline:
         return await validator.validate(schema)
 
     async def _refine_schema(
-        self, schema: Dict[str, Any], validation: ValidationResult
+        self, schema: Dict[str, Any], validation: WorkflowGenerationValidationResult
     ) -> Tuple[Dict[str, Any], RefinementResult]:
         """Refine schema based on validation errors.
 

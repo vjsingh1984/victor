@@ -74,7 +74,7 @@ from victor.framework.graph import (
     CompiledGraph,
     Edge,
     EdgeType,
-    ExecutionResult,
+    GraphExecutionResult,
     GraphConfig,
     MemoryCheckpointer,
     Node,
@@ -1007,7 +1007,7 @@ class YAMLToStateGraphCompiler:
         workflow: WorkflowDefinition,
         initial_state: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> ExecutionResult[WorkflowState]:
+    ) -> GraphExecutionResult[WorkflowState]:
         """Convenience method to compile and execute in one step.
 
         Args:
@@ -1016,7 +1016,7 @@ class YAMLToStateGraphCompiler:
             thread_id: Thread ID for checkpointing
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
         """
         compiled = self.compile(workflow)
 
@@ -1075,7 +1075,7 @@ async def execute_yaml_workflow(
     tool_registry: Optional["ToolRegistry"] = None,
     thread_id: Optional[str] = None,
     config: Optional[CompilerConfig] = None,
-) -> ExecutionResult[WorkflowState]:
+) -> GraphExecutionResult[WorkflowState]:
     """Compile and execute a YAML workflow.
 
     Convenience function for one-off execution.

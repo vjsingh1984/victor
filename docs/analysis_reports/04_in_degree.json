@@ -2,7 +2,7 @@
   {
     "rank": 1,
     "node_id": "symbol:victor/ui/emoji.py:get",
-    "in_degree": 2567,
+    "in_degree": 2569,
     "name": "get",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -10,7 +10,7 @@
   {
     "rank": 2,
     "node_id": "symbol:victor/core/event_sourcing.py:append",
-    "in_degree": 2176,
+    "in_degree": 2188,
     "name": "append",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -18,7 +18,7 @@
   {
     "rank": 3,
     "node_id": "symbol:victor/ui/emoji.py:warning",
-    "in_degree": 1276,
+    "in_degree": 1275,
     "name": "warning",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -26,7 +26,7 @@
   {
     "rank": 4,
     "node_id": "symbol:victor/ui/emoji.py:info",
-    "in_degree": 1173,
+    "in_degree": 1175,
     "name": "info",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -34,7 +34,7 @@
   {
     "rank": 5,
     "node_id": "symbol:victor/framework/graph.py:items",
-    "in_degree": 1126,
+    "in_degree": 1129,
     "name": "items",
     "type": "function",
     "module": "victor.framework.graph"
@@ -42,7 +42,7 @@
   {
     "rank": 6,
     "node_id": "symbol:victor/core/repository.py:list",
-    "in_degree": 1045,
+    "in_degree": 1046,
     "name": "list",
     "type": "function",
     "module": "victor.core.repository"
@@ -50,7 +50,7 @@
   {
     "rank": 7,
     "node_id": "symbol:victor/tools/cache_manager.py:set",
-    "in_degree": 847,
+    "in_degree": 850,
     "name": "set",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -98,7 +98,7 @@
   {
     "rank": 13,
     "node_id": "symbol:victor/framework/teams.py:result",
-    "in_degree": 442,
+    "in_degree": 441,
     "name": "result",
     "type": "function",
     "module": "victor.framework.teams"
@@ -122,7 +122,7 @@
   {
     "rank": 16,
     "node_id": "symbol:victor/benchmark/agent.py:config",
-    "in_degree": 377,
+    "in_degree": 376,
     "name": "config",
     "type": "function",
     "module": "victor.benchmark.agent"
@@ -130,7 +130,7 @@
   {
     "rank": 17,
     "node_id": "symbol:victor/observability/metrics.py:sum",
-    "in_degree": 374,
+    "in_degree": 376,
     "name": "sum",
     "type": "function",
     "module": "victor.observability.metrics"
@@ -138,7 +138,7 @@
   {
     "rank": 18,
     "node_id": "symbol:victor/core/tool_tier_registry.py:extend",
-    "in_degree": 347,
+    "in_degree": 349,
     "name": "extend",
     "type": "function",
     "module": "victor.core.tool_tier_registry"
@@ -146,7 +146,7 @@
   {
     "rank": 19,
     "node_id": "symbol:victor/tools/merge_tool.py:metadata",
-    "in_degree": 342,
+    "in_degree": 343,
     "name": "metadata",
     "type": "function",
     "module": "victor.tools.merge_tool"
@@ -154,7 +154,7 @@
   {
     "rank": 20,
     "node_id": "symbol:victor/core/repository.py:update",
-    "in_degree": 333,
+    "in_degree": 335,
     "name": "update",
     "type": "function",
     "module": "victor.core.repository"
@@ -194,7 +194,7 @@
   {
     "rank": 25,
     "node_id": "symbol:victor/ui/emoji.py:success",
-    "in_degree": 259,
+    "in_degree": 260,
     "name": "success",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -209,14 +209,6 @@
   },
   {
     "rank": 27,
-    "node_id": "symbol:victor/benchmark/agent.py:agent",
-    "in_degree": 236,
-    "name": "agent",
-    "type": "function",
-    "module": "victor.benchmark.agent"
-  },
-  {
-    "rank": 28,
     "node_id": "symbol:victor/framework/service_provider.py:provider",
     "in_degree": 235,
     "name": "provider",
@@ -224,7 +216,7 @@
     "module": "victor.framework.service_provider"
   },
   {
-    "rank": 29,
+    "rank": 28,
     "node_id": "symbol:victor/framework/graph.py:pop",
     "in_degree": 229,
     "name": "pop",
@@ -232,12 +224,20 @@
     "module": "victor.framework.graph"
   },
   {
-    "rank": 30,
+    "rank": 29,
     "node_id": "symbol:victor/framework/agent_components.py:tools",
-    "in_degree": 226,
+    "in_degree": 225,
     "name": "tools",
     "type": "function",
     "module": "victor.framework.agent_components"
+  },
+  {
+    "rank": 30,
+    "node_id": "symbol:victor/benchmark/agent.py:agent",
+    "in_degree": 204,
+    "name": "agent",
+    "type": "function",
+    "module": "victor.benchmark.agent"
   },
   {
     "rank": 31,
@@ -266,7 +266,7 @@
   {
     "rank": 34,
     "node_id": "symbol:victor/workflows/protocols.py:id",
-    "in_degree": 190,
+    "in_degree": 191,
     "name": "id",
     "type": "function",
     "module": "victor.workflows.protocols"
@@ -289,16 +289,16 @@
   },
   {
     "rank": 37,
-    "node_id": "symbol:victor/processing/serialization/formats/markdown_encoder.py:encode",
-    "in_degree": 164,
+    "node_id": "symbol:victor/framework/rl/shared_encoder.py:encode",
+    "in_degree": 166,
     "name": "encode",
     "type": "function",
-    "module": "victor.processing.serialization"
+    "module": "victor.framework.rl"
   },
   {
     "rank": 38,
     "node_id": "symbol:victor/core/events/protocols.py:datetime",
-    "in_degree": 162,
+    "in_degree": 163,
     "name": "datetime",
     "type": "function",
     "module": "victor.core.events"
@@ -306,7 +306,7 @@
   {
     "rank": 39,
     "node_id": "symbol:victor/workflows/protocols.py:status",
-    "in_degree": 161,
+    "in_degree": 162,
     "name": "status",
     "type": "function",
     "module": "victor.workflows.protocols"
@@ -338,7 +338,7 @@
   {
     "rank": 43,
     "node_id": "symbol:victor/tools/decorators.py:category",
-    "in_degree": 144,
+    "in_degree": 146,
     "name": "category",
     "type": "function",
     "module": "victor.tools.decorators"
@@ -353,6 +353,14 @@
   },
   {
     "rank": 45,
+    "node_id": "symbol:victor/core/protocols.py:confidence",
+    "in_degree": 137,
+    "name": "confidence",
+    "type": "function",
+    "module": "victor.core.protocols"
+  },
+  {
+    "rank": 46,
     "node_id": "symbol:victor/workflows/execution_context.py:settings",
     "in_degree": 137,
     "name": "settings",
@@ -360,36 +368,28 @@
     "module": "victor.workflows.execution_context"
   },
   {
-    "rank": 46,
-    "node_id": "symbol:victor/core/protocols.py:confidence",
-    "in_degree": 136,
-    "name": "confidence",
-    "type": "function",
-    "module": "victor.core.protocols"
-  },
-  {
     "rank": 47,
-    "node_id": "symbol:victor/core/protocols.py:task_type",
-    "in_degree": 134,
-    "name": "task_type",
+    "node_id": "symbol:victor/teams/unified_coordinator.py:role",
+    "in_degree": 135,
+    "name": "role",
     "type": "function",
-    "module": "victor.core.protocols"
+    "module": "victor.teams.unified_coordinator"
   },
   {
     "rank": 48,
-    "node_id": "symbol:victor/teams/types.py:role",
-    "in_degree": 134,
-    "name": "role",
-    "type": "function",
-    "module": "victor.teams.types"
-  },
-  {
-    "rank": 49,
     "node_id": "symbol:victor/tools/browser_tool.py:wait_for",
     "in_degree": 133,
     "name": "wait_for",
     "type": "function",
     "module": "victor.tools.browser_tool"
+  },
+  {
+    "rank": 49,
+    "node_id": "symbol:victor/core/protocols.py:task_type",
+    "in_degree": 133,
+    "name": "task_type",
+    "type": "function",
+    "module": "victor.core.protocols"
   },
   {
     "rank": 50,

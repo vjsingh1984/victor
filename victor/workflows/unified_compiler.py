@@ -74,7 +74,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.framework.graph import CompiledGraph, ExecutionResult, GraphConfig
+    from victor.framework.graph import CompiledGraph, GraphExecutionResult, GraphConfig
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import (
         WorkflowDefinitionCache,
@@ -1085,7 +1085,7 @@ class CachedCompiledGraph:
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
         use_cache: bool = True,
-    ) -> "ExecutionResult":
+    ) -> "GraphExecutionResult":
         """Execute the compiled workflow.
 
         Args:
@@ -1095,9 +1095,9 @@ class CachedCompiledGraph:
             use_cache: Whether to use execution cache (for future use)
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
         """
-        from victor.framework.graph import ExecutionResult
+        from victor.framework.graph import GraphExecutionResult
 
         # Prepare state with metadata
         exec_state = self._prepare_state(input_state)
@@ -1120,12 +1120,13 @@ class CachedCompiledGraph:
                     f"Workflow '{self.workflow_name}' timed out after "
                     f"{self.max_execution_timeout_seconds}s"
                 )
-                return ExecutionResult(
+                return GraphExecutionResult(
+                    state=exec_state,
                     success=False,
-                    final_state=exec_state,
-                    nodes_executed=[],
-                    duration_seconds=self.max_execution_timeout_seconds,
                     error=f"Workflow execution timed out after {self.max_execution_timeout_seconds}s",
+                    iterations=0,
+                    duration=self.max_execution_timeout_seconds,
+                    node_history=[],
                 )
         else:
             return await self.compiled_graph.invoke(
@@ -1824,7 +1825,7 @@ async def compile_and_execute(
     initial_state: Optional[Dict[str, Any]] = None,
     workflow_name: Optional[str] = None,
     **kwargs: Any,
-) -> "ExecutionResult":
+) -> "GraphExecutionResult":
     """Compile and execute a workflow in one step.
 
     Convenience function for one-off execution.
@@ -1836,7 +1837,7 @@ async def compile_and_execute(
         **kwargs: Additional compilation/execution options
 
     Returns:
-        ExecutionResult with final state
+        GraphExecutionResult with final state
     """
     graph = compile_workflow(source, workflow_name, **kwargs)
     return await graph.invoke(initial_state or {})

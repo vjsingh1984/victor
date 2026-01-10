@@ -52,8 +52,8 @@ from enum import Enum
 
 from victor.workflows.generation.requirements import WorkflowRequirements
 from victor.workflows.generation.types import (
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
     RefinementResult,
 )
 
@@ -287,7 +287,7 @@ class WorkflowGenerator:
         self,
         schema: Dict[str, Any],
         feedback: Union[str, List[str]],
-        validation_errors: Optional[List[ValidationError]] = None,
+        validation_errors: Optional[List[WorkflowValidationError]] = None,
     ) -> Dict[str, Any]:
         """Refine existing schema based on feedback.
 
@@ -659,7 +659,7 @@ Generate the workflow schema as JSON only.
         self,
         schema: Dict[str, Any],
         feedback: Union[str, List[str]],
-        validation_errors: Optional[List[ValidationError]] = None,
+        validation_errors: Optional[List[WorkflowValidationError]] = None,
     ) -> str:
         """Build prompt for schema refinement."""
         feedback_text = (

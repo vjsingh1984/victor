@@ -69,8 +69,8 @@ from victor.workflows.generation.requirements import (
     ExtractionMetadata,
     WorkflowRequirements,
     Ambiguity,
-    ValidationResult as RequirementValidationResult,
-    ValidationError as RequirementValidationError,
+    RequirementValidationResult,
+    RequirementValidationError,
 )
 
 from victor.workflows.generation.extractor import RequirementExtractor
@@ -88,8 +88,8 @@ from victor.workflows.generation.clarifier import (
 from victor.workflows.generation.types import (
     ErrorSeverity,
     ErrorCategory,
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
     RefinementResult,
     RefinementIteration,
     RefinementHistory,
@@ -177,8 +177,8 @@ __all__ = [
     # Workflow validation types
     "ErrorSeverity",
     "ErrorCategory",
-    "ValidationError",
-    "ValidationResult",
+    "WorkflowValidationError",
+    "WorkflowGenerationValidationResult",
     "RefinementResult",
     "RefinementIteration",
     "RefinementHistory",

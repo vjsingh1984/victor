@@ -41,8 +41,8 @@ from typing import Any, Dict, List, Optional
 from victor.workflows.generation.types import (
     ErrorCategory,
     ErrorSeverity,
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
 )
 from victor.workflows.generation.error_reporter import ErrorReporter
 
@@ -77,7 +77,7 @@ class RefinementPromptBuilder:
         self,
         user_request: str,
         workflow_dict: Dict[str, Any],
-        validation_result: ValidationResult,
+        validation_result: WorkflowGenerationValidationResult,
         examples: Optional[List[Dict[str, Any]]] = None,
         iteration: int = 0
     ) -> str:
@@ -126,7 +126,7 @@ You are helping to fix a workflow that failed validation. The workflow was gener
 
 This is refinement iteration #{iteration + 1}. Previous attempts to fix this workflow have failed. Please carefully address all validation errors."""
 
-    def _validation_errors(self, result: ValidationResult) -> str:
+    def _validation_errors(self, result: WorkflowGenerationValidationResult) -> str:
         """Format validation errors for LLM."""
         llm_report = self.error_reporter.llm_report(
             result,
@@ -466,7 +466,7 @@ entry_point: task1
     @classmethod
     def get_examples_for_errors(
         cls,
-        validation_result: ValidationResult
+        validation_result: WorkflowGenerationValidationResult
     ) -> List[Dict[str, Any]]:
         """Get relevant examples based on validation errors.
 
@@ -544,7 +544,7 @@ entry_point: task1
 def build_refinement_prompt(
     user_request: str,
     workflow_dict: Dict[str, Any],
-    validation_result: ValidationResult,
+    validation_result: WorkflowGenerationValidationResult,
     include_examples: bool = True,
     iteration: int = 0
 ) -> str:

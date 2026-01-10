@@ -64,7 +64,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
 from uuid import uuid4
 
-from victor.framework.events import Event, EventType
+from victor.framework.events import AgentExecutionEvent, EventType
 
 if TYPE_CHECKING:
     from victor.core.agent_commands import (
@@ -72,7 +72,7 @@ if TYPE_CHECKING:
         SessionProjection,
     )
     from victor.core.cqrs import CommandBus, Mediator, QueryBus
-    from victor.core.event_sourcing import Event as CQRSEvent
+    from victor.core.event_sourcing import DomainEvent as CQRSEvent
     from victor.core.event_sourcing import EventDispatcher, EventStore
     from victor.framework.agent import Agent
     from victor.core.events import ObservabilityBus
@@ -99,21 +99,21 @@ from victor.framework.event_registry import (
 # These are kept for backward compatibility with existing callers.
 
 
-def framework_event_to_cqrs(event: Event) -> Dict[str, Any]:
-    """Convert framework Event to CQRS data. Delegates to EventRegistry."""
+def framework_event_to_cqrs(event: AgentExecutionEvent) -> Dict[str, Any]:
+    """Convert framework AgentExecutionEvent to CQRS data. Delegates to EventRegistry."""
     return convert_to_cqrs(event)
 
 
-def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> Event:
-    """Convert a CQRS Event to a framework Event.
+def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> AgentExecutionEvent:
+    """Convert a CQRS DomainEvent to a framework AgentExecutionEvent.
 
     Delegates to EventRegistry for the actual conversion.
 
     Args:
-        cqrs_event: CQRS Event instance.
+        cqrs_event: CQRS DomainEvent instance.
 
     Returns:
-        Framework Event instance.
+        Framework AgentExecutionEvent instance.
     """
     # Extract event type and data from CQRS event
     event_type = cqrs_event.event_type
@@ -182,8 +182,8 @@ def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> Event:
     return convert_from_cqrs(data, event_type, metadata)
 
 
-def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadata) -> Event:
-    """Convert an observability event (topic-based) to a framework Event.
+def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadata) -> AgentExecutionEvent:
+    """Convert an observability event (topic-based) to a framework AgentExecutionEvent.
 
     Uses topic-based mapping since observability events now use topics
     (e.g., "tool.start" instead of category-based "tool.start").
@@ -194,7 +194,7 @@ def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadat
         **metadata: Additional metadata.
 
     Returns:
-        Framework Event instance.
+        Framework AgentExecutionEvent instance.
     """
     from victor.framework.events import (
         content_event,
@@ -263,8 +263,8 @@ def observability_event_to_framework(topic: str, data: Dict[str, Any], **metadat
         )
 
 
-def framework_event_to_observability(event: Event) -> Dict[str, Any]:
-    """Convert framework Event to observability data. Delegates to EventRegistry."""
+def framework_event_to_observability(event: AgentExecutionEvent) -> Dict[str, Any]:
+    """Convert framework AgentExecutionEvent to observability data. Delegates to EventRegistry."""
     return convert_to_observability(event)
 
 
@@ -303,11 +303,11 @@ class FrameworkEventAdapter:
     aggregate_id: Optional[str] = None
     _forwarded_count: int = field(default=0, init=False)
 
-    def forward(self, event: Event) -> None:
+    def forward(self, event: AgentExecutionEvent) -> None:
         """Forward a framework event to CQRS and observability.
 
         Args:
-            event: Framework Event to forward.
+            event: Framework AgentExecutionEvent to forward.
         """
         # Forward to CQRS EventDispatcher
         if self.event_dispatcher:
@@ -319,11 +319,11 @@ class FrameworkEventAdapter:
 
         self._forwarded_count += 1
 
-    def _forward_to_cqrs(self, event: Event) -> None:
+    def _forward_to_cqrs(self, event: AgentExecutionEvent) -> None:
         """Forward event to CQRS layer."""
         try:
             from victor.core.event_sourcing import (
-                Event as CQRSEvent,
+                DomainEvent as CQRSEvent,
                 StateChangedEvent,
                 ToolCalledEvent,
                 ToolResultEvent,
@@ -382,12 +382,12 @@ class FrameworkEventAdapter:
         except Exception as e:
             logger.warning(f"Failed to forward event to CQRS: {e}")
 
-    def _forward_to_observability(self, event: Event) -> None:
+    def _forward_to_observability(self, event: AgentExecutionEvent) -> None:
         """Forward event to observability layer."""
         try:
             from victor.core.events import get_observability_bus
 
-            # Convert framework Event to topic and data for ObservabilityBus
+            # Convert framework AgentExecutionEvent to topic and data for ObservabilityBus
             obs_data = framework_event_to_observability(event)
 
             # Extract topic from observability data format
@@ -478,7 +478,7 @@ class ObservabilityToCQRSBridge:
         """Handle an observability event (topic-based)."""
         try:
             from victor.core.event_sourcing import (
-                Event as CQRSEvent,
+                DomainEvent as CQRSEvent,
                 StateChangedEvent,
                 ToolCalledEvent,
                 ToolResultEvent,

@@ -6,11 +6,11 @@ Complete reference for configuring Victor's behavior and integrations.
 
 | File | Purpose | Location | Reference |
 |------|---------|----------|----------|
-| **profiles.yaml** | Provider and model profiles | `~/.victor/profiles.yaml` | [profiles.md →](profiles.md) |
-| **config.yaml** | Global settings and options | `~/.victor/config.yaml` | [config.md →](config.md) |
-| **mcp.yaml** | MCP server configuration | `~/.victor/mcp.yaml` | [mcp.md →](mcp.md) |
-| **.victor.md** | Project context | `<project>/.victor.md` | [.victor.md →](../../user-guide/project-context.md) |
-| **CLAUDE.md** | AI instructions | `<project>/CLAUDE.md` | [CLAUDE.md →](../../CLAUDE.md) |
+| **profiles.yaml** | Provider and model profiles | `~/.victor/profiles.yaml` | [#profilesyaml →](#profilesyaml) |
+| **config.yaml** | Global settings and options | `~/.victor/config.yaml` | [#configyaml →](#configyaml) |
+| **mcp.yaml** | MCP server configuration | `~/.victor/mcp.yaml` | [#mcpyaml →](#mcpyaml) |
+| **.victor.md** | Project context | `<project>/.victor.md` | [.victor.md →](../../user-guide/index.md#5-project-context) |
+| **CLAUDE.md** | AI instructions | `<project>/CLAUDE.md` | [CLAUDE.md →](../../../CLAUDE.md) |
 
 ## Configuration Directory Structure
 
@@ -219,7 +219,7 @@ victor config show
 | **timeout** | int | No | Request timeout (seconds) | `30` |
 | **retry_attempts** | int | No | Number of retries on failure | `3` |
 
-[Full profiles.yaml Reference →](profiles.md)
+[Full profiles.yaml Reference →](#profilesyaml)
 
 ---
 
@@ -386,7 +386,7 @@ ui:
   pager: less              # Default pager
 ```
 
-[Full config.yaml Reference →](config.md)
+[Full config.yaml Reference →](#configyaml)
 
 ---
 
@@ -448,7 +448,7 @@ resources:
 
 **Resources**: Expose file system and git resources
 
-[Full mcp.yaml Reference →](mcp.md)
+[Full mcp.yaml Reference →](#mcpyaml)
 
 ---
 
@@ -580,7 +580,7 @@ When refactoring code:
 
 **Usage**: Victor automatically reads `.victor.md` when working in a project directory.
 
-[Full .victor.md Guide →](../../user-guide/project-context.md)
+[Full .victor.md Guide →](../../user-guide/index.md#5-project-context)
 
 ### CLAUDE.md
 
@@ -614,7 +614,7 @@ When refactoring code:
 - Write self-documenting code
 ```
 
-[Full CLAUDE.md Reference →](../../CLAUDE.md)
+[Full CLAUDE.md Reference →](../../../CLAUDE.md)
 
 ---
 
@@ -897,12 +897,12 @@ victor chat "Important task"  # May fail!
 
 ## Additional Resources
 
-- **profiles.yaml**: [Full Reference →](profiles.md)
-- **config.yaml**: [Full Reference →](config.md)
-- **mcp.yaml**: [Full Reference →](mcp.md)
+- **profiles.yaml**: [Full Reference →](#profilesyaml)
+- **config.yaml**: [Full Reference →](#configyaml)
+- **mcp.yaml**: [Full Reference →](#mcpyaml)
 - **API Keys**: [Key Management →](keys.md)
 - **Troubleshooting**: [Troubleshooting Guide →](../../user-guide/troubleshooting.md)
 
 ---
 
-**Next**: [profiles.yaml →](profiles.md) | [config.yaml →](config.md) | [API Keys →](keys.md) | [Troubleshooting →](../../user-guide/troubleshooting.md)
+**Next**: [profiles.yaml →](#profilesyaml) | [config.yaml →](#configyaml) | [API Keys →](keys.md) | [Troubleshooting →](../../user-guide/troubleshooting.md)

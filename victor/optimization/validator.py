@@ -66,7 +66,7 @@ class ConstraintViolation:
 
 
 @dataclass
-class ValidationResult:
+class OptimizationValidationResult:
     """Result of optimization validation.
 
     Attributes:
@@ -147,7 +147,7 @@ class OptimizationValidator:
         optimization: OptimizationOpportunity,
         profile: WorkflowProfile,
         constraints: Optional[Dict[str, Any]] = None,
-    ) -> ValidationResult:
+    ) -> OptimizationValidationResult:
         """Validate an optimization opportunity.
 
         Args:
@@ -157,7 +157,7 @@ class OptimizationValidator:
             constraints: Optional custom constraints
 
         Returns:
-            ValidationResult with validation outcome
+            OptimizationValidationResult with validation outcome
         """
         logger.info(
             f"Validating optimization: {optimization.strategy_type.value} "
@@ -226,7 +226,7 @@ class OptimizationValidator:
             violations,
         )
 
-        result = ValidationResult(
+        result = OptimizationValidationResult(
             is_valid=is_valid,
             functional_equivalence=True,  # Assume equivalent for dry-run
             speedup=speedup,

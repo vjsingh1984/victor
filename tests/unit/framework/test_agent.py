@@ -192,13 +192,13 @@ class TestAgentRun:
     async def test_run_basic(self, mock_orchestrator):
         """run should collect events and return TaskResult."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         # Setup mock stream
         async def mock_stream(*args, **kwargs):
-            yield Event(type=EventType.CONTENT, content="Hello ")
-            yield Event(type=EventType.CONTENT, content="World")
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Hello ")
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="World")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
 
@@ -213,11 +213,11 @@ class TestAgentRun:
     async def test_run_with_error_event(self, mock_orchestrator):
         """run should handle ERROR events and set success=False."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         async def mock_stream(*args, **kwargs):
-            yield Event(type=EventType.ERROR, error="Something went wrong")
-            yield Event(type=EventType.STREAM_END, success=False, error="Something went wrong")
+            yield AgentExecutionEvent(type=EventType.ERROR, error="Something went wrong")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=False, error="Something went wrong")
 
         agent = Agent(mock_orchestrator)
 
@@ -231,11 +231,11 @@ class TestAgentRun:
     async def test_run_with_stream_end_failure(self, mock_orchestrator):
         """run should handle STREAM_END with success=False."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         async def mock_stream(*args, **kwargs):
-            yield Event(type=EventType.CONTENT, content="partial")
-            yield Event(type=EventType.STREAM_END, success=False, error="Timeout")
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="partial")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=False, error="Timeout")
 
         agent = Agent(mock_orchestrator)
 
@@ -285,13 +285,13 @@ class TestAgentRun:
     async def test_run_with_context(self, mock_orchestrator):
         """run should pass context to stream."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         captured_context = {}
 
         async def mock_stream(prompt, context=None):
             captured_context["context"] = context
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
         context = {"file": "test.py", "error": "SyntaxError"}
@@ -314,13 +314,13 @@ class TestAgentStream:
     async def test_stream_basic(self, mock_orchestrator):
         """stream should yield events from orchestrator."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         # Mock the internal stream function
         async def mock_stream_with_events(orchestrator, prompt):
-            yield Event(type=EventType.STREAM_START)
-            yield Event(type=EventType.CONTENT, content="Test")
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.STREAM_START)
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
 
@@ -338,13 +338,13 @@ class TestAgentStream:
     async def test_stream_with_context(self, mock_orchestrator):
         """stream should format and prepend context to prompt."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         captured_prompt = {}
 
         async def mock_stream_with_events(orchestrator, prompt):
             captured_prompt["prompt"] = prompt
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
 
@@ -360,7 +360,7 @@ class TestAgentStream:
     async def test_stream_notifies_state_observers(self, mock_orchestrator):
         """stream should notify state observers on stage changes."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
         from victor.agent.conversation_state import ConversationStage
 
         observer_called = []
@@ -380,9 +380,9 @@ class TestAgentStream:
         mock_orchestrator.get_stage.side_effect = get_stage_side_effect
 
         async def mock_stream_with_events(orchestrator, prompt):
-            yield Event(type=EventType.STREAM_START)
-            yield Event(type=EventType.CONTENT, content="Test")
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.STREAM_START)
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
         agent.on_state_change(observer)
@@ -399,12 +399,12 @@ class TestAgentStream:
     async def test_stream_forwards_to_cqrs(self, mock_orchestrator):
         """stream should forward events to CQRS when enabled."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         mock_adapter = MagicMock()
 
         async def mock_stream_with_events(orchestrator, prompt):
-            yield Event(type=EventType.CONTENT, content="Test")
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
 
         agent = Agent(mock_orchestrator)
         agent._cqrs_adapter = mock_adapter
@@ -419,7 +419,7 @@ class TestAgentStream:
     async def test_stream_observer_exception_does_not_break_streaming(self, mock_orchestrator):
         """stream should catch and suppress observer exceptions."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
         from victor.agent.conversation_state import ConversationStage
 
         # Create an observer that raises an exception
@@ -438,9 +438,9 @@ class TestAgentStream:
         mock_orchestrator.get_stage.side_effect = get_stage_side_effect
 
         async def mock_stream_with_events(orchestrator, prompt):
-            yield Event(type=EventType.STREAM_START)
-            yield Event(type=EventType.CONTENT, content="Test")
-            yield Event(type=EventType.STREAM_END, success=True)
+            yield AgentExecutionEvent(type=EventType.STREAM_START)
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
         agent.on_state_change(failing_observer)
@@ -493,13 +493,13 @@ class TestAgentChat:
     async def test_chat_session_stream(self, mock_orchestrator):
         """ChatSession.stream should delegate to AgentSession."""
         from victor.framework.agent import Agent, ChatSession
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         agent = Agent(mock_orchestrator)
         session = agent.chat("Initial prompt")
 
         async def mock_stream(message):
-            yield Event(type=EventType.CONTENT, content="Streamed")
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="Streamed")
 
         session._delegate.stream = mock_stream
 
@@ -968,13 +968,13 @@ class TestAgentCQRS:
     def test_forward_event_to_cqrs(self, mock_orchestrator):
         """_forward_event_to_cqrs should forward to adapter when set."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         mock_adapter = MagicMock()
         agent = Agent(mock_orchestrator)
         agent._cqrs_adapter = mock_adapter
 
-        event = Event(type=EventType.CONTENT, content="test")
+        event = AgentExecutionEvent(type=EventType.CONTENT, content="test")
         agent._forward_event_to_cqrs(event)
 
         mock_adapter.forward.assert_called_once_with(event)
@@ -982,10 +982,10 @@ class TestAgentCQRS:
     def test_forward_event_to_cqrs_no_adapter(self, mock_orchestrator):
         """_forward_event_to_cqrs should do nothing when no adapter."""
         from victor.framework.agent import Agent
-        from victor.framework.events import Event, EventType
+        from victor.framework.events import AgentExecutionEvent, EventType
 
         agent = Agent(mock_orchestrator)
-        event = Event(type=EventType.CONTENT, content="test")
+        event = AgentExecutionEvent(type=EventType.CONTENT, content="test")
 
         # Should not raise
         agent._forward_event_to_cqrs(event)

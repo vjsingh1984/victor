@@ -87,7 +87,7 @@ from typing import (
 )
 
 from victor.framework.events import (
-    Event,
+    AgentExecutionEvent,
     EventType,
     content_event,
     error_event,
@@ -103,7 +103,7 @@ from victor.framework.events import (
 )
 
 if TYPE_CHECKING:
-    from victor.core.event_sourcing import Event as CQRSEvent
+    from victor.core.event_sourcing import DomainEvent as CQRSEvent
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class EventConverterProtocol(Protocol):
         """External type names this converter can parse, per target."""
         ...
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         """Convert framework event to external format.
 
         Args:
@@ -166,7 +166,7 @@ class EventConverterProtocol(Protocol):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         """Convert external data to framework event.
 
         Args:
@@ -209,7 +209,7 @@ class BaseEventConverter(ABC):
         pass
 
     @abstractmethod
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         """Convert framework event to external format."""
         pass
 
@@ -219,11 +219,11 @@ class BaseEventConverter(ABC):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         """Convert external data to framework event."""
         pass
 
-    def _base_data(self, event: Event) -> Dict[str, Any]:
+    def _base_data(self, event: AgentExecutionEvent) -> Dict[str, Any]:
         """Extract common base data from event."""
         return {
             "timestamp": event.timestamp,
@@ -250,7 +250,7 @@ class ContentEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["content"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -273,7 +273,7 @@ class ContentEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return content_event(
             content=data.get("content", ""),
             metadata=metadata or data.get("metadata", {}),
@@ -294,7 +294,7 @@ class ThinkingEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["thinking"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -317,7 +317,7 @@ class ThinkingEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return thinking_event(
             content=data.get("reasoning_content", data.get("content", "")),
             metadata=metadata or data.get("metadata", {}),
@@ -338,7 +338,7 @@ class ToolCallEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["tool.start"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -367,7 +367,7 @@ class ToolCallEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         meta = metadata or data.get("metadata", {})
         return tool_call_event(
             tool_name=data.get("tool_name", "unknown"),
@@ -391,7 +391,7 @@ class ToolResultEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["tool.end"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -422,7 +422,7 @@ class ToolResultEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         meta = metadata or data.get("metadata", {})
         return tool_result_event(
             tool_name=data.get("tool_name", "unknown"),
@@ -447,7 +447,7 @@ class ToolErrorEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["tool.error"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -476,7 +476,7 @@ class ToolErrorEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         meta = metadata or data.get("metadata", {})
         return tool_error_event(
             tool_name=data.get("tool_name", "unknown"),
@@ -500,7 +500,7 @@ class StageChangeEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["stage_transition", "state.transition"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -527,7 +527,7 @@ class StageChangeEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return stage_change_event(
             old_stage=data.get("old_stage", data.get("from_state", "unknown")),
             new_stage=data.get("new_stage", data.get("to_state", "unknown")),
@@ -549,7 +549,7 @@ class StreamStartEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["stream.start", "lifecycle.start"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -571,7 +571,7 @@ class StreamStartEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         meta = metadata or data.get("metadata", {})
         # Include task_id, provider, model if present
         for key in ["task_id", "provider", "model"]:
@@ -598,7 +598,7 @@ class StreamEndEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["stream.end", "lifecycle.end"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -625,7 +625,7 @@ class StreamEndEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         # Handle TaskCompletedEvent vs TaskFailedEvent
         success = data.get("success", True)
         error = data.get("error")
@@ -655,7 +655,7 @@ class ErrorEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["error", "framework_error"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -682,7 +682,7 @@ class ErrorEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return error_event(
             error=data.get("error", data.get("message", "Unknown error")),
             recoverable=data.get("recoverable", True),
@@ -704,7 +704,7 @@ class ProgressEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["progress"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -727,7 +727,7 @@ class ProgressEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return progress_event(
             progress=data.get("progress", 0.0),
             metadata=metadata or data.get("metadata", {}),
@@ -748,7 +748,7 @@ class MilestoneEventConverter(BaseEventConverter):
             EventTarget.OBSERVABILITY: ["milestone"],
         }
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         base = self._base_data(event)
 
         if target == EventTarget.CQRS:
@@ -771,7 +771,7 @@ class MilestoneEventConverter(BaseEventConverter):
         data: Dict[str, Any],
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         return milestone_event(
             milestone=data.get("milestone", ""),
             metadata=metadata or data.get("metadata", {}),
@@ -872,7 +872,7 @@ class EventRegistry:
             for type_name in type_names:
                 self._reverse_map[(target, type_name)] = converter
 
-    def to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         """Convert a framework event to external format.
 
         Args:
@@ -900,7 +900,7 @@ class EventRegistry:
         external_type: str,
         target: EventTarget,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         """Convert external data to a framework event.
 
         Args:
@@ -954,7 +954,7 @@ class EventRegistry:
 
         return None
 
-    def _fallback_to_external(self, event: Event, target: EventTarget) -> Dict[str, Any]:
+    def _fallback_to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
         """Fallback conversion for unknown event types."""
         base = {
             "timestamp": event.timestamp,
@@ -981,7 +981,7 @@ class EventRegistry:
         data: Dict[str, Any],
         external_type: str,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> Event:
+    ) -> AgentExecutionEvent:
         """Fallback conversion for unknown external types."""
         return content_event(
             content=str(data.get("content", data)),
@@ -1033,11 +1033,11 @@ def get_event_registry() -> EventRegistry:
     return EventRegistry.get_instance()
 
 
-def convert_to_cqrs(event: Event) -> Dict[str, Any]:
+def convert_to_cqrs(event: AgentExecutionEvent) -> Dict[str, Any]:
     """Convenience function to convert event to CQRS format.
 
     Args:
-        event: Framework Event.
+        event: Framework AgentExecutionEvent.
 
     Returns:
         CQRS-compatible dictionary.
@@ -1049,7 +1049,7 @@ def convert_from_cqrs(
     data: Dict[str, Any],
     external_type: str,
     metadata: Optional[Dict[str, Any]] = None,
-) -> Event:
+) -> AgentExecutionEvent:
     """Convenience function to convert CQRS data to event.
 
     Args:
@@ -1058,16 +1058,16 @@ def convert_from_cqrs(
         metadata: Additional metadata.
 
     Returns:
-        Framework Event.
+        Framework AgentExecutionEvent.
     """
     return get_event_registry().from_external(data, external_type, EventTarget.CQRS, metadata)
 
 
-def convert_to_observability(event: Event) -> Dict[str, Any]:
+def convert_to_observability(event: AgentExecutionEvent) -> Dict[str, Any]:
     """Convenience function to convert event to observability format.
 
     Args:
-        event: Framework Event.
+        event: Framework AgentExecutionEvent.
 
     Returns:
         Observability-compatible dictionary.
@@ -1079,7 +1079,7 @@ def convert_from_observability(
     data: Dict[str, Any],
     external_type: str,
     metadata: Optional[Dict[str, Any]] = None,
-) -> Event:
+) -> AgentExecutionEvent:
     """Convenience function to convert observability data to event.
 
     Args:
@@ -1088,7 +1088,7 @@ def convert_from_observability(
         metadata: Additional metadata.
 
     Returns:
-        Framework Event.
+        Framework AgentExecutionEvent.
     """
     return get_event_registry().from_external(
         data, external_type, EventTarget.OBSERVABILITY, metadata

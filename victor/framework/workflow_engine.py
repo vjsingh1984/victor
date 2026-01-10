@@ -138,7 +138,7 @@ class WorkflowEngineConfig:
 
 
 @dataclass
-class ExecutionResult:
+class WorkflowExecutionResult:
     """Result of workflow execution.
 
     Attributes:
@@ -195,7 +195,7 @@ class WorkflowEngineProtocol(Protocol):
         yaml_path: Union[str, Path],
         initial_state: Dict[str, Any],
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a workflow from YAML file."""
         ...
 
@@ -204,7 +204,7 @@ class WorkflowEngineProtocol(Protocol):
         graph: "CompiledGraph",
         initial_state: Dict[str, Any],
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph."""
         ...
 
@@ -333,7 +333,7 @@ class WorkflowEngine:
         transform_registry: Optional[Dict[str, Callable]] = None,
         use_unified_compiler: bool = True,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a workflow from YAML file.
 
         Uses UnifiedWorkflowCompiler for consistent compilation and caching,
@@ -350,7 +350,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with final state and metadata.
+            WorkflowExecutionResult with final state and metadata.
         """
         import time
 
@@ -378,9 +378,9 @@ class WorkflowEngine:
                 duration = time.time() - start_time
 
                 # Handle polymorphic result types (LSP compliance)
-                # Result can be ExecutionResult object or dict
+                # Result can be GraphExecutionResult object or dict
                 if hasattr(result, "state"):
-                    # ExecutionResult from graph.py
+                    # GraphExecutionResult from graph.py
                     final_state = (
                         result.state if isinstance(result.state, dict) else {"result": result.state}
                     )
@@ -402,7 +402,7 @@ class WorkflowEngine:
                     success = True
                     error = None
 
-                return ExecutionResult(
+                return WorkflowExecutionResult(
                     success=success,
                     final_state=final_state,
                     nodes_executed=nodes_executed,
@@ -412,7 +412,7 @@ class WorkflowEngine:
 
             except Exception as e:
                 logger.error(f"YAML workflow execution failed: {e}")
-                return ExecutionResult(
+                return WorkflowExecutionResult(
                     success=False,
                     error=str(e),
                     duration_seconds=time.time() - start_time,
@@ -434,7 +434,7 @@ class WorkflowEngine:
         graph: "CompiledGraph",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph.
 
         Delegates to GraphExecutionCoordinator for SRP-compliant execution
@@ -446,7 +446,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with final state and metadata.
+            WorkflowExecutionResult with final state and metadata.
         """
         coordinator = self._get_graph_coordinator()
         return await coordinator.execute(
@@ -460,7 +460,7 @@ class WorkflowEngine:
         workflow: "WorkflowDefinition",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition.
 
         Args:
@@ -469,7 +469,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with final state and metadata.
+            WorkflowExecutionResult with final state and metadata.
         """
         import time
         import uuid
@@ -507,7 +507,7 @@ class WorkflowEngine:
                 },
             )
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=result.success,
                 final_state=result.final_state,
                 nodes_executed=result.nodes_executed,
@@ -529,7 +529,7 @@ class WorkflowEngine:
                 },
             )
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=duration,
@@ -541,7 +541,7 @@ class WorkflowEngine:
         initial_state: Optional[Dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a WorkflowGraph via CompiledGraph (unified execution path).
 
         Delegates to GraphExecutionCoordinator for SRP-compliant execution.
@@ -556,7 +556,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with final state and metadata.
+            WorkflowExecutionResult with final state and metadata.
 
         Example:
             from victor.workflows.graph_dsl import WorkflowGraph, State
@@ -585,7 +585,7 @@ class WorkflowEngine:
         workflow: "WorkflowDefinition",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
 
         Delegates to GraphExecutionCoordinator for SRP-compliant execution.
@@ -598,7 +598,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with final state and metadata.
+            WorkflowExecutionResult with final state and metadata.
         """
         coordinator = self._get_graph_coordinator()
         return await coordinator.execute_definition_compiled(
@@ -759,7 +759,7 @@ class WorkflowEngine:
         initial_state: Optional[Dict[str, Any]] = None,
         approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
         **kwargs: Any,
-    ) -> ExecutionResult:
+    ) -> WorkflowExecutionResult:
         """Execute workflow with HITL approval nodes.
 
         Delegates to HITLCoordinator for SRP-compliant execution.
@@ -771,7 +771,7 @@ class WorkflowEngine:
             **kwargs: Additional execution parameters.
 
         Returns:
-            ExecutionResult with HITL request history.
+            WorkflowExecutionResult with HITL request history.
         """
         coordinator = self._get_hitl_coordinator()
         return await coordinator.execute(
@@ -990,7 +990,7 @@ async def run_yaml_workflow(
     yaml_path: Union[str, Path],
     initial_state: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
-) -> ExecutionResult:
+) -> WorkflowExecutionResult:
     """Convenience function to run a YAML workflow.
 
     Args:
@@ -999,7 +999,7 @@ async def run_yaml_workflow(
         **kwargs: Additional parameters.
 
     Returns:
-        ExecutionResult from workflow execution.
+        WorkflowExecutionResult from workflow execution.
     """
     engine = create_workflow_engine()
     return await engine.execute_yaml(yaml_path, initial_state, **kwargs)
@@ -1009,7 +1009,7 @@ async def run_graph_workflow(
     graph: "CompiledGraph",
     initial_state: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
-) -> ExecutionResult:
+) -> WorkflowExecutionResult:
     """Convenience function to run a StateGraph workflow.
 
     Args:
@@ -1018,7 +1018,7 @@ async def run_graph_workflow(
         **kwargs: Additional parameters.
 
     Returns:
-        ExecutionResult from workflow execution.
+        WorkflowExecutionResult from workflow execution.
     """
     engine = create_workflow_engine()
     return await engine.execute_graph(graph, initial_state, **kwargs)

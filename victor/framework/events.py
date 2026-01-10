@@ -79,7 +79,7 @@ class EventType(str, Enum):
 
 
 @dataclass
-class Event:
+class AgentExecutionEvent:
     """An observable event from agent execution.
 
     Events provide real-time visibility into what the agent is doing.
@@ -191,7 +191,7 @@ class Event:
 # =============================================================================
 
 
-def content_event(content: str, **kwargs: Any) -> Event:
+def content_event(content: str, **kwargs: Any) -> AgentExecutionEvent:
     """Create a content event.
 
     Args:
@@ -199,12 +199,12 @@ def content_event(content: str, **kwargs: Any) -> Event:
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=CONTENT
+        AgentExecutionEvent with type=CONTENT
     """
-    return Event(type=EventType.CONTENT, content=content, **kwargs)
+    return AgentExecutionEvent(type=EventType.CONTENT, content=content, **kwargs)
 
 
-def thinking_event(content: str, **kwargs: Any) -> Event:
+def thinking_event(content: str, **kwargs: Any) -> AgentExecutionEvent:
     """Create a thinking event.
 
     Args:
@@ -212,9 +212,9 @@ def thinking_event(content: str, **kwargs: Any) -> Event:
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=THINKING
+        AgentExecutionEvent with type=THINKING
     """
-    return Event(type=EventType.THINKING, content=content, **kwargs)
+    return AgentExecutionEvent(type=EventType.THINKING, content=content, **kwargs)
 
 
 def tool_call_event(
@@ -222,7 +222,7 @@ def tool_call_event(
     arguments: Dict[str, Any],
     tool_id: Optional[str] = None,
     **kwargs: Any,
-) -> Event:
+) -> AgentExecutionEvent:
     """Create a tool call event.
 
     Args:
@@ -232,9 +232,9 @@ def tool_call_event(
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=TOOL_CALL
+        AgentExecutionEvent with type=TOOL_CALL
     """
-    return Event(
+    return AgentExecutionEvent(
         type=EventType.TOOL_CALL,
         tool_name=tool_name,
         tool_id=tool_id,
@@ -249,7 +249,7 @@ def tool_result_event(
     success: bool = True,
     tool_id: Optional[str] = None,
     **kwargs: Any,
-) -> Event:
+) -> AgentExecutionEvent:
     """Create a tool result event.
 
     Args:
@@ -260,9 +260,9 @@ def tool_result_event(
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=TOOL_RESULT
+        AgentExecutionEvent with type=TOOL_RESULT
     """
-    return Event(
+    return AgentExecutionEvent(
         type=EventType.TOOL_RESULT,
         tool_name=tool_name,
         tool_id=tool_id,
@@ -277,7 +277,7 @@ def tool_error_event(
     error: str,
     tool_id: Optional[str] = None,
     **kwargs: Any,
-) -> Event:
+) -> AgentExecutionEvent:
     """Create a tool error event.
 
     Args:
@@ -287,9 +287,9 @@ def tool_error_event(
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=TOOL_ERROR
+        AgentExecutionEvent with type=TOOL_ERROR
     """
-    return Event(
+    return AgentExecutionEvent(
         type=EventType.TOOL_ERROR,
         tool_name=tool_name,
         tool_id=tool_id,
@@ -303,7 +303,7 @@ def stage_change_event(
     old_stage: str,
     new_stage: str,
     **kwargs: Any,
-) -> Event:
+) -> AgentExecutionEvent:
     """Create a stage change event.
 
     Args:
@@ -312,9 +312,9 @@ def stage_change_event(
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=STAGE_CHANGE
+        AgentExecutionEvent with type=STAGE_CHANGE
     """
-    return Event(
+    return AgentExecutionEvent(
         type=EventType.STAGE_CHANGE,
         old_stage=old_stage,
         new_stage=new_stage,
@@ -326,7 +326,7 @@ def error_event(
     error: str,
     recoverable: bool = True,
     **kwargs: Any,
-) -> Event:
+) -> AgentExecutionEvent:
     """Create an error event.
 
     Args:
@@ -335,9 +335,9 @@ def error_event(
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=ERROR
+        AgentExecutionEvent with type=ERROR
     """
-    return Event(
+    return AgentExecutionEvent(
         type=EventType.ERROR,
         error=error,
         recoverable=recoverable,
@@ -346,16 +346,16 @@ def error_event(
     )
 
 
-def stream_start_event(**kwargs: Any) -> Event:
+def stream_start_event(**kwargs: Any) -> AgentExecutionEvent:
     """Create a stream start event.
 
     Returns:
-        Event with type=STREAM_START
+        AgentExecutionEvent with type=STREAM_START
     """
-    return Event(type=EventType.STREAM_START, **kwargs)
+    return AgentExecutionEvent(type=EventType.STREAM_START, **kwargs)
 
 
-def stream_end_event(success: bool = True, error: Optional[str] = None, **kwargs: Any) -> Event:
+def stream_end_event(success: bool = True, error: Optional[str] = None, **kwargs: Any) -> AgentExecutionEvent:
     """Create a stream end event.
 
     Args:
@@ -363,12 +363,12 @@ def stream_end_event(success: bool = True, error: Optional[str] = None, **kwargs
         error: Error message if failed
 
     Returns:
-        Event with type=STREAM_END
+        AgentExecutionEvent with type=STREAM_END
     """
-    return Event(type=EventType.STREAM_END, success=success, error=error, **kwargs)
+    return AgentExecutionEvent(type=EventType.STREAM_END, success=success, error=error, **kwargs)
 
 
-def progress_event(progress: float, **kwargs: Any) -> Event:
+def progress_event(progress: float, **kwargs: Any) -> AgentExecutionEvent:
     """Create a progress event.
 
     Args:
@@ -376,12 +376,12 @@ def progress_event(progress: float, **kwargs: Any) -> Event:
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=PROGRESS
+        AgentExecutionEvent with type=PROGRESS
     """
-    return Event(type=EventType.PROGRESS, progress=progress, **kwargs)
+    return AgentExecutionEvent(type=EventType.PROGRESS, progress=progress, **kwargs)
 
 
-def milestone_event(milestone: str, **kwargs: Any) -> Event:
+def milestone_event(milestone: str, **kwargs: Any) -> AgentExecutionEvent:
     """Create a milestone event.
 
     Args:
@@ -389,6 +389,8 @@ def milestone_event(milestone: str, **kwargs: Any) -> Event:
         **kwargs: Additional event attributes
 
     Returns:
-        Event with type=MILESTONE
+        AgentExecutionEvent with type=MILESTONE
     """
-    return Event(type=EventType.MILESTONE, milestone=milestone, **kwargs)
+    return AgentExecutionEvent(type=EventType.MILESTONE, milestone=milestone, **kwargs)
+
+

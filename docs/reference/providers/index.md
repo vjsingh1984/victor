@@ -1008,7 +1008,7 @@ victor chat --timeout 60
 
 ### Getting Help
 
-- **Documentation**: [Full docs →](../README.md)
+- **Documentation**: [Full docs →](../../README.md)
 - **Issues**: [GitHub Issues →](https://github.com/vjsingh1984/victor/issues)
 - **Discussions**: [GitHub Discussions →](https://github.com/vjsingh1984/victor/discussions)
 - **Setup Guide**: [Detailed setup →](setup.md)

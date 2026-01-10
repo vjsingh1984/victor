@@ -31,7 +31,7 @@ Architecture:
             └── OpenTelemetryExporter
 
 Example:
-    from victor.core.events import get_observability_bus, Event
+    from victor.core.events import get_observability_bus, MessagingEvent
     from victor.observability import JsonLineExporter
 
     # Get singleton bus
@@ -39,7 +39,7 @@ Example:
     await bus.connect()
 
     # Subscribe to events
-    async def on_tool_event(event: Event):
+    async def on_tool_event(event: MessagingEvent):
         print(f"Tool {event.topic}: {event.data}")
 
     bus.subscribe("tool.*", on_tool_event)
@@ -54,7 +54,7 @@ Example:
 # Event system - using canonical core/events
 from victor.core.events import (
     ObservabilityBus,
-    Event,
+    MessagingEvent,
     get_observability_bus,
 )
 from victor.observability.exporters import (
@@ -137,7 +137,7 @@ except ImportError:
 __all__ = [
     # Core (canonical event system)
     "ObservabilityBus",
-    "Event",
+    "MessagingEvent",
     "get_observability_bus",
     # Exporters
     "BaseExporter",

@@ -38,7 +38,7 @@ from victor.teams import TeamFormation
 # =============================================================================
 
 
-class ValidationResult:
+class PatternValidationResult:
     """Result of pattern validation."""
 
     def __init__(
@@ -327,7 +327,7 @@ class PatternValidatorProtocol(Protocol):
         self,
         pattern: CollaborationPattern,
         test_cases: Optional[List[TaskContext]] = None,
-    ) -> ValidationResult:
+    ) -> PatternValidationResult:
         """Validate pattern structure and correctness.
 
         Args:
@@ -335,7 +335,7 @@ class PatternValidatorProtocol(Protocol):
             test_cases: Optional test cases for validation
 
         Returns:
-            ValidationResult with is_valid flag and any errors
+            PatternValidationResult with is_valid flag and any errors
         """
         ...
 

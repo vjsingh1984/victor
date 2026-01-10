@@ -61,7 +61,7 @@ from victor.workflows.hitl import (
 
 # Checkpoint imports
 from victor.storage.checkpoints import (
-    CheckpointManager,
+    ConversationCheckpointManager,
     SQLiteCheckpointBackend,
 )
 
@@ -332,7 +332,7 @@ class TestCheckpointIntegration:
     async def test_checkpoint_save_restore(self, temp_dir):
         """Test saving and restoring checkpoints."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
-        manager = CheckpointManager(backend=backend)
+        manager = ConversationCheckpointManager(backend=backend)
 
         session_id = "test_session"
 
@@ -367,7 +367,7 @@ class TestCheckpointIntegration:
     async def test_checkpoint_list_and_diff(self, temp_dir):
         """Test listing checkpoints and comparing."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
-        manager = CheckpointManager(backend=backend)
+        manager = ConversationCheckpointManager(backend=backend)
 
         session_id = "test"
 
@@ -461,7 +461,7 @@ class TestCrossComponentIntegration:
         # Simulate checkpoint after successful execution
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = SQLiteCheckpointBackend(storage_path=Path(tmpdir))
-            manager = CheckpointManager(backend=backend)
+            manager = ConversationCheckpointManager(backend=backend)
 
             state = {
                 "messages": [{"role": "system", "content": "Pipeline completed"}],

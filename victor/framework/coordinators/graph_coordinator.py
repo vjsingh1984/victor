@@ -16,7 +16,7 @@
 
 Handles execution and streaming of StateGraph/CompiledGraph workflows.
 This coordinator encapsulates graph execution functionality with proper
-LSP-compliant handling of ExecutionResult types.
+LSP-compliant handling of GraphExecutionResult types.
 
 Features:
 - Execute compiled StateGraphs
@@ -41,7 +41,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
-    from victor.framework.workflow_engine import ExecutionResult, WorkflowEvent
+    from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.graph_dsl import WorkflowGraph
     from victor.workflows.graph_compiler import CompilerConfig
     from victor.workflows.node_runners import NodeRunnerRegistry
@@ -59,7 +59,7 @@ class GraphExecutionCoordinator:
     - LSP-compliant result handling
 
     The coordinator properly handles the polymorphic return type from
-    CompiledGraph.invoke(), which may return either an ExecutionResult
+    CompiledGraph.invoke(), which may return either a GraphExecutionResult
     object with a .state attribute or a raw state dictionary.
 
     Example:
@@ -100,7 +100,7 @@ class GraphExecutionCoordinator:
         graph: "CompiledGraph",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a compiled StateGraph.
 
         Properly handles the polymorphic return type from graph.invoke(),
@@ -112,9 +112,9 @@ class GraphExecutionCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
 
         start_time = time.time()
 
@@ -125,7 +125,7 @@ class GraphExecutionCoordinator:
             duration = time.time() - start_time
 
             # Handle polymorphic return type (LSP compliance)
-            # CompiledGraph.invoke() returns ExecutionResult with .state attribute
+            # CompiledGraph.invoke() returns GraphExecutionResult with .state attribute
             # Some graphs may return state dict directly for backward compatibility
             if hasattr(result, "state"):
                 final_state = result.state
@@ -139,7 +139,7 @@ class GraphExecutionCoordinator:
                 success = True
                 error = None
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=success,
                 final_state=final_state,
                 nodes_executed=(
@@ -155,7 +155,7 @@ class GraphExecutionCoordinator:
 
         except Exception as e:
             logger.error(f"Graph execution failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
@@ -224,7 +224,7 @@ class GraphExecutionCoordinator:
         initial_state: Optional[Dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a WorkflowGraph via CompiledGraph (unified execution path).
 
         This method compiles a WorkflowGraph to CompiledGraph and executes
@@ -238,9 +238,9 @@ class GraphExecutionCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
         from victor.workflows.graph_compiler import (
             WorkflowGraphCompiler,
             CompilerConfig,
@@ -278,7 +278,7 @@ class GraphExecutionCoordinator:
                 success = True
                 error = None
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=success,
                 final_state=final_state,
                 nodes_executed=nodes_executed,
@@ -288,7 +288,7 @@ class GraphExecutionCoordinator:
 
         except Exception as e:
             logger.error(f"WorkflowGraph execution failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
@@ -299,7 +299,7 @@ class GraphExecutionCoordinator:
         workflow: Any,
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
 
         This method compiles a WorkflowDefinition to CompiledGraph and executes
@@ -311,9 +311,9 @@ class GraphExecutionCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
         from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
 
         start_time = time.time()
@@ -340,7 +340,7 @@ class GraphExecutionCoordinator:
                 success = True
                 error = None
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=success,
                 final_state=final_state,
                 nodes_executed=nodes_executed,
@@ -350,7 +350,7 @@ class GraphExecutionCoordinator:
 
         except Exception as e:
             logger.error(f"WorkflowDefinition compiled execution failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,

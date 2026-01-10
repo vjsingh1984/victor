@@ -107,7 +107,7 @@ Three modes for different workflows:
 | **PLAN** | Analysis and planning | No | Understanding code |
 | **EXPLORE** | Understanding only | No | Learning codebase |
 
-[Learn More →](modes.md)
+[Learn More →](cli-reference.md#modes)
 
 ### 3. Tools System
 
@@ -138,7 +138,7 @@ nodes:
     tools: [pytest, coverage]
 ```
 
-[Learn More →](workflows.md)
+[Learn More →](../guides/workflow-development/)
 
 ### 5. Project Context
 
@@ -148,7 +148,7 @@ Configure project-specific instructions:
 - **`CLAUDE.md`**: AI assistant project instructions
 - **Auto-discovery**: Victor finds these files automatically
 
-[Learn More →](project-context.md)
+[Learn More →](../reference/configuration/index.md#victormd)
 
 ## Configuration
 
@@ -190,8 +190,8 @@ profiles:
 - Model not found? → [Provider Reference →](../reference/providers/)
 
 **Performance Issues**
-- Slow responses? → [Performance Guide →](../guides/performance.md)
-- High memory usage? → [Performance Guide →](../guides/performance.md)
+- Slow responses? → [Performance Benchmarks →](../operations/performance/benchmarks.md)
+- High memory usage? → [Performance Benchmarks →](../operations/performance/benchmarks.md)
 - Tool execution errors? → [Troubleshooting →](troubleshooting.md)
 
 [Full Troubleshooting Guide →](troubleshooting.md)
@@ -206,7 +206,7 @@ profiles:
   run: victor chat "Review this PR" --mode plan
 ```
 
-[Full Integration Guide →](../guides/integration/ci-cd.md)
+[More Guides →](../guides/index.md)
 
 ### HTTP API
 
@@ -230,7 +230,7 @@ victor mcp --stdio
 
 Install from marketplace or build from source.
 
-[VS Code Setup →](../guides/integration/vscode-extension.md)
+[VS Code Setup →](../../vscode-victor/README.md)
 
 ## Advanced Usage
 
@@ -240,11 +240,11 @@ Domain-specific assistants for specialized tasks:
 
 | Vertical | Description | Usage |
 |----------|-------------|-------|
-| [**Coding**](../reference/verticals/coding.md) | Software development | `victor --vertical coding` |
-| [**DevOps**](../reference/verticals/devops.md) | DevOps and infrastructure | `victor --vertical devops` |
-| [**RAG**](../reference/verticals/rag.md) | Retrieval-augmented generation | `victor --vertical rag` |
-| [**Data Analysis**](../reference/verticals/data-analysis.md) | Data science workflows | `victor --vertical dataanalysis` |
-| [**Research**](../reference/verticals/research.md) | Research and analysis | `victor --vertical research` |
+| [**Coding**](../reference/verticals/index.md) | Software development | `victor --vertical coding` |
+| [**DevOps**](../reference/verticals/index.md) | DevOps and infrastructure | `victor --vertical devops` |
+| [**RAG**](../reference/verticals/index.md) | Retrieval-augmented generation | `victor --vertical rag` |
+| [**Data Analysis**](../reference/verticals/index.md) | Data science workflows | `victor --vertical dataanalysis` |
+| [**Research**](../reference/verticals/index.md) | Research and analysis | `victor --vertical research` |
 
 ### Multi-Agent Coordination
 
@@ -324,7 +324,7 @@ pipe(read_file, analyze_code, write_report)
 parallel(run_tests, run_linter, run_coverage)
 ```
 
-[Tool Composition →](../reference/tools/composition.md)
+[Tool Catalog →](../reference/tools/catalog.md)
 
 ## Examples
 
@@ -392,7 +392,7 @@ result = await team.run("Implement user registration feature")
 - **Guides**: [Workflow Development →](../guides/workflow-development/)
 - **Guides**: [Multi-Agent Teams →](../guides/multi-agent/)
 - **Guides**: [Integration →](../guides/integration/)
-- **Development**: [Contributing →](../development/contributing/)
+- **Development**: [Contributing →](../../CONTRIBUTING.md)
 
 ---
 

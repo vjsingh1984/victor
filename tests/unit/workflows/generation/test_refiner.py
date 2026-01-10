@@ -33,8 +33,8 @@ from victor.workflows.generation import (
     WorkflowValidator,
     ErrorCategory,
     ErrorSeverity,
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
 )
 
 
@@ -57,7 +57,7 @@ class TestSchemaRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity=ErrorSeverity.ERROR,
                 message="Missing required field: 'role'",
@@ -89,7 +89,7 @@ class TestSchemaRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity=ErrorSeverity.ERROR,
                 message="tool_budget must be integer, got str",
@@ -123,7 +123,7 @@ class TestSchemaRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity=ErrorSeverity.ERROR,
                 message="tool_budget 1000 out of range [1, 500]",
@@ -155,7 +155,7 @@ class TestSchemaRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity=ErrorSeverity.ERROR,
                 message="Invalid agent role: 'developer'",
@@ -190,7 +190,7 @@ class TestStructureRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.STRUCTURE,
                 severity=ErrorSeverity.ERROR,
                 message="Node 'orphan' is not reachable from entry point 'start'",
@@ -216,7 +216,7 @@ class TestStructureRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.STRUCTURE,
                 severity=ErrorSeverity.ERROR,
                 message="Entry point 'missing' not found",
@@ -252,7 +252,7 @@ class TestSemanticRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SEMANTIC,
                 severity=ErrorSeverity.ERROR,
                 message="Tool 'unknown_tool' not found in registry",
@@ -283,7 +283,7 @@ class TestSemanticRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SEMANTIC,
                 severity=ErrorSeverity.ERROR,
                 message="Invalid role: 'coder'",
@@ -326,7 +326,7 @@ class TestSecurityRefiner:
         }
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SECURITY,
                 severity=ErrorSeverity.ERROR,
                 message="Total tool budget 120 exceeds limit 100",
@@ -436,7 +436,7 @@ class TestWorkflowRefiner:
             "entry_point": "agent1"
         }
 
-        error = ValidationError(
+        error = WorkflowValidationError(
             category=ErrorCategory.SCHEMA,
             severity=ErrorSeverity.ERROR,
             message="Missing field",
@@ -619,10 +619,10 @@ class TestRefinementIntegration:
         }
 
         # Create validation result with unfixable error
-        result = ValidationResult(
+        result = WorkflowGenerationValidationResult(
             is_valid=False,
             schema_errors=[
-                ValidationError(
+                WorkflowValidationError(
                     category=ErrorCategory.SCHEMA,
                     severity=ErrorSeverity.CRITICAL,
                     message="Some unfixable error",
@@ -643,10 +643,10 @@ class TestRefinementIntegration:
 
         workflow = {}
 
-        result = ValidationResult(
+        result = WorkflowGenerationValidationResult(
             is_valid=False,
             schema_errors=[
-                ValidationError(
+                WorkflowValidationError(
                     category=ErrorCategory.SCHEMA,
                     severity=ErrorSeverity.CRITICAL,
                     message="Missing required field: 'nodes'",

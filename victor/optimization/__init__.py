@@ -51,9 +51,9 @@ from victor.optimization.evaluator import VariantEvaluator
 from victor.optimization.optimizer import WorkflowOptimizer
 from victor.optimization.validator import (
     ConstraintViolation,
+    OptimizationValidationResult,
     OptimizationValidator,
     ValidationRecommendation,
-    ValidationResult,
 )
 
 __all__ = [
@@ -78,7 +78,7 @@ __all__ = [
     "ToolSelectionStrategy",
     # Validation
     "OptimizationValidator",
-    "ValidationResult",
+    "OptimizationValidationResult",
     "ValidationRecommendation",
     "ConstraintViolation",
 ]

@@ -13,15 +13,14 @@ This section contains step-by-step guides for common tasks, from basic setup to 
 | Guide | Description | Difficulty |
 |-------|-------------|------------|
 | [**Workflow DSL**](workflow-development/) | Define YAML workflows | Beginner |
-| [**Multi-Agent Teams**](multi-agent/) | Coordinate AI agents | Intermediate |
+| [**Multi-Agent Teams**](MULTI_AGENT_TEAMS.md) | Coordinate AI agents | Intermediate |
 | [**Observability**](observability/) | Events and metrics | Intermediate |
-| [**CI/CD Integration**](integration/ci-cd.md) | GitHub Actions, etc. | Beginner |
 | [**MCP Clients**](integration/mcp-clients.md) | Using MCP servers | Intermediate |
 | [**Development Setup**](development/local-models.md) | Local model setup | Beginner |
-| [**Performance**](performance.md) | Optimization and tuning | Advanced |
-| [**Security**](security.md) | Best practices | Intermediate |
-| [**Resilience**](resilience.md) | Error handling | Advanced |
-| [**HITL Workflows**](hitl-workflows.md) | Human-in-the-loop patterns | Intermediate |
+| [**Performance**](../operations/performance/benchmarks.md) | Optimization and tuning | Advanced |
+| [**Security**](../operations/security/compliance.md) | Best practices | Intermediate |
+| [**Resilience**](RESILIENCE.md) | Error handling | Advanced |
+| [**HITL Workflows**](HITL_WORKFLOWS.md) | Human-in-the-loop patterns | Intermediate |
 
 ## Workflow Development
 
@@ -32,7 +31,6 @@ Complete guide to creating and using YAML-based workflows.
 - **[Workflow DSL](workflow-development/dsl.md)**: StateGraph YAML syntax and features
 - **[Scheduling](workflow-development/scheduling.md)**: Cron-based workflow scheduling
 - **[Examples](workflow-development/examples.md)**: Common workflow patterns
-- **[Best Practices](workflow-development/best-practices.md)**: Workflow design patterns
 
 ### Example Workflow
 
@@ -76,9 +74,8 @@ Coordinate specialized AI agents for complex tasks.
 
 ### Topics
 
-- **[Teams](multi-agent/teams.md)**: Team formations and patterns
-- **[Formations](multi-agent/formations.md)**: Hierarchical, flat, pipeline, consensus, debate
-- **[Communication](multi-agent/communication.md)**: Inter-agent messaging and coordination
+- **[Multi-Agent Teams](MULTI_AGENT_TEAMS.md)**: Team formations and patterns
+- **[Quickstart](multi-agent-quickstart.md)**: Fast start for teams
 
 ### Example Multi-Agent Team
 
@@ -120,7 +117,7 @@ Monitor Victor's behavior and performance with the EventBus.
 
 - **[Event Bus](observability/event-bus.md)**: Event sourcing and subscriptions
 - **[Metrics](observability/metrics.md)**: Metrics collection and analysis
-- **[Tracing](observability/tracing.md)**: Distributed tracing for workflows
+- **[Overview](observability/index.md)**: Observability overview
 
 ### Example Event Monitoring
 
@@ -145,10 +142,8 @@ Integrate Victor with other tools and platforms.
 
 ### Topics
 
-- **[CI/CD Integration](integration/ci-cd.md)**: GitHub Actions, GitLab CI, Jenkins
 - **[MCP Clients](integration/mcp-clients.md)**: Using Victor as MCP server
-- **[HTTP API](integration/http-integration.md)**: REST API integration
-- **[VS Code Extension](integration/vscode-extension.md)**: VS Code setup and usage
+- **[MCP Server](VICTOR_AS_MCP_SERVER.md)**: Run Victor as MCP server
 
 ### Example: GitHub Actions
 
@@ -182,7 +177,7 @@ jobs:
             })
 ```
 
-[Full Integration Guide →](integration/)
+[MCP Clients Guide →](integration/mcp-clients.md)
 
 ## Development Setup
 
@@ -191,9 +186,8 @@ Guides for setting up and configuring development environments.
 ### Topics
 
 - **[Local Models](development/local-models.md)**: Ollama, LM Studio, vLLM setup
-- **[Cloud Providers](development/cloud-providers.md)**: Anthropic, OpenAI, Google setup
 - **[Embeddings](development/embeddings.md)**: Vector database and embeddings setup
-- **[Air-Gapped](development/air-gapped.md)**: Offline operation setup
+- **[Air-Gapped](development/AIRGAPPED.md)**: Offline operation setup
 
 ### Example: Local Model Setup
 
@@ -247,7 +241,7 @@ nodes:
 victor workflow run my-workflow --profile
 ```
 
-[Full Performance Guide →](performance.md)
+[Performance Benchmarks →](../operations/performance/benchmarks.md)
 
 ## Security
 
@@ -302,7 +296,7 @@ def audit_workflow(event):
 EventBus.subscribe("workflow.complete", audit_workflow)
 ```
 
-[Full Security Guide →](security.md)
+[Security Compliance →](../operations/security/compliance.md)
 
 ## Resilience
 
@@ -343,7 +337,7 @@ edges:
     target: process_data
 ```
 
-[Full Resilience Guide →](resilience.md)
+[Full Resilience Guide →](RESILIENCE.md)
 
 ## Human-in-the-Loop Workflows
 
@@ -386,7 +380,7 @@ edges:
     target: deploy
 ```
 
-[Full HITL Guide →](hitl-workflows.md)
+[Full HITL Guide →](HITL_WORKFLOWS.md)
 
 ## Common Patterns
 
@@ -466,8 +460,8 @@ result = await orchestrator.run("Analyze this code")
 - **Reference**: [Providers →](../reference/providers/)
 - **Reference**: [Tools →](../reference/tools/)
 - **Reference**: [Configuration →](../reference/configuration/)
-- **Development**: [Contributing →](../development/contributing/)
-- **Operations**: [Deployment →](../operations/deployment/)
+- **Development**: [Contributing →](../../CONTRIBUTING.md)
+- **Operations**: [Deployment →](../operations/deployment/enterprise.md)
 
 ---
 

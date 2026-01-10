@@ -2160,20 +2160,20 @@ class OrchestratorFactory(ModeAwareMixin):
         return criteria
 
     def create_checkpoint_manager(self) -> Optional[Any]:
-        """Create CheckpointManager for time-travel debugging.
+        """Create ConversationCheckpointManager for time-travel debugging.
 
         Creates the checkpoint manager based on settings configuration.
         Returns None if checkpointing is disabled.
 
         Returns:
-            CheckpointManager instance or None if disabled
+            ConversationCheckpointManager instance or None if disabled
         """
         if not getattr(self.settings, "checkpoint_enabled", True):
             logger.debug("Checkpoint system disabled via settings")
             return None
 
         try:
-            from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+            from victor.storage.checkpoints import ConversationCheckpointManager, SQLiteCheckpointBackend
             from victor.config.settings import get_project_paths
 
             # Get project paths for checkpoint storage
@@ -2190,20 +2190,20 @@ class OrchestratorFactory(ModeAwareMixin):
             auto_interval = getattr(self.settings, "checkpoint_auto_interval", 5)
             max_per_session = getattr(self.settings, "checkpoint_max_per_session", 50)
 
-            manager = CheckpointManager(
+            manager = ConversationCheckpointManager(
                 backend=backend,
                 auto_checkpoint_interval=auto_interval,
                 max_checkpoints_per_session=max_per_session,
             )
 
             logger.info(
-                f"CheckpointManager created (auto_interval={auto_interval}, "
+                f"ConversationCheckpointManager created (auto_interval={auto_interval}, "
                 f"max_per_session={max_per_session})"
             )
             return manager
 
         except Exception as e:
-            logger.warning(f"Failed to create CheckpointManager: {e}")
+            logger.warning(f"Failed to create ConversationCheckpointManager: {e}")
             return None
 
     def create_workflow_optimization_components(

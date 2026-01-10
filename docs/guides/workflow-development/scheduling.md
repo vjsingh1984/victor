@@ -601,6 +601,6 @@ Use Airflow, Temporal.io, or AWS Step Functions when you need:
 **Related Documentation**:
 - [StateGraph DSL →](dsl.md) - Building workflow graphs
 - [User Guide →](../../user-guide/) - Workflows section
-- [YAML Workflow Architecture](../../CLAUDE.md#yaml-workflow-architecture)
+- [YAML Workflow Architecture](../../../CLAUDE.md#yaml-workflow-architecture)
 
 *Last Updated: 2026-01-05*

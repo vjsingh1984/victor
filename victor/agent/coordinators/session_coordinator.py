@@ -35,7 +35,7 @@ Architecture:
     - SessionStateManager: Execution state tracking
     - LifecycleManager: Session lifecycle operations
     - MemoryManager: Persistent session storage
-    - CheckpointManager: Checkpoint save/restore
+    - ConversationCheckpointManager: Checkpoint save/restore
 
 Usage:
     coordinator = SessionCoordinator(

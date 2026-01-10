@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from scipy import stats
 
-from victor.core.events import Event, get_observability_bus
+from victor.core.events import MessagingEvent, get_observability_bus
 from victor.experiments.ab_testing.models import (
     AggregatedMetrics,
     ExecutionMetrics,
@@ -98,7 +98,7 @@ class MetricsCollector:
 
         self._subscription_handles.clear()
 
-    async def _on_workflow_event(self, event: Event) -> None:
+    async def _on_workflow_event(self, event: MessagingEvent) -> None:
         """Handle workflow execution events.
 
         Args:
@@ -115,7 +115,7 @@ class MetricsCollector:
         if event.topic.endswith("completed") or event.topic.endswith("failed"):
             await self._record_execution(event)
 
-    async def _record_execution(self, event: Event) -> None:
+    async def _record_execution(self, event: MessagingEvent) -> None:
         """Record execution metrics from event.
 
         Args:

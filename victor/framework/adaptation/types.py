@@ -92,8 +92,8 @@ class GraphModification:
 
 
 @dataclass
-class ValidationResult:
-    """Result of validation operation.
+class AdaptationValidationResult:
+    """Result of adaptation validation operation.
 
     Attributes:
         is_valid: Whether validation passed
@@ -109,9 +109,9 @@ class ValidationResult:
     suggestions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def merge(self, other: "ValidationResult") -> "ValidationResult":
+    def merge(self, other: "AdaptationValidationResult") -> "AdaptationValidationResult":
         """Merge two validation results."""
-        return ValidationResult(
+        return AdaptationValidationResult(
             is_valid=self.is_valid and other.is_valid,
             errors=self.errors + other.errors,
             warnings=self.warnings + other.warnings,
@@ -230,7 +230,7 @@ __all__ = [
     "AdaptationTrigger",
     "RiskLevel",
     "GraphModification",
-    "ValidationResult",
+    "AdaptationValidationResult",
     "AdaptationImpact",
     "AdaptationCheckpoint",
     "AdaptationResult",

@@ -24,8 +24,8 @@ import asyncio
 import pytest
 
 from victor.core.events import (
+    MessagingEvent,
     ObservabilityBus,
-    Event,
     get_observability_bus,
 )
 from victor.observability.event_registry import (

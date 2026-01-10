@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional
 
 from victor.agent.provider.switcher import ProviderSwitcher, ProviderSwitcherState
 from victor.agent.provider.health_monitor import ProviderHealthMonitor
-from victor.core.events.protocols import Event
+from victor.core.events.protocols import MessagingEvent
 
 
 class TestProviderSwitchCoordinator:

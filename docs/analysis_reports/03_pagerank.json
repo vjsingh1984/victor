@@ -2,7 +2,7 @@
   {
     "rank": 1,
     "node_id": "symbol:victor/ui/emoji.py:get",
-    "score": 0.028146425620846353,
+    "score": 0.027883190792606136,
     "name": "get",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -10,7 +10,7 @@
   {
     "rank": 2,
     "node_id": "symbol:victor/core/event_sourcing.py:append",
-    "score": 0.02336624502652189,
+    "score": 0.023614695475239242,
     "name": "append",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -18,7 +18,7 @@
   {
     "rank": 3,
     "node_id": "symbol:victor/ui/emoji.py:_get",
-    "score": 0.019379828005398822,
+    "score": 0.019155243745181173,
     "name": "_get",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -26,7 +26,7 @@
   {
     "rank": 4,
     "node_id": "symbol:victor/ui/emoji.py:get_icon",
-    "score": 0.016939196782956325,
+    "score": 0.0167440716077822,
     "name": "get_icon",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -34,7 +34,7 @@
   {
     "rank": 5,
     "node_id": "symbol:victor/framework/graph.py:items",
-    "score": 0.01471601721756579,
+    "score": 0.014849343191287926,
     "name": "items",
     "type": "function",
     "module": "victor.framework.graph"
@@ -42,7 +42,7 @@
   {
     "rank": 6,
     "node_id": "symbol:victor/ui/emoji.py:warning",
-    "score": 0.009893726983375652,
+    "score": 0.00966150084535091,
     "name": "warning",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -50,7 +50,7 @@
   {
     "rank": 7,
     "node_id": "symbol:victor/ui/emoji.py:info",
-    "score": 0.009640378179754007,
+    "score": 0.009631574549250012,
     "name": "info",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -58,7 +58,7 @@
   {
     "rank": 8,
     "node_id": "symbol:victor/framework/agent_components.py:connect",
-    "score": 0.009558729124218658,
+    "score": 0.009548939285093814,
     "name": "connect",
     "type": "function",
     "module": "victor.framework.agent_components"
@@ -66,7 +66,7 @@
   {
     "rank": 9,
     "node_id": "symbol:victor/tools/cache_manager.py:keys",
-    "score": 0.009512267474242643,
+    "score": 0.009306158449993863,
     "name": "keys",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -74,7 +74,7 @@
   {
     "rank": 10,
     "node_id": "symbol:victor/core/repository.py:list",
-    "score": 0.008875873587776098,
+    "score": 0.00861852996181829,
     "name": "list",
     "type": "function",
     "module": "victor.core.repository"
@@ -82,7 +82,7 @@
   {
     "rank": 11,
     "node_id": "symbol:victor/observability/metrics.py:time",
-    "score": 0.007170875768752308,
+    "score": 0.0071066794073089065,
     "name": "time",
     "type": "function",
     "module": "victor.observability.metrics"
@@ -90,7 +90,7 @@
   {
     "rank": 12,
     "node_id": "symbol:victor/tools/cache_manager.py:set",
-    "score": 0.006330541948481638,
+    "score": 0.006465790339517295,
     "name": "set",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -98,7 +98,7 @@
   {
     "rank": 13,
     "node_id": "symbol:victor/core/unit_of_work.py:commit",
-    "score": 0.005610765791231819,
+    "score": 0.005643046011487079,
     "name": "commit",
     "type": "function",
     "module": "victor.core.unit_of_work"
@@ -106,7 +106,7 @@
   {
     "rank": 14,
     "node_id": "symbol:victor/observability/metrics.py:TimerContext",
-    "score": 0.005202767932481633,
+    "score": 0.005143903079973801,
     "name": "TimerContext",
     "type": "class",
     "module": "victor.observability.metrics"
@@ -114,7 +114,7 @@
   {
     "rank": 15,
     "node_id": "symbol:victor/framework/graph.py:values",
-    "score": 0.005123775368363411,
+    "score": 0.005078583956034893,
     "name": "values",
     "type": "function",
     "module": "victor.framework.graph"
@@ -122,7 +122,7 @@
   {
     "rank": 16,
     "node_id": "symbol:victor/core/event_sourcing.py:get",
-    "score": 0.004715684721063618,
+    "score": 0.0047547505892300895,
     "name": "get",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -130,31 +130,31 @@
   {
     "rank": 17,
     "node_id": "symbol:victor/core/event_sourcing.py:EventEnvelope",
-    "score": 0.0037680167442105074,
+    "score": 0.0038055782438283265,
     "name": "EventEnvelope",
     "type": "class",
     "module": "victor.core.event_sourcing"
   },
   {
     "rank": 18,
-    "node_id": "symbol:victor/ui/emoji.py:is_emoji_enabled",
-    "score": 0.003757457680900767,
-    "name": "is_emoji_enabled",
-    "type": "function",
-    "module": "victor.ui.emoji"
-  },
-  {
-    "rank": 19,
     "node_id": "symbol:victor/core/event_sourcing.py:load",
-    "score": 0.003695480885550418,
+    "score": 0.0037224966093444764,
     "name": "load",
     "type": "function",
     "module": "victor.core.event_sourcing"
   },
   {
+    "rank": 19,
+    "node_id": "symbol:victor/ui/emoji.py:is_emoji_enabled",
+    "score": 0.0037124910080347227,
+    "name": "is_emoji_enabled",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
     "rank": 20,
     "node_id": "symbol:victor/framework/cqrs_bridge.py:FrameworkEventAdapter",
-    "score": 0.0036426994128012005,
+    "score": 0.0036389355639954396,
     "name": "FrameworkEventAdapter",
     "type": "class",
     "module": "victor.framework.cqrs_bridge"
@@ -162,7 +162,7 @@
   {
     "rank": 21,
     "node_id": "symbol:victor/ui/emoji.py:error",
-    "score": 0.0036201212540351918,
+    "score": 0.0036166031477011464,
     "name": "error",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -170,7 +170,7 @@
   {
     "rank": 22,
     "node_id": "symbol:victor/core/event_sourcing.py:ConcurrencyError",
-    "score": 0.0033748541354459917,
+    "score": 0.003412868477087824,
     "name": "ConcurrencyError",
     "type": "class",
     "module": "victor.core.event_sourcing"
@@ -178,7 +178,7 @@
   {
     "rank": 23,
     "node_id": "symbol:victor/core/event_sourcing.py:to_dict",
-    "score": 0.003374496091366767,
+    "score": 0.0034125110439760806,
     "name": "to_dict",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -186,7 +186,7 @@
   {
     "rank": 24,
     "node_id": "symbol:victor/ui/emoji.py:_get_settings",
-    "score": 0.0033641059719782393,
+    "score": 0.003325756528227521,
     "name": "_get_settings",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -194,7 +194,7 @@
   {
     "rank": 25,
     "node_id": "symbol:victor/framework/graph.py:copy",
-    "score": 0.003324545695163312,
+    "score": 0.003320330366595109,
     "name": "copy",
     "type": "function",
     "module": "victor.framework.graph"
@@ -202,7 +202,7 @@
   {
     "rank": 26,
     "node_id": "symbol:victor/config/provider_config_registry.py:get_settings",
-    "score": 0.003263806310481906,
+    "score": 0.0032607840060941834,
     "name": "get_settings",
     "type": "function",
     "module": "victor.config.provider_config_registry"
@@ -210,55 +210,55 @@
   {
     "rank": 27,
     "node_id": "symbol:victor/observability/metrics.py:sum",
-    "score": 0.003003296867616225,
+    "score": 0.0030062160622041662,
     "name": "sum",
     "type": "function",
     "module": "victor.observability.metrics"
   },
   {
     "rank": 28,
-    "node_id": "symbol:victor/tools/cache_manager.py:is_expired",
-    "score": 0.0028464123618368586,
-    "name": "is_expired",
-    "type": "function",
-    "module": "victor.tools.cache_manager"
-  },
-  {
-    "rank": 29,
-    "node_id": "symbol:victor/core/event_sourcing.py:exists",
-    "score": 0.0027526389302620375,
-    "name": "exists",
-    "type": "function",
-    "module": "victor.core.event_sourcing"
-  },
-  {
-    "rank": 30,
-    "node_id": "symbol:victor/core/event_sourcing.py:_get_data",
-    "score": 0.0027365057525393956,
-    "name": "_get_data",
-    "type": "function",
-    "module": "victor.core.event_sourcing"
-  },
-  {
-    "rank": 31,
     "node_id": "symbol:victor/tools/cache_manager.py:CacheEntry",
-    "score": 0.002736451141087806,
+    "score": 0.0027948762663996575,
     "name": "CacheEntry",
     "type": "class",
     "module": "victor.tools.cache_manager"
   },
   {
-    "rank": 32,
+    "rank": 29,
     "node_id": "symbol:victor/tools/cache_manager.py:_evict_oldest",
-    "score": 0.002735892191750266,
+    "score": 0.0027943182708549293,
     "name": "_evict_oldest",
     "type": "function",
     "module": "victor.tools.cache_manager"
   },
   {
+    "rank": 30,
+    "node_id": "symbol:victor/tools/cache_manager.py:is_expired",
+    "score": 0.0027852714872682208,
+    "name": "is_expired",
+    "type": "function",
+    "module": "victor.tools.cache_manager"
+  },
+  {
+    "rank": 31,
+    "node_id": "symbol:victor/core/event_sourcing.py:_get_data",
+    "score": 0.0027645493859870113,
+    "name": "_get_data",
+    "type": "function",
+    "module": "victor.core.event_sourcing"
+  },
+  {
+    "rank": 32,
+    "node_id": "symbol:victor/core/event_sourcing.py:exists",
+    "score": 0.0027478941665117144,
+    "name": "exists",
+    "type": "function",
+    "module": "victor.core.event_sourcing"
+  },
+  {
     "rank": 33,
     "node_id": "symbol:victor/ui/tui/app.py:print",
-    "score": 0.0026938967516622466,
+    "score": 0.0026891917874488067,
     "name": "print",
     "type": "function",
     "module": "victor.ui.tui"
@@ -266,7 +266,7 @@
   {
     "rank": 34,
     "node_id": "symbol:victor/core/repository.py:update",
-    "score": 0.0025961262433386373,
+    "score": 0.0026038796483063365,
     "name": "update",
     "type": "function",
     "module": "victor.core.repository"
@@ -274,7 +274,7 @@
   {
     "rank": 35,
     "node_id": "symbol:victor/workflows/registry.py:search",
-    "score": 0.0024675691287759623,
+    "score": 0.0024625928880416697,
     "name": "search",
     "type": "function",
     "module": "victor.workflows.registry"
@@ -282,7 +282,7 @@
   {
     "rank": 36,
     "node_id": "symbol:victor/benchmark/agent.py:create",
-    "score": 0.0024322978334959332,
+    "score": 0.0024302423040590266,
     "name": "create",
     "type": "function",
     "module": "victor.benchmark.agent"
@@ -290,7 +290,7 @@
   {
     "rank": 37,
     "node_id": "symbol:victor/agent/conversation_memory.py:add_system_message",
-    "score": 0.002385781777556316,
+    "score": 0.002381367120969911,
     "name": "add_system_message",
     "type": "function",
     "module": "victor.agent.conversation_memory"
@@ -298,105 +298,105 @@
   {
     "rank": 38,
     "node_id": "symbol:victor/core/event_sourcing.py:get_stream_version",
-    "score": 0.002383383027971448,
+    "score": 0.0023790949233685253,
     "name": "get_stream_version",
     "type": "function",
     "module": "victor.core.event_sourcing"
   },
   {
     "rank": 39,
+    "node_id": "symbol:victor/framework/rl/shared_encoder.py:encode",
+    "score": 0.0023510672474240197,
+    "name": "encode",
+    "type": "function",
+    "module": "victor.framework.rl"
+  },
+  {
+    "rank": 40,
     "node_id": "symbol:victor/framework/errors.py:AgentError",
-    "score": 0.0023113561517235206,
+    "score": 0.002309512595581544,
     "name": "AgentError",
     "type": "class",
     "module": "victor.framework.errors"
   },
   {
-    "rank": 40,
+    "rank": 41,
     "node_id": "symbol:victor/agent/conversation_memory.py:add_message",
-    "score": 0.0021050001923917402,
+    "score": 0.002101696384388987,
     "name": "add_message",
     "type": "function",
     "module": "victor.agent.conversation_memory"
   },
   {
-    "rank": 41,
+    "rank": 42,
     "node_id": "symbol:victor/framework/cqrs_bridge.py:connect_agent",
-    "score": 0.002077988315507374,
+    "score": 0.0020765468405417836,
     "name": "connect_agent",
     "type": "function",
     "module": "victor.framework.cqrs_bridge"
   },
   {
-    "rank": 42,
+    "rank": 43,
     "node_id": "symbol:victor/benchmark/agent.py:BenchmarkAgentConfig",
-    "score": 0.0019403993251492107,
+    "score": 0.0019373780333075588,
     "name": "BenchmarkAgentConfig",
     "type": "class",
     "module": "victor.benchmark.agent"
   },
   {
-    "rank": 43,
-    "node_id": "symbol:victor/processing/serialization/formats/markdown_encoder.py:encode",
-    "score": 0.0019309060979746278,
-    "name": "encode",
-    "type": "function",
-    "module": "victor.processing.serialization"
-  },
-  {
     "rank": 44,
     "node_id": "symbol:victor/framework/graph.py:_ensure_copy",
-    "score": 0.001737389645202751,
+    "score": 0.001734551222806448,
     "name": "_ensure_copy",
     "type": "function",
     "module": "victor.framework.graph"
   },
   {
     "rank": 45,
+    "node_id": "symbol:victor/core/tool_tier_registry.py:extend",
+    "score": 0.0017008253553456906,
+    "name": "extend",
+    "type": "function",
+    "module": "victor.core.tool_tier_registry"
+  },
+  {
+    "rank": 46,
     "node_id": "symbol:victor/core/repository.py:_put_in_cache",
-    "score": 0.0016752712818192805,
+    "score": 0.0016386617770460332,
     "name": "_put_in_cache",
     "type": "function",
     "module": "victor.core.repository"
   },
   {
-    "rank": 46,
+    "rank": 47,
     "node_id": "symbol:victor/core/event_sourcing.py:read",
-    "score": 0.0016153720336823647,
+    "score": 0.0016256591786537656,
     "name": "read",
     "type": "function",
     "module": "victor.core.event_sourcing"
   },
   {
-    "rank": 47,
+    "rank": 48,
     "node_id": "symbol:victor/core/event_sourcing.py:load_from_history",
-    "score": 0.0016152055997849994,
+    "score": 0.0016254930287596973,
     "name": "load_from_history",
     "type": "function",
     "module": "victor.core.event_sourcing"
   },
   {
-    "rank": 48,
+    "rank": 49,
     "node_id": "symbol:victor/core/event_sourcing.py:_apply_event",
-    "score": 0.001587320543612335,
+    "score": 0.0015854816432437444,
     "name": "_apply_event",
     "type": "function",
     "module": "victor.core.event_sourcing"
   },
   {
-    "rank": 49,
+    "rank": 50,
     "node_id": "symbol:victor/framework/graph.py:pop",
-    "score": 0.0015305941281148823,
+    "score": 0.0015282564002949016,
     "name": "pop",
     "type": "function",
     "module": "victor.framework.graph"
-  },
-  {
-    "rank": 50,
-    "node_id": "symbol:victor/framework/teams.py:run",
-    "score": 0.0015217639563820493,
-    "name": "run",
-    "type": "function",
-    "module": "victor.framework.teams"
   }
 ]

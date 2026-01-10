@@ -27,8 +27,8 @@ from victor.framework.patterns.types import (
     CollaborationPattern,
     PatternCategory,
     PatternRecommendation,
+    PatternValidationResult,
     TaskContext,
-    ValidationResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -487,7 +487,7 @@ class PatternValidator:
         self,
         pattern: CollaborationPattern,
         test_cases: Optional[List[TaskContext]] = None,
-    ) -> ValidationResult:
+    ) -> PatternValidationResult:
         """Validate pattern structure and correctness.
 
         Args:
@@ -495,7 +495,7 @@ class PatternValidator:
             test_cases: Optional test cases for validation
 
         Returns:
-            ValidationResult with is_valid flag and any errors
+            PatternValidationResult with is_valid flag and any errors
         """
         errors = []
         warnings = []
@@ -526,7 +526,7 @@ class PatternValidator:
         # Safety score (1.0 for now - would check for harmful patterns)
         safety_score = 1.0
 
-        return ValidationResult(
+        return PatternValidationResult(
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,

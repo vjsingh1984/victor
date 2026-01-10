@@ -61,7 +61,7 @@ from victor.core.events.protocols import (
     BackendConfig,
     BackendType,
     DeliveryGuarantee,
-    Event,
+    MessagingEvent,
     EventHandler,
     EventPublishError,
     IEventBackend,
@@ -108,7 +108,7 @@ class SQLiteEventBackend:
         backend = SQLiteEventBackend("events.db")
         await backend.connect()
 
-        await backend.publish(Event(topic="tool.call", data={"name": "read"}))
+        await backend.publish(MessagingEvent(topic="tool.call", data={"name": "read"}))
 
         async def handler(event):
             print(f"Received: {event.topic}")
@@ -250,11 +250,11 @@ class SQLiteEventBackend:
         except Exception:
             return False
 
-    async def publish(self, event: Event) -> bool:
+    async def publish(self, event: MessagingEvent) -> bool:
         """Publish event to database.
 
         Args:
-            event: Event to publish
+            event: MessagingEvent to publish
 
         Returns:
             True if event was stored
@@ -290,7 +290,7 @@ class SQLiteEventBackend:
         except Exception as e:
             raise EventPublishError(event, str(e), retryable=True)
 
-    async def publish_batch(self, events: List[Event]) -> int:
+    async def publish_batch(self, events: List[MessagingEvent]) -> int:
         """Publish multiple events."""
         success_count = 0
         for event in events:
@@ -407,7 +407,7 @@ class SQLiteEventBackend:
             )
 
             for row in cursor:
-                event = Event(
+                event = MessagingEvent(
                     id=row["event_id"],
                     topic=row["topic"],
                     data=json.loads(row["data"]),

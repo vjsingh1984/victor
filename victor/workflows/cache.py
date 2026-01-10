@@ -295,7 +295,7 @@ class WorkflowCacheConfig:
 
 
 @dataclass
-class CacheEntry:
+class WorkflowNodeCacheEntry:
     """A cached node result.
 
     Attributes:
@@ -406,7 +406,7 @@ class WorkflowCache:
 
         with self._lock:
             try:
-                entry: Optional[CacheEntry] = self._cache.get(cache_key)
+                entry: Optional[WorkflowNodeCacheEntry] = self._cache.get(cache_key)
                 if entry is not None:
                     entry.hit_count += 1
                     self._stats["hits"] += 1
@@ -449,7 +449,7 @@ class WorkflowCache:
         cache_key = self._make_cache_key(node, context)
 
         with self._lock:
-            entry = CacheEntry(
+            entry = WorkflowNodeCacheEntry(
                 node_id=node.id,
                 result=result,
                 created_at=time.time(),
@@ -480,7 +480,7 @@ class WorkflowCache:
             keys_to_delete = [
                 k
                 for k, v in self._cache.items()
-                if isinstance(v, CacheEntry) and v.node_id == node_id
+                if isinstance(v, WorkflowNodeCacheEntry) and v.node_id == node_id
             ]
 
             count = 0
@@ -997,7 +997,7 @@ __all__ = [
     "CascadingInvalidator",
     # Cache config and entries
     "WorkflowCacheConfig",
-    "CacheEntry",
+    "WorkflowNodeCacheEntry",
     "WorkflowCache",
     "WorkflowCacheManager",
     # Global management

@@ -24,7 +24,7 @@ from typing import List
 
 import pytest
 
-from victor.core.events import Event, BackendType
+from victor.core.events import MessagingEvent, BackendType
 from victor.core.events.backends_lightweight import (
     SQLiteEventBackend,
     register_lightweight_backends,
@@ -77,7 +77,7 @@ class TestSQLiteEventBackend:
     @pytest.mark.asyncio
     async def test_publish_stores_event(self, backend):
         """Publish should store event in database."""
-        event = Event(topic="test.topic", data={"key": "value"})
+        event = MessagingEvent(topic="test.topic", data={"key": "value"})
         result = await backend.publish(event)
 
         assert result is True
@@ -88,7 +88,7 @@ class TestSQLiteEventBackend:
         """Basic pub/sub should work with polling."""
         received: List[Event] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         # Subscribe first
@@ -96,7 +96,7 @@ class TestSQLiteEventBackend:
         assert handle.is_active is True
 
         # Publish
-        event = Event(topic="test.topic", data={"msg": "hello"})
+        event = MessagingEvent(topic="test.topic", data={"msg": "hello"})
         await backend.publish(event)
 
         # Wait for polling to deliver
@@ -111,18 +111,18 @@ class TestSQLiteEventBackend:
         tool_events: List[Event] = []
         agent_events: List[Event] = []
 
-        async def tool_handler(event: Event):
+        async def tool_handler(event: MessagingEvent):
             tool_events.append(event)
 
-        async def agent_handler(event: Event):
+        async def agent_handler(event: MessagingEvent):
             agent_events.append(event)
 
         await backend.subscribe("tool.*", tool_handler)
         await backend.subscribe("agent.*", agent_handler)
 
-        await backend.publish(Event(topic="tool.call"))
-        await backend.publish(Event(topic="agent.message"))
-        await backend.publish(Event(topic="tool.result"))
+        await backend.publish(MessagingEvent(topic="tool.call"))
+        await backend.publish(MessagingEvent(topic="agent.message"))
+        await backend.publish(MessagingEvent(topic="tool.result"))
 
         await asyncio.sleep(0.3)
 
@@ -134,18 +134,18 @@ class TestSQLiteEventBackend:
         """Unsubscribe should stop event delivery."""
         received: List[Event] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         handle = await backend.subscribe("test.*", handler)
 
-        await backend.publish(Event(topic="test.1"))
+        await backend.publish(MessagingEvent(topic="test.1"))
         await asyncio.sleep(0.3)
         assert len(received) == 1
 
         await handle.unsubscribe()
 
-        await backend.publish(Event(topic="test.2"))
+        await backend.publish(MessagingEvent(topic="test.2"))
         await asyncio.sleep(0.3)
         assert len(received) == 1  # Still 1
 
@@ -157,8 +157,8 @@ class TestSQLiteEventBackend:
         # First connection - publish events
         backend1 = SQLiteEventBackend(db_path)
         await backend1.connect()
-        await backend1.publish(Event(topic="persist.1", data={"seq": 1}))
-        await backend1.publish(Event(topic="persist.2", data={"seq": 2}))
+        await backend1.publish(MessagingEvent(topic="persist.1", data={"seq": 1}))
+        await backend1.publish(MessagingEvent(topic="persist.2", data={"seq": 2}))
         await backend1.disconnect()
 
         # Second connection - events should exist
@@ -171,9 +171,9 @@ class TestSQLiteEventBackend:
     async def test_batch_publish(self, backend):
         """Batch publish should store all events."""
         events = [
-            Event(topic="batch.1", data={"i": 1}),
-            Event(topic="batch.2", data={"i": 2}),
-            Event(topic="batch.3", data={"i": 3}),
+            MessagingEvent(topic="batch.1", data={"i": 1}),
+            MessagingEvent(topic="batch.2", data={"i": 2}),
+            MessagingEvent(topic="batch.3", data={"i": 3}),
         ]
 
         count = await backend.publish_batch(events)
@@ -185,7 +185,7 @@ class TestSQLiteEventBackend:
         """Cleanup should remove old events."""
         # Publish events
         for i in range(5):
-            await backend.publish(Event(topic=f"cleanup.{i}"))
+            await backend.publish(MessagingEvent(topic=f"cleanup.{i}"))
 
         assert backend.get_event_count() == 5
 
@@ -197,8 +197,8 @@ class TestSQLiteEventBackend:
     @pytest.mark.asyncio
     async def test_duplicate_event_id_rejected(self, backend):
         """Duplicate event IDs should be rejected."""
-        event1 = Event(id="duplicate123", topic="test.1")
-        event2 = Event(id="duplicate123", topic="test.2")
+        event1 = MessagingEvent(id="duplicate123", topic="test.1")
+        event2 = MessagingEvent(id="duplicate123", topic="test.2")
 
         result1 = await backend.publish(event1)
         result2 = await backend.publish(event2)

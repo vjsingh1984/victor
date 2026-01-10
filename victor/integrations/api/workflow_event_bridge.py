@@ -53,7 +53,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.core.events import (
     ObservabilityBus,
-    Event,
+    MessagingEvent,
     UnifiedEventType,
     get_observability_bus,
     SubscriptionHandle,
@@ -372,11 +372,11 @@ class WorkflowEventBridge:
         except Exception as e:
             logger.error(f"Error handling message from {client_id}: {e}")
 
-    async def _on_workflow_event(self, event: Event) -> None:
+    async def _on_workflow_event(self, event: MessagingEvent) -> None:
         """Handle a workflow event from ObservabilityBus.
 
         Args:
-            event: Event from ObservabilityBus
+            event: MessagingEvent from ObservabilityBus
         """
         try:
             # Extract workflow_id from event
@@ -403,11 +403,11 @@ class WorkflowEventBridge:
         except Exception as e:
             logger.error(f"Error handling workflow event: {e}")
 
-    def _event_to_ws_message(self, event: Event) -> Optional[WSMessage]:
+    def _event_to_ws_message(self, event: MessagingEvent) -> Optional[WSMessage]:
         """Convert ObservabilityBus event to WS message.
 
         Args:
-            event: Event from ObservabilityBus
+            event: MessagingEvent from ObservabilityBus
 
         Returns:
             WSMessage or None if event should be ignored

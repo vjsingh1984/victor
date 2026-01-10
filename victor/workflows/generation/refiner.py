@@ -22,7 +22,7 @@ Design Principles (SOLID):
     - OCP: Extensible via new refinement strategies
     - LSP: All refiners implement the same interface
     - ISP: Focused refinement methods per category
-    - DIP: Depends on ValidationError abstractions
+    - DIP: Depends on WorkflowValidationError abstractions
 
 Key Features:
     - Schema fixes: Add missing fields, remove invalid fields
@@ -50,8 +50,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.workflows.generation.types import (
     ErrorCategory,
     ErrorSeverity,
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
     RefinementResult,
     WorkflowFix,
 )
@@ -119,7 +119,7 @@ class SchemaRefiner:
     def refine(
         self,
         schema: Dict[str, Any],
-        errors: List[ValidationError]
+        errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply schema-level fixes.
 
@@ -146,7 +146,7 @@ class SchemaRefiner:
     def _fix_error(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single schema error.
 
@@ -180,7 +180,7 @@ class SchemaRefiner:
     def _fix_missing_field(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix missing required field."""
         location = error.location
@@ -239,7 +239,7 @@ class SchemaRefiner:
     def _fix_type_conversion(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix type conversion errors."""
         location = error.location
@@ -310,7 +310,7 @@ class SchemaRefiner:
     def _fix_range_clamp(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix out-of-range values by clamping."""
         location = error.location
@@ -368,7 +368,7 @@ class SchemaRefiner:
     def _fix_invalid_enum(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix invalid enum values."""
         location = error.location
@@ -454,7 +454,7 @@ class StructureRefiner:
     def refine(
         self,
         schema: Dict[str, Any],
-        errors: List[ValidationError]
+        errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply structure-level fixes.
 
@@ -489,7 +489,7 @@ class StructureRefiner:
         self,
         schema: Dict[str, Any],
         nodes_map: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single structure error."""
         # Orphan node
@@ -511,7 +511,7 @@ class StructureRefiner:
         self,
         schema: Dict[str, Any],
         nodes_map: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix orphan node by removing it."""
         # Extract node ID
@@ -543,7 +543,7 @@ class StructureRefiner:
         self,
         schema: Dict[str, Any],
         nodes_map: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix missing entry point by setting first node."""
         nodes = schema.get("nodes", [])
@@ -606,7 +606,7 @@ class SemanticRefiner:
     def refine(
         self,
         schema: Dict[str, Any],
-        errors: List[ValidationError]
+        errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply semantic-level fixes.
 
@@ -637,7 +637,7 @@ class SemanticRefiner:
     def _fix_error(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single semantic error."""
         # Unknown tool
@@ -653,7 +653,7 @@ class SemanticRefiner:
     def _fix_unknown_tool(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix unknown tool by removing it."""
         location = error.location
@@ -701,7 +701,7 @@ class SemanticRefiner:
     def _fix_invalid_role(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix invalid role by mapping to valid one."""
         location = error.location
@@ -770,7 +770,7 @@ class SecurityRefiner:
     def refine(
         self,
         schema: Dict[str, Any],
-        errors: List[ValidationError]
+        errors: List[WorkflowValidationError]
     ) -> Tuple[Dict[str, Any], List[WorkflowFix]]:
         """Apply security-level fixes.
 
@@ -801,7 +801,7 @@ class SecurityRefiner:
     def _fix_error(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix a single security error."""
         # Resource limit exceeded
@@ -813,7 +813,7 @@ class SecurityRefiner:
     def _fix_resource_limit(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Fix resource limit by clamping."""
         # Extract field and limit
@@ -891,7 +891,7 @@ class WorkflowRefiner:
     def refine(
         self,
         schema: Dict[str, Any],
-        validation_result: ValidationResult
+        validation_result: WorkflowGenerationValidationResult
     ) -> RefinementResult:
         """Apply automated refinements to workflow.
 
@@ -956,7 +956,7 @@ class WorkflowRefiner:
     def refine_single_error(
         self,
         schema: Dict[str, Any],
-        error: ValidationError
+        error: WorkflowValidationError
     ) -> Optional[WorkflowFix]:
         """Apply refinement for a single error.
 

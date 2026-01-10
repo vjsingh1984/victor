@@ -454,12 +454,12 @@ class TestSchemaRefinement:
         self, mock_orchestrator, sample_workflow_schema
     ):
         """Test refinement with validation error context."""
-        from victor.workflows.generation.types import ValidationError, ErrorCategory
+        from victor.workflows.generation.types import WorkflowValidationError, ErrorCategory
 
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity="error",
                 message="Missing field",
@@ -617,12 +617,12 @@ class TestRefinementPromptBuilding:
         self, mock_orchestrator, sample_workflow_schema
     ):
         """Test building refinement prompt with validation errors."""
-        from victor.workflows.generation.types import ValidationError, ErrorCategory
+        from victor.workflows.generation.types import WorkflowValidationError, ErrorCategory
 
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
         errors = [
-            ValidationError(
+            WorkflowValidationError(
                 category=ErrorCategory.SCHEMA,
                 severity="error",
                 message="Missing field",

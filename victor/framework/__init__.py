@@ -70,7 +70,7 @@ from victor.framework.errors import (
     ToolError,
 )
 from victor.framework.events import (
-    Event,
+    AgentExecutionEvent,
     EventType,
     content_event,
     error_event,
@@ -509,7 +509,7 @@ try:
         Edge,
         EdgeType,
         FrameworkNodeStatus,
-        ExecutionResult,
+        GraphExecutionResult,
         GraphConfig,
         WorkflowCheckpoint,
         CheckpointerProtocol,
@@ -530,7 +530,7 @@ try:
         "Edge",
         "EdgeType",
         "FrameworkNodeStatus",
-        "ExecutionResult",
+        "GraphExecutionResult",
         "GraphConfig",
         "WorkflowCheckpoint",
         "CheckpointerProtocol",
@@ -701,7 +701,7 @@ __all__ = (
         "Task",
         "Tools",
         "State",
-        "Event",
+        "AgentExecutionEvent",
         # Agent
         "ChatSession",
         # Task
@@ -1169,7 +1169,7 @@ if _STAGE_MANAGER_EXPORTS:
 # Workflow Engine (High-level workflow execution facade)
 try:
     from victor.framework.workflow_engine import (
-        ExecutionResult as WorkflowExecutionResult,
+        WorkflowExecutionResult,
         WorkflowEngine,
         WorkflowEngineConfig,
         WorkflowEngineProtocol,

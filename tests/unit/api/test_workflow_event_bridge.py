@@ -29,7 +29,7 @@ from victor.integrations.api.workflow_event_bridge import (
     WorkflowEventBridge,
     workflow_stream_chunk_to_ws_event,
 )
-from victor.core.events import Event, UnifiedEventType
+from victor.core.events import MessagingEvent, UnifiedEventType
 from victor.workflows.streaming import (
     WorkflowEventType,
     WorkflowStreamChunk,
@@ -299,7 +299,7 @@ class TestWorkflowEventBridge:
 
     def test_event_to_ws_message_workflow_start(self, event_bridge):
         """Test converting workflow start event to WS message."""
-        event = Event(
+        event = MessagingEvent(
             topic="workflow.start",
             data={"workflow_id": "test_workflow"},
         )
@@ -313,7 +313,7 @@ class TestWorkflowEventBridge:
 
     def test_event_to_ws_message_node_complete(self, event_bridge):
         """Test converting node complete event to WS message."""
-        event = Event(
+        event = MessagingEvent(
             topic="workflow.node.complete",
             data={
                 "workflow_id": "test_workflow",
@@ -331,7 +331,7 @@ class TestWorkflowEventBridge:
 
     def test_event_to_ws_message_ignored_topic(self, event_bridge):
         """Test that events with unrelated topics are ignored."""
-        event = Event(
+        event = MessagingEvent(
             topic="tool.start",
             data={"workflow_id": "test_workflow"},
         )

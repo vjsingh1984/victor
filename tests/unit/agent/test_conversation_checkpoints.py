@@ -20,7 +20,7 @@ from victor.storage.checkpoints.state_serializer import (
     deserialize_conversation_state,
 )
 from victor.storage.checkpoints.backends.memory_backend import MemoryCheckpointBackend
-from victor.storage.checkpoints.manager import CheckpointManager
+from victor.storage.checkpoints.manager import ConversationCheckpointManager
 
 
 class TestCheckpointMetadata:
@@ -209,13 +209,13 @@ class TestMemoryCheckpointBackend:
             await backend.load_checkpoint(checkpoint_id)
 
 
-class TestCheckpointManager:
-    """Tests for CheckpointManager."""
+class TestConversationCheckpointManager:
+    """Tests for ConversationCheckpointManager."""
 
     @pytest.fixture
     def manager(self):
         backend = MemoryCheckpointBackend()
-        return CheckpointManager(backend)
+        return ConversationCheckpointManager(backend)
 
     @pytest.mark.asyncio
     async def test_save_and_restore(self, manager):

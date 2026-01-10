@@ -924,7 +924,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize ObservabilityIntegration for unified event bus (via factory)
         self._observability = self._factory.create_observability()
 
-        # Initialize CheckpointManager for time-travel debugging (via factory)
+        # Initialize ConversationCheckpointManager for time-travel debugging (via factory)
         # Provides save/restore/fork capabilities for conversation state
         self._checkpoint_manager = self._factory.create_checkpoint_manager()
 
@@ -1653,7 +1653,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         - Comparing state differences
 
         Returns:
-            CheckpointManager instance or None if disabled
+            ConversationCheckpointManager instance or None if disabled
         """
         return self._checkpoint_manager
 

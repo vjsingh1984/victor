@@ -106,26 +106,26 @@
   {
     "rank": 14,
     "node_id": "file:victor/workflows/executor.py",
-    "out_degree": 195,
+    "out_degree": 194,
     "name": "executor.py",
     "type": "file",
     "module": "victor.workflows.executor"
   },
   {
     "rank": 15,
-    "node_id": "file:victor/framework/graph.py",
-    "out_degree": 193,
-    "name": "graph.py",
-    "type": "file",
-    "module": "victor.framework.graph"
-  },
-  {
-    "rank": 16,
     "node_id": "file:victor/workflows/services/credentials.py",
     "out_degree": 193,
     "name": "credentials.py",
     "type": "file",
     "module": "victor.workflows.services"
+  },
+  {
+    "rank": 16,
+    "node_id": "file:victor/framework/graph.py",
+    "out_degree": 192,
+    "name": "graph.py",
+    "type": "file",
+    "module": "victor.framework.graph"
   },
   {
     "rank": 17,
@@ -297,14 +297,6 @@
   },
   {
     "rank": 38,
-    "node_id": "file:victor/agent/coordinators/tool_coordinator.py",
-    "out_degree": 125,
-    "name": "tool_coordinator.py",
-    "type": "file",
-    "module": "victor.agent.coordinators"
-  },
-  {
-    "rank": 39,
     "node_id": "file:victor/evaluation/harness.py",
     "out_degree": 124,
     "name": "harness.py",
@@ -312,7 +304,7 @@
     "module": "victor.evaluation.harness"
   },
   {
-    "rank": 40,
+    "rank": 39,
     "node_id": "file:victor/tools/filesystem.py",
     "out_degree": 122,
     "name": "filesystem.py",
@@ -320,15 +312,15 @@
     "module": "victor.tools.filesystem"
   },
   {
-    "rank": 41,
-    "node_id": "file:victor/agent/rl/coordinator.py",
+    "rank": 40,
+    "node_id": "file:victor/framework/rl/coordinator.py",
     "out_degree": 122,
     "name": "coordinator.py",
     "type": "file",
-    "module": "victor.agent.rl"
+    "module": "victor.framework.rl"
   },
   {
-    "rank": 42,
+    "rank": 41,
     "node_id": "file:victor/ui/commands/chat.py",
     "out_degree": 118,
     "name": "chat.py",
@@ -336,7 +328,7 @@
     "module": "victor.ui.commands"
   },
   {
-    "rank": 43,
+    "rank": 42,
     "node_id": "file:victor/observability/debug/adapters/python.py",
     "out_degree": 115,
     "name": "python.py",
@@ -344,7 +336,7 @@
     "module": "victor.observability.debug"
   },
   {
-    "rank": 44,
+    "rank": 43,
     "node_id": "file:victor/core/validation.py",
     "out_degree": 113,
     "name": "validation.py",
@@ -352,12 +344,20 @@
     "module": "victor.core.validation"
   },
   {
-    "rank": 45,
+    "rank": 44,
     "node_id": "file:victor/ui/commands/workflow.py",
     "out_degree": 113,
     "name": "workflow.py",
     "type": "file",
     "module": "victor.ui.commands"
+  },
+  {
+    "rank": 45,
+    "node_id": "file:victor/agent/coordinators/tool_coordinator.py",
+    "out_degree": 113,
+    "name": "tool_coordinator.py",
+    "type": "file",
+    "module": "victor.agent.coordinators"
   },
   {
     "rank": 46,

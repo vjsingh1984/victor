@@ -673,7 +673,7 @@ class TestVerticalIntegrationObservability:
             VerticalIntegrationPipeline,
             IntegrationResult,
         )
-        from victor.core.events import Event, get_observability_bus
+        from victor.core.events import MessagingEvent, get_observability_bus
 
         # Create a mock result that the pipeline would return
         result = IntegrationResult(vertical_name="coding")

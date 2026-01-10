@@ -49,7 +49,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class CacheEntry:
+class GenericCacheEntry:
     """A cached value with metadata.
 
     Attributes:
@@ -140,7 +140,7 @@ class CacheNamespace:
         self.max_entries = max_entries
         self.default_ttl = default_ttl
 
-        self._data: Dict[str, CacheEntry] = {}
+        self._data: Dict[str, GenericCacheEntry] = {}
         self._stats = CacheStats()
         self._lock = threading.RLock()
 
@@ -186,7 +186,7 @@ class CacheNamespace:
                 self._evict_oldest()
 
             # Create or update entry
-            entry = CacheEntry(
+            entry = GenericCacheEntry(
                 value=value,
                 ttl=ttl if ttl is not None else self.default_ttl,
             )
@@ -528,7 +528,7 @@ __all__ = [
     "ToolCacheManager",
     # Supporting classes
     "CacheNamespace",
-    "CacheEntry",
+    "GenericCacheEntry",
     "CacheStats",
     # Factory functions
     "get_tool_cache_manager",

@@ -44,7 +44,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.workflow_engine import ExecutionResult, WorkflowEvent
+    from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.cache import WorkflowDefinitionCache
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.executor import WorkflowExecutor
@@ -234,7 +234,7 @@ class YAMLWorkflowCoordinator:
         transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         thread_id: Optional[str] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a YAML-defined workflow.
 
         Args:
@@ -247,9 +247,9 @@ class YAMLWorkflowCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
 
         start_time = time.time()
         hitl_requests: List[Dict[str, Any]] = []
@@ -294,7 +294,7 @@ class YAMLWorkflowCoordinator:
                     success = True
                     error = None
 
-                return ExecutionResult(
+                return WorkflowExecutionResult(
                     success=success,
                     final_state=final_state,
                     nodes_executed=nodes_executed,
@@ -328,7 +328,7 @@ class YAMLWorkflowCoordinator:
 
                 duration = time.time() - start_time
 
-                return ExecutionResult(
+                return WorkflowExecutionResult(
                     success=result.success,
                     final_state=result.final_state,
                     nodes_executed=result.nodes_executed,
@@ -339,7 +339,7 @@ class YAMLWorkflowCoordinator:
 
         except Exception as e:
             logger.error(f"YAML workflow execution failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,

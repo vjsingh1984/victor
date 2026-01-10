@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
-from victor.core.events import Event
+from victor.core.events import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -62,21 +62,21 @@ class BaseExporter(ABC):
     """
 
     @abstractmethod
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export an event synchronously.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         pass
 
-    async def export_async(self, event: Event) -> None:
+    async def export_async(self, event: MessagingEvent) -> None:
         """Export an event asynchronously.
 
         Default implementation calls sync export.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         self.export(event)
 
@@ -146,11 +146,11 @@ class JsonLineExporter(BaseExporter):
         self._event_count = 0
         self._last_flush_time = time.time()
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event to JSONL file.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         # Filter by topic prefix (was category, now topic-based)
         if self.include_categories:
@@ -282,11 +282,11 @@ class LoggingExporter(BaseExporter):
         self.include_data = include_data
         self._event_count = 0
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event to logging system.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         # Filter by topic prefix
         if self.include_categories:
@@ -348,10 +348,10 @@ class CallbackExporter(BaseExporter):
 
     def __init__(
         self,
-        callback: Callable[[Event], None],
+        callback: Callable[[MessagingEvent], None],
         *,
-        async_callback: Optional[Callable[[Event], Any]] = None,
-        error_handler: Optional[Callable[[Exception, Event], None]] = None,
+        async_callback: Optional[Callable[[MessagingEvent], Any]] = None,
+        error_handler: Optional[Callable[[Exception, MessagingEvent], None]] = None,
     ) -> None:
         """Initialize callback exporter.
 
@@ -364,11 +364,11 @@ class CallbackExporter(BaseExporter):
         self._async_callback = async_callback
         self._error_handler = error_handler
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event via callback.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         try:
             self._callback(event)
@@ -378,11 +378,11 @@ class CallbackExporter(BaseExporter):
             else:
                 logger.warning(f"Callback error: {e}")
 
-    async def export_async(self, event: Event) -> None:
+    async def export_async(self, event: MessagingEvent) -> None:
         """Export event via async callback.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         if self._async_callback:
             try:
@@ -438,11 +438,11 @@ class CompositeExporter(BaseExporter):
         if exporter in self._exporters:
             self._exporters.remove(exporter)
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event to all child exporters.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         for exporter in self._exporters:
             try:
@@ -450,11 +450,11 @@ class CompositeExporter(BaseExporter):
             except Exception as e:
                 logger.warning(f"Exporter {type(exporter).__name__} error: {e}")
 
-    async def export_async(self, event: Event) -> None:
+    async def export_async(self, event: MessagingEvent) -> None:
         """Export event to all child exporters asynchronously.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         tasks = []
         for exporter in self._exporters:
@@ -498,7 +498,7 @@ class FilteringExporter(BaseExporter):
         *,
         categories: Optional[Set[str]] = None,
         names: Optional[Set[str]] = None,
-        predicate: Optional[Callable[[Event], bool]] = None,
+        predicate: Optional[Callable[[MessagingEvent], bool]] = None,
     ) -> None:
         """Initialize filtering exporter.
 
@@ -513,11 +513,11 @@ class FilteringExporter(BaseExporter):
         self._names = names
         self._predicate = predicate
 
-    def _should_export(self, event: Event) -> bool:
+    def _should_export(self, event: MessagingEvent) -> bool:
         """Check if event should be exported.
 
         Args:
-            event: Event to check.
+            event: MessagingEvent to check.
 
         Returns:
             True if event should be exported.
@@ -531,20 +531,20 @@ class FilteringExporter(BaseExporter):
             return False
         return True
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event if it passes filters.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         if self._should_export(event):
             self._exporter.export(event)
 
-    async def export_async(self, event: Event) -> None:
+    async def export_async(self, event: MessagingEvent) -> None:
         """Export event asynchronously if it passes filters.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         if self._should_export(event):
             await self._exporter.export_async(event)
@@ -584,14 +584,14 @@ class BufferedExporter(BaseExporter):
         self._exporter = exporter
         self._batch_size = batch_size
         self._flush_interval = flush_interval
-        self._buffer: List[Event] = []
+        self._buffer: List[MessagingEvent] = []
         self._last_flush = datetime.now(timezone.utc)
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Buffer event for later export.
 
         Args:
-            event: Event to buffer.
+            event: MessagingEvent to buffer.
         """
         self._buffer.append(event)
 

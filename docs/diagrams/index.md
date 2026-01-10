@@ -401,7 +401,7 @@ code --install-extension bierner.markdown-mermaid
 Always provide alt text for diagrams:
 
 ```markdown
-![System architecture diagram showing Victor's layered architecture](system-overview.mmd "System Architecture")
+![System architecture diagram showing Victor's layered architecture](architecture/system-overview.mmd "System Architecture")
 ```
 
 ### Descriptions
@@ -418,7 +418,7 @@ The system architecture consists of four layers:
 3. **Core Layer**: Providers, tools, workflows, verticals
 4. **Infrastructure Layer**: DI container, event bus, configuration
 
-[Diagram](system-overview.mmd)
+[Diagram](architecture/system-overview.mmd)
 ```
 
 ### High Contrast

@@ -50,8 +50,8 @@ from typing import Dict, List, Optional
 from victor.workflows.generation.types import (
     ErrorCategory,
     ErrorSeverity,
-    ValidationError,
-    ValidationResult,
+    WorkflowValidationError,
+    WorkflowGenerationValidationResult,
 )
 
 
@@ -76,10 +76,10 @@ class ErrorReport:
 
     def __init__(
         self,
-        result: ValidationResult,
-        errors_by_category: Dict[str, List[ValidationError]],
-        errors_by_severity: Dict[str, List[ValidationError]],
-        errors_by_node: Dict[str, List[ValidationError]]
+        result: WorkflowGenerationValidationResult,
+        errors_by_category: Dict[str, List[WorkflowValidationError]],
+        errors_by_severity: Dict[str, List[WorkflowValidationError]],
+        errors_by_node: Dict[str, List[WorkflowValidationError]]
     ):
         self.result = result
         self.errors_by_category = errors_by_category
@@ -116,7 +116,7 @@ class ErrorReporter:
         json_str = reporter.json_report(result)
     """
 
-    def aggregate_errors(self, result: ValidationResult) -> ErrorReport:
+    def aggregate_errors(self, result: WorkflowGenerationValidationResult) -> ErrorReport:
         """Aggregate errors by category, severity, and node.
 
         Args:
@@ -126,7 +126,7 @@ class ErrorReporter:
             ErrorReport with grouped errors
         """
         # Group by category
-        errors_by_category: Dict[str, List[ValidationError]] = {
+        errors_by_category: Dict[str, List[WorkflowValidationError]] = {
             "schema": result.schema_errors,
             "structure": result.structure_errors,
             "semantic": result.semantic_errors,
@@ -134,7 +134,7 @@ class ErrorReporter:
         }
 
         # Group by severity
-        errors_by_severity: Dict[str, List[ValidationError]] = {
+        errors_by_severity: Dict[str, List[WorkflowValidationError]] = {
             "critical": [],
             "error": [],
             "warning": [],
@@ -156,7 +156,7 @@ class ErrorReporter:
 
     def human_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         show_suggestions: bool = True,
         show_context: bool = False
     ) -> str:
@@ -256,7 +256,7 @@ class ErrorReporter:
 
     def llm_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         include_fixes: bool = True,
         include_context: bool = False,
         max_errors_per_category: int = 20
@@ -361,7 +361,7 @@ class ErrorReporter:
 
     def json_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         indent: int = 2
     ) -> str:
         """Generate JSON report for programmatic consumption.
@@ -377,7 +377,7 @@ class ErrorReporter:
 
     def markdown_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         include_suggestions: bool = True
     ) -> str:
         """Generate Markdown report for documentation.
@@ -458,7 +458,7 @@ class ErrorReporter:
 
         return "\n".join(lines)
 
-    def compact_report(self, result: ValidationResult) -> str:
+    def compact_report(self, result: WorkflowGenerationValidationResult) -> str:
         """Generate compact one-line summary.
 
         Args:
@@ -479,7 +479,7 @@ class ErrorReporter:
 
     def node_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         node_id: str
     ) -> str:
         """Generate report for a specific node.
@@ -519,7 +519,7 @@ class ErrorReporter:
 
     def category_report(
         self,
-        result: ValidationResult,
+        result: WorkflowGenerationValidationResult,
         category: ErrorCategory
     ) -> str:
         """Generate report for a specific error category.
@@ -558,8 +558,8 @@ class ErrorReporter:
 
     def prioritize_errors(
         self,
-        errors: List[ValidationError]
-    ) -> List[ValidationError]:
+        errors: List[WorkflowValidationError]
+    ) -> List[WorkflowValidationError]:
         """Sort errors by severity and importance.
 
         Priority order:

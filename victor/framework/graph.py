@@ -726,7 +726,7 @@ class RLCheckpointerAdapter:
 
 
 @dataclass
-class ExecutionResult(Generic[StateType]):
+class GraphExecutionResult(Generic[StateType]):
     """Result from graph execution.
 
     Attributes:
@@ -960,10 +960,15 @@ class NodeExecutor:
             return False, str(e), state
 
 
-class CheckpointManager:
-    """Manages state checkpointing (SRP: Single Responsibility).
+class GraphCheckpointManager:
+    """Manages state checkpointing for graph workflows (SRP: Single Responsibility).
 
     Handles loading initial state from checkpoints and saving checkpoints.
+
+    Note: Renamed from CheckpointManager to GraphCheckpointManager to be
+    semantically distinct from:
+    - GitCheckpointManager (victor.agent.checkpoints): Git stash-based checkpoints
+    - ConversationCheckpointManager (victor.storage.checkpoints): Conversation state
     """
 
     def __init__(self, checkpointer: Optional[CheckpointerProtocol]):
@@ -1251,7 +1256,7 @@ class CompiledGraph(Generic[StateType]):
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
         debug_hook: Optional[Any] = None,
-    ) -> ExecutionResult[StateType]:
+    ) -> GraphExecutionResult[StateType]:
         """Execute the graph (SRP: Orchestrates focused helpers).
 
         Delegates to specialized helper classes for:
@@ -1259,7 +1264,7 @@ class CompiledGraph(Generic[StateType]):
         - TimeoutManager: timeout tracking
         - InterruptHandler: human-in-the-loop interrupts
         - NodeExecutor: node execution with COW optimization
-        - CheckpointManager: state persistence
+        - GraphCheckpointManager: state persistence
         - GraphEventEmitter: observability events
         - DebugHook: breakpoint and execution control (optional)
 
@@ -1270,7 +1275,7 @@ class CompiledGraph(Generic[StateType]):
             debug_hook: Optional DebugHook for debugging
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
         """
         exec_config = config or self._config
         thread_id = thread_id or uuid.uuid4().hex
@@ -1291,7 +1296,7 @@ class CompiledGraph(Generic[StateType]):
             interrupt_after=exec_config.interrupt.interrupt_after,
         )
         node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_cow)
-        checkpoint_manager = CheckpointManager(checkpointer=exec_config.checkpoint.checkpointer)
+        checkpoint_manager = GraphCheckpointManager(checkpointer=exec_config.checkpoint.checkpointer)
         event_emitter = GraphEventEmitter(
             graph_id=graph_id,
             emit_events=exec_config.observability.emit_events,
@@ -1320,7 +1325,7 @@ class CompiledGraph(Generic[StateType]):
                 should_continue, error = iteration_controller.should_continue(current_node)
                 if not should_continue:
                     logger.warning(f"Iteration limit reached: {error}")
-                    return ExecutionResult(
+                    return GraphExecutionResult(
                         state=state,
                         success=False,
                         error=error,
@@ -1333,7 +1338,7 @@ class CompiledGraph(Generic[StateType]):
                 if interrupt_handler.should_interrupt_before(current_node):
                     logger.info(f"Interrupt before node: {current_node}")
                     await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
-                    return ExecutionResult(
+                    return GraphExecutionResult(
                         state=state,
                         success=True,
                         iterations=iteration_controller.iterations,
@@ -1366,7 +1371,7 @@ class CompiledGraph(Generic[StateType]):
                     )
 
                 if not success:
-                    return ExecutionResult(
+                    return GraphExecutionResult(
                         state=state,
                         success=False,
                         error=error,
@@ -1392,7 +1397,7 @@ class CompiledGraph(Generic[StateType]):
                 # Check interrupt after
                 if interrupt_handler.should_interrupt_after(current_node):
                     logger.info(f"Interrupt after node: {current_node}")
-                    return ExecutionResult(
+                    return GraphExecutionResult(
                         state=state,
                         success=True,
                         iterations=iteration_controller.iterations,
@@ -1418,7 +1423,7 @@ class CompiledGraph(Generic[StateType]):
                 node_count=len(node_history),
             )
 
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=True,
                 iterations=iteration_controller.iterations,
@@ -1432,7 +1437,7 @@ class CompiledGraph(Generic[StateType]):
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
             )
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=False,
                 error="Execution timeout",
@@ -1448,7 +1453,7 @@ class CompiledGraph(Generic[StateType]):
                 iterations=iteration_controller.iterations,
                 duration=timeout_manager.get_elapsed(),
             )
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=False,
                 error=str(e),
@@ -2094,7 +2099,7 @@ __all__ = [
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     # Execution
-    "ExecutionResult",
+    "GraphExecutionResult",
     "GraphConfig",
     # Checkpointing
     "WorkflowCheckpoint",

@@ -32,10 +32,10 @@ from victor.framework.adaptation.types import (
     AdaptationConfig,
     AdaptationImpact,
     AdaptationResult,
+    AdaptationValidationResult,
     GraphModification,
     ModificationType,
     RiskLevel,
-    ValidationResult,
 )
 
 if TYPE_CHECKING:
@@ -255,14 +255,14 @@ class AdaptableGraph:
 
             return result
 
-    async def validate(self, modification: GraphModification) -> ValidationResult:
+    async def validate(self, modification: GraphModification) -> AdaptationValidationResult:
         """Validate a proposed modification.
 
         Args:
             modification: Modification to validate
 
         Returns:
-            ValidationResult with validation details
+            AdaptationValidationResult with validation details
         """
         errors = []
         warnings = []
@@ -296,7 +296,7 @@ class AdaptableGraph:
             if modification.target_node and not self._node_exists(modification.target_node):
                 errors.append(f"Target node does not exist: {modification.target_node}")
 
-        return ValidationResult(
+        return AdaptationValidationResult(
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,

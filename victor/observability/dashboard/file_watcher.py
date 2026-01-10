@@ -17,7 +17,7 @@ from typing import Optional
 from textual import work
 from textual.widgets import Static
 
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ class EventFileWatcher(Static):
                 logger.error(f"[EventFileWatcher] Error watching file: {e}")
                 await asyncio.sleep(1)
 
-    def _parse_jsonl_line(self, line: str) -> Optional[Event]:
+    def _parse_jsonl_line(self, line: str) -> Optional[MessagingEvent]:
         """Parse a JSONL event line into an Event.
 
         Args:

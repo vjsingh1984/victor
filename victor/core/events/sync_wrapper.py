@@ -29,7 +29,7 @@ Usage:
     sync_wrapper = SyncEventWrapper(backend)
 
     # Use sync API
-    event = Event(topic="test", data={})
+    event = MessagingEvent(topic="test", data={})
     sync_wrapper.publish(event)  # Sync call, runs async internally
 """
 
@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable
 
 from victor.core.events.protocols import (
     EventHandler,
-    Event,
+    MessagingEvent,
     IEventBackend,
     SubscriptionHandle,
 )
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Type alias for sync event handlers
-SyncEventHandler = Callable[[Event], None]
+SyncEventHandler = Callable[[MessagingEvent], None]
 
 
 class SyncEventWrapper:
@@ -65,7 +65,7 @@ class SyncEventWrapper:
     New code should use async/await directly.
 
     Example:
-        >>> from victor.core.events import create_event_backend, Event
+        >>> from victor.core.events import create_event_backend, MessagingEvent
         >>> from victor.core.events.sync_wrapper import SyncEventWrapper
         >>>
         >>> # Create async backend
@@ -76,7 +76,7 @@ class SyncEventWrapper:
         >>> sync_wrapper = SyncEventWrapper(backend)
         >>>
         >>> # Use sync API
-        >>> event = Event(topic="tool.start", data={"tool": "read_file"})
+        >>> event = MessagingEvent(topic="tool.start", data={"tool": "read_file"})
         >>> sync_wrapper.publish(event)
         True
 
@@ -146,26 +146,26 @@ class SyncEventWrapper:
             # No running loop, safe to use asyncio.run()
             return asyncio.run(coro)
 
-    def publish(self, event: Event) -> bool:
+    def publish(self, event: MessagingEvent) -> bool:
         """Publish an event synchronously.
 
         This method runs the async publish operation in a new event loop.
 
         Args:
-            event: Event to publish
+            event: MessagingEvent to publish
 
         Returns:
             True if event was published successfully
 
         Example:
             >>> wrapper = SyncEventWrapper(backend)
-            >>> event = Event(topic="test", data={})
+            >>> event = MessagingEvent(topic="test", data={})
             >>> wrapper.publish(event)
             True
         """
         return self._run_async_synchronous(self._backend.publish(event))
 
-    def publish_batch(self, events: list[Event]) -> int:
+    def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events synchronously.
 
         Args:
@@ -204,7 +204,7 @@ class SyncEventWrapper:
             >>> handle.unsubscribe()
         """
 
-        async def async_wrapper(event: Event) -> None:
+        async def async_wrapper(event: MessagingEvent) -> None:
             """Wrap sync handler for async backend."""
             try:
                 handler(event)
@@ -293,7 +293,7 @@ class SyncObservabilityBus:
             >>> bus.emit("tool.start", {"tool": "read_file", "path": "test.txt"})
             True
         """
-        event = Event(
+        event = MessagingEvent(
             topic=topic,
             data=data,
             source=source,

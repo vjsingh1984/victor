@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.framework.graph import ExecutionResult
+    from victor.framework.graph import GraphExecutionResult
     from victor.workflows.executor import WorkflowExecutor, WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
@@ -499,7 +499,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         workflow_name: str,
         context: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> "ExecutionResult":
+    ) -> "GraphExecutionResult":
         """Execute a workflow using the unified compiler.
 
         This method compiles the workflow using the UnifiedWorkflowCompiler
@@ -511,7 +511,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             thread_id: Thread ID for checkpointing
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
 
         Raises:
             ValueError: If workflow not found

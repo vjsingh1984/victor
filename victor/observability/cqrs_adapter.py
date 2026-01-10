@@ -43,7 +43,7 @@ Architecture:
           └─────────────────┘
 
 Example:
-    from victor.core.events import Event, ObservabilityBus, get_observability_bus
+    from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
     from victor.core import EventDispatcher
     from victor.observability.cqrs_adapter import CQRSEventAdapter
 
@@ -69,7 +69,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
 from uuid import uuid4
 
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 if TYPE_CHECKING:
     from victor.core.cqrs import Event as CQRSEvent
@@ -393,11 +393,11 @@ class CQRSEventAdapter:
         # This would be implemented when EventDispatcher also goes async
         pass
 
-    def _on_observability_event(self, event: Event) -> None:
+    def _on_observability_event(self, event: MessagingEvent) -> None:
         """Handle an event from the observability EventBus.
 
         Args:
-            event: Event from EventBus.
+            event: MessagingEvent from EventBus.
         """
         # Prevent circular loops
         if event.id in self._processing_ids:
@@ -450,14 +450,14 @@ class CQRSEventAdapter:
         finally:
             self._processing_ids.discard(event_id)
 
-    def _convert_to_cqrs_event(self, event: Event) -> Optional["CQRSEvent"]:
+    def _convert_to_cqrs_event(self, event: MessagingEvent) -> Optional["CQRSEvent"]:
         """Convert a VictorEvent to a CQRS Event.
 
         Uses concrete event types from event_sourcing module where available,
         or creates a generic ObservabilityEvent for custom events.
 
         Args:
-            event: Event to convert.
+            event: MessagingEvent to convert.
 
         Returns:
             CQRS Event or None if no mapping.
@@ -508,7 +508,7 @@ class CQRSEventAdapter:
             reason=f"category:{event.category.value}",
         )
 
-    def _convert_to_victor_event(self, event: "CQRSEvent") -> Optional[Event]:
+    def _convert_to_victor_event(self, event: "CQRSEvent") -> Optional[MessagingEvent]:
         """Convert a CQRS Event to an Event.
 
         Args:
@@ -636,7 +636,7 @@ class UnifiedEventBridge:
 
         Example:
             from victor.observability.cqrs_adapter import UnifiedEventBridge
-    from victor.core.events import Event, ObservabilityBus, get_observability_bus
+    from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
             bridge = UnifiedEventBridge.create()
             bridge.start()

@@ -32,7 +32,7 @@ Example:
     # Use factory (recommended)
     backend = create_event_backend()
     await backend.connect()
-    await backend.publish(Event(topic="test", data={}))
+    await backend.publish(MessagingEvent(topic="test", data={}))
 
     # Or create directly
     backend = InMemoryEventBackend()
@@ -52,7 +52,7 @@ from victor.core.events.protocols import (
     BackendConfig,
     BackendType,
     DeliveryGuarantee,
-    Event,
+    MessagingEvent,
     EventHandler,
     EventPublishError,
     EventSubscriptionError,
@@ -105,7 +105,7 @@ class InMemoryEventBackend:
             print(f"Received: {event.topic}")
 
         handle = await backend.subscribe("tool.*", handler)
-        await backend.publish(Event(topic="tool.call", data={"name": "read"}))
+        await backend.publish(MessagingEvent(topic="tool.call", data={"name": "read"}))
 
         await backend.disconnect()
     """
@@ -125,7 +125,7 @@ class InMemoryEventBackend:
         self._config = config or BackendConfig()
         self._queue_maxsize = queue_maxsize
         self._subscriptions: Dict[str, _Subscription] = {}
-        self._event_queue: asyncio.Queue[Event] = asyncio.Queue(maxsize=queue_maxsize)
+        self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(maxsize=queue_maxsize)
         self._is_connected = False
         self._dispatcher_task: Optional[asyncio.Task] = None
         self._lock = threading.Lock()
@@ -191,7 +191,7 @@ class InMemoryEventBackend:
             and not self._dispatcher_task.done()
         )
 
-    async def publish(self, event: Event) -> bool:
+    async def publish(self, event: MessagingEvent) -> bool:
         """Publish an event to all matching subscribers.
 
         Args:
@@ -215,7 +215,7 @@ class InMemoryEventBackend:
             logger.warning(f"Event queue full, dropping event: {event.topic}")
             return False
 
-    async def publish_batch(self, events: List[Event]) -> int:
+    async def publish_batch(self, events: List[MessagingEvent]) -> int:
         """Publish multiple events.
 
         Args:
@@ -327,7 +327,7 @@ class InMemoryEventBackend:
             except Exception as e:
                 logger.warning(f"Dispatch loop error: {e}")
 
-    async def _safe_call_handler(self, handler: EventHandler, event: Event) -> None:
+    async def _safe_call_handler(self, handler: EventHandler, event: MessagingEvent) -> None:
         """Safely call a handler, catching exceptions."""
         try:
             await handler(event)
@@ -592,7 +592,7 @@ class ObservabilityBus:
             for exporter, handler in pending:
                 await self._subscribe_exporter(exporter, handler)
 
-        event = Event(
+        event = MessagingEvent(
             topic=topic,
             data=data,
             source=source,
@@ -737,7 +737,7 @@ class AgentMessageBus:
         Returns:
             True if message was sent
         """
-        event = Event(
+        event = MessagingEvent(
             topic=f"agent.{to_agent}.{topic}",
             data={
                 **data,
@@ -775,7 +775,7 @@ class AgentMessageBus:
         Returns:
             True if broadcast was sent
         """
-        event = Event(
+        event = MessagingEvent(
             topic=f"agent.broadcast.{topic}",
             data={
                 **data,
@@ -967,7 +967,7 @@ def get_event_backend() -> IEventBackend:
         >>> from victor.core.events.backends import get_event_backend
         >>>
         >>> backend = get_event_backend()
-        >>> await backend.publish(Event(topic="test", data={}))
+        >>> await backend.publish(MessagingEvent(topic="test", data={}))
     """
     from victor.core.container import get_container
 
