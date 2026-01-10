@@ -75,7 +75,7 @@ class TestGetObservabilityBusFactory:
 
         events_received = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             events_received.append(event)
 
         await bus.subscribe("tool.*", handler)
@@ -424,7 +424,7 @@ class TestEventSystemIntegration:
         # Use custom topic prefix
         events_received = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             events_received.append(event)
 
         await bus.subscribe("security_scan.*", handler)
@@ -452,7 +452,7 @@ class TestEventSystemIntegration:
 
         events_received = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             events_received.append(event)
 
         await bus.subscribe("lifecycle.*", handler)
@@ -497,7 +497,7 @@ class TestEventSystemIntegration:
         # Subscribe to all custom categories
         events_received = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             events_received.append(event)
 
         await bus.subscribe("ml_pipeline.*", handler)

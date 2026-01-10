@@ -439,7 +439,7 @@ class TestGlobalSingleton:
 
     def test_get_checkpoint_store(self) -> None:
         """Test getting global singleton."""
-        import victor.agent.rl.checkpoint_store as module
+        import victor.framework.rl.checkpoint_store as module
 
         module._checkpoint_store = None
 
@@ -451,7 +451,7 @@ class TestGlobalSingleton:
 
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
-        import victor.agent.rl.checkpoint_store as module
+        import victor.framework.rl.checkpoint_store as module
 
         module._checkpoint_store = None
 
