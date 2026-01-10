@@ -49,6 +49,7 @@ def sample_llm_responses():
     """Sample LLM responses for mocking."""
     return {
         "extraction": """{
+            "description": "Analyze codebase, find bugs, and fix them",
             "functional": {
                 "tasks": [
                     {
