@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.config.settings import Settings
+    from victor.agent.presentation import PresentationProtocol
 
 from victor.providers.base import StreamChunk
 from victor.core.events import ObservabilityBus
@@ -126,6 +127,7 @@ class StreamingRecoveryCoordinator:
         unified_tracker: "UnifiedTaskTracker",
         settings: "Settings",
         event_bus: Optional[ObservabilityBus] = None,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize StreamingRecoveryCoordinator.
 
@@ -137,6 +139,7 @@ class StreamingRecoveryCoordinator:
             unified_tracker: Task progress tracker
             settings: Application settings
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.recovery_handler = recovery_handler
         self.recovery_integration = recovery_integration
@@ -145,6 +148,13 @@ class StreamingRecoveryCoordinator:
         self.unified_tracker = unified_tracker
         self.settings = settings
         self._event_bus = event_bus or self._get_default_bus()
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -204,8 +214,9 @@ class StreamingRecoveryCoordinator:
             # Return the chunk from the result
             if result.chunks:
                 return result.chunks[0]
+            pending_icon = self._presentation.icon("pending", with_color=False)
             return StreamChunk(
-                content="\n\n⏱️ Session time limit reached. "
+                content=f"\n\n{pending_icon} Session time limit reached. "
                 "Providing summary of progress so far.\n",
                 is_final=False,
             )
@@ -292,8 +303,9 @@ class StreamingRecoveryCoordinator:
 
         # Warn when we've used at least warning_threshold calls and still have remaining
         if ctx.tool_calls_used >= warning_threshold and remaining > 0:
+            warning_icon = self._presentation.icon("warning", with_color=False)
             return StreamChunk(
-                content=f"[tool] ⚠ Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+                content=f"[tool] {warning_icon} Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
             )
         return None
 
@@ -346,11 +358,12 @@ class StreamingRecoveryCoordinator:
             ctx.streaming_context, all_blocked, consecutive_limit, total_limit
         )
         if result:
+            warning_icon = self._presentation.icon("warning", with_color=False)
             chunk = (
                 result.chunks[0]
                 if result.chunks
                 else StreamChunk(
-                    content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n"
+                    content=f"\n[loop] {warning_icon} Multiple blocked attempts - forcing completion\n"
                 )
             )
             return (chunk, result.clear_tool_calls)
@@ -522,10 +535,11 @@ class StreamingRecoveryCoordinator:
                 logger.debug(f"Failed to emit force completion event: {e}")
 
         # Generate forced completion chunks
+        clipboard_icon = self._presentation.icon("clipboard", with_color=False)
         chunks = []
         chunks.append(
             StreamChunk(
-                content="\n\n📋 Providing summary of progress...\n",
+                content=f"\n\n{clipboard_icon} Providing summary of progress...\n",
                 is_final=False,
             )
         )
@@ -548,10 +562,11 @@ class StreamingRecoveryCoordinator:
             return None
 
         # Generate loop warning chunks
+        warning_icon = self._presentation.icon("warning", with_color=False)
         chunks = []
         chunks.append(
             StreamChunk(
-                content=f"\n[loop] ⚠️ {decision.reason}\n",
+                content=f"\n[loop] {warning_icon} {decision.reason}\n",
                 is_final=False,
             )
         )

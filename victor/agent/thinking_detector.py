@@ -27,7 +27,21 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Deque,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +249,7 @@ class ThinkingPatternDetector:
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         window_size: int = WINDOW_SIZE,
         stalling_threshold: int = STALLING_THRESHOLD,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize the thinking detector.
 
@@ -243,6 +258,7 @@ class ThinkingPatternDetector:
             similarity_threshold: Jaccard similarity threshold
             window_size: Number of recent patterns to track
             stalling_threshold: Count for consecutive stalling detection
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self._history: Deque[ThinkingPattern] = deque(maxlen=window_size)
         self._pattern_counts: Dict[str, int] = {}
@@ -258,6 +274,14 @@ class ThinkingPatternDetector:
         self._exact_matches = 0
         self._similar_matches = 0
         self._stalling_detected = 0
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def _extract_keywords(self, text: str) -> Set[str]:
         """Extract significant keywords from thinking block.
@@ -492,13 +516,15 @@ class ThinkingPatternDetector:
         """
         # Different base message for stalling vs repetition
         if loop_type == "stalling":
+            warning_icon = self._presentation.icon("warning", with_color=False)
             base_guidance = (
-                f"⚠️ STALLING DETECTED: "
+                f"{warning_icon} STALLING DETECTED: "
                 f"You've stated your intent {count} times without taking action. "
             )
         else:
+            refresh_icon = self._presentation.icon("refresh", with_color=False)
             base_guidance = (
-                f"🔄 LOOP DETECTED ({loop_type}): "
+                f"{refresh_icon} LOOP DETECTED ({loop_type}): "
                 f"You've repeated this thought pattern {count} times. "
             )
 

@@ -43,9 +43,44 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
+
+
+def _get_step_status_icon(
+    status: "StepStatus",
+    presentation: Optional["PresentationProtocol"] = None,
+) -> str:
+    """Get icon for a step status using presentation adapter.
+
+    Args:
+        status: The step status
+        presentation: Optional presentation adapter (creates default if None)
+
+    Returns:
+        Icon string for the status
+    """
+    if presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        presentation = create_presentation_adapter()
+
+    # Map step statuses to icon names
+    icon_map = {
+        StepStatus.PENDING: "pending",
+        StepStatus.IN_PROGRESS: "refresh",
+        StepStatus.COMPLETED: "success",
+        StepStatus.FAILED: "error",
+        StepStatus.SKIPPED: "skipped",
+        StepStatus.BLOCKED: "blocked",
+    }
+
+    icon_name = icon_map.get(status, "unknown")
+    return presentation.icon(icon_name, with_color=False)
 
 
 class StepStatus(Enum):
@@ -271,12 +306,25 @@ class ExecutionPlan:
         completed = sum(1 for s in self.steps if s.status == StepStatus.COMPLETED)
         return (completed / len(self.steps)) * 100
 
-    def to_markdown(self) -> str:
+    def to_markdown(
+        self, presentation: Optional["PresentationProtocol"] = None
+    ) -> str:
         """Convert plan to markdown format for display/approval.
+
+        Args:
+            presentation: Optional presentation adapter for icons (creates default if None)
 
         Returns:
             Markdown string representation of the plan
         """
+        # Get presentation adapter for arrow icon
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            presentation = create_presentation_adapter()
+
+        arrow = presentation.icon("arrow_right", with_color=False)
+
         lines = [
             f"# Execution Plan: {self.goal}",
             "",
@@ -289,20 +337,13 @@ class ExecutionPlan:
         ]
 
         for i, step in enumerate(self.steps, 1):
-            status_emoji = {
-                StepStatus.PENDING: "⏳",
-                StepStatus.IN_PROGRESS: "🔄",
-                StepStatus.COMPLETED: "✅",
-                StepStatus.FAILED: "❌",
-                StepStatus.SKIPPED: "⏭️",
-                StepStatus.BLOCKED: "🔒",
-            }.get(step.status, "❓")
+            status_icon = _get_step_status_icon(step.status, presentation)
 
             deps = f" (depends on: {', '.join(step.depends_on)})" if step.depends_on else ""
             approval = " *[requires approval]*" if step.requires_approval else ""
-            agent = f" → _{step.sub_agent_role}_" if step.sub_agent_role else ""
+            agent = f" {arrow} _{step.sub_agent_role}_" if step.sub_agent_role else ""
 
-            lines.append(f"### {i}. {status_emoji} {step.description}{approval}")
+            lines.append(f"### {i}. {status_icon} {step.description}{approval}")
             lines.append(f"- **Type:** {step.step_type.value}")
             lines.append(f"- **Estimated calls:** ~{step.estimated_tool_calls}")
             if deps:

@@ -335,6 +335,19 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return self.container.get(SearchRouterProtocol)
 
+    def create_presentation_adapter(self) -> Any:
+        """Create presentation adapter for icon/emoji rendering.
+
+        The presentation adapter provides a clean abstraction for presentation
+        concerns, decoupling the agent layer from direct UI dependencies.
+
+        Returns:
+            PresentationProtocol implementation (EmojiPresentationAdapter by default)
+        """
+        from victor.agent.presentation import PresentationProtocol
+
+        return self.container.get(PresentationProtocol)
+
     def create_core_services(
         self,
         tool_adapter: "BaseToolCallingAdapter",
@@ -1294,10 +1307,13 @@ class OrchestratorFactory(ModeAwareMixin):
         from victor.agent.streaming import StreamingChatHandler
 
         session_idle_timeout = getattr(self.settings, "session_idle_timeout", 180.0)
+        # Get presentation adapter from message_adder (orchestrator) if available
+        presentation = getattr(message_adder, "_presentation", None)
         handler = StreamingChatHandler(
             settings=self.settings,
             message_adder=message_adder,
             session_idle_timeout=session_idle_timeout,
+            presentation=presentation,
         )
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler

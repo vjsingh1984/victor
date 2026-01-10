@@ -577,6 +577,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
 
+        # Presentation adapter for icon/emoji rendering (via factory, DI)
+        # Decouples agent layer from direct UI dependencies
+        self._presentation = self._factory.create_presentation_adapter()
+
         # Task Completion Detection: Signal-based completion detection
         # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
         from victor.agent.task_completion import TaskCompletionDetector
@@ -2512,7 +2516,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
             # Mark initialization complete in ToolSelector (single source of truth)
             self.tool_selector._embeddings_initialized = True
-            logger.info("✓ Tool embeddings preloaded successfully in background")
+            logger.info(f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background")
         except Exception as e:
             logger.warning(
                 f"Failed to preload embeddings in background: {e}. "
@@ -3620,7 +3624,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 f"Known tool-capable models: {known}"
             )
             self.console.print(
-                f"[yellow]⚠ Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
+                f"[yellow]{self._presentation.icon('warning', with_color=False)} Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
                 f"Running without tools.[/]"
             )
             self._tool_capability_warned = True
@@ -3888,7 +3892,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if self._check_context_overflow(max_context):
                 logger.warning("Still overflowing after compaction. Forcing completion.")
                 chunk = StreamChunk(
-                    content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                    content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Context size limit reached. Providing summary.\n"
                 )
                 completion_prompt = self._get_thinking_disabled_prompt(
                     "Context limit reached. Summarize in 2-3 sentences."
@@ -3941,7 +3945,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
 
             chunk = StreamChunk(
-                content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+                content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
             )
 
             try:
@@ -4508,7 +4512,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Show status to user
         yield self._chunk_generator.generate_tool_start_chunk(
             tool_name=tool_name,
-            status_msg=f"🔧 Auto-executing {tool_name} from model intent...",
+            status_msg=f"{self._presentation.icon('running', with_color=False)} Auto-executing {tool_name} from model intent...",
         )
 
         # Emit extracted tool execution event
@@ -6103,13 +6107,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Validate tool call structure
             if not isinstance(tool_call, dict):
                 self.console.print(
-                    f"[yellow]⚠ Skipping invalid tool call (not a dict): {tool_call}[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid tool call (not a dict): {tool_call}[/]"
                 )
                 continue
 
             tool_name = tool_call.get("name")
             if not tool_name:
-                self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
+                self.console.print(f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping tool call without name: {tool_call}[/]")
                 # GAP-5 FIX: Add feedback so model learns from missing tool name
                 results.append(
                     {
@@ -6125,7 +6129,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Validate tool name format (reject hallucinated/malformed names)
             if not self.sanitizer.is_valid_tool_name(tool_name):
                 self.console.print(
-                    f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid/hallucinated tool name: {tool_name}[/]"
                 )
                 # GAP-5 FIX: Add feedback so model learns from invalid tool name
                 # Instead of silently dropping, return an error result the model can learn from
@@ -6154,7 +6158,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if not self.is_tool_enabled(canonical_tool_name):
                 # Log original and canonical names to aid debugging in tests
                 self.console.print(
-                    f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
                 )
                 # GAP-5 FIX: Add feedback so model learns from unknown/disabled tool
                 # Instead of silently dropping, return an error result the model can learn from
@@ -6172,7 +6176,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             if self.tool_calls_used >= self.tool_budget:
                 self.console.print(
-                    f"[yellow]⚠ Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
                 )
                 break
 
@@ -6233,7 +6237,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 signature = (tool_name, str(normalized_args))
             if signature in self.failed_tool_signatures:
                 self.console.print(
-                    f"[yellow]⚠ Skipping repeated failing call to '{tool_name}' with same arguments[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
                 )
                 continue
 
@@ -6243,7 +6247,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     f"Applied {strategy.value} normalization to {tool_name} arguments. "
                     f"Original: {tool_args} → Normalized: {normalized_args}"
                 )
-                self.console.print(f"[yellow]⚙ Normalized arguments via {strategy.value}[/]")
+                gear_icon = self._presentation.icon("gear", with_color=False)
+                self.console.print(f"[yellow]{gear_icon} Normalized arguments via {strategy.value}[/]")
             else:
                 # Log type coercion even when strategy is DIRECT
                 args_changed = tool_args != normalized_args
@@ -6386,7 +6391,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.failed_tool_signatures.add(signature)
                 # error_display was already set above from exec_result.error or semantic failure
                 self.console.print(
-                    f"[red]✗ Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
+                    f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
 
                 # ALWAYS pass error details back to the model so it can understand and continue

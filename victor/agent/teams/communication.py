@@ -53,7 +53,10 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import RLock
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 # Import canonical types from victor.teams.types
 from victor.teams.types import MessageType, AgentMessage as CanonicalAgentMessage
@@ -120,11 +123,27 @@ class AgentMessage:
             "priority": self.priority,
         }
 
-    def to_context_string(self) -> str:
-        """Format message for inclusion in agent context."""
+    def to_context_string(
+        self, presentation: Optional["PresentationProtocol"] = None
+    ) -> str:
+        """Format message for inclusion in agent context.
+
+        Args:
+            presentation: Optional presentation adapter for icons.
+                If None, creates default adapter.
+
+        Returns:
+            Formatted string for agent context.
+        """
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            presentation = create_presentation_adapter()
+
+        arrow = presentation.icon("arrow_right", with_color=False)
         header = f"[{self.type.value.upper()}] {self.from_agent}"
         if self.to_agent:
-            header += f" → {self.to_agent}"
+            header += f" {arrow} {self.to_agent}"
         return f"{header}: {self.content}"
 
 

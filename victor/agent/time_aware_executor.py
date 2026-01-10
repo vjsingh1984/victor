@@ -27,7 +27,10 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -191,22 +194,26 @@ class TimeAwareExecutor:
     WARNING_THRESHOLD = 0.50  # 50% time remaining
     CRITICAL_THRESHOLD = 0.25  # 25% time remaining
 
-    # Guidance messages per phase
-    PHASE_GUIDANCE = {
-        TimePhase.NORMAL: "",
+    # Guidance messages per phase (without icons - icons added dynamically)
+    # Format: (icon_name, message)
+    _PHASE_GUIDANCE_TEMPLATES = {
+        TimePhase.NORMAL: (None, ""),
         TimePhase.WARNING: (
-            "⏰ TIME WARNING: Less than 50% time remaining. "
+            "clock",
+            "TIME WARNING: Less than 50% time remaining. "
             "Focus on completing primary deliverables. "
-            "Avoid starting new exploration paths."
+            "Avoid starting new exploration paths.",
         ),
         TimePhase.CRITICAL: (
-            "⚠️ TIME CRITICAL: Less than 25% time remaining. "
+            "warning",
+            "TIME CRITICAL: Less than 25% time remaining. "
             "Prioritize delivering the most important output NOW. "
-            "Skip non-essential exploration and provide a summary."
+            "Skip non-essential exploration and provide a summary.",
         ),
         TimePhase.EXPIRED: (
-            "🛑 TIME EXPIRED: Execution time has been exhausted. "
-            "Provide immediate summary of current findings and stop."
+            "stop_sign",
+            "TIME EXPIRED: Execution time has been exhausted. "
+            "Provide immediate summary of current findings and stop.",
         ),
     }
 
@@ -214,16 +221,26 @@ class TimeAwareExecutor:
         self,
         timeout_seconds: Optional[float] = None,
         on_phase_change: Optional[Callable[[TimePhase, TimePhase], None]] = None,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize time-aware executor.
 
         Args:
             timeout_seconds: Total execution time budget (None for unlimited)
             on_phase_change: Callback when phase changes (old_phase, new_phase)
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self._budget: Optional[ExecutionBudget] = None
         self._on_phase_change = on_phase_change
         self._last_notified_phase = TimePhase.NORMAL
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
         if timeout_seconds is not None and timeout_seconds > 0:
             self._budget = ExecutionBudget(
@@ -259,9 +276,20 @@ class TimeAwareExecutor:
             Guidance string for agent (empty if NORMAL phase)
         """
         phase = self.get_phase()
-        guidance = self.PHASE_GUIDANCE.get(phase, "")
+        template = self._PHASE_GUIDANCE_TEMPLATES.get(phase, (None, ""))
+        icon_name, message = template
 
-        if guidance and self._budget:
+        if not message:
+            return ""
+
+        # Build guidance with icon
+        if icon_name:
+            icon = self._presentation.icon(icon_name, with_color=False)
+            guidance = f"{icon} {message}"
+        else:
+            guidance = message
+
+        if self._budget:
             remaining = self._budget.remaining
             guidance += f"\n[Remaining: {remaining:.0f}s]"
 

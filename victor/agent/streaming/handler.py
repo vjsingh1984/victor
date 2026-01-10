@@ -46,6 +46,7 @@ from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.presentation import PresentationProtocol
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ class StreamingChatHandler:
         message_adder: MessageAdder,
         tool_executor: Optional[ToolExecutor] = None,
         session_idle_timeout: float = 180.0,
+        presentation: Optional[Any] = None,
     ):
         """Initialize the streaming handler.
 
@@ -89,11 +91,19 @@ class StreamingChatHandler:
             message_adder: Object that can add messages to conversation
             tool_executor: Optional tool executor for running tools
             session_idle_timeout: Maximum idle time in seconds (resets on activity)
+            presentation: Optional PresentationProtocol for icon rendering
         """
         self.settings = settings
         self.message_adder = message_adder
         self.tool_executor = tool_executor
         self.session_idle_timeout = session_idle_timeout
+
+        # Presentation adapter for icon rendering (decouples from UI)
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def check_time_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Check if session idle time limit has been exceeded.
@@ -137,7 +147,7 @@ class StreamingChatHandler:
                 f"Max iterations ({ctx.max_total_iterations}) reached - forcing completion"
             )
             return create_break_result(
-                f"\n\n⚠️ Maximum iterations ({ctx.max_total_iterations}) reached.\n"
+                f"\n\n{self._presentation.icon('warning', with_color=False)} Maximum iterations ({ctx.max_total_iterations}) reached.\n"
             )
         return None
 
@@ -172,12 +182,12 @@ class StreamingChatHandler:
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
-                StreamChunk(content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n")
+                StreamChunk(content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n")
             )
             # Add strong instruction to stop tool use
             self.message_adder.add_message(
                 "user",
-                "⚠️ STOP: You have attempted blocked operations too many times. "
+                f"{self._presentation.icon('warning', with_color=False)} STOP: You have attempted blocked operations too many times. "
                 "You MUST now provide your final response WITHOUT any tool calls. "
                 "Summarize what you found and answer the user's question based on "
                 "the information you have already gathered. DO NOT call any more tools.",
@@ -281,7 +291,8 @@ class StreamingChatHandler:
                 )
 
         # Add thinking status
-        chunks.append(StreamChunk(content="", metadata={"status": "💭 Thinking..."}))
+        thinking_icon = self._presentation.icon("thinking", with_color=False)
+        chunks.append(StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."}))
         return chunks
 
     def generate_tool_start_chunk(
@@ -402,16 +413,17 @@ class StreamingChatHandler:
         logger.debug(f"BLOCKED tool call: {tool_name}({tool_args}) - {block_reason}")
 
         # Add tool result feedback
+        stop_icon = self._presentation.icon("stop", with_color=False)
         args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in tool_args.items())
         self.message_adder.add_message(
             "user",
-            f"⛔ TOOL BLOCKED: {tool_name}({args_summary})\n\n"
+            f"{stop_icon} TOOL BLOCKED: {tool_name}({args_summary})\n\n"
             f"Reason: {block_reason}\n\n"
             "This operation was permanently blocked because you already tried it multiple times. "
             "You MUST use a DIFFERENT approach - this exact operation will NEVER work again.",
         )
 
-        return StreamChunk(content=f"\n[loop] ⛔ {block_reason}\n")
+        return StreamChunk(content=f"\n[loop] {stop_icon} {block_reason}\n")
 
     def filter_blocked_tool_calls(
         self,
@@ -534,11 +546,11 @@ class StreamingChatHandler:
         """
         result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
         result.add_chunk(
-            StreamChunk(content="\n[loop] ⚠️ Multiple blocked attempts - forcing completion\n")
+            StreamChunk(content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Multiple blocked attempts - forcing completion\n")
         )
         self.message_adder.add_message(
             "user",
-            "⚠️ STOP: You have attempted blocked operations too many times. "
+            f"{self._presentation.icon('warning', with_color=False)} STOP: You have attempted blocked operations too many times. "
             "You MUST now provide your final response WITHOUT any tool calls. "
             "Summarize what you found and answer the user's question based on "
             "the information you have already gathered. DO NOT call any more tools.",
@@ -608,7 +620,7 @@ class StreamingChatHandler:
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
                 StreamChunk(
-                    content=f"[tool] ⚠ Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+                    content=f"[tool] {self._presentation.icon('warning', with_color=False)} Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
                 )
             )
             return result
@@ -660,7 +672,7 @@ class StreamingChatHandler:
         """
         return [
             StreamChunk(
-                content=f"[tool] ⚠ Tool budget reached ({ctx.tool_budget}); skipping tool calls.\n"
+                content=f"[tool] {self._presentation.icon('warning', with_color=False)} Tool budget reached ({ctx.tool_budget}); skipping tool calls.\n"
             ),
             StreamChunk(content="Generating final summary...\n"),
         ]
@@ -708,7 +720,7 @@ class StreamingChatHandler:
         """
         if is_research_loop:
             warning_chunk = StreamChunk(
-                content="[tool] ⚠ Research loop detected - forcing synthesis\n"
+                content=f"[tool] {self._presentation.icon('warning', with_color=False)} Research loop detected - forcing synthesis\n"
             )
             system_message = (
                 "You have performed multiple consecutive research/web searches. "
@@ -718,7 +730,7 @@ class StreamingChatHandler:
             )
         else:
             warning_chunk = StreamChunk(
-                content="⚠️ Reached exploration limit - summarizing findings...\n"
+                content=f"{self._presentation.icon('warning', with_color=False)} Reached exploration limit - summarizing findings...\n"
             )
             system_message = (
                 "You have made multiple tool calls without providing substantial analysis. "
@@ -949,7 +961,7 @@ class StreamingChatHandler:
             # Build metrics line
             tokens_per_second = output_tokens / elapsed_time if elapsed_time > 0 else 0
             metrics_parts = [
-                f"📊 in={input_tokens:,}",
+                f"{self._presentation.icon('chart', with_color=False)} in={input_tokens:,}",
                 f"out={output_tokens:,}",
             ]
             if cache_read > 0:
@@ -970,7 +982,7 @@ class StreamingChatHandler:
             # Fallback to estimate
             tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
             base = (
-                f"📊 ~{ctx.total_tokens:.0f} tokens (est.) | "
+                f"{self._presentation.icon('chart', with_color=False)} ~{ctx.total_tokens:.0f} tokens (est.) | "
                 f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
             )
             if cost_str:
@@ -1004,7 +1016,7 @@ class StreamingChatHandler:
         cost_info = ""
         if cost_str:
             cost_info = f" | {cost_str}"
-        return f"📊 {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}{cost_info}"
+        return f"{self._presentation.icon('chart', with_color=False)} {ctx.total_tokens:.0f} tokens | {elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s{ttft_info}{cost_info}"
 
     def generate_tool_result_chunk(
         self,
@@ -1172,7 +1184,7 @@ class StreamingChatHandler:
             Tuple of (warning_chunk, system_message)
         """
         warning_chunk = StreamChunk(
-            content=f"\n[loop] ⚠ Warning: Approaching loop limit - {warning_message}\n"
+            content=f"\n[loop] {self._presentation.icon('warning', with_color=False)} Warning: Approaching loop limit - {warning_message}\n"
         )
         system_message = (
             "WARNING: You are about to hit loop detection. You have been performing "
@@ -1212,7 +1224,8 @@ class StreamingChatHandler:
         Returns:
             StreamChunk with thinking status metadata
         """
-        return StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+        thinking_icon = self._presentation.icon("thinking", with_color=False)
+        return StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."})
 
     def generate_budget_error_chunk(self) -> StreamChunk:
         """Generate a chunk for budget limit summary error.
@@ -1395,9 +1408,12 @@ def create_streaming_handler(
         Configured StreamingChatHandler
     """
     limit = session_idle_timeout or getattr(settings, "session_idle_timeout", 180.0)
+    # Get presentation adapter from orchestrator if available
+    presentation = getattr(orchestrator, "_presentation", None)
     return StreamingChatHandler(
         settings=settings,
         message_adder=orchestrator,
         tool_executor=None,  # Tool execution stays in orchestrator for now
         session_idle_timeout=limit,
+        presentation=presentation,
     )

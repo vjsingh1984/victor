@@ -26,7 +26,10 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -303,9 +306,20 @@ class TaskCompletionDetector:
         }
     )
 
-    def __init__(self):
-        """Initialize the task completion detector."""
+    def __init__(self, presentation: Optional["PresentationProtocol"] = None):
+        """Initialize the task completion detector.
+
+        Args:
+            presentation: Optional presentation adapter for icons (creates default if None)
+        """
         self._state = TaskCompletionState()
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
         self._intent_keywords: Dict[str, List[DeliverableType]] = {
             # File creation keywords
             "create": [DeliverableType.FILE_CREATED],
@@ -528,7 +542,9 @@ class TaskCompletionDetector:
         if self._state.completed_deliverables:
             lines.append("### Deliverables")
             for d in self._state.completed_deliverables:
-                status = "✅" if d.verified else "⏳"
+                status = self._presentation.icon(
+                    "success" if d.verified else "pending", with_color=False
+                )
                 path_info = f" ({d.artifact_path})" if d.artifact_path else ""
                 lines.append(f"- {status} {d.type.value}: {d.description}{path_info}")
             lines.append("")

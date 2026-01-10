@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     # Team member dependencies
     from victor.agent.subagents.base import SubAgentRole
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
+    from victor.agent.presentation import PresentationProtocol
 
 
 class TeamFormation(str, Enum):
@@ -172,11 +173,27 @@ class AgentMessage:
         """Check if this is a reply to another message."""
         return self.reply_to is not None
 
-    def to_context_string(self) -> str:
-        """Format message for inclusion in agent context."""
+    def to_context_string(
+        self, presentation: Optional["PresentationProtocol"] = None
+    ) -> str:
+        """Format message for inclusion in agent context.
+
+        Args:
+            presentation: Optional presentation adapter for icons.
+                If None, creates default adapter.
+
+        Returns:
+            Formatted string for agent context.
+        """
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            presentation = create_presentation_adapter()
+
+        arrow = presentation.icon("arrow_right", with_color=False)
         header = f"[{self.message_type.value.upper()}] {self.sender_id}"
         if self.recipient_id:
-            header += f" → {self.recipient_id}"
+            header += f" {arrow} {self.recipient_id}"
         return f"{header}: {self.content}"
 
     def to_dict(self) -> Dict[str, Any]:

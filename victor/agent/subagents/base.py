@@ -57,6 +57,9 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Unio
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
+
 # Import from canonical location to avoid circular dependencies
 from victor.protocols.team import IAgent
 from victor.teams.types import AgentMessage
@@ -194,6 +197,7 @@ class SubAgent(IAgent):
         self,
         config: SubAgentConfig,
         parent: Union["AgentOrchestrator", SubAgentContext],
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize sub-agent with configuration and parent context.
 
@@ -202,6 +206,7 @@ class SubAgent(IAgent):
             parent: Parent context providing settings, provider, model, and tools.
                 Can be either a full AgentOrchestrator (for backward compatibility)
                 or any object implementing the SubAgentContext protocol.
+            presentation: Optional presentation adapter for icons (creates default if None)
 
         Note:
             If a full AgentOrchestrator is passed, it will be automatically
@@ -211,6 +216,14 @@ class SubAgent(IAgent):
         """
         self.config = config
         self._id = uuid.uuid4().hex[:12]
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
         # Auto-adapt full orchestrator to SubAgentContext for ISP compliance
         # Check if it's already a SubAgentContext (including adapters)
@@ -307,7 +320,8 @@ class SubAgent(IAgent):
 
         # Set disable_embeddings flag for workflow service mode
         if self.config.disable_embeddings:
-            logger.debug(f"   ⚙️  Setting disable_embeddings=True for {self.config.role.value} sub-agent")
+            gear_icon = self._presentation.icon("gear", with_color=False)
+            logger.debug(f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent")
             if hasattr(orchestrator, '_session_state_manager'):
                 orchestrator._session_state_manager.execution_state.disable_embeddings = True
 
@@ -387,18 +401,22 @@ class SubAgent(IAgent):
 
         last_exception = None
 
-        logger.debug(f"   🔄 Starting execution with retry logic (max {max_attempts} attempts)")
+        refresh_icon = self._presentation.icon("refresh", with_color=False)
+        success_icon = self._presentation.icon("success", with_color=False)
+        error_icon = self._presentation.icon("error", with_color=False)
+
+        logger.debug(f"   {refresh_icon} Starting execution with retry logic (max {max_attempts} attempts)")
 
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt > 1:
-                    logger.debug(f"   🔄 Retry attempt {attempt}/{max_attempts}...")
+                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
 
                 # Try to execute the chat
                 response = await self.orchestrator.chat(self.config.task)
 
                 if attempt > 1:
-                    logger.debug(f"   ✅ Retry attempt {attempt}/{max_attempts} succeeded!")
+                    logger.debug(f"   {success_icon} Retry attempt {attempt}/{max_attempts} succeeded!")
 
                 return response
 
@@ -437,7 +455,7 @@ class SubAgent(IAgent):
                 raise
 
         # All retries exhausted
-        logger.error(f"   ❌ All retry attempts exhausted for {self.config.role.value}")
+        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
         raise last_exception
 
     async def execute(self) -> SubAgentResult:
