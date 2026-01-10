@@ -191,7 +191,7 @@ class WorkflowServiceProvider:
         """
         # Import concrete implementations for registration
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
-        from victor.workflows.execution_engine import WorkflowExecutor
+        from victor.workflows.compiled_executor import WorkflowExecutor
 
         # WorkflowCompilerImpl - concrete implementation for DI container
         container.register(
@@ -437,7 +437,7 @@ class WorkflowServiceProvider:
         Returns:
             WorkflowExecutor instance
         """
-        from victor.workflows.execution_engine.state_graph_executor import WorkflowExecutor
+        from victor.workflows.compiled_executor import WorkflowExecutor
 
         # Get dependencies from DI container
         orchestrator_pool = self.container.get("OrchestratorPool")

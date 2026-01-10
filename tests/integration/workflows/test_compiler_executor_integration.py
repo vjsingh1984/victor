@@ -119,7 +119,7 @@ class TestWorkflowExecutor:
     @pytest.mark.asyncio
     async def test_executor_from_container(self, container):
         """Test that executor can be resolved from DI container."""
-        from victor.workflows.execution_engine import WorkflowExecutor
+        from victor.workflows.compiled_executor import WorkflowExecutor
 
         executor = container.get(WorkflowExecutor)
         assert executor is not None
@@ -277,7 +277,7 @@ class TestExecutionResult:
     @pytest.mark.asyncio
     async def test_execution_result_properties(self):
         """Test that execution result has required properties."""
-        from victor.workflows.execution_engine import ExecutionResult
+        from victor.workflows.compiled_executor import ExecutionResult
 
         result = ExecutionResult(
             final_state={"key": "value"},
@@ -316,7 +316,7 @@ class TestDiContainerIntegration:
         """Test that all workflow services are registered."""
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
-        from victor.workflows.execution_engine import WorkflowExecutor
+        from victor.workflows.compiled_executor import WorkflowExecutor
 
         # Should all be resolvable
         compiler = container.get(WorkflowCompilerImpl)
