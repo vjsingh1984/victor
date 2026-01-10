@@ -103,11 +103,6 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
         ]
 
 
-# Register DevOps domain handlers when this module is loaded
-from victor.devops.handlers import register_handlers as _register_handlers
-
-_register_handlers()
-
 __all__ = [
     # YAML-first workflow provider
     "DevOpsWorkflowProvider",

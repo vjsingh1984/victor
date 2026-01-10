@@ -27,6 +27,7 @@ Design Philosophy:
 
 Architecture:
     StepHandlerProtocol
+    ├── CapabilityConfigStepHandler - Centralized capability config storage
     ├── ToolStepHandler - Tool filter application
     ├── PromptStepHandler - System prompt and prompt contributors
     ├── SafetyStepHandler - Safety patterns and extensions
@@ -36,6 +37,7 @@ Architecture:
 
 Usage:
     from victor.framework.step_handlers import (
+        CapabilityConfigStepHandler,
         ToolStepHandler,
         PromptStepHandler,
         SafetyStepHandler,
@@ -821,6 +823,75 @@ class ConfigStepHandler(BaseStepHandler):
 
 
 # =============================================================================
+# Capability Config Step Handler (SOLID: Centralized Config Storage)
+# =============================================================================
+
+
+class CapabilityConfigStepHandler(BaseStepHandler):
+    """Handler for applying capability configs to VerticalContext.
+
+    Replaces direct orchestrator attribute assignment pattern:
+    - OLD: orchestrator.rag_config = {...}
+    - NEW: context.set_capability_config("rag_config", {...})
+
+    This handler centralizes all vertical capability configurations
+    in VerticalContext instead of scattered orchestrator attributes.
+    """
+
+    @property
+    def name(self) -> str:
+        return "capability_config"
+
+    @property
+    def order(self) -> int:
+        return 5  # Early, before tools (10)
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply capability configs from vertical to VerticalContext."""
+        configs = self._get_capability_configs(vertical)
+        if not configs:
+            return
+
+        # Store in VerticalContext
+        context.apply_capability_configs(configs)
+        result.add_info(f"Applied {len(configs)} capability configs")
+        logger.debug(f"Applied capability configs: {list(configs.keys())}")
+
+    def _get_capability_configs(
+        self, vertical: Type["VerticalBase"]
+    ) -> Dict[str, Any]:
+        """Get capability configs from vertical.
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            Dict of config names to configuration values
+        """
+        # Try get_capability_configs() method on vertical
+        if hasattr(vertical, "get_capability_configs"):
+            return vertical.get_capability_configs()
+
+        # Fallback: try importing from capabilities module
+        try:
+            module = __import__(
+                f"victor.{vertical.name}.capabilities", fromlist=["get_capability_configs"]
+            )
+            if hasattr(module, "get_capability_configs"):
+                return module.get_capability_configs()
+        except (ImportError, AttributeError):
+            pass
+
+        return {}
+
+
+# =============================================================================
 # Middleware Step Handler
 # =============================================================================
 
@@ -1396,8 +1467,9 @@ class FrameworkStepHandler(BaseStepHandler):
     ) -> None:
         """Explicitly register vertical compute handlers.
 
-        Phase 2: Gap fix - Handlers were registered via import side effects.
-        This method makes handler registration explicit and traceable.
+        SOLID: Replaces import-side-effect registration pattern with explicit
+        registration via vertical.get_handlers(). This makes registration
+        traceable and testable.
 
         Args:
             orchestrator: Orchestrator instance
@@ -1405,7 +1477,7 @@ class FrameworkStepHandler(BaseStepHandler):
             context: Vertical context
             result: Result to update
         """
-        # Check if vertical provides handlers
+        # Check if vertical provides handlers (NEW: use get_handlers())
         if not hasattr(vertical, "get_handlers"):
             return
 
@@ -1423,6 +1495,12 @@ class FrameworkStepHandler(BaseStepHandler):
             for name, handler in handlers.items():
                 registry.register(name, handler, vertical=vertical.name, replace=True)
                 logger.debug(f"Registered handler: {vertical.name}:{name}")
+
+            # Sync to executor for backward compatibility
+            try:
+                registry.sync_with_executor(direction="to_executor", replace=True)
+            except Exception:
+                pass  # Sync is optional
 
             result.add_info(f"Registered {handler_count} handlers: {', '.join(handlers.keys())}")
             logger.debug(f"Applied {handler_count} handlers from vertical")
@@ -2018,6 +2096,7 @@ class StepHandlerRegistry:
         """
         return cls(
             handlers=[
+                CapabilityConfigStepHandler(),  # SOLID: Centralized config storage
                 ToolStepHandler(),
                 TieredConfigStepHandler(),  # Phase 1: Gap fix
                 PromptStepHandler(),
@@ -2092,6 +2171,7 @@ __all__ = [
     # Concrete handlers
     "ToolStepHandler",
     "TieredConfigStepHandler",  # Phase 1: Gap fix
+    "CapabilityConfigStepHandler",  # SOLID: Centralized config storage
     "PromptStepHandler",
     "SafetyStepHandler",
     "ConfigStepHandler",

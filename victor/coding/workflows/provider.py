@@ -171,11 +171,6 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
         return task_mapping.get(task_type.lower())
 
 
-# Register Coding domain handlers when this module is loaded
-from victor.coding.handlers import register_handlers as _register_handlers
-
-_register_handlers()
-
 __all__ = [
     "CodingWorkflowProvider",
 ]

@@ -130,11 +130,6 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         return mapping.get(task_type.lower())
 
 
-# Register Research domain handlers when this module is loaded
-from victor.research.handlers import register_handlers as _register_handlers
-
-_register_handlers()
-
 __all__ = [
     # YAML-first workflow provider
     "ResearchWorkflowProvider",

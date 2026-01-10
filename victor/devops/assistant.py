@@ -308,3 +308,18 @@ When creating configurations:
             DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
         """
         return cls._get_extension_factory("capability_provider", "victor.devops.capabilities")
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for DevOps workflows.
+
+        Returns handlers from victor.devops.handlers for workflow execution.
+        This replaces the previous import-side-effect registration pattern.
+
+        Returns:
+            Dict mapping handler names to handler instances
+        """
+        from victor.devops.handlers import HANDLERS
+
+        return HANDLERS
+

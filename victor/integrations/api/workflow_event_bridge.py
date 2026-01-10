@@ -56,6 +56,7 @@ from victor.core.events import (
     Event,
     UnifiedEventType,
     get_observability_bus,
+    SubscriptionHandle,
 )
 from victor.workflows.streaming import WorkflowEventType, WorkflowStreamChunk
 
@@ -174,7 +175,7 @@ class WorkflowEventBridge:
         self._subscriptions: Dict[tuple[str, str], WorkflowSubscription] = {}
         self._running = False
         self._event_handlers: Dict[str, List[Callable]] = {}
-        self._event_subscriptions: List[str] = []
+        self._event_subscriptions: List[SubscriptionHandle] = []
 
     async def start(self) -> None:
         """Start the event bridge.
@@ -195,10 +196,10 @@ class WorkflowEventBridge:
 
         for pattern in workflow_patterns:
             try:
-                await self._event_bus.subscribe(
+                handle = await self._event_bus.subscribe(
                     pattern, self._on_workflow_event
                 )
-                self._event_subscriptions.append(pattern)
+                self._event_subscriptions.append(handle)
             except Exception as e:
                 logger.warning(f"Failed to subscribe to {pattern}: {e}")
 
@@ -213,15 +214,12 @@ class WorkflowEventBridge:
         if not self._running:
             return
 
-        # Unsubscribe from events
-        if self._event_bus:
-            for pattern in self._event_subscriptions:
-                try:
-                    await self._event_bus.unsubscribe(
-                        pattern, self._on_workflow_event
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to unsubscribe from {pattern}: {e}")
+        # Unsubscribe from events using the handles
+        for handle in self._event_subscriptions:
+            try:
+                await handle.unsubscribe()
+            except Exception as e:
+                logger.warning(f"Failed to unsubscribe from event bus: {e}")
 
         self._event_subscriptions.clear()
         self._subscriptions.clear()

@@ -294,3 +294,32 @@ You: [Use rag_query tool with query="authentication"]
             RAGCapabilityProvider instance
         """
         return cls._get_extension_factory("capability_provider", "victor.rag.capabilities")
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for RAG workflows.
+
+        Returns handlers from victor.rag.handlers for workflow execution.
+        This replaces the previous import-side-effect registration pattern.
+
+        Returns:
+            Dict mapping handler names to handler instances
+        """
+        from victor.rag.handlers import HANDLERS
+
+        return HANDLERS
+
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Get RAG capability configurations for centralized storage.
+
+        Returns default RAG configuration for VerticalContext storage.
+        This replaces direct orchestrator.rag_config assignment.
+
+        Returns:
+            Dict with default RAG capability configurations
+        """
+        from victor.rag.capabilities import get_capability_configs
+
+        return get_capability_configs()
+

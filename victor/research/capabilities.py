@@ -760,4 +760,51 @@ __all__ = [
     # Convenience functions
     "get_research_capabilities",
     "create_research_capability_loader",
+    # SOLID: Centralized config storage
+    "get_capability_configs",
 ]
+
+
+# =============================================================================
+# SOLID: Centralized Config Storage
+# =============================================================================
+
+
+def get_capability_configs() -> Dict[str, Any]:
+    """Get Research capability configurations for centralized storage.
+
+    Returns default Research configuration for VerticalContext storage.
+    This replaces direct orchestrator.source_verification_config assignment.
+
+    Returns:
+        Dict with default Research capability configurations
+    """
+    return {
+        "source_verification_config": {
+            "min_sources": 3,
+            "require_https": True,
+            "exclude_domains": [],
+            "trusted_domains": [],
+        },
+        "citation_config": {
+            "style": "apa",
+            "include_urls": True,
+            "max_citations": 10,
+        },
+        "research_quality_config": {
+            "min_coverage_score": 0.7,
+            "require_multiple_sources": True,
+            "enable_bias_detection": True,
+        },
+        "literature_config": {
+            "prefer_recent": True,
+            "max_paper_age_years": 5,
+            "include_preprints": False,
+        },
+        "fact_checking_config": {
+            "evidence_threshold": 0.8,
+            "require_primary_sources": True,
+            "enable_contradiction_detection": True,
+        },
+    }
+

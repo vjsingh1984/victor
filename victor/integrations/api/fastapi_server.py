@@ -2894,17 +2894,28 @@ Respond with just the command to run."""
         # Server shutdown
         @app.post("/shutdown", tags=["System"])
         async def shutdown() -> JSONResponse:
-            """Shutdown the server."""
+            """Shutdown the server gracefully.
+
+            This endpoint initiates a graceful shutdown of the server without
+            forcefully stopping the event loop, which prevents system-wide issues.
+            """
             logger.info("Shutdown requested")
             await self._record_rl_feedback()
 
+            # Close all WebSocket connections
             for ws in self._ws_clients:
                 try:
                     await ws.close()
                 except Exception:
                     pass
 
-            asyncio.get_event_loop().call_later(0.5, asyncio.get_event_loop().stop)
+            # Use server's built-in shutdown mechanism instead of loop.stop()
+            # This prevents event loop corruption and system-wide issues
+            if hasattr(self, "_server") and self._server is not None:
+                self._server.should_exit = True
+                # Schedule actual shutdown after response is sent
+                asyncio.create_task(self._delayed_shutdown())
+
             return JSONResponse({"status": "shutting_down"})
 
         # =============================================================================
@@ -3450,9 +3461,44 @@ Respond with just the command to run."""
         return self
 
     async def shutdown(self) -> None:
-        """Shutdown the server."""
-        if hasattr(self, "_server"):
+        """Shutdown the server gracefully.
+
+        This uses uvicorn's built-in shutdown mechanism to properly terminate
+        the server without affecting the asyncio event loop or causing system issues.
+        """
+        if hasattr(self, "_server") and self._server is not None:
+            # Signal the server to exit gracefully
             self._server.should_exit = True
+
+            # Use uvicorn's built-in shutdown if available
+            if hasattr(self._server, "shutdown"):
+                try:
+                    await asyncio.wait_for(self._server.shutdown(), timeout=3.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    # Timeout is acceptable - server will exit on its own
+                    pass
+                except Exception as e:
+                    logger.warning(f"Server shutdown encountered error: {e}")
+
+            # Small delay to ensure port is released (not for event loop stability)
+            await asyncio.sleep(0.1)
+
+    async def _delayed_shutdown(self) -> None:
+        """Delayed shutdown helper for /shutdown endpoint.
+
+        This method is called asynchronously after the shutdown response is sent,
+        allowing the HTTP response to complete before the server actually shuts down.
+        """
+        # Small delay to ensure response is sent
+        await asyncio.sleep(0.5)
+
+        # Perform actual shutdown
+        if hasattr(self, "_server") and self._server is not None:
+            if hasattr(self._server, "shutdown"):
+                try:
+                    await asyncio.wait_for(self._server.shutdown(), timeout=3.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
+                    logger.warning(f"Delayed shutdown encountered error: {e}")
 
 
 def create_fastapi_app(workspace_root: Optional[str] = None) -> FastAPI:

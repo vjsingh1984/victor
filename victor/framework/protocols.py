@@ -399,9 +399,22 @@ class OrchestratorProtocol(Protocol):
     with the framework layer. This is the primary interface contract.
 
     Design Pattern: Composite Protocol
-    - Inherits from all component protocols
-    - Adds core chat operations
-    - Defines lifecycle methods
+    ================================
+    This protocol combines 6 sub-protocols for type-safe orchestrator access:
+    - ConversationStateProtocol: Stage, tool usage, file tracking
+    - ProviderProtocol: Provider/model management
+    - ToolsProtocol: Tool access and management
+    - SystemPromptProtocol: Prompt customization
+    - MessagesProtocol: Message history
+    - StreamingProtocol: Streaming status
+
+    When to use:
+    - Framework code: Use this protocol for full orchestrator access
+    - Core modules: Use victor.core.protocols.OrchestratorProtocol for minimal interface
+    - SubAgents: Use SubAgentContext for ISP-compliant minimal interface
+
+    The composite pattern ensures type safety while maintaining
+    separation of concerns through sub-protocol definitions.
 
     Usage:
         async def run_agent(orch: OrchestratorProtocol, prompt: str):

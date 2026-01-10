@@ -47,7 +47,6 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     List,
     Optional,
@@ -175,8 +174,6 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
 
     def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
         """Apply multiple capability configurations at once."""
-        ...
-        """Apply custom system prompt."""
         ...
 
 

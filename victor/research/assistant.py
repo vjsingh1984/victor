@@ -273,3 +273,31 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         from victor.research.capabilities import ResearchCapabilityProvider
 
         return ResearchCapabilityProvider()
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for research workflows.
+
+        Returns handlers from victor.research.handlers for workflow execution.
+        This replaces the previous import-side-effect registration pattern.
+
+        Returns:
+            Dict mapping handler names to handler instances
+        """
+        from victor.research.handlers import HANDLERS
+
+        return HANDLERS
+
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Get research capability configurations for centralized storage.
+
+        Returns default research configuration for VerticalContext storage.
+        This replaces direct orchestrator attribute assignments for research configs.
+
+        Returns:
+            Dict with default research capability configurations
+        """
+        from victor.research.capabilities import get_capability_configs
+
+        return get_capability_configs()

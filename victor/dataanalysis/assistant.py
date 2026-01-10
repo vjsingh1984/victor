@@ -274,3 +274,17 @@ When presenting analysis:
         from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
 
         return DataAnalysisCapabilityProvider()
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get compute handlers for DataAnalysis workflows.
+
+        Returns handlers from victor.dataanalysis.handlers for workflow execution.
+        This replaces the previous import-side-effect registration pattern.
+
+        Returns:
+            Dict mapping handler names to handler instances
+        """
+        from victor.dataanalysis.handlers import HANDLERS
+
+        return HANDLERS

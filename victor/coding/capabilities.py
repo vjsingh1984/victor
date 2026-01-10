@@ -616,6 +616,58 @@ def create_coding_capability_loader() -> Any:
     return loader
 
 
+# =============================================================================
+# SOLID: Centralized Config Storage
+# =============================================================================
+
+
+def get_capability_configs() -> Dict[str, Any]:
+    """Get coding capability configurations for centralized storage.
+
+    Returns default coding configuration for VerticalContext storage.
+    This replaces direct orchestrator code_style/test_config assignment.
+
+    Returns:
+        Dict with default coding capability configurations
+    """
+    return {
+        "code_style": {
+            "formatter": "black",
+            "linter": "ruff",
+            "max_line_length": 100,
+            "enforce_type_hints": True,
+        },
+        "test_config": {
+            "min_coverage": 0.0,
+            "required_patterns": [],
+            "framework": "pytest",
+            "run_on_edit": False,
+        },
+        "git_safety_config": {
+            "block_force_push": True,
+            "block_main_push": True,
+            "require_tests_before_commit": False,
+            "allowed_branches": [],
+        },
+        "lsp_config": {
+            "languages": ["python", "typescript", "javascript", "rust", "go"],
+            "features": {
+                "hover": True,
+                "references": True,
+                "symbols": True,
+            },
+        },
+        "refactor_config": {
+            "operations": {
+                "rename": True,
+                "extract": True,
+                "inline": True,
+            },
+            "require_tests": True,
+        },
+    }
+
+
 __all__ = [
     # Handlers
     "configure_git_safety",
@@ -632,4 +684,6 @@ __all__ = [
     # Convenience functions
     "get_coding_capabilities",
     "create_coding_capability_loader",
+    # SOLID: Centralized config storage
+    "get_capability_configs",
 ]

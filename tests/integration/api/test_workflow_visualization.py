@@ -41,12 +41,13 @@ from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def fastapi_server():
     """Create a FastAPI server for testing.
 
-    Note: This fixture uses function scope to ensure proper cleanup
-    between tests. The server is started and stopped for each test class.
+    Note: This fixture uses module scope to ensure a single server instance
+    is shared across all tests in the module. This prevents port binding errors
+    when multiple test classes try to create server instances on the same port.
     """
     server = VictorFastAPIServer(
         host="localhost",
