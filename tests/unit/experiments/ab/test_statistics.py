@@ -57,7 +57,7 @@ class TestCompareMeans:
         result = analyzer.compare_means(control, treatment, alpha=0.05)
 
         # Should not be significant
-        assert result["significant"] is False
+        assert not result["significant"]  # numpy bool, use truthiness not identity
         assert result["p_value"] > 0.05
 
     def test_compare_means_insufficient_data_raises(self):
@@ -107,7 +107,7 @@ class TestCompareProportions:
         # Treatment has higher success rate, should be significant
         assert result["treatment_rate"] > result["control_rate"]
         assert result["rate_difference"] > 0
-        assert result["significant"] is True
+        assert result["significant"]  # numpy bool, use truthiness not identity
         assert result["p_value"] < 0.05
 
     def test_compare_proportions_no_significant_difference(self):
@@ -122,7 +122,7 @@ class TestCompareProportions:
         )
 
         # Should not be significant
-        assert result["significant"] is False
+        assert not result["significant"]  # numpy bool, use truthiness not identity
         assert result["p_value"] > 0.05
 
     def test_compare_proportions_insufficient_data_raises(self):
@@ -161,7 +161,7 @@ class TestMannWhitney:
 
         # Treatment has higher values, should be significant
         assert result["treatment_median"] > result["control_median"]
-        assert result["significant"] is True
+        assert result["significant"]  # numpy bool, use truthiness not identity
         assert result["p_value"] < 0.05
 
     def test_mann_whitney_insufficient_data_raises(self):

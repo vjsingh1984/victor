@@ -453,12 +453,19 @@ class BreakpointManager:
         Raises:
             ValueError: If parameters are invalid
         """
-        if bp_type == BreakpointType.NODE and not node_id:
+        # Auto-detect breakpoint type based on parameters
+        actual_type = bp_type
+        if condition is not None and bp_type == BreakpointType.NODE:
+            actual_type = BreakpointType.CONDITIONAL
+        elif state_key is not None and bp_type == BreakpointType.NODE:
+            actual_type = BreakpointType.STATE
+
+        if actual_type == BreakpointType.NODE and not node_id:
             raise ValueError("node_id required for NODE breakpoints")
 
         bp = WorkflowBreakpoint(
             id=uuid.uuid4().hex,
-            type=bp_type,
+            type=actual_type,
             position=position,
             node_id=node_id,
             condition=condition,
