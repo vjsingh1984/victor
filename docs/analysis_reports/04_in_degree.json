@@ -369,11 +369,11 @@
   },
   {
     "rank": 47,
-    "node_id": "symbol:victor/teams/unified_coordinator.py:role",
+    "node_id": "symbol:victor/teams/types.py:role",
     "in_degree": 135,
     "name": "role",
     "type": "function",
-    "module": "victor.teams.unified_coordinator"
+    "module": "victor.teams.types"
   },
   {
     "rank": 48,

@@ -2,7 +2,7 @@
   {
     "rank": 1,
     "node_id": "file:victor/agent/orchestrator.py",
-    "out_degree": 876,
+    "out_degree": 875,
     "name": "orchestrator.py",
     "type": "file",
     "module": "victor.agent.orchestrator"
@@ -34,7 +34,7 @@
   {
     "rank": 5,
     "node_id": "file:victor/framework/__init__.py",
-    "out_degree": 332,
+    "out_degree": 333,
     "name": "__init__.py",
     "type": "file",
     "module": "victor.framework.__init__"
@@ -74,7 +74,7 @@
   {
     "rank": 10,
     "node_id": "file:victor/agent/coordinators/chat_coordinator.py",
-    "out_degree": 208,
+    "out_degree": 207,
     "name": "chat_coordinator.py",
     "type": "file",
     "module": "victor.agent.coordinators"
@@ -82,7 +82,7 @@
   {
     "rank": 11,
     "node_id": "file:victor/coding/codebase/indexer.py",
-    "out_degree": 206,
+    "out_degree": 205,
     "name": "indexer.py",
     "type": "file",
     "module": "victor.coding.codebase"
@@ -114,7 +114,7 @@
   {
     "rank": 15,
     "node_id": "file:victor/workflows/services/credentials.py",
-    "out_degree": 193,
+    "out_degree": 192,
     "name": "credentials.py",
     "type": "file",
     "module": "victor.workflows.services"
@@ -122,7 +122,7 @@
   {
     "rank": 16,
     "node_id": "file:victor/framework/graph.py",
-    "out_degree": 192,
+    "out_degree": 190,
     "name": "graph.py",
     "type": "file",
     "module": "victor.framework.graph"
@@ -265,6 +265,14 @@
   },
   {
     "rank": 34,
+    "node_id": "file:victor/framework/cqrs_bridge.py",
+    "out_degree": 126,
+    "name": "cqrs_bridge.py",
+    "type": "file",
+    "module": "victor.framework.cqrs_bridge"
+  },
+  {
+    "rank": 35,
     "node_id": "file:victor/workflows/yaml_to_graph_compiler.py",
     "out_degree": 126,
     "name": "yaml_to_graph_compiler.py",
@@ -272,7 +280,7 @@
     "module": "victor.workflows.yaml_to_graph_compiler"
   },
   {
-    "rank": 35,
+    "rank": 36,
     "node_id": "file:victor/core/bootstrap.py",
     "out_degree": 125,
     "name": "bootstrap.py",
@@ -280,20 +288,12 @@
     "module": "victor.core.bootstrap"
   },
   {
-    "rank": 36,
+    "rank": 37,
     "node_id": "file:victor/framework/vertical_integration.py",
     "out_degree": 125,
     "name": "vertical_integration.py",
     "type": "file",
     "module": "victor.framework.vertical_integration"
-  },
-  {
-    "rank": 37,
-    "node_id": "file:victor/framework/cqrs_bridge.py",
-    "out_degree": 125,
-    "name": "cqrs_bridge.py",
-    "type": "file",
-    "module": "victor.framework.cqrs_bridge"
   },
   {
     "rank": 38,

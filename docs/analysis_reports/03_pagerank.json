@@ -2,7 +2,7 @@
   {
     "rank": 1,
     "node_id": "symbol:victor/ui/emoji.py:get",
-    "score": 0.027883190792606136,
+    "score": 0.02789400132389062,
     "name": "get",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -10,7 +10,7 @@
   {
     "rank": 2,
     "node_id": "symbol:victor/core/event_sourcing.py:append",
-    "score": 0.023614695475239242,
+    "score": 0.02362788752473074,
     "name": "append",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -18,7 +18,7 @@
   {
     "rank": 3,
     "node_id": "symbol:victor/ui/emoji.py:_get",
-    "score": 0.019155243745181173,
+    "score": 0.0191729407583904,
     "name": "_get",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -26,7 +26,7 @@
   {
     "rank": 4,
     "node_id": "symbol:victor/ui/emoji.py:get_icon",
-    "score": 0.0167440716077822,
+    "score": 0.0167598792390062,
     "name": "get_icon",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -34,7 +34,7 @@
   {
     "rank": 5,
     "node_id": "symbol:victor/framework/graph.py:items",
-    "score": 0.014849343191287926,
+    "score": 0.01485758862188288,
     "name": "items",
     "type": "function",
     "module": "victor.framework.graph"
@@ -42,7 +42,7 @@
   {
     "rank": 6,
     "node_id": "symbol:victor/ui/emoji.py:warning",
-    "score": 0.00966150084535091,
+    "score": 0.009667857747008067,
     "name": "warning",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -50,7 +50,7 @@
   {
     "rank": 7,
     "node_id": "symbol:victor/ui/emoji.py:info",
-    "score": 0.009631574549250012,
+    "score": 0.009640744685287323,
     "name": "info",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -58,7 +58,7 @@
   {
     "rank": 8,
     "node_id": "symbol:victor/framework/agent_components.py:connect",
-    "score": 0.009548939285093814,
+    "score": 0.009558674100885737,
     "name": "connect",
     "type": "function",
     "module": "victor.framework.agent_components"
@@ -66,7 +66,7 @@
   {
     "rank": 9,
     "node_id": "symbol:victor/tools/cache_manager.py:keys",
-    "score": 0.009306158449993863,
+    "score": 0.009313612105782852,
     "name": "keys",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -74,7 +74,7 @@
   {
     "rank": 10,
     "node_id": "symbol:victor/core/repository.py:list",
-    "score": 0.00861852996181829,
+    "score": 0.008627969719795568,
     "name": "list",
     "type": "function",
     "module": "victor.core.repository"
@@ -82,7 +82,7 @@
   {
     "rank": 11,
     "node_id": "symbol:victor/observability/metrics.py:time",
-    "score": 0.0071066794073089065,
+    "score": 0.007110513422848329,
     "name": "time",
     "type": "function",
     "module": "victor.observability.metrics"
@@ -90,7 +90,7 @@
   {
     "rank": 12,
     "node_id": "symbol:victor/tools/cache_manager.py:set",
-    "score": 0.006465790339517295,
+    "score": 0.00646946469962763,
     "name": "set",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -98,7 +98,7 @@
   {
     "rank": 13,
     "node_id": "symbol:victor/core/unit_of_work.py:commit",
-    "score": 0.005643046011487079,
+    "score": 0.005648030926879616,
     "name": "commit",
     "type": "function",
     "module": "victor.core.unit_of_work"
@@ -106,7 +106,7 @@
   {
     "rank": 14,
     "node_id": "symbol:victor/observability/metrics.py:TimerContext",
-    "score": 0.005143903079973801,
+    "score": 0.005146959471175958,
     "name": "TimerContext",
     "type": "class",
     "module": "victor.observability.metrics"
@@ -114,7 +114,7 @@
   {
     "rank": 15,
     "node_id": "symbol:victor/framework/graph.py:values",
-    "score": 0.005078583956034893,
+    "score": 0.005080190983096995,
     "name": "values",
     "type": "function",
     "module": "victor.framework.graph"
@@ -122,7 +122,7 @@
   {
     "rank": 16,
     "node_id": "symbol:victor/core/event_sourcing.py:get",
-    "score": 0.0047547505892300895,
+    "score": 0.0047573796705192035,
     "name": "get",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -130,7 +130,7 @@
   {
     "rank": 17,
     "node_id": "symbol:victor/core/event_sourcing.py:EventEnvelope",
-    "score": 0.0038055782438283265,
+    "score": 0.0038074510805445306,
     "name": "EventEnvelope",
     "type": "class",
     "module": "victor.core.event_sourcing"
@@ -138,7 +138,7 @@
   {
     "rank": 18,
     "node_id": "symbol:victor/core/event_sourcing.py:load",
-    "score": 0.0037224966093444764,
+    "score": 0.0037249390618579446,
     "name": "load",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -146,7 +146,7 @@
   {
     "rank": 19,
     "node_id": "symbol:victor/ui/emoji.py:is_emoji_enabled",
-    "score": 0.0037124910080347227,
+    "score": 0.0037167860469962564,
     "name": "is_emoji_enabled",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -154,7 +154,7 @@
   {
     "rank": 20,
     "node_id": "symbol:victor/framework/cqrs_bridge.py:FrameworkEventAdapter",
-    "score": 0.0036389355639954396,
+    "score": 0.003642941841700025,
     "name": "FrameworkEventAdapter",
     "type": "class",
     "module": "victor.framework.cqrs_bridge"
@@ -162,7 +162,7 @@
   {
     "rank": 21,
     "node_id": "symbol:victor/ui/emoji.py:error",
-    "score": 0.0036166031477011464,
+    "score": 0.003621058284465727,
     "name": "error",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -170,7 +170,7 @@
   {
     "rank": 22,
     "node_id": "symbol:victor/core/event_sourcing.py:ConcurrencyError",
-    "score": 0.003412868477087824,
+    "score": 0.0034145746928063306,
     "name": "ConcurrencyError",
     "type": "class",
     "module": "victor.core.event_sourcing"
@@ -178,7 +178,7 @@
   {
     "rank": 23,
     "node_id": "symbol:victor/core/event_sourcing.py:to_dict",
-    "score": 0.0034125110439760806,
+    "score": 0.0034142172747873498,
     "name": "to_dict",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -186,7 +186,7 @@
   {
     "rank": 24,
     "node_id": "symbol:victor/ui/emoji.py:_get_settings",
-    "score": 0.003325756528227521,
+    "score": 0.003329711840779807,
     "name": "_get_settings",
     "type": "function",
     "module": "victor.ui.emoji"
@@ -194,7 +194,7 @@
   {
     "rank": 25,
     "node_id": "symbol:victor/framework/graph.py:copy",
-    "score": 0.003320330366595109,
+    "score": 0.003318582071823586,
     "name": "copy",
     "type": "function",
     "module": "victor.framework.graph"
@@ -202,7 +202,7 @@
   {
     "rank": 26,
     "node_id": "symbol:victor/config/provider_config_registry.py:get_settings",
-    "score": 0.0032607840060941834,
+    "score": 0.003261917727814445,
     "name": "get_settings",
     "type": "function",
     "module": "victor.config.provider_config_registry"
@@ -210,31 +210,31 @@
   {
     "rank": 27,
     "node_id": "symbol:victor/observability/metrics.py:sum",
-    "score": 0.0030062160622041662,
+    "score": 0.0030023741867073075,
     "name": "sum",
     "type": "function",
     "module": "victor.observability.metrics"
   },
   {
     "rank": 28,
-    "node_id": "symbol:victor/tools/cache_manager.py:CacheEntry",
-    "score": 0.0027948762663996575,
-    "name": "CacheEntry",
-    "type": "class",
-    "module": "victor.tools.cache_manager"
-  },
-  {
-    "rank": 29,
     "node_id": "symbol:victor/tools/cache_manager.py:_evict_oldest",
-    "score": 0.0027943182708549293,
+    "score": 0.002796040972119033,
     "name": "_evict_oldest",
     "type": "function",
     "module": "victor.tools.cache_manager"
   },
   {
+    "rank": 29,
+    "node_id": "symbol:victor/tools/cache_manager.py:GenericCacheEntry",
+    "score": 0.002795477284447863,
+    "name": "GenericCacheEntry",
+    "type": "class",
+    "module": "victor.tools.cache_manager"
+  },
+  {
     "rank": 30,
     "node_id": "symbol:victor/tools/cache_manager.py:is_expired",
-    "score": 0.0027852714872682208,
+    "score": 0.002787611850410441,
     "name": "is_expired",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -242,7 +242,7 @@
   {
     "rank": 31,
     "node_id": "symbol:victor/core/event_sourcing.py:_get_data",
-    "score": 0.0027645493859870113,
+    "score": 0.0027659563910667224,
     "name": "_get_data",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -250,7 +250,7 @@
   {
     "rank": 32,
     "node_id": "symbol:victor/core/event_sourcing.py:exists",
-    "score": 0.0027478941665117144,
+    "score": 0.002750233393842863,
     "name": "exists",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -258,7 +258,7 @@
   {
     "rank": 33,
     "node_id": "symbol:victor/ui/tui/app.py:print",
-    "score": 0.0026891917874488067,
+    "score": 0.0026893054032353365,
     "name": "print",
     "type": "function",
     "module": "victor.ui.tui"
@@ -266,7 +266,7 @@
   {
     "rank": 34,
     "node_id": "symbol:victor/core/repository.py:update",
-    "score": 0.0026038796483063365,
+    "score": 0.0026046046012026974,
     "name": "update",
     "type": "function",
     "module": "victor.core.repository"
@@ -274,7 +274,7 @@
   {
     "rank": 35,
     "node_id": "symbol:victor/workflows/registry.py:search",
-    "score": 0.0024625928880416697,
+    "score": 0.00246536597874573,
     "name": "search",
     "type": "function",
     "module": "victor.workflows.registry"
@@ -282,7 +282,7 @@
   {
     "rank": 36,
     "node_id": "symbol:victor/benchmark/agent.py:create",
-    "score": 0.0024302423040590266,
+    "score": 0.0024325898553451243,
     "name": "create",
     "type": "function",
     "module": "victor.benchmark.agent"
@@ -290,7 +290,7 @@
   {
     "rank": 37,
     "node_id": "symbol:victor/agent/conversation_memory.py:add_system_message",
-    "score": 0.002381367120969911,
+    "score": 0.002381468807525921,
     "name": "add_system_message",
     "type": "function",
     "module": "victor.agent.conversation_memory"
@@ -298,7 +298,7 @@
   {
     "rank": 38,
     "node_id": "symbol:victor/core/event_sourcing.py:get_stream_version",
-    "score": 0.0023790949233685253,
+    "score": 0.0023811407864013354,
     "name": "get_stream_version",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -306,7 +306,7 @@
   {
     "rank": 39,
     "node_id": "symbol:victor/framework/rl/shared_encoder.py:encode",
-    "score": 0.0023510672474240197,
+    "score": 0.002346908557885329,
     "name": "encode",
     "type": "function",
     "module": "victor.framework.rl"
@@ -314,7 +314,7 @@
   {
     "rank": 40,
     "node_id": "symbol:victor/framework/errors.py:AgentError",
-    "score": 0.002309512595581544,
+    "score": 0.002311522413056444,
     "name": "AgentError",
     "type": "class",
     "module": "victor.framework.errors"
@@ -322,7 +322,7 @@
   {
     "rank": 41,
     "node_id": "symbol:victor/agent/conversation_memory.py:add_message",
-    "score": 0.002101696384388987,
+    "score": 0.0021017891930534167,
     "name": "add_message",
     "type": "function",
     "module": "victor.agent.conversation_memory"
@@ -330,7 +330,7 @@
   {
     "rank": 42,
     "node_id": "symbol:victor/framework/cqrs_bridge.py:connect_agent",
-    "score": 0.0020765468405417836,
+    "score": 0.002078555658040361,
     "name": "connect_agent",
     "type": "function",
     "module": "victor.framework.cqrs_bridge"
@@ -338,7 +338,7 @@
   {
     "rank": 43,
     "node_id": "symbol:victor/benchmark/agent.py:BenchmarkAgentConfig",
-    "score": 0.0019373780333075588,
+    "score": 0.001939670656624565,
     "name": "BenchmarkAgentConfig",
     "type": "class",
     "module": "victor.benchmark.agent"
@@ -346,7 +346,7 @@
   {
     "rank": 44,
     "node_id": "symbol:victor/framework/graph.py:_ensure_copy",
-    "score": 0.001734551222806448,
+    "score": 0.0017344686949151559,
     "name": "_ensure_copy",
     "type": "function",
     "module": "victor.framework.graph"
@@ -354,7 +354,7 @@
   {
     "rank": 45,
     "node_id": "symbol:victor/core/tool_tier_registry.py:extend",
-    "score": 0.0017008253553456906,
+    "score": 0.0017117487848654623,
     "name": "extend",
     "type": "function",
     "module": "victor.core.tool_tier_registry"
@@ -362,7 +362,7 @@
   {
     "rank": 46,
     "node_id": "symbol:victor/core/repository.py:_put_in_cache",
-    "score": 0.0016386617770460332,
+    "score": 0.0016401894134596804,
     "name": "_put_in_cache",
     "type": "function",
     "module": "victor.core.repository"
@@ -370,7 +370,7 @@
   {
     "rank": 47,
     "node_id": "symbol:victor/core/event_sourcing.py:read",
-    "score": 0.0016256591786537656,
+    "score": 0.001627226569693663,
     "name": "read",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -378,7 +378,7 @@
   {
     "rank": 48,
     "node_id": "symbol:victor/core/event_sourcing.py:load_from_history",
-    "score": 0.0016254930287596973,
+    "score": 0.001627060426815343,
     "name": "load_from_history",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -386,7 +386,7 @@
   {
     "rank": 49,
     "node_id": "symbol:victor/core/event_sourcing.py:_apply_event",
-    "score": 0.0015854816432437444,
+    "score": 0.0015861490464745818,
     "name": "_apply_event",
     "type": "function",
     "module": "victor.core.event_sourcing"
@@ -394,7 +394,7 @@
   {
     "rank": 50,
     "node_id": "symbol:victor/framework/graph.py:pop",
-    "score": 0.0015282564002949016,
+    "score": 0.0015281472695866148,
     "name": "pop",
     "type": "function",
     "module": "victor.framework.graph"
