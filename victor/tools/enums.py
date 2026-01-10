@@ -16,6 +16,18 @@
 
 from enum import Enum
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 class CostTier(Enum):
     """Cost tier for tools.
@@ -250,14 +262,16 @@ class DangerLevel(Enum):
     @property
     def warning_message(self) -> str:
         """Get appropriate warning message for this danger level."""
-        messages = {
-            DangerLevel.SAFE: "",
-            DangerLevel.LOW: "This operation modifies data.",
-            DangerLevel.MEDIUM: "⚠️ This operation may be difficult to reverse.",
-            DangerLevel.HIGH: "⚠️ WARNING: This is a potentially destructive operation.",
-            DangerLevel.CRITICAL: "🚨 DANGER: This operation may cause irreversible changes!",
-        }
-        return messages[self]
+        if self == DangerLevel.SAFE:
+            return ""
+        elif self == DangerLevel.LOW:
+            return "This operation modifies data."
+        elif self == DangerLevel.MEDIUM:
+            return f"{_get_icon('warning')} This operation may be difficult to reverse."
+        elif self == DangerLevel.HIGH:
+            return f"{_get_icon('warning')} WARNING: This is a potentially destructive operation."
+        else:  # CRITICAL
+            return f"{_get_icon('stop')} DANGER: This operation may cause irreversible changes!"
 
 
 class SchemaLevel(str, Enum):
