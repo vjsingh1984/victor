@@ -60,10 +60,13 @@ from victor.workflows.hitl import (
 )
 
 # Checkpoint imports
-from victor.storage.checkpoints import (
-    ConversationCheckpointManager,
-    SQLiteCheckpointBackend,
-)
+from victor.storage.checkpoints import ConversationCheckpointManager
+
+# SQLiteCheckpointBackend requires optional aiosqlite dependency
+try:
+    from victor.storage.checkpoints import SQLiteCheckpointBackend
+except ImportError:
+    SQLiteCheckpointBackend = None  # type: ignore
 
 
 class TestEntityMemoryWithExtraction:
