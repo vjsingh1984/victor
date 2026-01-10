@@ -277,23 +277,55 @@ print("\n" + "="*70)
 print("[7] DEAD CODE CANDIDATES (Unreferenced Functions/Classes)")
 print("="*70)
 
+# Dunder methods are called implicitly by Python and can't be traced by static analysis
+# These are almost never truly dead code
+EXCLUDED_DUNDER_METHODS = {
+    '__init__', '__new__', '__del__', '__repr__', '__str__', '__bytes__',
+    '__format__', '__lt__', '__le__', '__eq__', '__ne__', '__gt__', '__ge__',
+    '__hash__', '__bool__', '__getattr__', '__getattribute__', '__setattr__',
+    '__delattr__', '__dir__', '__get__', '__set__', '__delete__', '__set_name__',
+    '__slots__', '__init_subclass__', '__class_getitem__', '__call__',
+    '__len__', '__length_hint__', '__getitem__', '__setitem__', '__delitem__',
+    '__missing__', '__iter__', '__reversed__', '__contains__', '__add__',
+    '__sub__', '__mul__', '__matmul__', '__truediv__', '__floordiv__', '__mod__',
+    '__divmod__', '__pow__', '__lshift__', '__rshift__', '__and__', '__xor__',
+    '__or__', '__radd__', '__rsub__', '__rmul__', '__rmatmul__', '__rtruediv__',
+    '__rfloordiv__', '__rmod__', '__rdivmod__', '__rpow__', '__rlshift__',
+    '__rrshift__', '__rand__', '__rxor__', '__ror__', '__iadd__', '__isub__',
+    '__imul__', '__imatmul__', '__itruediv__', '__ifloordiv__', '__imod__',
+    '__ipow__', '__ilshift__', '__irshift__', '__iand__', '__ixor__', '__ior__',
+    '__neg__', '__pos__', '__abs__', '__invert__', '__complex__', '__int__',
+    '__float__', '__index__', '__round__', '__trunc__', '__floor__', '__ceil__',
+    '__enter__', '__exit__', '__aenter__', '__aexit__', '__await__', '__aiter__',
+    '__anext__', '__copy__', '__deepcopy__', '__reduce__', '__reduce_ex__',
+    '__getstate__', '__setstate__', '__getnewargs__', '__getnewargs_ex__',
+}
+
 dead_code = []
+excluded_dunder_count = 0
 for nid, node in victor_nodes.items():
     if node['type'] in ('function', 'class'):
+        name = node['name']
+
+        # Skip dunder methods - they're called implicitly by Python
+        if name in EXCLUDED_DUNDER_METHODS:
+            excluded_dunder_count += 1
+            continue
+
         in_edges = list(G.in_edges(nid, data=True))
         meaningful = [e for e in in_edges if e[2].get('edge_type') != 'CONTAINS']
         if len(meaningful) == 0:
-            is_private = node['name'].startswith('_')
-            is_dunder = node['name'].startswith('__') and node['name'].endswith('__')
+            is_private = name.startswith('_')
+            is_dunder = name.startswith('__') and name.endswith('__')
             dead_code.append({
-                'name': node['name'],
+                'name': name,
                 'type': node['type'],
                 'file': node['file'],
                 'line': node['line'],
                 'module': get_module(node['file']),
                 'is_private': is_private,
                 'is_dunder': is_dunder,
-                'severity': 'low' if is_private or is_dunder else 'medium'
+                'severity': 'low' if is_private else 'medium'
             })
 
 dead_code.sort(key=lambda x: (x['severity'], x['module']))
@@ -305,6 +337,7 @@ for item in dead_code:
 print(f"\n  Total dead code candidates: {len(dead_code)}")
 print(f"  Medium severity (public): {len([x for x in dead_code if x['severity'] == 'medium'])}")
 print(f"  Low severity (private): {len([x for x in dead_code if x['severity'] == 'low'])}")
+print(f"  Excluded dunder methods: {excluded_dunder_count} (implicitly called by Python)")
 
 print("\n  By Module:")
 for mod, items in sorted(by_module.items(), key=lambda x: len(x[1]), reverse=True)[:10]:
@@ -319,6 +352,7 @@ for item in medium:
 with open(OUTPUT_DIR / "06_dead_code.json", 'w') as f:
     json.dump({
         'total': len(dead_code),
+        'excluded_dunder_methods': excluded_dunder_count,
         'by_severity': {'medium': len([x for x in dead_code if x['severity'] == 'medium']),
                         'low': len([x for x in dead_code if x['severity'] == 'low'])},
         'by_module': {m: len(v) for m, v in by_module.items()},
