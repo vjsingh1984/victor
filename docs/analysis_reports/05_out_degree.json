@@ -2,7 +2,7 @@
   {
     "rank": 1,
     "node_id": "file:victor/agent/orchestrator.py",
-    "out_degree": 875,
+    "out_degree": 877,
     "name": "orchestrator.py",
     "type": "file",
     "module": "victor.agent.orchestrator"
@@ -26,26 +26,26 @@
   {
     "rank": 4,
     "node_id": "file:victor/agent/service_provider.py",
-    "out_degree": 350,
+    "out_degree": 353,
     "name": "service_provider.py",
     "type": "file",
     "module": "victor.agent.service_provider"
   },
   {
     "rank": 5,
+    "node_id": "file:victor/agent/orchestrator_factory.py",
+    "out_degree": 335,
+    "name": "orchestrator_factory.py",
+    "type": "file",
+    "module": "victor.agent.orchestrator_factory"
+  },
+  {
+    "rank": 6,
     "node_id": "file:victor/framework/__init__.py",
     "out_degree": 333,
     "name": "__init__.py",
     "type": "file",
     "module": "victor.framework.__init__"
-  },
-  {
-    "rank": 6,
-    "node_id": "file:victor/agent/orchestrator_factory.py",
-    "out_degree": 332,
-    "name": "orchestrator_factory.py",
-    "type": "file",
-    "module": "victor.agent.orchestrator_factory"
   },
   {
     "rank": 7,
@@ -178,7 +178,7 @@
   {
     "rank": 23,
     "node_id": "file:victor/agent/streaming/handler.py",
-    "out_degree": 151,
+    "out_degree": 154,
     "name": "handler.py",
     "type": "file",
     "module": "victor.agent.streaming"
@@ -241,19 +241,19 @@
   },
   {
     "rank": 31,
+    "node_id": "file:victor/agent/teams/coordinator.py",
+    "out_degree": 137,
+    "name": "coordinator.py",
+    "type": "file",
+    "module": "victor.agent.teams"
+  },
+  {
+    "rank": 32,
     "node_id": "file:vscode-victor/src/victorClient.ts",
     "out_degree": 135,
     "name": "victorClient.ts",
     "type": "file",
     "module": "unknown"
-  },
-  {
-    "rank": 32,
-    "node_id": "file:victor/agent/teams/coordinator.py",
-    "out_degree": 134,
-    "name": "coordinator.py",
-    "type": "file",
-    "module": "victor.agent.teams"
   },
   {
     "rank": 33,
@@ -265,19 +265,19 @@
   },
   {
     "rank": 34,
+    "node_id": "file:victor/workflows/yaml_to_graph_compiler.py",
+    "out_degree": 130,
+    "name": "yaml_to_graph_compiler.py",
+    "type": "file",
+    "module": "victor.workflows.yaml_to_graph_compiler"
+  },
+  {
+    "rank": 35,
     "node_id": "file:victor/framework/cqrs_bridge.py",
     "out_degree": 126,
     "name": "cqrs_bridge.py",
     "type": "file",
     "module": "victor.framework.cqrs_bridge"
-  },
-  {
-    "rank": 35,
-    "node_id": "file:victor/workflows/yaml_to_graph_compiler.py",
-    "out_degree": 126,
-    "name": "yaml_to_graph_compiler.py",
-    "type": "file",
-    "module": "victor.workflows.yaml_to_graph_compiler"
   },
   {
     "rank": 36,
@@ -337,19 +337,19 @@
   },
   {
     "rank": 43,
+    "node_id": "file:victor/ui/commands/workflow.py",
+    "out_degree": 114,
+    "name": "workflow.py",
+    "type": "file",
+    "module": "victor.ui.commands"
+  },
+  {
+    "rank": 44,
     "node_id": "file:victor/core/validation.py",
     "out_degree": 113,
     "name": "validation.py",
     "type": "file",
     "module": "victor.core.validation"
-  },
-  {
-    "rank": 44,
-    "node_id": "file:victor/ui/commands/workflow.py",
-    "out_degree": 113,
-    "name": "workflow.py",
-    "type": "file",
-    "module": "victor.ui.commands"
   },
   {
     "rank": 45,
@@ -369,6 +369,22 @@
   },
   {
     "rank": 47,
+    "node_id": "file:victor/agent/recovery_coordinator.py",
+    "out_degree": 107,
+    "name": "recovery_coordinator.py",
+    "type": "file",
+    "module": "victor.agent.recovery_coordinator"
+  },
+  {
+    "rank": 48,
+    "node_id": "file:victor/ui/tui/widgets.py",
+    "out_degree": 107,
+    "name": "widgets.py",
+    "type": "file",
+    "module": "victor.ui.tui"
+  },
+  {
+    "rank": 49,
     "node_id": "file:victor/core/agent_commands.py",
     "out_degree": 106,
     "name": "agent_commands.py",
@@ -376,27 +392,11 @@
     "module": "victor.core.agent_commands"
   },
   {
-    "rank": 48,
-    "node_id": "file:victor/ui/tui/widgets.py",
-    "out_degree": 106,
-    "name": "widgets.py",
-    "type": "file",
-    "module": "victor.ui.tui"
-  },
-  {
-    "rank": 49,
+    "rank": 50,
     "node_id": "file:victor/agent/task_analyzer.py",
     "out_degree": 105,
     "name": "task_analyzer.py",
     "type": "file",
     "module": "victor.agent.task_analyzer"
-  },
-  {
-    "rank": 50,
-    "node_id": "file:victor/agent/usage_analytics.py",
-    "out_degree": 105,
-    "name": "usage_analytics.py",
-    "type": "file",
-    "module": "victor.agent.usage_analytics"
   }
 ]

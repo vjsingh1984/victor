@@ -42,7 +42,7 @@
   {
     "rank": 6,
     "node_id": "symbol:victor/core/repository.py:list",
-    "in_degree": 1046,
+    "in_degree": 1048,
     "name": "list",
     "type": "function",
     "module": "victor.core.repository"
@@ -74,7 +74,7 @@
   {
     "rank": 10,
     "node_id": "symbol:victor/tools/cache_manager.py:keys",
-    "in_degree": 544,
+    "in_degree": 546,
     "name": "keys",
     "type": "function",
     "module": "victor.tools.cache_manager"
@@ -234,7 +234,7 @@
   {
     "rank": 30,
     "node_id": "symbol:victor/benchmark/agent.py:agent",
-    "in_degree": 204,
+    "in_degree": 224,
     "name": "agent",
     "type": "function",
     "module": "victor.benchmark.agent"
@@ -369,11 +369,11 @@
   },
   {
     "rank": 47,
-    "node_id": "symbol:victor/teams/types.py:role",
+    "node_id": "symbol:victor/teams/unified_coordinator.py:role",
     "in_degree": 135,
     "name": "role",
     "type": "function",
-    "module": "victor.teams.types"
+    "module": "victor.teams.unified_coordinator"
   },
   {
     "rank": 48,
