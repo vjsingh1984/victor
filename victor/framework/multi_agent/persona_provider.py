@@ -109,7 +109,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
     """
 
     _instance: Optional["FrameworkPersonaProvider"] = None
-    _lock: threading.Lock = threading.Lock()
+    _lock: threading.RLock = threading.RLock()  # RLock allows reentrant acquisition
 
     def __new__(cls) -> "FrameworkPersonaProvider":
         """Create or return singleton instance."""
@@ -139,6 +139,17 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         self._capabilities: Dict[str, "PersonaTraits"] = {}
         self._metadata_full: Dict[str, CapabilityMetadata] = {}
         self._initialized = True
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance (for testing).
+
+        Thread-safe reset that properly acquires the lock before
+        clearing the instance. This prevents race conditions during
+        test teardown.
+        """
+        with cls._lock:
+            cls._instance = None
 
     def register_persona(
         self,

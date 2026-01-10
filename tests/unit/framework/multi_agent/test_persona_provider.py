@@ -39,11 +39,11 @@ from victor.framework.multi_agent.personas import PersonaTraits
 @pytest.fixture(autouse=True)
 def reset_persona_provider():
     """Reset FrameworkPersonaProvider singleton before/after each test."""
-    # Reset before test
-    FrameworkPersonaProvider._instance = None
+    # Reset before test (thread-safe)
+    FrameworkPersonaProvider.reset_instance()
     yield
-    # Reset after test
-    FrameworkPersonaProvider._instance = None
+    # Reset after test (thread-safe)
+    FrameworkPersonaProvider.reset_instance()
 
 
 @pytest.fixture
@@ -830,9 +830,9 @@ class TestRegistryStatistics:
 
         stats = provider.get_registry_stats()
 
-        assert stats["total_personas"] == 3  # res_1/res_2 share name
+        assert stats["total_personas"] == 4  # res_1, res_2, plan_1, exec_1
         assert stats["total_versions"] == 4
-        assert stats["category_counts"]["research"] == 1
+        assert stats["category_counts"]["research"] == 2  # res_1 and res_2
         assert stats["category_counts"]["planning"] == 1
         assert stats["category_counts"]["execution"] == 1
         assert stats["category_counts"]["review"] == 0
