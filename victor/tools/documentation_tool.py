@@ -33,6 +33,19 @@ from victor.tools.common import gather_files_by_pattern
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 # Helper functions for docstring generation
 
@@ -744,7 +757,7 @@ async def docs_coverage(
             f"Files analyzed: {len(files_to_analyze)} of {total_files_found} (limited by max_files={max_files})"
         )
         report.append(
-            "⚠️  Increase max_files to analyze more files, or specify a more specific path"
+            f"{_get_icon('warning')}  Increase max_files to analyze more files, or specify a more specific path"
         )
     else:
         report.append(f"Files analyzed: {len(files_to_analyze)}")
@@ -775,8 +788,8 @@ async def docs_coverage(
     report.append("")
     report.append("Recommendations:")
     for rec in recommendations:
-        emoji = "🔴" if coverage < 50 else ("🟡" if coverage < 80 else "🟢")
-        report.append(f"  {emoji} {rec}")
+        level_icon = _get_icon("level_critical") if coverage < 50 else (_get_icon("level_medium") if coverage < 80 else _get_icon("level_low"))
+        report.append(f"  {level_icon} {rec}")
 
     # Truncate lists to prevent context overflow
     MAX_MISSING_ITEMS = 20

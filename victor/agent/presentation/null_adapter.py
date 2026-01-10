@@ -76,6 +76,15 @@ _TEXT_ICONS = {
     "level_info": "[I]",
     "level_unknown": "[?]",
     "person": "[P]",
+    # Platform/technology icons
+    "terraform": "[TF]",
+    "docker": "[DK]",
+    "kubernetes": "[K8]",
+    # Miscellaneous
+    "hint": "*",
+    "alert": "(!)",
+    "trend_up": "^",
+    "trend_down": "v",
 }
 
 

@@ -41,6 +41,19 @@ from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 class PipelineAnalyzerTool(BaseTool):
     """Tool for analyzing CI/CD pipelines and coverage."""
@@ -249,8 +262,8 @@ class PipelineAnalyzerTool(BaseTool):
 
         # Issues
         lines.append("**Issues:**")
-        lines.append(f"- 🚨 Critical: {summary['critical_issues']}")
-        lines.append(f"- ⚠️ Warnings: {summary['warning_issues']}")
+        lines.append(f"- {_get_icon('alert')} Critical: {summary['critical_issues']}")
+        lines.append(f"- {_get_icon('warning')} Warnings: {summary['warning_issues']}")
         lines.append(f"- Total: {summary['total_issues']}")
         lines.append("")
 
@@ -292,19 +305,19 @@ class PipelineAnalyzerTool(BaseTool):
         info = [i for i in result.issues if i.severity == "info"]
 
         if critical:
-            lines.append(f"\n🚨 **Critical ({len(critical)}):**")
+            lines.append(f"\n{_get_icon('alert')} **Critical ({len(critical)}):**")
             for issue in critical[:5]:
                 lines.append(f"  - [{issue.category}] {issue.message}")
                 if issue.recommendation:
-                    lines.append(f"    → {issue.recommendation}")
+                    lines.append(f"    {_get_icon('arrow_right')} {issue.recommendation}")
 
         if warnings:
-            lines.append(f"\n⚠️ **Warnings ({len(warnings)}):**")
+            lines.append(f"\n{_get_icon('warning')} **Warnings ({len(warnings)}):**")
             for issue in warnings[:5]:
                 lines.append(f"  - [{issue.category}] {issue.message}")
 
         if info:
-            lines.append(f"\nℹ️ **Info ({len(info)}):**")
+            lines.append(f"\n{_get_icon('info')} **Info ({len(info)}):**")
             for issue in info[:3]:
                 lines.append(f"  - {issue.message}")
 
@@ -354,7 +367,7 @@ class PipelineAnalyzerTool(BaseTool):
         line_delta = comparison["line_coverage_delta"]
         branch_delta = comparison["branch_coverage_delta"]
 
-        status = "📈 Improved" if comparison["improved"] else "📉 Regressed"
+        status = f"{_get_icon('trend_up')} Improved" if comparison["improved"] else f"{_get_icon('trend_down')} Regressed"
         lines.append(f"**Status:** {status}")
         lines.append("")
 
@@ -369,16 +382,16 @@ class PipelineAnalyzerTool(BaseTool):
         if comparison.get("improved_files"):
             lines.append(f"**Improved Files ({len(comparison['improved_files'])}):**")
             for item in comparison["improved_files"][:5]:
-                lines.append(f"  ✅ {item['file']} (+{item['delta']:.1f}%)")
+                lines.append(f"  {_get_icon('success')} {item['file']} (+{item['delta']:.1f}%)")
 
         if comparison.get("regressed_files"):
             lines.append(f"\n**Regressed Files ({len(comparison['regressed_files'])}):**")
             for item in comparison["regressed_files"][:5]:
-                lines.append(f"  ❌ {item['file']} ({item['delta']:.1f}%)")
+                lines.append(f"  {_get_icon('error')} {item['file']} ({item['delta']:.1f}%)")
 
         if comparison.get("new_uncovered_files"):
             lines.append(f"\n**New Uncovered Files ({len(comparison['new_uncovered_files'])}):**")
             for f in comparison["new_uncovered_files"][:5]:
-                lines.append(f"  ⚠️ {f}")
+                lines.append(f"  {_get_icon('warning')} {f}")
 
         return "\n".join(lines)

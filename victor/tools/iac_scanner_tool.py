@@ -42,6 +42,19 @@ from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 class IaCScannerTool(BaseTool):
     """Tool for scanning Infrastructure-as-Code for security issues."""
@@ -214,13 +227,13 @@ class IaCScannerTool(BaseTool):
 
         lines = ["**Detected IaC Platforms:**"]
         platform_icons = {
-            IaCPlatform.TERRAFORM: "🏗️",
-            IaCPlatform.DOCKER: "🐳",
-            IaCPlatform.DOCKER_COMPOSE: "🐳",
-            IaCPlatform.KUBERNETES: "☸️",
+            IaCPlatform.TERRAFORM: _get_icon("terraform"),
+            IaCPlatform.DOCKER: _get_icon("docker"),
+            IaCPlatform.DOCKER_COMPOSE: _get_icon("docker"),
+            IaCPlatform.KUBERNETES: _get_icon("kubernetes"),
         }
         for p in platforms:
-            icon = platform_icons.get(p, "📄")
+            icon = platform_icons.get(p, _get_icon("file"))
             lines.append(f"- {icon} {p.value}")
         return "\n".join(lines)
 
@@ -231,16 +244,16 @@ class IaCScannerTool(BaseTool):
         # Risk score
         risk = summary["risk_score"]
         if risk < 20:
-            risk_icon = "🟢"
+            risk_icon = _get_icon("level_low")
             risk_label = "Low Risk"
         elif risk < 50:
-            risk_icon = "🟡"
+            risk_icon = _get_icon("level_medium")
             risk_label = "Medium Risk"
         elif risk < 80:
-            risk_icon = "🟠"
+            risk_icon = _get_icon("level_high")
             risk_label = "High Risk"
         else:
-            risk_icon = "🔴"
+            risk_icon = _get_icon("level_critical")
             risk_label = "Critical Risk"
 
         lines.append(f"**Risk Score:** {risk_icon} {risk}/100 ({risk_label})")
@@ -255,11 +268,11 @@ class IaCScannerTool(BaseTool):
         # Findings by severity
         sev = summary["by_severity"]
         lines.append("**Findings by Severity:**")
-        lines.append(f"- 🔴 Critical: {sev['critical']}")
-        lines.append(f"- 🟠 High: {sev['high']}")
-        lines.append(f"- 🟡 Medium: {sev['medium']}")
-        lines.append(f"- 🔵 Low: {sev['low']}")
-        lines.append(f"- ⚪ Info: {sev['info']}")
+        lines.append(f"- {_get_icon('level_critical')} Critical: {sev['critical']}")
+        lines.append(f"- {_get_icon('level_high')} High: {sev['high']}")
+        lines.append(f"- {_get_icon('level_medium')} Medium: {sev['medium']}")
+        lines.append(f"- {_get_icon('level_info')} Low: {sev['low']}")
+        lines.append(f"- {_get_icon('level_unknown')} Info: {sev['info']}")
         lines.append("")
 
         # By category
@@ -289,36 +302,36 @@ class IaCScannerTool(BaseTool):
 
         # Findings by severity
         if result.critical_count > 0:
-            lines.append(f"\n🔴 **Critical ({result.critical_count}):**")
+            lines.append(f"\n{_get_icon('level_critical')} **Critical ({result.critical_count}):**")
             for f in result.findings:
                 if f.severity.value == "critical":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
-                    lines.append(f"    📁 {f.file_path.name}:{f.line_number}")
+                    lines.append(f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}")
                     if f.remediation:
-                        lines.append(f"    💡 {f.remediation}")
+                        lines.append(f"    {_get_icon('hint')} {f.remediation}")
 
         if result.high_count > 0:
-            lines.append(f"\n🟠 **High ({result.high_count}):**")
+            lines.append(f"\n{_get_icon('level_high')} **High ({result.high_count}):**")
             for f in result.findings:
                 if f.severity.value == "high":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
-                    lines.append(f"    📁 {f.file_path.name}:{f.line_number}")
+                    lines.append(f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}")
 
         if result.medium_count > 0:
-            lines.append(f"\n🟡 **Medium ({result.medium_count}):**")
+            lines.append(f"\n{_get_icon('level_medium')} **Medium ({result.medium_count}):**")
             for f in result.findings[:10]:  # Limit medium findings shown
                 if f.severity.value == "medium":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
 
         if result.low_count > 0:
-            lines.append(f"\nℹ️ **Low ({result.low_count}):** (use summary for details)")
+            lines.append(f"\n{_get_icon('info')} **Low ({result.low_count}):** (use summary for details)")
 
         return "\n".join(lines)
 
     def _format_findings(self, findings: list, file_path: Path) -> str:
         """Format findings for a specific file."""
         if not findings:
-            return f"✅ No security issues found in {file_path.name}"
+            return f"{_get_icon('success')} No security issues found in {file_path.name}"
 
         lines = [f"**Security Findings in {file_path.name}**", ""]
         lines.append(f"**Total:** {len(findings)}")
@@ -326,19 +339,19 @@ class IaCScannerTool(BaseTool):
 
         for finding in findings:
             severity_icon = {
-                "critical": "🔴",
-                "high": "🟠",
-                "medium": "🟡",
-                "low": "🔵",
-                "info": "⚪",
-            }.get(finding.severity.value, "⚪")
+                "critical": _get_icon("level_critical"),
+                "high": _get_icon("level_high"),
+                "medium": _get_icon("level_medium"),
+                "low": _get_icon("level_info"),
+                "info": _get_icon("level_unknown"),
+            }.get(finding.severity.value, _get_icon("level_unknown"))
 
             lines.append(f"{severity_icon} **{finding.rule_id}**")
             lines.append(f"   {finding.message}")
             if finding.line_number:
                 lines.append(f"   Line: {finding.line_number}")
             if finding.remediation:
-                lines.append(f"   💡 {finding.remediation}")
+                lines.append(f"   {_get_icon('hint')} {finding.remediation}")
             lines.append("")
 
         return "\n".join(lines)

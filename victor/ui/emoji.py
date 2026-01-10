@@ -141,6 +141,15 @@ ICONS = {
     "level_info": IconSet("🔵", "[I]", "blue"),
     "level_unknown": IconSet("⚪", "[?]", None),
     "person": IconSet("👤", "[P]", None),
+    # Platform/technology icons
+    "terraform": IconSet("🏗️", "[TF]", None),
+    "docker": IconSet("🐳", "[DK]", None),
+    "kubernetes": IconSet("☸️", "[K8]", None),
+    # Miscellaneous
+    "hint": IconSet("💡", "*", "yellow"),
+    "alert": IconSet("🚨", "(!)", "red"),
+    "trend_up": IconSet("📈", "^", "green"),
+    "trend_down": IconSet("📉", "v", "red"),
 }
 
 

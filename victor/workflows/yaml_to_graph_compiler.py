@@ -98,6 +98,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 # =============================================================================
 # Workflow State Definition
@@ -334,7 +347,7 @@ class NodeExecutorFactory:
 
                     # Create and execute sub-agent
                     sub_orchestrator = SubAgentOrchestrator(node_orchestrator)
-                    logger.debug(f"   ⚙️  Spawning sub-agent with role: {role.value}")
+                    logger.debug(f"   {_get_icon('gear')}  Spawning sub-agent with role: {role.value}")
 
                     result = await sub_orchestrator.spawn(
                         role=role,
