@@ -2036,10 +2036,18 @@ class ConversationStore:
             )
 
         try:
-            loop = asyncio.get_running_loop()
-            future = asyncio.ensure_future(_search())
-            search_results = loop.run_until_complete(future)
-        except RuntimeError:
+            # Check if we're in an async context
+            asyncio.get_running_loop()
+            # If we are, raise an error to force caller to use async API
+            raise RuntimeError(
+                "Cannot call _get_relevant_messages_via_lancedb from async context. "
+                "Use the async version of this method instead."
+            )
+        except RuntimeError as e:
+            if "async context" in str(e):
+                # Re-raise our custom error
+                raise
+            # No running loop, safe to use asyncio.run()
             search_results = asyncio.run(_search())
 
         # Fetch full messages from SQLite for the matching IDs

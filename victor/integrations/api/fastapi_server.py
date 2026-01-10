@@ -369,6 +369,7 @@ class VictorFastAPIServer:
         self._event_clients: List[WebSocket] = []
         self._workflow_event_bridge: Optional[WorkflowEventBridge] = None
         self._workflow_executions: Dict[str, Dict[str, Any]] = {}
+        self._shutting_down = False
 
         # Create FastAPI app with lifespan
         self.app = FastAPI(
@@ -2899,6 +2900,11 @@ Respond with just the command to run."""
             This endpoint initiates a graceful shutdown of the server without
             forcefully stopping the event loop, which prevents system-wide issues.
             """
+            # Check if shutdown is already in progress
+            if self._shutting_down:
+                return JSONResponse({"status": "already_shutting_down"})
+
+            self._shutting_down = True
             logger.info("Shutdown requested")
             await self._record_rl_feedback()
 
@@ -3489,6 +3495,10 @@ Respond with just the command to run."""
         This method is called asynchronously after the shutdown response is sent,
         allowing the HTTP response to complete before the server actually shuts down.
         """
+        # Check if shutdown is already in progress
+        if self._shutting_down:
+            return
+
         # Small delay to ensure response is sent
         await asyncio.sleep(0.5)
 

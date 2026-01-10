@@ -20,12 +20,20 @@ used across all verticals. These are domain-agnostic search implementations.
 Provides:
 - HybridSearchEngine: RRF-based fusion of semantic and keyword search
 - HybridSearchResult: Result dataclass for hybrid search
+- QueryExpander: Query expansion with synonyms for better recall
+- QueryExpansionConfig: Configuration for query expansion
 
 Usage:
     from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine
 
     engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
     results = engine.combine_results(semantic_results, keyword_results)
+
+    from victor.framework.search import QueryExpander, QueryExpansionConfig
+
+    config = QueryExpansionConfig(expansions={"error": ["exception", "failure"]})
+    expander = QueryExpander(config)
+    result = expander.expand("fix error handling")
 """
 
 from victor.framework.search.hybrid import (
@@ -33,9 +41,23 @@ from victor.framework.search.hybrid import (
     HybridSearchResult,
     create_hybrid_search_engine,
 )
+from victor.framework.search.query_expansion import (
+    QueryExpander,
+    QueryExpansionConfig,
+    ExpandedQuery,
+    QueryExpanderProtocol,
+    create_query_expander,
+)
 
 __all__ = [
+    # Hybrid search
     "HybridSearchEngine",
     "HybridSearchResult",
     "create_hybrid_search_engine",
+    # Query expansion
+    "QueryExpander",
+    "QueryExpansionConfig",
+    "ExpandedQuery",
+    "QueryExpanderProtocol",
+    "create_query_expander",
 ]

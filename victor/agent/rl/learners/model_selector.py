@@ -522,3 +522,19 @@ class ModelSelectorLearner(BaseLearner):
             )
 
         return sorted(rankings, key=lambda x: x["q_value"], reverse=True)
+
+    def get_exploration_rate(self) -> float:
+        """Get the current exploration rate (epsilon).
+
+        Returns:
+            Current epsilon value for exploration
+        """
+        return self.epsilon
+
+    def get_strategy(self) -> SelectionStrategy:
+        """Get the current selection strategy.
+
+        Returns:
+            Current selection strategy enum
+        """
+        return self.strategy

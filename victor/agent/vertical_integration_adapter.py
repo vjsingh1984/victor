@@ -31,17 +31,115 @@ DIP Compliance (Phase 1 Foundation Fix):
 - Falls back to CAPABILITY_METHOD_MAPPINGS for method resolution
 - Graceful degradation when capability registry not available
 
-Usage:
+Runtime vs Setup Integration
+----------------------------
+
+Victor has TWO distinct vertical integration mechanisms that serve different purposes:
+
+1. **Setup Integration (VerticalIntegrationPipeline)**:
+   Located in ``victor/framework/vertical_integration.py``
+
+   - **When to use**: During agent/orchestrator initialization
+   - **Purpose**: Apply ALL vertical configuration at once (tools, prompts, middleware,
+     safety patterns, workflows, etc.)
+   - **Called by**: FrameworkShim (CLI), Agent.create() (SDK), and direct pipeline usage
+   - **Execution**: Ordered step handlers with caching support
+   - **Use case**: One-time setup when creating an agent with a specific vertical
+
+   Example::
+       from victor.framework.vertical_integration import VerticalIntegrationPipeline
+       from victor.coding import CodingAssistant
+
+       pipeline = VerticalIntegrationPipeline()
+       result = pipeline.apply(orchestrator, CodingAssistant)
+       # Applies: tools, prompts, middleware, safety patterns, workflows, etc.
+
+2. **Runtime Integration (VerticalIntegrationAdapter)**:
+   Located in this module (``victor/agent/vertical_integration_adapter.py``)
+
+   - **When to use**: During active conversation execution
+   - **Purpose**: Apply INDIVIDUAL vertical components as needed (middleware, safety)
+   - **Called by**: AgentOrchestrator internally during conversation flow
+   - **Execution**: Direct method calls via adapter interface
+   - **Use case**: Dynamic application of middleware or safety patterns during runtime
+
+   Example::
+       from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
+
+       adapter = VerticalIntegrationAdapter(orchestrator)
+       adapter.apply_middleware(middleware_list)
+       adapter.apply_safety_patterns(safety_patterns)
+
+Key Differences:
+
++-------------------+---------------------------+-------------------------------+
+| Aspect            | Setup (Pipeline)          | Runtime (Adapter)             |
++===================+===========================+===============================+
+| **Scope**         | Full vertical config      | Individual components         |
++-------------------+---------------------------+-------------------------------+
+| **Timing**        | Initialization only       | During conversation           |
++-------------------+---------------------------+-------------------------------+
+| **Caching**       | Yes (two-level)           | No                            |
++-------------------+---------------------------+-------------------------------+
+| **Step Handlers** | Yes (ordered execution)   | No (direct methods)           |
++-------------------+---------------------------+-------------------------------+
+| **Primary Use**   | Agent creation            | Dynamic runtime integration   |
++-------------------+---------------------------+-------------------------------+
+
+Usage Examples
+--------------
+
+Basic runtime middleware application::
+
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
+    from victor.coding.middleware import CodeReviewMiddleware
 
     # Create adapter with orchestrator reference
     adapter = VerticalIntegrationAdapter(orchestrator)
 
-    # Apply middleware (single implementation)
-    adapter.apply_middleware(middleware_list)
+    # Apply middleware during runtime
+    middleware = [CodeReviewMiddleware()]
+    adapter.apply_middleware(middleware)
 
-    # Apply safety patterns (single implementation)
+Runtime safety pattern application::
+
+    from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
+    from victor.coding.safety import DangerousOperationPattern
+
+    adapter = VerticalIntegrationAdapter(orchestrator)
+
+    # Apply safety patterns dynamically
+    patterns = [
+        DangerousOperationPattern(
+            pattern=r"rm.*-rf",
+            description="Prevents destructive file operations",
+            risk_level="high"
+        )
+    ]
     adapter.apply_safety_patterns(patterns)
+
+Checking capability availability before integration::
+
+    adapter = VerticalIntegrationAdapter(orchestrator)
+
+    # Check if middleware chain is available
+    if adapter._has_capability("middleware_chain"):
+        adapter.apply_middleware(middleware_list)
+    else:
+        logger.warning("Middleware chain not available in current config")
+
+When to use the adapter directly:
+- Adding middleware dynamically during a conversation
+- Applying safety patterns based on runtime context
+- Testing vertical integration in isolation
+- Building custom vertical initialization logic
+- Implementing dynamic capability switching
+
+When to use the pipeline instead:
+- Initial agent setup and configuration
+- Applying full vertical with all extensions
+- When caching and performance are critical
+- Standard SDK/CLI usage patterns
 """
 
 from __future__ import annotations

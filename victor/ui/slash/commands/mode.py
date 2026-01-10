@@ -250,9 +250,9 @@ class PlanCommand(BaseSlashCommand):
 
         from victor.agent.planning.store import get_plan_store
 
-        # Get current plan from agent
-        planner = getattr(ctx.agent, "_planner", None)
-        current_plan = getattr(planner, "current_plan", None) if planner else None
+        # Get current plan from agent using public interface
+        conversation_controller = getattr(ctx.agent, "conversation_controller", None)
+        current_plan = getattr(conversation_controller, "current_plan", None) if conversation_controller else None
 
         if not current_plan:
             # Check if there's a plan in conversation context using public interface
@@ -313,14 +313,9 @@ class PlanCommand(BaseSlashCommand):
                 return
 
             # Attach plan to agent using public interface
-            planner = getattr(ctx.agent, "_planner", None)
-            if planner:
-                planner.current_plan = plan
-            else:
-                # Use public conversation_controller property and set_current_plan method
-                conv_controller = ctx.agent.conversation_controller
-                if conv_controller:
-                    conv_controller.set_current_plan(plan)
+            conversation_controller = getattr(ctx.agent, "conversation_controller", None)
+            if conversation_controller:
+                conversation_controller.set_current_plan(plan)
 
             from rich.markdown import Markdown
 
@@ -377,8 +372,8 @@ class PlanCommand(BaseSlashCommand):
 
     def _show_plan(self, ctx: CommandContext) -> None:
         """Show the current plan."""
-        planner = getattr(ctx.agent, "_planner", None)
-        current_plan = getattr(planner, "current_plan", None) if planner else None
+        conversation_controller = getattr(ctx.agent, "conversation_controller", None)
+        current_plan = getattr(conversation_controller, "current_plan", None) if conversation_controller else None
 
         if not current_plan:
             # Use public interface for conversation controller and current_plan

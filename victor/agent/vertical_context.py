@@ -24,6 +24,44 @@ Design Philosophy:
 - Backward compatibility with existing code
 - Type-safe access to all vertical configuration
 
+Capability Config Storage Pattern
+----------------------------------
+The `capability_configs` dict provides centralized storage for vertical
+capability configurations, replacing direct orchestrator attribute assignment.
+This pattern follows SOLID principles by avoiding tight coupling between
+verticals and the orchestrator implementation.
+
+OLD Pattern (avoid - creates tight coupling):
+    # In vertical integration code
+    orchestrator.rag_config = {"chunk_size": 512}
+    orchestrator.source_verification_config = {"strict": True}
+    orchestrator.code_style = {"max_line_length": 100}
+
+NEW Pattern (preferred - decoupled via context):
+    # In vertical integration code
+    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.set_capability_config("source_verification_config", {"strict": True})
+    context.set_capability_config("code_style", {"max_line_length": 100})
+
+    # Or bulk apply
+    context.apply_capability_configs({
+        "rag_config": {"chunk_size": 512},
+        "source_verification_config": {"strict": True},
+        "code_style": {"max_line_length": 100},
+    })
+
+    # Retrieve elsewhere
+    rag_config = context.get_capability_config("rag_config", {})
+    if rag_config.get("strict"):
+        # Apply strict mode
+        ...
+
+Benefits:
+- Verticals don't need to know orchestrator's internal structure
+- Easy to add new configs without modifying orchestrator class
+- Type-safe via protocol methods
+- Clear separation of concerns
+
 Usage:
     from victor.agent.vertical_context import VerticalContext
 
@@ -35,10 +73,20 @@ Usage:
     context.apply_middleware(middleware_list)
     context.apply_safety_patterns(patterns)
 
+    # Store capability configs
+    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.apply_capability_configs({
+        "code_style": {"max_line_length": 100},
+        "test_framework": "pytest",
+    })
+
     # Query context
     if context.has_middleware:
         for mw in context.middleware:
             await mw.before_tool_call(...)
+
+    # Retrieve capability configs
+    code_style = context.get_capability_config("code_style", {})
 """
 
 from __future__ import annotations

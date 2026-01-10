@@ -12,14 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Query expansion for semantic search to fix false negatives.
+"""Coding-vertical query expansion for semantic code search.
 
-This module provides query expansion capabilities to improve semantic search
-recall by adding synonyms and related terms to user queries.
+This module provides coding-specific query expansion capabilities.
+The generic QueryExpander base class is in victor/framework/search/query_expansion.py.
+
+This vertical-specific module:
+- Defines SEMANTIC_QUERY_EXPANSIONS for coding domain concepts
+- Provides backward-compatible QueryExpander class wrapping framework base
+- Maintains existing API (get_query_expander, expand_query functions)
 """
 
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
+
+from victor.framework.search.query_expansion import (
+    QueryExpander as FrameworkQueryExpander,
+    QueryExpansionConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -267,15 +277,27 @@ SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
 
 
 class QueryExpander:
-    """Expands user queries with synonyms and related terms for better semantic search recall."""
+    """Coding-vertical query expander with code-specific expansions.
 
-    def __init__(self, expansions: Dict[str, List[str]] = None):
+    This is a thin wrapper around the framework's QueryExpander that provides
+    backward compatibility and uses coding-specific expansion terms.
+
+    Example:
+        >>> expander = QueryExpander()
+        >>> expander.expand_query("tool registration")
+        ['tool registration', 'register tool', '@tool decorator', ...]
+    """
+
+    def __init__(self, expansions: Optional[Dict[str, List[str]]] = None):
         """Initialize query expander.
 
         Args:
             expansions: Custom expansion dictionary. If None, uses SEMANTIC_QUERY_EXPANSIONS.
         """
         self.expansions = expansions or SEMANTIC_QUERY_EXPANSIONS
+        self._base = FrameworkQueryExpander(
+            QueryExpansionConfig(expansions=self.expansions)
+        )
 
     def expand_query(self, query: str, max_expansions: int = 5) -> List[str]:
         """Expand query with synonyms and related terms.
@@ -292,34 +314,8 @@ class QueryExpander:
             >>> expander.expand_query("tool registration")
             ['tool registration', 'register tool', '@tool decorator', 'tool registry', 'register_tool']
         """
-        query_lower = query.lower().strip()
-
-        # Always include original query first
-        expanded_queries = [query]
-        seen = {query_lower}
-
-        # Find matching patterns and add expansions
-        for pattern, synonyms in self.expansions.items():
-            if pattern in query_lower:
-                for synonym in synonyms:
-                    if synonym.lower() not in seen:
-                        expanded_queries.append(synonym)
-                        seen.add(synonym.lower())
-
-                        # Stop if we've hit the limit
-                        if len(expanded_queries) >= max_expansions:
-                            break
-
-                # Break if we've hit the limit
-                if len(expanded_queries) >= max_expansions:
-                    break
-
-        logger.debug(
-            f"Expanded query '{query}' to {len(expanded_queries)} variations: "
-            f"{expanded_queries[:3]}{'...' if len(expanded_queries) > 3 else ''}"
-        )
-
-        return expanded_queries
+        result = self._base.expand(query, max_expansions=max_expansions)
+        return result.variations
 
     def is_expandable(self, query: str) -> bool:
         """Check if query has available expansions.
@@ -330,8 +326,7 @@ class QueryExpander:
         Returns:
             True if query can be expanded, False otherwise
         """
-        query_lower = query.lower().strip()
-        return any(pattern in query_lower for pattern in self.expansions.keys())
+        return self._base.is_expandable(query)
 
     def get_expansion_terms(self, query: str) -> Set[str]:
         """Get all expansion terms for a query without deduplication.
@@ -342,18 +337,11 @@ class QueryExpander:
         Returns:
             Set of all expansion terms (excluding original query)
         """
-        query_lower = query.lower().strip()
-        terms = set()
-
-        for pattern, synonyms in self.expansions.items():
-            if pattern in query_lower:
-                terms.update(synonyms)
-
-        return terms
+        return self._base.get_expansion_terms(query)
 
 
 # Global singleton instance
-_query_expander: QueryExpander = None
+_query_expander: Optional[QueryExpander] = None
 
 
 def get_query_expander() -> QueryExpander:

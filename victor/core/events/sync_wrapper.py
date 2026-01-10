@@ -95,6 +95,57 @@ class SyncEventWrapper:
         self._backend = backend
         logger.debug(f"[SyncEventWrapper] Created wrapper for {type(backend).__name__}")
 
+    def _run_async_synchronous(self, coro: Awaitable) -> any:
+        """Run an async coroutine in a synchronous context.
+
+        This method handles both cases:
+        1. Called from sync context - uses asyncio.run()
+        2. Called from async context - runs in a separate thread with its own event loop
+
+        Args:
+            coro: Awaitable coroutine to execute
+
+        Returns:
+            Result of the coroutine
+
+        Raises:
+            TimeoutError: If operation takes longer than 5 seconds
+            Exception: If coroutine raises an exception
+        """
+        try:
+            # Check if we're already in an async context
+            asyncio.get_running_loop()
+            # If we get here, we're in an async context
+            # This shouldn't happen for a sync wrapper - warn and run in thread pool
+            logger.warning(
+                "[SyncEventWrapper] Method called from async context. "
+                "This indicates incorrect usage. Use async backend directly."
+            )
+            # Run in a new thread with its own event loop to avoid blocking
+            import threading
+
+            result = [None]
+            exception = [None]
+
+            def run_in_thread():
+                try:
+                    result[0] = asyncio.run(coro)
+                except Exception as e:
+                    exception[0] = e
+
+            thread = threading.Thread(target=run_in_thread)
+            thread.start()
+            thread.join(timeout=5.0)  # 5 second timeout
+
+            if exception[0]:
+                raise exception[0]
+            if thread.is_alive():
+                raise TimeoutError("Async operation timed out")
+            return result[0]
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(coro)
+
     def publish(self, event: Event) -> bool:
         """Publish an event synchronously.
 
@@ -112,15 +163,7 @@ class SyncEventWrapper:
             >>> wrapper.publish(event)
             True
         """
-        try:
-            return asyncio.run(self._backend.publish(event))
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                # Already in async context, get running loop
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(self._backend.publish(event))
-                return asyncio.run(task)  # Wait for task completion
-            raise
+        return self._run_async_synchronous(self._backend.publish(event))
 
     def publish_batch(self, events: list[Event]) -> int:
         """Publish multiple events synchronously.
@@ -131,14 +174,7 @@ class SyncEventWrapper:
         Returns:
             Number of events successfully published
         """
-        try:
-            return asyncio.run(self._backend.publish_batch(events))
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(self._backend.publish_batch(events))
-                return asyncio.run(task)
-            raise
+        return self._run_async_synchronous(self._backend.publish_batch(events))
 
     def subscribe(
         self,
@@ -175,14 +211,7 @@ class SyncEventWrapper:
             except Exception as e:
                 logger.error(f"[SyncEventWrapper] Handler error for {event.topic}: {e}")
 
-        try:
-            return asyncio.run(self._backend.subscribe(pattern, async_wrapper))
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(self._backend.subscribe(pattern, async_wrapper))
-                return asyncio.run(task)
-            raise
+        return self._run_async_synchronous(self._backend.subscribe(pattern, async_wrapper))
 
     def unsubscribe(self, handle: SubscriptionHandle) -> bool:
         """Unsubscribe from events synchronously.
@@ -193,14 +222,7 @@ class SyncEventWrapper:
         Returns:
             True if unsubscribed successfully
         """
-        try:
-            return asyncio.run(self._backend.unsubscribe(handle))
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(self._backend.unsubscribe(handle))
-                return asyncio.run(task)
-            raise
+        return self._run_async_synchronous(self._backend.unsubscribe(handle))
 
     def health_check(self) -> bool:
         """Check backend health synchronously.
@@ -208,14 +230,7 @@ class SyncEventWrapper:
         Returns:
             True if backend is healthy
         """
-        try:
-            return asyncio.run(self._backend.health_check())
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(self._backend.health_check())
-                return asyncio.run(task)
-            raise
+        return self._run_async_synchronous(self._backend.health_check())
 
 
 class SyncObservabilityBus:

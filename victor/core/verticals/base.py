@@ -23,6 +23,12 @@ Design Patterns:
     - Factory Method: create_agent() factory
     - Registry: VerticalRegistry for discovery
 
+Architecture (Phase 2.3 - SRP Compliance):
+    VerticalBase now composes functionality from focused classes:
+    - VerticalMetadataProvider: Metadata (name, description, provider hints, etc.)
+    - VerticalExtensionLoader: Extension loading and caching
+    - VerticalWorkflowProvider: Workflow and handler providers
+
 Example:
     class MyCustomVertical(VerticalBase):
         name = "my_vertical"
@@ -42,13 +48,17 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Type, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
 
+# Import focused capability providers for SRP compliance
+from victor.core.verticals.metadata import VerticalMetadataProvider
+from victor.core.verticals.extension_loader import VerticalExtensionLoader
+from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
+
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
-    from victor.core.vertical_types import TieredToolConfig
 
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
@@ -148,10 +158,24 @@ class VerticalConfig:
             return default
 
 
-class VerticalBase(ABC):
+class VerticalBase(
+    VerticalMetadataProvider,
+    VerticalExtensionLoader,
+    VerticalWorkflowProvider,
+    ABC,
+):
     """Abstract base class for domain-specific assistants.
 
-    Implements the Template Method pattern. Subclasses must override:
+    Implements the Template Method pattern using composition of focused
+    capability providers for SRP compliance:
+
+    - VerticalMetadataProvider: Metadata (name, description, version,
+      provider_hints, evaluation_criteria, capability_configs)
+    - VerticalExtensionLoader: Extension loading (middleware, safety,
+      prompt_contributor, mode_config, tool_deps, etc.)
+    - VerticalWorkflowProvider: Workflow and handler providers
+
+    Subclasses must override:
     - name: Vertical identifier
     - description: Human-readable description
     - get_tools(): List of tool names
@@ -159,9 +183,8 @@ class VerticalBase(ABC):
 
     Optional overrides:
     - get_stages(): Stage definitions
-    - get_provider_hints(): Provider selection hints
-    - get_evaluation_criteria(): Performance criteria
     - customize_config(): Hook for final config customization
+    - Extension methods: get_middleware(), get_safety_extension(), etc.
 
     Example:
         class SecurityAuditor(VerticalBase):
@@ -182,126 +205,23 @@ class VerticalBase(ABC):
         when config sources change (typically only needed in tests).
 
     Extension Loading:
-        The get_extensions() method now supports strict error handling.
+        The get_extensions() method supports strict error handling.
         Set strict_extension_loading=True to raise ExtensionLoadError on
         any failure. Set required_extensions to specify which extensions
         must load successfully even in non-strict mode.
+
+    Backward Compatibility:
+        All methods from the original VerticalBase are preserved through
+        inheritance from the focused provider classes. Existing verticals
+        that inherit from VerticalBase require no changes.
     """
-
-    # Subclasses must define these
-    name: str = ""
-    description: str = ""
-    version: str = "1.0.0"
-
-    # Extension loading configuration
-    # When True, any extension loading failure raises ExtensionLoadError
-    strict_extension_loading: ClassVar[bool] = False
-
-    # Extensions that must load successfully even when strict_extension_loading=False
-    # Valid values: "middleware", "safety", "prompt", "mode_config", "tool_deps",
-    #               "workflow", "service", "rl_config", "team_spec", "enrichment",
-    #               "tiered_tools"
-    required_extensions: ClassVar[Set[str]] = set()
 
     # Config cache (keyed by class name, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
-    _extensions_cache: Dict[str, Any] = {}
 
     # =========================================================================
-    # Extension Caching Infrastructure
+    # Required Abstract Methods
     # =========================================================================
-
-    @classmethod
-    def _get_cached_extension(cls, key: str, factory: callable) -> Any:
-        """Get extension from cache or create and cache it.
-
-        This helper enables fine-grained caching of individual extension
-        instances, avoiding repeated object creation when extensions are
-        accessed multiple times.
-
-        The cache uses a composite key of (class_name, extension_key) to
-        ensure proper isolation between different vertical subclasses.
-
-        Args:
-            key: Unique key for this extension type (e.g., "middleware",
-                 "safety_extension", "workflow_provider")
-            factory: Zero-argument callable that creates the extension instance.
-                     Only called if the extension is not already cached.
-
-        Returns:
-            Cached or newly created extension instance.
-
-        Example:
-            @classmethod
-            def get_middleware(cls) -> List[MiddlewareProtocol]:
-                def _create():
-                    from myvertical.middleware import MyMiddleware
-                    return [MyMiddleware()]
-                return cls._get_cached_extension("middleware", _create)
-        """
-        # Use composite key to avoid collisions between different vertical classes
-        cache_key = f"{cls.__name__}:{key}"
-        if cache_key not in cls._extensions_cache:
-            cls._extensions_cache[cache_key] = factory()
-        return cls._extensions_cache[cache_key]
-
-    @classmethod
-    def _get_extension_factory(
-        cls,
-        extension_key: str,
-        import_path: str,
-        attribute_name: Optional[str] = None,
-    ) -> Any:
-        """Generic factory for lazy-loading and caching extensions.
-
-        Eliminates boilerplate across all verticals by providing a single
-        implementation of the lazy import + create + cache pattern.
-
-        Args:
-            extension_key: Cache key (e.g., "safety_extension", "prompt_contributor")
-            import_path: Full Python import path (e.g., "victor.coding.safety")
-            attribute_name: Class name to import. If None, auto-generates from vertical name
-                          (e.g., "CodingSafetyExtension" for CodingAssistant)
-
-        Returns:
-            Cached or newly created extension instance
-
-        Example:
-            # Before (13 lines)
-            def get_safety_extension(cls):
-                def _create():
-                    from victor.coding.safety import CodingSafetyExtension
-                    return CodingSafetyExtension()
-                return cls._get_cached_extension("safety_extension", _create)
-
-            # After (3 lines)
-            def get_safety_extension(cls):
-                return cls._get_extension_factory(
-                    "safety_extension",
-                    "victor.coding.safety",
-                )
-        """
-
-        def _create():
-            # Determine the class name to import
-            if attribute_name is None:
-                # Auto-generate class name
-                # Convert "CodingAssistant" → "Coding"
-                vertical_name = cls.__name__.replace("Assistant", "")
-                # Convert "safety_extension" → "SafetyExtension"
-                extension_type = extension_key.replace("_", " ").title().replace(" ", "")
-                class_name = f"{vertical_name}{extension_type}"
-            else:
-                class_name = attribute_name
-
-            # Lazy import: only loads module when first called
-            module = __import__(import_path, fromlist=[class_name])
-
-            # Import and instantiate
-            return getattr(module, class_name)()
-
-        # Use existing caching infrastructure
-        return cls._get_cached_extension(extension_key, _create)
 
     @classmethod
     @abstractmethod
@@ -323,6 +243,10 @@ class VerticalBase(ABC):
         """
         pass
 
+    # =========================================================================
+    # Configurable Override Points
+    # =========================================================================
+
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get stage definitions for this vertical.
@@ -339,10 +263,10 @@ class VerticalBase(ABC):
         7. COMPLETION: Finalize, document, and wrap up
 
         This workflow applies to most domains:
-        - Coding: understand → plan → read code → analyze → implement → test → commit
-        - DevOps: assess → plan → implement → validate → deploy → monitor
-        - Research: question → search → read → synthesize → write → verify
-        - Data Analysis: understand → explore → analyze → visualize → report
+        - Coding: understand -> plan -> read code -> analyze -> implement -> test -> commit
+        - DevOps: assess -> plan -> implement -> validate -> deploy -> monitor
+        - Research: question -> search -> read -> synthesize -> write -> verify
+        - Data Analysis: understand -> explore -> analyze -> visualize -> report
 
         Verticals should override this method to provide domain-specific:
         - Stage names (e.g., DEPLOYMENT, SYNTHESIZING)
@@ -483,70 +407,6 @@ class VerticalBase(ABC):
         }
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get hints for provider selection.
-
-        Returns:
-            Dictionary with provider preferences.
-
-        Default implementation uses VerticalConfigRegistry. Override in subclasses
-        for vertical-specific requirements.
-        """
-        from victor.core.verticals.config_registry import VerticalConfigRegistry
-
-        # Try to get from registry based on vertical name
-        try:
-            return VerticalConfigRegistry.get_provider_hints(cls.name)
-        except KeyError:
-            # Fallback to generic defaults
-            return {
-                "preferred_providers": ["anthropic", "openai"],
-                "min_context_window": 100000,
-                "requires_tool_calling": True,
-            }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get criteria for evaluating agent performance.
-
-        Returns:
-            List of evaluation criteria descriptions.
-
-        Default implementation uses VerticalConfigRegistry. Override in subclasses
-        for vertical-specific requirements.
-        """
-        from victor.core.verticals.config_registry import VerticalConfigRegistry
-
-        # Try to get from registry based on vertical name
-        try:
-            return VerticalConfigRegistry.get_evaluation_criteria(cls.name)
-        except KeyError:
-            # Fallback to generic defaults
-            return [
-                "Task completion accuracy",
-                "Tool usage efficiency",
-                "Response relevance",
-            ]
-
-    @classmethod
-    def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:
-        """Get tiered tool configuration for this vertical.
-
-        TieredToolConfig defines mandatory, vertical_core, and semantic_pool
-        tool sets for intelligent tool filtering by ToolAccessController.
-
-        Default implementation uses TieredToolTemplate to generate config
-        based on vertical name. Override for custom configurations.
-
-        Returns:
-            TieredToolConfig or None if vertical doesn't use tiered config.
-        """
-        from victor.core.vertical_types import TieredToolTemplate
-
-        # Try to get pre-built config from template
-        return TieredToolTemplate.for_vertical(cls.name)
-
-    @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
         """Hook for final configuration customization.
 
@@ -559,475 +419,6 @@ class VerticalBase(ABC):
             Customized configuration.
         """
         return config
-
-    # =========================================================================
-    # Extension Protocol Methods (Optional)
-    # =========================================================================
-    # These methods enable verticals to provide framework extensions.
-    # Override them to integrate with the framework's middleware, safety,
-    # prompt, and configuration systems.
-
-    @classmethod
-    def get_middleware(cls) -> List[Any]:
-        """Get middleware implementations for this vertical.
-
-        Override to provide vertical-specific middleware for tool
-        execution processing.
-
-        Returns:
-            List of middleware implementations (MiddlewareProtocol)
-        """
-        return []
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[Any]:
-        """Get safety extension for this vertical.
-
-        Override to provide vertical-specific dangerous operation patterns.
-
-        Returns:
-            Safety extension (SafetyExtensionProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[Any]:
-        """Get prompt contributor for this vertical.
-
-        Override to provide vertical-specific task hints and prompt sections.
-
-        Returns:
-            Prompt contributor (PromptContributorProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[Any]:
-        """Get mode configuration provider for this vertical.
-
-        Override to provide vertical-specific operational modes.
-
-        Returns:
-            Mode config provider (ModeConfigProviderProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_mode_config(cls) -> Dict[str, Any]:
-        """Get mode configurations for this vertical.
-
-        Returns operational modes like 'fast', 'thorough', 'explore' with
-        their configurations (tool_budget, max_iterations, temperature).
-
-        Default implementation provides standard modes. Override in subclasses
-        for vertical-specific mode configurations.
-
-        Returns:
-            Dictionary mapping mode names to ModeConfig-like dicts.
-        """
-        return {
-            "fast": {
-                "name": "fast",
-                "tool_budget": 10,
-                "max_iterations": 20,
-                "temperature": 0.7,
-                "description": "Quick responses with limited tool usage",
-            },
-            "thorough": {
-                "name": "thorough",
-                "tool_budget": 50,
-                "max_iterations": 50,
-                "temperature": 0.7,
-                "description": "Comprehensive analysis with extensive tool usage",
-            },
-            "explore": {
-                "name": "explore",
-                "tool_budget": 30,
-                "max_iterations": 30,
-                "temperature": 0.9,
-                "description": "Exploratory mode with higher creativity",
-            },
-        }
-
-    @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
-        """Get task-type-specific prompt hints.
-
-        Returns hints for common task types (edit, search, explain, etc.)
-        with tool priorities and budget recommendations.
-
-        Default implementation provides standard hints. Override in subclasses
-        for vertical-specific task type hints.
-
-        Returns:
-            Dictionary mapping task types to TaskTypeHint-like dicts.
-        """
-        return {
-            "edit": {
-                "task_type": "edit",
-                "hint": "[EDIT MODE] Read target files first, then make focused modifications.",
-                "tool_budget": 15,
-                "priority_tools": ["read", "edit", "grep"],
-            },
-            "search": {
-                "task_type": "search",
-                "hint": "[SEARCH MODE] Use semantic search and grep for efficient discovery.",
-                "tool_budget": 10,
-                "priority_tools": ["grep", "code_search", "ls"],
-            },
-            "explain": {
-                "task_type": "explain",
-                "hint": "[EXPLAIN MODE] Read relevant code and provide clear explanations.",
-                "tool_budget": 8,
-                "priority_tools": ["read", "grep", "overview"],
-            },
-            "debug": {
-                "task_type": "debug",
-                "hint": "[DEBUG MODE] Investigate systematically, check logs and error messages.",
-                "tool_budget": 20,
-                "priority_tools": ["read", "grep", "shell", "run_tests"],
-            },
-            "implement": {
-                "task_type": "implement",
-                "hint": "[IMPLEMENT MODE] Plan first, implement incrementally, verify each step.",
-                "tool_budget": 30,
-                "priority_tools": ["read", "write", "edit", "shell"],
-            },
-        }
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[Any]:
-        """Get tool dependency provider for this vertical.
-
-        Override to provide vertical-specific tool execution patterns.
-
-        Returns:
-            Tool dependency provider (ToolDependencyProviderProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_tool_graph(cls) -> Optional[Any]:
-        """Get tool execution graph for this vertical.
-
-        Override to provide a custom ToolExecutionGraph that defines
-        tool dependencies, transitions, and execution sequences.
-        The graph is registered with the global ToolGraphRegistry.
-
-        Returns:
-            ToolExecutionGraph instance or None (no graph registered)
-        """
-        return None
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for workflow execution.
-
-        Override to provide domain-specific handlers for workflow nodes.
-        These handlers are registered with the HandlerRegistry during
-        vertical integration, replacing the previous import-side-effect
-        registration pattern.
-
-        Example:
-            @classmethod
-            def get_handlers(cls) -> Dict[str, Any]:
-                from victor.coding.handlers import HANDLERS
-                return HANDLERS
-
-        Returns:
-            Dict mapping handler name to handler instance
-        """
-        return {}
-
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get capability configurations for this vertical.
-
-        Override to provide vertical-specific capability configurations
-        that will be stored in VerticalContext instead of direct
-        orchestrator attribute assignment.
-
-        This replaces the previous pattern of setting attributes like:
-        - orchestrator.rag_config = {...}
-        - orchestrator.source_verification_config = {...}
-
-        Example:
-            @classmethod
-            def get_capability_configs(cls) -> Dict[str, Any]:
-                return {
-                    "rag_config": {
-                        "indexing": {"chunk_size": 512, ...},
-                        "retrieval": {"top_k": 5, ...},
-                    },
-                }
-
-        Returns:
-            Dict mapping config names to configuration values
-        """
-        return {}
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[Any]:
-        """Get tiered tool configuration for intelligent selection.
-
-        DEPRECATED: Use get_tiered_tool_config() instead.
-
-        This method is maintained for backward compatibility. New verticals
-        should override get_tiered_tool_config() which has a default
-        implementation using TieredToolTemplate.
-
-        ISP/LSP Compliance: This method now delegates to get_tiered_tool_config()
-        to ensure consistent behavior regardless of which method is called.
-
-        Override to provide vertical-specific tiered tool configuration
-        for context-efficient tool selection. When implemented, this enables:
-
-        1. Mandatory tools: Always included (e.g., read, ls)
-        2. Vertical core: Always included for this vertical (e.g., web, fetch for research)
-        3. Semantic pool: Selected based on query similarity and stage
-
-        Example for research vertical:
-            return TieredToolConfig(
-                mandatory={"read", "ls"},
-                vertical_core={"web", "fetch"},
-                semantic_pool={"write", "edit", "grep", "search"},
-                stage_tools={
-                    "WRITING": {"write", "edit"},
-                    "SEARCHING": {"web", "fetch", "grep"},
-                },
-                readonly_only_for_analysis=True,
-            )
-
-        Returns:
-            TieredToolConfig or None (falls back to get_tools())
-        """
-        # ISP/LSP: Delegate to canonical method for consistent behavior
-        return cls.get_tiered_tool_config()
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Get workflow provider for this vertical.
-
-        Override to provide vertical-specific workflows.
-
-        Returns:
-            Workflow provider (WorkflowProviderProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for this vertical.
-
-        Override to provide vertical-specific RL learner configurations,
-        task type mappings, and quality thresholds.
-
-        Returns:
-            RL config provider (RLConfigProviderProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for outcome recording.
-
-        Override to provide vertical-specific RL hooks for
-        recording task outcomes and updating learners.
-
-        Returns:
-            RLHooks instance or None
-        """
-        return None
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for this vertical.
-
-        Override to provide vertical-specific multi-agent team
-        configurations for complex task execution.
-
-        Returns:
-            Team spec provider (TeamSpecProviderProtocol) or None
-        """
-        return None
-
-    @classmethod
-    def get_service_provider(cls) -> Optional[Any]:
-        """Get service provider for this vertical.
-
-        By default, returns a BaseVerticalServiceProvider that registers
-        the vertical's prompt contributor, safety extension, mode config,
-        and tool dependency providers with the DI container.
-
-        Override to provide custom service registration logic.
-
-        Returns:
-            Service provider (ServiceProviderProtocol) or factory-created provider
-        """
-        try:
-            from victor.core.verticals.base_service_provider import VerticalServiceProviderFactory
-
-            return VerticalServiceProviderFactory.create(cls)
-        except ImportError:
-            return None
-
-    @classmethod
-    def get_enrichment_strategy(cls) -> Optional[Any]:
-        """Get vertical-specific enrichment strategy.
-
-        Override to provide vertical-specific prompt enrichment strategies
-        for DSPy-like auto prompt optimization. Enrichments can include:
-        - Knowledge graph symbols and related code snippets (coding)
-        - Web search results and source citations (research)
-        - Infrastructure context and command patterns (devops)
-        - Schema context and query patterns (data analysis)
-
-        Returns:
-            EnrichmentStrategyProtocol implementation or None
-        """
-        return None
-
-    @classmethod
-    def get_extensions(
-        cls,
-        *,
-        use_cache: bool = True,
-        strict: Optional[bool] = None,
-    ) -> "VerticalExtensions":
-        """Get all extensions for this vertical with strict error handling.
-
-        Aggregates all extension implementations for framework integration.
-        Override for custom extension aggregation.
-
-        LSP Compliance: This method ALWAYS returns a valid VerticalExtensions
-        object, never None. Even on exceptions (in non-strict mode), it returns
-        a VerticalExtensions with successfully loaded extensions.
-
-        Error Handling Modes:
-        - strict=True: Raises ExtensionLoadError on ANY extension failure
-        - strict=False: Collects errors, logs warnings, returns partial extensions
-        - strict=None: Uses class-level strict_extension_loading setting
-
-        Required Extensions:
-        Even when strict=False, extensions listed in required_extensions will
-        raise ExtensionLoadError if they fail to load.
-
-        Args:
-            use_cache: If True (default), return cached extensions if available.
-                       Set to False to force rebuild.
-            strict: Override the class-level strict_extension_loading setting.
-                    If None (default), uses cls.strict_extension_loading.
-
-        Returns:
-            VerticalExtensions containing all vertical extensions (never None)
-
-        Raises:
-            ExtensionLoadError: In strict mode or when a required extension fails
-        """
-        from victor.core.errors import ExtensionLoadError
-        from victor.core.verticals.protocols import VerticalExtensions
-
-        cache_key = cls.__name__
-
-        # Return cached extensions if available and caching enabled
-        if use_cache and cache_key in cls._extensions_cache:
-            return cls._extensions_cache[cache_key]
-
-        # Determine strict mode
-        is_strict = strict if strict is not None else cls.strict_extension_loading
-
-        # Collect errors for reporting
-        errors: List["ExtensionLoadError"] = []
-
-        def _load_extension(
-            extension_type: str,
-            loader: callable,
-            is_list: bool = False,
-        ) -> Any:
-            """Load an extension with error handling.
-
-            Args:
-                extension_type: Type name for error reporting
-                loader: Callable that loads the extension
-                is_list: If True, the extension should be a list
-
-            Returns:
-                The loaded extension, or default value on error
-            """
-            try:
-                result = loader()
-                return result
-            except Exception as e:
-                is_required = extension_type in cls.required_extensions
-                error = ExtensionLoadError(
-                    message=f"Failed to load '{extension_type}' extension for vertical '{cls.name}': {e}",
-                    extension_type=extension_type,
-                    vertical_name=cls.name,
-                    original_error=e,
-                    is_required=is_required,
-                )
-                errors.append(error)
-
-                # Log the error with appropriate severity
-                if is_strict or is_required:
-                    logger.error(
-                        f"[{error.correlation_id}] {extension_type} extension failed to load "
-                        f"for vertical '{cls.name}': {e}",
-                        exc_info=True,
-                    )
-                else:
-                    logger.warning(
-                        f"[{error.correlation_id}] {extension_type} extension failed to load "
-                        f"for vertical '{cls.name}': {e}"
-                    )
-
-                # Return default value
-                return [] if is_list else None
-
-        # Load each extension with error handling
-        middleware = _load_extension("middleware", cls.get_middleware, is_list=True)
-        safety = _load_extension("safety", cls.get_safety_extension)
-        prompt = _load_extension("prompt", cls.get_prompt_contributor)
-        mode_config = _load_extension("mode_config", cls.get_mode_config_provider)
-        tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
-        workflow = _load_extension("workflow", cls.get_workflow_provider)
-        service = _load_extension("service", cls.get_service_provider)
-        rl_config = _load_extension("rl_config", cls.get_rl_config_provider)
-        team_spec = _load_extension("team_spec", cls.get_team_spec_provider)
-        enrichment = _load_extension("enrichment", cls.get_enrichment_strategy)
-        tiered_tools = _load_extension("tiered_tools", cls.get_tiered_tool_config)
-
-        # Check for critical failures (strict mode or required extensions)
-        critical_errors = [e for e in errors if is_strict or e.is_required]
-        if critical_errors:
-            # Raise the first critical error
-            raise critical_errors[0]
-
-        # Log summary if there were non-critical errors
-        if errors:
-            logger.warning(
-                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
-                f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
-            )
-
-        # Build extensions object
-        extensions = VerticalExtensions(
-            middleware=middleware if middleware else [],
-            safety_extensions=[safety] if safety else [],
-            prompt_contributors=[prompt] if prompt else [],
-            mode_config_provider=mode_config,
-            tool_dependency_provider=tool_deps,
-            workflow_provider=workflow,
-            service_provider=service,
-            rl_config_provider=rl_config,
-            team_spec_provider=team_spec,
-            enrichment_strategy=enrichment,
-            tiered_tool_config=tiered_tools,
-        )
-
-        # Cache the extensions
-        cls._extensions_cache[cache_key] = extensions
-        return extensions
 
     # =========================================================================
     # Template Method Implementation
@@ -1091,17 +482,12 @@ class VerticalBase(ABC):
         """
         if clear_all:
             cls._config_cache.clear()
-            cls._extensions_cache.clear()
+            cls.clear_extension_cache(clear_all=True)
         else:
             cache_key = cls.__name__
             cls._config_cache.pop(cache_key, None)
-            # Clear composite extensions cache entry
-            cls._extensions_cache.pop(cache_key, None)
-            # Also clear individual extension cache entries (format: "ClassName:key")
-            prefix = f"{cache_key}:"
-            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
-            for key in keys_to_remove:
-                cls._extensions_cache.pop(key, None)
+            # Clear extensions cache for this class too
+            cls.clear_extension_cache(clear_all=False)
 
     @classmethod
     def get_tool_set(cls) -> ToolSet:

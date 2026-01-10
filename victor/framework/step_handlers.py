@@ -25,35 +25,75 @@ Design Philosophy:
 - Interface Segregation: Minimal protocol for step handlers
 - Dependency Inversion: Handlers depend on protocols, not implementations
 
+Step Handler Execution Order:
+    The handlers execute in a specific order to ensure dependencies are
+    satisfied. Lower order numbers execute first.
+
+    Order | Handler             | Class                    | Purpose                                    | Dependencies
+    ------|---------------------|--------------------------|--------------------------------------------|-------------
+    5     | capability_config   | CapabilityConfigStepHandler | Centralized capability config storage    | None
+    10    | tools               | ToolStepHandler          | Tool filter application                    | None
+    15    | tiered_config       | TieredConfigStepHandler  | Tiered tool config (mandatory/core/pool)   | Tool
+    20    | prompt              | PromptStepHandler        | System prompt and prompt contributors      | None
+    30    | safety              | SafetyStepHandler        | Safety patterns and extensions             | None
+    40    | config              | ConfigStepHandler        | Stages, mode configs, tool dependencies    | None
+    45    | extensions          | ExtensionsStepHandler    | Coordinated extension application          | Config
+    50    | middleware          | MiddlewareStepHandler    | Middleware chain application               | Extensions
+    60    | framework           | FrameworkStepHandler     | Workflows, RL, teams, chains, personas     | All prior
+    100   | context             | ContextStepHandler       | Attach context to orchestrator             | All prior
+
+    Dependencies Explained:
+    - TieredConfig (15) runs after Tool (10) because it applies access
+      rules to the tools that were just registered
+    - Extensions (45) runs after Config (40) because it needs the stages
+      and mode configuration to be available for extension handlers
+    - Middleware (50) runs after Extensions (45) as it's part of the
+      extensions system but needs to apply after core extensions
+    - Framework (60) runs last because it registers workflows and teams
+      that may depend on tools, prompts, and configurations being
+      fully initialized
+    - Context (100) runs last as a finalization step to attach the
+      complete context to the orchestrator
+
 Architecture:
     StepHandlerProtocol
     ├── CapabilityConfigStepHandler - Centralized capability config storage
     ├── ToolStepHandler - Tool filter application
+    ├── TieredConfigStepHandler - Tiered tool config (Phase 1 fix)
     ├── PromptStepHandler - System prompt and prompt contributors
     ├── SafetyStepHandler - Safety patterns and extensions
     ├── ConfigStepHandler - Stages, modes, and tool dependencies
+    ├── ExtensionsStepHandler - Coordinated extension application
     ├── MiddlewareStepHandler - Middleware chain application
-    └── FrameworkStepHandler - Workflows, RL config, and team specs
+    ├── FrameworkStepHandler - Workflows, RL config, and team specs
+    └── ContextStepHandler - Final context attachment
 
 Usage:
     from victor.framework.step_handlers import (
         CapabilityConfigStepHandler,
         ToolStepHandler,
+        TieredConfigStepHandler,
         PromptStepHandler,
         SafetyStepHandler,
         ConfigStepHandler,
+        ExtensionsStepHandler,
         MiddlewareStepHandler,
         FrameworkStepHandler,
+        ContextStepHandler,
     )
 
-    # Create handlers
+    # Create handlers (or use StepHandlerRegistry.default())
     handlers = [
+        CapabilityConfigStepHandler(),
         ToolStepHandler(),
+        TieredConfigStepHandler(),
         PromptStepHandler(),
         SafetyStepHandler(),
         ConfigStepHandler(),
+        ExtensionsStepHandler(),
         MiddlewareStepHandler(),
         FrameworkStepHandler(),
+        ContextStepHandler(),
     ]
 
     # Apply in pipeline
@@ -84,15 +124,8 @@ if TYPE_CHECKING:
     from victor.framework.vertical_integration import IntegrationResult
     from victor.core.verticals.base import VerticalBase
     from victor.core.verticals.protocols import (
-        MiddlewareProtocol,
-        ModeConfigProviderProtocol,
-        PromptContributorProtocol,
         RLConfigProviderProtocol,
-        SafetyExtensionProtocol,
         TeamSpecProviderProtocol,
-        ToolDependencyProviderProtocol,
-        VerticalExtensions,
-        WorkflowProviderProtocol,
     )
 
 # Import protocols for runtime isinstance checks
@@ -100,7 +133,6 @@ from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
     TaskTypeHint,
     TeamSpecProviderProtocol,
-    WorkflowProviderProtocol,
 )
 
 # Import PromptContributorAdapter for hint normalization
@@ -809,17 +841,12 @@ class ConfigStepHandler(BaseStepHandler):
             _invoke_capability(orchestrator, "tool_sequences", sequences)
             logger.debug("Applied tool sequences via capability")
 
-        # Fallback: try tool sequence tracker directly
+        # If capability not available, log warning (no private attribute fallback)
         if not _check_capability(orchestrator, "tool_dependencies"):
-            tracker = getattr(orchestrator, "tool_sequence_tracker", None) or getattr(
-                orchestrator, "_sequence_tracker", None
+            logger.warning(
+                "Orchestrator does not implement tool_dependencies capability; "
+                "dependencies stored in context only"
             )
-            if tracker:
-                if hasattr(tracker, "set_dependencies"):
-                    tracker.set_dependencies(dependencies)
-                if hasattr(tracker, "set_sequences"):
-                    tracker.set_sequences(sequences)
-                logger.debug("Applied tool deps via fallback")
 
 
 # =============================================================================

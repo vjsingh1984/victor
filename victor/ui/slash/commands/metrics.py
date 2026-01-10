@@ -52,8 +52,17 @@ class CostCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        # Get usage analytics if available
-        analytics = getattr(ctx.agent, "_usage_analytics", None)
+        # Try capability registry first (DIP compliant)
+        if hasattr(ctx.agent, "get_capability_value"):
+            try:
+                analytics = ctx.agent.get_capability_value("usage_analytics")
+            except (KeyError, TypeError):
+                analytics = None
+        elif hasattr(ctx.agent, "usage_analytics"):
+            # Public property fallback
+            analytics = ctx.agent.usage_analytics
+        else:
+            analytics = None
 
         if analytics:
             summary = analytics.get_session_summary()
@@ -70,10 +79,19 @@ class CostCommand(BaseSlashCommand):
                 for provider, stats in summary["provider_breakdown"].items():
                     content += f"  {provider}: {stats.get('tokens', 0):,} tokens\n"
         else:
+            # Get tool call count via capability or public method
+            tool_calls = 0
+            if hasattr(ctx.agent, "get_capability_value"):
+                tool_calls = ctx.agent.get_capability_value("tool_metrics", {}).get("call_count", 0)
+            elif hasattr(ctx.agent, "get_tool_call_count"):
+                tool_calls = ctx.agent.get_tool_call_count()
+            elif hasattr(ctx.agent, "tool_call_count"):
+                tool_calls = ctx.agent.tool_call_count
+
             content = (
                 f"[bold]Session Statistics[/]\n\n"
                 f"[bold]Messages:[/] {ctx.agent.conversation.message_count()}\n"
-                f"[bold]Tool Calls:[/] {getattr(ctx.agent, '_tool_calls', 0)}\n"
+                f"[bold]Tool Calls:[/] {tool_calls}\n"
                 f"[bold]Provider:[/] {ctx.agent.provider_name}\n"
                 f"[bold]Model:[/] {ctx.agent.model}\n"
             )
@@ -310,7 +328,7 @@ class LearningCommand(BaseSlashCommand):
 
                 # Set on mode controller if available
                 if ctx.agent:
-                    mode_controller = getattr(ctx.agent, "_mode_controller", None)
+                    mode_controller = getattr(ctx.agent, "mode_controller", None)
                     if mode_controller:
                         mode_controller.adjust_exploration_rate(rate)
                         ctx.console.print(
@@ -336,12 +354,22 @@ class LearningCommand(BaseSlashCommand):
         if subcommand == "reset":
             # Reset intelligent pipeline
             if ctx.agent:
-                integration = getattr(ctx.agent, "intelligent_integration", None)
+                # Use capability registry for intelligent pipeline access
+                if hasattr(ctx.agent, "get_capability_value"):
+                    integration = ctx.agent.get_capability_value("intelligent_pipeline")
+                else:
+                    integration = getattr(ctx.agent, "intelligent_integration", None)
+
                 if integration:
-                    pipeline = getattr(integration, "_pipeline", None)
-                    if pipeline:
-                        pipeline.reset_session()
+                    if hasattr(integration, "reset_session"):
+                        integration.reset_session()
                         ctx.console.print("[green]Intelligent pipeline session reset[/]")
+                    else:
+                        # Fallback to _pipeline attribute
+                        pipeline = getattr(integration, "_pipeline", None)
+                        if pipeline:
+                            pipeline.reset_session()
+                            ctx.console.print("[green]Intelligent pipeline session reset[/]")
 
             # Reset model selector
             from victor.agent.rl.coordinator import get_rl_coordinator
@@ -411,11 +439,24 @@ class LearningCommand(BaseSlashCommand):
 
         # 1. Intelligent Pipeline stats (mode controller)
         if ctx.agent:
-            integration = getattr(ctx.agent, "intelligent_integration", None)
+            # Use capability registry for intelligent pipeline access
+            if hasattr(ctx.agent, "get_capability_value"):
+                integration = ctx.agent.get_capability_value("intelligent_pipeline")
+            else:
+                integration = getattr(ctx.agent, "intelligent_integration", None)
+
             if integration:
-                pipeline = getattr(integration, "_pipeline", None)
-                if pipeline:
-                    stats = pipeline.get_stats()
+                if hasattr(integration, "get_stats"):
+                    stats = integration.get_stats()
+                else:
+                    # Fallback to _pipeline attribute
+                    pipeline = getattr(integration, "_pipeline", None)
+                    if pipeline and hasattr(pipeline, "get_stats"):
+                        stats = pipeline.get_stats()
+                    else:
+                        stats = None
+
+                if stats:
                     content += "[bold cyan]Intelligent Pipeline:[/]\n"
                     content += f"  Session Duration: {stats.session_duration:.1f}s\n"
                     content += f"  Total Requests: {stats.total_requests}\n"
@@ -426,10 +467,18 @@ class LearningCommand(BaseSlashCommand):
                         content += f"  Avg Quality Score: {stats.avg_quality_score:.2f}\n"
                         content += f"  Avg Grounding Score: {stats.avg_grounding_score:.2f}\n"
 
-                    mode_controller = getattr(pipeline, "_mode_controller", None)
+                    # Get mode controller via capability registry or attribute
+                    if hasattr(integration, "mode_controller"):
+                        mode_controller = integration.mode_controller
+                    elif hasattr(integration, "_pipeline"):
+                        pipeline = getattr(integration, "_pipeline", None)
+                        mode_controller = getattr(pipeline, "_mode_controller", None) if pipeline else None
+                    else:
+                        mode_controller = None
+
                     if mode_controller:
                         session_stats = mode_controller.get_session_stats()
-                        content += f"\n[bold cyan]Mode Learning:[/]\n"
+                        content += "\n[bold cyan]Mode Learning:[/]\n"
                         content += f"  Profile: {session_stats.get('profile_name', 'unknown')}\n"
                         content += f"  Total Reward: {session_stats.get('total_reward', 0):.2f}\n"
                         content += (
@@ -465,8 +514,8 @@ class LearningCommand(BaseSlashCommand):
                         )
                         content += f"  {rank['provider']}: Q={rank['q_value']:.2f} (n={rank['sample_count']}){current}\n"
 
-                    exploration = getattr(learner, "_exploration_rate", 0.1)
-                    strategy = getattr(learner, "_strategy", None)
+                    exploration = learner.get_exploration_rate() if hasattr(learner, "get_exploration_rate") else getattr(learner, "_exploration_rate", 0.1)
+                    strategy = learner.get_strategy() if hasattr(learner, "get_strategy") else getattr(learner, "_strategy", None)
                     content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:
@@ -556,7 +605,7 @@ class MLStatsCommand(BaseSlashCommand):
 
             # Get coordinator-level stats
             coord_stats = coordinator.get_stats()
-            content += f"\n[bold]Coordinator Stats:[/]\n"
+            content += "\n[bold]Coordinator Stats:[/]\n"
             content += f"  Total Outcomes: {coord_stats.get('total_outcomes', 0)}\n"
             content += f"  Sessions: {coord_stats.get('sessions', 0)}\n"
 

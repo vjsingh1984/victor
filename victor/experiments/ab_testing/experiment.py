@@ -117,8 +117,7 @@ class ABTestManager:
                 started_at REAL,
                 completed_at REAL,
                 paused_at REAL,
-                tags_json TEXT,
-                PRIMARY KEY (experiment_id)
+                tags_json TEXT
             )
         """
         )
@@ -148,7 +147,6 @@ class ABTestManager:
             """
             CREATE TABLE IF NOT EXISTS metrics (
                 experiment_id TEXT NOT NULL,
-                variant_id TEXT NOT NULL,
                 metric_id TEXT NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT,
@@ -541,12 +539,6 @@ class ABTestManager:
         conn.commit()
         conn.close()
 
-        # Update status
-        if experiment_id in self._experiment_status:
-            status = self._experiment_status[experiment_id]
-            status.total_samples += 1
-            status.variant_samples[variant_id] = status.variant_samples.get(variant_id, 0) + 1
-
         return variant_id
 
     async def record_execution(self, metrics: ExecutionMetrics) -> None:
@@ -596,6 +588,12 @@ class ABTestManager:
 
         conn.commit()
         conn.close()
+
+        # Update cache
+        if metrics.experiment_id in self._experiment_status:
+            status = self._experiment_status[metrics.experiment_id]
+            status.total_samples += 1
+            status.variant_samples[metrics.variant_id] = status.variant_samples.get(metrics.variant_id, 0) + 1
 
     async def get_status(self, experiment_id: str) -> Optional[ExperimentStatus]:
         """Get experiment status.

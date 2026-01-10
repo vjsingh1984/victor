@@ -108,7 +108,7 @@ class StatisticalAnalyzer:
         )
 
         # Determine significance
-        significant = p_value < alpha
+        significant = bool(p_value < alpha)
 
         return {
             "test": "t-test",

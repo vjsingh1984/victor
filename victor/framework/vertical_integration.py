@@ -43,6 +43,55 @@ Architecture (Refactored with Step Handlers):
         │   └── Team Specs - Register team specifications
         └── ContextStepHandler (order=100) - Attach context
 
+Architecture Notes: Pipeline vs Adapter
+---------------------------------------
+
+This module contains two distinct components with different responsibilities:
+
+1. **VerticalIntegrationPipeline** (this module):
+   - Purpose: Orchestrate the COMPLETE vertical application process
+   - Phase: Setup/initialization (one-time during agent creation)
+   - Scope: All vertical aspects (tools, prompts, config, extensions, workflows)
+   - Usage: Called by FrameworkShim, Agent.create(), SDK initialization
+   - Pattern: Facade + Template Method with step handlers
+   - Example:
+        pipeline = VerticalIntegrationPipeline()
+        result = pipeline.apply(orchestrator, CodingAssistant)
+
+2. **VerticalIntegrationAdapter** (victor/agent/vertical_integration_adapter.py):
+   - Purpose: Provide runtime implementation for middleware/safety application
+   - Phase: Runtime (during request processing)
+   - Scope: Only middleware chain and safety pattern application
+   - Usage: Called by orchestrator's apply_vertical_middleware/safety_patterns methods
+   - Pattern: Adapter (wraps orchestrator, provides single implementation)
+   - Example:
+        adapter = VerticalIntegrationAdapter(orchestrator)
+        adapter.apply_middleware(middleware_list)
+        adapter.apply_safety_patterns(patterns)
+
+Key Differences:
+┌────────────────────────┬──────────────────────────────┬─────────────────────────────────┐
+│ Aspect                 │ VerticalIntegrationPipeline   │ VerticalIntegrationAdapter       │
+├────────────────────────┼──────────────────────────────┼─────────────────────────────────┤
+│ When to use            │ Agent creation/setup         │ Runtime request processing      │
+│ What it handles        │ Entire vertical config       │ Middleware & safety only        │
+│ Called by              │ FrameworkShim, SDK           │ AgentOrchestrator methods       │
+│ Step handlers          │ Yes (orchestration)          │ No (direct implementation)      │
+│ Returns                │ IntegrationResult            │ None (void)                     │
+│ Caching                │ Yes (config cache)           │ No (stateful)                   │
+│ Location               │ victor.framework.vertical_integration │ victor.agent.vertical_integration_adapter │
+└────────────────────────┴──────────────────────────────┴─────────────────────────────────┘
+
+When to use which:
+- Use Pipeline when: Creating an agent, applying a vertical, SDK initialization
+- Use Adapter when: Implementing orchestrator methods, applying middleware/safety at runtime
+
+The Pipeline delegates to the Adapter:
+- The Pipeline's MiddlewareStepHandler calls orchestrator.apply_vertical_middleware()
+- The orchestrator method delegates to VerticalIntegrationAdapter.apply_middleware()
+- This separation allows: (a) Pipeline to orchestrate the full setup, (b) Adapter to
+  provide runtime implementation without requiring Pipeline imports
+
 Usage:
     from victor.framework.vertical_integration import (
         VerticalIntegrationPipeline,
@@ -89,39 +138,19 @@ from typing import (
     Optional,
     Protocol,
     Set,
+    Tuple,
     Type,
     Union,
     runtime_checkable,
 )
 
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
-from victor.core.events import ObservabilityBus
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.step_handlers import StepHandlerRegistry
-    from victor.core.verticals.base import VerticalBase, VerticalConfig
-    from victor.core.verticals.protocols import (
-        MiddlewareProtocol,
-        ModeConfigProviderProtocol,
-        PromptContributorProtocol,
-        RLConfigProviderProtocol,
-        SafetyExtensionProtocol,
-        TeamSpecProviderProtocol,
-        ToolDependencyProviderProtocol,
-        VerticalExtensions,
-        WorkflowProviderProtocol,
-    )
+    from victor.core.verticals.base import VerticalBase
 
 # Import protocols for runtime isinstance checks
-from victor.core.verticals.protocols import (
-    RLConfigProviderProtocol,
-    TeamSpecProviderProtocol,
-    WorkflowProviderProtocol,
-    VerticalRLProviderProtocol,
-    VerticalTeamProviderProtocol,
-    VerticalWorkflowProviderProtocol,
-)
 
 # Import capability registry protocol for type-safe capability access
 from victor.framework.protocols import CapabilityRegistryProtocol
@@ -287,6 +316,20 @@ class ExtensionHandlerInfo:
 class ExtensionHandlerRegistry:
     """Registry for extension handlers (OCP compliance).
 
+    .. deprecated::
+        This registry is kept for architectural reference but is NOT actively used.
+        The active implementation lives in `victor.framework.step_handlers.ExtensionsStepHandler`
+        which uses its own `ExtensionHandlerRegistry` instance-based approach.
+
+        This legacy registry represents the original OCP-compliant design for the
+        `VerticalIntegrationPipeline`. The codebase has evolved to use step handlers
+        with SOLID principles, and the extension handling is now managed by
+        `ExtensionsStepHandler` in `step_handlers.py`.
+
+        Keeping this registry serves as documentation of the architectural evolution
+        from OCP to SOLID principles. It may be repurposed in future iterations for
+        higher-level extension types that operate outside the step handler system.
+
     This registry allows new extension types to be added without modifying
     the _apply_extensions method. Each extension type registers a handler
     that will be called when that extension is present.
@@ -301,6 +344,10 @@ class ExtensionHandlerRegistry:
             handler=lambda pipeline, orch, ext, ctx, res: pipeline._apply_chain_factory(orch, ext, ctx, res),
             order=70,
         )
+
+    Note:
+        For new extension types, use `victor.framework.step_handlers.ExtensionsStepHandler`
+        and its `ExtensionHandlerRegistry` instead.
     """
 
     def __init__(self) -> None:
@@ -825,6 +872,15 @@ class VerticalIntegrationPipeline:
     Each step handler implements a single concern (Single Responsibility Principle).
     New steps can be added without modifying existing ones (Open/Closed Principle).
 
+    Architecture Notes: Pipeline vs Adapter
+    ---------------------------------------
+    This class (VerticalIntegrationPipeline) is the SETUP-PHASE orchestrator.
+    It coordinates the complete vertical application process through step handlers.
+    For runtime middleware/safety application, see VerticalIntegrationAdapter.
+
+    - Pipeline: Use during agent creation, applies entire vertical config
+    - Adapter: Use at runtime, applies middleware/safety to active requests
+
     Example:
         pipeline = VerticalIntegrationPipeline()
 
@@ -1270,7 +1326,6 @@ class VerticalIntegrationPipeline:
             pipeline = VerticalIntegrationPipeline()
             result = await pipeline.apply_async(orchestrator, CodingAssistant)
         """
-        import asyncio
 
         # Resolve vertical
         vertical_cls = self._resolve_vertical(vertical)
