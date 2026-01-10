@@ -735,7 +735,7 @@ class SQLiteEventStore(EventStore):
                 for row in cursor:
                     event_data = json.loads(row[2])
                     # Create event from data
-                    event = Event.from_dict(event_data)
+                    event = DomainEvent.from_dict(event_data)
                     envelope = EventEnvelope(
                         stream_id=row[0],
                         stream_version=row[1],
@@ -768,7 +768,7 @@ class SQLiteEventStore(EventStore):
                 result = []
                 for row in cursor:
                     event_data = json.loads(row[2])
-                    event = Event.from_dict(event_data)
+                    event = DomainEvent.from_dict(event_data)
                     envelope = EventEnvelope(
                         stream_id=row[0],
                         stream_version=row[1],

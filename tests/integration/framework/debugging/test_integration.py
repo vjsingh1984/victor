@@ -25,6 +25,7 @@ from victor.framework.debugging import (
 from victor.framework.debugging.breakpoints import BreakpointType
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.slow
 class TestWorkflowDebugging:
