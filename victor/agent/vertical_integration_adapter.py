@@ -223,6 +223,35 @@ class VerticalIntegrationAdapter:
 
         Uses capability registry protocol if available, falls back to public method.
 
+        .. note:: **Retention Rationale (Dead Code Analysis 2025-01)**
+
+            This method is currently unused but intentionally retained for DIP compliance.
+
+            **Why it exists:**
+            This method completes the DIP-compliant capability access helper trio:
+            - ``_has_capability``: Check if capability exists (USED in apply_safety_patterns)
+            - ``_get_capability_value``: Read capability value (USED in apply_middleware, apply_safety_patterns)
+            - ``_invoke_capability``: Invoke/set capability (UNUSED - this method)
+
+            **Why it's unused today:**
+            The current ``apply_middleware`` and ``apply_safety_patterns`` implementations
+            use direct setter methods (e.g., ``_set_vertical_middleware_storage``) because
+            they ARE the capability implementations and need to avoid recursion. Direct
+            setters were chosen over invoke_capability to prevent circular calls.
+
+            **Why we keep it:**
+            1. **API Completeness**: Provides symmetric read/write/invoke capability access
+               pattern expected by DIP-compliant code.
+            2. **Future Integration Points**: New vertical integration methods may need to
+               invoke capabilities on the orchestrator without being the capability impl.
+            3. **Testing & Extension**: External code or tests may need protocol-compliant
+               capability invocation without direct attribute access.
+            4. **Consistency with Framework**: Mirrors the standalone ``_invoke_capability``
+               function in ``victor/framework/vertical_integration.py`` which IS heavily used.
+
+            If adding new integration methods that need to invoke orchestrator capabilities
+            (and aren't themselves the capability implementation), use this method.
+
         Returns:
             True if capability was invoked successfully
         """

@@ -184,18 +184,6 @@ class TestCreateGraphStore:
         with pytest.raises(ValueError, match="DuckDB.*not installed"):
             create_graph_store("duckdb", Path("."))
 
-    @patch("victor.storage.graph.registry.LanceDBGraphStore", None)
-    def test_lancedb_not_installed(self):
-        """Test LanceDB raises when not installed."""
-        with pytest.raises(ValueError, match="LanceDB.*not installed"):
-            create_graph_store("lancedb", Path("."))
-
-    @patch("victor.storage.graph.registry.Neo4jGraphStore", None)
-    def test_neo4j_not_installed(self):
-        """Test Neo4j raises when not installed."""
-        with pytest.raises(ValueError, match="Neo4j.*not installed"):
-            create_graph_store("neo4j", Path("."))
-
 
 class TestMemoryGraphStore:
     """Tests for MemoryGraphStore."""

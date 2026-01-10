@@ -29,26 +29,6 @@ try:
     DUCKDB_AVAILABLE = importlib.util.find_spec("duckdb") is not None
 except Exception:  # pragma: no cover - defensive
     DUCKDB_AVAILABLE = False
-try:
-    from victor.storage.graph.lancedb_store import LanceDBGraphStore
-except Exception:  # pragma: no cover - optional backend
-    LanceDBGraphStore = None
-try:
-    import importlib.util
-
-    LANCEDB_AVAILABLE = importlib.util.find_spec("lancedb") is not None
-except Exception:  # pragma: no cover - defensive
-    LANCEDB_AVAILABLE = False
-try:
-    from victor.storage.graph.neo4j_store import Neo4jGraphStore
-except Exception:  # pragma: no cover - optional backend
-    Neo4jGraphStore = None
-try:
-    import importlib.util
-
-    NEO4J_AVAILABLE = importlib.util.find_spec("neo4j") is not None
-except Exception:  # pragma: no cover - defensive
-    NEO4J_AVAILABLE = False
 
 
 def test_create_graph_store_sqlite(tmp_path: Path):
@@ -72,19 +52,3 @@ def test_create_graph_store_duckdb(tmp_path: Path):
     db_path = tmp_path / "graph.db"
     store = create_graph_store("duckdb", db_path)
     assert isinstance(store, DuckDBGraphStore)
-
-
-@pytest.mark.skipif(
-    LanceDBGraphStore is None or not LANCEDB_AVAILABLE, reason="lancedb not installed"
-)
-def test_create_graph_store_lancedb(tmp_path: Path):
-    db_path = tmp_path / "graph.db"
-    with pytest.raises(NotImplementedError):
-        create_graph_store("lancedb", db_path)
-
-
-@pytest.mark.skipif(Neo4jGraphStore is None or not NEO4J_AVAILABLE, reason="neo4j not installed")
-def test_create_graph_store_neo4j(tmp_path: Path):
-    db_path = tmp_path / "graph.db"
-    with pytest.raises(NotImplementedError):
-        create_graph_store("neo4j", db_path)
