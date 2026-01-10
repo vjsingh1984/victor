@@ -12,12 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dynamic workflow adaptation framework.
+"""Dynamic Workflow Adaptation Framework.
 
-This module provides protocols and utilities for runtime workflow graph
-modification with safety mechanisms (validation, rollback, circuit breaker).
+This module provides runtime workflow modification capabilities with
+safety mechanisms including validation, rollback, and circuit breakers.
+
+Key Components:
+    - AdaptableGraph: Wrapper for safe runtime modifications
+    - GraphModification: Modification specifications
+    - AdaptationStrategy: Pluggable adaptation logic
+    - Validation and Impact Analysis: Safety mechanisms
+
+Example:
+    from victor.framework.adaptation import (
+        AdaptableGraph,
+        AdaptationConfig,
+        GraphModification,
+        ModificationType,
+        create_retry_strategy,
+    )
+
+    # Wrap existing graph
+    adaptable = AdaptableGraph(compiled_graph)
+
+    # Configure
+    adaptable.configure(AdaptationConfig(
+        enable_auto_checkpoint=True,
+        rollback_on_error=True,
+    ))
+
+    # Apply modification
+    modification = GraphModification(
+        modification_type=ModificationType.ADD_RETRY,
+        description="Add retry to API call",
+        target_node="api_call",
+        data={"max_retries": 3},
+    )
+
+    result = await adaptable.adapt(modification)
 """
 
+# Types
+from victor.framework.adaptation.types import (
+    ModificationType,
+    AdaptationTrigger,
+    RiskLevel,
+    GraphModification,
+    ValidationResult,
+    AdaptationImpact,
+    AdaptationCheckpoint,
+    AdaptationResult,
+    AdaptationConfig,
+    AdaptationStrategy,
+)
+
+# Protocols
 from victor.framework.adaptation.protocols import (
     GraphValidator,
     GraphApplier,
@@ -25,9 +74,43 @@ from victor.framework.adaptation.protocols import (
     ImpactAnalyzer,
 )
 
+# Graph
+from victor.framework.adaptation.graph import (
+    AdaptableGraph,
+)
+
+# Strategies
+from victor.framework.adaptation.strategies import (
+    create_retry_strategy,
+    create_circuit_breaker_strategy,
+    create_parallelization_strategy,
+    create_caching_strategy,
+    DEFAULT_STRATEGIES,
+)
+
 __all__ = [
+    # Types
+    "ModificationType",
+    "AdaptationTrigger",
+    "RiskLevel",
+    "GraphModification",
+    "ValidationResult",
+    "AdaptationImpact",
+    "AdaptationCheckpoint",
+    "AdaptationResult",
+    "AdaptationConfig",
+    "AdaptationStrategy",
+    # Protocols
     "GraphValidator",
     "GraphApplier",
     "GraphRollback",
     "ImpactAnalyzer",
+    # Graph
+    "AdaptableGraph",
+    # Strategies
+    "create_retry_strategy",
+    "create_circuit_breaker_strategy",
+    "create_parallelization_strategy",
+    "create_caching_strategy",
+    "DEFAULT_STRATEGIES",
 ]

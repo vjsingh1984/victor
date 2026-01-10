@@ -26,6 +26,7 @@ This package contains all slash command implementations organized by category:
 - codebase: reindex, review, init
 - checkpoint: checkpoint (save, list, restore, diff, timeline)
 - entities: entities (list, search, show, related, stats, clear)
+- debug: debug (break, clear, list, enable, disable, state, continue, step)
 
 Commands are auto-discovered and registered when the slash module is loaded.
 """
@@ -34,6 +35,7 @@ Commands are auto-discovered and registered when the slash module is loaded.
 from victor.ui.slash.commands import (
     checkpoint,
     codebase,
+    debug,
     entities,
     metrics,
     mode,
@@ -47,6 +49,7 @@ from victor.ui.slash.commands import (
 __all__ = [
     "checkpoint",
     "codebase",
+    "debug",
     "entities",
     "metrics",
     "mode",

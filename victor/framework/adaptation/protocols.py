@@ -27,9 +27,10 @@ Following the refinement plan, these protocols extend existing Victor
 infrastructure and follow SOLID principles.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
-from langchain_core.runnables import Runnable
+if TYPE_CHECKING:
+    from langchain_core.runnables import Runnable
 
 
 # =============================================================================
@@ -104,7 +105,7 @@ class ValidationResult:
 class CompiledGraph:
     """Compiled workflow graph (alias for type clarity)."""
 
-    def __init__(self, graph: Runnable, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, graph: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Initialize compiled graph wrapper.
 
         Args:

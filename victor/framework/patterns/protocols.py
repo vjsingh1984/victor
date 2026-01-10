@@ -38,6 +38,30 @@ from victor.teams import TeamFormation
 # =============================================================================
 
 
+class ValidationResult:
+    """Result of pattern validation."""
+
+    def __init__(
+        self,
+        is_valid: bool,
+        errors: Optional[List[str]] = None,
+        warnings: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Initialize validation result.
+
+        Args:
+            is_valid: Whether validation passed
+            errors: List of error messages
+            warnings: List of warning messages
+            metadata: Optional additional metadata
+        """
+        self.is_valid = is_valid
+        self.errors = errors or []
+        self.warnings = warnings or []
+        self.metadata = metadata or {}
+
+
 class CollaborationPattern:
     """A discovered or defined collaboration pattern.
 

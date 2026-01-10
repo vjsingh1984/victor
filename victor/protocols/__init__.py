@@ -108,6 +108,13 @@ from victor.protocols.team import (
     TeamMemberProtocol,
 )
 
+# Search Protocols
+from victor.protocols.search import (
+    ISemanticSearch,
+    IIndexable,
+    ISemanticSearchWithIndexing,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -182,4 +189,8 @@ __all__ = [
     "IEnhancedTeamCoordinator",
     "TeamCoordinatorProtocol",
     "TeamMemberProtocol",
+    # Search Protocols
+    "ISemanticSearch",
+    "IIndexable",
+    "ISemanticSearchWithIndexing",
 ]

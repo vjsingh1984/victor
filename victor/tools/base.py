@@ -315,6 +315,37 @@ class BaseTool(ABC):
         """
         return CostTier.FREE  # Default: local operations are free
 
+    @property
+    def is_idempotent(self) -> bool:
+        """Whether the tool execution is idempotent.
+
+        An idempotent tool produces the same result for the same input and has
+        no side effects that would change subsequent executions. This property
+        enables optimizations such as:
+        - Result caching (memoization)
+        - Safe retries on transient failures
+        - Parallel execution without coordination
+        - Deduplication of redundant calls
+
+        Examples of idempotent tools:
+        - File read operations
+        - Search/query operations
+        - Git status/log/diff (read-only)
+        - Web fetch (GET requests)
+
+        Examples of non-idempotent tools:
+        - File write/edit operations
+        - Git commit/push
+        - API mutations (POST, PUT, DELETE)
+        - Docker container operations
+
+        Override this property in subclasses for idempotent operations.
+
+        Returns:
+            True if tool execution is idempotent, False otherwise (default)
+        """
+        return False  # Default: assume side effects
+
     @staticmethod
     def convert_parameters_to_schema(parameters: List[ToolParameter]) -> Dict[str, Any]:
         """Convert list of ToolParameter objects to JSON Schema format.

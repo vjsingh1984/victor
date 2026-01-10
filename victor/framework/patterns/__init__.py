@@ -12,20 +12,84 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Emergent collaboration patterns framework.
+"""Emergent Collaboration Patterns Framework.
 
-This module provides protocols and utilities for pattern discovery,
-recommendation, and evolution from workflow execution traces.
+This module provides data-driven pattern discovery and recommendation
+for workflow collaboration patterns.
+
+Key Components:
+    - PatternMiner: Discovers patterns from execution traces
+    - PatternRecommender: Suggests optimal patterns for tasks
+    - PatternValidator: Validates pattern quality and safety
+    - CollaborationPattern: Pattern representation
+
+Example:
+    from victor.framework.patterns import (
+        PatternMiner,
+        PatternRecommender,
+        TaskContext,
+        CollaborationPattern,
+    )
+
+    # Mine patterns from execution history
+    miner = PatternMiner(min_occurrences=3)
+    patterns = await miner.mine_from_traces(execution_traces)
+
+    # Get recommendations for new task
+    recommender = PatternRecommender(patterns)
+    context = TaskContext(
+        task_description="Implement authentication",
+        required_capabilities=["coding", "security"],
+        complexity="high",
+    )
+    recommendations = await recommender.recommend(context, top_k=3)
 """
 
+# Types
+from victor.framework.patterns.types import (
+    PatternStatus,
+    PatternCategory,
+    ValidationResult,
+    PatternMetrics,
+    TaskContext,
+    CollaborationPattern,
+    PatternRecommendation,
+    WorkflowExecutionTrace,
+)
+
+# Protocols
 from victor.framework.patterns.protocols import (
     PatternMinerProtocol,
     PatternValidatorProtocol,
     PatternRecommenderProtocol,
 )
 
+# Implementations
+from victor.framework.patterns.miner import (
+    PatternMiner,
+)
+
+from victor.framework.patterns.recommender import (
+    PatternRecommender,
+    PatternValidator,
+)
+
 __all__ = [
+    # Types
+    "PatternStatus",
+    "PatternCategory",
+    "ValidationResult",
+    "PatternMetrics",
+    "TaskContext",
+    "CollaborationPattern",
+    "PatternRecommendation",
+    "WorkflowExecutionTrace",
+    # Protocols
     "PatternMinerProtocol",
     "PatternValidatorProtocol",
     "PatternRecommenderProtocol",
+    # Implementations
+    "PatternMiner",
+    "PatternRecommender",
+    "PatternValidator",
 ]

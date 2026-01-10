@@ -511,3 +511,298 @@ class ConversationRoutingProtocol(Protocol):
             True if agent should reply
         """
         ...
+
+
+# =============================================================================
+# Concrete Protocol Implementations
+# =============================================================================
+
+
+class BaseConversationProtocol:
+    """Base implementation for conversation protocols.
+
+    Provides default implementations that can be overridden by specific
+    protocol types (RequestResponse, Debate, Consensus).
+    """
+
+    def __init__(
+        self,
+        max_turns: int = 10,
+        require_all_participants: bool = False,
+    ):
+        """Initialize base protocol.
+
+        Args:
+            max_turns: Maximum conversation turns
+            require_all_participants: Whether all participants must speak
+        """
+        self.max_turns = max_turns
+        self.require_all_participants = require_all_participants
+        self._participants: List[ConversationParticipant] = []
+        self._turn_order: List[str] = []
+        self._current_index = 0
+
+    async def initialize(
+        self,
+        participants: List[ConversationParticipant],
+        context: ConversationContext,
+    ) -> None:
+        """Initialize conversation with participants."""
+        self._participants = participants
+        self._turn_order = [p.agent_id for p in participants]
+        self._current_index = 0
+        context.metadata["protocol_initialized"] = True
+
+    async def get_next_speaker(
+        self,
+        context: ConversationContext,
+    ) -> Optional[str]:
+        """Get next speaker (round-robin by default)."""
+        if not self._turn_order:
+            return None
+
+        speaker = self._turn_order[self._current_index % len(self._turn_order)]
+        self._current_index += 1
+        return speaker
+
+    async def should_continue(
+        self,
+        context: ConversationContext,
+    ) -> tuple[bool, Optional[str]]:
+        """Check if conversation should continue."""
+        if context.turn_count >= self.max_turns:
+            return False, "Maximum turns reached"
+        if context.metadata.get("consensus_reached"):
+            return False, "Consensus reached"
+        if context.metadata.get("terminate"):
+            return False, context.metadata.get("termination_reason", "Terminated")
+        return True, None
+
+
+class RequestResponseProtocol(BaseConversationProtocol):
+    """Simple request-response conversation protocol.
+
+    One agent asks questions, others respond in turn.
+    """
+
+    def __init__(
+        self,
+        questioner: str,
+        max_questions: int = 5,
+    ):
+        """Initialize request-response protocol.
+
+        Args:
+            questioner: Agent ID who asks questions
+            max_questions: Maximum number of questions
+        """
+        super().__init__(max_turns=max_questions * 2)
+        self.questioner = questioner
+        self.max_questions = max_questions
+        self._question_count = 0
+        self._awaiting_response = False
+
+    async def get_next_speaker(
+        self,
+        context: ConversationContext,
+    ) -> Optional[str]:
+        """Alternate between questioner and responders."""
+        if not self._awaiting_response:
+            self._awaiting_response = True
+            self._question_count += 1
+            return self.questioner
+        else:
+            self._awaiting_response = False
+            # Next responder
+            responders = [p.agent_id for p in self._participants if p.agent_id != self.questioner]
+            if responders:
+                idx = (context.turn_count // 2) % len(responders)
+                return responders[idx]
+            return None
+
+    async def should_continue(
+        self,
+        context: ConversationContext,
+    ) -> tuple[bool, Optional[str]]:
+        """Continue until max questions reached."""
+        if self._question_count >= self.max_questions and not self._awaiting_response:
+            return False, "All questions answered"
+        return await super().should_continue(context)
+
+
+class DebateProtocol(BaseConversationProtocol):
+    """Debate conversation protocol.
+
+    Two sides present arguments for and against a position.
+    """
+
+    def __init__(
+        self,
+        proposition: str,
+        rounds: int = 3,
+        moderator: Optional[str] = None,
+    ):
+        """Initialize debate protocol.
+
+        Args:
+            proposition: The proposition being debated
+            rounds: Number of debate rounds
+            moderator: Optional moderator agent ID
+        """
+        super().__init__(max_turns=rounds * 2 + (2 if moderator else 0))
+        self.proposition = proposition
+        self.rounds = rounds
+        self.moderator = moderator
+        self._current_round = 0
+        self._for_speaker: Optional[str] = None
+        self._against_speaker: Optional[str] = None
+
+    async def initialize(
+        self,
+        participants: List[ConversationParticipant],
+        context: ConversationContext,
+    ) -> None:
+        """Initialize debate with FOR and AGAINST sides."""
+        await super().initialize(participants, context)
+
+        # Assign sides based on role or first two participants
+        for p in participants:
+            if p.role in ["proponent", "for", "defender"]:
+                self._for_speaker = p.agent_id
+            elif p.role in ["opponent", "against", "critic"]:
+                self._against_speaker = p.agent_id
+
+        # Fallback to first two non-moderator participants
+        non_moderators = [p for p in participants if p.agent_id != self.moderator]
+        if not self._for_speaker and len(non_moderators) > 0:
+            self._for_speaker = non_moderators[0].agent_id
+        if not self._against_speaker and len(non_moderators) > 1:
+            self._against_speaker = non_moderators[1].agent_id
+
+        context.metadata["proposition"] = self.proposition
+        context.metadata["for_speaker"] = self._for_speaker
+        context.metadata["against_speaker"] = self._against_speaker
+
+    async def get_next_speaker(
+        self,
+        context: ConversationContext,
+    ) -> Optional[str]:
+        """Alternate between FOR and AGAINST speakers."""
+        turn = context.turn_count
+
+        # Opening statement by moderator
+        if turn == 0 and self.moderator:
+            return self.moderator
+
+        # Alternate FOR and AGAINST
+        effective_turn = turn - (1 if self.moderator else 0)
+        if effective_turn % 2 == 0:
+            return self._for_speaker
+        else:
+            self._current_round += 1
+            return self._against_speaker
+
+    async def should_continue(
+        self,
+        context: ConversationContext,
+    ) -> tuple[bool, Optional[str]]:
+        """Continue for specified rounds."""
+        if self._current_round >= self.rounds:
+            return False, f"Debate completed after {self.rounds} rounds"
+        return await super().should_continue(context)
+
+
+class ConsensusProtocol(BaseConversationProtocol):
+    """Consensus-building conversation protocol.
+
+    Participants discuss and vote to reach agreement.
+    """
+
+    def __init__(
+        self,
+        threshold: float = 0.7,
+        max_voting_rounds: int = 3,
+    ):
+        """Initialize consensus protocol.
+
+        Args:
+            threshold: Required agreement threshold (0.0 - 1.0)
+            max_voting_rounds: Maximum voting rounds
+        """
+        super().__init__(max_turns=30)
+        self.threshold = threshold
+        self.max_voting_rounds = max_voting_rounds
+        self._voting_round = 0
+        self._votes: Dict[str, bool] = {}
+        self._in_voting_phase = False
+
+    async def initialize(
+        self,
+        participants: List[ConversationParticipant],
+        context: ConversationContext,
+    ) -> None:
+        """Initialize consensus protocol."""
+        await super().initialize(participants, context)
+        context.metadata["consensus_threshold"] = self.threshold
+        context.metadata["votes"] = {}
+
+    async def get_next_speaker(
+        self,
+        context: ConversationContext,
+    ) -> Optional[str]:
+        """Get next speaker, entering voting phase periodically."""
+        # Check if we should enter voting phase
+        if (context.turn_count > 0 and
+            context.turn_count % (len(self._participants) * 2) == 0):
+            self._in_voting_phase = True
+            self._votes.clear()
+
+        if self._in_voting_phase:
+            # Get next voter
+            voters_needed = [
+                p.agent_id for p in self._participants
+                if p.agent_id not in self._votes
+            ]
+            if voters_needed:
+                return voters_needed[0]
+            else:
+                # Check if consensus reached
+                await self._check_consensus(context)
+                self._in_voting_phase = False
+                self._voting_round += 1
+
+        return await super().get_next_speaker(context)
+
+    async def _check_consensus(self, context: ConversationContext) -> None:
+        """Check if consensus has been reached."""
+        if not self._votes:
+            return
+
+        agree_count = sum(1 for v in self._votes.values() if v)
+        total = len(self._votes)
+        agreement_ratio = agree_count / total if total > 0 else 0
+
+        context.metadata["votes"] = dict(self._votes)
+        context.metadata["agreement_ratio"] = agreement_ratio
+
+        if agreement_ratio >= self.threshold:
+            context.metadata["consensus_reached"] = True
+            context.metadata["consensus_type"] = "agreement"
+        elif self._voting_round >= self.max_voting_rounds:
+            context.metadata["consensus_reached"] = True
+            context.metadata["consensus_type"] = "no_agreement"
+
+    async def should_continue(
+        self,
+        context: ConversationContext,
+    ) -> tuple[bool, Optional[str]]:
+        """Continue until consensus or max voting rounds."""
+        if context.metadata.get("consensus_reached"):
+            consensus_type = context.metadata.get("consensus_type", "unknown")
+            ratio = context.metadata.get("agreement_ratio", 0)
+            return False, f"Consensus {consensus_type} (ratio: {ratio:.1%})"
+
+        if self._voting_round >= self.max_voting_rounds:
+            return False, "Max voting rounds reached without consensus"
+
+        return await super().should_continue(context)
