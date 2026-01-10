@@ -28,6 +28,7 @@ from victor.core.events import (
     ObservabilityBus,
     get_observability_bus,
 )
+from victor.core.container import reset_container
 from victor.observability.event_registry import (
     CustomEventCategory,
     EventCategoryRegistry,
@@ -37,13 +38,15 @@ from victor.observability.event_registry import (
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset singletons before and after each test."""
-    # Reset registry before tests
+    # Reset registry and container before tests
     EventCategoryRegistry.reset_instance()
+    reset_container()
 
     yield
 
-    # Reset registry after tests
+    # Reset registry and container after tests
     EventCategoryRegistry.reset_instance()
+    reset_container()
 
 
 # =============================================================================
