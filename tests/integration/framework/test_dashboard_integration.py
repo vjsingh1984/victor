@@ -102,7 +102,7 @@ class TestDashboardEventSubscription:
         # Track received events
         received_events = []
 
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             received_events.append(event)
 
         # Subscribe to all patterns
@@ -137,7 +137,7 @@ class TestDashboardEventSubscription:
 
         received_events = []
 
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             received_events.append(event)
 
         # Subscribe
@@ -179,7 +179,7 @@ class TestDashboardEventProcessing:
         dashboard._performance_metrics_view = MagicMock()
 
         # Process a tool event
-        event = Event(
+        event = MessagingEvent(
             topic="tool.start",
             data={
                 "tool": "read_file",
@@ -214,7 +214,7 @@ class TestDashboardEventProcessing:
         dashboard._performance_metrics_view = MagicMock()
 
         # Process a state event
-        event = Event(
+        event = MessagingEvent(
             topic="state.transition",
             data={
                 "from_stage": "idle",
@@ -249,7 +249,7 @@ class TestDashboardWithRealEvents:
         processed_events = []
 
         # Subscribe handler that tracks events
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             processed_events.append(event)
 
         # Subscribe to all patterns
@@ -318,7 +318,7 @@ class TestDashboardJSONLLoading:
 
         # Event should be parsed successfully
         assert event is not None
-        assert isinstance(event, Event)
+        assert isinstance(event, MessagingEvent)
         # Old format (category + name) should be converted to topic
         assert event.topic == "tool.tool.start"
         assert event.data == {"tool": "read_file", "path": "/test"}

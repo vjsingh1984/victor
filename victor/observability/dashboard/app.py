@@ -1546,7 +1546,7 @@ class ObservabilityDashboard(App):
                     data["timestamp"] = time.time()
 
             # Create Event from dictionary
-            event = Event.from_dict(data)
+            event = MessagingEvent.from_dict(data)
             return event
 
         except Exception as e:
