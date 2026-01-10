@@ -119,6 +119,20 @@ ICONS = {
     "bulb": IconSet("💡", "*", "yellow"),
     "note": IconSet("📝", "#", None),
     "refresh": IconSet("🔄", "~", None),
+    # Safety/risk level icons
+    "risk_high": IconSet("🔴", "!!", "red"),
+    "risk_critical": IconSet("⛔", "!!!", "red"),
+    "unknown": IconSet("❓", "?", None),
+    # Step status icons
+    "skipped": IconSet("⏭️", ">>", "dim"),
+    "blocked": IconSet("🔒", "[X]", "yellow"),
+    # Additional UI icons
+    "thinking": IconSet("💭", "...", "dim"),
+    "gear": IconSet("⚙️", "[*]", "cyan"),
+    "clipboard": IconSet("📋", "[=]", None),
+    "stop": IconSet("⛔", "[!]", "red"),
+    "clock": IconSet("⏰", "[T]", "yellow"),
+    "stop_sign": IconSet("🛑", "[X]", "red"),
 }
 
 
