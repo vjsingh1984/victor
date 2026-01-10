@@ -16,7 +16,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 from victor.config.settings import Settings
 from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine
-from victor.agent.rl.learners.semantic_threshold import SemanticThresholdLearner
+from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_deduplication import ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.tools.base import ToolRegistry
@@ -90,7 +90,7 @@ class TestThresholdLearnerIntegration:
         """Test that threshold learner records search outcomes."""
         # Arrange - use a clean learner with no persisted state
         import sqlite3
-        from victor.agent.rl.base import RLOutcome
+        from victor.framework.rl.base import RLOutcome
 
         # Create an in-memory database for testing
         db = sqlite3.connect(":memory:")
@@ -152,7 +152,7 @@ class TestThresholdLearnerIntegration:
         """Test that learner recommends threshold adjustment after sufficient data."""
         # Arrange
         import sqlite3
-        from victor.agent.rl.base import RLOutcome
+        from victor.framework.rl.base import RLOutcome
 
         db = sqlite3.connect(":memory:")
         learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)
@@ -194,7 +194,7 @@ class TestThresholdLearnerIntegration:
         """Test that learner provides recommendations after sufficient data."""
         # Arrange - use a clean learner with no persisted state
         import sqlite3
-        from victor.agent.rl.base import RLOutcome
+        from victor.framework.rl.base import RLOutcome
 
         db = sqlite3.connect(":memory:")
         learner = SemanticThresholdLearner(name="semantic_threshold", db_connection=db)

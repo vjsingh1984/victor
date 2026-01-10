@@ -41,14 +41,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.agent.rl.checkpoint_store import (
+from victor.framework.rl.checkpoint_store import (
     CheckpointStore,
     get_checkpoint_store,
 )
 
 if TYPE_CHECKING:
-    from victor.agent.rl.base import BaseLearner
-    from victor.agent.rl.coordinator import RLCoordinator
+    from victor.framework.rl.base import BaseLearner
+    from victor.framework.rl.coordinator import RLCoordinator
 
 logger = logging.getLogger(__name__)
 

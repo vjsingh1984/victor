@@ -24,7 +24,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from victor.agent.rl.checkpoint_store import (
+from victor.framework.rl.checkpoint_store import (
     CheckpointStore,
     PolicyCheckpoint,
     CheckpointDiff,

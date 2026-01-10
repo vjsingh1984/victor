@@ -545,7 +545,7 @@ class ProviderManager:
             reason: Reason for the switch
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

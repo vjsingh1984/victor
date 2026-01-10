@@ -53,7 +53,7 @@ from victor.providers.base import Message
 
 if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
-    from victor.agent.rl.learners.context_pruning import ContextPruningLearner
+    from victor.framework.rl.learners.context_pruning import ContextPruningLearner
 
 logger = logging.getLogger(__name__)
 

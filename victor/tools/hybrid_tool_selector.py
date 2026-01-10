@@ -36,7 +36,7 @@ from victor.tools.selection_filters import blend_tool_results, deduplicate_tools
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
-    from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+    from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
     from victor.tools.keyword_tool_selector import KeywordToolSelector
     from victor.tools.semantic_selector import SemanticToolSelector
 
@@ -142,7 +142,7 @@ class HybridToolSelector:
 
         self._rl_init_attempted = True
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             self._rl_learner = coordinator.get_learner("tool_selector")
@@ -361,8 +361,8 @@ class HybridToolSelector:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             ctx = context or {}
             task_type = ctx.get("task_type", "default")

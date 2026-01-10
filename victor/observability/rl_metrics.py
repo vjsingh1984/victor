@@ -51,7 +51,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.rl.coordinator import RLCoordinator
+    from victor.framework.rl.coordinator import RLCoordinator
 
 logger = logging.getLogger(__name__)
 

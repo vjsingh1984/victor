@@ -475,8 +475,8 @@ async def code_search(
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.base import RLOutcome
 
                 coordinator = get_rl_coordinator()
 

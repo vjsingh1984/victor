@@ -151,7 +151,7 @@ class StatusCommand(BaseSlashCommand):
 
         # Add RL recommendation if available
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")

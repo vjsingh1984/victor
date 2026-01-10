@@ -159,7 +159,7 @@ from victor.agent.context_manager import (
 )
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
-from victor.agent.rl.coordinator import get_rl_coordinator
+from victor.framework.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
 from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
@@ -1114,8 +1114,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         based on session outcome (success, latency, throughput, tool usage).
         """
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
 
             if not self._rl_coordinator:
                 return
@@ -2668,7 +2668,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Record to RL tool_selector learner for Q-learning optimization
         if self._rl_coordinator:
             try:
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.base import RLOutcome
 
                 # Get current context
                 provider_name = getattr(self.current_provider, "name", "unknown")
@@ -3287,7 +3287,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             prompt: The final system prompt that was built
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

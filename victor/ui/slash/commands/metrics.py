@@ -336,7 +336,7 @@ class LearningCommand(BaseSlashCommand):
                         )
 
                 # Set on model selector learner
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -372,7 +372,7 @@ class LearningCommand(BaseSlashCommand):
                             ctx.console.print("[green]Intelligent pipeline session reset[/]")
 
             # Reset model selector
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -383,7 +383,7 @@ class LearningCommand(BaseSlashCommand):
 
         # Handle recommend subcommand
         if subcommand == "recommend":
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -410,8 +410,8 @@ class LearningCommand(BaseSlashCommand):
 
         # Handle strategy subcommand
         if subcommand == "strategy":
-            from victor.agent.rl.coordinator import get_rl_coordinator
-            from victor.agent.rl.learners.model_selector import SelectionStrategy
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.learners.model_selector import SelectionStrategy
 
             strategy_name = self._get_arg(ctx, 1)
             if not strategy_name:
@@ -496,7 +496,7 @@ class LearningCommand(BaseSlashCommand):
 
         # 2. Model Selector learner stats
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -546,7 +546,7 @@ class MLStatsCommand(BaseSlashCommand):
         subcommand = self._get_arg(ctx, 0, "summary").lower()
 
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
 

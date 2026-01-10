@@ -1020,7 +1020,7 @@ class OrchestratorServiceProvider:
 
     def _create_rl_coordinator(self) -> Any:
         """Create RLCoordinator instance."""
-        from victor.agent.rl.coordinator import get_rl_coordinator
+        from victor.framework.rl.coordinator import get_rl_coordinator
 
         return get_rl_coordinator()
 

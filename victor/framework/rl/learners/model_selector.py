@@ -36,7 +36,7 @@ import random
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)

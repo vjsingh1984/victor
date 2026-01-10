@@ -20,7 +20,7 @@ Tests the hierarchical RL components for multi-step task planning.
 import pytest
 from unittest.mock import MagicMock
 
-from victor.agent.rl.option_framework import (
+from victor.framework.rl.option_framework import (
     Option,
     OptionRegistry,
     OptionResult,
@@ -31,13 +31,13 @@ from victor.agent.rl.option_framework import (
     DebugOption,
     ReviewOption,
 )
-from victor.agent.rl.hierarchical_policy import (
+from victor.framework.rl.hierarchical_policy import (
     HierarchicalPolicy,
     HierarchicalState,
     PolicyDecision,
     get_hierarchical_policy,
 )
-from victor.agent.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome
 
 
 # =============================================================================
@@ -557,7 +557,7 @@ class TestGlobalSingleton:
 
     def test_get_hierarchical_policy(self) -> None:
         """Test getting global singleton."""
-        import victor.agent.rl.hierarchical_policy as module
+        import victor.framework.rl.hierarchical_policy as module
 
         module._hierarchical_policy = None
 
@@ -568,7 +568,7 @@ class TestGlobalSingleton:
 
     def test_singleton_preserves_state(self) -> None:
         """Test singleton preserves state."""
-        import victor.agent.rl.hierarchical_policy as module
+        import victor.framework.rl.hierarchical_policy as module
 
         module._hierarchical_policy = None
 

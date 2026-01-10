@@ -56,8 +56,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
-from victor.agent.rl.option_framework import (
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.option_framework import (
     OptionRegistry,
     OptionResult,
     OptionState,

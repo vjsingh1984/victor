@@ -661,7 +661,7 @@ class RLCheckpointerAdapter:
     def _get_store(self):
         """Lazy load checkpoint store."""
         if self._store is None:
-            from victor.agent.rl.checkpoint_store import get_checkpoint_store
+            from victor.framework.rl.checkpoint_store import get_checkpoint_store
 
             self._store = get_checkpoint_store()
         return self._store
@@ -1514,7 +1514,7 @@ class CompiledGraph(Generic[StateType]):
     ) -> None:
         """Emit RL event for graph completion."""
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

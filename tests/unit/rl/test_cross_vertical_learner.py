@@ -26,11 +26,11 @@ import sqlite3
 import pytest
 from datetime import datetime
 
-from victor.agent.rl.learners.cross_vertical import (
+from victor.framework.rl.learners.cross_vertical import (
     CrossVerticalLearner,
     SharedPattern,
 )
-from victor.agent.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome
 from victor.core.schema import Tables
 
 
@@ -377,12 +377,12 @@ class TestLearnerImport:
 
     def test_learner_in_exports(self):
         """Test that CrossVerticalLearner is exported from learners module."""
-        from victor.agent.rl.learners import CrossVerticalLearner as CVL
+        from victor.framework.rl.learners import CrossVerticalLearner as CVL
 
         assert CVL is CrossVerticalLearner
 
     def test_learner_inherits_from_base(self, learner):
         """Test that CrossVerticalLearner inherits from BaseLearner."""
-        from victor.agent.rl.base import BaseLearner
+        from victor.framework.rl.base import BaseLearner
 
         assert isinstance(learner, BaseLearner)

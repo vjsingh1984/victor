@@ -12,43 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Reinforcement Learning - High-level API for adaptive learning.
+"""Reinforcement Learning - Framework-level adaptive learning infrastructure.
 
-This module provides a simplified API for using Victor's RL infrastructure,
-exposing the existing RL learners and coordinator via the framework API.
+This module provides Victor's RL system for learning optimal parameters
+from experience across all verticals.
 
-The RL system enables Victor to learn and adapt from experience:
-- Tool selection optimization
-- Continuation patience tuning
-- Prompt template adaptation
-- Model selection preferences
-- Grounding threshold adjustment
+Architecture:
+┌──────────────────────────────────────────────────────────────────────┐
+│                    HIGH-LEVEL API                                     │
+│  RLManager, LearnerType, convenience functions                        │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ wraps
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    RLCoordinator (Singleton)                          │
+│  ├─ Learner registry                                                  │
+│  ├─ Unified SQLite storage (~/.victor/rl_data/rl.db)                 │
+│  ├─ Telemetry collection                                              │
+│  └─ Cross-vertical learning                                           │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ manages
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Specialized Learners                               │
+│  ├─ ToolSelectorLearner        ├─ ContinuationPatienceLearner        │
+│  ├─ ContinuationPromptLearner  ├─ SemanticThresholdLearner           │
+│  ├─ ModelSelectorLearner       ├─ GroundingThresholdLearner          │
+│  ├─ ModeTransitionLearner      ├─ PromptTemplateLearner              │
+│  ├─ QualityWeightsLearner      └─ CacheEvictionLearner               │
+└──────────────────────────────────────────────────────────────────────┘
 
-Example:
-    from victor.framework import Agent
-    from victor.framework.rl import RLManager, LearnerType
+Key Components:
+- RLCoordinator: Central coordinator for all learners
+- BaseLearner: Abstract base class for all RL learners
+- RLManager: High-level API for using RL in applications
+- LearnerType: Enum of available learner types
 
-    # Access RL via agent
-    agent = await Agent.create(provider="anthropic")
-    rl = RLManager.from_agent(agent)
+Usage:
+    from victor.framework.rl import RLManager, LearnerType, get_rl_coordinator
 
-    # Record successful outcome
+    # Option 1: Use high-level RLManager
+    rl = RLManager()
     rl.record_success(
         learner=LearnerType.TOOL_SELECTOR,
-        context={"task_type": "analysis", "tool": "code_search"},
+        provider="anthropic",
+        model="claude-3-opus",
+        task_type="analysis",
     )
 
-    # Get recommendation
     rec = rl.get_recommendation(
         learner=LearnerType.CONTINUATION_PATIENCE,
         provider="deepseek",
         model="deepseek-chat",
     )
-    print(f"Recommended patience: {rec.value}")
 
-    # Or use the global coordinator directly
-    from victor.framework.rl import get_rl_coordinator
+    # Option 2: Use coordinator directly
     coordinator = get_rl_coordinator()
+    coordinator.record_outcome(
+        learner_name="continuation_patience",
+        outcome=RLOutcome(...),
+        vertical="coding",
+    )
 """
 
 from __future__ import annotations
@@ -62,12 +86,11 @@ from typing import (
     Dict,
     List,
     Optional,
-    Type,
     Union,
 )
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
-from victor.agent.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
@@ -583,7 +606,7 @@ __all__ = [
     "LearnerType",
     "LearnerStats",
     "RLStats",
-    # Re-exports from rl infrastructure
+    # Core infrastructure
     "RLOutcome",
     "RLRecommendation",
     "RLCoordinator",

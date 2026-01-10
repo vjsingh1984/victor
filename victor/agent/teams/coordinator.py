@@ -438,7 +438,7 @@ class TeamCoordinator(ITeamCoordinator):
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.base import RLOutcome
 
             # Compute quality score based on success and efficiency
             quality_score = 0.5  # Baseline
@@ -509,7 +509,7 @@ class TeamCoordinator(ITeamCoordinator):
             quality_score: Computed quality score
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

@@ -25,7 +25,7 @@ Metrics Categories:
     - Performance: Learner update frequencies, outcome recording latencies
 
 Usage:
-    from victor.agent.rl.metrics import RLMetricsExporter, get_rl_metrics
+    from victor.framework.rl.metrics import RLMetricsExporter, get_rl_metrics
 
     # Get global exporter
     exporter = get_rl_metrics()
@@ -49,8 +49,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.rl.coordinator import RLCoordinator
-    from victor.agent.rl.hooks import RLHookRegistry
+    from victor.framework.rl.coordinator import RLCoordinator
+    from victor.framework.rl.hooks import RLHookRegistry
 
 logger = logging.getLogger(__name__)
 

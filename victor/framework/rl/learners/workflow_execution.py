@@ -34,7 +34,7 @@ Architecture:
     └─────────────────────────────────────────────────────────────────┘
 
 Usage:
-    from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
+    from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
 
     learner = WorkflowExecutionLearner("workflow_execution", db_connection)
 
@@ -60,7 +60,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)

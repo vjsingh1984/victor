@@ -14,13 +14,13 @@
 
 """Specialized RL learners for different parameter types."""
 
-from victor.agent.rl.learners.context_pruning import ContextPruningLearner
-from victor.agent.rl.learners.continuation_patience import ContinuationPatienceLearner
-from victor.agent.rl.learners.continuation_prompts import ContinuationPromptLearner
-from victor.agent.rl.learners.cross_vertical import CrossVerticalLearner
-from victor.agent.rl.learners.model_selector import ModelSelectorLearner
-from victor.agent.rl.learners.semantic_threshold import SemanticThresholdLearner
-from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
+from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+from victor.framework.rl.learners.continuation_patience import ContinuationPatienceLearner
+from victor.framework.rl.learners.continuation_prompts import ContinuationPromptLearner
+from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
+from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
+from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
 
 __all__ = [
     "ContextPruningLearner",

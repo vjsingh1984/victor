@@ -33,7 +33,7 @@ Migrated from: victor/agent/continuation_learner.py
 import logging
 from typing import Optional
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
 
 logger = logging.getLogger(__name__)

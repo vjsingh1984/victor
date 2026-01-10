@@ -624,7 +624,7 @@ class OrchestratorIntegration:
         # Record RL outcomes for all learners
         if rl_coordinator and stream_context:
             try:
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.base import RLOutcome
 
                 ctx = stream_context
                 # Determine task type from context
@@ -756,7 +756,7 @@ class OrchestratorIntegration:
             stuck_detected: Whether a stuck loop was detected
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

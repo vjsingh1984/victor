@@ -1792,7 +1792,7 @@ Respond with just the command to run."""
         async def rl_stats() -> JSONResponse:
             """Get RL model selector statistics."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1844,7 +1844,7 @@ Respond with just the command to run."""
         async def rl_recommend(task_type: Optional[str] = Query(None)) -> JSONResponse:
             """Get model recommendation based on Q-values."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
                 import json
 
                 coordinator = get_rl_coordinator()
@@ -1903,7 +1903,7 @@ Respond with just the command to run."""
         async def rl_explore(request: RLExploreRequest) -> JSONResponse:
             """Set exploration rate for RL model selector."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1932,8 +1932,8 @@ Respond with just the command to run."""
         async def rl_strategy(request: RLStrategyRequest) -> JSONResponse:
             """Set selection strategy for RL model selector."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
-                from victor.agent.rl.learners.model_selector import SelectionStrategy
+                from victor.framework.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.learners.model_selector import SelectionStrategy
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1973,7 +1973,7 @@ Respond with just the command to run."""
         async def rl_reset() -> JSONResponse:
             """Reset RL model selector Q-values."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -3257,8 +3257,8 @@ Respond with just the command to run."""
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")

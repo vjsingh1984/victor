@@ -43,16 +43,16 @@ Sprint 4: Implicit Feedback Enhancement
 import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
-from victor.agent.rl.implicit_feedback import (
+from victor.framework.rl.implicit_feedback import (
     ImplicitFeedback,
     SessionContext,
     get_feedback_collector,
 )
-from victor.agent.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome
 
 if TYPE_CHECKING:
     from victor.agent.response_quality import QualityResult
-    from victor.agent.rl.coordinator import RLCoordinator
+    from victor.framework.rl.coordinator import RLCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class FeedbackIntegration:
         """
         if self._rl_coordinator is None:
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 self._rl_coordinator = get_rl_coordinator()
             except Exception as e:

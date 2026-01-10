@@ -103,7 +103,7 @@ class RLMixin:
 
         try:
             # Try to use RL hooks if available
-            from victor.agent.rl.hooks import RLEvent, RLEventType, get_rl_hooks
+            from victor.framework.rl.hooks import RLEvent, RLEventType, get_rl_hooks
 
             hooks = get_rl_hooks()
             if hooks:

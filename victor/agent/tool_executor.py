@@ -68,7 +68,7 @@ def _get_rl_hooks():
     global _rl_hooks
     if _rl_hooks is None:
         try:
-            from victor.agent.rl.hooks import get_rl_hooks
+            from victor.framework.rl.hooks import get_rl_hooks
 
             _rl_hooks = get_rl_hooks()
         except ImportError:
@@ -756,7 +756,7 @@ class ToolExecutor:
             if rl_hooks is None:
                 return
 
-            from victor.agent.rl.hooks import RLEvent, RLEventType
+            from victor.framework.rl.hooks import RLEvent, RLEventType
 
             # Calculate quality score based on success and execution time
             # Fast successful executions get higher scores

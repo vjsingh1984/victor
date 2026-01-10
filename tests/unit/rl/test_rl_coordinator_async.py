@@ -26,12 +26,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from victor.agent.rl.coordinator import (
+from victor.framework.rl.coordinator import (
     RLCoordinator,
     get_rl_coordinator,
     get_rl_coordinator_async,
 )
-from victor.agent.rl.base import RLOutcome, RLRecommendation
+from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.core.database import reset_database, get_database
 
 
@@ -144,7 +144,7 @@ class TestAsyncSingleton:
     async def test_get_rl_coordinator_async_returns_coordinator(self) -> None:
         """Test get_rl_coordinator_async returns RLCoordinator instance."""
         # Reset global singleton
-        import victor.agent.rl.coordinator as coord_module
+        import victor.framework.rl.coordinator as coord_module
 
         original = coord_module._rl_coordinator
         coord_module._rl_coordinator = None
@@ -160,7 +160,7 @@ class TestAsyncSingleton:
     async def test_get_rl_coordinator_async_returns_same_instance(self) -> None:
         """Test get_rl_coordinator_async returns same singleton."""
         # Reset global singleton
-        import victor.agent.rl.coordinator as coord_module
+        import victor.framework.rl.coordinator as coord_module
 
         original = coord_module._rl_coordinator
         coord_module._rl_coordinator = None
@@ -176,7 +176,7 @@ class TestAsyncSingleton:
     async def test_async_and_sync_return_same_instance(self) -> None:
         """Test async and sync getters share the same singleton."""
         # Reset global singleton
-        import victor.agent.rl.coordinator as coord_module
+        import victor.framework.rl.coordinator as coord_module
 
         original = coord_module._rl_coordinator
         coord_module._rl_coordinator = None

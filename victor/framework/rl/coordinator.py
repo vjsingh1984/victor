@@ -32,7 +32,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.database import get_database
 from victor.core.schema import Tables, Schema
 
@@ -528,13 +528,13 @@ class RLCoordinator:
         """
         try:
             # Connect to hooks registry
-            from victor.agent.rl.hooks import get_rl_hooks
+            from victor.framework.rl.hooks import get_rl_hooks
 
             hooks = get_rl_hooks(coordinator=self)
             logger.debug("RL: Connected to hooks registry")
 
             # Connect to metrics exporter
-            from victor.agent.rl.metrics import get_rl_metrics
+            from victor.framework.rl.metrics import get_rl_metrics
 
             get_rl_metrics(coordinator=self, hooks=hooks)
             logger.debug("RL: Connected to metrics exporter")
@@ -586,7 +586,7 @@ class RLCoordinator:
         # Import here to avoid circular dependencies
         try:
             if name == "continuation_patience":
-                from victor.agent.rl.learners.continuation_patience import (
+                from victor.framework.rl.learners.continuation_patience import (
                     ContinuationPatienceLearner,
                 )
 
@@ -594,7 +594,7 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "continuation_prompts":
-                from victor.agent.rl.learners.continuation_prompts import (
+                from victor.framework.rl.learners.continuation_prompts import (
                     ContinuationPromptLearner,
                 )
 
@@ -602,39 +602,39 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "semantic_threshold":
-                from victor.agent.rl.learners.semantic_threshold import (
+                from victor.framework.rl.learners.semantic_threshold import (
                     SemanticThresholdLearner,
                 )
 
                 return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "model_selector":
-                from victor.agent.rl.learners.model_selector import ModelSelectorLearner
+                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
 
                 return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "cache_eviction":
-                from victor.agent.rl.learners.cache_eviction import CacheEvictionLearner
+                from victor.framework.rl.learners.cache_eviction import CacheEvictionLearner
 
                 return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
-                from victor.agent.rl.learners.grounding_threshold import GroundingThresholdLearner
+                from victor.framework.rl.learners.grounding_threshold import GroundingThresholdLearner
 
                 return GroundingThresholdLearner(
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "quality_weights":
-                from victor.agent.rl.learners.quality_weights import QualityWeightLearner
+                from victor.framework.rl.learners.quality_weights import QualityWeightLearner
 
                 return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "tool_selector":
-                from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+                from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
 
                 return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "mode_transition":
-                from victor.agent.rl.learners.mode_transition import ModeTransitionLearner
+                from victor.framework.rl.learners.mode_transition import ModeTransitionLearner
 
                 return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "prompt_template":
-                from victor.agent.rl.learners.prompt_template import PromptTemplateLearner
+                from victor.framework.rl.learners.prompt_template import PromptTemplateLearner
 
                 return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "team_composition":
@@ -643,15 +643,15 @@ class RLCoordinator:
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
                 return TeamCompositionLearner(learning_rate=0.1)
             elif name == "cross_vertical":
-                from victor.agent.rl.learners.cross_vertical import CrossVerticalLearner
+                from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
 
                 return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "workflow_execution":
-                from victor.agent.rl.learners.workflow_execution import WorkflowExecutionLearner
+                from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
 
                 return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "context_pruning":
-                from victor.agent.rl.learners.context_pruning import ContextPruningLearner
+                from victor.framework.rl.learners.context_pruning import ContextPruningLearner
 
                 return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
             else:

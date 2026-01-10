@@ -22,9 +22,9 @@ import pytest
 from pathlib import Path
 from typing import Dict
 
-from victor.agent.rl.base import RLOutcome
-from victor.agent.rl.coordinator import RLCoordinator
-from victor.agent.rl.learners.quality_weights import (
+from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.coordinator import RLCoordinator
+from victor.framework.rl.learners.quality_weights import (
     QualityWeightLearner,
     QualityDimension,
 )

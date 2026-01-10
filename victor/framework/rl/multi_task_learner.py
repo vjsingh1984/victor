@@ -49,8 +49,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from victor.agent.rl.base import BaseLearner, RLOutcome, RLRecommendation
-from victor.agent.rl.shared_encoder import (
+from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.shared_encoder import (
     ContextEmbedding,
     get_shared_encoder,
 )

@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Optional, Tuple
 from unittest.mock import patch
 
-from victor.agent.rl.base import RLOutcome
-from victor.agent.rl.coordinator import RLCoordinator
-from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.coordinator import RLCoordinator
+from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 

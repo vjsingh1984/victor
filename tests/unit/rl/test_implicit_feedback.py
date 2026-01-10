@@ -22,7 +22,7 @@ import time
 import pytest
 from unittest.mock import MagicMock
 
-from victor.agent.rl.implicit_feedback import (
+from victor.framework.rl.implicit_feedback import (
     ImplicitFeedback,
     ImplicitFeedbackCollector,
     SessionContext,

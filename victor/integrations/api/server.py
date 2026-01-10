@@ -1058,8 +1058,8 @@ class VictorAPIServer:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1832,7 +1832,7 @@ class VictorAPIServer:
     async def _rl_stats(self, request: Request) -> Response:
         """Get RL model selector statistics."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1888,7 +1888,7 @@ class VictorAPIServer:
                        (simple, complex, action, generation, analysis)
         """
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
             import json
 
             coordinator = get_rl_coordinator()
@@ -1943,7 +1943,7 @@ class VictorAPIServer:
     async def _rl_explore(self, request: Request) -> Response:
         """Set exploration rate for RL model selector."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1985,8 +1985,8 @@ class VictorAPIServer:
     async def _rl_strategy(self, request: Request) -> Response:
         """Set selection strategy for RL model selector."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
-            from victor.agent.rl.learners.model_selector import SelectionStrategy
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.learners.model_selector import SelectionStrategy
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -2031,7 +2031,7 @@ class VictorAPIServer:
     async def _rl_reset(self, request: Request) -> Response:
         """Reset RL model selector Q-values to initial state."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")

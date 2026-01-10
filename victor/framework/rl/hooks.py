@@ -36,7 +36,7 @@ Events:
     - MODEL_SELECTED: Model selection made (triggers model_selector)
 
 Usage:
-    from victor.agent.rl.hooks import RLHookRegistry, RLEvent, RLEventType
+    from victor.framework.rl.hooks import RLHookRegistry, RLEvent, RLEventType
 
     # Get global registry
     registry = get_rl_hooks()
@@ -64,8 +64,8 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.rl.coordinator import RLCoordinator
-    from victor.agent.rl.base import RLOutcome
+    from victor.framework.rl.coordinator import RLCoordinator
+    from victor.framework.rl.base import RLOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -351,7 +351,7 @@ class RLHookRegistry:
             learner_name: Name of learner
             event: Event data
         """
-        from victor.agent.rl.base import RLOutcome
+        from victor.framework.rl.base import RLOutcome
 
         # Convert event to outcome
         outcome = RLOutcome(

@@ -19,7 +19,7 @@ Tests the shared encoder for multi-task learning embeddings.
 
 import pytest
 
-from victor.agent.rl.shared_encoder import (
+from victor.framework.rl.shared_encoder import (
     ContextEmbedding,
     SharedEncoder,
 )
