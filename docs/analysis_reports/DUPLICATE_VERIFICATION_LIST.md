@@ -2,17 +2,28 @@
 
 **Purpose:** Verified duplicate candidates with recommendations
 **Generated:** 2026-01-10
-**Status:** VERIFIED
+**Updated:** 2026-01-10 (post-consolidation)
+**Status:** COMPLETED
 
 ---
 
 ## Summary
 
-| Category | Count | Action |
+| Category | Count | Status |
 |----------|-------|--------|
-| False Positives (Intentional) | 6 classes | None - different implementations by design |
-| True Duplicates | 2 classes | Consolidate |
-| Potential Consolidation | 3 classes | Consider base class or protocol |
+| False Positives (Intentional) | 6 classes | VERIFIED - keep separate |
+| True Duplicates | 2 classes | COMPLETED - consolidated |
+| Potential Consolidation | 3 classes | ANALYZED - keep separate |
+| Dead Code / Stub Removal | 1 directory | COMPLETED - removed |
+
+### Consolidation Work Completed
+
+| Item | Action Taken | Commit |
+|------|--------------|--------|
+| `tool_coordinator.py` duplicate | Removed, updated imports | `a8f47e8` |
+| `ToolExecutionResult` duplicate | Removed from coordinators | `a8f47e8` |
+| `ProviderProtocol` in continuation.py | Updated to import from core/protocols | `a8f47e8` |
+| `execution_engine/` stub directory | Removed, created compiled_executor.py | `0f1fb16f` |
 
 ---
 
@@ -94,7 +105,7 @@ One is an exception, others are dataclasses:
 
 ---
 
-### 6. ExecutionResult (4 locations) - DIFFERENT
+### 6. ExecutionResult (3 locations) - DIFFERENT
 
 Each represents execution in different contexts:
 
@@ -102,34 +113,25 @@ Each represents execution in different contexts:
 |------|---------|------------|
 | `framework/graph.py` | Graph execution | state, iterations, node_history |
 | `framework/workflow_engine.py` | Workflow execution | final_state, checkpoints, hitl_requests |
-| `workflows/.../state_graph_executor.py` | Migration wrapper | final_state, metrics |
 | `workflows/sandbox_executor.py` | Sandbox execution | output, error, exit_code |
 
 **Verdict:** KEEP SEPARATE - Different execution contexts need different result fields.
-**Note:** `state_graph_executor.py` says "Minimal implementation for migration phase" - review if still needed.
+**Note:** `state_graph_executor.py` was removed in commit `0f1fb16f` - stub code consolidated to `compiled_executor.py`.
 
 ---
 
-## TRUE DUPLICATES - Action Required
+## TRUE DUPLICATES - COMPLETED
 
-### 1. TaskContext - CONSOLIDATE
+### 1. TaskContext - CONSOLIDATED
 
-**Real duplicate found:**
+**Status:** COMPLETED
 
-| File | Status |
-|------|--------|
-| `victor/agent/tool_coordinator.py:75` | **DUPLICATE** |
-| `victor/agent/coordinators/tool_coordinator.py:85` | **PRIMARY** (more complete) |
+**Action Taken:**
+- Removed `victor/agent/tool_coordinator.py` (duplicate file)
+- Updated `victor/agent/service_provider.py` imports to use `coordinators` package
+- Updated `tests/unit/agent/test_tool_coordinator.py` imports and fixtures
 
-**Evidence:**
-- Same class name, same purpose (tool selection context)
-- `coordinators/tool_coordinator.py` has additional fields: `conversation_depth`, `conversation_history`
-- `tool_coordinator.py` appears to be an older/simpler version
-
-**Action:**
-1. Deprecate `victor/agent/tool_coordinator.py`
-2. Update imports to use `victor/agent/coordinators/tool_coordinator.py`
-3. Add deprecation warning if backward compatibility needed
+**Canonical Location:** `victor/agent/coordinators/tool_coordinator.py`
 
 **Other TaskContext locations (KEEP):**
 - `framework/patterns/protocols.py` - Different purpose (pattern recommendation)
@@ -138,85 +140,101 @@ Each represents execution in different contexts:
 
 ---
 
-### 2. ToolExecutionResult - CONSOLIDATE
+### 2. ToolExecutionResult - CONSOLIDATED
 
-**Similar implementations that could share base class:**
+**Status:** COMPLETED
 
-| File | Purpose | Key Fields |
-|------|---------|------------|
-| `coordinators/tool_coordinator.py:142` | Single tool result | tool_name, success, result, error, elapsed_ms |
-| `tool_executor.py:109` | Single tool result | + correlation_id, cached, retry_count |
+**Action Taken:**
+- Removed duplicate `ToolExecutionResult` class from `coordinators/tool_coordinator.py`
+- Canonical location is `victor/agent/tool_executor.py` (has additional fields like correlation_id)
+- Added comment directing imports to canonical location
+
+**Canonical Location:** `victor/agent/tool_executor.py`
 
 **Streaming versions (KEEP SEPARATE):**
 - `streaming/iteration.py` - Batch results with chunks
 - `streaming/tool_execution.py` - Streaming phase result
 
-**Action:**
-1. Create base `ToolExecutionResult` in `victor/tools/results.py`
-2. Have both implementations extend the base
-3. Or consolidate to single class in `tool_executor.py` (more complete)
+---
+
+## POTENTIAL CONSOLIDATION - ANALYZED (Keep Separate)
+
+### 1. Message - DO NOT CONSOLIDATE
+
+**Analysis Result:** Keep separate classes - they serve different architectural layers
+
+| File | Layer | Purpose |
+|------|-------|---------|
+| `providers/base.py:Message` | Provider API | LLM API format with tool_calls, tool_call_id |
+| `context/manager.py:Message` | Context Management | Memory management with tokens, priority |
+| `ui/tui/session.py:Message` | UI Session | Display format with timestamp |
+
+**Rationale:**
+- Each class is optimized for its specific layer's needs
+- Inheritance would create coupling between unrelated concerns
+- Current design follows Single Responsibility Principle
 
 ---
 
-## POTENTIAL CONSOLIDATION - Consider
+### 2. ProviderProtocol - CONSOLIDATED
 
-### 1. Message - Consider Base Class
+**Status:** COMPLETED
 
-| File | Key Fields | Notes |
-|------|------------|-------|
-| `providers/base.py` | role, content, tool_calls, tool_call_id | **Most canonical** - LLM API format |
-| `context/manager.py` | role, content, tokens, priority | Adds context mgmt fields |
-| `ui/tui/session.py` | role, content, timestamp | Adds UI fields |
+**Action Taken:**
+- Updated `streaming/continuation.py` to import `ProviderProtocol` from `core/protocols.py`
+- The `framework/protocols.py` version serves a different purpose (provider management interface)
 
-**Recommendation:** Consider making `providers/base.py:Message` the base class, with extensions for context management and UI.
+**Canonical Location:** `victor/core/protocols.py`
 
 ---
 
-### 2. ProviderProtocol - Consolidate to Core
+### 3. ToolCallRecord - DO NOT CONSOLIDATE
 
-| File | Purpose | Methods |
-|------|---------|---------|
-| `core/protocols.py` | Base provider interface | name, supports_tools, chat |
-| `streaming/continuation.py` | Minimal for continuation | chat only |
-| `framework/protocols.py` | Provider management | current_provider, switch |
+**Analysis Result:** Keep separate classes - they serve different purposes
 
-**Recommendation:** `streaming/continuation.py` should import from `core/protocols.py` instead of defining its own.
+| File | Purpose | Why Different |
+|------|---------|---------------|
+| `background_agent.py` | Agent-level tracking | Tracks overall tool execution status |
+| `tool_loop_detector.py` | Loop detection | Tracks argument/result hashes for pattern detection |
+| `tracing/tool_calls.py` | Observability | Tracks span relationships for distributed tracing |
 
----
-
-### 3. ToolCallRecord - Consider Base Class
-
-| File | Purpose | Notes |
-|------|---------|-------|
-| `background_agent.py` | Agent tracking | id, status, start/end time |
-| `tool_loop_detector.py` | Loop analysis | arguments_hash, result_hash |
-| `tracing/tool_calls.py` | Observability | call_id, parent_span_id |
-
-**Recommendation:** Consider creating `victor/tools/types.py:ToolCallRecord` as base class.
+**Rationale:**
+- Each serves a distinct subsystem with different field requirements
+- Creating a base class would add unnecessary coupling
+- Current separation allows independent evolution of each subsystem
 
 ---
 
 ## Action Items
 
-### Immediate (P0)
-- [ ] Consolidate TaskContext: Remove `victor/agent/tool_coordinator.py` duplicate
+### Immediate (P0) - COMPLETED
+- [x] Consolidate TaskContext: Removed `victor/agent/tool_coordinator.py` duplicate
 
-### Short-term (P1)
-- [ ] Consolidate ToolExecutionResult: Create base class or merge implementations
-- [ ] Fix ProviderProtocol: Update `streaming/continuation.py` to use `core/protocols.py`
+### Short-term (P1) - COMPLETED
+- [x] Consolidate ToolExecutionResult: Removed duplicate from coordinators
+- [x] Fix ProviderProtocol: Updated `streaming/continuation.py` to use `core/protocols.py`
+- [x] Remove execution_engine stub: Created `compiled_executor.py`, deleted stub directory
 
-### Long-term (P2)
-- [ ] Consider Message base class consolidation
-- [ ] Consider ToolCallRecord base class
-- [ ] Review `state_graph_executor.py` ExecutionResult migration status
+### Long-term (P2) - ANALYZED (No Action Required)
+- [x] Message classes: Analyzed - KEEP SEPARATE (different architectural layers)
+- [x] ToolCallRecord classes: Analyzed - KEEP SEPARATE (different subsystem needs)
+- [x] `state_graph_executor.py`: Removed - stub consolidated to `compiled_executor.py`
+
+### Dead Code Analysis - COMPLETED
+- [x] `victor.agent.rl` module: Analyzed - KEEP (actively used by 79 files, 129 "dead" items are false positives from dynamic dispatch patterns)
 
 ---
 
 ## Verification Complete
 
-All 11 duplicate class candidates have been verified:
-- 6 are false positives (intentionally different)
-- 2 require consolidation action
-- 3 are candidates for future refactoring
+All 11 duplicate class candidates have been verified and addressed:
+- 6 are false positives (intentionally different) - CONFIRMED
+- 2 were true duplicates - CONSOLIDATED
+- 3 were analyzed for potential consolidation - KEEP SEPARATE (different purposes)
+- 1 stub directory removed - CONSOLIDATED
 
-*Verified by comparing actual implementations on 2026-01-10*
+**Consolidation Commits:**
+- `a8f47e8`: Remove tool_coordinator.py duplicate, consolidate ToolExecutionResult, fix ProviderProtocol
+- `0f1fb16f`: Remove execution_engine stub, create compiled_executor.py
+
+*Verified and completed on 2026-01-10*
