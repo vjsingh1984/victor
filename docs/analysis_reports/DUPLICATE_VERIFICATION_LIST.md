@@ -1,231 +1,222 @@
 # Duplicate Code Verification List
 
-**Purpose:** Manual verification of potential code duplications before consolidation
+**Purpose:** Verified duplicate candidates with recommendations
 **Generated:** 2026-01-10
+**Status:** VERIFIED
 
 ---
 
-## How to Use This Document
+## Summary
 
-For each duplicate listed below:
-1. Open each file location in your editor
-2. Compare the implementations
-3. Mark the "Verified" column with:
-   - `SAME` - Identical implementations, safe to consolidate
-   - `SIMILAR` - Similar but with differences, needs review
-   - `DIFFERENT` - Different implementations, intentional duplication
-   - `KEEP` - Intentional separate implementations
+| Category | Count | Action |
+|----------|-------|--------|
+| False Positives (Intentional) | 6 classes | None - different implementations by design |
+| True Duplicates | 2 classes | Consolidate |
+| Potential Consolidation | 3 classes | Consider base class or protocol |
 
 ---
 
-## 1. ValidationResult (6 locations)
+## FALSE POSITIVES - No Action Required
 
-**Suggested Canonical Location:** `victor.core.results.ValidationResult`
+These classes share names but have **intentionally different implementations** for different domains/contexts.
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/framework/adaptation/protocols.py` | 81 | [ ] | |
-| 2 | `victor/framework/adaptation/types.py` | 95 | [ ] | |
-| 3 | `victor/framework/patterns/types.py` | 53 | [ ] | |
-| 4 | `victor/optimization/validator.py` | 69 | [ ] | |
-| 5 | `victor/workflows/generation/requirements.py` | 673 | [ ] | |
-| 6 | `victor/workflows/generation/types.py` | 150 | [ ] | |
+### 1. ValidationResult (6 locations) - DIFFERENT
 
-**Verification Command:**
-```bash
-# Compare all implementations
-for f in victor/framework/adaptation/protocols.py victor/framework/adaptation/types.py victor/framework/patterns/types.py victor/optimization/validator.py victor/workflows/generation/requirements.py victor/workflows/generation/types.py; do
-  echo "=== $f ==="
-  grep -A 20 "class ValidationResult" $f 2>/dev/null | head -25
-done
-```
+Each serves a different validation domain with domain-specific fields:
+
+| File | Purpose | Key Fields |
+|------|---------|------------|
+| `framework/adaptation/protocols.py` | Generic validation | is_valid, errors, warnings, metadata |
+| `framework/adaptation/types.py` | Adaptation validation | + suggestions field |
+| `framework/patterns/types.py` | Pattern validation | + quality_score, safety_score |
+| `optimization/validator.py` | Optimization validation | + speedup, cost_reduction, functional_equivalence |
+| `workflows/generation/requirements.py` | Requirement validation | + recommendations, score |
+| `workflows/generation/types.py` | Workflow generation | + schema_errors, structure_errors, semantic_errors |
+
+**Verdict:** KEEP SEPARATE - Domain-specific validation requires different fields.
 
 ---
 
-## 2. TaskContext (5 locations)
+### 2. CacheEntry (4 locations) - DIFFERENT
 
-**Suggested Canonical Location:** `victor.core.context.TaskContext`
+Each caches different types of data:
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/coordinators/tool_coordinator.py` | 85 | [ ] | |
-| 2 | `victor/agent/prompt_coordinator.py` | 71 | [ ] | |
-| 3 | `victor/agent/tool_coordinator.py` | 75 | [ ] | |
-| 4 | `victor/framework/patterns/protocols.py` | 108 | [ ] | |
-| 5 | `victor/framework/patterns/types.py` | 99 | [ ] | |
+| File | Caches | Key Fields |
+|------|--------|------------|
+| `agent/tool_result_cache.py` | Tool results | embedding, args_hash, expires_at |
+| `framework/graph_cache.py` | Compiled graphs | graph_hash, compiled |
+| `tools/cache_manager.py` | Generic values | value, ttl, accessed_at |
+| `workflows/cache.py` | Node results | node_id, result |
 
-**Verification Command:**
-```bash
-for f in victor/agent/coordinators/tool_coordinator.py victor/agent/prompt_coordinator.py victor/agent/tool_coordinator.py victor/framework/patterns/protocols.py victor/framework/patterns/types.py; do
-  echo "=== $f ==="
-  grep -A 20 "class TaskContext" $f 2>/dev/null | head -25
-done
-```
+**Verdict:** KEEP SEPARATE - Different cache subsystems need different metadata.
 
 ---
 
-## 3. CacheEntry (4 locations)
+### 3. CheckpointManager (3 locations) - DIFFERENT
 
-**Suggested Canonical Location:** `victor.storage.cache.CacheEntry`
+Each manages different checkpoint types:
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/tool_result_cache.py` | 67 | [ ] | |
-| 2 | `victor/framework/graph_cache.py` | 84 | [ ] | |
-| 3 | `victor/tools/cache_manager.py` | 52 | [ ] | |
-| 4 | `victor/workflows/cache.py` | 298 | [ ] | |
+| File | Manages | Mechanism |
+|------|---------|-----------|
+| `agent/checkpoints.py` | Git checkpoints | Git stash |
+| `framework/graph.py` | Graph state | CheckpointerProtocol |
+| `storage/checkpoints/manager.py` | Conversation state | SQLite/memory backend |
 
-**Assessment:** May be intentionally different per-subsystem. Verify if fields differ.
-
----
-
-## 4. ExecutionResult (4 locations)
-
-**Suggested Canonical Location:** `victor.core.results.ExecutionResult`
-
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/framework/graph.py` | 729 | [ ] | |
-| 2 | `victor/framework/workflow_engine.py` | 141 | [ ] | |
-| 3 | `victor/workflows/execution_engine/state_graph_executor.py` | 161 | [ ] | |
-| 4 | `victor/workflows/sandbox_executor.py` | 59 | [ ] | |
-
-**Priority:** HIGH - Core result type used across workflow system
+**Verdict:** KEEP SEPARATE - Different checkpoint domains.
 
 ---
 
-## 5. ToolExecutionResult (4 locations)
+### 4. Event (3 locations) - DIFFERENT
 
-**Suggested Canonical Location:** `victor.tools.results.ToolExecutionResult`
+Each serves a different event system:
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/coordinators/tool_coordinator.py` | 142 | [ ] | |
-| 2 | `victor/agent/streaming/iteration.py` | 123 | [ ] | |
-| 3 | `victor/agent/streaming/tool_execution.py` | 149 | [ ] | |
-| 4 | `victor/agent/tool_executor.py` | 109 | [ ] | |
+| File | Purpose | Key Fields |
+|------|---------|------------|
+| `core/event_sourcing.py` | Domain events (CQRS) | event_id, timestamp, immutable |
+| `core/events/protocols.py` | Distributed messaging | topic, correlation_id, source |
+| `framework/events.py` | Agent execution | type, content, tool_name, progress |
 
-**Priority:** HIGH - Tool system core type
-
----
-
-## 6. CheckpointManager (3 locations)
-
-**Suggested Canonical Location:** `victor.storage.checkpoints.CheckpointManager`
-
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/checkpoints.py` | 110 | [ ] | |
-| 2 | `victor/framework/graph.py` | 963 | [ ] | |
-| 3 | `victor/storage/checkpoints/manager.py` | 39 | [ ] | |
-
-**Assessment:** Should be consolidated to storage module
+**Verdict:** KEEP SEPARATE - Different event systems (CQRS vs messaging vs observability).
 
 ---
 
-## 7. Event (3 locations)
+### 5. ValidationError (3 locations) - DIFFERENT
 
-**Suggested Canonical Location:** `victor.core.events.Event`
+One is an exception, others are dataclasses:
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/core/event_sourcing.py` | 105 | [ ] | |
-| 2 | `victor/core/events/protocols.py` | 102 | [ ] | |
-| 3 | `victor/framework/events.py` | 82 | [ ] | |
+| File | Type | Purpose |
+|------|------|---------|
+| `core/errors.py` | **Exception** | Raised on validation failure |
+| `workflows/generation/requirements.py` | Dataclass | Validation issue record |
+| `workflows/generation/types.py` | Dataclass | Detailed validation error |
 
-**Priority:** HIGH - Core event system type
-
----
-
-## 8. Message (3 locations)
-
-**Suggested Canonical Location:** `victor.core.messages.Message`
-
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/context/manager.py` | 41 | [ ] | |
-| 2 | `victor/providers/base.py` | 162 | [ ] | |
-| 3 | `victor/ui/tui/session.py` | 25 | [ ] | |
-
-**Assessment:** Different contexts may need different Message types. Verify fields.
+**Verdict:** KEEP SEPARATE - Exception vs data class are fundamentally different.
 
 ---
 
-## 9. ProviderProtocol (3 locations)
+### 6. ExecutionResult (4 locations) - DIFFERENT
 
-**Suggested Canonical Location:** `victor.protocols.provider.ProviderProtocol`
+Each represents execution in different contexts:
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/streaming/continuation.py` | 118 | [ ] | |
-| 2 | `victor/core/protocols.py` | 390 | [ ] | |
-| 3 | `victor/framework/protocols.py` | 228 | [ ] | |
+| File | Context | Key Fields |
+|------|---------|------------|
+| `framework/graph.py` | Graph execution | state, iterations, node_history |
+| `framework/workflow_engine.py` | Workflow execution | final_state, checkpoints, hitl_requests |
+| `workflows/.../state_graph_executor.py` | Migration wrapper | final_state, metrics |
+| `workflows/sandbox_executor.py` | Sandbox execution | output, error, exit_code |
 
-**Priority:** HIGH - Protocol should have single canonical definition
-
----
-
-## 10. ToolCallRecord (3 locations)
-
-**Suggested Canonical Location:** `victor.tools.types.ToolCallRecord`
-
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/agent/background_agent.py` | 69 | [ ] | |
-| 2 | `victor/agent/tool_loop_detector.py` | 188 | [ ] | |
-| 3 | `victor/observability/tracing/tool_calls.py` | 58 | [ ] | |
+**Verdict:** KEEP SEPARATE - Different execution contexts need different result fields.
+**Note:** `state_graph_executor.py` says "Minimal implementation for migration phase" - review if still needed.
 
 ---
 
-## 11. ValidationError (3 locations)
+## TRUE DUPLICATES - Action Required
 
-**Suggested Canonical Location:** `victor.core.errors.ValidationError`
+### 1. TaskContext - CONSOLIDATE
 
-| # | File | Line | Verified | Notes |
-|---|------|------|----------|-------|
-| 1 | `victor/core/errors.py` | 408 | [ ] | Likely canonical |
-| 2 | `victor/workflows/generation/requirements.py` | 637 | [ ] | |
-| 3 | `victor/workflows/generation/types.py` | 94 | [ ] | |
+**Real duplicate found:**
 
----
+| File | Status |
+|------|--------|
+| `victor/agent/tool_coordinator.py:75` | **DUPLICATE** |
+| `victor/agent/coordinators/tool_coordinator.py:85` | **PRIMARY** (more complete) |
 
-## Consolidation Plan Template
+**Evidence:**
+- Same class name, same purpose (tool selection context)
+- `coordinators/tool_coordinator.py` has additional fields: `conversation_depth`, `conversation_history`
+- `tool_coordinator.py` appears to be an older/simpler version
 
-After verification, use this template for each consolidation:
+**Action:**
+1. Deprecate `victor/agent/tool_coordinator.py`
+2. Update imports to use `victor/agent/coordinators/tool_coordinator.py`
+3. Add deprecation warning if backward compatibility needed
 
-```markdown
-### Consolidation: [ClassName]
-
-**Source files to update:**
-- [ ] file1.py - Change import to canonical
-- [ ] file2.py - Remove duplicate, update imports
-
-**New canonical location:** `victor/[module]/[submodule].py`
-
-**Migration steps:**
-1. Create canonical class at new location
-2. Update imports in dependent files
-3. Remove duplicate definitions
-4. Run tests
-5. Update documentation
-
-**Backwards compatibility:**
-- [ ] Add re-export from old location (deprecation warning)
-- [ ] Document in CHANGELOG
-```
+**Other TaskContext locations (KEEP):**
+- `framework/patterns/protocols.py` - Different purpose (pattern recommendation)
+- `framework/patterns/types.py` - Dataclass version of above
+- `agent/prompt_coordinator.py` - Different purpose (prompt building)
 
 ---
 
-## Summary Statistics
+### 2. ToolExecutionResult - CONSOLIDATE
 
-| Status | Count |
-|--------|-------|
-| Total duplicate classes identified | 29 |
-| High priority (>3 locations) | 6 |
-| Medium priority (3 locations) | 23 |
-| Requiring protocol consolidation | 3 |
-| Requiring result type consolidation | 4 |
+**Similar implementations that could share base class:**
+
+| File | Purpose | Key Fields |
+|------|---------|------------|
+| `coordinators/tool_coordinator.py:142` | Single tool result | tool_name, success, result, error, elapsed_ms |
+| `tool_executor.py:109` | Single tool result | + correlation_id, cached, retry_count |
+
+**Streaming versions (KEEP SEPARATE):**
+- `streaming/iteration.py` - Batch results with chunks
+- `streaming/tool_execution.py` - Streaming phase result
+
+**Action:**
+1. Create base `ToolExecutionResult` in `victor/tools/results.py`
+2. Have both implementations extend the base
+3. Or consolidate to single class in `tool_executor.py` (more complete)
 
 ---
 
-*Complete verification before making any changes. Use git branch for consolidation work.*
+## POTENTIAL CONSOLIDATION - Consider
+
+### 1. Message - Consider Base Class
+
+| File | Key Fields | Notes |
+|------|------------|-------|
+| `providers/base.py` | role, content, tool_calls, tool_call_id | **Most canonical** - LLM API format |
+| `context/manager.py` | role, content, tokens, priority | Adds context mgmt fields |
+| `ui/tui/session.py` | role, content, timestamp | Adds UI fields |
+
+**Recommendation:** Consider making `providers/base.py:Message` the base class, with extensions for context management and UI.
+
+---
+
+### 2. ProviderProtocol - Consolidate to Core
+
+| File | Purpose | Methods |
+|------|---------|---------|
+| `core/protocols.py` | Base provider interface | name, supports_tools, chat |
+| `streaming/continuation.py` | Minimal for continuation | chat only |
+| `framework/protocols.py` | Provider management | current_provider, switch |
+
+**Recommendation:** `streaming/continuation.py` should import from `core/protocols.py` instead of defining its own.
+
+---
+
+### 3. ToolCallRecord - Consider Base Class
+
+| File | Purpose | Notes |
+|------|---------|-------|
+| `background_agent.py` | Agent tracking | id, status, start/end time |
+| `tool_loop_detector.py` | Loop analysis | arguments_hash, result_hash |
+| `tracing/tool_calls.py` | Observability | call_id, parent_span_id |
+
+**Recommendation:** Consider creating `victor/tools/types.py:ToolCallRecord` as base class.
+
+---
+
+## Action Items
+
+### Immediate (P0)
+- [ ] Consolidate TaskContext: Remove `victor/agent/tool_coordinator.py` duplicate
+
+### Short-term (P1)
+- [ ] Consolidate ToolExecutionResult: Create base class or merge implementations
+- [ ] Fix ProviderProtocol: Update `streaming/continuation.py` to use `core/protocols.py`
+
+### Long-term (P2)
+- [ ] Consider Message base class consolidation
+- [ ] Consider ToolCallRecord base class
+- [ ] Review `state_graph_executor.py` ExecutionResult migration status
+
+---
+
+## Verification Complete
+
+All 11 duplicate class candidates have been verified:
+- 6 are false positives (intentionally different)
+- 2 require consolidation action
+- 3 are candidates for future refactoring
+
+*Verified by comparing actual implementations on 2026-01-10*
