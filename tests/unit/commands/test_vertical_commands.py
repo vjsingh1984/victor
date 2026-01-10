@@ -406,7 +406,8 @@ class TestVerticalCommands:
         """Test install command requires package argument."""
         result = runner.invoke(vertical_app, ["install"])
         assert result.exit_code != 0
-        assert "Missing argument" in result.stdout or "requires an argument" in result.stdout
+        # Typer puts error messages in result.output, not result.stdout
+        assert "Missing argument" in result.output or "requires an argument" in result.output
 
     @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.install")
     def test_install_command_success(self, mock_install):
