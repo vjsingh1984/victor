@@ -12,6 +12,18 @@ on:
     paths:
       - 'packages/**'  # Only trigger when packages dir exists and has changes
 
+# Skip workflow if packages directory doesn't exist (for monorepo migration)
+jobs:
+  check-existence:
+    name: Check if packages exist
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: test -d packages && echo "exists=true" >> $GITHUB_OUTPUT || echo "exists=false" >> $GITHUB_OUTPUT
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,6 +33,7 @@ jobs:
   test-packages:
     name: Test ${{ matrix.package }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    if: needs.check-existence.outputs.should_run == 'true'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -69,8 +82,8 @@ jobs:
   build-packages:
     name: Build ${{ matrix.package }}
     runs-on: ubuntu-latest
-    needs: test-packages
-    if: always() && (needs.test-packages.result == 'success' || needs.test-packages.result == 'failure')
+    needs: [check-existence, test-packages]
+    if: needs.check-existence.outputs.should_run == 'true' && always() && (needs.test-packages.result == 'success' || needs.test-packages.result == 'failure')
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +118,8 @@ jobs:
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
-    needs: build-packages
+    needs: [check-existence, build-packages]
+    if: needs.check-existence.outputs.should_run == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -144,8 +158,8 @@ jobs:
   publish-testpypi:
     name: Publish to TestPyPI
     runs-on: ubuntu-latest
-    needs: [build-packages, integration-test]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [check-existence, build-packages, integration-test]
+    if: needs.check-existence.outputs.should_run == 'true' && github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment: testpypi
     permissions:
       id-token: write
@@ -175,8 +189,8 @@ jobs:
   publish-pypi:
     name: Publish ${{ matrix.package }} to PyPI
     runs-on: ubuntu-latest
-    needs: [build-packages, integration-test]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check-existence, build-packages, integration-test]
+    if: needs.check-existence.outputs.should_run == 'true' && startsWith(github.ref, 'refs/tags/v')
     environment: pypi
     permissions:
       id-token: write
