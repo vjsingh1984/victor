@@ -14,6 +14,9 @@ from victor.core.verticals.protocols import (
     ToolDependencyProviderProtocol,
 )
 
+# Phase 3: Import framework capabilities
+from victor.framework.capabilities import FileOperationsCapability
+
 
 class DataAnalysisAssistant(VerticalBase):
     """Data analysis assistant for exploration, visualization, and insights.
@@ -25,31 +28,39 @@ class DataAnalysisAssistant(VerticalBase):
     description = "Data exploration, statistical analysis, visualization, and ML insights"
     version = "1.0.0"
 
+    # Phase 3: Framework file operations capability (read, write, edit, grep)
+    _file_ops = FileOperationsCapability()
+
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for data analysis tasks.
+
+        Phase 3: Uses framework FileOperationsCapability for common file operations
+        to reduce code duplication and maintain consistency across verticals.
 
         Uses canonical tool names from victor.tools.tool_names.
         """
         from victor.tools.tool_names import ToolNames
 
-        return [
-            # Core filesystem for data files
-            ToolNames.READ,  # read_file → read
-            ToolNames.WRITE,  # write_file → write
-            ToolNames.EDIT,  # edit_files → edit
+        # Start with framework file operations (read, write, edit, grep)
+        tools = cls._file_ops.get_tool_list()
+
+        # Add data analysis-specific tools
+        tools.extend([
+            # Directory listing for data file exploration
             ToolNames.LS,  # list_directory → ls
             # Python/Shell execution for analysis
             ToolNames.SHELL,  # bash → shell (for running Python scripts)
             # Code generation and search
-            ToolNames.GREP,  # Keyword search
             ToolNames.CODE_SEARCH,  # Semantic code search
             ToolNames.OVERVIEW,  # codebase_overview → overview
             ToolNames.GRAPH,  # Code graph analysis (PageRank, dependencies)
             # Web for datasets and documentation
             ToolNames.WEB_SEARCH,  # Web search (internet search)
             ToolNames.WEB_FETCH,  # Fetch URL content
-        ]
+        ])
+
+        return tools
 
     @classmethod
     def get_system_prompt(cls) -> str:

@@ -14,6 +14,9 @@ from victor.core.verticals.protocols import (
     ToolDependencyProviderProtocol,
 )
 
+# Phase 3: Import framework capabilities
+from victor.framework.capabilities import FileOperationsCapability
+
 
 class ResearchAssistant(VerticalBase):
     """Research assistant for web research, fact-checking, and synthesis.
@@ -25,28 +28,36 @@ class ResearchAssistant(VerticalBase):
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "1.0.0"
 
+    # Phase 3: Framework file operations capability (read, write, edit, grep)
+    _file_ops = FileOperationsCapability()
+
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for research tasks.
+
+        Phase 3: Uses framework FileOperationsCapability for common file operations
+        to reduce code duplication and maintain consistency across verticals.
 
         Uses canonical tool names from victor.tools.tool_names.
         """
         from victor.tools.tool_names import ToolNames
 
-        return [
+        # Start with framework file operations (read, write, edit, grep)
+        tools = cls._file_ops.get_tool_list()
+
+        # Add research-specific tools
+        tools.extend([
             # Core research tools
             ToolNames.WEB_SEARCH,  # Web search (internet search)
             ToolNames.WEB_FETCH,  # Fetch URL content
-            # File operations for reading/writing reports
-            ToolNames.READ,  # read_file → read
-            ToolNames.WRITE,  # write_file → write
-            ToolNames.EDIT,  # edit_files → edit
+            # Directory listing for file exploration
             ToolNames.LS,  # list_directory → ls
             # Code search for technical research
-            ToolNames.GREP,  # Keyword search
             ToolNames.CODE_SEARCH,  # Semantic code search
             ToolNames.OVERVIEW,  # codebase_overview → overview
-        ]
+        ])
+
+        return tools
 
     @classmethod
     def get_system_prompt(cls) -> str:
