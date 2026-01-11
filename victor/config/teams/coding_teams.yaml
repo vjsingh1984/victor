@@ -1,77 +1,57 @@
-# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Team Configuration for Coding Vertical
-
-vertical_name: coding
-
+# Coding Vertical Teams Configuration
 teams:
-  - name: feature_team
-    display_name: Feature Implementation Team
-    description: End-to-end feature implementation with research, planning, implementation, and review
-    formation: pipeline
-    total_tool_budget: 100
-    max_iterations: 50
-    members:
-      - role: researcher
-        name: Code Researcher
-        goal: Analyze codebase for relevant patterns and dependencies
-        tool_budget: 25
-        memory: true
-      - role: planner
-        name: Implementation Planner
-        goal: Design implementation approach based on research
-        tool_budget: 15
-        memory: true
-      - role: executor
-        name: Feature Implementer
-        goal: Implement the feature according to plan
-        tool_budget: 40
-        cache: true
-      - role: reviewer
-        name: Code Reviewer
-        goal: Review code and run tests
-        tool_budget: 20
+  - name: code_review_team
+    display_name: "Code Review Team"
+    description: "Multi-agent team for comprehensive code review"
+    formation: parallel
+    communication_style: structured
+    max_iterations: 5
+    roles:
+      - name: security_reviewer
+        display_name: "Security Reviewer"
+        description: "Focuses on security vulnerabilities"
+        persona: "You are a security expert specializing in identifying vulnerabilities, injection flaws, and security anti-patterns in code."
+        tool_categories: [security, analysis]
+        capabilities: [security_scan, vulnerability_detection]
 
-  - name: bug_fix_team
-    display_name: Bug Fix Team
-    description: Systematic bug investigation and fix with verification
-    formation: pipeline
-    total_tool_budget: 70
-    max_iterations: 40
-    members:
-      - role: researcher
-        name: Bug Investigator
-        goal: Investigate bug root cause through code analysis
-        tool_budget: 25
-        memory: true
-        verbose: true
-      - role: executor
-        name: Bug Fixer
-        goal: Apply the fix based on investigation
-        tool_budget: 25
-      - role: reviewer
-        name: Fix Verifier
-        goal: Verify fix with tests
-        tool_budget: 20
+      - name: quality_reviewer
+        display_name: "Quality Reviewer"
+        description: "Focuses on code quality and maintainability"
+        persona: "You are a code quality expert analyzing code for maintainability, readability, and adherence to best practices."
+        tool_categories: [analysis, metrics]
+        capabilities: [complexity_analysis, style_check]
 
-  - name: refactoring_team
-    display_name: Refactoring Team
-    description: Safe refactoring with analysis and testing
+      - name: performance_reviewer
+        display_name: "Performance Reviewer"
+        description: "Focuses on performance optimization"
+        persona: "You are a performance optimization expert identifying bottlenecks and optimization opportunities."
+        tool_categories: [analysis, profiling]
+        capabilities: [profiling, benchmarking]
+
+  - name: feature_implementation_team
+    display_name: "Feature Implementation Team"
+    description: "Team for implementing new features"
     formation: hierarchical
-    total_tool_budget: 75
-    max_iterations: 45
-    members:
-      - role: planner
-        name: Refactoring Planner
-        goal: Plan refactoring approach and identify affected areas
-        tool_budget: 20
-        is_manager: true
-        memory: true
-      - role: executor
-        name: Refactoring Executor
-        goal: Execute refactoring changes
-        tool_budget: 35
-      - role: reviewer
-        name: Quality Verifier
-        goal: Ensure tests pass and code quality maintained
-        tool_budget: 20
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: architect
+        display_name: "Architect"
+        description: "Designs the solution architecture"
+        persona: "You are a software architect designing robust, scalable solutions."
+        tool_categories: [analysis, design]
+        capabilities: [design, planning]
+
+      - name: implementer
+        display_name: "Implementer"
+        description: "Writes the implementation code"
+        persona: "You are a senior developer writing clean, maintainable code."
+        tool_categories: [editing, testing]
+        capabilities: [code_generation, test_generation]
+
+      - name: tester
+        display_name: "Tester"
+        description: "Validates the implementation"
+        persona: "You are a QA engineer ensuring quality through comprehensive testing."
+        tool_categories: [testing, analysis]
+        capabilities: [test_generation, test_execution]

@@ -605,6 +605,104 @@ class VerticalBase(
         caps = cls.get_capabilities()
         return caps.list_capabilities()
 
+    # =========================================================================
+    # Capability Provider (Canonical - using CapabilityLoader)
+    # =========================================================================
+
+    @classmethod
+    def get_capability_provider(cls):
+        """Get capability provider for this vertical.
+
+        This provides access to the centralized CapabilityLoader with YAML-based
+        configuration, replacing scattered capability definitions.
+
+        Returns:
+            CapabilitySet instance with all capabilities for this vertical
+
+        Example:
+            provider = CodingVertical.get_capability_provider()
+            capabilities = provider.list_capabilities(CapabilityType.TOOL)
+            code_review = provider.get_capability("code_review")
+        """
+        from victor.core.capabilities import CapabilityLoader
+
+        loader = CapabilityLoader.from_vertical(cls.name)
+        return loader.get_capability_set(cls.name)
+
+    @classmethod
+    def list_capabilities_by_type(cls, capability_type: str | None = None) -> List[str]:
+        """List capabilities by type.
+
+        Args:
+            capability_type: Filter by type (tool, workflow, middleware, etc.)
+
+        Returns:
+            List of capability names
+
+        Example:
+            tools = CodingVertical.list_capabilities_by_type("tool")
+            workflows = CodingVertical.list_capabilities_by_type("workflow")
+        """
+        from victor.core.capabilities import CapabilityLoader
+
+        loader = CapabilityLoader.from_vertical(cls.name)
+        return loader.list_capabilities(cls.name, capability_type)
+
+    # =========================================================================
+    # Team Provider (Canonical - using BaseYAMLTeamProvider)
+    # =========================================================================
+
+    @classmethod
+    def get_team_provider(cls):
+        """Get team provider for this vertical.
+
+        This provides access to the centralized BaseYAMLTeamProvider with
+        YAML-based team formations, replacing scattered team definitions.
+
+        Returns:
+            BaseYAMLTeamProvider instance for this vertical
+
+        Example:
+            provider = CodingVertical.get_team_provider()
+            teams = provider.list_teams()
+            review_team = provider.get_team("code_review_team")
+        """
+        from victor.core.teams import BaseYAMLTeamProvider
+
+        return BaseYAMLTeamProvider.get_provider(cls.name)
+
+    @classmethod
+    def get_team(cls, team_name: str):
+        """Get specific team specification.
+
+        Args:
+            team_name: Name of the team
+
+        Returns:
+            TeamSpecification instance or None
+
+        Example:
+            team = CodingVertical.get_team("code_review_team")
+            print(team.formation)
+            print(team.list_roles())
+        """
+        provider = cls.get_team_provider()
+        return provider.get_team(team_name)
+
+    @classmethod
+    def list_teams(cls) -> List[str]:
+        """List available teams for this vertical.
+
+        Returns:
+            List of team names
+
+        Example:
+            teams = CodingVertical.list_teams()
+            # ["code_review_team", "feature_implementation_team"]
+        """
+        provider = cls.get_team_provider()
+        return provider.list_teams()
+
     @classmethod
     async def create_agent(
         cls,

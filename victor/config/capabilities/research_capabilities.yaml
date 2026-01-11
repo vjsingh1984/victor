@@ -1,73 +1,54 @@
-# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Capability Configuration for Research Vertical
-
+# Research Vertical Capabilities Configuration
 vertical_name: research
 
 capabilities:
-  - name: source_verification
-    capability_type: safety
-    version: "1.0"
-    description: Source credibility verification and validation
-    tags:
-      - research
-      - verification
-      - credibility
-    handler_module: victor.research.capabilities
-    handler_function: configure_source_verification
-    getter_function: get_source_verification
-    default_config:
-      min_credibility: 0.7
-      min_source_count: 3
-      require_diverse_sources: true
-      validate_urls: true
+  web_search:
+    type: tool
+    description: "Search the web for information"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.tools:WebSearch"
 
-  - name: citation_management
-    capability_type: mode
-    version: "1.0"
-    description: Citation and bibliography management
-    tags:
-      - citation
-      - bibliography
-      - academic
-    handler_module: victor.research.capabilities
-    handler_function: configure_citation_management
-    getter_function: get_citation_config
-    default_config:
-      default_style: apa
-      require_urls: true
-      include_authors: true
-      include_dates: true
+  deep_research:
+    type: workflow
+    description: "Perform deep research with multiple sources"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.workflows:DeepResearchWorkflow"
+    config:
+      max_sources: 20
+      depth: 3
 
-  - name: web_search_integration
-    capability_type: tool
-    version: "1.0"
-    description: Web search capabilities for research
-    tags:
-      - search
-      - web
-      - discovery
-    handler_module: victor.research.capabilities
-    handler_function: configure_web_search
-    default_config:
-      max_results: 10
-      search_depth: standard
-      include_snippets: true
+  citation_extraction:
+    type: tool
+    description: "Extract citations from research content"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.citation:Extractor"
 
-  - name: synthesis_assistant
-    capability_type: tool
-    version: "1.0"
-    description: Research synthesis and summary capabilities
-    tags:
-      - synthesis
-      - summary
-      - analysis
-    handler_module: victor.research.capabilities
-    handler_function: configure_synthesis
-    default_config:
-      synthesis_length: medium
-      include_key_findings: true
-      include_citations: true
-    dependencies:
-      - source_verification
-      - citation_management
+  fact_check:
+    type: workflow
+    description: "Verify claims against multiple sources"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.workflows:FactCheckWorkflow"
+    config:
+      confidence_threshold: 0.8
+
+  source_synthesis:
+    type: workflow
+    description: "Synthesize information from multiple sources"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.synthesis:Synthesizer"
+
+  academic_search:
+    type: tool
+    description: "Search academic databases and papers"
+    enabled: true
+    version: "1.0.0"
+    handler: "victor.research.academic:AcademicSearch"
+
+handlers:
+  search: "victor.research.tools:SearchEngine"
+  synthesis: "victor.research.synthesis:Synthesizer"

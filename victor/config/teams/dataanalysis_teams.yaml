@@ -1,27 +1,57 @@
-# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Team Configuration for DataAnalysis Vertical
-
-vertical_name: dataanalysis
-
+# DataAnalysis Vertical Teams Configuration
 teams:
   - name: analysis_team
-    display_name: Data Analysis Team
-    description: Comprehensive data analysis with profiling, visualization, and insights
+    display_name: "Analysis Team"
+    description: "Team for data analysis and insights"
     formation: pipeline
-    total_tool_budget: 75
-    max_iterations: 40
-    members:
-      - role: researcher
-        name: Data Profiler
-        goal: Profile data and understand structure
-        tool_budget: 25
-        memory: true
-      - role: executor
-        name: Analysis Implementer
-        goal: Perform statistical analysis and create visualizations
-        tool_budget: 35
-      - role: reviewer
-        name: Insight Reviewer
-        goal: Review insights and validate conclusions
-        tool_budget: 15
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: data_explorer
+        display_name: "Data Explorer"
+        description: "Explores and understands the data"
+        persona: "You are a data explorer skilled at understanding data structures and patterns."
+        tool_categories: [analysis, exploration]
+        capabilities: [pandas_query, visualization]
+
+      - name: analyst
+        display_name: "Analyst"
+        description: "Performs statistical analysis"
+        persona: "You are a data analyst performing statistical analysis and generating insights."
+        tool_categories: [analysis, statistics]
+        capabilities: [pandas_query, statistical_analysis, visualization]
+
+      - name: presenter
+        display_name: "Presenter"
+        description: "Creates visualizations and reports"
+        persona: "You are a data visualization expert creating compelling visualizations and reports."
+        tool_categories: [visualization, reporting]
+        capabilities: [visualization]
+
+  - name: ml_team
+    display_name: "ML Team"
+    description: "Team for machine learning projects"
+    formation: hierarchical
+    communication_style: structured
+    max_iterations: 15
+    roles:
+      - name: data_engineer
+        display_name: "Data Engineer"
+        description: "Prepares and cleans data"
+        persona: "You are a data engineer preparing data for machine learning."
+        tool_categories: [engineering, preparation]
+        capabilities: [pandas_query, data_cleaning]
+
+      - name: ml_engineer
+        display_name: "ML Engineer"
+        description: "Trains and evaluates models"
+        persona: "You are an ML engineer training and evaluating machine learning models."
+        tool_categories: [ml, modeling]
+        capabilities: [machine_learning, statistical_analysis]
+
+      - name: validator
+        display_name: "Validator"
+        description: "Validates model performance"
+        persona: "You are an ML validator ensuring model quality and reliability."
+        tool_categories: [validation, testing]
+        capabilities: [statistical_analysis, visualization]

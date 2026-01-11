@@ -87,6 +87,170 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Execution Metrics with Cache Performance Tracking
+# =============================================================================
+
+
+@dataclass
+class ExecutionMetrics:
+    """Tool execution metrics with cache performance tracking.
+
+    Tracks detailed statistics about tool execution including:
+    - Total executions and success/failure rates
+    - Cache hit/miss rates
+    - Execution time statistics
+    - Tool-specific metrics
+
+    Attributes:
+        total_executions: Total number of tool executions
+        cache_hits: Number of cache hits
+        cache_misses: Number of cache misses
+        successful_executions: Number of successful executions
+        failed_executions: Number of failed executions
+        skipped_executions: Number of skipped executions
+        total_execution_time: Total time spent executing tools (seconds)
+        min_execution_time: Minimum execution time (seconds)
+        max_execution_time: Maximum execution time (seconds)
+        execution_times: List of individual execution times
+        tool_counts: Dict mapping tool names to execution counts
+        tool_errors: Dict mapping tool names to error counts
+    """
+
+    total_executions: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    successful_executions: int = 0
+    failed_executions: int = 0
+    skipped_executions: int = 0
+    total_execution_time: float = 0.0
+    min_execution_time: float = float('inf')
+    max_execution_time: float = 0.0
+    execution_times: List[float] = field(default_factory=list)
+    tool_counts: Dict[str, int] = field(default_factory=dict)
+    tool_errors: Dict[str, int] = field(default_factory=dict)
+
+    def record_execution(
+        self,
+        tool_name: str,
+        execution_time: float,
+        success: bool,
+        cached: bool = False,
+        skipped: bool = False,
+    ) -> None:
+        """Record a tool execution.
+
+        Args:
+            tool_name: Name of the tool executed
+            execution_time: Time taken to execute (seconds)
+            success: Whether execution was successful
+            cached: Whether result was from cache
+            skipped: Whether execution was skipped
+        """
+        self.total_executions += 1
+
+        if cached:
+            self.cache_hits += 1
+        else:
+            self.cache_misses += 1
+
+        if success:
+            self.successful_executions += 1
+        elif not skipped:
+            self.failed_executions += 1
+            # Track errors by tool
+            self.tool_errors[tool_name] = self.tool_errors.get(tool_name, 0) + 1
+
+        if skipped:
+            self.skipped_executions += 1
+
+        # Track execution time
+        self.execution_times.append(execution_time)
+        self.total_execution_time += execution_time
+        self.min_execution_time = min(self.min_execution_time, execution_time)
+        self.max_execution_time = max(self.max_execution_time, execution_time)
+
+        # Track tool usage
+        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+
+    def get_cache_hit_rate(self) -> float:
+        """Calculate cache hit rate."""
+        if self.cache_hits + self.cache_misses == 0:
+            return 0.0
+        return self.cache_hits / (self.cache_hits + self.cache_misses)
+
+    def get_success_rate(self) -> float:
+        """Calculate success rate (excluding skipped)."""
+        total = self.successful_executions + self.failed_executions
+        if total == 0:
+            return 0.0
+        return self.successful_executions / total
+
+    def get_avg_execution_time(self) -> float:
+        """Calculate average execution time."""
+        if not self.execution_times:
+            return 0.0
+        return self.total_execution_time / len(self.execution_times)
+
+    def get_median_execution_time(self) -> float:
+        """Calculate median execution time."""
+        if not self.execution_times:
+            return 0.0
+        sorted_times = sorted(self.execution_times)
+        n = len(sorted_times)
+        if n % 2 == 0:
+            return (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
+        return sorted_times[n // 2]
+
+    def get_p95_execution_time(self) -> float:
+        """Calculate 95th percentile execution time."""
+        if not self.execution_times:
+            return 0.0
+        sorted_times = sorted(self.execution_times)
+        idx = int(len(sorted_times) * 0.95)
+        return sorted_times[min(idx, len(sorted_times) - 1)]
+
+    def get_top_tools(self, n: int = 5) -> List[tuple[str, int]]:
+        """Get top N most used tools."""
+        return sorted(self.tool_counts.items(), key=lambda x: x[1], reverse=True)[:n]
+
+    def reset(self) -> None:
+        """Reset all metrics."""
+        self.total_executions = 0
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.successful_executions = 0
+        self.failed_executions = 0
+        self.skipped_executions = 0
+        self.total_execution_time = 0.0
+        self.min_execution_time = float('inf')
+        self.max_execution_time = 0.0
+        self.execution_times.clear()
+        self.tool_counts.clear()
+        self.tool_errors.clear()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert metrics to dictionary."""
+        return {
+            "total_executions": self.total_executions,
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
+            "cache_hit_rate": self.get_cache_hit_rate(),
+            "successful_executions": self.successful_executions,
+            "failed_executions": self.failed_executions,
+            "skipped_executions": self.skipped_executions,
+            "success_rate": self.get_success_rate(),
+            "total_execution_time": self.total_execution_time,
+            "avg_execution_time": self.get_avg_execution_time(),
+            "median_execution_time": self.get_median_execution_time(),
+            "p95_execution_time": self.get_p95_execution_time(),
+            "min_execution_time": self.min_execution_time if self.min_execution_time != float('inf') else 0.0,
+            "max_execution_time": self.max_execution_time,
+            "top_tools": self.get_top_tools(),
+            "tool_errors": self.tool_errors,
+        }
+
+
 @dataclass
 class ToolPipelineConfig:
     """Configuration for tool pipeline.
@@ -504,6 +668,8 @@ class ToolPipeline:
 
         # Analytics
         self._tool_stats: Dict[str, Dict[str, Any]] = {}
+        # Enhanced execution metrics with cache performance tracking
+        self._execution_metrics: ExecutionMetrics = ExecutionMetrics()
 
         # Parallel executor (lazy initialized)
         self._parallel_executor: Optional[ParallelToolExecutor] = None
@@ -1660,6 +1826,41 @@ class ToolPipeline:
             "remaining": self.calls_remaining,
             "tools": dict(self._tool_stats),
         }
+
+    # =========================================================================
+    # Enhanced Execution Metrics with Cache Performance Tracking
+    # =========================================================================
+
+    def get_execution_metrics(self) -> ExecutionMetrics:
+        """Get enhanced execution metrics with cache performance tracking.
+
+        Returns:
+            ExecutionMetrics object with detailed statistics
+        """
+        return self._execution_metrics
+
+    def get_execution_metrics_dict(self) -> Dict[str, Any]:
+        """Get execution metrics as a dictionary.
+
+        Returns:
+            Dictionary with all execution metrics including:
+            - total_executions: Total number of tool executions
+            - cache_hit_rate: Cache hit rate (0-1)
+            - success_rate: Success rate (0-1)
+            - avg_execution_time: Average execution time in seconds
+            - median_execution_time: Median execution time in seconds
+            - p95_execution_time: 95th percentile execution time
+            - top_tools: List of (tool_name, count) tuples
+            - tool_errors: Dict of tool_name -> error_count
+        """
+        return self._execution_metrics.to_dict()
+
+    def reset_execution_metrics(self) -> None:
+        """Reset execution metrics.
+
+        Clears all collected execution statistics.
+        """
+        self._execution_metrics.reset()
 
     def clear_failed_signatures(self) -> None:
         """Clear the failed signature cache."""

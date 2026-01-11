@@ -83,7 +83,9 @@ Related Modules:
 from __future__ import annotations
 
 import logging
+import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
 if TYPE_CHECKING:
@@ -91,6 +93,40 @@ if TYPE_CHECKING:
     from victor.core.vertical_types import TieredToolConfig
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Cache Entry with TTL and Version Tracking
+# =============================================================================
+
+
+@dataclass
+class ExtensionCacheEntry:
+    """Cache entry with TTL and version tracking.
+
+    Attributes:
+        value: The cached extension instance
+        timestamp: When the entry was created
+        ttl: Time-to-live in seconds (None = no expiration)
+        version: Version string for cache invalidation
+        access_count: Number of times accessed
+    """
+
+    value: Any
+    timestamp: float = field(default_factory=time.time)
+    ttl: Optional[int] = None  # Default TTL from settings
+    version: str = ""
+    access_count: int = 0
+
+    def is_expired(self) -> bool:
+        """Check if entry has expired based on TTL."""
+        if not self.ttl:
+            return False
+        return (time.time() - self.timestamp) > self.ttl
+
+    def get_age(self) -> float:
+        """Get age of entry in seconds."""
+        return time.time() - self.timestamp
 
 
 class VerticalExtensionLoader(ABC):
@@ -119,16 +155,24 @@ class VerticalExtensionLoader(ABC):
     #               "tiered_tools"
     required_extensions: ClassVar[Set[str]] = set()
 
+    # Default TTL for extension cache entries (in seconds)
+    # None = no expiration, 3600 = 1 hour default
+    default_extension_ttl: ClassVar[Optional[int]] = 3600
+
     # Extension cache (shared across all verticals)
-    _extensions_cache: Dict[str, Any] = {}
+    # Now uses ExtensionCacheEntry for TTL and version tracking
+    _extensions_cache: Dict[str, ExtensionCacheEntry] = {}
+
+    # Version tracker for cache invalidation
+    _extension_versions: Dict[str, str] = {}
 
     # =========================================================================
     # Extension Caching Infrastructure
     # =========================================================================
 
     @classmethod
-    def _get_cached_extension(cls, key: str, factory: callable) -> Any:
-        """Get extension from cache or create and cache it.
+    def _get_cached_extension(cls, key: str, factory: callable, ttl: Optional[int] = None) -> Any:
+        """Get extension from cache or create and cache it with TTL support.
 
         This helper enables fine-grained caching of individual extension
         instances, avoiding repeated object creation when extensions are
@@ -142,6 +186,7 @@ class VerticalExtensionLoader(ABC):
                  "safety_extension", "workflow_provider")
             factory: Zero-argument callable that creates the extension instance.
                      Only called if the extension is not already cached.
+            ttl: Time-to-live in seconds (None = use default_extension_ttl)
 
         Returns:
             Cached or newly created extension instance.
@@ -156,9 +201,54 @@ class VerticalExtensionLoader(ABC):
         """
         # Use composite key to avoid collisions between different vertical classes
         cache_key = f"{cls.__name__}:{key}"
-        if cache_key not in cls._extensions_cache:
-            cls._extensions_cache[cache_key] = factory()
-        return cls._extensions_cache[cache_key]
+
+        # Get version for this key if available
+        version = cls._extension_versions.get(cache_key, "")
+
+        # Check cache with TTL validation
+        if cache_key in cls._extensions_cache:
+            entry = cls._extensions_cache[cache_key]
+
+            # Check if entry is expired
+            if entry.is_expired():
+                logger.debug(
+                    f"Extension cache entry expired for {cache_key} "
+                    f"(age={entry.get_age():.1f}s, ttl={entry.ttl})"
+                )
+                del cls._extensions_cache[cache_key]
+            # Check if version has changed
+            elif version and entry.version != version:
+                logger.debug(
+                    f"Extension cache version mismatch for {cache_key} "
+                    f"(cached={entry.version}, current={version})"
+                )
+                del cls._extensions_cache[cache_key]
+            # Cache hit - update access count and return
+            else:
+                entry.access_count += 1
+                logger.debug(
+                    f"Extension cache hit for {cache_key} "
+                    f"(accesses={entry.access_count}, age={entry.get_age():.1f}s)"
+                )
+                return entry.value
+
+        # Cache miss - create new entry
+        logger.debug(f"Extension cache miss for {cache_key} - creating new instance")
+        value = factory()
+
+        # Use provided TTL or default
+        if ttl is None:
+            ttl = cls.default_extension_ttl
+
+        # Create and cache entry
+        entry = ExtensionCacheEntry(
+            value=value,
+            ttl=ttl,
+            version=version,
+        )
+        cls._extensions_cache[cache_key] = entry
+
+        return value
 
     @classmethod
     def _get_extension_factory(
@@ -540,7 +630,11 @@ class VerticalExtensionLoader(ABC):
 
         # Return cached extensions if available and caching enabled
         if use_cache and cache_key in cls._extensions_cache:
-            return cls._extensions_cache[cache_key]
+            # Handle both ExtensionCacheEntry (new) and raw VerticalExtensions (old for compatibility)
+            cached = cls._extensions_cache[cache_key]
+            if isinstance(cached, ExtensionCacheEntry):
+                return cached.value
+            return cached
 
         # Determine strict mode
         is_strict = strict if strict is not None else cls.strict_extension_loading
@@ -634,8 +728,13 @@ class VerticalExtensionLoader(ABC):
             tiered_tool_config=tiered_tools,
         )
 
-        # Cache the extensions
-        cls._extensions_cache[cache_key] = extensions
+        # Cache the extensions using ExtensionCacheEntry
+        cache_entry = ExtensionCacheEntry(
+            value=extensions,
+            ttl=cls.default_extension_ttl,
+            version="",
+        )
+        cls._extensions_cache[cache_key] = cache_entry
         return extensions
 
     @classmethod
@@ -649,6 +748,127 @@ class VerticalExtensionLoader(ABC):
         """
         return None
 
+    # =========================================================================
+    # Enhanced Cache Invalidation with Version Tracking
+    # =========================================================================
+
+    @classmethod
+    def invalidate_extension_cache(
+        cls,
+        extension_key: Optional[str] = None,
+        version: Optional[str] = None,
+    ) -> int:
+        """Invalidate cache entries by key or version.
+
+        Args:
+            extension_key: Specific extension key to invalidate (e.g., "middleware",
+                          "safety_extension"). If None, checks version instead.
+            version: Version to invalidate. All cache entries with this version
+                     will be invalidated. If None and extension_key is None,
+                     clears all for this vertical.
+
+        Returns:
+            Number of cache entries invalidated.
+
+        Examples:
+            # Invalidate specific extension
+            cls.invalidate_extension_cache(extension_key="middleware")
+
+            # Invalidate all entries with a specific version
+            cls.invalidate_extension_cache(version="1.2.3")
+
+            # Invalidate all for this vertical
+            cls.invalidate_extension_cache()
+        """
+        cache_prefix = f"{cls.__name__}:"
+        count = 0
+
+        if extension_key:
+            # Invalidate specific extension
+            cache_key = f"{cache_prefix}{extension_key}"
+            if cache_key in cls._extensions_cache:
+                del cls._extensions_cache[cache_key]
+                count += 1
+                logger.debug(f"Invalidated extension cache: {cache_key}")
+        elif version:
+            # Invalidate all entries with this version
+            keys_to_remove = [
+                k for k, v in cls._extensions_cache.items()
+                if k.startswith(cache_prefix) and v.version == version
+            ]
+            for key in keys_to_remove:
+                del cls._extensions_cache[key]
+                count += 1
+            logger.debug(
+                f"Invalidated {count} extension(s) for version {version} "
+                f"in vertical {cls.__name__}"
+            )
+        else:
+            # Clear all for this vertical
+            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(cache_prefix)]
+            for key in keys_to_remove:
+                del cls._extensions_cache[key]
+                count = len(keys_to_remove)
+            logger.debug(f"Cleared {count} extension(s) for vertical {cls.__name__}")
+
+        return count
+
+    @classmethod
+    def update_extension_version(cls, extension_key: str, version: str) -> None:
+        """Update version for an extension to trigger cache invalidation.
+
+        When an extension's implementation changes, call this method to update
+        the version. Subsequent cache accesses will invalidate old cached entries.
+
+        Args:
+            extension_key: Extension key (e.g., "middleware", "safety_extension")
+            version: New version string
+
+        Example:
+            cls.update_extension_version("middleware", "2.0.0")
+        """
+        cache_key = f"{cls.__name__}:{extension_key}"
+        cls._extension_versions[cache_key] = version
+        logger.debug(f"Updated extension version: {cache_key} -> {version}")
+
+    @classmethod
+    def get_extension_cache_stats(cls) -> Dict[str, Any]:
+        """Get cache statistics for this vertical.
+
+        Returns:
+            Dictionary with cache statistics including:
+            - total_entries: Number of cached extensions
+            - expired_entries: Number of expired entries
+            - total_accesses: Sum of access counts
+            - avg_age: Average age of cache entries
+        """
+        cache_prefix = f"{cls.__name__}:"
+        entries = [
+            (k, v) for k, v in cls._extensions_cache.items()
+            if k.startswith(cache_prefix)
+        ]
+
+        if not entries:
+            return {
+                "vertical": cls.__name__,
+                "total_entries": 0,
+                "expired_entries": 0,
+                "total_accesses": 0,
+                "avg_age": 0.0,
+            }
+
+        expired_count = sum(1 for _, v in entries if v.is_expired())
+        total_accesses = sum(v.access_count for _, v in entries)
+        avg_age = sum(v.get_age() for _, v in entries) / len(entries)
+
+        return {
+            "vertical": cls.__name__,
+            "total_entries": len(entries),
+            "expired_entries": expired_count,
+            "total_accesses": total_accesses,
+            "avg_age": avg_age,
+        }
+
     @classmethod
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:
         """Clear the extension cache for this vertical.
@@ -659,6 +879,7 @@ class VerticalExtensionLoader(ABC):
         """
         if clear_all:
             cls._extensions_cache.clear()
+            cls._extension_versions.clear()
         else:
             cache_key = cls.__name__
             # Clear composite extensions cache entry
@@ -668,3 +889,7 @@ class VerticalExtensionLoader(ABC):
             keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
             for key in keys_to_remove:
                 cls._extensions_cache.pop(key, None)
+            # Also clear version entries
+            version_keys = [k for k in cls._extension_versions if k.startswith(prefix)]
+            for key in version_keys:
+                cls._extension_versions.pop(key, None)
