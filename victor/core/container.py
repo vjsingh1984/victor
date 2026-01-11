@@ -180,7 +180,9 @@ class ServiceNotFoundError(Exception):
 
     def __init__(self, service_type: Type):
         self.service_type = service_type
-        super().__init__(f"Service not registered: {service_type.__name__}")
+        # Handle both Type objects and string service names
+        name = service_type.__name__ if hasattr(service_type, "__name__") else str(service_type)
+        super().__init__(f"Service not registered: {name}")
 
 
 class ServiceAlreadyRegisteredError(Exception):

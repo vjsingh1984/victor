@@ -401,11 +401,13 @@ class WorkflowServiceProvider:
             WorkflowCompilerImpl instance
         """
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+        from victor.workflows.validator import WorkflowValidator
         from victor.workflows.yaml_loader import YAMLWorkflowProvider
 
-        # Get dependencies from DI container
-        factory = self.container.get("NodeExecutorFactoryProtocol")
-        validator = self.container.get("WorkflowValidator")
+        # Get dependencies from DI container (use actual types, not strings)
+        factory = self.container.get(NodeExecutorFactoryProtocol)
+        validator = self.container.get(WorkflowValidator)
 
         # Create YAML provider directly (not registered in container)
         cache_enabled = getattr(self._settings, "enable_workflow_cache", True)
