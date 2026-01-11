@@ -560,7 +560,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         self._continuation_patience: int = 10
 
         # Agent mode settings (plan/explore get higher multipliers)
-        self._mode_exploration_multiplier: float = 1.0
+        # Note: Uses ModeAwareMixin.exploration_multiplier property instead of local field
 
         # Global settings
         global_config = self._config_loader.get_global_config()
@@ -614,7 +614,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough file exploration.
         """
-        effective = int(self._base_max_overlapping_reads * self._mode_exploration_multiplier)
+        effective = int(self._base_max_overlapping_reads * self.exploration_multiplier)
         return max(self._base_max_overlapping_reads, effective)
 
     @property
@@ -623,7 +623,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough search exploration.
         """
-        effective = int(self._base_max_searches_per_prefix * self._mode_exploration_multiplier)
+        effective = int(self._base_max_searches_per_prefix * self.exploration_multiplier)
         return max(self._base_max_searches_per_prefix, effective)
 
     # =========================================================================
@@ -734,7 +734,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if self._task_config is None:
             return 8  # Default fallback
         base = self._task_config.max_exploration_iterations
-        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        combined_multiplier = self._exploration_multiplier * self.exploration_multiplier
         return int(base * combined_multiplier)
 
     def set_mode_exploration_multiplier(self, multiplier: float) -> None:
@@ -743,19 +743,19 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Plan mode (2.5x) and Explore mode (3.0x) need more iterations
         since their purpose is thorough exploration before action.
 
-        Also syncs with BudgetManager if available.
+        Note: The actual multiplier value comes from ModeAwareMixin.exploration_multiplier
+        which is synced with the mode controller. This method now just syncs with
+        BudgetManager and logs for debugging.
 
         Args:
             multiplier: Mode-specific multiplier (1.0 for build, 2.5 for plan, 3.0 for explore)
         """
-        self._mode_exploration_multiplier = multiplier
-
         # Sync with BudgetManager if available
         if self._budget_manager:
             self._budget_manager.set_mode_multiplier(multiplier)
 
         logger.info(
-            f"UnifiedTaskTracker: mode_exploration_multiplier={multiplier}, "
+            f"UnifiedTaskTracker: mode multiplier={multiplier}, "
             f"effective_max={self.max_exploration_iterations}"
         )
 
@@ -772,11 +772,11 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Sync current multipliers
         if budget_manager:
-            budget_manager.set_mode_multiplier(self._mode_exploration_multiplier)
+            budget_manager.set_mode_multiplier(self.exploration_multiplier)
             budget_manager.set_model_multiplier(self._exploration_multiplier)
             logger.debug(
                 f"UnifiedTaskTracker: BudgetManager attached with "
-                f"mode_multiplier={self._mode_exploration_multiplier}, "
+                f"mode_multiplier={self.exploration_multiplier}, "
                 f"model_multiplier={self._exploration_multiplier}"
             )
 
@@ -1313,7 +1313,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Apply combined multiplier (model * mode)
         # Mode multipliers: Build=1.0, Plan=2.5, Explore=3.0
-        combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
+        combined_multiplier = self._exploration_multiplier * self.exploration_multiplier
         model_adjusted = int(base_max * combined_multiplier)
 
         # Apply productivity ratio adjustment
@@ -1351,7 +1351,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Apply mode multiplier for PLAN/EXPLORE modes
         # This allows more exploration before triggering loop detection
-        effective_threshold = int(base_threshold * self._mode_exploration_multiplier)
+        effective_threshold = int(base_threshold * self.exploration_multiplier)
 
         # Ensure minimum threshold of base to prevent immediate loops
         return max(base_threshold, effective_threshold)
