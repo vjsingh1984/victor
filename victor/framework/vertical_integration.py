@@ -125,7 +125,7 @@ import asyncio
 import hashlib
 import inspect
 import logging
-import pickle
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -1253,25 +1253,19 @@ class VerticalIntegrationPipeline:
         Returns:
             Cached IntegrationResult or None
         """
-        # Simple in-memory cache (can be extended to use CacheCoordinator later)
+        # Simple in-memory cache using JSON serialization
+        # Note: Uses to_dict()/from_dict() to avoid pickle issues with
+        # unpicklable middleware objects. The context is NOT cached.
         cached_data = self._cache.get(cache_key)
         if cached_data:
             try:
-                result = pickle.loads(cached_data)
-
-                # Verify result integrity
-                if not isinstance(result, IntegrationResult):
-                    logger.warning(
-                        f"Cache corruption: expected IntegrationResult, got {type(result)}"
-                    )
-                    del self._cache[cache_key]
-                    return None
+                result = IntegrationResult.from_dict(json.loads(cached_data))
 
                 # Log metrics
                 logger.debug(f"Loaded cached integration: {cache_key}")
                 return result
 
-            except Exception as e:
+            except (json.JSONDecodeError, TypeError, KeyError) as e:
                 logger.warning(f"Failed to load from cache: {e}")
                 # Clear corrupted cache entry
                 del self._cache[cache_key]
@@ -1281,17 +1275,21 @@ class VerticalIntegrationPipeline:
     def _save_to_cache(self, cache_key: str, result: "IntegrationResult") -> None:
         """Save integration result to in-memory cache.
 
+        Uses JSON serialization via to_dict() to avoid pickle issues with
+        unpicklable middleware objects. Note: The VerticalContext is NOT
+        cached as it contains unpicklable references.
+
         Args:
             cache_key: Cache key
             result: Integration result to cache
         """
         try:
-            # Serialize result
-            data = pickle.dumps(result)
+            # Serialize result using JSON (avoids pickle issues)
+            data = json.dumps(result.to_dict())
 
             # Save to cache
             if not hasattr(self, "_cache"):
-                self._cache: Dict[str, bytes] = {}
+                self._cache: Dict[str, str] = {}
 
             self._cache[cache_key] = data
 
@@ -1302,7 +1300,7 @@ class VerticalIntegrationPipeline:
 
             logger.debug(f"Cached integration result: {cache_key}")
 
-        except Exception as e:
+        except (TypeError, ValueError) as e:
             logger.warning(f"Failed to save to cache: {e}")
 
     async def apply_async(
