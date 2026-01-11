@@ -1,0 +1,34 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Mode Configuration for DataAnalysis Vertical
+
+vertical_name: dataanalysis
+default_mode: build
+
+modes:
+  build:
+    name: build
+    display_name: Build
+    exploration: standard
+    edit_permission: full
+    tool_budget_multiplier: 1.0
+    max_iterations: 10
+    description: "Standard data analysis mode with full edit permissions"
+
+  plan:
+    name: plan
+    display_name: Plan
+    exploration: thorough
+    edit_permission: sandbox
+    tool_budget_multiplier: 2.5
+    max_iterations: 25
+    description: "Planning mode with 2.5x exploration and sandbox-only edits"
+
+  explore:
+    name: explore
+    display_name: Explore
+    exploration: deep
+    edit_permission: none
+    tool_budget_multiplier: 3.0
+    max_iterations: 30
+    description: "Exploration mode with 3.0x exploration and no edits"

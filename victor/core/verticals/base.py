@@ -500,6 +500,50 @@ class VerticalBase(
         """
         return ToolSet.from_tools(cls.get_tools())
 
+    # =========================================================================
+    # Mode Configuration (Canonical - using ModeConfigRegistry)
+    # =========================================================================
+
+    @classmethod
+    def get_mode_config(cls, mode_name: str):
+        """Get mode configuration from centralized registry.
+
+        This replaces the legacy get_mode_config() method with a canonical
+        implementation that uses the ModeConfigRegistry for data-driven
+        configuration.
+
+        Args:
+            mode_name: Name of the mode (e.g., "build", "plan", "explore")
+
+        Returns:
+            AgentMode instance with mode configuration
+
+        Example:
+            mode = CodingVertical.get_mode_config("plan")
+            print(mode.exploration)  # ExplorationLevel.THOROUGH
+            print(mode.tool_budget_multiplier)  # 2.5
+        """
+        from victor.core.config import ModeConfigRegistry
+
+        registry = ModeConfigRegistry.get_instance()
+        return registry.get_mode(cls.name, mode_name)
+
+    @classmethod
+    def list_modes(cls) -> List[str]:
+        """List available modes for this vertical.
+
+        Returns:
+            List of mode names available for this vertical.
+
+        Example:
+            modes = CodingVertical.list_modes()
+            # ["build", "plan", "explore"]
+        """
+        from victor.core.config import ModeConfigRegistry
+
+        registry = ModeConfigRegistry.get_instance()
+        return registry.list_modes(cls.name)
+
     @classmethod
     async def create_agent(
         cls,
