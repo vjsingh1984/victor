@@ -1182,14 +1182,17 @@ class GroundingVerifier:
                     given_parts = clean_path.split("/")
                     actual_parts = actual_path.split("/")
 
-                    # Check if given path matches the end of actual path (allowing for one level of nesting)
-                    # Example: "utils/file.py" matches "project/utils/file.py"
-                    # Example: "project/utils/file.py" matches "project/project/utils/file.py"
+                    # Only validate as nested if:
+                    # 1. Given path has fewer or equal components to actual path
+                    # 2. The given path matches the LAST N components of the actual path
+                    # This rejects: "wrong/path/main.py" vs "main.py" (given has more components)
+                    # This accepts: "utils/file.py" vs "project/utils/file.py" (proper suffix match)
+                    # This accepts: "project/utils/file.py" vs "project/project/utils/file.py" (nested)
                     is_valid_nested = False
-                    for i in range(1, min(len(given_parts) + 1, len(actual_parts) + 1)):
-                        if actual_parts[-i:] == given_parts[-i:]:
+                    if len(given_parts) <= len(actual_parts):
+                        # Check if the given path is a suffix of the actual path
+                        if actual_parts[-len(given_parts):] == given_parts:
                             is_valid_nested = True
-                            break
 
                     if is_valid_nested:
                         # Valid nested structure reference - count as verified
