@@ -62,6 +62,10 @@ from victor.agent.synthesis_checkpoint import (
     CheckpointResult,
     get_checkpoint_for_complexity,
 )
+from victor.config.tool_selection_defaults import (
+    ToolPipelineDefaults,
+    IdempotentTools,
+)
 
 # Import native compute_signature for 10-20x faster signature generation
 try:
@@ -85,9 +89,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ToolPipelineConfig:
-    """Configuration for tool pipeline."""
+    """Configuration for tool pipeline.
 
-    tool_budget: int = 25
+    Uses centralized defaults from ToolPipelineDefaults.
+    """
+
+    tool_budget: int = ToolPipelineDefaults.TOOL_BUDGET
     enable_caching: bool = True
     enable_analytics: bool = True
     enable_failed_signature_tracking: bool = True
@@ -99,14 +106,14 @@ class ToolPipelineConfig:
 
     # Parallel execution settings
     enable_parallel_execution: bool = True
-    max_concurrent_tools: int = 5
-    parallel_batch_size: int = 10
-    parallel_timeout_per_tool: float = 60.0
+    max_concurrent_tools: int = ToolPipelineDefaults.MAX_CONCURRENT_TOOLS
+    parallel_batch_size: int = ToolPipelineDefaults.PARALLEL_BATCH_SIZE
+    parallel_timeout_per_tool: float = ToolPipelineDefaults.PARALLEL_TIMEOUT_PER_TOOL
 
     # Session-level result caching for idempotent tools
     # This prevents re-reading same files during a session (helps DeepSeek, Ollama)
     enable_idempotent_caching: bool = True
-    idempotent_cache_max_size: int = 100  # Max entries in cache
+    idempotent_cache_max_size: int = ToolPipelineDefaults.IDEMPOTENT_CACHE_MAX_SIZE
 
     # Batch-level deduplication for providers that send duplicate tool calls
     # (helps DeepSeek, Ollama which sometimes issue identical calls in same batch)
@@ -124,22 +131,19 @@ class ToolPipelineConfig:
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
 # Include both lowercase and capitalized variants for tool name normalization
-IDEMPOTENT_TOOLS = frozenset(
+# Extended from centralized IdempotentTools with additional pipeline-specific variants
+IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
     {
-        "read",
-        "Read",  # Capitalized variant
-        "read_file",  # Alternative name
-        "list_directory",
-        "grep",
-        "Grep",  # Capitalized variant
-        "code_search",
+        # Additional capitalized variants and aliases for tool name normalization
+        "Read",
+        "Grep",
+        "Graph",
+        "Glob",
+        "read_file",  # Alternative name for 'read'
+        "list_directory",  # Alternative name for 'ls'
+        "code_search",  # Semantic code search alias
         "semantic_code_search",
-        "graph",  # Graph queries are read-only
-        "Graph",  # Capitalized variant
-        "refs",  # Reference lookup is read-only
-        "ls",  # Directory listing
-        "glob",  # Glob file search is read-only
-        "Glob",  # Capitalized variant
+        "refs",  # Reference lookup
     }
 )
 
@@ -209,43 +213,85 @@ class ToolRateLimiter:
 
 
 class LRUToolCache:
-    """LRU (Least Recently Used) cache for idempotent tool results.
+    """LRU (Least Recently Used) cache with TTL for idempotent tool results.
 
-    Provides efficient caching with LRU eviction policy, which is more
-    optimal than FIFO for caching tool results since frequently accessed
-    results stay in cache longer.
+    Provides efficient caching with LRU eviction policy and time-based expiry.
+    This prevents stale results from being returned after files change and
+    bounds memory growth for long-running sessions.
 
     Attributes:
         _cache: OrderedDict maintaining insertion/access order
-        _max_size: Maximum number of entries to cache
+        _timestamps: Dict mapping keys to creation timestamps
+        _max_size: Maximum number of entries to cache (default: 50)
+        _ttl_seconds: Time-to-live in seconds (default: 300s = 5 minutes)
 
     Example:
-        cache = LRUToolCache(max_size=100)
+        cache = LRUToolCache(max_size=50, ttl_seconds=300)
         cache.set("key", result)
-        result = cache.get("key")  # Returns cached result and updates LRU order
+        result = cache.get("key")  # Returns cached result if not expired
     """
 
-    def __init__(self, max_size: int = 100):
-        """Initialize the LRU cache.
+    def __init__(
+        self,
+        max_size: int = ToolPipelineDefaults.IDEMPOTENT_CACHE_MAX_SIZE,
+        ttl_seconds: float = ToolPipelineDefaults.IDEMPOTENT_CACHE_TTL,
+    ):
+        """Initialize the LRU cache with TTL.
 
         Args:
             max_size: Maximum number of entries to cache
+            ttl_seconds: Time-to-live in seconds
         """
         self._cache: OrderedDict = OrderedDict()
+        self._timestamps: Dict[str, float] = {}
         self._max_size = max_size
+        self._ttl_seconds = ttl_seconds
+
+    def _is_expired(self, key: str) -> bool:
+        """Check if a cache entry has expired.
+
+        Args:
+            key: Cache key to check
+
+        Returns:
+            True if entry is expired or timestamp missing
+        """
+        if key not in self._timestamps:
+            return True
+        age = time.time() - self._timestamps[key]
+        return age > self._ttl_seconds
+
+    def _evict_expired(self) -> int:
+        """Remove all expired entries from the cache.
+
+        Returns:
+            Number of entries evicted
+        """
+        expired_keys = [k for k in self._cache if self._is_expired(k)]
+        for key in expired_keys:
+            del self._cache[key]
+            self._timestamps.pop(key, None)
+        return len(expired_keys)
 
     def get(self, key: str) -> Optional[Any]:
         """Get a value from the cache.
 
-        If found, the entry is moved to the end (most recently used).
+        If found and not expired, the entry is moved to the end (most recently used).
+        Expired entries are automatically removed.
 
         Args:
             key: Cache key
 
         Returns:
-            Cached value or None if not found
+            Cached value or None if not found or expired
         """
         if key in self._cache:
+            # Check TTL expiration
+            if self._is_expired(key):
+                # Remove expired entry
+                del self._cache[key]
+                self._timestamps.pop(key, None)
+                return None
             # Move to end (most recently used)
             self._cache.move_to_end(key)
             return self._cache[key]
@@ -254,33 +300,43 @@ class LRUToolCache:
     def set(self, key: str, value: Any) -> None:
         """Set a value in the cache.
 
-        If the key exists, it's updated and moved to the end.
-        If cache is full, the oldest entry (least recently used) is evicted.
+        If the key exists, it's updated and moved to the end with refreshed TTL.
+        If cache is full, expired entries are evicted first, then LRU eviction.
 
         Args:
             key: Cache key
             value: Value to cache
         """
+        current_time = time.time()
+
         if key in self._cache:
             # Update existing and move to end
             self._cache.move_to_end(key)
         self._cache[key] = value
+        self._timestamps[key] = current_time
 
-        # Evict oldest if over capacity
+        # Evict expired entries first (cheaper than LRU for memory)
         if len(self._cache) > self._max_size:
-            self._cache.popitem(last=False)  # Remove oldest (first) item
+            self._evict_expired()
+
+        # Still over capacity? LRU eviction
+        while len(self._cache) > self._max_size:
+            oldest_key, _ = self._cache.popitem(last=False)
+            self._timestamps.pop(oldest_key, None)
 
     def clear(self) -> None:
         """Clear all entries from the cache."""
         self._cache.clear()
+        self._timestamps.clear()
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""
         return len(self._cache)
 
     def items(self):
-        """Return all items in the cache."""
-        return self._cache.items()
+        """Return all non-expired items in the cache."""
+        # Filter out expired entries
+        return [(k, v) for k, v in self._cache.items() if not self._is_expired(k)]
 
     def remove(self, key: str) -> bool:
         """Remove a specific key from the cache.
@@ -293,8 +349,24 @@ class LRUToolCache:
         """
         if key in self._cache:
             del self._cache[key]
+            self._timestamps.pop(key, None)
             return True
         return False
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for monitoring.
+
+        Returns:
+            Dict with size, max_size, ttl_seconds, expired_count
+        """
+        expired_count = sum(1 for k in self._cache if self._is_expired(k))
+        return {
+            "size": len(self._cache),
+            "max_size": self._max_size,
+            "ttl_seconds": self._ttl_seconds,
+            "expired_count": expired_count,
+            "active_count": len(self._cache) - expired_count,
+        }
 
 
 @dataclass

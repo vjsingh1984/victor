@@ -39,6 +39,11 @@ from victor.tools.metadata_registry import (
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,
 )
+from victor.config.tool_selection_defaults import (
+    SemanticSelectorDefaults,
+    FallbackTools,
+    QueryPatterns,
+)
 
 # Import for type checking only (avoid circular imports)
 from typing import TYPE_CHECKING
@@ -113,11 +118,13 @@ class SemanticToolSelector:
         ollama_base_url: str = "http://localhost:11434",
         cache_embeddings: bool = True,
         cache_dir: Optional[Path] = None,
-        cost_aware_selection: bool = True,
-        cost_penalty_factor: float = 0.05,
+        cost_aware_selection: bool = SemanticSelectorDefaults.COST_AWARE_SELECTION,
+        cost_penalty_factor: float = SemanticSelectorDefaults.COST_PENALTY_FACTOR,
         sequence_tracking: bool = True,
     ):
         """Initialize semantic tool selector.
+
+        Uses centralized defaults from SemanticSelectorDefaults.
 
         Args:
             embedding_model: Model to use for embeddings
@@ -128,8 +135,8 @@ class SemanticToolSelector:
             ollama_base_url: Ollama/vLLM/LMStudio API base URL
             cache_embeddings: Cache tool embeddings (recommended)
             cache_dir: Directory to store embedding cache (default: ~/.victor/embeddings/)
-            cost_aware_selection: Deprioritize high-cost tools (default: True)
-            cost_penalty_factor: Penalty per cost weight (default: 0.05)
+            cost_aware_selection: Deprioritize high-cost tools
+            cost_penalty_factor: Penalty per cost weight
             sequence_tracking: Enable tool sequence tracking for 15-20% boost (default: True)
         """
         self.embedding_model = embedding_model
@@ -545,24 +552,13 @@ class SemanticToolSelector:
 
     # Tools for conceptual queries - forces semantic search as primary
     # Excludes ls to prevent LLM from exploring instead of searching
-    # NOTE: Uses canonical short names for token efficiency
-    CONCEPTUAL_FALLBACK_TOOLS: List[str] = [
-        "search",  # MUST be first - primary tool for conceptual queries
-        "read",  # To examine results after search
-    ]
+    # Uses centralized FallbackTools from tool_selection_defaults
+    CONCEPTUAL_FALLBACK_TOOLS: List[str] = list(FallbackTools.CONCEPTUAL_FALLBACK_TOOLS)
 
     # Common fallback tools - used when semantic selection returns too few results
     # These are the most universally useful tools
-    # NOTE: Uses canonical short names for token efficiency
-    COMMON_FALLBACK_TOOLS: List[str] = [
-        "read",
-        "grep",
-        "search",
-        "ls",
-        "shell",
-        "write",
-        "edit",
-    ]
+    # Uses centralized FallbackTools from tool_selection_defaults
+    COMMON_FALLBACK_TOOLS: List[str] = list(FallbackTools.COMMON_FALLBACK_TOOLS)
 
     def _get_fallback_tools(
         self, tools: "ToolRegistry", max_tools: int = 5, query: str = ""
@@ -1188,7 +1184,7 @@ class SemanticToolSelector:
         tools: ToolRegistry,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         max_tools: int = 5,
-        similarity_threshold: float = 0.15,
+        similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
     ) -> List[ToolDefinition]:
         """Select tools with full conversation context awareness (Phase 2).
 
@@ -1306,7 +1302,9 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append((tool, 0.9))
+                selected_tools.append(
+                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
+                )
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1316,8 +1314,8 @@ class SemanticToolSelector:
                 selected_names.add(tool.name)
 
         # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
-        MIN_TOOLS_THRESHOLD = 2
-        if len(selected_tools) < MIN_TOOLS_THRESHOLD:
+        min_threshold = SemanticSelectorDefaults.MIN_TOOLS_THRESHOLD
+        if len(selected_tools) < min_threshold:
             fallback_names = self._get_fallback_tools(
                 tools, max_tools - len(selected_tools), query=user_message
             )
@@ -1325,10 +1323,12 @@ class SemanticToolSelector:
                 if fallback_name not in selected_names:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
-                        selected_tools.append((fallback_tool, 0.5))
+                        selected_tools.append(
+                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                        )
                         selected_names.add(fallback_name)
             logger.debug(
-                f"Added {len(fallback_names)} fallback tools (selection returned < {MIN_TOOLS_THRESHOLD})"
+                f"Added {len(fallback_names)} fallback tools (selection returned < {min_threshold})"
             )
 
         # Log selection
@@ -1369,7 +1369,7 @@ class SemanticToolSelector:
         user_message: str,
         tools: ToolRegistry,
         max_tools: int = 5,
-        similarity_threshold: float = 0.15,
+        similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
     ) -> List[ToolDefinition]:
         """Select relevant tools using semantic similarity with category filtering.
 
@@ -1448,7 +1448,9 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append((tool, 0.9))
+                selected_tools.append(
+                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
+                )
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1459,8 +1461,8 @@ class SemanticToolSelector:
 
         # Phase 8: Smart fallback - if too few tools selected, add common fallback tools
         # This prevents broadcasting ALL tools (which wastes tokens)
-        MIN_TOOLS_THRESHOLD = 2
-        if len(selected_tools) < MIN_TOOLS_THRESHOLD:
+        min_threshold = SemanticSelectorDefaults.MIN_TOOLS_THRESHOLD
+        if len(selected_tools) < min_threshold:
             fallback_names = self._get_fallback_tools(
                 tools, max_tools - len(selected_tools), query=user_message
             )
@@ -1468,10 +1470,12 @@ class SemanticToolSelector:
                 if fallback_name not in selected_names:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
-                        selected_tools.append((fallback_tool, 0.5))  # Default score for fallback
+                        selected_tools.append(
+                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                        )
                         selected_names.add(fallback_name)
             logger.debug(
-                f"Added {len(fallback_names)} fallback tools (semantic selection returned < {MIN_TOOLS_THRESHOLD})"
+                f"Added {len(fallback_names)} fallback tools (semantic selection returned < {min_threshold})"
             )
 
         # Log selection
@@ -1742,7 +1746,7 @@ class SemanticToolSelector:
         classification_result: "ClassificationResult",
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         max_tools: int = 5,
-        base_similarity_threshold: float = 0.15,
+        base_similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
     ) -> List[ToolDefinition]:
         """Select tools using classification result for smarter selection.
 
@@ -1857,7 +1861,9 @@ class SemanticToolSelector:
         mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append((tool, 0.9))
+                selected_tools.append(
+                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
+                )
                 selected_names.add(tool.name)
 
         # Add top semantic matches
@@ -1867,8 +1873,8 @@ class SemanticToolSelector:
                 selected_names.add(tool.name)
 
         # Smart fallback if too few tools
-        MIN_TOOLS = 2
-        if len(selected_tools) < MIN_TOOLS:
+        min_threshold = SemanticSelectorDefaults.MIN_TOOLS_THRESHOLD
+        if len(selected_tools) < min_threshold:
             fallback_names = self._get_fallback_tools(
                 tools, max_tools - len(selected_tools), query=user_message
             )
@@ -1876,7 +1882,9 @@ class SemanticToolSelector:
                 if fallback_name not in selected_names and fallback_name not in excluded_tools:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
-                        selected_tools.append((fallback_tool, 0.5))
+                        selected_tools.append(
+                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                        )
                         selected_names.add(fallback_name)
 
         # Log selection
