@@ -84,7 +84,9 @@ class TestCLISessionInitialization:
 
         # Verify overrides were applied
         mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(50, user_override=True)
+        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
+            50, user_override=True
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -231,8 +233,10 @@ class TestCLISessionLifecycle:
 
             # Process message
             mock_agent.provider.supports_streaming.return_value = True
+
             async def mock_stream(msg):
                 yield MagicMock(content="Response", type="content")
+
             mock_agent.stream_chat = mock_stream
 
             response = await handler.process_message(agent, "Test", stream=True)
@@ -305,6 +309,7 @@ class TestOneShotIntegration:
         mock_shim.emit_session_start = MagicMock()
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+
             async def mock_stream(msg):
                 yield MagicMock(content="One-shot response", type="content")
 

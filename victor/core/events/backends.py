@@ -319,7 +319,9 @@ class InMemoryEventBackend:
                 # Dispatch to handlers concurrently
                 for subscription in subscriptions:
                     try:
-                        task = asyncio.create_task(self._safe_call_handler(subscription.handler, event))
+                        task = asyncio.create_task(
+                            self._safe_call_handler(subscription.handler, event)
+                        )
                         self._pending_tasks.add(task)
                         task.add_done_callback(self._pending_tasks.discard)
                     except Exception:

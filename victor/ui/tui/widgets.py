@@ -326,7 +326,7 @@ class InputWidget(Static):
             InputWidget._history_loaded = True
             # Use a short timer to defer loading, allowing TUI to render first
             # Widget has access to app via self.app when mounted
-            if hasattr(self, 'app') and self.app is not None:
+            if hasattr(self, "app") and self.app is not None:
                 self.app.set_timer(0.1, self._start_history_load)
             else:
                 # Fallback: load immediately if no app context

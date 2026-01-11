@@ -108,7 +108,9 @@ class TestTUISessionInitialization:
 
         # Verify custom settings were applied
         mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(200, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(100, user_override=True)
+        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
+            100, user_override=True
+        )
 
 
 class TestTUISessionLifecycle:
@@ -287,7 +289,9 @@ class TestTUIErrorHandling:
         handler = TUISessionHandler()
 
         mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(side_effect=Exception("Provider connection failed"))
+        mock_shim.create_orchestrator = AsyncMock(
+            side_effect=Exception("Provider connection failed")
+        )
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
             # Should raise the error (TUI would handle this)
@@ -403,14 +407,16 @@ class TestTUIWithThinkingMode:
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", side_effect=verify_shim_init) as mock_shim_patch:
+        with patch(
+            "victor.framework.shim.FrameworkShim", side_effect=verify_shim_init
+        ) as mock_shim_patch:
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(config, agent=None)
 
                 # Verify thinking mode was used
                 mock_shim_patch.assert_called_once()
                 call_kwargs = mock_shim_patch.call_args[1]
-                assert call_kwargs['thinking'] is True
+                assert call_kwargs["thinking"] is True
 
 
 class TestTUIConcurrentSessions:

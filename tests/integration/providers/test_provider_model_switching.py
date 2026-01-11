@@ -83,6 +83,7 @@ def mock_provider2():
         native_tool_calls=True,
         source="discovery",
     )
+
     # Mock health check - needs to be async
     async def mock_health_check():
         return True

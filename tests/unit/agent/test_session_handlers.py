@@ -289,7 +289,9 @@ class TestBaseSessionHandler:
 
         # Verify overrides were applied
         mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(50, user_override=True)
+        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
+            50, user_override=True
+        )
 
 
 class TestOneshotSessionHandler:

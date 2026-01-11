@@ -1,15 +1,19 @@
-# FEP-0003: Progressive Tool Loading with Cost-Based Selection
-
-- **FEP**: 3
-- **Title**: Progressive Tool Loading with Cost-Based Selection
-- **Type**: Standards Track
-- **Status**: Draft
-- **Authors**: Vijaykumar Singh <singhvjd@gmail.com> (@vjsingh1984)
-- **Created**: 2025-01-09
-- **Modified**: 2025-01-09
-- **Discussion**: https://github.com/vjsingh1984/victor/discussions/3
-
 ---
+fep: 3
+title: Progressive Tool Loading with Cost-Based Selection
+type: Standards Track
+status: Draft
+created: 2025-01-09
+modified: 2025-01-09
+authors:
+  - name: Vijaykumar Singh
+    email: singhvjd@gmail.com
+    github: vjsingh1984
+reviewers: []
+discussion: https://github.com/vjsingh1984/victor/discussions/3
+---
+
+# FEP-0003: Progressive Tool Loading with Cost-Based Selection
 
 ## Table of Contents
 

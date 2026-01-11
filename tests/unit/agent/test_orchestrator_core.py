@@ -1928,16 +1928,23 @@ class TestSwitchProvider:
                 new_state = SwitchState(
                     provider_name="new_provider",
                     model="new-model",
-                    switch_count=orchestrator._provider_coordinator._manager._provider_switcher._current_state.switch_count + 1 if orchestrator._provider_coordinator._manager._provider_switcher._current_state else 1,
+                    switch_count=(
+                        orchestrator._provider_coordinator._manager._provider_switcher._current_state.switch_count
+                        + 1
+                        if orchestrator._provider_coordinator._manager._provider_switcher._current_state
+                        else 1
+                    ),
                 )
-                orchestrator._provider_coordinator._manager._provider_switcher._current_state = new_state
+                orchestrator._provider_coordinator._manager._provider_switcher._current_state = (
+                    new_state
+                )
                 return True
 
             # Patch the provider switcher's switch_provider method
             with patch.object(
                 orchestrator._provider_coordinator._manager._provider_switcher,
                 "switch_provider",
-                side_effect=mock_switch_provider
+                side_effect=mock_switch_provider,
             ):
                 result = await orchestrator.switch_provider("new_provider", "new-model")
 

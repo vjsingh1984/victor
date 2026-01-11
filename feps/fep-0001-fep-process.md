@@ -1,15 +1,19 @@
-# FEP-0001: Framework Enhancement Proposal Process
-
-- **FEP**: 1
-- **Title**: Framework Enhancement Proposal Process
-- **Type**: Process
-- **Status**: Accepted
-- **Authors**: Vijaykumar Singh <singhvjd@gmail.com> (@vjsingh1984)
-- **Created**: 2025-01-09
-- **Modified**: 2025-01-09
-- **Discussion**: https://github.com/vjsingh1984/victor/discussions/1
-
 ---
+fep: 1
+title: Framework Enhancement Proposal Process
+type: Process
+status: Accepted
+created: 2025-01-09
+modified: 2025-01-09
+authors:
+  - name: Vijaykumar Singh
+    email: singhvjd@gmail.com
+    github: vjsingh1984
+reviewers: []
+discussion: https://github.com/vjsingh1984/victor/discussions/1
+---
+
+# FEP-0001: Framework Enhancement Proposal Process
 
 ## Table of Contents
 

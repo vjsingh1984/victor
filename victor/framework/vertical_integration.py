@@ -1305,6 +1305,7 @@ class VerticalIntegrationPipeline:
             except RuntimeError:
                 # No event loop running, fall back to wall clock time
                 import time
+
                 self._cache_timestamps[cache_key] = time.time()
 
             logger.debug(f"Cached integration result: {cache_key}")

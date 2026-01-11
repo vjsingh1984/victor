@@ -220,9 +220,15 @@ def test_get_metrics(temp_db: SQLiteStorage):
     temp_db.create_run(run)
 
     # Log multiple metrics
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.0, timestamp=datetime.now(timezone.utc)))
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m2", value=2.0, timestamp=datetime.now(timezone.utc)))
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.5, timestamp=datetime.now(timezone.utc)))
+    temp_db.log_metric(
+        Metric(run_id=run.run_id, key="m1", value=1.0, timestamp=datetime.now(timezone.utc))
+    )
+    temp_db.log_metric(
+        Metric(run_id=run.run_id, key="m2", value=2.0, timestamp=datetime.now(timezone.utc))
+    )
+    temp_db.log_metric(
+        Metric(run_id=run.run_id, key="m1", value=1.5, timestamp=datetime.now(timezone.utc))
+    )
 
     # Retrieve all metrics
     metrics = temp_db.get_metrics(run.run_id)

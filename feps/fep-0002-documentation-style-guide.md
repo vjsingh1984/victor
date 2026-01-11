@@ -1,15 +1,19 @@
-# FEP-0002: Documentation Style Guide
-
-- **FEP**: 2
-- **Title**: Documentation Style Guide
-- **Type**: Informational
-- **Status**: Draft
-- **Authors**: Vijaykumar Singh <singhvjd@gmail.com> (@vjsingh1984)
-- **Created**: 2025-01-09
-- **Modified**: 2025-01-09
-- **Discussion**: https://github.com/vjsingh1984/victor/discussions/2
-
 ---
+fep: 2
+title: Documentation Style Guide
+type: Informational
+status: Draft
+created: 2025-01-09
+modified: 2025-01-09
+authors:
+  - name: Vijaykumar Singh
+    email: singhvjd@gmail.com
+    github: vjsingh1984
+reviewers: []
+discussion: https://github.com/vjsingh1984/victor/discussions/2
+---
+
+# FEP-0002: Documentation Style Guide
 
 ## Table of Contents
 

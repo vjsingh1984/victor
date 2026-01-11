@@ -331,7 +331,9 @@ class TestProviderSwitching:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to pass
-        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
             result = await manager.switch_provider("openai", "gpt-4-turbo")
 
             assert result is True
@@ -394,11 +396,14 @@ class TestProviderSwitching:
 
         # Mock health check to fail then succeed (for fallback)
         health_check_results = [False, True]  # First fails, second succeeds
+
         async def mock_check_health(provider):
             return health_check_results.pop(0)
 
         with patch.object(
-            manager._provider_switcher._health_monitor, "check_health", side_effect=mock_check_health
+            manager._provider_switcher._health_monitor,
+            "check_health",
+            side_effect=mock_check_health,
         ):
             result = await manager.switch_provider("google")
 
@@ -536,7 +541,9 @@ class TestSwitchHistory:
         mock_adapter_registry.get_adapter.return_value = mock_adapter
 
         # Mock health check to pass
-        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
             await manager.switch_provider("openai", "gpt-4")
 
         history = manager.get_switch_history()
@@ -593,7 +600,9 @@ class TestSwitchCallbacks:
         manager.add_switch_callback(callback)
 
         # Mock health check to pass
-        with patch.object(manager._provider_switcher._health_monitor, "check_health", return_value=True):
+        with patch.object(
+            manager._provider_switcher._health_monitor, "check_health", return_value=True
+        ):
             await manager.switch_provider("openai", "gpt-4")
 
         assert len(callback_calls) == 1

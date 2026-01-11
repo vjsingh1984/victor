@@ -193,8 +193,7 @@ class SessionPicker(ModalScreen[Optional[str]]):
         filtered = []
         for session in self._sessions:
             haystack = " ".join(
-                str(session.get(key, ""))
-                for key in ("id", "name", "provider", "model", "source")
+                str(session.get(key, "")) for key in ("id", "name", "provider", "model", "source")
             ).lower()
             if query in haystack:
                 filtered.append(session)
@@ -1139,7 +1138,9 @@ class VictorTUI(App):
                 self._add_system_message(f"Loading... {i + 1}/{message_count}")
 
         self._restore_agent_conversation(session.messages)
-        self._add_system_message(f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)")
+        self._add_system_message(
+            f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
+        )
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""

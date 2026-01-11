@@ -246,7 +246,7 @@ class OneshotSessionHandler(BaseSessionHandler):
             metrics.success = False
             raise
         finally:
-            if 'agent' in locals():
+            if "agent" in locals():
                 await self.cleanup(agent, metrics)
 
 

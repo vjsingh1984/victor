@@ -1,3 +1,20 @@
+---
+fep: XXXX
+title: "Template FEP"
+type: Standards Track
+status: Draft
+created: YYYY-MM-DD
+modified: YYYY-MM-DD
+authors:
+  - name: Your Name
+    email: your.email@example.com
+    github: yourusername
+reviewers: []
+discussion: https://github.com/vjsingh1984/victor/discussions/XXXX
+---
+
+# FEP-XXXX: Template FEP
+
 ## Table of Contents
 
 1. [Summary](#summary)
