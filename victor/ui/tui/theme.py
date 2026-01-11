@@ -16,7 +16,8 @@ $primary-darken-2: #4f8fd6;
 $secondary: #9ed0ff;
 $success: #5fd1a2;
 $warning: #f5c169;
-$error: #ff7a7a;
+$error: #ff8787;  /* Improved from #ff7a7a for better contrast */
+$error-bg: #3d1515;  /* Dark red background for error messages */
 $border-muted: #243146;
 $border-strong: #32405a;
 """

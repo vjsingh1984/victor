@@ -238,12 +238,13 @@ class VictorTUI(App):
     Screen {
         background: $background;
         color: $text;
+        layout: vertical;
     }
 
     #main-container {
         width: 100%;
         height: 100%;
-        padding: 0 2 1 2;
+        padding: 0 1 0 1;
         layout: vertical;
         min-height: 0;
     }
@@ -252,17 +253,17 @@ class VictorTUI(App):
         width: 100%;
         height: 1fr;
         min-height: 0;
-        padding: 1 0 1 0;
+        padding: 0 0 0 0;
         layout: vertical;
     }
 
     EnhancedConversationLog {
         height: 1fr;
         min-height: 0;
-        background: $panel;
-        border: round $border-strong;
-        padding: 1 2;
-        margin: 0 0 1 0;
+        background: $background;
+        border: none;
+        padding: 0;
+        margin: 0;
         scrollbar-gutter: stable;
     }
 
@@ -282,14 +283,14 @@ class VictorTUI(App):
         display: block;
     }
 
-    /* Status bar */
+    /* Status bar - compact */
     StatusBar {
         dock: top;
-        height: 2;
+        height: 1;
         background: $panel;
         color: $text;
         padding: 0 1;
-        border-bottom: solid $border-strong;
+        border-bottom: solid $border-muted;
         margin: 0;
     }
 
@@ -334,39 +335,49 @@ class VictorTUI(App):
         width: 1fr;
     }
 
-    /* Messages */
+    /* Messages - more compact */
     MessageWidget {
         width: 100%;
-        padding: 1 2;
-        margin: 1 0;
-        background: $panel;
-        border: round $border-muted;
+        padding: 0 1;
+        margin: 0 0 1 0;
+        background: transparent;
+        border: none;
     }
 
     MessageWidget.user {
         background: $panel-alt;
-        border: round $border-strong;
+        border: round $border-muted;
+        padding: 0 1;
     }
 
     MessageWidget.assistant {
-        background: $panel;
-        border: round $border-muted;
+        background: transparent;
+        border: none;
     }
 
     MessageWidget.system {
-        background: $panel;
-        border: round $border-muted;
+        background: transparent;
+        border: none;
         text-style: italic;
     }
 
     MessageWidget.error {
-        background: $panel;
+        background: $error-bg;
         border: round $error;
+    }
+
+    MessageWidget.error .message-header {
+        color: $error;
+        text-style: bold;
+    }
+
+    MessageWidget.error .message-content {
+        color: $error;
     }
 
     MessageWidget .message-header {
         height: 1;
-        margin-bottom: 1;
+        margin-bottom: 0;
         text-style: bold;
     }
 
@@ -378,16 +389,18 @@ class VictorTUI(App):
     MessageWidget .message-content {
         width: 100%;
         color: $text;
+        max-height: 20;
+        overflow-y: auto;
     }
 
     /* Input - compact at bottom */
     InputWidget {
         dock: bottom;
         height: auto;
-        max-height: 8;
-        padding: 0 1;
+        max-height: 10;
+        padding: 1;
         background: $panel;
-        border-top: solid $border-muted;
+        border-top: solid $border-strong;
         margin: 0;
     }
 
@@ -395,31 +408,35 @@ class VictorTUI(App):
         width: 100%;
         height: auto;
         padding: 0;
+        margin: 0 0 1 0;
     }
 
     InputWidget .prompt-indicator {
         width: 2;
-        height: 1;
+        height: 3;
         color: $primary;
+        text-style: bold;
     }
 
     InputWidget SubmitTextArea,
     InputWidget TextArea {
         width: 1fr;
         height: auto;
-        min-height: 1;
-        max-height: 5;
-        border: round $border-strong;
-        background: $surface;
+        min-height: 3;
+        max-height: 6;
+        border: thick $primary;
+        background: $background;
         color: $text;
-        padding: 0 1;
+        padding: 1;
         scrollbar-gutter: stable;
+        text-style: none;
     }
 
     InputWidget SubmitTextArea:focus,
     InputWidget TextArea:focus {
-        border: round $border-strong;
+        border: thick $primary;
         background: $background;
+        text-style: bold;
     }
 
     InputWidget .input-hint {
@@ -429,15 +446,16 @@ class VictorTUI(App):
         text-align: right;
         padding: 0;
         margin: 0;
+        text-style: italic;
     }
 
-    /* Tool calls */
+    /* Tool calls - compact */
     ToolCallWidget {
         width: 100%;
-        padding: 1 2;
+        padding: 0 1;
         margin: 0 0 1 0;
         background: $panel;
-        border: round $border-strong;
+        border: round $border-muted;
     }
 
     ToolCallWidget.pending { border: round $warning; }
@@ -449,24 +467,26 @@ class VictorTUI(App):
     ToolCallWidget.success .tool-status { color: $success; }
     ToolCallWidget.error .tool-status { color: $error; }
 
-    /* Thinking */
+    /* Thinking - compact */
     ThinkingWidget {
         width: 100%;
-        padding: 1 2;
+        padding: 0 1;
         margin: 0 0 1 0;
         background: $panel;
-        border: round $border-strong;
+        border: round $border-muted;
         color: $text-muted;
     }
 
     ThinkingWidget .thinking-header {
         height: 1;
         color: $primary;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
 
     ThinkingWidget .thinking-content {
         width: 100%;
+        max-height: 10;
+        overflow-y: auto;
         text-style: italic;
     }
 
@@ -474,7 +494,7 @@ class VictorTUI(App):
     #tool-calls-container,
     #thinking-container {
         width: 100%;
-        padding: 0 2;
+        padding: 0 1;
         margin: 0 0 1 0;
         display: none;
     }
@@ -523,11 +543,13 @@ class VictorTUI(App):
         # Phase 1.6 Enhanced keyboard shortcuts
         Binding("ctrl+t", "toggle_thinking", "Toggle Thinking", show=True),
         Binding("ctrl+y", "toggle_tools", "Toggle Tools", show=True),
+        Binding("ctrl+d", "toggle_details", "Toggle Details", show=True),
         Binding("ctrl+x", "cancel_stream", "Cancel", show=True),
         Binding("ctrl+g", "resume_any_session", "Resume Any Session", show=True),
         Binding("ctrl+p", "resume_project_session", "Resume Project Session", show=True),
         Binding("ctrl+r", "resume_session", "Resume Session", show=True),
         Binding("ctrl+s", "save_session", "Save Session", show=True),
+        Binding("ctrl+e", "export_session", "Export Session", show=True),
         Binding("ctrl+slash", "show_help", "Help", show=True),
         Binding("ctrl+up", "scroll_up", "Scroll Up", show=False),
         Binding("ctrl+down", "scroll_down", "Scroll Down", show=False),
@@ -642,8 +664,8 @@ class VictorTUI(App):
         # Add user message to log
         self._add_user_message(message)
 
-        # Process message (note: @work decorator makes this return a Worker, not a coroutine)
-        self._process_message(message)
+        # Process message directly (not using @work decorator to avoid thread issues)
+        await self._process_message_async(message)
 
     async def _handle_command(self, command: str) -> None:
         """Handle slash commands.
@@ -685,8 +707,7 @@ class VictorTUI(App):
 
         self._input_widget.focus_input()
 
-    @work(exclusive=True)
-    async def _process_message(self, message: str) -> None:
+    async def _process_message_async(self, message: str) -> None:
         """Process user message and get response."""
         if self._is_processing:
             return
@@ -703,20 +724,23 @@ class VictorTUI(App):
                 if asyncio.iscoroutine(result):
                     result = await result
                 if result:
-                    self._call_ui(self._add_assistant_message, str(result))
+                    self._add_assistant_message(str(result))
             else:
                 # Demo mode
-                self._call_ui(
-                    self._add_assistant_message,
+                self._add_assistant_message(
                     f"You said: *{message}*\n\n" "(No agent configured - running in demo mode)",
                 )
         except Exception as e:
-            self._call_ui(self._add_error_message, str(e))
+            self._add_error_message(str(e))
         finally:
             self._is_processing = False
             self._set_status("Idle", "idle")
             if self._input_widget:
-                self._call_ui(self._input_widget.focus_input)
+                # Call directly without _call_ui since we're in the UI thread
+                try:
+                    self._input_widget.focus_input()
+                except Exception:
+                    pass
 
     async def _process_with_agent(self, message: str) -> None:
         """Process message with the agent."""
@@ -727,7 +751,10 @@ class VictorTUI(App):
             await self._stream_response(message)
         else:
             response = await self.agent.chat(message)
-            self._call_ui(self._add_assistant_message, response.content)
+            try:
+                self._add_assistant_message(response.content)
+            except Exception:
+                pass
 
     async def _stream_response(self, message: str) -> None:
         """Stream response from agent."""
@@ -746,42 +773,77 @@ class VictorTUI(App):
                     if chunk_type == "content":
                         content_buffer += chunk.content or ""
                         if self._conversation_log:
-                            self._call_ui(self._conversation_log.update_streaming, content_buffer)
+                            try:
+                                self._conversation_log.update_streaming(content_buffer)
+                            except Exception:
+                                pass
+                            # Update jump-to-bottom button visibility during streaming
+                            try:
+                                self._update_jump_to_bottom()
+                            except Exception:
+                                pass
 
                     elif chunk_type == "thinking_start":
-                        self._call_ui(self._show_thinking)
+                        try:
+                            self._show_thinking()
+                        except Exception:
+                            pass
 
                     elif chunk_type == "thinking":
-                        self._call_ui(self._update_thinking, chunk.content or "")
+                        try:
+                            self._update_thinking(chunk.content or "")
+                        except Exception:
+                            pass
 
                     elif chunk_type == "thinking_end":
-                        self._call_ui(self._hide_thinking)
+                        try:
+                            self._hide_thinking()
+                        except Exception:
+                            pass
 
                     elif chunk_type == "tool_start":
-                        self._call_ui(
-                            self._show_tool_call,
-                            chunk.tool_name or "unknown",
-                            chunk.arguments or {},
-                        )
+                        try:
+                            self._show_tool_call(
+                                chunk.tool_name or "unknown",
+                                chunk.arguments or {},
+                            )
+                        except Exception:
+                            pass
 
                     elif chunk_type == "tool_end":
-                        self._call_ui(
-                            self._finish_tool_call,
-                            success=chunk.success if hasattr(chunk, "success") else True,
-                            elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
-                        )
+                        try:
+                            self._finish_tool_call(
+                                success=chunk.success if hasattr(chunk, "success") else True,
+                                elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
+                            )
+                        except Exception:
+                            pass
 
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
                     content_buffer += chunk.content
                     if self._conversation_log:
-                        self._call_ui(self._conversation_log.update_streaming, content_buffer)
+                        try:
+                            self._conversation_log.update_streaming(content_buffer)
+                        except Exception:
+                            pass
+                        # Update jump-to-bottom button visibility during streaming
+                        try:
+                            self._update_jump_to_bottom()
+                        except Exception:
+                            pass
 
         finally:
             # Finish streaming
             if self._conversation_log:
-                self._call_ui(self._conversation_log.finish_streaming)
-            self._call_ui(self._hide_thinking)
+                try:
+                    self._conversation_log.finish_streaming()
+                except Exception:
+                    pass
+            try:
+                self._hide_thinking()
+            except Exception:
+                pass
             self._set_status("Idle", "idle")
             if content_buffer.strip():
                 self._record_message("assistant", content_buffer)
@@ -848,15 +910,23 @@ class VictorTUI(App):
             container.remove_class("visible")
 
     def _prune_tool_widgets(self) -> None:
+        """Remove oldest tool widgets if limit exceeded.
+
+        Also hides the container if no widgets remain.
+        """
         while len(self._tool_widgets) > self._tool_widget_limit:
             widget = self._tool_widgets.pop(0)
             try:
                 widget.remove()
             except Exception:
                 pass
+        # Hide container if no widgets remain (defensive check)
         if not self._tool_widgets:
-            container = self.query_one("#tool-calls-container")
-            container.remove_class("visible")
+            try:
+                container = self.query_one("#tool-calls-container")
+                container.remove_class("visible")
+            except Exception:
+                pass
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -893,6 +963,25 @@ class VictorTUI(App):
         else:
             container.add_class("visible")
             self._add_system_message("Tools panel shown")
+
+    def action_toggle_details(self) -> None:
+        """Toggle both thinking and tools panel visibility (details mode)."""
+        thinking_container = self.query_one("#thinking-container")
+        tools_container = self.query_one("#tool-calls-container")
+        thinking_visible = "visible" in thinking_container.classes
+        tools_visible = "visible" in tools_container.classes
+
+        # If either is visible, hide both. If neither is visible, show both.
+        if thinking_visible or tools_visible:
+            if thinking_visible:
+                thinking_container.remove_class("visible")
+            if tools_visible:
+                tools_container.remove_class("visible")
+            self._add_system_message("Details panels hidden")
+        else:
+            thinking_container.add_class("visible")
+            tools_container.add_class("visible")
+            self._add_system_message("Details panels shown")
 
     def action_cancel_stream(self) -> None:
         """Request cancellation of the current stream if active."""
@@ -1026,6 +1115,7 @@ class VictorTUI(App):
             self._load_session(session_key)
 
     def _load_session(self, session_id: str) -> None:
+        """Load a TUI session with progress indication."""
         from victor.ui.tui.session import SessionManager
 
         manager = SessionManager()
@@ -1034,17 +1124,25 @@ class VictorTUI(App):
             self._add_error_message(f"Session not found: {session_id}")
             return
 
+        message_count = len(session.messages)
+        if message_count > 50:
+            self._add_system_message(f"Loading {message_count} messages...")
+
         if self._conversation_log:
             self._conversation_log.clear()
 
         self._session_messages = list(session.messages)
-        for msg in session.messages:
+        for i, msg in enumerate(session.messages):
             self._render_message(msg.role, msg.content)
+            # Show progress for large sessions
+            if message_count > 50 and (i + 1) % 25 == 0:
+                self._add_system_message(f"Loading... {i + 1}/{message_count}")
 
         self._restore_agent_conversation(session.messages)
-        self._add_system_message(f"Session loaded: {session.name or session.id[:8]}")
+        self._add_system_message(f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)")
 
     def _load_project_session(self, session_id: str) -> None:
+        """Load a project session with progress indication."""
         from victor.agent.conversation_state import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
@@ -1059,11 +1157,15 @@ class VictorTUI(App):
         history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
         messages = history.messages
 
+        message_count = len(messages)
+        if message_count > 50:
+            self._add_system_message(f"Loading {message_count} messages from project session...")
+
         if self._conversation_log:
             self._conversation_log.clear()
 
         self._session_messages = []
-        for msg in messages:
+        for i, msg in enumerate(messages):
             role = msg.role
             content = msg.content
             if role == "tool":
@@ -1078,6 +1180,9 @@ class VictorTUI(App):
                 continue
             self._render_message(role, content)
             self._session_messages.append(Message(role=role, content=content, metadata={}))
+            # Show progress for large sessions
+            if message_count > 50 and (i + 1) % 25 == 0:
+                self._add_system_message(f"Loading... {i + 1}/{message_count}")
 
         if self.agent:
             self.agent.conversation = history
@@ -1093,7 +1198,7 @@ class VictorTUI(App):
 
         metadata = session.get("metadata", {})
         title = metadata.get("title") or session_id[:8]
-        self._add_system_message(f"Project session loaded: {title}")
+        self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
 
     def _render_message(self, role: str, content: str) -> None:
         if not self._conversation_log:
@@ -1145,9 +1250,37 @@ class VictorTUI(App):
             )
             session.messages = list(self._session_messages)
             manager.save(session)
-            self._add_system_message(f"Session saved: {session.id[:8]}")
+            self._add_system_message(f"Session saved: {session.id[:8]} (use Ctrl+R to resume)")
         except Exception as e:
             self._add_error_message(f"Failed to save session: {e}")
+
+    def action_export_session(self) -> None:
+        """Export the current session to a markdown file."""
+        import tempfile
+        from pathlib import Path
+
+        try:
+            from victor.ui.tui.session import Session, SessionManager
+
+            # Create a temporary session for export
+            session = Session(
+                name=f"Session {self.provider}/{self.model}",
+                provider=self.provider,
+                model=self.model,
+            )
+            session.messages = list(self._session_messages)
+
+            # Export to temp file first, then show user the path
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".md", delete=False, prefix="victor_session_"
+            ) as f:
+                f.write(session.to_markdown())
+                temp_path = Path(f.name)
+
+            self._add_system_message(f"Session exported to: {temp_path}")
+            self._add_system_message(f"Message count: {len(self._session_messages)}")
+        except Exception as e:
+            self._add_error_message(f"Failed to export session: {e}")
 
     def action_show_help(self) -> None:
         """Show help overlay with keyboard shortcuts."""
@@ -1159,13 +1292,16 @@ Keyboard Shortcuts:
   Ctrl+L       Clear conversation
   Ctrl+T       Toggle thinking panel
   Ctrl+Y       Toggle tools panel
+  Ctrl+D       Toggle all details (thinking + tools)
   Ctrl+X       Cancel streaming
   Ctrl+G       Resume any session
   Ctrl+P       Resume project session
-  Ctrl+R       Resume session
+  Ctrl+R       Resume TUI session
   Ctrl+S       Save session
+  Ctrl+E       Export session to markdown
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
+  Ctrl+Home/End Jump to top/bottom
   ↑/↓          Navigate input history
   Escape       Focus input
 
@@ -1249,7 +1385,10 @@ Slash Commands:
     def _set_status(self, status: str, state: str = "idle") -> None:
         if not self._status_bar:
             return
-        self._call_ui(self._status_bar.update_status, status, state)
+        try:
+            self._status_bar.update_status(status, state)
+        except Exception:
+            pass
 
     def _update_jump_to_bottom(self) -> None:
         if not self._jump_button or not self._conversation_log:
@@ -1313,6 +1452,12 @@ async def run_tui(
         stream: Whether to stream responses
         settings: Optional Settings instance for slash commands
     """
+    import os
+
+    # Set environment variable to disable event backend dispatcher
+    # The dispatcher conflicts with Textual's event loop
+    os.environ["VICTOR_TUI_MODE"] = "1"
+
     app = VictorTUI(
         agent=agent,
         provider=provider,
@@ -1320,4 +1465,8 @@ async def run_tui(
         stream=stream,
         settings=settings,
     )
-    await app.run_async()
+    try:
+        await app.run_async()
+    finally:
+        # Clean up environment variable
+        os.environ.pop("VICTOR_TUI_MODE", None)

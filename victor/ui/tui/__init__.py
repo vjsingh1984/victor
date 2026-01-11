@@ -9,6 +9,6 @@ Claude Code, Codex, and Gemini CLI with:
 """
 
 from victor.ui.tui.app import VictorTUI
-from victor.ui.tui.widgets import MessageWidget, InputWidget, StatusBar
+from victor.ui.tui.widgets import InputWidget, StatusBar
 
-__all__ = ["VictorTUI", "MessageWidget", "InputWidget", "StatusBar"]
+__all__ = ["VictorTUI", "InputWidget", "StatusBar"]

@@ -74,7 +74,7 @@ class StatusBar(Static):
     """Top status bar showing provider, model, and session info.
 
     Displays connection status, current provider/model, and
-    helpful keyboard shortcuts.
+    helpful keyboard shortcuts that update based on context.
     """
 
     DEFAULT_CSS = ""
@@ -89,6 +89,7 @@ class StatusBar(Static):
         self.provider = provider
         self.model = model
         self.status = "Idle"
+        self._state = "idle"  # idle, streaming, error
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="status-content"):
@@ -113,7 +114,69 @@ class StatusBar(Static):
                     " send",
                 ),
                 classes="shortcuts",
+                id="shortcut-hints",
             )
+
+    def _update_shortcuts_idle(self) -> None:
+        """Update shortcuts for idle state."""
+        try:
+            hints = self.query_one("#shortcut-hints", Label)
+            hints.update(
+                Text.assemble(
+                    ("Ctrl+L", "bold"),
+                    " clear  ",
+                    ("Ctrl+S", "bold"),
+                    " save  ",
+                    ("Enter", "bold"),
+                    " send",
+                )
+            )
+        except Exception:
+            pass
+
+    def _update_shortcuts_streaming(self) -> None:
+        """Update shortcuts for streaming state."""
+        try:
+            hints = self.query_one("#shortcut-hints", Label)
+            hints.update(
+                Text.assemble(
+                    ("Ctrl+X", "bold"),
+                    " cancel  ",
+                    ("Ctrl+D", "bold"),
+                    " toggle details",
+                )
+            )
+        except Exception:
+            pass
+
+    def _update_shortcuts_error(self) -> None:
+        """Update shortcuts for error state."""
+        try:
+            hints = self.query_one("#shortcut-hints", Label)
+            hints.update(
+                Text.assemble(
+                    ("Ctrl+L", "bold"),
+                    " clear  ",
+                    ("Ctrl+C", "bold"),
+                    " exit",
+                )
+            )
+        except Exception:
+            pass
+
+    def update_shortcuts(self, state: str) -> None:
+        """Update shortcut hints based on application state.
+
+        Args:
+            state: One of 'idle', 'streaming', 'error'
+        """
+        self._state = state
+        if state == "streaming":
+            self._update_shortcuts_streaming()
+        elif state == "error":
+            self._update_shortcuts_error()
+        else:  # idle
+            self._update_shortcuts_idle()
 
     def update_info(self, provider: str, model: str) -> None:
         """Update provider and model display."""
@@ -132,126 +195,29 @@ class StatusBar(Static):
         self.refresh()
 
     def update_status(self, status: str, state: str = "idle") -> None:
-        """Update status text and styling."""
+        """Update status text, styling, and dynamic shortcut hints.
+
+        Args:
+            status: Status text to display (e.g., "Idle", "Streaming", "Error")
+            state: State for styling and shortcuts ('idle', 'streaming', 'error', 'busy')
+        """
         self.status = status
         label = self.query_one(".status-indicator", Label)
         label.update(self.status)
         label.remove_class("idle", "busy", "streaming")
         label.add_class(state)
-
-
-class MessageWidget(Static):
-    """Widget for displaying a single chat message.
-
-    Supports both user and assistant messages with different
-    styling and markdown rendering for assistant responses.
-    """
-
-    DEFAULT_CSS = ""
-
-    def __init__(
-        self,
-        content: str,
-        role: str = "assistant",
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.content = content
-        self.role = role
-        self.add_class(role)
-
-    def compose(self) -> ComposeResult:
-        role_label = {
-            "user": "You",
-            "assistant": "Victor",
-            "system": "System",
-            "error": "Error",
-        }.get(self.role, self.role.title())
-
-        header = Label(role_label, classes="message-header")
-        header.add_class(self.role)
-
-        with Vertical():
-            yield header
-            if self.role == "assistant":
-                yield Static(Markdown(self.content), classes="message-content")
-            else:
-                yield Static(self.content, classes="message-content")
-
-    def update_content(self, content: str) -> None:
-        """Update message content (for streaming)."""
-        self.content = content
-        content_widget = self.query_one(".message-content", Static)
-        if self.role == "assistant":
-            content_widget.update(Markdown(content))
-        else:
-            content_widget.update(content)
-
-
-class ConversationLog(RichLog):
-    """Scrollable log for displaying conversation history.
-
-    Provides auto-scrolling, message formatting, and support
-    for streaming responses.
-    """
-
-    DEFAULT_CSS = ""
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(
-            highlight=True,
-            markup=True,
-            wrap=True,
-            auto_scroll=True,
-            **kwargs,
-        )
-        self._streaming_message: str | None = None
-
-    def add_user_message(self, content: str) -> None:
-        """Add a user message to the log."""
-        self.write(Text())
-        self.write(Text("You", style="bold green"))
-        self.write(Text(content))
-        self.write(Text())
-
-    def add_assistant_message(self, content: str) -> None:
-        """Add an assistant message to the log."""
-        self.write(Text())
-        self.write(Text("Victor", style="bold blue"))
-        self.write(Markdown(content))
-        self.write(Text())
-
-    def add_system_message(self, content: str) -> None:
-        """Add a system/status message to the log."""
-        self.write(Text(f"[{content}]", style="dim italic"))
-
-    def add_error_message(self, content: str) -> None:
-        """Add an error message to the log."""
-        self.write(Text(f"Error: {content}", style="bold red"))
-
-    def start_streaming(self) -> None:
-        """Start a streaming response."""
-        self.write(Text())
-        self.write(Text("Victor", style="bold blue"))
-        self._streaming_message = ""
-
-    def update_streaming(self, content: str) -> None:
-        """Update the streaming response content."""
-        self._streaming_message = content
-
-    def finish_streaming(self) -> None:
-        """Finish the streaming response."""
-        if self._streaming_message:
-            self.write(Markdown(self._streaming_message))
-            self.write(Text())
-        self._streaming_message = None
+        # Update shortcut hints based on state
+        self.update_shortcuts(state)
 
 
 class SubmitTextArea(TextArea):
     """Custom TextArea that submits on Enter and allows Shift+Enter for newlines.
 
-    This subclass overrides the default Enter behavior to emit a Submit message
-    instead of inserting a newline. Shift+Enter still inserts newlines.
+    This provides a Claude Code-like multi-line input experience:
+    - Enter: Submit message (if not at end of line with text)
+    - Shift+Enter: Always insert newline
+    - Ctrl+Enter: Always submit
+    - Proper multi-line editing with word wrap
     """
 
     class Submit(Message):
@@ -263,15 +229,37 @@ class SubmitTextArea(TextArea):
 
     def _on_key(self, event) -> None:
         """Handle key events before TextArea processes them."""
-        # Check for plain Enter (not shift+enter)
-        # In Textual, shift+enter appears as "shift+enter" in event.key
-        if event.key == "enter":
-            # Plain Enter: submit instead of newline
+        # Ctrl+Enter: Always submit
+        if event.key == "ctrl+enter":
             if self.text.strip():
                 self.post_message(self.Submit(self.text))
             event.prevent_default()
             event.stop()
             return
+
+        # Check for plain Enter (not shift+enter)
+        if event.key == "enter":
+            # Check cursor position - if in middle of line, insert newline
+            # If at end of line, submit
+            cursor_location = self.cursor_location
+            text = self.text
+
+            # cursor_location is a tuple (line, column)
+            line_idx, col_idx = cursor_location
+
+            # Get the current line text using the document
+            lines = text.splitlines()
+            current_line = lines[line_idx] if line_idx < len(lines) else ""
+            is_at_end_of_line = col_idx >= len(current_line)
+
+            # If at end of line and there's text, submit
+            # Otherwise insert newline
+            if is_at_end_of_line and text.strip():
+                self.post_message(self.Submit(self.text))
+                event.prevent_default()
+                event.stop()
+                return
+
         # Shift+Enter and all other keys handled normally by parent
         super()._on_key(event)
 
@@ -312,13 +300,13 @@ class InputWidget(Static):
     def compose(self) -> ComposeResult:
         with Vertical():
             with Horizontal(classes="input-row"):
-                yield Label("> ", classes="prompt-indicator")
+                yield Label("❯", classes="prompt-indicator")
                 yield SubmitTextArea(
-                    placeholder="Type message or /help...",
+                    placeholder="Enter your message here...",
                     id="message-input",
                 )
             yield Label(
-                "Enter send · Shift+Enter newline · ↑↓ history · /help",
+                "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands",
                 classes="input-hint",
             )
 
@@ -328,14 +316,25 @@ class InputWidget(Static):
             self.post_message(self.Submitted(event.value))
 
     def on_mount(self) -> None:
-        """Focus the input on mount and load history from DB."""
+        """Focus the input on mount and defer history loading."""
         self._input = self.query_one("#message-input", SubmitTextArea)
         self._input.focus()
 
+        # Defer history loading until after TUI has rendered (non-blocking)
         # Load persistent history from conversation database (once per session)
         if not InputWidget._history_loaded:
             InputWidget._history_loaded = True
-            self._history_task = asyncio.create_task(self._load_history_async())
+            # Use a short timer to defer loading, allowing TUI to render first
+            # Widget has access to app via self.app when mounted
+            if hasattr(self, 'app') and self.app is not None:
+                self.app.set_timer(0.1, self._start_history_load)
+            else:
+                # Fallback: load immediately if no app context
+                self._history_task = asyncio.create_task(self._load_history_async())
+
+    def _start_history_load(self) -> None:
+        """Start async history loading."""
+        self._history_task = asyncio.create_task(self._load_history_async())
 
     async def _load_history_async(self) -> None:
         """Load input history without blocking the UI."""
@@ -921,12 +920,11 @@ class ToolProgressPanel(Static):
 class EnhancedConversationLog(VerticalScroll):
     """Enhanced conversation log with streaming support.
 
-    Replaces RichLog-based ConversationLog with a ScrollableContainer
-    that supports:
-    - Live streaming updates
-    - Message widgets with proper styling
-    - Code blocks with syntax highlighting
-    - Auto-scroll to bottom
+    Provides a Claude Code-like message display:
+    - Messages flow naturally one after another
+    - Auto-scrolls to show new content
+    - Smooth scrolling through history
+    - Proper message separation and styling
     """
 
     DEFAULT_CSS = """
@@ -935,6 +933,14 @@ class EnhancedConversationLog(VerticalScroll):
         padding: 1;
         scrollbar-gutter: stable;
     }
+
+    EnhancedConversationLog > Static {
+        margin: 1 0;
+    }
+
+    EnhancedConversationLog > StreamingMessageBlock {
+        margin: 1 0;
+    }
     """
 
     def __init__(self, **kwargs) -> None:
@@ -942,6 +948,7 @@ class EnhancedConversationLog(VerticalScroll):
         self._streaming_message: Optional[StreamingMessageBlock] = None
         self._message_count = 0
         self._auto_scroll = True
+        self._user_scrolled = False
 
     @property
     def auto_scroll_enabled(self) -> bool:
@@ -956,7 +963,8 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self._maybe_scroll_end()
+        # Always scroll to show user message
+        self.scroll_end(animate=False)
 
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
@@ -967,7 +975,9 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self._maybe_scroll_end()
+        # Auto-scroll to show assistant response
+        if self._auto_scroll:
+            self.scroll_end(animate=False)
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
@@ -977,7 +987,8 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self._maybe_scroll_end()
+        # Don't auto-scroll for system messages to avoid disruption
+        pass
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
@@ -987,7 +998,8 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        self._maybe_scroll_end()
+        # Always show errors
+        self.scroll_end(animate=False)
 
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
@@ -1003,22 +1015,33 @@ class EnhancedConversationLog(VerticalScroll):
         return self._streaming_message
 
     def update_streaming(self, content: str) -> None:
-        """Update the current streaming message."""
+        """Update the current streaming message.
+
+        Shows new content as it arrives, like Claude Code.
+        Always scrolls during streaming to show progress.
+        """
         if self._streaming_message:
             self._streaming_message.content = content
-            self._maybe_scroll_end()
+            # Always scroll during streaming to show new content
+            self.scroll_end(animate=False)
 
     def append_streaming_chunk(self, chunk: str) -> None:
-        """Append a chunk to the current streaming message."""
+        """Append a chunk to the current streaming message.
+
+        Shows new content as it arrives, like Claude Code.
+        """
         if self._streaming_message:
             self._streaming_message.append_chunk(chunk)
-            self._maybe_scroll_end()
+            # Always scroll during streaming to show new content
+            self.scroll_end(animate=False)
 
     def finish_streaming(self) -> None:
         """Finish the current streaming response."""
         if self._streaming_message:
             self._streaming_message.finish_streaming()
             self._streaming_message = None
+        # Final scroll to ensure full response is visible
+        self.scroll_end(animate=False)
 
     def add_tool_progress(
         self,

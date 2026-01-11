@@ -318,14 +318,19 @@ class InMemoryEventBackend:
 
                 # Dispatch to handlers concurrently
                 for subscription in subscriptions:
-                    task = asyncio.create_task(self._safe_call_handler(subscription.handler, event))
-                    self._pending_tasks.add(task)
-                    task.add_done_callback(self._pending_tasks.discard)
+                    try:
+                        task = asyncio.create_task(self._safe_call_handler(subscription.handler, event))
+                        self._pending_tasks.add(task)
+                        task.add_done_callback(self._pending_tasks.discard)
+                    except Exception:
+                        # Silently skip all errors - event loop issues, closed loops, etc.
+                        pass
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.warning(f"Dispatch loop error: {e}")
+            except Exception:
+                # Silently suppress all dispatch loop errors
+                pass
 
     async def _safe_call_handler(self, handler: EventHandler, event: MessagingEvent) -> None:
         """Safely call a handler, catching exceptions."""
