@@ -1,0 +1,13 @@
+[
+  {
+    "name": "_invoke_capability",
+    "type": "function",
+    "file": "victor/agent/vertical_integration_adapter.py",
+    "line": 221,
+    "module": "victor.agent.vertical_integration_adapter",
+    "is_private": true,
+    "is_dunder": false,
+    "severity": "low",
+    "confidence": 0.7
+  }
+]

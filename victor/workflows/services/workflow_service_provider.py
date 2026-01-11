@@ -403,22 +403,22 @@ class WorkflowServiceProvider:
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
         from victor.workflows.validator import WorkflowValidator
-        from victor.workflows.yaml_loader import YAMLWorkflowProvider
+        from victor.workflows.yaml_loader import YAMLWorkflowLoader
 
         # Get dependencies from DI container (use actual types, not strings)
         factory = self.container.get(NodeExecutorFactoryProtocol)
         validator = self.container.get(WorkflowValidator)
 
-        # Create YAML provider directly (not registered in container)
+        # Create YAML loader directly (not registered in container)
         cache_enabled = getattr(self._settings, "enable_workflow_cache", True)
         cache_ttl = getattr(self._settings, "workflow_cache_ttl", 3600)
-        yaml_provider = YAMLWorkflowProvider(
+        yaml_loader = YAMLWorkflowLoader(
             enable_cache=cache_enabled,
             cache_ttl=cache_ttl,
         )
 
         compiler_impl = WorkflowCompilerImpl(
-            yaml_loader=yaml_provider,  # Using YAMLWorkflowProvider as loader
+            yaml_loader=yaml_loader,
             validator=validator,
             node_factory=factory,
         )
@@ -440,9 +440,10 @@ class WorkflowServiceProvider:
             WorkflowExecutor instance
         """
         from victor.workflows.compiled_executor import WorkflowExecutor
+        from victor.workflows.orchestrator_pool import OrchestratorPool
 
-        # Get dependencies from DI container
-        orchestrator_pool = self.container.get("OrchestratorPool")
+        # Get dependencies from DI container (use actual type, not string)
+        orchestrator_pool = self.container.get(OrchestratorPool)
 
         executor = WorkflowExecutor(
             orchestrator_pool=orchestrator_pool,

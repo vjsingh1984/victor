@@ -118,15 +118,25 @@ class WorkflowCompilerImpl:
             orchestrators=None,  # Will be set by execution context
         )
 
-        # Load YAML
-        yaml_def = self._yaml_loader.load(source)
+        # Load YAML (pass workflow_name to select specific workflow if needed)
+        yaml_def = self._yaml_loader.load(source, workflow_name=workflow_name)
+
+        # If we got a dict of workflows (no workflow_name specified), use the first one
+        if isinstance(yaml_def, dict) and not hasattr(yaml_def, 'nodes'):
+            if len(yaml_def) == 1:
+                yaml_def = next(iter(yaml_def.values()))
+            else:
+                raise ValueError(
+                    f"Multiple workflows found. Please specify workflow_name. "
+                    f"Available: {list(yaml_def.keys())}"
+                )
 
         # Validate if requested
         if validate and self._validator:
             self._validator.validate(yaml_def)
 
         # Compile using legacy implementation
-        return legacy_compiler.compile(yaml_def, workflow_name=workflow_name)
+        return legacy_compiler.compile(yaml_def)
 
 
 __all__ = [
