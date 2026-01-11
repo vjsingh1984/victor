@@ -199,6 +199,9 @@ def bootstrap_container(
     # Register core services
     _register_core_services(container, settings)
 
+    # Register registry services (UniversalRegistry for framework-wide use)
+    _register_registry_services(container, settings)
+
     # Register event services
     _register_event_services(container, settings)
 
@@ -251,6 +254,30 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
         lambda c: InMemoryCacheService(max_size=1000),
         ServiceLifetime.SINGLETON,
     )
+
+
+def _register_registry_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register universal registry system for framework-wide entity management.
+
+    The UniversalRegistry provides a unified interface for managing different
+    types of entities across the Victor framework, replacing multiple ad-hoc
+    registry patterns.
+    """
+    from victor.core.registries import UniversalRegistry, CacheStrategy
+
+    # Register UniversalRegistry factory as singleton
+    # The get_registry() method returns type-specific registries
+    container.register(
+        UniversalRegistry,
+        lambda c: UniversalRegistry.get_registry(
+            "default",
+            cache_strategy=getattr(settings, "registry_cache_strategy", CacheStrategy.LRU),
+            max_size=getattr(settings, "registry_max_size", 1000)
+        ),
+        ServiceLifetime.SINGLETON,
+    )
+
+    logger.info("Registered universal registry services")
 
 
 def _register_event_services(container: ServiceContainer, settings: Settings) -> None:
