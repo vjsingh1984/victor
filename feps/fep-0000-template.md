@@ -3,8 +3,8 @@ fep: XXXX
 title: "Template FEP"
 type: Standards Track
 status: Draft
-created: YYYY-MM-DD
-modified: YYYY-MM-DD
+created: 2025-01-11
+modified: 2025-01-11
 authors:
   - name: Your Name
     email: your.email@example.com
