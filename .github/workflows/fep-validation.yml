@@ -128,7 +128,8 @@ jobs:
 
               # Compare filename number vs frontmatter number
               # Allow 0 or XXXX for new FEPs
-              if [ "$file_number" != "0000" ] && [ "$file_number" != "$fep_number" ]; then
+              # Normalize comparison: format fep_number with leading zeros
+              if [ "$file_number" != "0000" ] && [ "$file_number" != "$(printf '%04d' $fep_number)" ]; then
                 echo "✗ Numbering mismatch in $filename"
                 echo "  Filename indicates: FEP-$file_number"
                 echo "  Frontmatter indicates: FEP-$(printf '%04d' $fep_number)"
