@@ -3306,8 +3306,11 @@ class TestSwitchModel:
 
     def test_switch_model_returns_bool(self, orchestrator):
         """Test switch_model returns boolean."""
-        # switch_model is a sync method that returns bool
-        result = orchestrator.switch_model("claude-3-sonnet")
+        import asyncio
+
+        # switch_model is now an async method (protocol method)
+        # Use asyncio.run to call it from sync context
+        result = asyncio.run(orchestrator.switch_model("claude-3-sonnet"))
         assert isinstance(result, bool)
 
 

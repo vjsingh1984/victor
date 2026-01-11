@@ -6685,9 +6685,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         if result:
             self._provider_coordinator._notify_post_switch_hooks()
+            # Sync orchestrator's attributes with provider manager state
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
             if on_switch:
                 on_switch(self.provider_name, self.model)
 
+        return result
+
+    async def switch_model(self, model: str) -> bool:
+        """Switch to a different model on the current provider (protocol method).
+
+        Delegates to ProviderManager's async switch_model directly
+        for proper exception handling in async context (Phase 2 refactoring fix).
+
+        Args:
+            model: Target model name
+
+        Returns:
+            True if switch was successful, False otherwise
+        """
+        result = await self._provider_manager.switch_model(model)
+        if result:
+            self._provider_coordinator._notify_post_switch_hooks()
+            # Sync orchestrator's model attribute with provider manager state
+            self.model = self._provider_manager.model
         return result
 
     # --- ToolsProtocol ---
