@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests for vertical workflow provider streaming support.
+"""Integration tests for vertical workflow provider canonical API.
 
 Tests verify that all vertical workflow providers properly implement:
-- create_executor() - Returns WorkflowExecutor (DEPRECATED)
-- create_streaming_executor() - Returns StreamingWorkflowExecutor (DEPRECATED)
-- astream() - Async generator yielding WorkflowStreamChunk events (DEPRECATED)
 - compile_workflow() - Returns CompiledGraph (CANONICAL)
 - invoke() - Executes workflow with caching (CANONICAL)
 - stream() - Streams workflow execution (CANONICAL)
+- run_compiled_workflow() - Convenience wrapper for invoke
+- stream_compiled_workflow() - Convenience wrapper for stream
 
 Verticals tested:
 - CodingWorkflowProvider
@@ -33,32 +32,8 @@ import pytest
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
-from victor.workflows.executor import WorkflowExecutor
-from victor.workflows.streaming_executor import (
-    StreamingWorkflowExecutor,
-    WorkflowEventType,
-    WorkflowStreamChunk,
-)
-
-# Suppress deprecation warnings for legacy API tests during migration period
-pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
-
 
 # ============ Test Fixtures ============
-
-
-def create_mock_orchestrator():
-    """Create a mock orchestrator for testing without real LLM calls."""
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.settings = MagicMock()
-    mock_orchestrator.settings.tool_budget = 15
-    return mock_orchestrator
-
-
-@pytest.fixture
-def mock_orchestrator():
-    """Fixture providing a mock orchestrator."""
-    return create_mock_orchestrator()
 
 
 @pytest.fixture
@@ -93,32 +68,13 @@ def dataanalysis_provider():
     return DataAnalysisWorkflowProvider()
 
 
-# ============ CodingWorkflowProvider Tests ============
+# ============ Per-Vertical Workflow Tests ============
 
 
 @pytest.mark.integration
 @pytest.mark.workflows
-class TestCodingWorkflowProviderStreaming:
-    """Tests for CodingWorkflowProvider streaming support."""
-
-    def test_create_executor_returns_workflow_executor(self, mock_orchestrator, coding_provider):
-        """Test create_executor returns a WorkflowExecutor instance."""
-        executor = coding_provider.create_executor(mock_orchestrator)
-        assert isinstance(executor, WorkflowExecutor)
-
-    def test_create_streaming_executor_returns_streaming_executor(
-        self, mock_orchestrator, coding_provider
-    ):
-        """Test create_streaming_executor returns StreamingWorkflowExecutor."""
-        executor = coding_provider.create_streaming_executor(mock_orchestrator)
-        assert isinstance(executor, StreamingWorkflowExecutor)
-
-    @pytest.mark.asyncio
-    async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, coding_provider):
-        """Test astream raises ValueError for unknown workflow name."""
-        with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
-            async for _ in coding_provider.astream("nonexistent", mock_orchestrator, {}):
-                pass
+class TestCodingWorkflowProvider:
+    """Tests for CodingWorkflowProvider canonical API."""
 
     def test_provider_has_workflows(self, coding_provider):
         """Test provider has expected workflows available."""
@@ -137,32 +93,10 @@ class TestCodingWorkflowProviderStreaming:
             assert hasattr(workflow, "nodes")
 
 
-# ============ DevOpsWorkflowProvider Tests ============
-
-
 @pytest.mark.integration
 @pytest.mark.workflows
-class TestDevOpsWorkflowProviderStreaming:
-    """Tests for DevOpsWorkflowProvider streaming support."""
-
-    def test_create_executor_returns_workflow_executor(self, mock_orchestrator, devops_provider):
-        """Test create_executor returns a WorkflowExecutor instance."""
-        executor = devops_provider.create_executor(mock_orchestrator)
-        assert isinstance(executor, WorkflowExecutor)
-
-    def test_create_streaming_executor_returns_streaming_executor(
-        self, mock_orchestrator, devops_provider
-    ):
-        """Test create_streaming_executor returns StreamingWorkflowExecutor."""
-        executor = devops_provider.create_streaming_executor(mock_orchestrator)
-        assert isinstance(executor, StreamingWorkflowExecutor)
-
-    @pytest.mark.asyncio
-    async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, devops_provider):
-        """Test astream raises ValueError for unknown workflow name."""
-        with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
-            async for _ in devops_provider.astream("nonexistent", mock_orchestrator, {}):
-                pass
+class TestDevOpsWorkflowProvider:
+    """Tests for DevOpsWorkflowProvider canonical API."""
 
     def test_provider_has_workflows(self, devops_provider):
         """Test provider has expected workflows available."""
@@ -181,32 +115,10 @@ class TestDevOpsWorkflowProviderStreaming:
             assert hasattr(workflow, "nodes")
 
 
-# ============ ResearchWorkflowProvider Tests ============
-
-
 @pytest.mark.integration
 @pytest.mark.workflows
-class TestResearchWorkflowProviderStreaming:
-    """Tests for ResearchWorkflowProvider streaming support."""
-
-    def test_create_executor_returns_workflow_executor(self, mock_orchestrator, research_provider):
-        """Test create_executor returns a WorkflowExecutor instance."""
-        executor = research_provider.create_executor(mock_orchestrator)
-        assert isinstance(executor, WorkflowExecutor)
-
-    def test_create_streaming_executor_returns_streaming_executor(
-        self, mock_orchestrator, research_provider
-    ):
-        """Test create_streaming_executor returns StreamingWorkflowExecutor."""
-        executor = research_provider.create_streaming_executor(mock_orchestrator)
-        assert isinstance(executor, StreamingWorkflowExecutor)
-
-    @pytest.mark.asyncio
-    async def test_astream_raises_for_unknown_workflow(self, mock_orchestrator, research_provider):
-        """Test astream raises ValueError for unknown workflow name."""
-        with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
-            async for _ in research_provider.astream("nonexistent", mock_orchestrator, {}):
-                pass
+class TestResearchWorkflowProvider:
+    """Tests for ResearchWorkflowProvider canonical API."""
 
     def test_provider_has_workflows(self, research_provider):
         """Test provider has expected workflows available."""
@@ -225,36 +137,10 @@ class TestResearchWorkflowProviderStreaming:
             assert hasattr(workflow, "nodes")
 
 
-# ============ DataAnalysisWorkflowProvider Tests ============
-
-
 @pytest.mark.integration
 @pytest.mark.workflows
-class TestDataAnalysisWorkflowProviderStreaming:
-    """Tests for DataAnalysisWorkflowProvider streaming support."""
-
-    def test_create_executor_returns_workflow_executor(
-        self, mock_orchestrator, dataanalysis_provider
-    ):
-        """Test create_executor returns a WorkflowExecutor instance."""
-        executor = dataanalysis_provider.create_executor(mock_orchestrator)
-        assert isinstance(executor, WorkflowExecutor)
-
-    def test_create_streaming_executor_returns_streaming_executor(
-        self, mock_orchestrator, dataanalysis_provider
-    ):
-        """Test create_streaming_executor returns StreamingWorkflowExecutor."""
-        executor = dataanalysis_provider.create_streaming_executor(mock_orchestrator)
-        assert isinstance(executor, StreamingWorkflowExecutor)
-
-    @pytest.mark.asyncio
-    async def test_astream_raises_for_unknown_workflow(
-        self, mock_orchestrator, dataanalysis_provider
-    ):
-        """Test astream raises ValueError for unknown workflow name."""
-        with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
-            async for _ in dataanalysis_provider.astream("nonexistent", mock_orchestrator, {}):
-                pass
+class TestDataAnalysisWorkflowProvider:
+    """Tests for DataAnalysisWorkflowProvider canonical API."""
 
     def test_provider_has_workflows(self, dataanalysis_provider):
         """Test provider has expected workflows available."""
@@ -271,70 +157,6 @@ class TestDataAnalysisWorkflowProviderStreaming:
             assert workflow is not None
             assert hasattr(workflow, "name")
             assert hasattr(workflow, "nodes")
-
-
-# ============ Cross-Vertical Tests ============
-
-
-@pytest.mark.integration
-@pytest.mark.workflows
-class TestCrossVerticalStreamingConsistency:
-    """Tests for consistent streaming API across all verticals."""
-
-    @pytest.fixture
-    def all_providers(
-        self,
-        coding_provider,
-        devops_provider,
-        research_provider,
-        dataanalysis_provider,
-    ):
-        """Fixture providing all workflow providers."""
-        return [
-            ("coding", coding_provider),
-            ("devops", devops_provider),
-            ("research", research_provider),
-            ("dataanalysis", dataanalysis_provider),
-        ]
-
-    def test_all_providers_have_create_executor(self, mock_orchestrator, all_providers):
-        """Test all providers implement create_executor."""
-        for name, provider in all_providers:
-            assert hasattr(provider, "create_executor"), f"{name} provider missing create_executor"
-            executor = provider.create_executor(mock_orchestrator)
-            assert isinstance(executor, WorkflowExecutor), f"{name} create_executor wrong type"
-
-    def test_all_providers_have_create_streaming_executor(self, mock_orchestrator, all_providers):
-        """Test all providers implement create_streaming_executor."""
-        for name, provider in all_providers:
-            assert hasattr(
-                provider, "create_streaming_executor"
-            ), f"{name} provider missing create_streaming_executor"
-            executor = provider.create_streaming_executor(mock_orchestrator)
-            assert isinstance(
-                executor, StreamingWorkflowExecutor
-            ), f"{name} create_streaming_executor wrong type"
-
-    def test_all_providers_have_astream(self, all_providers):
-        """Test all providers implement astream method."""
-        for name, provider in all_providers:
-            assert hasattr(provider, "astream"), f"{name} provider missing astream"
-            # Verify it's callable
-            assert callable(provider.astream), f"{name} astream not callable"
-
-    def test_all_providers_have_consistent_api(self, all_providers):
-        """Test all providers have consistent API surface."""
-        expected_methods = [
-            "get_workflows",
-            "get_workflow",
-            "get_workflow_names",
-            "create_executor",
-            "create_streaming_executor",
-            "astream",
-        ]
-        for name, provider in all_providers:
-            for method in expected_methods:
-                assert hasattr(provider, method), f"{name} provider missing {method}"
 
 
 # ============ Canonical API Tests (UnifiedWorkflowCompiler) ============
@@ -397,7 +219,7 @@ class TestCanonicalWorkflowAPI:
     async def test_run_compiled_workflow_raises_for_unknown_workflow(self, all_providers):
         """Test run_compiled_workflow raises ValueError for unknown workflow."""
         for name, provider in all_providers:
-            with pytest.raises(ValueError, match="Unknown workflow: nonexistent"):
+            with pytest.raises(ValueError, match="Workflow not found: nonexistent"):
                 await provider.run_compiled_workflow("nonexistent", {})
 
     @pytest.mark.asyncio
@@ -409,7 +231,7 @@ class TestCanonicalWorkflowAPI:
                     pass
                 pytest.fail(f"{name} provider should have raised ValueError")
             except ValueError as e:
-                assert "Unknown workflow: nonexistent" in str(e)
+                assert "Workflow not found: nonexistent" in str(e)
 
     def test_all_providers_have_canonical_convenience_methods(self, all_providers):
         """Test all providers have canonical convenience methods."""
