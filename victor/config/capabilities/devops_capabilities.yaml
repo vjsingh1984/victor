@@ -1,61 +1,45 @@
-# DevOps Vertical Capabilities Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for DevOps Vertical
+
 vertical_name: devops
 
 capabilities:
-  deployment:
-    type: workflow
-    description: "Deploy applications to infrastructure"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.workflows:DeploymentWorkflow"
-    config:
-      strategy: rolling
-      health_check_timeout: 300
+  - name: docker_management
+    capability_type: tool
+    version: "1.0"
+    description: Docker container management
+    tags:
+      - docker
+      - container
+    handler_module: victor.devops.tools
+    handler_function: docker_manager
+    default_config:
+      runtime: docker
+      security_scan_enabled: true
 
-  infrastructure_management:
-    type: tool
-    description: "Manage infrastructure using Terraform"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.terraform:Manager"
+  - name: deployment_safety
+    capability_type: validator
+    version: "1.0"
+    description: Deployment safety checks and validation
+    tags:
+      - deployment
+      - safety
+    handler_module: victor.devops.validation
+    handler_function: deployment_validator
+    default_config:
+      require_approval: true
+      enable_rollback: true
 
-  container_management:
-    type: tool
-    description: "Manage Docker containers"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.docker:ContainerManager"
-
-  monitoring:
-    type: tool
-    description: "Monitor application and infrastructure metrics"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.monitoring:Monitor"
-
-  log_analysis:
-    type: tool
-    description: "Analyze logs for issues and insights"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.logging:LogAnalyzer"
-
-  ci_cd:
-    type: workflow
-    description: "Manage CI/CD pipelines"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.cicd:PipelineManager"
-
-  incident_response:
-    type: workflow
-    description: "Respond to infrastructure incidents"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.devops.incident:IncidentResponder"
-    config:
-      escalation_timeout: 900
-
-handlers:
-  deploy: "victor.devops.deployment:Deployer"
-  monitor: "victor.devops.monitoring:Monitor"
+  - name: infrastructure_as_code
+    capability_type: workflow
+    version: "1.0"
+    description: Infrastructure as Code operations
+    tags:
+      - iac
+      - terraform
+    handler_module: victor.devops.iac
+    handler_function: IaCManager
+    default_config:
+      tool: terraform
+      require_plan: true

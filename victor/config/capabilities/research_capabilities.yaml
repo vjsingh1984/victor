@@ -1,54 +1,47 @@
-# Research Vertical Capabilities Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for Research Vertical
+
 vertical_name: research
 
 capabilities:
-  web_search:
-    type: tool
-    description: "Search the web for information"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.tools:WebSearch"
+  - name: web_search
+    capability_type: tool
+    version: "1.0"
+    description: Web search for research and fact-checking
+    tags:
+      - search
+      - web
+      - research
+    handler_module: victor.research.tools
+    handler_function: web_search
+    default_config:
+      max_results: 10
+      search_depth: standard
 
-  deep_research:
-    type: workflow
-    description: "Perform deep research with multiple sources"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.workflows:DeepResearchWorkflow"
-    config:
-      max_sources: 20
-      depth: 3
+  - name: source_verification
+    capability_type: validator
+    version: "1.0"
+    description: Verify source credibility and accuracy
+    tags:
+      - verification
+      - credibility
+      - fact-check
+    handler_module: victor.research.verification
+    handler_function: verify_source
+    default_config:
+      min_credibility: 0.7
+      require_diverse_sources: true
 
-  citation_extraction:
-    type: tool
-    description: "Extract citations from research content"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.citation:Extractor"
-
-  fact_check:
-    type: workflow
-    description: "Verify claims against multiple sources"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.workflows:FactCheckWorkflow"
-    config:
-      confidence_threshold: 0.8
-
-  source_synthesis:
-    type: workflow
-    description: "Synthesize information from multiple sources"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.synthesis:Synthesizer"
-
-  academic_search:
-    type: tool
-    description: "Search academic databases and papers"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.research.academic:AcademicSearch"
-
-handlers:
-  search: "victor.research.tools:SearchEngine"
-  synthesis: "victor.research.synthesis:Synthesizer"
+  - name: citation_management
+    capability_type: middleware
+    version: "1.0"
+    description: Manage citations and bibliography
+    tags:
+      - citation
+      - bibliography
+    handler_module: victor.research.citations
+    handler_function: CitationManager
+    default_config:
+      default_style: apa
+      require_urls: true

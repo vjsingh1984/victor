@@ -1,70 +1,71 @@
-# Coding Vertical Capabilities Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for Coding Vertical
+
 vertical_name: coding
 
 capabilities:
-  code_review:
-    type: workflow
-    description: "Review code for quality, security, and best practices"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.workflows:CodeReviewWorkflow"
-    config:
+  - name: code_review
+    capability_type: workflow
+    version: "1.0"
+    description: Review code for quality, security, and best practices
+    tags:
+      - review
+      - quality
+      - security
+    handler_module: victor.coding.workflows
+    handler_function: CodeReviewWorkflow
+    default_config:
       max_files: 50
-      severity_levels: [error, warning, info]
+      severity_levels:
+        - error
+        - warning
+        - info
 
-  test_generation:
-    type: workflow
-    description: "Generate unit tests from code analysis"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.test_generation:TestGenerator"
-    config:
+  - name: test_generation
+    capability_type: workflow
+    version: "1.0"
+    description: Generate unit tests from code analysis
+    tags:
+      - testing
+      - generation
+    handler_module: victor.coding.test_generation
+    handler_function: TestGenerator
+    default_config:
       coverage_target: 80
       test_framework: pytest
 
-  ast_analysis:
-    type: tool
-    description: "Parse and analyze code structure using AST"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.ast:Analyzer"
-    dependencies: [tree_sitter]
+  - name: ast_analysis
+    capability_type: tool
+    version: "1.0"
+    description: Parse and analyze code structure using AST
+    tags:
+      - ast
+      - analysis
+    handler_module: victor.coding.ast
+    handler_function: Analyzer
+    dependencies:
+      - tree_sitter
 
-  complexity_analysis:
-    type: validator
-    description: "Analyze code complexity metrics"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.metrics:ComplexityAnalyzer"
-    config:
+  - name: complexity_analysis
+    capability_type: validator
+    version: "1.0"
+    description: Analyze code complexity metrics
+    tags:
+      - complexity
+      - metrics
+    handler_module: victor.coding.metrics
+    handler_function: ComplexityAnalyzer
+    default_config:
       max_cyclomatic: 10
       max_cognitive: 15
 
-  code_navigation:
-    type: tool
-    description: "Navigate code structure and find definitions"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.navigation:Navigator"
-
-  refactoring:
-    type: workflow
-    description: "Refactor code for improved maintainability"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.refactor:RefactoringEngine"
-
-  security_scan:
-    type: validator
-    description: "Scan code for security vulnerabilities"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.coding.security:SecurityScanner"
-    config:
-      check_secrets: true
-      check_injections: true
-
-handlers:
-  quality_check: "victor.coding.review:QualityChecker"
-  security_scan: "victor.coding.security:SecurityScanner"
-  refactor: "victor.coding.refactor:RefactoringEngine"
+  - name: code_navigation
+    capability_type: tool
+    version: "1.0"
+    description: Navigate code structure and find definitions
+    tags:
+      - navigation
+      - lsp
+    handler_module: victor.coding.navigation
+    handler_function: Navigator

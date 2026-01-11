@@ -1,67 +1,45 @@
-# DataAnalysis Vertical Capabilities Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for DataAnalysis Vertical
+
 vertical_name: dataanalysis
 
 capabilities:
-  pandas_query:
-    type: tool
-    description: "Execute pandas queries on dataframes"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.pandas:QueryExecutor"
+  - name: data_profiling
+    capability_type: tool
+    version: "1.0"
+    description: Data profiling and statistics
+    tags:
+      - profiling
+      - statistics
+    handler_module: victor.dataanalysis.profiler
+    handler_function: DataProfiler
+    default_config:
+      include_visualizations: true
+      compute_correlations: true
 
-  statistical_analysis:
-    type: tool
-    description: "Perform statistical analysis on data"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.statistics:StatisticalAnalyzer"
-    config:
-      confidence_interval: 0.95
+  - name: visualization
+    capability_type: tool
+    version: "1.0"
+    description: Data visualization and plotting
+    tags:
+      - visualization
+      - charts
+    handler_module: victor.dataanalysis.viz
+    handler_function: Visualizer
+    default_config:
+      default_style: seaborn
+      dpi: 100
 
-  data_visualization:
-    type: tool
-    description: "Create visualizations from data"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.visualization:Visualizer"
-    config:
-      default_chart_type: auto
-
-  data_cleaning:
-    type: workflow
-    description: "Clean and preprocess data"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.cleaning:DataCleaner"
-
-  eda:
-    type: workflow
-    description: "Perform exploratory data analysis"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.eda:EDAAnalyzer"
-    config:
-      max_columns: 50
-      max_rows: 100000
-
-  ml_modeling:
-    type: workflow
-    description: "Train and evaluate ML models"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.ml:ModelingPipeline"
-    config:
-      test_size: 0.2
-      random_state: 42
-
-  data_export:
-    type: tool
-    description: "Export data to various formats"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.dataanalysis.export:DataExporter"
-
-handlers:
-  query: "victor.dataanalysis.pandas:QueryExecutor"
-  stats: "victor.dataanalysis.statistics:Analyzer"
-  viz: "victor.dataanalysis.visualization:Visualizer"
+  - name: statistical_analysis
+    capability_type: workflow
+    version: "1.0"
+    description: Statistical testing and analysis
+    tags:
+      - statistics
+      - testing
+    handler_module: victor.dataanalysis.stats
+    handler_function: StatisticalAnalyzer
+    default_config:
+      significance_level: 0.05
+      correction_method: bonferroni

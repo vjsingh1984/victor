@@ -1,54 +1,46 @@
-# RAG Vertical Capabilities Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for RAG Vertical
+
 vertical_name: rag
 
 capabilities:
-  document_ingestion:
-    type: tool
-    description: "Ingest documents from various sources"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.ingestion:DocumentIngester"
-    config:
-      supported_formats: [pdf, txt, md, html, docx]
+  - name: vector_search
+    capability_type: tool
+    version: "1.0"
+    description: Vector similarity search
+    tags:
+      - search
+      - vector
+      - semantic
+    handler_module: victor.rag.search
+    handler_function: vector_search
+    default_config:
+      similarity_threshold: 0.75
+      max_results: 10
 
-  vector_search:
-    type: tool
-    description: "Search documents using vector embeddings"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.search:VectorSearch"
+  - name: document_ingestion
+    capability_type: workflow
+    version: "1.0"
+    description: Document ingestion and processing
+    tags:
+      - ingestion
+      - processing
+    handler_module: victor.rag.ingestion
+    handler_function: DocumentProcessor
+    default_config:
+      chunk_size: 512
+      chunk_overlap: 50
 
-  embedding_generation:
-    type: tool
-    description: "Generate embeddings for text chunks"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.embeddings:EmbeddingGenerator"
-
-  retrieval:
-    type: workflow
-    description: "Retrieve relevant documents for query"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.workflows:RetrievalWorkflow"
-    config:
-      top_k: 5
-      score_threshold: 0.7
-
-  knowledge_base:
-    type: tool
-    description: "Manage knowledge base of documents"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.knowledge:KnowledgeBase"
-
-  query_augmentation:
-    type: tool
-    description: "Augment queries with context"
-    enabled: true
-    version: "1.0.0"
-    handler: "victor.rag.augmentation:QueryAugmenter"
-
-handlers:
-  search: "victor.rag.search:SearchEngine"
-  embeddings: "victor.rag.embeddings:Embedder"
+  - name: knowledge_base
+    capability_type: middleware
+    version: "1.0"
+    description: Knowledge base management
+    tags:
+      - management
+      - kb
+    handler_module: victor.rag.kb
+    handler_function: KnowledgeBaseManager
+    default_config:
+      enable_versioning: true
+      auto_update: false

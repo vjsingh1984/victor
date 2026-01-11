@@ -1,51 +1,41 @@
-# Research Vertical Teams Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for Research Vertical
+
+vertical_name: research
+
 teams:
   - name: deep_research_team
-    display_name: "Deep Research Team"
-    description: "Team for conducting comprehensive research on complex topics"
-    formation: hierarchical
-    communication_style: structured
-    max_iterations: 15
-    roles:
-      - name: lead_researcher
-        display_name: "Lead Researcher"
-        description: "Coordinates the research effort"
-        persona: "You are a lead researcher coordinating a comprehensive investigation."
-        tool_categories: [coordination, analysis]
-        capabilities: [web_search, planning]
-
-      - name: source_analyst
-        display_name: "Source Analyst"
-        description: "Analyzes and evaluates sources"
-        persona: "You are a research analyst evaluating source credibility and relevance."
-        tool_categories: [analysis, evaluation]
-        capabilities: [citation_extraction, source_synthesis]
-
-      - name: fact_checker
-        display_name: "Fact Checker"
-        description: "Verifies claims and findings"
-        persona: "You are a fact checker verifying claims against multiple sources."
-        tool_categories: [verification, analysis]
-        capabilities: [fact_check, citation_extraction]
-
-  - name: academic_synthesis_team
-    display_name: "Academic Synthesis Team"
-    description: "Team for synthesizing academic research"
-    formation: consensus
+    display_name: Deep Research Team
+    description: Comprehensive research with source verification and synthesis
+    formation: pipeline
     communication_style: structured
     max_iterations: 10
-    voting_strategy: majority
     roles:
-      - name: literature_reviewer
-        display_name: "Literature Reviewer"
-        description: "Reviews existing literature"
-        persona: "You are an academic researcher conducting thorough literature reviews."
-        tool_categories: [research, analysis]
-        capabilities: [academic_search, citation_extraction]
-
+      - name: investigator
+        display_name: Source Investigator
+        description: Find and verify credible sources
+        persona: Thorough researcher evaluating source credibility
+        tool_categories:
+          - web_search
+          - web_fetch
+        capabilities:
+          - source_verification
+      - name: fact_checker
+        display_name: Fact Checker
+        description: Verify claims and cross-reference
+        persona: Skeptic verifying all claims against sources
+        tool_categories:
+          - web_search
+          - grep
+        capabilities:
+          - source_verification
       - name: synthesizer
-        display_name: "Synthesizer"
-        description: "Synthesizes findings across papers"
-        persona: "You are a research synthesizer combining insights from multiple sources."
-        tool_categories: [analysis, synthesis]
-        capabilities: [source_synthesis, fact_check]
+        display_name: Research Synthesizer
+        description: Synthesize findings into report
+        persona: Clear communicator creating coherent reports
+        tool_categories:
+          - write
+          - read
+        capabilities:
+          - citation_management

@@ -1,57 +1,42 @@
-# DevOps Vertical Teams Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for DevOps Vertical
+
+vertical_name: devops
+
 teams:
   - name: deployment_team
-    display_name: "Deployment Team"
-    description: "Team for managing infrastructure deployments"
+    display_name: Deployment Team
+    description: Safe deployment with testing and verification
     formation: pipeline
     communication_style: structured
     max_iterations: 10
     roles:
+      - name: analyzer
+        display_name: Infrastructure Analyzer
+        description: Analyze current deployment setup
+        persona: Cautious analyst checking infrastructure state
+        tool_categories:
+          - shell
+          - docker
+          - read
       - name: planner
-        display_name: "Planner"
-        description: "Plans deployment strategy"
-        persona: "You are a DevOps engineer planning safe and efficient deployments."
-        tool_categories: [planning, analysis]
-        capabilities: [terraform, kubectl]
-
+        display_name: Deployment Planner
+        description: Plan safe deployment strategy
+        persona: Safety-first planner considering rollback options
+        tool_categories:
+          - read
+          - plan
+        capabilities:
+          - deployment_safety
       - name: executor
-        display_name: "Executor"
-        description: "Executes the deployment"
-        persona: "You are a DevOps engineer executing infrastructure deployments."
-        tool_categories: [execution, deployment]
-        capabilities: [kubectl, docker, terraform]
-
-      - name: validator
-        display_name: "Validator"
-        description: "Validates deployment success"
-        persona: "You are a DevOps engineer validating deployment success and health."
-        tool_categories: [validation, monitoring]
-        capabilities: [monitoring, kubectl]
-
-  - name: incident_response_team
-    display_name: "Incident Response Team"
-    description: "Team for handling incidents"
-    formation: hierarchical
-    communication_style: structured
-    max_iterations: 15
-    roles:
-      - name: incident_commander
-        display_name: "Incident Commander"
-        description: "Coordinates incident response"
-        persona: "You are an incident commander coordinating the response to infrastructure incidents."
-        tool_categories: [coordination, monitoring]
-        capabilities: [monitoring, ci_cd]
-
-      - name: investigator
-        display_name: "Investigator"
-        description: "Investigates the incident"
-        persona: "You are an investigator analyzing infrastructure incidents and their root causes."
-        tool_categories: [investigation, analysis]
-        capabilities: [kubectl, docker, monitoring]
-
-      - name: resolver
-        display_name: "Resolver"
-        description: "Resolves the incident"
-        persona: "You are a resolver implementing fixes for infrastructure incidents."
-        tool_categories: [execution, resolution]
-        capabilities: [kubectl, docker, terraform]
+        display_name: Deployment Executor
+        description: Execute deployment with safety checks
+        persona: Careful executor following safety protocols
+        tool_categories:
+          - shell
+          - docker
+          - git
+        capabilities:
+          - deployment_safety
+          - docker_management

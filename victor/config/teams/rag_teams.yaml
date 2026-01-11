@@ -1,57 +1,32 @@
-# RAG Vertical Teams Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for RAG Vertical
+
+vertical_name: rag
+
 teams:
-  - name: knowledge_curation_team
-    display_name: "Knowledge Curation Team"
-    description: "Team for curating and maintaining knowledge bases"
-    formation: pipeline
+  - name: knowledge_team
+    display_name: Knowledge Base Team
+    description: Document ingestion and knowledge base management
+    formation: sequential
     communication_style: structured
     max_iterations: 10
     roles:
-      - name: document_collector
-        display_name: "Document Collector"
-        description: "Collects documents from various sources"
-        persona: "You are a document collector gathering relevant content for the knowledge base."
-        tool_categories: [collection, ingestion]
-        capabilities: [document_ingestion, web_search]
-
-      - name: content_processor
-        display_name: "Content Processor"
-        description: "Processes and cleans documents"
-        persona: "You are a content processor preparing documents for embedding."
-        tool_categories: [processing, cleaning]
-        capabilities: [data_cleaning, text_processing]
-
-      - name: knowledge_validator
-        display_name: "Knowledge Validator"
-        description: "Validates knowledge quality"
-        persona: "You are a knowledge validator ensuring accuracy and relevance."
-        tool_categories: [validation, quality]
-        capabilities: [retrieval, evaluation]
-
-  - name: query_processing_team
-    display_name: "Query Processing Team"
-    description: "Team for processing and answering queries"
-    formation: parallel
-    communication_style: structured
-    max_iterations: 5
-    roles:
-      - name: query_analyzer
-        display_name: "Query Analyzer"
-        description: "Analyzes user queries"
-        persona: "You are a query analyst understanding user intent and context."
-        tool_categories: [analysis, nlp]
-        capabilities: [query_augmentation, nlp]
-
-      - name: retrieval_specialist
-        display_name: "Retrieval Specialist"
-        description: "Retrieves relevant documents"
-        persona: "You are a retrieval specialist finding the most relevant content."
-        tool_categories: [search, retrieval]
-        capabilities: [vector_search, retrieval]
-
-      - name: answer_synthesizer
-        display_name: "Answer Synthesizer"
-        description: "Synthesizes final answer"
-        persona: "You are an answer synthesizer combining retrieved information into coherent responses."
-        tool_categories: [synthesis, generation]
-        capabilities: [source_synthesis, generation]
+      - name: processor
+        display_name: Document Processor
+        description: Ingest and process documents
+        persona: Thorough processor ensuring quality parsing
+        tool_categories:
+          - rag_ingest
+          - read
+        capabilities:
+          - document_ingestion
+      - name: verifier
+        display_name: Knowledge Verifier
+        description: Verify search quality and accuracy
+        persona: Quality-focused verifier testing retrieval
+        tool_categories:
+          - rag_search
+          - rag_query
+        capabilities:
+          - vector_search

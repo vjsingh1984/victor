@@ -1,57 +1,88 @@
-# Coding Vertical Teams Configuration
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for Coding Vertical
+
+vertical_name: coding
+
 teams:
   - name: code_review_team
-    display_name: "Code Review Team"
-    description: "Multi-agent team for comprehensive code review"
+    display_name: Code Review Team
+    description: Comprehensive code review with parallel analysis
     formation: parallel
-    communication_style: structured
-    max_iterations: 5
-    roles:
-      - name: security_reviewer
-        display_name: "Security Reviewer"
-        description: "Focuses on security vulnerabilities"
-        persona: "You are a security expert specializing in identifying vulnerabilities, injection flaws, and security anti-patterns in code."
-        tool_categories: [security, analysis]
-        capabilities: [security_scan, vulnerability_detection]
-
-      - name: quality_reviewer
-        display_name: "Quality Reviewer"
-        description: "Focuses on code quality and maintainability"
-        persona: "You are a code quality expert analyzing code for maintainability, readability, and adherence to best practices."
-        tool_categories: [analysis, metrics]
-        capabilities: [complexity_analysis, style_check]
-
-      - name: performance_reviewer
-        display_name: "Performance Reviewer"
-        description: "Focuses on performance optimization"
-        persona: "You are a performance optimization expert identifying bottlenecks and optimization opportunities."
-        tool_categories: [analysis, profiling]
-        capabilities: [profiling, benchmarking]
-
-  - name: feature_implementation_team
-    display_name: "Feature Implementation Team"
-    description: "Team for implementing new features"
-    formation: hierarchical
     communication_style: structured
     max_iterations: 10
     roles:
-      - name: architect
-        display_name: "Architect"
-        description: "Designs the solution architecture"
-        persona: "You are a software architect designing robust, scalable solutions."
-        tool_categories: [analysis, design]
-        capabilities: [design, planning]
+      - name: security_reviewer
+        display_name: Security Reviewer
+        description: Review for security vulnerabilities
+        persona: Security-focused reviewer checking for injection attacks and auth flaws
+        tool_categories:
+          - code_search
+          - grep
+        capabilities:
+          - security_scan
+      - name: logic_reviewer
+        display_name: Logic Reviewer
+        description: Review for logic correctness
+        persona: Detail-oriented reviewer checking edge cases and error handling
+        tool_categories:
+          - read
+          - grep
+        capabilities:
+          - ast_analysis
+      - name: style_reviewer
+        display_name: Style Reviewer
+        description: Review for code style and conventions
+        persona: Consistency advocate ensuring readable, maintainable code
+        tool_categories:
+          - read
+        capabilities:
+          - complexity_analysis
+      - name: synthesizer
+        display_name: Review Synthesizer
+        description: Synthesize findings into actionable feedback
+        persona: Diplomatic communicator prioritizing issues by severity
+        tool_categories:
+          - read
+          - write
 
+  - name: feature_implementation_team
+    display_name: Feature Implementation Team
+    description: End-to-end feature implementation with research, planning, implementation, and review
+    formation: pipeline
+    communication_style: structured
+    max_iterations: 10
+    roles:
+      - name: researcher
+        display_name: Code Researcher
+        description: Analyze codebase for relevant patterns
+        persona: Meticulous code archaeologist with eye for patterns
+        tool_categories:
+          - code_search
+          - overview
+          - grep
+        capabilities:
+          - code_navigation
+      - name: planner
+        display_name: Implementation Planner
+        description: Design implementation approach
+        persona: Pragmatic architect valuing clean solutions
+        tool_categories:
+          - read
+          - plan
       - name: implementer
-        display_name: "Implementer"
-        description: "Writes the implementation code"
-        persona: "You are a senior developer writing clean, maintainable code."
-        tool_categories: [editing, testing]
-        capabilities: [code_generation, test_generation]
-
-      - name: tester
-        display_name: "Tester"
-        description: "Validates the implementation"
-        persona: "You are a QA engineer ensuring quality through comprehensive testing."
-        tool_categories: [testing, analysis]
-        capabilities: [test_generation, test_execution]
+        display_name: Feature Implementer
+        description: Implement the feature
+        persona: Skilled craftsman writing clean code
+        tool_categories:
+          - write
+          - edit
+          - shell
+      - name: verifier
+        display_name: Code Reviewer
+        description: Review code and run tests
+        persona: Detail-oriented reviewer catching bugs
+        tool_categories:
+          - read
+          - test
+          - shell
