@@ -3,7 +3,7 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import (
@@ -46,19 +46,21 @@ class DataAnalysisAssistant(VerticalBase):
         tools = cls._file_ops.get_tool_list()
 
         # Add data analysis-specific tools
-        tools.extend([
-            # Directory listing for data file exploration
-            ToolNames.LS,  # list_directory → ls
-            # Python/Shell execution for analysis
-            ToolNames.SHELL,  # bash → shell (for running Python scripts)
-            # Code generation and search
-            ToolNames.CODE_SEARCH,  # Semantic code search
-            ToolNames.OVERVIEW,  # codebase_overview → overview
-            ToolNames.GRAPH,  # Code graph analysis (PageRank, dependencies)
-            # Web for datasets and documentation
-            ToolNames.WEB_SEARCH,  # Web search (internet search)
-            ToolNames.WEB_FETCH,  # Fetch URL content
-        ])
+        tools.extend(
+            [
+                # Directory listing for data file exploration
+                ToolNames.LS,  # list_directory → ls
+                # Python/Shell execution for analysis
+                ToolNames.SHELL,  # bash → shell (for running Python scripts)
+                # Code generation and search
+                ToolNames.CODE_SEARCH,  # Semantic code search
+                ToolNames.OVERVIEW,  # codebase_overview → overview
+                ToolNames.GRAPH,  # Code graph analysis (PageRank, dependencies)
+                # Web for datasets and documentation
+                ToolNames.WEB_SEARCH,  # Web search (internet search)
+                ToolNames.WEB_FETCH,  # Fetch URL content
+            ]
+        )
 
         return tools
 
@@ -196,9 +198,18 @@ When presenting analysis:
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        return cls._get_extension_factory(
-            "tool_dependency_provider", "victor.dataanalysis.tool_dependencies"
-        )
+        """Get tool dependency provider using centralized factory.
+
+        Phase 4: Migrated from deprecated DataAnalysisToolDependencyProvider
+        wrapper to centralized create_vertical_tool_dependency_provider().
+        """
+
+        def _create():
+            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+            return create_vertical_tool_dependency_provider("dataanalysis")
+
+        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:

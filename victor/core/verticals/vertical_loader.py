@@ -43,10 +43,9 @@ Usage:
 from __future__ import annotations
 
 import logging
-import sys
 from typing import TYPE_CHECKING, Dict, List, Optional, Type
 
-from victor.framework.module_loader import EntryPointCache, get_entry_point_cache
+from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 if TYPE_CHECKING:
@@ -355,6 +354,7 @@ class VerticalLoader:
 
         Call this after installing new packages to re-scan entry points.
         Invalidates both the local cache and the global EntryPointCache.
+        Also clears the extension cache for consistency.
         """
         self._discovered_verticals = None
         self._discovered_tools = None
@@ -363,6 +363,11 @@ class VerticalLoader:
         cache = get_entry_point_cache()
         cache.invalidate("victor.verticals")
         cache.invalidate("victor.tools")
+
+        # Clear extension cache for consistency (Phase 3.3 fix)
+        from victor.core.verticals.extension_loader import VerticalExtensionLoader
+
+        VerticalExtensionLoader.clear_extension_cache(clear_all=True)
 
         logger.info("Plugin cache cleared, will re-discover on next access")
 

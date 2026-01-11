@@ -141,6 +141,10 @@ class LearnerType(str, Enum):
     """Optimizes prompt template selection."""
 
 
+# Import config after LearnerType to avoid circular import
+from victor.framework.rl.config import BaseRLConfig, DEFAULT_ACTIVE_LEARNERS, DEFAULT_PATIENCE_MAP
+
+
 @dataclass
 class LearnerStats:
     """Statistics for a specific learner.
@@ -612,6 +616,10 @@ __all__ = [
     "RLCoordinator",
     "BaseLearner",
     "get_rl_coordinator",
+    # Configuration
+    "BaseRLConfig",
+    "DEFAULT_PATIENCE_MAP",
+    "DEFAULT_ACTIVE_LEARNERS",
     # Convenience functions
     "create_outcome",
     "record_tool_success",
