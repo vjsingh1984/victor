@@ -345,11 +345,13 @@ class DatabaseManager:
                 """,
                 (now, now),
             )
-            conn.commit()
 
             self._migrated = True
             if migrated_count > 0:
                 logger.info(f"Database migration complete: {migrated_count} tables")
+
+        # Run schema version migrations after legacy migrations
+        self._run_schema_migrations(conn)
 
     def _migrate_from_legacy(
         self,
@@ -449,6 +451,91 @@ class DatabaseManager:
 
         finally:
             conn.execute(f"DETACH DATABASE legacy_{source_name}")
+
+    def _run_schema_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run schema version migrations.
+
+        Handles adding new columns to existing tables (e.g., profile column to sessions).
+
+        Args:
+            conn: Database connection
+        """
+        from victor.core.schema import Tables, CURRENT_SCHEMA_VERSION
+
+        # Get current schema version
+        cursor = conn.execute(
+            f"SELECT value FROM {Tables.SYS_METADATA} WHERE key = 'schema_version'"
+        )
+        row = cursor.fetchone()
+        current_version = int(row[0]) if row else 1
+
+        if current_version >= CURRENT_SCHEMA_VERSION:
+            logger.debug(f"Schema version {current_version} is up to date")
+            return
+
+        logger.info(f"Migrating schema from version {current_version} to {CURRENT_SCHEMA_VERSION}")
+
+        # Run version migrations
+        for target_version in range(current_version + 1, CURRENT_SCHEMA_VERSION + 1):
+            self._migrate_schema_to(conn, target_version)
+
+        # Update schema version
+        conn.execute(
+            f"""
+            INSERT OR REPLACE INTO {Tables.SYS_METADATA} (key, value, updated_at)
+            VALUES ('schema_version', ?, datetime('now'))
+            """,
+            (str(CURRENT_SCHEMA_VERSION),),
+        )
+        conn.commit()
+        logger.info(f"Schema migrated to version {CURRENT_SCHEMA_VERSION}")
+
+    def _migrate_schema_to(self, conn: sqlite3.Connection, version: int) -> None:
+        """Migrate schema to a specific version.
+
+        Args:
+            conn: Database connection
+            version: Target schema version
+        """
+        # Version 2: Add profile column to sessions table
+        if version == 2:
+            self._add_column_if_missing(
+                conn,
+                "sessions",
+                "profile",
+                "TEXT DEFAULT 'default'",
+            )
+
+    def _add_column_if_missing(
+        self,
+        conn: sqlite3.Connection,
+        table: str,
+        column: str,
+        definition: str,
+    ) -> None:
+        """Add a column to a table if it doesn't exist.
+
+        Args:
+            conn: Database connection
+            table: Table name
+            column: Column name
+            definition: Column definition (e.g., "TEXT DEFAULT 'default'")
+        """
+        # Check if column exists
+        cursor = conn.execute(f"PRAGMA table_info({table})")
+        columns = {row["name"] for row in cursor.fetchall()}
+
+        if column in columns:
+            logger.debug(f"Column {table}.{column} already exists")
+            return
+
+        # Add column
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            conn.commit()
+            logger.info(f"Added column {table}.{column}")
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Failed to add column {table}.{column}: {e}")
 
     def backup(self, backup_path: Optional[Path] = None) -> Path:
         """Create a backup of the database.
@@ -930,6 +1017,9 @@ class ProjectDatabaseManager:
             if migrated_count > 0:
                 logger.info(f"Project database migration complete: {migrated_count} tables")
 
+        # Run schema version migrations after legacy migrations
+        self._run_schema_migrations(conn)
+
     def _migrate_project_tables(
         self,
         conn: sqlite3.Connection,
@@ -992,6 +1082,84 @@ class ProjectDatabaseManager:
 
         finally:
             conn.execute(f"DETACH DATABASE legacy_{source_name}")
+
+    def _run_schema_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run schema version migrations for project database.
+
+        Handles adding new columns to existing tables.
+
+        Args:
+            conn: Database connection
+        """
+        from victor.core.schema import CURRENT_SCHEMA_VERSION
+
+        # Get current schema version
+        cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'schema_version'")
+        row = cursor.fetchone()
+        current_version = int(row[0]) if row else 1
+
+        if current_version >= CURRENT_SCHEMA_VERSION:
+            logger.debug(f"Project schema version {current_version} is up to date")
+            return
+
+        logger.info(f"Migrating project schema from version {current_version} to {CURRENT_SCHEMA_VERSION}")
+
+        # Run version migrations
+        for target_version in range(current_version + 1, CURRENT_SCHEMA_VERSION + 1):
+            self._migrate_schema_to(conn, target_version)
+
+        # Update schema version
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO _project_metadata (key, value, updated_at)
+            VALUES ('schema_version', ?, datetime('now'))
+            """,
+            (str(CURRENT_SCHEMA_VERSION),),
+        )
+        conn.commit()
+        logger.info(f"Project schema migrated to version {CURRENT_SCHEMA_VERSION}")
+
+    def _migrate_schema_to(self, conn: sqlite3.Connection, version: int) -> None:
+        """Migrate project schema to a specific version.
+
+        Args:
+            conn: Database connection
+            version: Target schema version
+        """
+        # Version 2 migrations for project tables can be added here
+        # Currently no project-specific column additions needed
+        pass
+
+    def _add_column_if_missing(
+        self,
+        conn: sqlite3.Connection,
+        table: str,
+        column: str,
+        definition: str,
+    ) -> None:
+        """Add a column to a table if it doesn't exist.
+
+        Args:
+            conn: Database connection
+            table: Table name
+            column: Column name
+            definition: Column definition (e.g., "TEXT DEFAULT 'default'")
+        """
+        # Check if column exists
+        cursor = conn.execute(f"PRAGMA table_info({table})")
+        columns = {row["name"] for row in cursor.fetchall()}
+
+        if column in columns:
+            logger.debug(f"Column {table}.{column} already exists")
+            return
+
+        # Add column
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            conn.commit()
+            logger.info(f"Added column {table}.{column}")
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Failed to add column {table}.{column}: {e}")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get database statistics."""

@@ -48,6 +48,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 import yaml
 
 from victor.tools.tool_names import ToolNames, get_canonical_name
+from victor.agent.loop_detector import LoopSignature, LoopContext, OperationPurpose
 from victor.tools.metadata_registry import get_progress_params
 from victor.protocols.mode_aware import ModeAwareMixin
 
@@ -1379,15 +1380,15 @@ class UnifiedTaskTracker(ModeAwareMixin):
     ) -> str:
         """Generate context-aware signature for loop detection.
 
-        For progressive tools (with progress_params defined via @tool decorator),
-        only the specified parameters are used in the signature - this allows
-        different queries/paths to be treated as exploration, not loops.
+        Uses the enhanced LoopSignature class that considers:
+        - Tool-specific volatile parameters (pattern, offset, limit, etc.)
+        - Conversation stage (same operation in different stages is not a loop)
+        - Purpose inference (explore, analyze, modify, verify)
 
-        Context-Awareness:
-        - Includes conversation stage to prevent false loop detection when the same
-          operation is performed in different stages (e.g., reading a file in
-          EXPLORING stage vs IMPLEMENTING stage)
-        - Excludes volatile parameters like offset/limit for progressive reads
+        This reduces false positives for legitimate exploration:
+        - ls with different patterns = exploration (not loop)
+        - read with different offsets = exploration (not loop)
+        - Same operation at different stages = different intent
 
         Args:
             tool_name: Name of the tool being called
@@ -1397,50 +1398,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Context-aware signature string for loop detection
         """
-        # Volatile fields that shouldn't count towards loop detection
-        # Reading the same file with different offsets is NOT a loop
-        volatile_fields = {
-            "offset",
-            "limit",
-            "line_start",
-            "line_end",
-            "start_line",
-            "end_line",
-            "page",
-            "page_size",
-            "count",
-            "max_results",
-            "timeout",
-        }
+        # Create loop context
+        context = None
+        if include_stage:
+            # Infer purpose from tool and stage
+            purpose = LoopSignature.infer_purpose(tool_name, arguments, self._progress.stage)
+            context = LoopContext.from_stage(
+                self._progress.stage,
+                milestones={m.value for m in self._progress.milestones}
+            )
 
-        params = list(get_progress_params(tool_name))
-        if params:
-            sig_parts = [tool_name]
-            for param in params:
-                # Skip volatile fields for progressive tools
-                if param in volatile_fields:
-                    continue
-                value = arguments.get(param, "")
-                if isinstance(value, str) and len(value) > 100:
-                    value = value[:100]
-                sig_parts.append(str(value))
-
-            # Add stage for context-awareness
-            if include_stage:
-                sig_parts.append(f"stage:{self._progress.stage.value}")
-
-            return "|".join(sig_parts)
-        else:
-            # Filter out volatile fields for non-progressive tools too
-            stable_args = {k: v for k, v in arguments.items() if k not in volatile_fields}
-            args_str = str(sorted(stable_args.items()))
-            base_sig = f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
-
-            # Add stage for context-awareness
-            if include_stage:
-                base_sig += f"|stage:{self._progress.stage.value}"
-
-            return base_sig
+        # Use enhanced LoopSignature class
+        return LoopSignature.generate(tool_name, arguments, context)
 
     def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate resource key for tracking unique resources."""

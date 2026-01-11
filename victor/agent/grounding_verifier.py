@@ -1175,17 +1175,37 @@ class GroundingVerifier:
                     # (model used relative path from subdirectory which is fine)
                     result.verified_references.append(path)
                 elif len(partial_matches) == 1:
-                    # Single match but wrong directory path - flag it but low severity
-                    result.add_issue(
-                        GroundingIssue(
-                            issue_type=IssueType.PATH_INVALID,
-                            severity=IssueSeverity.LOW,
-                            description=f"Path '{path}' has incorrect directory",
-                            reference=path,
-                            suggestion=f"Correct path is: {partial_matches[0]}",
+                    # Check for nested project structure (e.g., project/project/file.py)
+                    # If the given path's directory structure matches the actual path's suffix,
+                    # it's likely a valid nested structure reference
+                    actual_path = partial_matches[0]
+                    given_parts = clean_path.split("/")
+                    actual_parts = actual_path.split("/")
+
+                    # Check if given path matches the end of actual path (allowing for one level of nesting)
+                    # Example: "utils/file.py" matches "project/utils/file.py"
+                    # Example: "project/utils/file.py" matches "project/project/utils/file.py"
+                    is_valid_nested = False
+                    for i in range(1, min(len(given_parts) + 1, len(actual_parts) + 1)):
+                        if actual_parts[-i:] == given_parts[-i:]:
+                            is_valid_nested = True
+                            break
+
+                    if is_valid_nested:
+                        # Valid nested structure reference - count as verified
+                        result.verified_references.append(path)
+                    else:
+                        # Single match but wrong directory path - flag it but low severity
+                        result.add_issue(
+                            GroundingIssue(
+                                issue_type=IssueType.PATH_INVALID,
+                                severity=IssueSeverity.LOW,
+                                description=f"Path '{path}' has incorrect directory",
+                                reference=path,
+                                suggestion=f"Correct path is: {partial_matches[0]}",
+                            )
                         )
-                    )
-                    result.unverified_references.append(path)
+                        result.unverified_references.append(path)
                 else:
                     # Multiple matches and a partial path was given - ambiguous
                     result.add_issue(
