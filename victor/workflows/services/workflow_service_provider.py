@@ -192,10 +192,18 @@ class WorkflowServiceProvider:
         # Import concrete implementations for registration
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
         from victor.workflows.compiled_executor import WorkflowExecutor
+        from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
 
         # WorkflowCompilerImpl - concrete implementation for DI container
         container.register(
             WorkflowCompilerImpl,
+            lambda c: self._create_workflow_compiler_impl(),
+            ServiceLifetime.TRANSIENT,
+        )
+
+        # WorkflowCompilerProtocol - protocol alias for the compiler implementation
+        container.register(
+            WorkflowCompilerProtocol,
             lambda c: self._create_workflow_compiler_impl(),
             ServiceLifetime.TRANSIENT,
         )

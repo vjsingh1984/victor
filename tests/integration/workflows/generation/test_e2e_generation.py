@@ -191,6 +191,7 @@ class TestE2EGenerationAutoMode:
         pipeline = WorkflowGenerationPipeline(
             mock_orchestrator,
             vertical="coding",
+            strategy="llm_single_stage",
         )
 
         # Mock LLM responses
@@ -399,8 +400,8 @@ class TestE2EWorkflowRefinement:
             "entry_point": "node1",
         }
 
-        # Mock graph
-        mock_graph = MagicMock(spec=StateGraph)
+        # Mock graph (don't use spec=StateGraph since we need to_dict method)
+        mock_graph = MagicMock()
         mock_graph.to_dict.return_value = original_schema
 
         # Mock refined schema
@@ -519,10 +520,10 @@ class TestE2EGenerationMultipleVerticals:
             vertical=vertical,
         )
 
-        # Mock LLM responses
+        # Mock LLM responses (include required description field and at least one task)
         mock_orchestrator.chat.side_effect = [
-            f'{{"functional": {{"tasks": []}}, "structural": {{"execution_order": "sequential"}}, "quality": {{}}, "context": {{"vertical": "{vertical}"}}}}',
-            '{"workflow_name": "test", "nodes": [], "edges": [], "entry_point": "start"}',
+            f'{{"description": "{description}", "functional": {{"tasks": [{{"id": "task1", "description": "Main task", "task_type": "agent", "role": "executor", "goal": "{description}"}}]}}, "structural": {{"execution_order": "sequential"}}, "quality": {{}}, "context": {{"vertical": "{vertical}"}}}}',
+            '{{"workflow_name": "test", "nodes": [{{"id": "task1", "type": "agent", "role": "executor", "goal": "{description}"}}], "edges": [{{"source": "task1", "target": "__end__", "type": "normal"}}], "entry_point": "task1"}}'.replace('{description}', description),
         ]
 
         with patch(

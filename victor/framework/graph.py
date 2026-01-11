@@ -1192,6 +1192,18 @@ class CompiledGraph(Generic[StateType]):
         """
         self._debug_hook = hook
 
+    @property
+    def graph(self) -> "CompiledGraph[StateType]":
+        """Return the compiled graph itself.
+
+        This property provides a self-reference for compatibility
+        with APIs that expect a .graph attribute.
+
+        Returns:
+            Self reference to the compiled graph
+        """
+        return self
+
     def _should_use_cow(self, exec_config: GraphConfig) -> bool:
         """Determine if copy-on-write should be used.
 
@@ -2013,6 +2025,36 @@ class StateGraph(Generic[StateType]):
 
                 metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
                 graph.add_node(node_id, passthrough_func, **metadata)
+
+            elif node_type == "agent":
+                # Agent node - placeholder for workflow execution
+                # The actual agent execution is handled by the workflow executor
+                def create_agent_placeholder(node_config):
+                    def agent_placeholder(state):
+                        # Store node config in state for executor to use
+                        return {
+                            **state,
+                            "_pending_agent": node_config,
+                        }
+                    return agent_placeholder
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, create_agent_placeholder(node_def), **metadata)
+
+            elif node_type == "compute":
+                # Compute node - placeholder for handler execution
+                # The actual compute execution is handled by the workflow executor
+                def create_compute_placeholder(node_config):
+                    def compute_placeholder(state):
+                        # Store node config in state for executor to use
+                        return {
+                            **state,
+                            "_pending_compute": node_config,
+                        }
+                    return compute_placeholder
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, create_compute_placeholder(node_def), **metadata)
 
             else:
                 raise TypeError(f"Unsupported node type: {node_type}")

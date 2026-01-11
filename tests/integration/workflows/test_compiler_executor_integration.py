@@ -212,9 +212,10 @@ class TestNodeExecutorFactory:
         # Test creating agent executor
         agent_node = AgentNode(
             id="test",
+            name="Test Agent",
             role="researcher",
             goal="Test",
-            output="result"
+            output_key="result"
         )
         agent_executor = factory.create_executor(agent_node)
         assert agent_executor is not None
@@ -223,8 +224,9 @@ class TestNodeExecutorFactory:
         # Test creating compute executor
         compute_node = ComputeNode(
             id="test",
+            name="Test Compute",
             handler="test_handler",
-            output="result"
+            output_key="result"
         )
         compute_executor = factory.create_executor(compute_node)
         assert compute_executor is not None
