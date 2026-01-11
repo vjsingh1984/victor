@@ -290,6 +290,18 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Free up disk space before Trivy scan
+        run: |
+          # Remove cached Docker images to free up space
+          docker system prune -af --filter "until=24h" || true
+          # Clean up package caches
+          sudo rm -rf /var/cache/apt/archives/* || true
+          sudo rm -rf /usr/share/dotnet/sdk/man || true
+          # Clean up temporary files
+          sudo rm -rf /tmp/* || true
+          # Show available disk space
+          df -h
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
