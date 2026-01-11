@@ -27,7 +27,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from collections import OrderedDict
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -104,11 +105,18 @@ class EmbeddingService:
         self._dimension: Optional[int] = None
 
         # In-memory embedding cache for repeated texts (e.g., tool descriptions)
+        # Uses OrderedDict for LRU eviction order
         # Key: hash of text, Value: embedding vector
-        self._embedding_cache: Dict[str, np.ndarray] = {}
+        self._embedding_cache: OrderedDict[str, np.ndarray] = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
-        self._max_cache_size = 1000  # Limit memory usage
+
+        # Memory-based eviction configuration
+        # Each embedding: 384 floats * 4 bytes = 1,536 bytes (~1.5KB)
+        # Default limit: 50MB allows ~32,000 embeddings
+        self._max_cache_memory_bytes = 50 * 1024 * 1024  # 50MB default
+        self._current_cache_memory_bytes = 0
+        self._bytes_per_float = 4  # float32
 
         # Shutdown flag to prevent new operations after shutdown initiated
         self._shutdown = False
@@ -221,6 +229,46 @@ class EmbeddingService:
         """Generate cache key for text."""
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
+    def _estimate_embedding_memory(self, embedding: np.ndarray) -> int:
+        """Estimate memory usage of an embedding in bytes.
+
+        Args:
+            embedding: Numpy array embedding
+
+        Returns:
+            Estimated memory usage in bytes
+        """
+        return embedding.size * self._bytes_per_float
+
+    def _evict_cache_for_memory(self, needed_bytes: int) -> int:
+        """Evict oldest cache entries to free memory.
+
+        Uses LRU eviction - removes entries from the front of OrderedDict
+        until enough memory is freed.
+
+        Args:
+            needed_bytes: Bytes needed for new entry
+
+        Returns:
+            Number of entries evicted
+        """
+        evicted = 0
+        target_memory = self._max_cache_memory_bytes - needed_bytes
+
+        while self._current_cache_memory_bytes > target_memory and self._embedding_cache:
+            # Pop oldest entry (from front of OrderedDict)
+            key, embedding = self._embedding_cache.popitem(last=False)
+            freed_bytes = self._estimate_embedding_memory(embedding)
+            self._current_cache_memory_bytes -= freed_bytes
+            evicted += 1
+            logger.log(
+                TRACE,
+                f"[EmbeddingService] Evicted cache entry: freed={freed_bytes}B, "
+                f"current_memory={self._current_cache_memory_bytes}B",
+            )
+
+        return evicted
+
     def embed_text_sync(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Generate embedding for a single text (sync version).
 
@@ -236,6 +284,8 @@ class EmbeddingService:
             cache_key = self._get_cache_key(text)
             if cache_key in self._embedding_cache:
                 self._cache_hits += 1
+                # Move to end for LRU ordering (most recently used)
+                self._embedding_cache.move_to_end(cache_key)
                 logger.log(TRACE, f"[EmbeddingService] cache hit: chars={len(text)}")
                 return self._embedding_cache[cache_key]
             self._cache_misses += 1
@@ -263,17 +313,17 @@ class EmbeddingService:
 
             result = np.asarray(embedding, dtype=np.float32)
 
-            # Cache the result
+            # Cache the result with memory-based eviction
             if use_cache:
-                # Evict oldest entries if cache is full
-                if len(self._embedding_cache) >= self._max_cache_size:
-                    # Simple eviction: remove first 10% of entries
-                    keys_to_remove = list(self._embedding_cache.keys())[
-                        : self._max_cache_size // 10
-                    ]
-                    for key in keys_to_remove:
-                        del self._embedding_cache[key]
+                entry_bytes = self._estimate_embedding_memory(result)
+
+                # Check if we need to evict entries to make room
+                if self._current_cache_memory_bytes + entry_bytes > self._max_cache_memory_bytes:
+                    self._evict_cache_for_memory(entry_bytes)
+
+                # Add to cache and update memory tracking
                 self._embedding_cache[cache_key] = result
+                self._current_cache_memory_bytes += entry_bytes
 
             return result
         except Exception as e:
@@ -370,21 +420,31 @@ class EmbeddingService:
         """Get embedding cache statistics.
 
         Returns:
-            Dictionary with cache stats: hits, misses, size, hit_rate
+            Dictionary with cache stats including memory usage
         """
         total = self._cache_hits + self._cache_misses
         hit_rate = self._cache_hits / total if total > 0 else 0.0
+        memory_mb = self._current_cache_memory_bytes / (1024 * 1024)
+        max_memory_mb = self._max_cache_memory_bytes / (1024 * 1024)
+        memory_utilization = (
+            self._current_cache_memory_bytes / self._max_cache_memory_bytes
+            if self._max_cache_memory_bytes > 0
+            else 0.0
+        )
         return {
             "hits": self._cache_hits,
             "misses": self._cache_misses,
             "size": len(self._embedding_cache),
             "hit_rate": f"{hit_rate:.1%}",
-            "max_size": self._max_cache_size,
+            "memory_used_mb": f"{memory_mb:.2f}",
+            "max_memory_mb": f"{max_memory_mb:.2f}",
+            "memory_utilization": f"{memory_utilization:.1%}",
         }
 
     def clear_cache(self) -> None:
         """Clear the embedding cache."""
         self._embedding_cache.clear()
+        self._current_cache_memory_bytes = 0
         self._cache_hits = 0
         self._cache_misses = 0
         logger.debug("[EmbeddingService] Cache cleared")

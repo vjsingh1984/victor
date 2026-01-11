@@ -97,6 +97,10 @@ class ITeamMember(IAgent, Protocol):
 
     Defines the minimal interface for an agent that can participate
     in team coordination.
+
+    Note: execute_task returns Any (not str) to maintain LSP compliance
+    with IAgent. Implementations may return str, but the protocol allows
+    any return type for substitutability.
     """
 
     @property
@@ -104,7 +108,7 @@ class ITeamMember(IAgent, Protocol):
         """Persona of this member (IAgentPersona or None)."""
         ...
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
         """Execute a task and return the result.
 
         Args:
@@ -112,7 +116,7 @@ class ITeamMember(IAgent, Protocol):
             context: Execution context with shared state
 
         Returns:
-            Result string from execution
+            Result of task execution (typically str, but Any for LSP compliance)
         """
         ...
 

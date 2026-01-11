@@ -174,26 +174,68 @@ class VerticalLoader:
                 force_refresh=force_refresh,
             )
 
-            for name, value in ep_entries.items():
-                try:
-                    # Parse "module:attr" format and load
-                    vertical_cls = self._load_entry_point(name, value)
-                    if isinstance(vertical_cls, type) and issubclass(vertical_cls, VerticalBase):
-                        self._discovered_verticals[name] = vertical_cls
-                        # Also register in the global registry
-                        VerticalRegistry.register(vertical_cls)
-                        logger.debug("Discovered vertical plugin: %s", name)
-                    else:
-                        logger.warning(
-                            "Entry point '%s' is not a VerticalBase subclass",
-                            name,
-                        )
-                except Exception as e:
-                    logger.warning("Failed to load vertical entry point '%s': %s", name, e)
+            self._load_vertical_entries(ep_entries)
         except Exception as e:
             logger.warning("Failed to discover vertical entry points: %s", e)
 
         return self._discovered_verticals
+
+    async def discover_verticals_async(
+        self,
+        force_refresh: bool = False,
+    ) -> Dict[str, Type[VerticalBase]]:
+        """Discover verticals asynchronously (non-blocking).
+
+        Async version of discover_verticals() that offloads entry point
+        scanning to a thread pool to avoid blocking the event loop.
+
+        Args:
+            force_refresh: Force re-scan of entry points (bypass cache)
+
+        Returns:
+            Dictionary mapping vertical names to their classes
+        """
+        if self._discovered_verticals is not None and not force_refresh:
+            return self._discovered_verticals
+
+        self._discovered_verticals = {}
+
+        try:
+            # Use async entry point cache to avoid blocking
+            cache = get_entry_point_cache()
+            ep_entries = await cache.get_entry_points_async(
+                "victor.verticals",
+                force_refresh=force_refresh,
+            )
+
+            self._load_vertical_entries(ep_entries)
+        except Exception as e:
+            logger.warning("Failed to discover vertical entry points: %s", e)
+
+        return self._discovered_verticals
+
+    def _load_vertical_entries(self, ep_entries: Dict[str, str]) -> None:
+        """Load vertical classes from entry point entries.
+
+        Args:
+            ep_entries: Dictionary of name -> module:attr strings
+        """
+        for name, value in ep_entries.items():
+            try:
+                # Parse "module:attr" format and load
+                vertical_cls = self._load_entry_point(name, value)
+                if isinstance(vertical_cls, type) and issubclass(vertical_cls, VerticalBase):
+                    self._discovered_verticals[name] = vertical_cls
+                    # Also register in the global registry
+                    VerticalRegistry.register(vertical_cls)
+                    logger.debug("Discovered vertical plugin: %s", name)
+                else:
+                    logger.warning(
+                        "Entry point '%s' is not a VerticalBase subclass",
+                        name,
+                    )
+            except Exception as e:
+                logger.warning("Failed to load vertical entry point '%s': %s", name, e)
 
     def _load_entry_point(self, name: str, value: str) -> Type:
         """Load an entry point by its value string.
@@ -254,17 +296,59 @@ class VerticalLoader:
                 force_refresh=force_refresh,
             )
 
-            for name, value in ep_entries.items():
-                try:
-                    tool_cls = self._load_entry_point(name, value)
-                    self._discovered_tools[name] = tool_cls
-                    logger.debug("Discovered tool plugin: %s", name)
-                except Exception as e:
-                    logger.warning("Failed to load tool entry point '%s': %s", name, e)
+            self._load_tool_entries(ep_entries)
         except Exception as e:
             logger.warning("Failed to discover tool entry points: %s", e)
 
         return self._discovered_tools
+
+    async def discover_tools_async(
+        self,
+        force_refresh: bool = False,
+    ) -> Dict[str, Type]:
+        """Discover tools asynchronously (non-blocking).
+
+        Async version of discover_tools() that offloads entry point
+        scanning to a thread pool to avoid blocking the event loop.
+
+        Args:
+            force_refresh: Force re-scan of entry points (bypass cache)
+
+        Returns:
+            Dictionary mapping tool names to their classes
+        """
+        if self._discovered_tools is not None and not force_refresh:
+            return self._discovered_tools
+
+        self._discovered_tools = {}
+
+        try:
+            # Use async entry point cache to avoid blocking
+            cache = get_entry_point_cache()
+            ep_entries = await cache.get_entry_points_async(
+                "victor.tools",
+                force_refresh=force_refresh,
+            )
+
+            self._load_tool_entries(ep_entries)
+        except Exception as e:
+            logger.warning("Failed to discover tool entry points: %s", e)
+
+        return self._discovered_tools
+
+    def _load_tool_entries(self, ep_entries: Dict[str, str]) -> None:
+        """Load tool classes from entry point entries.
+
+        Args:
+            ep_entries: Dictionary of name -> module:attr strings
+        """
+        for name, value in ep_entries.items():
+            try:
+                tool_cls = self._load_entry_point(name, value)
+                self._discovered_tools[name] = tool_cls
+                logger.debug("Discovered tool plugin: %s", name)
+            except Exception as e:
+                logger.warning("Failed to load tool entry point '%s': %s", name, e)
 
     def refresh_plugins(self) -> None:
         """Refresh the cached plugin discovery.
@@ -453,6 +537,28 @@ def discover_tool_plugins() -> Dict[str, Type]:
     return get_vertical_loader().discover_tools()
 
 
+async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
+    """Discover vertical plugins asynchronously (convenience function).
+
+    Non-blocking version that offloads entry point scanning to thread pool.
+
+    Returns:
+        Dictionary mapping vertical names to their classes
+    """
+    return await get_vertical_loader().discover_verticals_async()
+
+
+async def discover_tool_plugins_async() -> Dict[str, Type]:
+    """Discover tool plugins asynchronously (convenience function).
+
+    Non-blocking version that offloads entry point scanning to thread pool.
+
+    Returns:
+        Dictionary mapping tool names to their classes
+    """
+    return await get_vertical_loader().discover_tools_async()
+
+
 __all__ = [
     "VerticalLoader",
     "get_vertical_loader",
@@ -461,4 +567,6 @@ __all__ = [
     "get_vertical_extensions",
     "discover_vertical_plugins",
     "discover_tool_plugins",
+    "discover_vertical_plugins_async",
+    "discover_tool_plugins_async",
 ]

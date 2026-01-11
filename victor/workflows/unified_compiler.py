@@ -204,6 +204,37 @@ class NodeExecutorFactory:
         self._runner_registry = runner_registry
         self._emitter = emitter
 
+        # Keys that need deep copy for isolation in parallel execution
+        self._mutable_state_keys = frozenset(
+            {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
+        )
+
+    def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Create an isolated copy of state for parallel execution.
+
+        Uses selective copying strategy:
+        - Shallow copy for most keys (user data assumed immutable)
+        - Deep copy only for internal mutable tracking structures
+
+        This is significantly faster than full deepcopy while maintaining
+        isolation for parallel node execution.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            Isolated state copy for child node execution
+        """
+        # Start with shallow copy
+        child_state = dict(state)
+
+        # Deep copy only mutable internal structures
+        for key in self._mutable_state_keys:
+            if key in child_state:
+                child_state[key] = copy.deepcopy(child_state[key])
+
+        return child_state
+
     def create_executor(
         self,
         node: "WorkflowNode",
@@ -704,7 +735,9 @@ class NodeExecutorFactory:
                 if child_executors:
                     # Execute all child nodes in true parallel with asyncio.gather
                     async def run_child(child_node: "WorkflowNode", executor: Callable) -> tuple:
-                        child_state = copy.deepcopy(state)
+                        # Use selective copy instead of full deepcopy for performance
+                        # Shallow copies most keys, deep copies only mutable internal structures
+                        child_state = factory._copy_state_for_parallel(state)
                         try:
                             result_state = await executor(child_state)
                             return (child_node.id, True, result_state)
