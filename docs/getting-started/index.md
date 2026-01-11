@@ -1,56 +1,84 @@
 # Getting Started with Victor
 
-Welcome! This guide will help you install, configure, and run Victor in under 5 minutes.
+Welcome to Victor! This guide will help you install, configure, and run Victor in under 5 minutes.
 
 ## What is Victor?
 
 **Victor** is a provider-agnostic AI coding assistant that supports 21 LLM providers (both local and cloud) through a unified CLI/TUI interface.
 
 **Key Features:**
-- **Provider Switching**: Switch between any LLM provider without losing conversation context
-- **No API Key Required**: Use local models (Ollama, LM Studio, vLLM) by default
+- **21 LLM Providers**: Cloud (Anthropic, OpenAI, Google) and local (Ollama, LM Studio, vLLM)
+- **Provider Switching**: Switch between any provider mid-conversation without losing context
+- **No API Key Required**: Use local models by default for privacy and cost savings
 - **55+ Tools**: File operations, code editing, git, testing, search, and more
-- **5 Verticals**: Specialized assistants for Coding, DevOps, RAG, Data Analysis, Research
-- **Workflows**: YAML-based automation with scheduling and versioning
+- **5 Domain Verticals**: Specialized assistants for Coding, DevOps, RAG, Data Analysis, Research
+- **YAML Workflows**: Define multi-step automation with scheduling and versioning
 - **Multi-Agent Teams**: Coordinate specialized AI agents for complex tasks
 
 ## Choose Your Path
 
-Select the installation path that matches your use case:
+Select the guide that matches your situation:
 
-### Path 1: Local Model (Recommended for Beginners)
+| Your Goal | Guide | Time |
+|-----------|-------|------|
+| **Quick start** | [Quickstart](quickstart.md) | 5 min |
+| **Full installation options** | [Installation](installation.md) | 10 min |
+| **Configure Victor** | [Configuration](configuration.md) | 10 min |
+| **Troubleshoot issues** | [Troubleshooting](../user-guide/troubleshooting.md) | As needed |
 
-**Best for**: Privacy, offline use, free tier
+## Fastest Path to Running Victor
 
-- No API key required
-- Privacy-focused (data stays local)
-- Free and open source
-- [Get Started →](installation.md#local-models)
+### Local Model (No API Key)
 
-### Path 2: Cloud Provider
+```bash
+# 1. Install Victor
+pipx install victor-ai
 
-**Best for**: Maximum capability, faster execution
+# 2. Install and start Ollama
+brew install ollama  # macOS
+# or: curl -fsSL https://ollama.com/install.sh | sh  # Linux
+ollama serve
 
-- More powerful models
-- Faster execution
-- Pay per use
-- [Get Started →](installation.md#cloud-providers)
+# 3. Pull a model
+ollama pull qwen2.5-coder:7b
 
-### Path 3: Docker
+# 4. Start Victor
+victor chat "Hello, Victor!"
+```
 
-**Best for**: Isolated environment, easy deployment
+### Cloud Provider (API Key Required)
 
-- Containerized deployment
-- Easy to scale
-- Cross-platform
-- [Get Started →](installation.md#docker)
+```bash
+# 1. Install Victor
+pipx install victor-ai
+
+# 2. Set API key
+export ANTHROPIC_API_KEY=sk-ant-your-key
+
+# 3. Start Victor
+victor chat --provider anthropic "Hello, Victor!"
+```
+
+### Docker
+
+```bash
+# Pull and run
+docker pull ghcr.io/vjsingh1984/victor:latest
+docker run -it \
+  -v ~/.victor:/root/.victor \
+  -v "$(pwd)":/workspace \
+  -w /workspace \
+  ghcr.io/vjsingh1984/victor:latest chat
+```
 
 ## System Requirements
 
-- **Python**: 3.10 or higher
-- **RAM**: 4GB minimum (8GB recommended)
-- **Disk**: 500MB free space
-- **OS**: Linux, macOS, Windows (WSL2)
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **Python** | 3.10 | 3.11+ |
+| **RAM** | 4 GB | 8 GB+ |
+| **Disk** | 500 MB | 1 GB (local models: 8-32 GB) |
+| **OS** | Linux, macOS, Windows (WSL2) | Linux or macOS |
 
 ## Quick Verification
 
@@ -60,40 +88,61 @@ After installation, verify Victor is working:
 # Check version
 victor --version
 
-# Test with local model
-victor chat "Hello, Victor!" --provider ollama
+# List providers
+victor providers
 
-# Test TUI mode
+# Test chat
+victor chat "Hello, Victor!"
+
+# Open TUI mode
 victor
 ```
 
+## Getting Started Guides
+
+### 1. [Installation Guide](installation.md)
+
+Complete installation instructions including:
+- System requirements
+- Installation methods (pipx, pip, Docker, development)
+- Optional dependencies
+- Platform-specific instructions (macOS, Linux, Windows)
+- Troubleshooting common issues
+
+### 2. [Quickstart Guide](quickstart.md)
+
+Get productive quickly:
+- First run experience
+- Interface modes (TUI, CLI, API)
+- Essential commands
+- Common workflows
+- Quick reference card
+
+### 3. [Configuration Guide](configuration.md)
+
+Customize Victor for your needs:
+- Environment variables and API keys
+- Profiles configuration
+- Global settings
+- Project context files (.victor.md, CLAUDE.md)
+- Modes (BUILD, PLAN, EXPLORE)
+
 ## What's Next?
 
-After installation, continue your journey:
+After getting started:
 
-1. **[First Run](first-run.md)** - Initial configuration and setup wizard
-2. **[Basic Usage](basic-usage.md)** - Your first conversation
-3. **[User Guide](../user-guide/)** - Daily usage patterns
-4. **[Reference](../reference/)** - Provider and tool documentation
-
-## Common Installation Options
-
-| Method | Command | Best For |
-|--------|---------|----------|
-| **pipx** (Recommended) | `pipx install victor-ai` | Isolated installation |
-| **pip** | `pip install victor-ai` | Virtual environments |
-| **Docker** | `docker pull ghcr.io/vjsingh1984/victor:latest` | Containers |
-| **Source** | `pip install -e .[dev]` | Development |
-
-[Full Installation Guide →](installation.md)
+1. **[User Guide](../user-guide/)** - Daily usage patterns and workflows
+2. **[Provider Reference](../reference/providers/)** - All 21 providers detailed
+3. **[Tool Catalog](../reference/tools/catalog.md)** - 55+ available tools
+4. **[Workflow DSL](../guides/workflow-development/dsl.md)** - YAML workflow automation
 
 ## Need Help?
 
-- **Troubleshooting**: See [Troubleshooting Guide](../user-guide/troubleshooting.md)
-- **Documentation**: Browse [full docs](../README.md)
-- **Community**: Join [Discord](https://discord.gg/...) or [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
+- **Troubleshooting**: [Troubleshooting Guide](../user-guide/troubleshooting.md)
+- **Documentation**: [Full docs](../README.md)
+- **Community**: [GitHub Discussions](https://github.com/vjsingh1984/victor/discussions)
 - **Issues**: [Report bugs](https://github.com/vjsingh1984/victor/issues)
 
 ---
 
-**Next**: [Installation Guide →](installation.md)
+**Next**: [Installation Guide](installation.md) | [Quickstart](quickstart.md) | [Configuration](configuration.md)

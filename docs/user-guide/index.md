@@ -14,9 +14,10 @@ This guide covers everything you need to use Victor effectively, from basic conv
 |-------|--------------|----------|
 | **Basic Usage** | [Basic Usage](../getting-started/basic-usage.md) | Your first conversation |
 | **CLI Commands** | [CLI Reference](cli-reference.md) | All commands and options |
+| **Tools** | [Tools Guide](tools.md) | Tool system, selection, execution |
 | **Session Management** | [Session Management](session-management.md) | Save and restore sessions |
-| **Provider Switching** | See below | Change models mid-conversation |
-| **Workflows** | [Workflow DSL →](../guides/workflow-development/) | YAML-based automation |
+| **Providers** | [Provider Guide](providers.md) | 21 LLM providers setup and switching |
+| **Workflows** | [Workflows Guide](workflows.md) | YAML-based automation |
 | **Configuration** | [Configuration →](../reference/configuration/) | Profiles and settings |
 
 ## Common Tasks
@@ -36,25 +37,25 @@ This guide covers everything you need to use Victor effectively, from basic conv
 ```bash
 victor "Review this PR for bugs and improvements"
 ```
-[Full Guide →](../reference/tools/)
+[Tools Guide →](tools.md#code-analysis)
 
 **Refactoring**
 ```bash
 victor --mode build "Refactor to use dependency injection"
 ```
-[Learn More →](../reference/tools/)
+[Tools Guide →](tools.md#file-operations)
 
 **Testing**
 ```bash
 victor "Write unit tests for auth.py"
 ```
-[Full Guide →](../reference/tools/)
+[Tools Guide →](tools.md#shell-and-execution)
 
 **Git Operations**
 ```bash
 victor "Create commit for these changes"
 ```
-[Full Guide →](../reference/tools/)
+[Tools Guide →](tools.md#git-operations)
 
 ### Advanced Features
 
@@ -64,13 +65,13 @@ victor chat --provider anthropic
 /provider openai --model gpt-4
 /provider ollama --model qwen2.5-coder:7b
 ```
-[Learn More → Provider Switching below]
+[Provider Guide →](providers.md)
 
 **Workflow Execution**
 ```bash
 victor workflow run code-review
 ```
-[Learn More →](../guides/workflow-development/)
+[Workflows Guide →](workflows.md)
 
 **Multi-Agent Teams**
 ```python
@@ -95,7 +96,7 @@ Start with Claude, continue with GPT-4, finish with a local model—all in one c
 - **Instant Switching**: Use `/provider` command anytime
 - **Full Support**: All 21 providers support context preservation
 
-[Learn More → Provider Switching below]
+[Provider Guide →](providers.md)
 
 ### 2. Execution Modes
 
@@ -120,25 +121,31 @@ Three modes for different workflows:
 - **Web** (5 tools): HTTP requests, scraping, browsing
 - **And 8 more categories...**
 
-[Full Tool Catalog →](../reference/tools/catalog.md)
+[Tools Guide →](tools.md) | [Full Tool Catalog →](../reference/tools/catalog.md)
 
 ### 4. Workflows
 
 YAML-based automation with scheduling and versioning:
 
 ```yaml
-workflow: CodeReview
-nodes:
-  - id: analyze
-    type: agent
-    role: You are a code reviewer. Analyze this PR.
+workflows:
+  code_review:
+    nodes:
+      - id: analyze
+        type: agent
+        role: reviewer
+        goal: "Analyze this PR for issues"
+        tool_budget: 30
+        next: [test]
 
-  - id: test
-    type: compute
-    tools: [pytest, coverage]
+      - id: test
+        type: compute
+        tools: [shell]
+        inputs:
+          command: pytest tests/
 ```
 
-[Learn More →](../guides/workflow-development/)
+[Workflows Guide →](workflows.md) | [DSL Reference →](../guides/workflow-development/dsl.md)
 
 ### 5. Project Context
 
@@ -309,7 +316,7 @@ Define workflows for common operations:
 - Documentation generation
 - Deployment
 
-[Workflow DSL Guide →](../guides/workflow-development/)
+[Workflows Guide →](workflows.md)
 
 ### 5. Leverage Tool Composition
 
@@ -389,7 +396,7 @@ result = await team.run("Implement user registration feature")
 - **Troubleshooting**: [Troubleshooting Guide →](troubleshooting.md)
 - **Reference**: [Provider Reference →](../reference/providers/)
 - **Reference**: [Tool Catalog →](../reference/tools/)
-- **Guides**: [Workflow Development →](../guides/workflow-development/)
+- **Workflows**: [Workflows Guide →](workflows.md)
 - **Guides**: [Multi-Agent Teams →](../guides/multi-agent/)
 - **Guides**: [Integration →](../guides/integration/)
 - **Development**: [Contributing →](../../CONTRIBUTING.md)
