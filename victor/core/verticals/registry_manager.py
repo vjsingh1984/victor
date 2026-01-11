@@ -14,11 +14,47 @@
 
 """Vertical Registry Manager for package discovery and installation.
 
-This module provides the VerticalRegistryManager class that handles:
-- Discovery of vertical packages (local, built-in, remote)
-- Installation from PyPI, git, or local paths
-- Validation and security checks
-- Metadata caching
+This module provides the VerticalRegistryManager class that handles discovery,
+installation, validation, and management of vertical packages from multiple
+sources including PyPI, git repositories, and local paths.
+
+Design Principles:
+- Multi-source support: Built-in, PyPI, git, local paths
+- Validation: Security checks and version compatibility
+- Metadata caching: Fast lookup via victor-vertical.toml
+- Dry-run mode: Safe preview of install/uninstall operations
+
+Key Classes:
+    VerticalRegistryManager: Main class for vertical package management
+    PackageSpec: Specification for parsing package strings
+    InstalledVertical: Information about installed verticals
+    PackageSourceType: Enum of supported package sources
+
+Usage:
+    from victor.core.verticals.registry_manager import VerticalRegistryManager, PackageSpec
+
+    # List all available verticals
+    manager = VerticalRegistryManager()
+    verticals = manager.list_verticals(source="all")
+
+    # Search for verticals
+    results = manager.search("security")
+
+    # Install a vertical
+    spec = PackageSpec.parse("victor-security>=1.0.0")
+    success, message = manager.install(spec)
+
+    # Install from git
+    git_spec = PackageSpec.parse("git+https://github.com/user/victor-security.git")
+    success, message = manager.install(git_spec)
+
+    # Get detailed info
+    info = manager.get_info("security")
+    print(f"Version: {info.version}, Location: {info.location}")
+
+Related Modules:
+    victor.core.verticals.vertical_loader: Runtime vertical activation
+    victor.core.verticals.package_schema: Metadata schema definitions
 """
 
 from __future__ import annotations
@@ -200,7 +236,9 @@ class VerticalRegistryManager:
     ]
 
     # Default registry URL (can be overridden via settings)
-    DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/vjsingh1984/victor-registry/main/index.json"
+    DEFAULT_REGISTRY_URL = (
+        "https://raw.githubusercontent.com/vjsingh1984/victor-registry/main/index.json"
+    )
 
     def __init__(
         self,
@@ -516,9 +554,7 @@ class VerticalRegistryManager:
                     metadata_file = vertical.location / "victor-vertical.toml"
                     if metadata_file.exists():
                         try:
-                            vertical.metadata = VerticalPackageMetadata.from_toml(
-                                metadata_file
-                            )
+                            vertical.metadata = VerticalPackageMetadata.from_toml(metadata_file)
                         except Exception:
                             pass
                 return vertical
@@ -560,7 +596,7 @@ class VerticalRegistryManager:
 
         # Execute installation
         try:
-            result = subprocess.run(
+            subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
@@ -599,7 +635,7 @@ class VerticalRegistryManager:
 
         # Execute uninstallation
         try:
-            result = subprocess.run(
+            subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
@@ -625,9 +661,7 @@ class VerticalRegistryManager:
 
         # Check for reserved names
         if package_spec.name in self.BUILTIN_VERTICALS:
-            errors.append(
-                f"Package name '{package_spec.name}' conflicts with built-in vertical"
-            )
+            errors.append(f"Package name '{package_spec.name}' conflicts with built-in vertical")
 
         # For git and local packages, try to load metadata
         if package_spec.source in [PackageSourceType.GIT, PackageSourceType.LOCAL]:

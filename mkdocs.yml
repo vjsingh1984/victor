@@ -2,6 +2,7 @@
 site_name: Victor
 site_description: Provider-agnostic AI coding assistant supporting 21 LLM providers with 55 specialized tools across 5 domain verticals
 site_author: Vijaykumar Singh
+site_url: https://vjsingh1984.github.io/victor/
 repo_url: https://github.com/vjsingh1984/victor
 copyright: Copyright &copy; 2025 Vijaykumar Singh
 
@@ -41,7 +42,7 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   logo: assets/victor-banner.png
-  # favicon: assets/favicon.ico  # Add later when available
+  # favicon: assets/images/victor-logo-icon.png  # Uncomment when logo icon is created
   icon:
     repo: fontawesome/brands/github
     edit: material/pencil
