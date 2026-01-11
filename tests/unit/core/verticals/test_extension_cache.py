@@ -19,8 +19,6 @@ Tests that refresh_plugins() properly clears the extension cache.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.vertical_loader import VerticalLoader
 
@@ -52,6 +50,7 @@ class TestClearExtensionCache:
 
         # Clear only CodingAssistant (by calling from CodingAssistant class)
         from victor.coding.assistant import CodingAssistant
+
         CodingAssistant.clear_extension_cache(clear_all=False)
 
         # Should clear 2 CodingAssistant entries but not Research
@@ -85,7 +84,9 @@ class TestRefreshPluginsClearsExtensionCache:
         # Mock the other parts of refresh_plugins
         with patch.object(loader, "_discovered_verticals", None):
             with patch.object(loader, "_discovered_tools", None):
-                with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
                     mock_cache = MagicMock()
                     mock_cache_get.return_value = mock_cache
 
@@ -106,16 +107,27 @@ class TestRefreshPluginsClearsExtensionCache:
 
         with patch.object(loader, "_discovered_verticals", None):
             with patch.object(loader, "_discovered_tools", None):
-                with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
                     mock_cache = MagicMock()
                     mock_cache_get.return_value = mock_cache
 
                     loader.refresh_plugins()
 
                     # All should be cleared
-                    assert "CodingAssistant:middleware" not in VerticalExtensionLoader._extensions_cache
-                    assert "ResearchAssistant:middleware" not in VerticalExtensionLoader._extensions_cache
-                    assert "DataAnalysisAssistant:middleware" not in VerticalExtensionLoader._extensions_cache
+                    assert (
+                        "CodingAssistant:middleware"
+                        not in VerticalExtensionLoader._extensions_cache
+                    )
+                    assert (
+                        "ResearchAssistant:middleware"
+                        not in VerticalExtensionLoader._extensions_cache
+                    )
+                    assert (
+                        "DataAnalysisAssistant:middleware"
+                        not in VerticalExtensionLoader._extensions_cache
+                    )
 
     def test_refresh_plugins_invalidates_entry_point_cache(self):
         """refresh_plugins should still invalidate entry point cache."""
@@ -123,7 +135,9 @@ class TestRefreshPluginsClearsExtensionCache:
 
         with patch.object(loader, "_discovered_verticals", None):
             with patch.object(loader, "_discovered_tools", None):
-                with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
                     mock_cache = MagicMock()
                     mock_cache_get.return_value = mock_cache
 
@@ -163,8 +177,16 @@ class TestExtensionCacheConsistency:
         ResearchAssistant.get_safety_extension()
 
         # Should have separate cache entries
-        coding_keys = [k for k in VerticalExtensionLoader._extensions_cache.keys() if k.startswith("CodingAssistant:")]
-        research_keys = [k for k in VerticalExtensionLoader._extensions_cache.keys() if k.startswith("ResearchAssistant:")]
+        coding_keys = [
+            k
+            for k in VerticalExtensionLoader._extensions_cache.keys()
+            if k.startswith("CodingAssistant:")
+        ]
+        research_keys = [
+            k
+            for k in VerticalExtensionLoader._extensions_cache.keys()
+            if k.startswith("ResearchAssistant:")
+        ]
 
         # Safety extensions should be cached
         assert len(coding_keys) > 0
@@ -185,7 +207,9 @@ class TestExtensionCacheConsistency:
         loader = VerticalLoader()
         with patch.object(loader, "_discovered_verticals", None):
             with patch.object(loader, "_discovered_tools", None):
-                with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
                     mock_cache = MagicMock()
                     mock_cache_get.return_value = mock_cache
                     loader.refresh_plugins()
