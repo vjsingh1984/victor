@@ -103,10 +103,11 @@ extra_css:
   # - assets/overrides.css  # Add custom overrides later
   # - assets/colors.css  # Add custom colors later
 
-extra_javascript:
-  # - assets/mathjax.js  # Add MathJax config later if needed
-  # - https://polyfill.io/v3/polyfill.min.js?features=es6
-  # - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+# Extra JavaScript (uncomment and add as needed)
+# extra_javascript:
+#   - assets/mathjax.js  # Add MathJax config later if needed
+#   - https://polyfill.io/v3/polyfill.min.js?features=es6
+#   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 # Extra
 extra:
