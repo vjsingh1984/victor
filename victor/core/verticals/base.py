@@ -544,6 +544,30 @@ class VerticalBase(
         registry = ModeConfigRegistry.get_instance()
         return registry.list_modes(cls.name)
 
+    # =========================================================================
+    # RL Configuration (Canonical - using RLConfigRegistry)
+    # =========================================================================
+
+    @classmethod
+    def get_rl_config(cls):
+        """Get RL configuration from centralized registry.
+
+        This provides data-driven RL configuration that complements the
+        existing BaseRLConfig pattern. Verticals can use either or both.
+
+        Returns:
+            RLConfig instance with RL configuration
+
+        Example:
+            rl_config = CodingVertical.get_rl_config()
+            tools = rl_config.get_tools_for_task("debugging")
+            threshold = rl_config.get_quality_threshold("debugging")
+        """
+        from victor.core.config import RLConfigRegistry
+
+        registry = RLConfigRegistry.get_instance()
+        return registry.get_rl_config(cls.name)
+
     @classmethod
     async def create_agent(
         cls,

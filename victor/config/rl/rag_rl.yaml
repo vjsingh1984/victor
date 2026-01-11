@@ -1,0 +1,53 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# RL Configuration for RAG Vertical
+
+vertical_name: rag
+
+# Active RL learners for this vertical
+active_learners:
+  - tool_selector
+  - grounding_threshold
+  - quality_weights
+
+# Task type to tool mappings (using canonical tool names)
+task_type_mappings:
+  search:
+    - rag_search
+    - rag_query
+    - read
+  ingest:
+    - rag_ingest
+    - read
+    - ls
+    - web_fetch
+  synthesis:
+    - rag_query
+    - rag_search
+  management:
+    - rag_list
+    - rag_delete
+    - rag_stats
+  exploration:
+    - rag_search
+    - rag_list
+    - rag_stats
+    - read
+
+# Quality thresholds by task type (0.0-1.0)
+quality_thresholds:
+  search: 0.80
+  synthesis: 0.85
+  ingest: 0.75
+  management: 0.70
+  exploration: 0.75
+
+# RAG-specific: lower default patience for RAG tasks
+default_patience:
+  anthropic: 3
+  openai: 3
+  ollama: 5
+  google: 3
+
+# Exploration bonus for tool selection
+exploration_bonus: 0.15

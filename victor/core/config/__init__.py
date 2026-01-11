@@ -22,13 +22,21 @@ Exports:
     AgentMode: Mode configuration dataclass
     ExplorationLevel: Exploration intensity enum
     EditPermission: Edit permission enum
+    RLConfigRegistry: Registry for RL configurations
+    RLConfig: RL configuration dataclass
 
 Example:
-    from victor.core.config import ModeConfigRegistry
+    from victor.core.config import ModeConfigRegistry, RLConfigRegistry
 
-    registry = ModeConfigRegistry.get_instance()
-    mode = registry.get_mode("coding", "plan")
+    # Mode configuration
+    mode_registry = ModeConfigRegistry.get_instance()
+    mode = mode_registry.get_mode("coding", "plan")
     print(mode.exploration)  # ExplorationLevel.THOROUGH
+
+    # RL configuration
+    rl_registry = RLConfigRegistry.get_instance()
+    rl_config = rl_registry.get_rl_config("coding")
+    print(rl_config.task_type_mappings)
 """
 
 from victor.core.config.mode_config import (
@@ -39,12 +47,20 @@ from victor.core.config.mode_config import (
     VerticalModeConfig,
     create_mode_config_registry,
 )
+from victor.core.config.rl_config import (
+    RLConfig,
+    RLConfigRegistry,
+)
 
 __all__ = [
+    # Mode configuration
     "ModeConfigRegistry",
     "AgentMode",
     "ExplorationLevel",
     "EditPermission",
     "VerticalModeConfig",
     "create_mode_config_registry",
+    # RL configuration
+    "RLConfigRegistry",
+    "RLConfig",
 ]

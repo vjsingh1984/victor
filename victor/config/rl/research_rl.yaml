@@ -1,0 +1,74 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# RL Configuration for Research Vertical
+
+vertical_name: research
+
+# Active RL learners for this vertical
+active_learners:
+  - tool_selector
+  - grounding_threshold
+  - quality_weights
+
+# Task type to tool mappings (using canonical tool names)
+task_type_mappings:
+  research:
+    - web_search
+    - web_fetch
+    - read
+    - write
+  fact_check:
+    - web_search
+    - web_fetch
+    - grep
+  literature:
+    - web_search
+    - web_fetch
+    - read
+  competitive:
+    - web_search
+    - web_fetch
+    - write
+  synthesis:
+    - read
+    - write
+    - edit_files
+  exploration:
+    - web_search
+    - read
+    - grep
+    - overview
+
+# Quality thresholds by task type (0.0-1.0)
+quality_thresholds:
+  research: 0.85
+  fact_check: 0.90
+  literature: 0.85
+  competitive: 0.80
+  synthesis: 0.80
+  exploration: 0.75
+
+# Default continuation patience by provider
+default_patience:
+  anthropic: 4
+  openai: 4
+  google: 4
+  deepseek: 5
+  ollama: 6
+
+# Research-specific: preferred providers by task
+preferred_providers_by_task:
+  research:
+    - anthropic
+    - openai
+    - google
+  fact_check:
+    - anthropic
+    - openai
+  literature:
+    - anthropic
+    - openai
+    - google
+
+# Exploration bonus for tool selection
+exploration_bonus: 0.15

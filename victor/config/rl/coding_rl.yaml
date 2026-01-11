@@ -1,0 +1,68 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# RL Configuration for Coding Vertical
+
+vertical_name: coding
+
+# Active RL learners for this vertical
+active_learners:
+  - tool_selector
+  - continuation_patience
+  - grounding_threshold
+
+# Task type to tool mappings
+task_type_mappings:
+  analysis:
+    - code_search
+    - semantic_search
+    - read
+  debugging:
+    - read
+    - grep
+    - code_search
+  refactoring:
+    - edit_files
+    - read
+    - grep
+  implementation:
+    - write
+    - edit_files
+    - read
+  testing:
+    - write
+    - shell
+    - read
+  review:
+    - read
+    - grep
+    - code_search
+  documentation:
+    - read
+    - write
+    - edit_files
+
+# Quality thresholds by task type (0.0-1.0)
+quality_thresholds:
+  analysis: 0.80
+  debugging: 0.85
+  refactoring: 0.90
+  implementation: 0.85
+  testing: 0.85
+  review: 0.80
+  documentation: 0.80
+
+# Default continuation patience by provider
+default_patience:
+  anthropic: 4
+  openai: 4
+  google: 4
+  deepseek: 5
+  xai: 4
+  moonshot: 4
+  kimi: 4
+  ollama: 6
+  lmstudio: 6
+  vllm: 6
+
+# Exploration bonus for tool selection
+exploration_bonus: 0.15

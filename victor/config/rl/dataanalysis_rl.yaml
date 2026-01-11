@@ -1,0 +1,102 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# RL Configuration for DataAnalysis Vertical
+
+vertical_name: dataanalysis
+
+# Active RL learners for this vertical
+active_learners:
+  - tool_selector
+  - continuation_patience
+  - grounding_threshold
+
+# Task type to tool mappings (using canonical tool names)
+task_type_mappings:
+  eda:
+    - read
+    - shell
+    - write
+    - ls
+  cleaning:
+    - shell
+    - read
+    - write
+  visualization:
+    - shell
+    - write
+  statistics:
+    - shell
+    - read
+    - write
+  ml:
+    - shell
+    - read
+    - write
+  profiling:
+    - read
+    - shell
+    - ls
+  reporting:
+    - write
+    - read
+    - shell
+
+# Quality thresholds by task type (0.0-1.0)
+quality_thresholds:
+  eda: 0.75
+  cleaning: 0.85
+  visualization: 0.80
+  statistics: 0.90
+  ml: 0.85
+  profiling: 0.75
+  reporting: 0.80
+
+# Default continuation patience by provider
+default_patience:
+  anthropic: 4
+  openai: 4
+  google: 4
+  deepseek: 5
+  ollama: 6
+
+# Data analysis-specific: preferred output length by task
+preferred_output_length:
+  eda: medium
+  cleaning: medium
+  visualization: long
+  statistics: medium
+  ml: long
+  profiling: short
+  reporting: long
+
+# Preferred Python libraries by task type
+preferred_libraries:
+  eda:
+    - pandas
+    - numpy
+    - seaborn
+    - matplotlib
+  cleaning:
+    - pandas
+    - numpy
+  visualization:
+    - matplotlib
+    - seaborn
+    - plotly
+  statistics:
+    - scipy
+    - statsmodels
+    - pandas
+  ml:
+    - scikit-learn
+    - pandas
+    - numpy
+  profiling:
+    - pandas
+    - ydata-profiling
+  reporting:
+    - pandas
+    - matplotlib
+
+# Exploration bonus for tool selection
+exploration_bonus: 0.15

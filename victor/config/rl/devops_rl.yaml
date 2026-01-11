@@ -1,0 +1,59 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# RL Configuration for DevOps Vertical
+
+vertical_name: devops
+
+# Active RL learners for this vertical
+active_learners:
+  - tool_selector
+  - continuation_patience
+  - grounding_threshold
+
+# Task type to tool mappings (using canonical tool names)
+task_type_mappings:
+  deployment:
+    - shell
+    - docker
+    - git
+    - read
+    - edit_files
+  containerization:
+    - docker
+    - shell
+    - read
+    - write
+  monitoring:
+    - shell
+    - read
+    - write
+    - grep
+  configuration:
+    - read
+    - write
+    - edit_files
+    - grep
+  troubleshooting:
+    - shell
+    - read
+    - grep
+    - docker
+
+# Quality thresholds by task type (0.0-1.0)
+quality_thresholds:
+  deployment: 0.90
+  containerization: 0.85
+  monitoring: 0.80
+  configuration: 0.85
+  troubleshooting: 0.80
+
+# Default continuation patience by provider
+default_patience:
+  anthropic: 4
+  openai: 4
+  google: 4
+  deepseek: 5
+  ollama: 6
+
+# Exploration bonus for tool selection
+exploration_bonus: 0.15
