@@ -1,0 +1,27 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for DataAnalysis Vertical
+
+vertical_name: dataanalysis
+
+teams:
+  - name: analysis_team
+    display_name: Data Analysis Team
+    description: Comprehensive data analysis with profiling, visualization, and insights
+    formation: pipeline
+    total_tool_budget: 75
+    max_iterations: 40
+    members:
+      - role: researcher
+        name: Data Profiler
+        goal: Profile data and understand structure
+        tool_budget: 25
+        memory: true
+      - role: executor
+        name: Analysis Implementer
+        goal: Perform statistical analysis and create visualizations
+        tool_budget: 35
+      - role: reviewer
+        name: Insight Reviewer
+        goal: Review insights and validate conclusions
+        tool_budget: 15

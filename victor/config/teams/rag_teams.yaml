@@ -1,0 +1,22 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for RAG Vertical
+
+vertical_name: rag
+
+teams:
+  - name: knowledge_team
+    display_name: Knowledge Base Team
+    description: Document ingestion and knowledge base management
+    formation: sequential
+    total_tool_budget: 60
+    max_iterations: 30
+    members:
+      - role: executor
+        name: Document Processor
+        goal: Ingest and process documents
+        tool_budget: 30
+      - role: reviewer
+        name: Knowledge Verifier
+        goal: Verify search quality and accuracy
+        tool_budget: 30

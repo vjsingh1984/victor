@@ -1,0 +1,26 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for DevOps Vertical
+
+vertical_name: devops
+
+teams:
+  - name: deployment_team
+    display_name: Deployment Team
+    description: Safe deployment with testing and verification
+    formation: pipeline
+    total_tool_budget: 70
+    max_iterations: 35
+    members:
+      - role: researcher
+        name: Infrastructure Analyzer
+        goal: Analyze current deployment setup
+        tool_budget: 20
+      - role: planner
+        name: Deployment Planner
+        goal: Plan safe deployment strategy
+        tool_budget: 15
+      - role: executor
+        name: Deployment Executor
+        goal: Execute deployment with safety checks
+        tool_budget: 35

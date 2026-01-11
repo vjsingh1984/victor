@@ -1,0 +1,27 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for Research Vertical
+
+vertical_name: research
+
+teams:
+  - name: deep_research_team
+    display_name: Deep Research Team
+    description: Comprehensive research with source verification and synthesis
+    formation: pipeline
+    total_tool_budget: 80
+    max_iterations: 40
+    members:
+      - role: researcher
+        name: Source Investigator
+        goal: Find and verify credible sources
+        tool_budget: 30
+        memory: true
+      - role: researcher
+        name: Fact Checker
+        goal: Verify claims and cross-reference sources
+        tool_budget: 20
+      - role: executor
+        name: Research Synthesizer
+        goal: Synthesize findings into coherent report
+        tool_budget: 30

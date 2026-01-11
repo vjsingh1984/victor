@@ -1,0 +1,77 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Team Configuration for Coding Vertical
+
+vertical_name: coding
+
+teams:
+  - name: feature_team
+    display_name: Feature Implementation Team
+    description: End-to-end feature implementation with research, planning, implementation, and review
+    formation: pipeline
+    total_tool_budget: 100
+    max_iterations: 50
+    members:
+      - role: researcher
+        name: Code Researcher
+        goal: Analyze codebase for relevant patterns and dependencies
+        tool_budget: 25
+        memory: true
+      - role: planner
+        name: Implementation Planner
+        goal: Design implementation approach based on research
+        tool_budget: 15
+        memory: true
+      - role: executor
+        name: Feature Implementer
+        goal: Implement the feature according to plan
+        tool_budget: 40
+        cache: true
+      - role: reviewer
+        name: Code Reviewer
+        goal: Review code and run tests
+        tool_budget: 20
+
+  - name: bug_fix_team
+    display_name: Bug Fix Team
+    description: Systematic bug investigation and fix with verification
+    formation: pipeline
+    total_tool_budget: 70
+    max_iterations: 40
+    members:
+      - role: researcher
+        name: Bug Investigator
+        goal: Investigate bug root cause through code analysis
+        tool_budget: 25
+        memory: true
+        verbose: true
+      - role: executor
+        name: Bug Fixer
+        goal: Apply the fix based on investigation
+        tool_budget: 25
+      - role: reviewer
+        name: Fix Verifier
+        goal: Verify fix with tests
+        tool_budget: 20
+
+  - name: refactoring_team
+    display_name: Refactoring Team
+    description: Safe refactoring with analysis and testing
+    formation: hierarchical
+    total_tool_budget: 75
+    max_iterations: 45
+    members:
+      - role: planner
+        name: Refactoring Planner
+        goal: Plan refactoring approach and identify affected areas
+        tool_budget: 20
+        is_manager: true
+        memory: true
+      - role: executor
+        name: Refactoring Executor
+        goal: Execute refactoring changes
+        tool_budget: 35
+      - role: reviewer
+        name: Quality Verifier
+        goal: Ensure tests pass and code quality maintained
+        tool_budget: 20
