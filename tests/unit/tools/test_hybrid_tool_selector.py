@@ -388,7 +388,7 @@ class TestHybridToolSelectorRLIntegration:
         learner = selector._get_rl_learner()
         assert learner is None
 
-    @patch("victor.agent.rl.coordinator.get_rl_coordinator")
+    @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_rl_enabled_gets_learner(
         self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector
     ):
@@ -410,7 +410,7 @@ class TestHybridToolSelectorRLIntegration:
         assert learner is mock_learner
         mock_coordinator.get_learner.assert_called_once_with("tool_selector")
 
-    @patch("victor.agent.rl.coordinator.get_rl_coordinator")
+    @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_rl_learner_cached(
         self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector
     ):
@@ -463,7 +463,7 @@ class TestHybridToolSelectorRLIntegration:
         result = selector._apply_rl_boost(tool_definitions, "analysis")
         assert result == tool_definitions
 
-    @patch("victor.agent.rl.coordinator.get_rl_coordinator")
+    @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_apply_rl_boost_exploration_mode(
         self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector, tool_definitions
     ):
@@ -499,7 +499,7 @@ class TestHybridToolSelectorRLIntegration:
         for r in results:
             assert set(r) == expected_names
 
-    @patch("victor.agent.rl.coordinator.get_rl_coordinator")
+    @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_apply_rl_boost_exploitation_mode(
         self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector, tool_definitions
     ):
@@ -535,7 +535,7 @@ class TestHybridToolSelectorRLIntegration:
         # The exact position depends on the math, but shell should be higher than original (position 4)
         assert "shell" in result_names[:4]  # At least in top 4
 
-    @patch("victor.agent.rl.coordinator.get_rl_coordinator")
+    @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_record_rl_outcome(
         self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector
     ):

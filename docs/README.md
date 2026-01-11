@@ -1,303 +1,320 @@
 # Victor Documentation
 
-Complete documentation for Victor AI Assistant - the provider-agnostic coding assistant that supports 21 LLM providers (local and cloud) through a unified CLI/TUI interface.
-
----
+This directory contains the MkDocs-based documentation for Victor.
 
 ## Quick Start
 
-**New to Victor?** Start here:
+New contributors should start with the [Quick Start Guide](QUICKSTART.md) for fast setup.
 
-1. **Install**: `pipx install victor-ai`
-2. **Run**: `victor` (TUI mode) or `victor chat "your task"` (CLI mode)
-3. **Learn**: Browse documentation below
+For deployment and configuration, see the [Deployment Guide](DEPLOYMENT.md).
 
-[Full Getting Started Guide →](getting-started/)
+## Building Documentation Locally
 
----
+### Prerequisites
 
-## Documentation by Audience
+Install the documentation dependencies:
 
-### For Users
+```bash
+# Install with pip
+pip install -e ".[docs]"
 
-Daily usage, configuration, troubleshooting, and reference materials.
+# Or install dependencies manually
+pip install mkdocs>=1.5
+pip install mkdocs-material>=9.5
+pip install mkdocstrings[python]>=0.24
+pip install mkdocs-git-revision-date-localized-plugin
+pip install pymdown-extensions
+```
 
-| Documentation | Description |
-|--------------|-------------|
-| [**Getting Started**](getting-started/) | Install, configure, and run Victor for the first time |
-| [**User Guide**](user-guide/) | Daily usage patterns, commands, modes, workflows |
-| [**Troubleshooting**](user-guide/troubleshooting.md) | Common issues and solutions |
+### Build Commands
 
-### For Developers
+```bash
+# Serve documentation locally with live reload
+mkdocs serve
 
-Contributing to Victor, understanding the codebase, extending functionality.
+# Build static site (outputs to ./site directory)
+mkdocs build
 
-| Documentation | Description |
-|--------------|-------------|
-| [**Development Guide**](development/) | Setup, testing, patterns, contributing |
-| [**Architecture**](development/architecture/) | System design, patterns, data flow |
-| [**Extending**](development/extending/) | Add providers, tools, verticals, workflows |
+# Build and deploy to custom directory
+mkdocs build -d /path/to/output
 
-### For Architects
+# Clean build directory before building
+mkdocs build --clean
 
-Deep technical evaluation, design decisions, scalability, and operations.
+# Show verbose output during build
+mkdocs build -v
+```
 
-| Documentation | Description |
-|--------------|-------------|
-| [**Architecture Deep Dive**](development/architecture/deep-dive.md) | Comprehensive system internals |
-| [**Design Patterns**](development/architecture/design-patterns.md) | SOLID principles, coordinator pattern |
-| [**Operations**](operations/) | Deployment, monitoring, security, performance |
+### Local Development
 
-### For Operators
+1. Start the local development server:
+   ```bash
+   mkdocs serve
+   ```
 
-Production deployment, monitoring, and maintenance.
+2. Open your browser to `http://127.0.0.1:8000`
 
-| Documentation | Description |
-|--------------|-------------|
-| [**Deployment**](operations/deployment/) | Docker, Kubernetes, cloud platforms |
-| [**Monitoring**](operations/monitoring/) | Metrics, logging, health checks |
-| [**Security**](operations/security/) | Key management, compliance, auditing |
+3. Edit documentation files - changes will auto-reload
 
----
+4. Press `Ctrl+C` to stop the server
 
-## Documentation by Topic
+## Documentation Structure
 
-### Core Concepts
+```
+docs/
+├── index.md                          # Landing page
+├── getting-started/                  # Getting started guide
+│   ├── index.md
+│   ├── installation.md
+│   ├── quickstart.md
+│   ├── configuration.md
+│   ├── first-run.md
+│   └── basic-usage.md
+├── user-guide/                       # User guide
+│   ├── index.md
+│   ├── cli-reference.md
+│   ├── tui-mode.md
+│   ├── providers.md
+│   ├── tools.md
+│   ├── workflows.md
+│   ├── session-management.md
+│   └── troubleshooting.md
+├── api-reference/                    # API reference
+│   ├── protocols.md
+│   ├── providers.md
+│   ├── tools.md
+│   └── workflows.md
+├── tutorials/                        # Tutorials
+│   ├── build-custom-tool.md
+│   ├── create-workflow.md
+│   └── integrate-provider.md
+├── reference/                        # Reference documentation
+│   ├── index.md
+│   ├── cli-commands.md
+│   ├── configuration-options.md
+│   └── environment-variables.md
+├── verticals/                        # Vertical-specific docs
+│   ├── coding.md
+│   ├── devops.md
+│   ├── rag.md
+│   ├── data-analysis.md
+│   └── research.md
+└── development/                      # Development guide
+    ├── index.md
+    ├── setup.md
+    ├── code-style.md
+    └── testing.md
+```
 
-Understanding Victor's architecture and capabilities.
+## Deployment to GitHub Pages
 
-| Topic | Documentation |
-|-------|--------------|
-| **Providers** | [Provider Reference →](reference/providers/) - All 21 LLM providers |
-| **Tools** | [Tool Catalog →](reference/tools/) - 55+ tools and composition |
-| **Verticals** | [Verticals →](reference/verticals/) - 5 domain assistants |
-| **Workflows** | [Workflow DSL →](guides/workflow-development/) - YAML automation |
-| **Multi-Agent** | [Teams →](guides/multi-agent/) - Agent coordination |
+### Automated Deployment
 
-### Configuration
+Documentation is automatically deployed to GitHub Pages when:
 
-Setting up Victor for your environment.
+- You push to the `main` branch
+- Changes are made to:
+  - `docs/**` directory
+  - `mkdocs.yml` configuration file
+  - `.github/workflows/docs.yml` workflow file
 
-| Topic | Documentation |
-|-------|--------------|
-| **Profiles** | [profiles.yaml →](reference/configuration/profiles.md) - Provider/model configs |
-| **API Keys** | [Key Management →](reference/configuration/keys.md) - Secure key storage |
-| **MCP** | [MCP Config →](reference/configuration/mcp.md) - Model Context Protocol |
-| **Environment** | [Config Reference →](reference/configuration/) - Complete reference |
+The GitHub Actions workflow (`.github/workflows/docs.yml`) will:
+1. Build the documentation using MkDocs
+2. Deploy to GitHub Pages
+3. Publish to `https://vjsingh1984.github.io/victor/`
 
-### Integration
+### Manual Deployment
 
-Using Victor with other tools and platforms.
+To manually trigger a documentation build:
 
-| Topic | Documentation |
-|-------|--------------|
-| **HTTP API** | [API Reference →](reference/api/http-api.md) - victor serve endpoints |
-| **MCP Servers** | [MCP Protocol →](reference/api/mcp-server.md) - victor mcp |
-| **CI/CD** | [CI/CD Integration →](guides/integration/ci-cd.md) - GitHub Actions, etc. |
-| **VS Code** | [VS Code Setup →](guides/integration/vscode-extension.md) - Extension usage |
-| **MCP Clients** | [MCP Clients →](guides/integration/mcp-clients.md) - Using MCP servers |
+1. Go to the **Actions** tab in your GitHub repository
+2. Select **Deploy Documentation** workflow
+3. Click **Run workflow**
+4. Select the `main` branch
+5. Click **Run workflow**
 
-### Advanced Features
+### Deployment Workflow Details
 
-Power user capabilities and workflows.
+The deployment workflow:
+- Uses Python 3.12
+- Installs MkDocs Material theme and dependencies
+- Builds the documentation site
+- Deploys to GitHub Pages using GitHub Actions
+- Only runs on the `main` branch
+- Cancels in-progress deployments to avoid conflicts
 
-| Topic | Documentation |
-|-------|--------------|
-| **Observability** | [EventBus →](guides/observability/event-bus.md) - Events and metrics |
-| **Workflows** | [Workflow DSL →](guides/workflow-development/dsl.md) - StateGraph YAML |
-| **Scheduling** | [Scheduler →](guides/workflow-development/scheduling.md) - Cron workflows |
-| **Teams** | [Formations →](guides/multi-agent/teams.md) - Team patterns |
-| **Performance** | [Performance →](guides/performance.md) - Optimization and tuning |
-| **Security** | [Security →](guides/security.md) - Best practices |
-| **Resilience** | [Resilience →](guides/resilience.md) - Error handling patterns |
+### Custom Domain
 
----
+To use a custom domain (e.g., `docs.victor-ai.com`):
 
-## Visual Guides
+1. Create a `CNAME` file in the `docs/` directory:
+   ```
+   docs.victor-ai.com
+   ```
 
-Diagrams, flowcharts, and visual documentation.
+2. Commit the CNAME file:
+   ```bash
+   git add docs/CNAME
+   git commit -m "Add custom domain CNAME"
+   git push
+   ```
 
-| Guide | Description |
-|-------|-------------|
-| [**Architecture Diagrams**](diagrams/architecture/) | System, data flow, components |
-| [**Workflow Diagrams**](diagrams/workflows/) | 55 workflow visualizations (SVG) |
-| [**Sequence Diagrams**](diagrams/sequences/) | Tool execution, provider switching |
+3. Configure DNS records with your domain provider
 
----
+4. GitHub Pages will automatically use the custom domain
+
+## Documentation Features
+
+### Theme Features
+
+The documentation uses the **Material for MkDocs** theme with:
+- Navigation instant loading
+- Tabbed navigation sections
+- Search functionality with suggestions
+- Dark/light mode toggle
+- Code copying
+- Content tabs
+- Table of contents integration
+
+### Markdown Extensions
+
+- **Admonitions**: Note, warning, tip, info blocks
+- **Code highlighting**: Pygments with line numbers
+- **Task lists**: Custom checkboxes
+- **Emoji support**: Full emoji set
+- **Math support**: LaTeX math equations
+- **Tabs**: Alternate style tabbed content
+- **SuperFences**: Nested code blocks
+- **MagicLink**: Auto-linking to GitHub issues/PRs
+
+### Plugins
+
+- **Search**: Full-text search
+- **Git Revision Date**: Display last update dates
+- **Minify**: (optional) HTML/CSS/JS minification
+
+## Writing Documentation
+
+### Markdown Style Guide
+
+1. Use ATX-style headings (`#` rather than `=`)
+2. Use `$$` for block math, `$` for inline math
+3. Use `!!!` for admonitions:
+   ```markdown
+   !!! note
+       This is a note
+
+   !!! warning
+       This is a warning
+   ```
+
+4. Use code blocks with language specification:
+   ````markdown
+   ```python
+   def hello():
+       print("Hello, World!")
+   ```
+   ````
+
+5. Use task lists:
+   ```markdown
+   - [x] Completed task
+   - [ ] Incomplete task
+   ```
+
+### Adding New Pages
+
+1. Create a new `.md` file in the appropriate directory
+2. Add it to the navigation structure in `mkdocs.yml`:
+   ```yaml
+   nav:
+     - Section Name:
+       - section/page.md
+       - section/new-page.md  # Add new page here
+   ```
+
+3. Write the content following the markdown style guide
+4. Test locally with `mkdocs serve`
+5. Commit and push to trigger deployment
+
+### Code Documentation
+
+Use `mkdocstrings` to automatically generate API documentation from docstrings:
+
+```python
+def example_function(param1: str, param2: int) -> bool:
+    """
+    Brief description.
+
+    Args:
+        param1: Description of param1
+        param2: Description of param2
+
+    Returns:
+        Description of return value
+
+    Raises:
+        ValueError: If param1 is empty
+    """
+    pass
+```
+
+Then reference it in documentation:
+
+````markdown
+::: victor.module.example_function
+    :members:
+    :show-inheritance:
+````
+
+## Troubleshooting
+
+### Build Fails
+
+If the documentation build fails:
+
+1. Check the GitHub Actions logs for errors
+2. Test locally first: `mkdocs build -v`
+3. Verify all referenced files exist
+4. Check for broken links: `mkdocs build --strict`
+5. Validate YAML syntax: `python -c "import yaml; yaml.safe_load(open('mkdocs.yml'))"`
+
+### Navigation Issues
+
+If navigation doesn't appear:
+
+1. Verify the page is listed in `mkdocs.yml` under the `nav` section
+2. Check the file path is correct relative to `docs/`
+3. Ensure the file exists and has valid front matter
+
+### Theme Not Loading
+
+If the theme doesn't load correctly:
+
+1. Clear your browser cache
+2. Verify `mkdocs-material` is installed: `pip show mkdocs-material`
+3. Check the theme configuration in `mkdocs.yml`
 
 ## Resources
 
-Additional learning resources and community content.
+- [MkDocs Documentation](https://www.mkdocs.org/)
+- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
+- [MkDocstrings](https://mkdocstrings.github.io/)
+- [PyMdown Extensions](https://facelessuser.github.io/pymdown-extensions/)
 
-| Resource | Description |
-|----------|-------------|
-| [**Examples**](resources/examples/) | Code examples and snippets |
-| [**Blog Posts**](resources/blog/) | Articles and tutorials |
-| [**Community**](resources/community/) | Discussions, Discord, Stack Overflow |
+## Contributing
 
----
+When contributing documentation:
 
-## Key Reference Documentation
+1. Follow the existing style and structure
+2. Test locally before submitting PRs
+3. Use descriptive commit messages
+4. Add yourself to contributors if desired
+5. Ensure all links are valid
+6. Check for spelling and grammar errors
 
-### Providers
-
-Complete reference for all 21 supported LLM providers.
-
-**Local Providers:**
-- [Ollama](reference/providers/local/ollama.md) - Local model execution
-- [LM Studio](reference/providers/local/lm-studio.md) - Local model UI
-- [vLLM](reference/providers/local/vllm.md) - Fast local inference
-- [llama.cpp](reference/providers/local/llama-cpp.md) - Lightweight inference
-
-**Cloud Providers:**
-- [Anthropic](reference/providers/cloud/anthropic.md) - Claude models
-- [OpenAI](reference/providers/cloud/openai.md) - GPT models
-- [Google](reference/providers/cloud/google.md) - Gemini models
-- [Azure](reference/providers/cloud/azure.md) - Azure OpenAI
-- [And 17 more...](reference/providers/)
-
-[Full Provider Reference →](reference/providers/)
-
-### Tools
-
-55+ tools organized by category.
-
-**Categories:**
-- [File Operations](reference/tools/) - Read, write, edit files
-- [Git](reference/tools/) - Version control operations
-- [Testing](reference/tools/) - Test execution and coverage
-- [Search](reference/tools/) - Code and semantic search
-- [Web](reference/tools/) - Web requests and scraping
-- [And 8 more categories...](reference/tools/)
-
-[Full Tool Catalog →](reference/tools/catalog.md)
-
-### Configuration
-
-Complete configuration reference.
-
-| File | Purpose | Reference |
-|------|---------|----------|
-| `profiles.yaml` | Provider/model profiles | [profiles.md →](reference/configuration/profiles.md) |
-| `config.yaml` | Global settings | [config.md →](reference/configuration/) |
-| `mcp.yaml` | MCP server configuration | [mcp.md →](reference/configuration/mcp.md) |
-| `.victor.md` | Project context | [project-context.md →](user-guide/project-context.md) |
+For more information, see the [Development Guide](development/).
 
 ---
 
-## Development Documentation
-
-### Contributing
-
-We welcome contributions! See the [Contributing Guide](CONTRIBUTING.md) for details.
-
-**Quick Start:**
-```bash
-git clone https://github.com/vjsingh1984/victor.git
-cd victor
-pip install -e ".[dev]"
-make test
-```
-
-**Resources:**
-- [Development Setup →](development/setup/)
-- [Testing Strategy →](development/testing/)
-- [Code Style →](development/contributing/code-style.md)
-- [Pull Requests →](development/contributing/pull-requests.md)
-
-### Architecture
-
-Understanding Victor's internal design.
-
-| Topic | Documentation |
-|-------|--------------|
-| **Overview** | [High-level architecture →](development/architecture/overview.md) |
-| **Deep Dive** | [System internals →](development/architecture/deep-dive.md) (900+ lines) |
-| **Patterns** | [SOLID design →](development/architecture/design-patterns.md) |
-| **State Machine** | [Conversation stages →](development/architecture/state-machine.md) |
-| **Data Flow** | [Request/response flow →](development/architecture/data-flow.md) |
-| **Components** | [Component details →](development/architecture/component-details.md) |
-
-### Extending Victor
-
-Adding custom functionality.
-
-| Topic | Documentation |
-|-------|--------------|
-| **Providers** | [Add providers →](development/extending/providers.md) |
-| **Tools** | [Add tools →](development/extending/tools.md) |
-| **Verticals** | [Create verticals →](development/extending/verticals.md) |
-| **Workflows** | [Custom workflows →](development/extending/workflows.md) |
-
----
-
-## Operations Documentation
-
-### Deployment
-
-Running Victor in production.
-
-| Platform | Documentation |
-|----------|--------------|
-| **Docker** | [Docker deployment →](operations/deployment/docker.md) |
-| **Kubernetes** | [K8s deployment →](operations/deployment/kubernetes.md) |
-| **Cloud** | [Cloud platforms →](operations/deployment/cloud.md) |
-| **Air-Gapped** | [Offline mode →](operations/deployment/air-gapped.md) |
-
-### Monitoring & Security
-
-Operating Victor at scale.
-
-| Topic | Documentation |
-|-------|--------------|
-| **Metrics** | [Metrics & alerting →](operations/monitoring/metrics.md) |
-| **Logging** | [Logging config →](operations/monitoring/logging.md) |
-| **Health** | [Health checks →](operations/monitoring/health-checks.md) |
-| **Security** | [Security overview →](operations/security/) |
-| **Compliance** | [SOC2, GDPR →](operations/security/compliance.md) |
-| **Performance** | [Optimization →](operations/performance/) |
-
----
-
-## Search & Navigation
-
-**Looking for something specific?**
-
-- **New users?** Start with [Getting Started](getting-started/)
-- **Daily use?** See [User Guide](user-guide/)
-- **Developing?** Check [Development Guide](development/)
-- **Architecture?** Read [Architecture Deep Dive](development/architecture/deep-dive.md)
-- **Providers?** View [Provider Reference](reference/providers/)
-- **Tools?** Browse [Tool Catalog](reference/tools/catalog.md)
-- **Config?** Read [Configuration Reference](reference/configuration/)
-- **Stuck?** Try [Troubleshooting](user-guide/troubleshooting.md)
-
----
-
-## Community & Support
-
-- **Discord**: [Join our Discord community](https://discord.gg/...)
-- **GitHub Discussions**: [Start a discussion](https://github.com/vjsingh1984/victor/discussions)
-- **Issues**: [Report bugs or request features](https://github.com/vjsingh1984/victor/issues)
-- **Stack Overflow**: Tag questions with `victor-ai`
-
----
-
-## Additional Resources
-
-- **Changelog**: See [CHANGELOG.md](../CHANGELOG.md) for version history
-- **License**: See [LICENSE](../LICENSE) for Apache 2.0 license
-- **Contributing**: See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guide
-- **Security**: See [SECURITY.md](../SECURITY.md) for security policy
-
----
-
-<div align="center">
-
-**[← Back to Repository](../README.md)**
-
-**Victor Documentation**
-
-*Provider-agnostic coding assistant for developers*
-
-</div>
+Back to [README.md](../README.md)

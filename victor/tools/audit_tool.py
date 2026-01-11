@@ -39,6 +39,19 @@ from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 class AuditTool(BaseTool):
     """Tool for audit logging and compliance checking."""
@@ -242,7 +255,7 @@ Actions:
                 )
                 return ToolResult(
                     success=True,
-                    output=f"✅ Exported audit log to:\n{export_path}",
+                    output=f"{_get_icon('success')} Exported audit log to:\n{export_path}",
                     metadata={"path": str(export_path)},
                 )
 
@@ -270,7 +283,11 @@ Actions:
         lines.append("")
 
         # Compliance status
-        status_icon = "✅" if summary["compliance_status"] == "compliant" else "⚠️"
+        status_icon = (
+            _get_icon("success")
+            if summary["compliance_status"] == "compliant"
+            else _get_icon("warning")
+        )
         lines.append(f"**Compliance Status:** {status_icon} {summary['compliance_status']}")
         if summary["violations"] > 0:
             lines.append(f"**Violations:** {summary['violations']}")
@@ -291,14 +308,14 @@ Actions:
         if summary["events_by_severity"]:
             lines.append("**Events by Severity:**")
             severity_icons = {
-                "critical": "🔴",
-                "error": "🟠",
-                "warning": "🟡",
-                "info": "🔵",
-                "debug": "⚪",
+                "critical": _get_icon("level_critical"),
+                "error": _get_icon("level_high"),
+                "warning": _get_icon("level_medium"),
+                "info": _get_icon("level_info"),
+                "debug": _get_icon("level_unknown"),
             }
             for sev, count in summary["events_by_severity"].items():
-                icon = severity_icons.get(sev, "⚪")
+                icon = severity_icons.get(sev, _get_icon("level_unknown"))
                 lines.append(f"- {icon} {sev}: {count}")
 
         return "\n".join(lines)
@@ -319,12 +336,12 @@ Actions:
         if report.violations:
             lines.append(f"**Violations ({len(report.violations)}):**")
             for v in report.violations[:5]:
-                lines.append(f"- ⚠️ {v.rule.name}: {v.message}")
+                lines.append(f"- {_get_icon('warning')} {v.rule.name}: {v.message}")
             if len(report.violations) > 5:
                 lines.append(f"  ... and {len(report.violations) - 5} more")
             lines.append("")
         else:
-            lines.append("**Violations:** ✅ None")
+            lines.append(f"**Violations:** {_get_icon('success')} None")
             lines.append("")
 
         # Event breakdown
@@ -348,13 +365,14 @@ Actions:
 
         for event in events[:20]:  # Limit display
             timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M")
-            severity_icon = {
-                "critical": "🔴",
-                "error": "🟠",
-                "warning": "🟡",
-                "info": "🔵",
-                "debug": "⚪",
-            }.get(event.severity.value, "⚪")
+            severity_icons = {
+                "critical": _get_icon("level_critical"),
+                "error": _get_icon("level_high"),
+                "warning": _get_icon("level_medium"),
+                "info": _get_icon("level_info"),
+                "debug": _get_icon("level_unknown"),
+            }
+            severity_icon = severity_icons.get(event.severity.value, _get_icon("level_unknown"))
 
             lines.append(f"{severity_icon} **{event.event_type.value}** - {timestamp}")
             lines.append(f"   {event.action}")
@@ -373,7 +391,7 @@ Actions:
 
         framework = status["framework"].upper()
         compliant = status["compliant"]
-        icon = "✅" if compliant else "❌"
+        icon = _get_icon("success") if compliant else _get_icon("error")
 
         lines.append(f"**Framework:** {framework}")
         lines.append(f"**Status:** {icon} {'Compliant' if compliant else 'Non-Compliant'}")
@@ -384,6 +402,6 @@ Actions:
         if status["violations"] > 0:
             lines.append(f"**Violations ({status['violations']}):**")
             for v in status["violation_details"]:
-                lines.append(f"- ⚠️ {v['violation_type']}: {v['message']}")
+                lines.append(f"- {_get_icon('warning')} {v['violation_type']}: {v['message']}")
 
         return "\n".join(lines)

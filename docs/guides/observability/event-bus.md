@@ -627,5 +627,5 @@ event = Event(
 
 - [Workflow DSL →](../workflow-development/dsl.md) - Workflow observability
 - [Workflow Scheduler →](../workflow-development/scheduling.md) - Scheduled workflow monitoring
-- [Multi-Agent Teams →](../multi-agent/teams.md) - Team coordination
+- [Multi-Agent Teams →](../MULTI_AGENT_TEAMS.md) - Team coordination
 - [User Guide →](../../user-guide/) - General usage

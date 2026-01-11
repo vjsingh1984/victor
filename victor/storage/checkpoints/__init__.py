@@ -28,10 +28,10 @@ Key Features:
 - Replay from any checkpoint
 
 Usage - Basic Checkpointing:
-    from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+    from victor.storage.checkpoints import ConversationCheckpointManager, SQLiteCheckpointBackend
 
     backend = SQLiteCheckpointBackend(storage_path)
-    manager = CheckpointManager(backend)
+    manager = ConversationCheckpointManager(backend)
 
     # Save checkpoint
     checkpoint_id = await manager.save_checkpoint(session_id, state, "before refactor")
@@ -79,7 +79,7 @@ from victor.storage.checkpoints.protocol import (
     DiffType,
     FieldDiff,
 )
-from victor.storage.checkpoints.manager import CheckpointManager
+from victor.storage.checkpoints.manager import ConversationCheckpointManager
 
 # SQLiteCheckpointBackend requires aiosqlite - lazy import to avoid import errors
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ __all__ = [
     "DiffType",
     "FieldDiff",
     # Core manager
-    "CheckpointManager",
+    "ConversationCheckpointManager",
     "SQLiteCheckpointBackend",
     # Tree/Branch types
     "BranchStatus",

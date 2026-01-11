@@ -28,7 +28,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable, Any, Dict, Optional
 from contextlib import contextmanager
 
-from victor.core.events import Event
+from victor.core.events import MessagingEvent
 
 
 @runtime_checkable
@@ -46,7 +46,7 @@ class IEventEmitter(Protocol):
     - Support context managers for scoped events
     """
 
-    def emit(self, event: Event) -> None:
+    def emit(self, event: MessagingEvent) -> None:
         """Emit a single event.
 
         Args:
@@ -54,7 +54,7 @@ class IEventEmitter(Protocol):
         """
         ...
 
-    def emit_safe(self, event: Event) -> bool:
+    def emit_safe(self, event: MessagingEvent) -> bool:
         """Safely emit an event, catching any exceptions.
 
         Args:

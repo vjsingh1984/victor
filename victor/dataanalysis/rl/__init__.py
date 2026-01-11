@@ -22,24 +22,23 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.rl.config import BaseRLConfig
 from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
-class DataAnalysisRLConfig:
+class DataAnalysisRLConfig(BaseRLConfig):
     """RL configuration for Data Analysis vertical.
+
+    Inherits common RL configuration from BaseRLConfig and extends
+    with data analysis-specific task types and quality thresholds.
 
     Configures which RL learners to use and their parameters
     for data analysis tasks.
     """
 
-    active_learners: List[LearnerType] = field(
-        default_factory=lambda: [
-            LearnerType.TOOL_SELECTOR,
-            LearnerType.CONTINUATION_PATIENCE,
-            LearnerType.GROUNDING_THRESHOLD,
-        ]
-    )
+    # active_learners inherited from BaseRLConfig
+    # default_patience inherited from BaseRLConfig
 
     # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
@@ -66,14 +65,9 @@ class DataAnalysisRLConfig:
         }
     )
 
-    default_patience: Dict[str, int] = field(
-        default_factory=lambda: {
-            "anthropic": 4,
-            "openai": 4,
-            "google": 4,
-            "ollama": 6,
-        }
-    )
+    # default_patience inherited from BaseRLConfig
+    # Methods get_tools_for_task, get_quality_threshold, get_patience,
+    # is_learner_active, get_rl_config, __repr__ all inherited
 
     # Data analysis often needs larger outputs for code
     preferred_output_length: Dict[str, str] = field(
@@ -88,51 +82,10 @@ class DataAnalysisRLConfig:
         }
     )
 
-    def get_tools_for_task(self, task_type: str) -> List[str]:
-        """Get recommended tools for a task type."""
-        return self.task_type_mappings.get(task_type.lower(), [])
-
-    def get_quality_threshold(self, task_type: str) -> float:
-        """Get quality threshold for a task type."""
-        return self.quality_thresholds.get(task_type.lower(), 0.80)
-
-    def get_patience(self, provider: str) -> int:
-        """Get patience setting for a provider."""
-        return self.default_patience.get(provider.lower(), 4)
-
+    # DataAnalysis-specific method
     def get_preferred_output_length(self, task_type: str) -> str:
         """Get preferred output length for task type."""
         return self.preferred_output_length.get(task_type.lower(), "medium")
-
-    def is_learner_active(self, learner: LearnerType) -> bool:
-        """Check if a learner is active."""
-        return learner in self.active_learners
-
-    def get_rl_config(self) -> Dict[str, Any]:
-        """Return RL configuration as dictionary (protocol compliance).
-
-        Implements RLConfigProviderProtocol.get_rl_config() to enable
-        integration with the vertical framework.
-
-        Returns:
-            Dict with RL configuration including:
-            - active_learners: List of learner type values
-            - task_type_mappings: Map task types to recommended tools
-            - quality_thresholds: Task-specific quality thresholds
-            - default_patience: Provider-specific patience settings
-        """
-        return {
-            "active_learners": [learner.value for learner in self.active_learners],
-            "task_type_mappings": self.task_type_mappings,
-            "quality_thresholds": self.quality_thresholds,
-            "default_patience": self.default_patience,
-        }
-
-    def __repr__(self) -> str:
-        return (
-            f"DataAnalysisRLConfig(learners={len(self.active_learners)}, "
-            f"task_types={len(self.task_type_mappings)})"
-        )
 
 
 class DataAnalysisRLHooks:

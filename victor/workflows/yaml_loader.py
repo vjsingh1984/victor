@@ -927,6 +927,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
           type: agent
           role: researcher
           goal: "Analyze data patterns"
+          profile: openai  # Optional: use specific provider profile
           llm_config:
             temperature: 0.3
             model_hint: claude-3-sonnet
@@ -954,6 +955,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
         output_key=node_data.get("output", node_id),
         llm_config=llm_config,
         timeout_seconds=timeout_seconds,
+        profile=node_data.get("profile"),  # Per-node provider profile
         next_nodes=node_data.get("next", []),
     )
 
@@ -1695,6 +1697,73 @@ class YAMLWorkflowProvider:
     def list_workflows(self) -> List[str]:
         """List all available workflow names."""
         return list(self._workflows.keys())
+
+
+class YAMLWorkflowLoader:
+    """Loader for YAML workflow definitions.
+
+    Provides a simple interface for loading workflows from file paths
+    or YAML string content. Used by WorkflowCompilerImpl for DI integration.
+
+    Attributes:
+        _enable_cache: Whether to enable definition caching
+        _cache_ttl: Cache time-to-live in seconds
+        _config: Optional YAMLWorkflowConfig for parsing
+
+    Example:
+        loader = YAMLWorkflowLoader(enable_cache=True, cache_ttl=3600)
+        workflow_def = loader.load("path/to/workflow.yaml")
+        # or
+        workflow_def = loader.load("workflows:\\n  my_workflow:...")
+    """
+
+    def __init__(
+        self,
+        enable_cache: bool = True,
+        cache_ttl: int = 3600,
+        config: Optional[YAMLWorkflowConfig] = None,
+    ):
+        """Initialize the loader.
+
+        Args:
+            enable_cache: Whether to enable definition caching
+            cache_ttl: Cache time-to-live in seconds
+            config: Optional YAMLWorkflowConfig for parsing
+        """
+        self._enable_cache = enable_cache
+        self._cache_ttl = cache_ttl
+        self._config = config or YAMLWorkflowConfig()
+        self._cache: Dict[str, Any] = {}
+
+    def load(self, source: str, workflow_name: Optional[str] = None) -> Any:
+        """Load workflow definition from file path or YAML string.
+
+        Args:
+            source: File path (if file exists) or YAML string content
+            workflow_name: Optional specific workflow to load from multi-workflow files
+
+        Returns:
+            Parsed workflow definition (WorkflowDefinition or dict)
+
+        Raises:
+            YAMLWorkflowError: If parsing fails
+            FileNotFoundError: If file path doesn't exist
+        """
+        # Check if source is a file path
+        source_path = (
+            Path(source) if not source.strip().startswith(("workflows:", "-", "{")) else None
+        )
+
+        if source_path:
+            if not source_path.exists():
+                raise FileNotFoundError(f"Workflow file not found: {source}")
+            # Load from file
+            return load_workflow_from_file(
+                source_path, workflow_name=workflow_name, config=self._config
+            )
+        else:
+            # Parse as YAML string
+            return load_workflow_from_yaml(source, workflow_name=workflow_name, config=self._config)
 
 
 # =============================================================================

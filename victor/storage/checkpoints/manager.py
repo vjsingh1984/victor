@@ -36,7 +36,7 @@ from victor.storage.checkpoints.protocol import (
 logger = logging.getLogger(__name__)
 
 
-class CheckpointManager:
+class ConversationCheckpointManager:
     """High-level API for conversation state checkpointing.
 
     Wraps a storage backend (SQLite, memory, etc.) with convenient
@@ -48,11 +48,16 @@ class CheckpointManager:
     - diff_checkpoints: Compare two checkpoints
     - auto_checkpoint: Automatic checkpointing based on tool count
 
+    Note: Renamed from CheckpointManager to ConversationCheckpointManager to be
+    semantically distinct from:
+    - GitCheckpointManager (victor.agent.checkpoints): Git stash-based checkpoints
+    - GraphCheckpointManager (victor.framework.graph): Graph state checkpoints
+
     Usage:
-        from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+        from victor.storage.checkpoints import ConversationCheckpointManager, SQLiteCheckpointBackend
 
         backend = SQLiteCheckpointBackend()
-        manager = CheckpointManager(backend)
+        manager = ConversationCheckpointManager(backend)
 
         # Manual checkpoint
         cp_id = await manager.save_checkpoint(session_id, state, "before refactor")

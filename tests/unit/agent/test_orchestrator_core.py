@@ -1911,20 +1911,43 @@ class TestSwitchProvider:
     async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
         """Successful switch updates provider_name."""
         with patch("victor.agent.orchestrator.UsageLogger"):
-            with patch("victor.agent.orchestrator.ProviderRegistry.create") as mock_create:
-                mock_new_provider = MagicMock()
-                mock_new_provider.name = "new_provider"
-                mock_new_provider.supports_tools.return_value = True
-                mock_new_provider.get_context_window.return_value = 100000
-                mock_create.return_value = mock_new_provider
+            orchestrator = AgentOrchestrator(
+                settings=orchestrator_settings,
+                provider=mock_provider,
+                model="test-model",
+            )
 
-                orchestrator = AgentOrchestrator(
-                    settings=orchestrator_settings,
-                    provider=mock_provider,
-                    model="test-model",
+            # Mock the provider manager's switch_provider to simulate a successful switch
+            original_provider_name = orchestrator.provider_name
+
+            async def mock_switch_provider(**kwargs):
+                # Simulate the switch by updating the provider_switcher's state directly
+                from victor.agent.provider.switcher import SwitchState
+
+                # Create a new state with the updated provider name
+                new_state = SwitchState(
+                    provider_name="new_provider",
+                    model="new-model",
+                    switch_count=(
+                        orchestrator._provider_coordinator._manager._provider_switcher._current_state.switch_count
+                        + 1
+                        if orchestrator._provider_coordinator._manager._provider_switcher._current_state
+                        else 1
+                    ),
                 )
+                orchestrator._provider_coordinator._manager._provider_switcher._current_state = (
+                    new_state
+                )
+                return True
 
+            # Patch the provider switcher's switch_provider method
+            with patch.object(
+                orchestrator._provider_coordinator._manager._provider_switcher,
+                "switch_provider",
+                side_effect=mock_switch_provider,
+            ):
                 result = await orchestrator.switch_provider("new_provider", "new-model")
+
                 if result:  # Only check if switch succeeded
                     assert orchestrator.provider_name == "new_provider"
 
@@ -3290,8 +3313,11 @@ class TestSwitchModel:
 
     def test_switch_model_returns_bool(self, orchestrator):
         """Test switch_model returns boolean."""
-        # switch_model is a sync method that returns bool
-        result = orchestrator.switch_model("claude-3-sonnet")
+        import asyncio
+
+        # switch_model is now an async method (protocol method)
+        # Use asyncio.run to call it from sync context
+        result = asyncio.run(orchestrator.switch_model("claude-3-sonnet"))
         assert isinstance(result, bool)
 
 

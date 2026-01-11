@@ -30,7 +30,7 @@ Two Primary Use Cases:
 Example:
     # Using the protocol directly
     async def publish_events(backend: IEventBackend):
-        await backend.publish(Event(topic="tool.start", data={}))
+        await backend.publish(MessagingEvent(topic="tool.start", data={}))
 
     # Factory creates appropriate backend
     backend = create_event_backend(backend_type="kafka", config=kafka_config)
@@ -99,7 +99,7 @@ class BackendType(str, Enum):
 
 
 @dataclass
-class Event:
+class MessagingEvent:
     """Canonical event format for all distributed messaging.
 
     This is the unified event structure used across all backends.
@@ -117,7 +117,7 @@ class Event:
         delivery_guarantee: Required delivery level
 
     Example:
-        event = Event(
+        event = MessagingEvent(
             topic="tool.read",
             data={"file": "/path/to/file", "lines": 100},
             source="agent_1",
@@ -172,7 +172,7 @@ class Event:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
+    def from_dict(cls, data: Dict[str, Any]) -> "MessagingEvent":
         """Deserialize event from dictionary."""
         return cls(
             id=data.get("id", uuid.uuid4().hex[:16]),
@@ -245,8 +245,8 @@ class SubscriptionHandle:
 
 
 # Type alias for event handlers
-EventHandler = Callable[[Event], Awaitable[None]]
-SyncEventHandler = Callable[[Event], None]
+EventHandler = Callable[[MessagingEvent], Awaitable[None]]
+SyncEventHandler = Callable[[MessagingEvent], None]
 
 
 @dataclass
@@ -339,7 +339,7 @@ class IEventPublisher(Protocol):
     Implementations should handle serialization and transport.
     """
 
-    async def publish(self, event: Event) -> bool:
+    async def publish(self, event: MessagingEvent) -> bool:
         """Publish a single event.
 
         Args:
@@ -353,7 +353,7 @@ class IEventPublisher(Protocol):
         """
         ...
 
-    async def publish_batch(self, events: List[Event]) -> int:
+    async def publish_batch(self, events: List[MessagingEvent]) -> int:
         """Publish multiple events in a batch.
 
         Args:
@@ -390,7 +390,7 @@ class IEventSubscriber(Protocol):
             Handle for managing the subscription
 
         Example:
-            async def on_tool_event(event: Event):
+            async def on_tool_event(event: MessagingEvent):
                 print(f"Tool: {event.topic}")
 
             handle = await backend.subscribe("tool.*", on_tool_event)
@@ -425,7 +425,7 @@ class IEventBackend(IEventPublisher, IEventSubscriber, Protocol):
                 self._producer = AIOKafkaProducer(...)
                 await self._producer.start()
 
-            async def publish(self, event: Event) -> bool:
+            async def publish(self, event: MessagingEvent) -> bool:
                 await self._producer.send(event.topic, event.to_dict())
                 return True
 
@@ -474,7 +474,7 @@ class IEventBackend(IEventPublisher, IEventSubscriber, Protocol):
 class EventPublishError(Exception):
     """Raised when event publishing fails."""
 
-    def __init__(self, event: Event, message: str, retryable: bool = True):
+    def __init__(self, event: MessagingEvent, message: str, retryable: bool = True):
         self.event = event
         self.retryable = retryable
         super().__init__(f"Failed to publish event {event.id}: {message}")

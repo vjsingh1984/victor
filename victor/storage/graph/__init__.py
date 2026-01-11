@@ -9,8 +9,6 @@ multiple backend options:
 - **SqliteGraphStore**: Production-ready, embedded SQLite
 - **MemoryGraphStore**: Fast in-memory store for testing
 - **DuckDBGraphStore**: Analytics-optimized (optional)
-- **LanceDBGraphStore**: Vector-enhanced graphs (optional)
-- **Neo4jGraphStore**: Enterprise graph database (optional)
 
 Example:
     ```python

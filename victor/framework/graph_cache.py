@@ -81,7 +81,7 @@ class CompiledGraphCacheConfig:
 
 
 @dataclass
-class CacheEntry:
+class GraphCacheEntry:
     """A cached compiled graph entry.
 
     Attributes:
@@ -141,7 +141,7 @@ class CompiledGraphCache:
 
         # Initialize cache if enabled
         if self._config.enabled:
-            self._cache: Optional[TTLCache[str, CacheEntry]] = TTLCache(
+            self._cache: Optional[TTLCache[str, GraphCacheEntry]] = TTLCache(
                 maxsize=self._config.max_entries,
                 ttl=self._config.ttl_seconds,
             )
@@ -234,7 +234,7 @@ class CompiledGraphCache:
 
         with self._lock:
             try:
-                entry: Optional[CacheEntry] = self._cache.get(graph_hash)
+                entry: Optional[GraphCacheEntry] = self._cache.get(graph_hash)
                 if entry is not None:
                     entry.hit_count += 1
                     self._stats["hits"] += 1
@@ -264,7 +264,7 @@ class CompiledGraphCache:
 
         with self._lock:
             try:
-                entry = CacheEntry(
+                entry = GraphCacheEntry(
                     graph_hash=graph_hash,
                     compiled=compiled,
                     created_at=time.time(),

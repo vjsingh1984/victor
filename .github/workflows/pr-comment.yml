@@ -1,0 +1,333 @@
+name: PR Comment Helper
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_call:  # Can be called from other workflows
+    inputs:
+      fep_validation_result:
+        description: 'FEP validation result'
+        required: false
+        type: string
+        default: 'success'
+      vertical_validation_result:
+        description: 'Vertical validation result'
+        required: false
+        type: string
+        default: 'success'
+
+permissions:
+  pull-requests: write
+
+jobs:
+  post-helpful-comment:
+    name: Post PR Helper Comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect PR type
+        id: detect-type
+        run: |
+          BASE_BRANCH="${{ github.base_ref }}"
+          CHANGED_FILES=$(git diff --name-only origin/${BASE_BRANCH}...HEAD)
+
+          # Initialize flags
+          HAS_FEP_CHANGES=false
+          HAS_VERTICAL_CHANGES=false
+          HAS_CODE_CHANGES=false
+
+          # Check for FEP changes
+          if echo "$CHANGED_FILES" | grep -q '^feps/'; then
+            HAS_FEP_CHANGES=true
+          fi
+
+          # Check for vertical changes
+          if echo "$CHANGED_FILES" | grep -q '^victor/.*/victor-vertical.toml'; then
+            HAS_VERTICAL_CHANGES=true
+          fi
+
+          # Check for code changes (victor/ directory)
+          if echo "$CHANGED_FILES" | grep -q '^victor/'; then
+            HAS_CODE_CHANGES=true
+          fi
+
+          # Output to GitHub Actions
+          echo "has_fep_changes=$HAS_FEP_CHANGES" >> $GITHUB_OUTPUT
+          echo "has_vertical_changes=$HAS_VERTICAL_CHANGES" >> $GITHUB_OUTPUT
+          echo "has_code_changes=$HAS_CODE_CHANGES" >> $GITHUB_OUTPUT
+
+      - name: Generate helpful comment
+        id: generate-comment
+        run: |
+          cat > pr-comment.md << 'EOF'
+          ## 👋 Welcome to your PR!
+
+          Thanks for contributing to Victor! Here's what you need to know:
+
+          EOF
+
+          # Add FEP section
+          if [ "${{ steps.detect-type.outputs.has_fep_changes }}" = "true" ]; then
+            cat >> pr-comment.md << 'EOF'
+
+          ### 📋 FEP Changes Detected
+
+          This PR includes changes to Framework Enhancement Proposals (FEPs).
+
+          **Automated Validation:**
+          - The FEP validation workflow will run automatically
+          - It will check YAML frontmatter, required sections, and content quality
+          - Results will be posted as a comment on this PR
+
+          **Before Submitting:**
+          1. Validate locally: `victor fep validate feps/fep-XXXX-title.md`
+          2. Check FEP numbering matches filename
+          3. Ensure all required sections are complete
+          4. Review the [FEP Process](feps/README.md)
+
+          **FEP Resources:**
+          - [FEP Process](feps/README.md)
+          - [FEP Template](feps/fep-0000-template.md)
+          - [Create FEP](https://docs.victor.dev/feps/creating)
+
+          EOF
+          fi
+
+          # Add Vertical section
+          if [ "${{ steps.detect-type.outputs.has_vertical_changes }}" = "true" ]; then
+            cat >> pr-comment.md << 'EOF'
+
+          ### 📦 Vertical Package Changes Detected
+
+          This PR includes changes to vertical package metadata.
+
+          **Automated Validation:**
+          - The vertical validation workflow will run automatically
+          - It will check `victor-vertical.toml` schema, class implementation, and entry points
+          - Results will be posted as a comment on this PR
+
+          **Before Submitting:**
+          1. Validate locally: `victor vertical validate victor/<vertical>/victor-vertical.toml`
+          2. Ensure vertical class inherits from `VerticalBase`
+          3. Verify all provided tools/workflows are registered
+          4. Check entry points in `pyproject.toml` (if external package)
+
+          **Vertical Resources:**
+          - [Vertical Package Spec](docs/feps/vertical-package-spec.md)
+          - [Creating Verticals](https://docs.victor.dev/verticals/creating)
+          - [Vertical Examples](victor/)
+
+          EOF
+          fi
+
+          # Add general code section
+          if [ "${{ steps.detect-type.outputs.has_code_changes }}" = "true" ]; then
+            cat >> pr-comment.md << 'EOF'
+
+          ### 💻 Code Changes
+
+          This PR includes code changes to the Victor framework.
+
+          **CI Checks:**
+          - Linting (Black, Ruff, MyPy)
+          - Unit tests across Python 3.10, 3.11, 3.12
+          - Security scanning
+          - VS Code extension build (if applicable)
+
+          **Before Submitting:**
+          1. Run tests locally: `make test`
+          2. Check formatting: `make format`
+          3. Run linters: `make lint`
+          4. Add tests for new features
+          5. Update documentation as needed
+
+          **Development Resources:**
+          - [CONTRIBUTING.md](CONTRIBUTING.md)
+          - [CLAUDE.md](CLAUDE.md) - Architecture guide
+          - [Documentation](https://docs.victor.dev)
+
+          EOF
+          fi
+
+          # Add common next steps
+          cat >> pr-comment.md << 'EOF'
+
+          ---
+          ### 🚀 Next Steps
+
+          1. **Watch the CI checks** - Results will appear below this comment
+          2. **Address any failures** - Fix issues and push commits to this branch
+          3. **Request review** - Ask maintainers for review when CI passes
+          4. **Respond to feedback** - Engage with reviewer comments
+
+          ### ❓ Need Help?
+
+          - Join the [GitHub Discussions](https://github.com/vijay-singh/codingagent/discussions)
+          - Chat on [Discord](https://discord.gg/victor)
+          - Check existing [Issues](https://github.com/vijay-singh/codingagent/issues)
+
+          EOF
+
+      - name: Post comment on new PRs
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const comment = fs.readFileSync('pr-comment.md', 'utf8');
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Post comment
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: comment,
+              });
+
+              console.log('Posted welcome comment');
+            } catch (error) {
+              console.log('Error posting comment:', error);
+            }
+
+      - name: Update validation status comment
+        if: github.event.action != 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const comment = fs.readFileSync('pr-comment.md', 'utf8');
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Find existing helper comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+              });
+
+              const helperComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('Welcome to your PR!')
+              );
+
+              if (helperComment) {
+                // Update existing comment with current status
+                const statusSection = `\n\n---\n\n**Status**: This PR has been updated. Rerun checks for latest results.\n`;
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: helperComment.id,
+                  body: comment + statusSection,
+                });
+
+                console.log('Updated helper comment');
+              }
+            } catch (error) {
+              console.log('Error updating comment:', error);
+            }
+
+  # Separate job for posting validation results from other workflows
+  post-validation-results:
+    name: Post Validation Results
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_call' || github.event.action != 'opened'
+    timeout-minutes: 5
+
+    steps:
+      - name: Download FEP validation report
+        if: inputs.fep_validation_result != 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: fep-validation-report
+          path: validation-reports
+
+      - name: Download vertical validation report
+        if: inputs.vertical_validation_result != 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: vertical-validation-report
+          path: validation-reports
+
+      - name: Post combined validation summary
+        if: inputs.fep_validation_result != 'success' || inputs.vertical_validation_result != 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              let summary = '# 📊 Validation Summary\n\n';
+
+              // Add FEP results if available
+              try {
+                const fepReport = fs.readFileSync('validation-reports/fep-validation.md', 'utf8');
+                summary += '## FEP Validation\n\n';
+                summary += fepReport;
+                summary += '\n\n';
+              } catch (e) {
+                // No FEP report
+              }
+
+              // Add vertical results if available
+              try {
+                const verticalReport = fs.readFileSync('validation-reports/vertical-validation.md', 'utf8');
+                summary += '## Vertical Package Validation\n\n';
+                summary += verticalReport;
+                summary += '\n\n';
+              } catch (e) {
+                // No vertical report
+              }
+
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Find existing validation summary comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+              });
+
+              const validationComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('📊 Validation Summary')
+              );
+
+              if (validationComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: validationComment.id,
+                  body: summary,
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: summary,
+                });
+              }
+
+              console.log('Posted validation summary');
+            } catch (error) {
+              console.log('Error posting validation summary:', error);
+            }

@@ -23,7 +23,7 @@ Design Pattern:
 
 Example:
     from victor.observability.event_registry import EventCategoryRegistry
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
     registry = EventCategoryRegistry.get_instance()
 

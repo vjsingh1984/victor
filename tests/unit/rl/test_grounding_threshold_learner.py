@@ -22,9 +22,9 @@ import pytest
 from pathlib import Path
 from typing import Dict, Tuple
 
-from victor.agent.rl.base import RLOutcome
-from victor.agent.rl.coordinator import RLCoordinator
-from victor.agent.rl.learners.grounding_threshold import GroundingThresholdLearner
+from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.coordinator import RLCoordinator
+from victor.framework.rl.learners.grounding_threshold import GroundingThresholdLearner
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 

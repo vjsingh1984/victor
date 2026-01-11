@@ -39,6 +39,19 @@ from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 class MergeConflictTool(BaseTool):
     """Tool for detecting and resolving merge conflicts."""
@@ -142,7 +155,7 @@ class MergeConflictTool(BaseTool):
                 if not conflicts:
                     return ToolResult(
                         success=True,
-                        output="✅ No merge conflicts detected",
+                        output=f"{_get_icon('success')} No merge conflicts detected",
                         metadata={"conflicts": []},
                     )
                 return ToolResult(
@@ -192,7 +205,7 @@ class MergeConflictTool(BaseTool):
                 if success:
                     return ToolResult(
                         success=True,
-                        output=f"✅ Applied {strategy_str} strategy to {file_path}",
+                        output=f"{_get_icon('success')} Applied {strategy_str} strategy to {file_path}",
                     )
                 else:
                     return ToolResult(
@@ -206,7 +219,7 @@ class MergeConflictTool(BaseTool):
                 if success:
                     return ToolResult(
                         success=True,
-                        output="✅ Merge/rebase aborted successfully",
+                        output=f"{_get_icon('success')} Merge/rebase aborted successfully",
                     )
                 else:
                     return ToolResult(
@@ -238,11 +251,11 @@ class MergeConflictTool(BaseTool):
 
         for conflict in conflicts:
             complexity_icon = {
-                "trivial": "🟢",
-                "simple": "🟡",
-                "moderate": "🟠",
-                "complex": "🔴",
-            }.get(conflict.complexity.value, "⚪")
+                "trivial": _get_icon("level_low"),
+                "simple": _get_icon("level_medium"),
+                "moderate": _get_icon("level_high"),
+                "complex": _get_icon("level_critical"),
+            }.get(conflict.complexity.value, _get_icon("level_unknown"))
 
             lines.append(f"{complexity_icon} **{conflict.file_path.name}**")
             lines.append(f"   Type: {conflict.conflict_type.value}")
@@ -255,16 +268,16 @@ class MergeConflictTool(BaseTool):
     def _format_analysis(self, summary: dict[str, Any]) -> str:
         """Format conflict analysis."""
         if not summary["has_conflicts"]:
-            return "✅ No merge conflicts to analyze"
+            return f"{_get_icon('success')} No merge conflicts to analyze"
 
         lines = ["**Conflict Analysis**", ""]
 
         # Overview
         effort_icon = {
-            "low": "🟢",
-            "medium": "🟡",
-            "high": "🔴",
-        }.get(summary["estimated_effort"], "⚪")
+            "low": _get_icon("level_low"),
+            "medium": _get_icon("level_medium"),
+            "high": _get_icon("level_critical"),
+        }.get(summary["estimated_effort"], _get_icon("level_unknown"))
 
         lines.append(f"**Effort Required:** {effort_icon} {summary['estimated_effort']}")
         lines.append(f"**Total Files:** {summary['total_files']}")
@@ -272,8 +285,8 @@ class MergeConflictTool(BaseTool):
         lines.append("")
 
         lines.append("**Resolution Outlook:**")
-        lines.append(f"- ✅ Auto-resolvable: {summary['auto_resolvable']}")
-        lines.append(f"- 👤 Needs Manual: {summary['needs_manual']}")
+        lines.append(f"- {_get_icon('success')} Auto-resolvable: {summary['auto_resolvable']}")
+        lines.append(f"- {_get_icon('person')} Needs Manual: {summary['needs_manual']}")
         lines.append("")
 
         # By complexity
@@ -307,10 +320,10 @@ class MergeConflictTool(BaseTool):
 
         for resolution in resolutions:
             if resolution.fully_resolved:
-                icon = "✅"
+                icon = _get_icon("success")
                 status = "Resolved"
             else:
-                icon = "⚠️"
+                icon = _get_icon("warning")
                 status = "Partial"
 
             applied = " (applied)" if resolution.applied else ""

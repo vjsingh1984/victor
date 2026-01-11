@@ -64,6 +64,7 @@ from victor.agent.provider import (
     ProviderSwitcherState,
 )
 from victor.agent.strategies import DefaultProviderClassificationStrategy
+from victor.core.errors import ProviderNotFoundError
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -449,6 +450,9 @@ class ProviderManager:
 
             return True
 
+        except ProviderNotFoundError:
+            # Let ProviderNotFoundError propagate to caller
+            raise
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
             if self._current_state:
@@ -545,7 +549,7 @@ class ProviderManager:
             reason: Reason for the switch
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

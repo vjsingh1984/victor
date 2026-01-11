@@ -166,11 +166,6 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
         return mapping.get(task_type.lower())
 
 
-# Register RAG domain handlers when this module is loaded
-from victor.rag.handlers import register_handlers as _register_handlers
-
-_register_handlers()
-
 __all__ = [
     # YAML-first workflow provider
     "RAGWorkflowProvider",

@@ -36,6 +36,7 @@ from victor.core.tool_dependency_loader import (
     load_tool_dependency_yaml,
     create_tool_dependency_provider,
     get_cached_provider,
+    invalidate_provider_cache,
     _default_loader,
 )
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
@@ -161,9 +162,9 @@ def reset_default_loader():
 @pytest.fixture
 def reset_cached_provider():
     """Reset the cached provider between tests."""
-    get_cached_provider.cache_clear()
+    invalidate_provider_cache()
     yield
-    get_cached_provider.cache_clear()
+    invalidate_provider_cache()
 
 
 # =============================================================================

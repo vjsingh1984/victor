@@ -27,6 +27,8 @@ from victor.ui.commands.dashboard import dashboard_app
 from victor.ui.commands.docs import docs_app
 from victor.ui.commands.embeddings import embeddings_app
 from victor.ui.commands.examples import examples_app
+from victor.ui.commands.experiments import experiment_app
+from victor.ui.commands.fep import fep_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
 from victor.ui.commands.keys import keys_app
@@ -42,6 +44,7 @@ from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.sessions import sessions_app
+from victor.ui.commands.vertical import vertical_app
 from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
@@ -59,6 +62,8 @@ app.add_typer(dashboard_app)
 app.add_typer(docs_app)
 app.add_typer(embeddings_app)
 app.add_typer(examples_app)
+app.add_typer(experiment_app)
+app.add_typer(fep_app)
 app.add_typer(index_app)
 app.add_typer(init_app)
 app.add_typer(keys_app)
@@ -71,9 +76,11 @@ app.add_typer(security_app)
 app.add_typer(serve_app)
 app.add_typer(test_provider_app)
 app.add_typer(tools_app)
-app.add_typer(scaffold_app)
+# Register scaffold_app as "vertical scaffold" subcommand under vertical_app
+vertical_app.add_typer(scaffold_app, name="scaffold")
 app.add_typer(scheduler_app)
 app.add_typer(sessions_app)
+app.add_typer(vertical_app)
 app.add_typer(workflow_app)
 
 console = Console()

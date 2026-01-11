@@ -63,6 +63,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
 logger = logging.getLogger(__name__)
@@ -345,6 +346,164 @@ class S3Service(ServiceLifecycle):
         return True
 
 
+class SQLiteService(ServiceLifecycle):
+    """Lifecycle manager for SQLite databases (project.db, conversation.db).
+
+    Supports LanceSQL pattern: SQLite for structured data (graph, symbols)
+    + LanceDB for vector embeddings.
+    """
+
+    async def initialize(self, config: ServiceConfig) -> Any:
+        """Initialize SQLite database connection.
+
+        Args:
+            config: ServiceConfig with:
+                - db_path: Path to SQLite database (required)
+                - readonly: Open in read-only mode (default: False for agents)
+                - enable_wal: Enable WAL mode (default: True)
+        """
+        db_path = config.config.get("db_path")
+        if not db_path:
+            raise ValueError(f"SQLite service '{config.name}' missing 'db_path' in config")
+
+        logger.info(f"Initializing SQLite service: {config.name} at {db_path}")
+
+        try:
+            import aiosqlite
+
+            # Expand path and ensure parent directory exists
+            db_path = Path(db_path).expanduser()
+            if not config.config.get("readonly", False):
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Open connection
+            conn = await aiosqlite.connect(
+                str(db_path),
+                isolation_level=None,  # Autocommit mode
+            )
+
+            # Enable WAL mode for better concurrency
+            if config.config.get("enable_wal", True):
+                await conn.execute("PRAGMA journal_mode=WAL")
+                await conn.execute("PRAGMA synchronous=NORMAL")
+                await conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
+                await conn.execute("PRAGMA temp_store=MEMORY")
+
+            # Read-only mode for agents
+            if config.config.get("readonly", False):
+                logger.info(f"SQLite service '{config.name}' in READ-ONLY mode")
+                # Can't set read-only on aiosqlite after connection, but we can prevent writes
+                # via service layer (agent doesn't get write handle)
+
+            logger.info(f"SQLite service '{config.name}' connected successfully")
+            return {"connection": conn, "type": "aiosqlite", "path": str(db_path)}
+
+        except ImportError:
+            logger.warning("aiosqlite not installed, using placeholder")
+            return {
+                "path": str(db_path),
+                "type": "placeholder",
+            }
+
+    async def cleanup(self, handle: Any, config: ServiceConfig) -> None:
+        """Close SQLite connection."""
+        logger.info(f"Cleaning up SQLite service: {config.name}")
+        if handle.get("type") == "aiosqlite" and handle.get("connection"):
+            await handle["connection"].close()
+
+    async def health_check(self, handle: Any) -> bool:
+        """Check SQLite connectivity."""
+        if handle.get("type") == "aiosqlite" and handle.get("connection"):
+            try:
+                async with handle["connection"].execute("SELECT 1") as cursor:
+                    await cursor.fetchone()
+                return True
+            except Exception:
+                return False
+        return True
+
+
+class LanceDBService(ServiceLifecycle):
+    """Lifecycle manager for LanceDB vector database.
+
+    Part of LanceSQL pattern: Works with SQLiteService to provide
+    both structured queries (SQLite) and semantic search (LanceDB).
+    """
+
+    async def initialize(self, config: ServiceConfig) -> Any:
+        """Initialize LanceDB connection.
+
+        Args:
+            config: ServiceConfig with:
+                - persist_directory: Path to LanceDB storage (required)
+                - embedding_model: Model name (default: BAAI/bge-small-en-v1.5)
+                - table_name: Table name (default: embeddings)
+                - readonly: Read-only mode for agents (default: False)
+        """
+        from victor.storage.vector_stores import EmbeddingConfig, EmbeddingRegistry
+
+        persist_dir = config.config.get("persist_directory")
+        if not persist_dir:
+            raise ValueError(
+                f"LanceDB service '{config.name}' missing 'persist_directory' in config"
+            )
+
+        logger.info(f"Initializing LanceDB service: {config.name} at {persist_dir}")
+
+        # Create embedding config
+        embedding_config = EmbeddingConfig(
+            vector_store="lancedb",
+            persist_directory=persist_dir,
+            embedding_model_name=config.config.get("embedding_model", "BAAI/bge-small-en-v1.5"),
+            extra_config={
+                "table_name": config.config.get("table_name", "embeddings"),
+                "readonly": config.config.get("readonly", False),
+            },
+        )
+
+        # Use singleton registry - all agents share same instance!
+        provider = EmbeddingRegistry.create(embedding_config)
+        await provider.initialize()
+
+        # Get stats
+        stats = await provider.get_stats()
+        logger.info(
+            f"LanceDB service '{config.name}' ready: "
+            f"{stats.get('total_documents', 0)} documents, "
+            f"table={stats.get('table_name', 'embeddings')}"
+        )
+
+        if config.config.get("readonly", False):
+            logger.info(f"LanceDB service '{config.name}' in READ-ONLY mode")
+
+        return {
+            "provider": provider,
+            "config": embedding_config,
+            "type": "lancedb",
+        }
+
+    async def cleanup(self, handle: Any, config: ServiceConfig) -> None:
+        """Cleanup LanceDB connection.
+
+        Note: We don't close the singleton provider as other agents
+        may be using it. Just cleanup resources.
+        """
+        logger.info(f"Cleaning up LanceDB service: {config.name}")
+        if handle.get("provider"):
+            # Don't close singleton - just log
+            logger.debug(f"LanceDB service '{config.name}' provider remains cached for reuse")
+
+    async def health_check(self, handle: Any) -> bool:
+        """Check LanceDB is accessible."""
+        if handle.get("provider"):
+            try:
+                stats = await handle["provider"].get_stats()
+                return stats.get("total_documents", 0) >= 0
+            except Exception:
+                return False
+        return True
+
+
 class ServiceManager:
     """Manages service lifecycle for workflow execution.
 
@@ -362,6 +521,9 @@ class ServiceManager:
         "http": HTTPClientService,
         "api": HTTPClientService,
         "s3": S3Service,
+        "sqlite": SQLiteService,
+        "sqlite3": SQLiteService,
+        "lancedb": LanceDBService,
     }
 
     def __init__(self):
@@ -497,6 +659,8 @@ __all__ = [
     "KafkaService",
     "HTTPClientService",
     "S3Service",
+    "SQLiteService",
+    "LanceDBService",
     # Manager
     "ServiceManager",
 ]

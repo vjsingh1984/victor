@@ -534,7 +534,7 @@ To migrate JSON sessions to SQLite (manual process):
    - Use `/save` to create a new SQLite session
    - Copy conversation content from JSON
 
-A migration utility may be added in the future (see Phase 6 in CODE_PRUNING_SUMMARY.md).
+A migration utility may be added in a future release.
 
 ## Troubleshooting
 

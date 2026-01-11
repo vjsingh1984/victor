@@ -75,7 +75,7 @@ from victor.workflows.streaming import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.rl.checkpoint_store import CheckpointStore
+    from victor.framework.rl.checkpoint_store import CheckpointStore
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
 
 logger = logging.getLogger(__name__)

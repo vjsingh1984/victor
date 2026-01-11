@@ -21,11 +21,11 @@ import sqlite3
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.rl.multi_task_learner import (
+from victor.framework.rl.multi_task_learner import (
     MultiTaskLearner,
     VerticalHead,
 )
-from victor.agent.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome
 
 
 @pytest.fixture
@@ -251,7 +251,7 @@ class TestMultiTaskLearner:
 
     def test_compute_transfer_weight_high_similarity(self, learner: MultiTaskLearner) -> None:
         """Test transfer weight for high similarity."""
-        from victor.agent.rl.shared_encoder import ContextEmbedding
+        from victor.framework.rl.shared_encoder import ContextEmbedding
 
         # Create embeddings with same vector (identical contexts)
         source = ContextEmbedding(

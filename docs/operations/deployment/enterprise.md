@@ -675,7 +675,7 @@ A: Migration typically takes 1-2 weeks. Victor can run alongside existing tools 
 
 ## Next Steps
 
-1. **Evaluate**: Start with the [Quick Start](../README.md#quick-start) guide
+1. **Evaluate**: Start with the [Quick Start](../index.md#quick-start) guide
 2. **Pilot**: Deploy for 5-10 developers (free tier)
 3. **Measure**: Track usage and ROI for 2 weeks
 4. **Decide**: Continue with free community edition or contact us for enterprise support

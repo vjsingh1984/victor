@@ -180,15 +180,29 @@ def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
     return result
 
 
-# Backward compatibility: module-level exports
-# These are loaded lazily to avoid circular imports and improve startup time
-RAG_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = None  # type: ignore
-RAG_TOOL_CLUSTERS: Dict[str, Set[str]] = None  # type: ignore
-RAG_TOOL_SEQUENCES: Dict[str, List[str]] = None  # type: ignore
-RAG_TOOL_DEPENDENCIES: List[ToolDependency] = None  # type: ignore
-RAG_REQUIRED_TOOLS: Set[str] = None  # type: ignore
-RAG_OPTIONAL_TOOLS: Set[str] = None  # type: ignore
-RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = None  # type: ignore
+# Backward compatibility: module-level exports accessed via __getattr__
+# These constants are deprecated and will emit warnings when accessed.
+_DEPRECATED_CONSTANTS = {
+    "RAG_TOOL_TRANSITIONS": _get_transitions,
+    "RAG_TOOL_CLUSTERS": _get_clusters,
+    "RAG_TOOL_SEQUENCES": _get_sequences,
+    "RAG_TOOL_DEPENDENCIES": _get_dependencies,
+    "RAG_REQUIRED_TOOLS": _get_required_tools,
+    "RAG_OPTIONAL_TOOLS": _get_optional_tools,
+    "RAG_COMPOSED_PATTERNS": _get_composed_patterns,
+}
+
+
+def _warn_deprecated(name: str) -> None:
+    """Emit deprecation warning for legacy constant access."""
+    import warnings
+
+    warnings.warn(
+        f"{name} is deprecated. Use RAGToolDependencyProvider() or "
+        f"create_vertical_tool_dependency_provider('rag') instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def __getattr__(name: str) -> Any:
@@ -196,45 +210,14 @@ def __getattr__(name: str) -> Any:
 
     This allows existing code to import the module-level constants
     while actually loading them from the YAML file.
+
+    .. deprecated::
+        These constants are deprecated. Use RAGToolDependencyProvider() or
+        create_vertical_tool_dependency_provider('rag') instead.
     """
-    global RAG_TOOL_TRANSITIONS, RAG_TOOL_CLUSTERS, RAG_TOOL_SEQUENCES
-    global RAG_TOOL_DEPENDENCIES, RAG_REQUIRED_TOOLS, RAG_OPTIONAL_TOOLS
-    global RAG_COMPOSED_PATTERNS
-
-    if name == "RAG_TOOL_TRANSITIONS":
-        if RAG_TOOL_TRANSITIONS is None:
-            RAG_TOOL_TRANSITIONS = _get_transitions()
-        return RAG_TOOL_TRANSITIONS
-
-    if name == "RAG_TOOL_CLUSTERS":
-        if RAG_TOOL_CLUSTERS is None:
-            RAG_TOOL_CLUSTERS = _get_clusters()
-        return RAG_TOOL_CLUSTERS
-
-    if name == "RAG_TOOL_SEQUENCES":
-        if RAG_TOOL_SEQUENCES is None:
-            RAG_TOOL_SEQUENCES = _get_sequences()
-        return RAG_TOOL_SEQUENCES
-
-    if name == "RAG_TOOL_DEPENDENCIES":
-        if RAG_TOOL_DEPENDENCIES is None:
-            RAG_TOOL_DEPENDENCIES = _get_dependencies()
-        return RAG_TOOL_DEPENDENCIES
-
-    if name == "RAG_REQUIRED_TOOLS":
-        if RAG_REQUIRED_TOOLS is None:
-            RAG_REQUIRED_TOOLS = _get_required_tools()
-        return RAG_REQUIRED_TOOLS
-
-    if name == "RAG_OPTIONAL_TOOLS":
-        if RAG_OPTIONAL_TOOLS is None:
-            RAG_OPTIONAL_TOOLS = _get_optional_tools()
-        return RAG_OPTIONAL_TOOLS
-
-    if name == "RAG_COMPOSED_PATTERNS":
-        if RAG_COMPOSED_PATTERNS is None:
-            RAG_COMPOSED_PATTERNS = _get_composed_patterns()
-        return RAG_COMPOSED_PATTERNS
+    if name in _DEPRECATED_CONSTANTS:
+        _warn_deprecated(name)
+        return _DEPRECATED_CONSTANTS[name]()
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -273,19 +256,19 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
     if _rag_tool_graph is not None:
         return _rag_tool_graph
 
-    # Load data from YAML via the lazy-loaded module attributes
-    transitions = __getattr__("RAG_TOOL_TRANSITIONS")
-    clusters = __getattr__("RAG_TOOL_CLUSTERS")
-    sequences = __getattr__("RAG_TOOL_SEQUENCES")
-    dependencies = __getattr__("RAG_TOOL_DEPENDENCIES")
-    composed_patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+    # Load data from YAML via internal loader functions (avoids deprecation warnings)
+    transitions = _get_transitions()
+    clusters = _get_clusters()
+    sequences = _get_sequences()
+    dependencies = _get_dependencies()
+    composed_patterns = _get_composed_patterns()
 
     graph = ToolExecutionGraph(name="rag")
 
     # Add dependencies
     for dep in dependencies:
         graph.add_dependency(
-            tool_name=dep.tool_name,
+            dep.tool_name,
             depends_on=dep.depends_on,
             enables=dep.enables,
             weight=dep.weight,
@@ -334,7 +317,7 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
             print(f"Sequence: {pattern['sequence']}")
             print(f"Inputs: {pattern['inputs']}")
     """
-    patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+    patterns = _get_composed_patterns()
     return patterns.get(pattern_name)
 
 
@@ -344,14 +327,14 @@ def list_composed_patterns() -> List[str]:
     Returns:
         List of pattern names
     """
-    patterns = __getattr__("RAG_COMPOSED_PATTERNS")
+    patterns = _get_composed_patterns()
     return list(patterns.keys())
 
 
-__all__ = [
+__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
     # Provider class
     "RAGToolDependencyProvider",
-    # Data exports (backward compatibility)
+    # Data exports (lazy-loaded with deprecation warnings)
     "RAG_TOOL_DEPENDENCIES",
     "RAG_TOOL_TRANSITIONS",
     "RAG_TOOL_CLUSTERS",

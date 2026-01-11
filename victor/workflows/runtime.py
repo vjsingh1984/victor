@@ -91,6 +91,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 @dataclass
 class HITLServerConfig:
@@ -504,7 +517,7 @@ class WorkflowRuntime:
             await asyncio.sleep(0.5)
 
             logger.info(f"HITL server started at {self._hitl_url}")
-            print(f"\n📋 HITL Approval UI: {self._hitl_url}")
+            print(f"\n{_get_icon('clipboard')} HITL Approval UI: {self._hitl_url}")
             print(f"   API Docs: http://{host}:{self.config.hitl.port}/docs\n")
 
         except ImportError as e:

@@ -285,6 +285,8 @@ def configure_data_privacy(
 ) -> None:
     """Configure data privacy settings.
 
+    Delegates to framework PrivacyCapabilityProvider for cross-vertical privacy management.
+
     Args:
         orchestrator: Target orchestrator
         anonymize_pii: Whether to anonymize PII columns
@@ -292,19 +294,22 @@ def configure_data_privacy(
         hash_identifiers: Hash identifier columns
         log_access: Log data access for audit trail
     """
-    if hasattr(orchestrator, "privacy_config"):
-        orchestrator.privacy_config = {
-            "anonymize_pii": anonymize_pii,
-            "pii_columns": pii_columns or [],
-            "hash_identifiers": hash_identifiers,
-            "log_access": log_access,
-        }
+    # Delegate to framework privacy capability
+    from victor.framework.capabilities.privacy import configure_data_privacy as framework_privacy
 
-    logger.info(f"Configured data privacy: anonymize={anonymize_pii}")
+    framework_privacy(
+        orchestrator,
+        anonymize_pii=anonymize_pii,
+        pii_columns=pii_columns,
+        hash_identifiers=hash_identifiers,
+        log_access=log_access,
+    )
 
 
 def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     """Get current privacy configuration.
+
+    Delegates to framework PrivacyCapabilityProvider for cross-vertical privacy management.
 
     Args:
         orchestrator: Target orchestrator
@@ -312,16 +317,10 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Privacy configuration dict
     """
-    return getattr(
-        orchestrator,
-        "privacy_config",
-        {
-            "anonymize_pii": True,
-            "pii_columns": [],
-            "hash_identifiers": True,
-            "log_access": True,
-        },
-    )
+    # Delegate to framework privacy capability
+    from victor.framework.capabilities.privacy import get_privacy_config as framework_get_privacy
+
+    return framework_get_privacy(orchestrator)
 
 
 # =============================================================================
@@ -740,6 +739,57 @@ def create_data_analysis_capability_loader() -> Any:
     return loader
 
 
+# =============================================================================
+# SOLID: Centralized Config Storage
+# =============================================================================
+
+
+def get_capability_configs() -> Dict[str, Any]:
+    """Get data analysis capability configurations for centralized storage.
+
+    Returns default data analysis configuration for VerticalContext storage.
+    This replaces direct orchestrator data_quality/visualization/ml_config assignment.
+
+    Returns:
+        Dict with default data analysis capability configurations
+    """
+    return {
+        "data_quality": {
+            "min_completeness": 0.9,
+            "max_outlier_ratio": 0.05,
+            "require_type_validation": True,
+            "handle_missing": "impute",
+        },
+        "visualization": {
+            "backend": "matplotlib",
+            "theme": "seaborn-v0_8-whitegrid",
+            "figure_size": (10, 6),
+            "dpi": 100,
+            "save_format": "png",
+        },
+        "statistical_analysis": {
+            "significance_level": 0.05,
+            "confidence_interval": 0.95,
+            "multiple_testing_correction": "bonferroni",
+            "effect_size_threshold": 0.2,
+        },
+        "ml_pipeline": {
+            "framework": "sklearn",
+            "cv_folds": 5,
+            "test_size": 0.2,
+            "random_state": 42,
+            "hyperparameter_tuning": True,
+            "tuning_method": "grid",
+        },
+        "privacy": {
+            "anonymize_pii": True,
+            "pii_columns": [],
+            "hash_identifiers": True,
+            "log_access": True,
+        },
+    }
+
+
 __all__ = [
     # Handlers
     "configure_data_quality",
@@ -761,4 +811,6 @@ __all__ = [
     # Convenience functions
     "get_data_analysis_capabilities",
     "create_data_analysis_capability_loader",
+    # SOLID: Centralized config storage
+    "get_capability_configs",
 ]

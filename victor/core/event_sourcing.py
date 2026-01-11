@@ -28,7 +28,7 @@ Design Patterns:
 
 Example:
     from victor.core.event_sourcing import (
-        Event,
+        DomainEvent,
         EventStore,
         Aggregate,
         InMemoryEventStore,
@@ -36,12 +36,12 @@ Example:
 
     # Define events
     @dataclass
-    class TaskCreated(Event):
+    class TaskCreated(DomainEvent):
         task_id: str
         prompt: str
 
     @dataclass
-    class TaskCompleted(Event):
+    class TaskCompleted(DomainEvent):
         task_id: str
         result: str
 
@@ -98,23 +98,23 @@ logger = logging.getLogger(__name__)
 
 
 # Event type registry for deserialization (module-level to avoid dataclass issues)
-_EVENT_REGISTRY: Dict[str, Type["Event"]] = {}
+_EVENT_REGISTRY: Dict[str, Type["DomainEvent"]] = {}
 
 
 @dataclass
-class Event:
+class DomainEvent:
     """Base class for all domain events.
 
     Events are immutable records of state changes that have occurred.
     They should be named in past tense (e.g., TaskCreated, FileModified).
 
     Event subclasses are automatically registered for deserialization.
-    Use Event.from_dict() to deserialize events with proper type resolution.
+    Use DomainEvent.from_dict() to deserialize events with proper type resolution.
     """
 
     # Metadata
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = 1
     correlation_id: Optional[str] = None
     causation_id: Optional[str] = None
@@ -126,7 +126,7 @@ class Event:
         _EVENT_REGISTRY[cls.__name__] = cls
 
     @classmethod
-    def register(cls, event_class: Type["Event"]) -> Type["Event"]:
+    def register(cls, event_class: Type["DomainEvent"]) -> Type["DomainEvent"]:
         """Explicitly register an event type.
 
         Normally event types are auto-registered, but this can be used
@@ -142,7 +142,7 @@ class Event:
         return event_class
 
     @classmethod
-    def get_registered_types(cls) -> Dict[str, Type["Event"]]:
+    def get_registered_types(cls) -> Dict[str, Type["DomainEvent"]]:
         """Get all registered event types."""
         return dict(_EVENT_REGISTRY)
 
@@ -180,19 +180,19 @@ class Event:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
+    def from_dict(cls, data: Dict[str, Any]) -> "DomainEvent":
         """Deserialize event from dictionary.
 
         Uses the event type registry to instantiate the correct event class.
-        If the event type is not registered, creates a base Event.
+        If the event type is not registered, creates a base DomainEvent.
 
         Args:
             data: Dictionary with event data including 'event_type' and 'data'
 
         Returns:
-            Event instance of the appropriate type
+            DomainEvent instance of the appropriate type
         """
-        event_type = data.get("event_type", "Event")
+        event_type = data.get("event_type", "DomainEvent")
         event_data = data.get("data", {})
 
         # Look up the correct class from registry
@@ -215,8 +215,8 @@ class EventEnvelope:
 
     stream_id: str
     stream_version: int
-    event: Event
-    stored_at: datetime = field(default_factory=datetime.utcnow)
+    event: DomainEvent
+    stored_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize envelope to dictionary."""
@@ -265,7 +265,7 @@ class Aggregate(ABC):
         """
         self._aggregate_id = aggregate_id
         self._version = 0
-        self._uncommitted_events: List[Event] = []
+        self._uncommitted_events: List[DomainEvent] = []
 
     @property
     def aggregate_id(self) -> str:
@@ -278,11 +278,11 @@ class Aggregate(ABC):
         return self._version
 
     @property
-    def uncommitted_events(self) -> List[Event]:
+    def uncommitted_events(self) -> List[DomainEvent]:
         """Get events that haven't been persisted."""
         return self._uncommitted_events.copy()
 
-    def apply(self, event: Event) -> None:
+    def apply(self, event: DomainEvent) -> None:
         """Apply an event to the aggregate.
 
         This both mutates state and records the event.
@@ -294,7 +294,7 @@ class Aggregate(ABC):
         self._uncommitted_events.append(event)
         self._version += 1
 
-    def _apply_event(self, event: Event) -> None:
+    def _apply_event(self, event: DomainEvent) -> None:
         """Apply event to internal state.
 
         Args:
@@ -309,7 +309,7 @@ class Aggregate(ABC):
 
         handler(event)
 
-    def load_from_history(self, events: List[Event]) -> None:
+    def load_from_history(self, events: List[DomainEvent]) -> None:
         """Rebuild aggregate state from event history.
 
         Args:
@@ -375,7 +375,7 @@ class EventStore(ABC):
     async def append(
         self,
         stream_id: str,
-        events: List[Event],
+        events: List[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to a stream.
@@ -528,7 +528,7 @@ class InMemoryEventStore(EventStore):
     async def append(
         self,
         stream_id: str,
-        events: List[Event],
+        events: List[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to stream."""
@@ -658,7 +658,7 @@ class SQLiteEventStore(EventStore):
     async def append(
         self,
         stream_id: str,
-        events: List[Event],
+        events: List[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to stream."""
@@ -735,7 +735,7 @@ class SQLiteEventStore(EventStore):
                 for row in cursor:
                     event_data = json.loads(row[2])
                     # Create event from data
-                    event = Event.from_dict(event_data)
+                    event = DomainEvent.from_dict(event_data)
                     envelope = EventEnvelope(
                         stream_id=row[0],
                         stream_version=row[1],
@@ -768,7 +768,7 @@ class SQLiteEventStore(EventStore):
                 result = []
                 for row in cursor:
                     event_data = json.loads(row[2])
-                    event = Event.from_dict(event_data)
+                    event = DomainEvent.from_dict(event_data)
                     envelope = EventEnvelope(
                         stream_id=row[0],
                         stream_version=row[1],
@@ -857,8 +857,8 @@ class SQLiteEventStore(EventStore):
 # =============================================================================
 
 
-EventHandler = Callable[[Event], None]
-AsyncEventHandler = Callable[[Event], Any]
+EventHandler = Callable[[DomainEvent], None]
+AsyncEventHandler = Callable[[DomainEvent], Any]
 
 
 class EventDispatcher:
@@ -895,7 +895,7 @@ class EventDispatcher:
         """
         self._all_handlers.append(handler)
 
-    async def dispatch(self, event: Event) -> None:
+    async def dispatch(self, event: DomainEvent) -> None:
         """Dispatch event to handlers.
 
         Args:
@@ -928,7 +928,7 @@ class Projection(ABC):
     """
 
     @abstractmethod
-    async def handle(self, event: Event) -> None:
+    async def handle(self, event: DomainEvent) -> None:
         """Handle an event and update projection.
 
         Args:
@@ -937,7 +937,7 @@ class Projection(ABC):
         pass
 
     @abstractmethod
-    async def rebuild(self, events: List[Event]) -> None:
+    async def rebuild(self, events: List[DomainEvent]) -> None:
         """Rebuild projection from event history.
 
         Args:
@@ -1024,7 +1024,7 @@ class EventSourcedRepository(Generic[T]):
 
 
 @dataclass
-class TaskStartedEvent(Event):
+class TaskStartedEvent(DomainEvent):
     """Event for when a task is started."""
 
     task_id: str = ""
@@ -1034,7 +1034,7 @@ class TaskStartedEvent(Event):
 
 
 @dataclass
-class TaskCompletedEvent(Event):
+class TaskCompletedEvent(DomainEvent):
     """Event for when a task completes."""
 
     task_id: str = ""
@@ -1044,7 +1044,7 @@ class TaskCompletedEvent(Event):
 
 
 @dataclass
-class TaskFailedEvent(Event):
+class TaskFailedEvent(DomainEvent):
     """Event for when a task fails."""
 
     task_id: str = ""
@@ -1053,7 +1053,7 @@ class TaskFailedEvent(Event):
 
 
 @dataclass
-class ToolCalledEvent(Event):
+class ToolCalledEvent(DomainEvent):
     """Event for when a tool is called."""
 
     task_id: str = ""
@@ -1062,7 +1062,7 @@ class ToolCalledEvent(Event):
 
 
 @dataclass
-class ToolResultEvent(Event):
+class ToolResultEvent(DomainEvent):
     """Event for tool result."""
 
     task_id: str = ""
@@ -1073,7 +1073,7 @@ class ToolResultEvent(Event):
 
 
 @dataclass
-class StateChangedEvent(Event):
+class StateChangedEvent(DomainEvent):
     """Event for state machine transitions."""
 
     task_id: str = ""

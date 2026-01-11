@@ -33,10 +33,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.providers.base import ToolDefinition
 from victor.tools.selection_filters import blend_tool_results, deduplicate_tools
+from victor.config.tool_selection_defaults import HybridSelectorDefaults
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
-    from victor.agent.rl.learners.tool_selector import ToolSelectorLearner
+    from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
     from victor.tools.keyword_tool_selector import KeywordToolSelector
     from victor.tools.semantic_selector import SemanticToolSelector
 
@@ -47,23 +48,25 @@ logger = logging.getLogger(__name__)
 class HybridSelectorConfig:
     """Configuration for hybrid tool selector.
 
+    Uses centralized defaults from HybridSelectorDefaults.
+
     Attributes:
-        semantic_weight: Weight for semantic results (0.0-1.0), default 0.7
-        keyword_weight: Weight for keyword results (0.0-1.0), default 0.3
+        semantic_weight: Weight for semantic results (0.0-1.0)
+        keyword_weight: Weight for keyword results (0.0-1.0)
         min_semantic_tools: Minimum tools from semantic selector
         min_keyword_tools: Minimum tools from keyword selector
         max_total_tools: Maximum total tools to return
         enable_rl: Enable RL-based tool ranking (default True)
-        rl_boost_weight: Weight for RL boost in final ranking (0.0-0.3)
+        rl_boost_weight: Weight for RL boost in final ranking (0.0-0.5)
     """
 
-    semantic_weight: float = 0.7
-    keyword_weight: float = 0.3
-    min_semantic_tools: int = 3
-    min_keyword_tools: int = 2
-    max_total_tools: int = 15
+    semantic_weight: float = HybridSelectorDefaults.SEMANTIC_WEIGHT
+    keyword_weight: float = HybridSelectorDefaults.KEYWORD_WEIGHT
+    min_semantic_tools: int = HybridSelectorDefaults.MIN_SEMANTIC_TOOLS
+    min_keyword_tools: int = HybridSelectorDefaults.MIN_KEYWORD_TOOLS
+    max_total_tools: int = HybridSelectorDefaults.MAX_TOTAL_TOOLS
     enable_rl: bool = True  # Enabled by default as per plan
-    rl_boost_weight: float = 0.15  # Conservative: 15% influence on ranking
+    rl_boost_weight: float = HybridSelectorDefaults.RL_BOOST_WEIGHT
 
     def __post_init__(self):
         """Validate configuration."""
@@ -142,7 +145,7 @@ class HybridToolSelector:
 
         self._rl_init_attempted = True
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             self._rl_learner = coordinator.get_learner("tool_selector")
@@ -248,11 +251,12 @@ class HybridToolSelector:
                 # Exploration: small random shuffle of top tools
                 import random
 
-                if len(tools) > 3:
-                    top_3 = tools[:3]
-                    random.shuffle(top_3)
-                    tools = top_3 + tools[3:]
-                    logger.debug("RL: Exploration mode - shuffled top 3 tools")
+                top_k = HybridSelectorDefaults.EXPLORATION_TOP_K
+                if len(tools) > top_k:
+                    top_tools = tools[:top_k]
+                    random.shuffle(top_tools)
+                    tools = top_tools + tools[top_k:]
+                    logger.debug(f"RL: Exploration mode - shuffled top {top_k} tools")
                 return tools
 
             # Exploitation: boost based on learned Q-values
@@ -272,7 +276,9 @@ class HybridToolSelector:
                 position_score = 1.0 / (i + 1)
 
                 # RL boost from Q-value
-                q_val, confidence = q_lookup.get(tool.name, (0.5, 0.3))
+                default_q = HybridSelectorDefaults.DEFAULT_Q_VALUE
+                default_conf = HybridSelectorDefaults.DEFAULT_CONFIDENCE
+                q_val, confidence = q_lookup.get(tool.name, (default_q, default_conf))
                 rl_boost = q_val * confidence * self.config.rl_boost_weight
 
                 # Combined score
@@ -361,19 +367,26 @@ class HybridToolSelector:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             ctx = context or {}
             task_type = ctx.get("task_type", "default")
 
             # Build metadata for reward computation
+            default_grounding = (
+                HybridSelectorDefaults.DEFAULT_GROUNDING_SCORE_SUCCESS
+                if success
+                else HybridSelectorDefaults.DEFAULT_GROUNDING_SCORE_FAILURE
+            )
             metadata = {
                 "tool_name": tool_name,
                 "tool_success": success,
                 "task_completed": ctx.get("task_completed", success),
-                "grounding_score": ctx.get("grounding_score", 0.5 if success else 0.2),
-                "efficiency_score": ctx.get("efficiency_score", 0.5),
+                "grounding_score": ctx.get("grounding_score", default_grounding),
+                "efficiency_score": ctx.get(
+                    "efficiency_score", HybridSelectorDefaults.DEFAULT_EFFICIENCY_SCORE
+                ),
             }
 
             # Create outcome

@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
 from victor.framework.events import (
-    Event,
+    AgentExecutionEvent,
     EventType,
     content_event,
     error_event,
@@ -313,18 +313,18 @@ def configure_tools(
 async def stream_with_events(
     orchestrator: Any,
     prompt: str,
-) -> AsyncIterator[Event]:
-    """Stream orchestrator response as framework Events.
+) -> AsyncIterator[AgentExecutionEvent]:
+    """Stream orchestrator response as framework AgentExecutionEvents.
 
     This function wraps the orchestrator's stream_chat method
-    and converts internal stream chunks to framework Events.
+    and converts internal stream chunks to framework AgentExecutionEvents.
 
     Args:
         orchestrator: AgentOrchestrator instance
         prompt: User prompt
 
     Yields:
-        Event objects representing agent actions
+        AgentExecutionEvent objects representing agent actions
     """
     # Emit stream start
     yield stream_start_event()
@@ -409,11 +409,11 @@ def format_context_message(context: Dict[str, Any]) -> Optional[str]:
     return "\n".join(parts) if parts else None
 
 
-def collect_tool_calls(events: List[Event]) -> List[Dict[str, Any]]:
+def collect_tool_calls(events: List[AgentExecutionEvent]) -> List[Dict[str, Any]]:
     """Collect tool calls from a list of events.
 
     Args:
-        events: List of Event objects
+        events: List of AgentExecutionEvent objects
 
     Returns:
         List of tool call dictionaries

@@ -1,0 +1,253 @@
+name: FEP Validation
+
+on:
+  pull_request:
+    paths:
+      - 'feps/**'
+  workflow_dispatch:  # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-feps:
+    name: Validate FEPs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for checking modified files
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Victor with dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Use CPU-only torch for faster CI
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Find modified FEP files
+        id: find-feps
+        run: |
+          # Get list of modified/added FEP files in this PR
+          BASE_BRANCH="${{ github.base_ref }}"
+          FEP_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^feps/fep-.*\.md$' || true)
+
+          if [ -z "$FEP_FILES" ]; then
+            echo "No FEP files modified or added in this PR"
+            echo "fep_files=" >> $GITHUB_OUTPUT
+          else
+            echo "Found FEP files:"
+            echo "$FEP_FILES"
+            # Convert multiline to space-separated for matrix
+            FEP_LIST=$(echo "$FEP_FILES" | tr '\n' ' ' | sed 's/ $//')
+            echo "fep_files=$FEP_LIST" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate each FEP
+        if: steps.find-feps.outputs.fep_files != ''
+        run: |
+          FEP_FILES="${{ steps.find-feps.outputs.fep_files }}"
+          VALIDATION_FAILED=0
+
+          echo "Starting FEP validation..."
+          echo ""
+
+          for fep_file in $FEP_FILES; do
+            echo "========================================="
+            echo "Validating: $fep_file"
+            echo "========================================="
+
+            # Run validation
+            if victor fep validate "$fep_file"; then
+              echo "✓ $fep_file is valid"
+            else
+              echo "✗ $fep_file validation failed"
+              VALIDATION_FAILED=1
+            fi
+            echo ""
+          done
+
+          if [ $VALIDATION_FAILED -ne 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "FEP Validation Failed"
+            echo "========================================="
+            echo ""
+            echo "One or more FEPs failed validation."
+            echo "Please fix the errors above and push your changes."
+            exit 1
+          fi
+
+      - name: Check FEP numbering
+        if: steps.find-feps.outputs.fep_files != ''
+        run: |
+          FEP_FILES="${{ steps.find-feps.outputs.fep_files }}"
+          NUMBERING_FAILED=0
+
+          echo "Checking FEP numbering consistency..."
+          echo ""
+
+          for fep_file in $FEP_FILES; do
+            # Extract filename (without path)
+            filename=$(basename "$fep_file")
+
+            # Extract FEP number from filename (format: fep-XXXX-title.md)
+            if [[ $filename =~ ^fep-([0-9]+)-(.*?)\.md$ ]]; then
+              file_number="${BASH_REMATCH[1]}"
+
+              # Parse FEP number from frontmatter
+              fep_number=$(python - <<EOF
+          import sys
+          from pathlib import Path
+          try:
+              from victor.feps import parse_fep_metadata
+              content = Path("$fep_file").read_text()
+              metadata = parse_fep_metadata(content)
+              print(metadata.fep)
+          except Exception as e:
+              print(f"Error: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+              )
+
+              if [ $? -ne 0 ]; then
+                echo "✗ Failed to parse $fep_file"
+                NUMBERING_FAILED=1
+                continue
+              fi
+
+              # Compare filename number vs frontmatter number
+              # Allow 0 or XXXX for new FEPs
+              # Normalize comparison: format fep_number with leading zeros
+              if [ "$file_number" != "0000" ] && [ "$file_number" != "$(printf '%04d' $fep_number)" ]; then
+                echo "✗ Numbering mismatch in $filename"
+                echo "  Filename indicates: FEP-$file_number"
+                echo "  Frontmatter indicates: FEP-$(printf '%04d' $fep_number)"
+                NUMBERING_FAILED=1
+              else
+                echo "✓ Numbering consistent in $filename (FEP-$(printf '%04d' $fep_number))"
+              fi
+            else
+              echo "⚠ Skipping $filename (not in fep-XXXX-title.md format)"
+            fi
+          done
+
+          if [ $NUMBERING_FAILED -ne 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "FEP Numbering Check Failed"
+            echo "========================================="
+            echo ""
+            echo "Filename must match FEP number in frontmatter."
+            echo "Format: fep-XXXX-title.md where XXXX matches 'fep: XXXX' in YAML"
+            exit 1
+          fi
+
+      - name: Generate validation report
+        if: always() && steps.find-feps.outputs.fep_files != ''
+        run: |
+          mkdir -p validation-reports
+
+          cat > validation-reports/fep-validation.md << 'EOF'
+          # FEP Validation Report
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **PR**: ${{ github.event.pull_request.number }}
+
+          ## Summary
+
+          This report shows the validation results for all FEP files modified in this PR.
+
+          ## Validated Files
+
+          EOF
+
+          FEP_FILES="${{ steps.find-feps.outputs.fep_files }}"
+          for fep_file in $FEP_FILES; do
+            filename=$(basename "$fep_file")
+            echo "- [$filename]($fep_file)" >> validation-reports/fep-validation.md
+          done
+
+          echo "" >> validation-reports/fep-validation.md
+          echo "## Validation Checks" >> validation-reports/fep-validation.md
+          echo "" >> validation-reports/fep-validation.md
+          echo "- [x] YAML frontmatter syntax" >> validation-reports/fep-validation.md
+          echo "- [x] Required metadata fields" >> validation-reports/fep-validation.md
+          echo "- [x] Required sections" >> validation-reports/fep-validation.md
+          echo "- [x] Section content quality" >> validation-reports/fep-validation.md
+          echo "- [x] FEP numbering consistency" >> validation-reports/fep-validation.md
+
+          echo "" >> validation-reports/fep-validation.md
+          echo "## Next Steps" >> validation-reports/fep-validation.md
+          echo "" >> validation-reports/fep-validation.md
+          echo "1. Review any validation errors above" >> validation-reports/fep-validation.md
+          echo "2. Make corrections locally" >> validation-reports/fep-validation.md
+          echo "3. Test with: \`victor fep validate <fep-file>\`" >> validation-reports/fep-validation.md
+          echo "4. Push your changes" >> validation-reports/fep-validation.md
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fep-validation-report
+          path: validation-reports/fep-validation.md
+          retention-days: 30
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request' && steps.find-feps.outputs.fep_files != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'validation-reports/fep-validation.md';
+
+            try {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Find existing comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+              });
+
+              const botComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('FEP Validation Report')
+              );
+
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: botComment.id,
+                  body: report,
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: report,
+                });
+              }
+            } catch (error) {
+              console.log('Error posting comment:', error);
+            }

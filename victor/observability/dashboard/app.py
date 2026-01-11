@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from victor.config.settings import get_settings
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -132,7 +132,7 @@ class EventLogView(RichLog):
         self._event_lines: list[str] = []  # Store lines: newest at START (index 0), oldest at END
         self._max_lines = 1000
 
-    def add_event(self, event: Event) -> None:
+    def add_event(self, event: MessagingEvent) -> None:
         """Add an event to the log with rich details (prepends to show newest first)."""
         import logging
 
@@ -185,7 +185,7 @@ class EventLogView(RichLog):
         # Refresh display
         self._refresh_display()
 
-    def _format_event_details(self, event: Event) -> list[str]:
+    def _format_event_details(self, event: MessagingEvent) -> list[str]:
         """Format event details into lines."""
         topic = event.topic
         data = event.data
@@ -435,12 +435,12 @@ class TimeOrderedTableView(DataTable):
             enable_dedup: Whether to track event IDs and prevent duplicates (default: False)
         """
         super().__init__(*args, **kwargs)
-        self._events: List[Event] = []
+        self._events: List[MessagingEvent] = []
         self._max_rows = max_rows
         self._enable_dedup = enable_dedup
         self._seen_event_ids: set = set() if enable_dedup else None
 
-    def add_event(self, event: Event) -> None:
+    def add_event(self, event: MessagingEvent) -> None:
         """Add an event to the table.
 
         Events are received in descending order (newest first) and we append them
@@ -506,7 +506,7 @@ class TimeOrderedTableView(DataTable):
                 logger = logging.getLogger(__name__)
                 logger.error(f"[{self.__class__.__name__}] Error formatting event row: {e}")
 
-    def _format_event_row(self, event: Event) -> tuple:
+    def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format an event as a table row.
 
         Subclasses must implement this method to convert events to row values.
@@ -541,7 +541,7 @@ class EventTableView(TimeOrderedTableView):
         self.add_columns("Time", "Category", "Name", "Details")
         self.cursor_type = "row"
 
-    def _format_event_row(self, event: Event) -> tuple:
+    def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format an event as a table row.
 
         Args:
@@ -580,7 +580,7 @@ class ToolExecutionView(DataTable):
         self.add_columns("Tool", "Calls", "Avg Time", "Success Rate", "Last Called")
         self.cursor_type = "row"
 
-    def add_tool_event(self, event: Event) -> None:
+    def add_tool_event(self, event: MessagingEvent) -> None:
         """Process a tool event and update statistics."""
         # Handle both tool.* and lifecycle.chunk.tool_start events
         is_tool_event = (
@@ -658,7 +658,7 @@ class VerticalTraceView(ScrollableContainer):
     def compose(self) -> ComposeResult:
         yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
 
-    def add_vertical_event(self, event: Event) -> None:
+    def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event (prepends for newest first)."""
         if not event.topic.startswith("vertical."):
             return
@@ -689,7 +689,7 @@ class JSONLBrowser(ScrollableContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._events: List[Event] = []
+        self._events: List[MessagingEvent] = []
 
     def compose(self) -> ComposeResult:
         yield Static("[dim]Load a JSONL file to browse historical events...[/]", id="jsonl-content")
@@ -771,7 +771,7 @@ class ExecutionTraceView(TimeOrderedTableView):
         self.add_columns("Time", "Type", "Operation", "Duration")
         self.cursor_type = "row"
 
-    def add_span_event(self, event: Event) -> None:
+    def add_span_event(self, event: MessagingEvent) -> None:
         """Add a span event to the trace view.
 
         Filters for lifecycle.* events and uses base class add_event()
@@ -783,7 +783,7 @@ class ExecutionTraceView(TimeOrderedTableView):
         # Use base class add_event() for consistent handling
         self.add_event(event)
 
-    def _format_event_row(self, event: Event) -> tuple:
+    def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format a lifecycle event as a table row.
 
         Args:
@@ -831,7 +831,7 @@ class ToolCallHistoryView(TimeOrderedTableView):
         self.add_columns("Time", "Tool", "Status", "Duration", "Span ID", "Arguments")
         self.cursor_type = "row"
 
-    def add_tool_call_event(self, event: Event) -> None:
+    def add_tool_call_event(self, event: MessagingEvent) -> None:
         """Add a tool call event to the history.
 
         Filters for tool.* events and uses base class add_event()
@@ -843,7 +843,7 @@ class ToolCallHistoryView(TimeOrderedTableView):
         # Use base class add_event() for consistent handling
         self.add_event(event)
 
-    def _format_event_row(self, event: Event) -> tuple:
+    def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format a tool event as a table row.
 
         Args:
@@ -930,7 +930,7 @@ class StateTransitionView(TimeOrderedTableView):
         self.add_columns("Time", "Scope", "Key", "Old Value", "New Value")
         self.cursor_type = "row"
 
-    def add_state_event(self, event: Event) -> None:
+    def add_state_event(self, event: MessagingEvent) -> None:
         """Add a state transition event.
 
         Filters for state.* events and uses base class add_event()
@@ -943,7 +943,7 @@ class StateTransitionView(TimeOrderedTableView):
         # Use base class add_event() for consistent handling
         self.add_event(event)
 
-    def _format_event_row(self, event: Event) -> tuple:
+    def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format a state event as a table row.
 
         Args:
@@ -1027,7 +1027,7 @@ class PerformanceMetricsView(Static):
     def watch_total_state_transitions(self, value: int) -> None:
         self._update_display()
 
-    def update_from_span_event(self, event: Event) -> None:
+    def update_from_span_event(self, event: MessagingEvent) -> None:
         """Update metrics from span event."""
         if event.topic.startswith("lifecycle."):
             if event.topic == "span_started":
@@ -1036,7 +1036,7 @@ class PerformanceMetricsView(Static):
             elif event.topic == "span_ended":
                 self.active_spans -= 1
 
-    def update_from_tool_event(self, event: Event) -> None:
+    def update_from_tool_event(self, event: MessagingEvent) -> None:
         """Update metrics from tool event."""
         if event.topic.startswith("tool."):
             data = event.data or {}
@@ -1051,7 +1051,7 @@ class PerformanceMetricsView(Static):
                 self.total_tool_calls += 1
                 self.failed_tool_calls += 1
 
-    def update_from_state_event(self, event: Event) -> None:
+    def update_from_state_event(self, event: MessagingEvent) -> None:
         """Update metrics from state event."""
         if event.topic.startswith("state."):
             self.total_state_transitions += 1
@@ -1197,7 +1197,7 @@ class ObservabilityDashboard(App):
         self._subscribe_to_bus = subscribe_to_bus
         self._paused = False
         self._unsubscribe: Optional[Callable[[], None]] = None
-        self._event_buffer: List[Event] = []
+        self._event_buffer: List[MessagingEvent] = []
         self._subscription_handles: List[Any] = []  # For canonical event system subscriptions
 
         # Widget references
@@ -1314,7 +1314,7 @@ class ObservabilityDashboard(App):
 
         event_counter = [0]  # Use list to avoid nonlocal
 
-        async def handle_event(event: Event) -> None:
+        async def handle_event(event: MessagingEvent) -> None:
             """Handle incoming event from canonical event system.
 
             This is called asynchronously from the ObservabilityBus backend.
@@ -1514,7 +1514,7 @@ class ObservabilityDashboard(App):
                 logger.error(f"[Dashboard] Traceback: {traceback.format_exc()}")
                 await asyncio.sleep(1.0)
 
-    def _parse_jsonl_line(self, line: str) -> Optional[Event]:
+    def _parse_jsonl_line(self, line: str) -> Optional[MessagingEvent]:
         """Parse a JSONL event line into an Event with backward compatibility."""
         try:
             import logging
@@ -1546,7 +1546,7 @@ class ObservabilityDashboard(App):
                     data["timestamp"] = time.time()
 
             # Create Event from dictionary
-            event = Event.from_dict(data)
+            event = MessagingEvent.from_dict(data)
             return event
 
         except Exception as e:
@@ -1558,7 +1558,7 @@ class ObservabilityDashboard(App):
             logger.debug(f"[Dashboard] Line content: {line[:300]}")
             return None
 
-    def _process_event(self, event: Event) -> None:
+    def _process_event(self, event: MessagingEvent) -> None:
         """Process and display an event."""
         import logging
         import traceback

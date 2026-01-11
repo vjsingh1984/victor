@@ -21,14 +21,14 @@ import sqlite3
 import pytest
 from unittest.mock import MagicMock
 
-from victor.agent.rl.learners.prompt_template import (
+from victor.framework.rl.learners.prompt_template import (
     PromptTemplateLearner,
     PromptStyle,
     PromptElement,
     PromptTemplate,
     BetaDistribution,
 )
-from victor.agent.rl.base import RLOutcome
+from victor.framework.rl.base import RLOutcome
 from victor.core.schema import Tables
 
 

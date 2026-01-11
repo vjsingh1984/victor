@@ -29,7 +29,7 @@ from textual.containers import Container, Horizontal
 from textual.widgets import DataTable, RichLog, Select, Static, Switch
 from textual.reactive import reactive
 
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 
 # Color mapping for event categories (topic prefixes)
@@ -76,7 +76,7 @@ class EventLogWidget(RichLog):
         self._max_data_length = max_data_length
         self._event_count = 0
 
-    def add_event(self, event: Event) -> None:
+    def add_event(self, event: MessagingEvent) -> None:
         """Add an event to the log.
 
         Args:
@@ -157,7 +157,7 @@ class EventTableWidget(DataTable):
         """
         super().__init__(*args, **kwargs)
         self._max_rows = max_rows
-        self._events: List[Event] = []
+        self._events: List[MessagingEvent] = []
 
     def on_mount(self) -> None:
         """Set up table columns."""
@@ -165,7 +165,7 @@ class EventTableWidget(DataTable):
         self.cursor_type = "row"
         self.zebra_stripes = True
 
-    def add_event(self, event: Event) -> None:
+    def add_event(self, event: MessagingEvent) -> None:
         """Add an event to the table.
 
         Events are displayed in descending order (newest first).
@@ -183,7 +183,7 @@ class EventTableWidget(DataTable):
         # Rebuild table
         self._rebuild_table()
 
-    def _add_row(self, event: Event) -> None:
+    def _add_row(self, event: MessagingEvent) -> None:
         """Add a single row for an event."""
         timestamp = event.timestamp.strftime("%H:%M:%S")
         category = event.topic.split(".")[0] if event.topic.split(".")[0] else "unknown"
@@ -194,7 +194,7 @@ class EventTableWidget(DataTable):
 
         self.add_row(timestamp, category, event.topic, session, details)
 
-    def _get_event_details(self, event: Event) -> str:
+    def _get_event_details(self, event: MessagingEvent) -> str:
         """Extract key details from event data."""
         if not event.data:
             return ""
@@ -231,7 +231,7 @@ class EventTableWidget(DataTable):
         for event in self._events:
             self._add_row(event)
 
-    def get_selected_event(self) -> Optional[Event]:
+    def get_selected_event(self) -> Optional[MessagingEvent]:
         """Get the currently selected event.
 
         Events list and table are both in descending order (newest first),
@@ -307,7 +307,7 @@ class EventFilterWidget(Container):
             except ValueError:
                 pass
 
-    def should_show_event(self, event: Event) -> bool:
+    def should_show_event(self, event: MessagingEvent) -> bool:
         """Check if an event should be displayed based on current filters.
 
         Args:

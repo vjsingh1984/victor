@@ -433,7 +433,7 @@ class RLEvictionPolicy:
         if self._external_learner:
             # Delegate to external learner
             try:
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.base import RLOutcome
 
                 outcome = RLOutcome(
                     provider="cache",

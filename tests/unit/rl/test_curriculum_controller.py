@@ -19,7 +19,7 @@ Tests the curriculum learning controller for progressive complexity.
 
 import pytest
 
-from victor.agent.rl.curriculum_controller import (
+from victor.framework.rl.curriculum_controller import (
     CurriculumController,
     CurriculumStage,
     StageConfig,

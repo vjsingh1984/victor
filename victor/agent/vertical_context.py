@@ -24,6 +24,44 @@ Design Philosophy:
 - Backward compatibility with existing code
 - Type-safe access to all vertical configuration
 
+Capability Config Storage Pattern
+----------------------------------
+The `capability_configs` dict provides centralized storage for vertical
+capability configurations, replacing direct orchestrator attribute assignment.
+This pattern follows SOLID principles by avoiding tight coupling between
+verticals and the orchestrator implementation.
+
+OLD Pattern (avoid - creates tight coupling):
+    # In vertical integration code
+    orchestrator.rag_config = {"chunk_size": 512}
+    orchestrator.source_verification_config = {"strict": True}
+    orchestrator.code_style = {"max_line_length": 100}
+
+NEW Pattern (preferred - decoupled via context):
+    # In vertical integration code
+    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.set_capability_config("source_verification_config", {"strict": True})
+    context.set_capability_config("code_style", {"max_line_length": 100})
+
+    # Or bulk apply
+    context.apply_capability_configs({
+        "rag_config": {"chunk_size": 512},
+        "source_verification_config": {"strict": True},
+        "code_style": {"max_line_length": 100},
+    })
+
+    # Retrieve elsewhere
+    rag_config = context.get_capability_config("rag_config", {})
+    if rag_config.get("strict"):
+        # Apply strict mode
+        ...
+
+Benefits:
+- Verticals don't need to know orchestrator's internal structure
+- Easy to add new configs without modifying orchestrator class
+- Type-safe via protocol methods
+- Clear separation of concerns
+
 Usage:
     from victor.agent.vertical_context import VerticalContext
 
@@ -35,10 +73,20 @@ Usage:
     context.apply_middleware(middleware_list)
     context.apply_safety_patterns(patterns)
 
+    # Store capability configs
+    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.apply_capability_configs({
+        "code_style": {"max_line_length": 100},
+        "test_framework": "pytest",
+    })
+
     # Query context
     if context.has_middleware:
         for mw in context.middleware:
             await mw.before_tool_call(...)
+
+    # Retrieve capability configs
+    code_style = context.get_capability_config("code_style", {})
 """
 
 from __future__ import annotations
@@ -47,7 +95,6 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     List,
     Optional,
@@ -165,6 +212,18 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
         """Apply custom system prompt."""
         ...
 
+    def set_capability_config(self, name: str, config: Any) -> None:
+        """Store a capability configuration."""
+        ...
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any:
+        """Retrieve a capability configuration."""
+        ...
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+        """Apply multiple capability configurations at once."""
+        ...
+
 
 # =============================================================================
 # Vertical Context Data Class
@@ -253,6 +312,12 @@ class VerticalContext:
     # Tool selection strategy (SOLID: vertical-specific tool selection)
     tool_selection_strategy: Optional[Any] = None
 
+    # Capability configurations (SOLID: centralized config storage)
+    # Replaces direct orchestrator attribute assignment patterns like:
+    # orchestrator.rag_config = {...}
+    # orchestrator.source_verification_config = {...}
+    capability_configs: Dict[str, Any] = field(default_factory=dict)
+
     # ==========================================================================
     # Property Accessors
     # ==========================================================================
@@ -321,6 +386,11 @@ class VerticalContext:
     def has_tool_selection_strategy(self) -> bool:
         """Check if tool selection strategy is configured."""
         return self.tool_selection_strategy is not None
+
+    @property
+    def has_capability_configs(self) -> bool:
+        """Check if capability configs are stored."""
+        return len(self.capability_configs) > 0
 
     # ==========================================================================
     # Mutation Methods (implements MutableVerticalContextProtocol)
@@ -491,6 +561,39 @@ class VerticalContext:
             strategy: ToolSelectionStrategyProtocol implementation from the vertical
         """
         self.tool_selection_strategy = strategy
+
+    def set_capability_config(self, name: str, config: Any) -> None:
+        """Store a capability configuration.
+
+        Replaces direct orchestrator attribute assignment pattern:
+        - OLD: orchestrator.rag_config = {...}
+        - NEW: context.set_capability_config("rag_config", {...})
+
+        Args:
+            name: Config name (e.g., "rag_config", "code_style")
+            config: Configuration value
+        """
+        self.capability_configs[name] = config
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any:
+        """Retrieve a capability configuration.
+
+        Args:
+            name: Config name
+            default: Default value if not found
+
+        Returns:
+            Configuration value or default
+        """
+        return self.capability_configs.get(name, default)
+
+    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+        """Apply multiple capability configurations at once.
+
+        Args:
+            configs: Dict mapping config names to configuration values
+        """
+        self.capability_configs.update(configs)
 
     # ==========================================================================
     # Query Methods

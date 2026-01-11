@@ -26,17 +26,22 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from victor.framework.rl import LearnerType
+from victor.framework.rl.config import BaseRLConfig
 from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
-class RAGRLConfig:
+class RAGRLConfig(BaseRLConfig):
     """RL configuration for RAG vertical.
+
+    Inherits common RL configuration from BaseRLConfig and extends
+    with RAG-specific task types and quality thresholds.
 
     Configures which learners are active and how they should behave
     for RAG-specific tasks like search, synthesis, and ingestion.
     """
 
+    # RAG uses different active learners (QUALITY_WEIGHTS instead of CONTINUATION_PATIENCE)
     active_learners: List[LearnerType] = field(
         default_factory=lambda: [
             LearnerType.TOOL_SELECTOR,
@@ -87,6 +92,7 @@ class RAGRLConfig:
         }
     )
 
+    # RAG-specific: lower default patience for RAG tasks (3 instead of 4)
     default_patience: Dict[str, int] = field(
         default_factory=lambda: {
             "anthropic": 3,
@@ -96,55 +102,8 @@ class RAGRLConfig:
         }
     )
 
-    def get_tools_for_task(self, task_type: str) -> List[str]:
-        """Get recommended tools for a task type.
-
-        Args:
-            task_type: Type of task (search, ingest, synthesis, etc.)
-
-        Returns:
-            List of tool names for the task type
-        """
-        return self.task_type_mappings.get(task_type.lower(), [])
-
-    def get_quality_threshold(self, task_type: str) -> float:
-        """Get quality threshold for a task type.
-
-        Args:
-            task_type: Type of task
-
-        Returns:
-            Quality threshold (0.0-1.0), defaults to 0.80
-        """
-        return self.quality_thresholds.get(task_type.lower(), 0.80)
-
-    def get_patience(self, provider: str) -> int:
-        """Get continuation patience for a provider.
-
-        Args:
-            provider: LLM provider name
-
-        Returns:
-            Patience value (number of continuation attempts)
-        """
-        return self.default_patience.get(provider.lower(), 3)
-
-    def is_learner_active(self, learner: LearnerType) -> bool:
-        """Check if a learner is active.
-
-        Args:
-            learner: Learner type to check
-
-        Returns:
-            True if learner is in active_learners
-        """
-        return learner in self.active_learners
-
-    def __repr__(self) -> str:
-        return (
-            f"RAGRLConfig(learners={len(self.active_learners)}, "
-            f"task_types={len(self.task_type_mappings)})"
-        )
+    # Methods get_tools_for_task, get_quality_threshold, get_patience,
+    # is_learner_active, get_rl_config, __repr__ all inherited
 
 
 class RAGRLHooks:

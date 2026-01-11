@@ -38,7 +38,7 @@ Example Usage:
     from victor.storage.memory import EntityMemory, get_memory_coordinator
 
     # Checkpoints
-    from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+    from victor.storage.checkpoints import ConversationCheckpointManager, SQLiteCheckpointBackend
 
     # Graph storage
     from victor.storage.graph import create_graph_store, GraphNode

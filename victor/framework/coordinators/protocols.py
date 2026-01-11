@@ -41,7 +41,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
-    from victor.framework.workflow_engine import ExecutionResult, WorkflowEvent
+    from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.hitl import HITLHandler
 
@@ -64,7 +64,7 @@ class IWorkflowExecutor(Protocol):
         workflow: Any,
         initial_state: Dict[str, Any],
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a workflow.
 
         Args:
@@ -73,7 +73,7 @@ class IWorkflowExecutor(Protocol):
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
         ...
 
@@ -157,7 +157,7 @@ class IYAMLWorkflowCoordinator(Protocol):
         condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a YAML-defined workflow.
 
         Args:
@@ -169,7 +169,7 @@ class IYAMLWorkflowCoordinator(Protocol):
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
         ...
 
@@ -215,7 +215,7 @@ class IGraphExecutor(Protocol):
         graph: "CompiledGraph",
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a compiled StateGraph.
 
         Args:
@@ -224,7 +224,7 @@ class IGraphExecutor(Protocol):
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with final state and metadata
+            WorkflowExecutionResult with final state and metadata
         """
         ...
 
@@ -265,7 +265,7 @@ class IHITLExecutor(Protocol):
         initial_state: Optional[Dict[str, Any]] = None,
         approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute workflow with HITL approval nodes.
 
         Args:
@@ -275,7 +275,7 @@ class IHITLExecutor(Protocol):
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with HITL request history
+            WorkflowExecutionResult with HITL request history
         """
         ...
 

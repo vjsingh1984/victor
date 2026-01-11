@@ -38,7 +38,7 @@ Usage - Event Taxonomy:
 Usage - Protocol-Based Backends:
     from victor.core.events import (
         create_event_backend,
-        Event,
+        MessagingEvent,
         ObservabilityBus,
         AgentMessageBus,
     )
@@ -87,7 +87,7 @@ from victor.core.events.taxonomy import (
 # Protocol-based event system
 from victor.core.events.protocols import (
     # Core types
-    Event,
+    MessagingEvent,
     SubscriptionHandle,
     DeliveryGuarantee,
     BackendType,
@@ -165,7 +165,7 @@ __all__ = [
     # Taxonomy - Deprecation helpers
     "emit_deprecation_warning",
     # Protocol-based - Core types
-    "Event",
+    "MessagingEvent",
     "SubscriptionHandle",
     "DeliveryGuarantee",
     "BackendType",

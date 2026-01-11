@@ -80,6 +80,14 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.research.escape_hatches"
 
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the research capability provider.
+
+        Returns:
+            Module path string for ResearchCapabilityProvider
+        """
+        return "victor.research.capabilities"
+
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 
@@ -121,11 +129,6 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         }
         return mapping.get(task_type.lower())
 
-
-# Register Research domain handlers when this module is loaded
-from victor.research.handlers import register_handlers as _register_handlers
-
-_register_handlers()
 
 __all__ = [
     # YAML-first workflow provider

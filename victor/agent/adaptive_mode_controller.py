@@ -1071,7 +1071,7 @@ class AdaptiveModeController:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.base import RLOutcome
 
             # Build outcome for the learner
             from_mode = (

@@ -32,6 +32,20 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icon rendering
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
+
 # Project templates
 TEMPLATES = {
     "fastapi": {
@@ -526,7 +540,7 @@ async def scaffold(
         report.append("")
         report.append("Files created:")
         for file_path in created_files:
-            report.append(f"  ✓ {file_path}")
+            report.append(f"  {_get_icon('success')} {file_path}")
         report.append("")
         report.append("Next steps:")
         for step in next_steps:
@@ -701,7 +715,7 @@ async def scaffold(
         report.append("")
         report.append("Files created:")
         for file_path in created_files:
-            report.append(f"  ✓ {file_path}")
+            report.append(f"  {_get_icon('success')} {file_path}")
 
         return {
             "success": True,

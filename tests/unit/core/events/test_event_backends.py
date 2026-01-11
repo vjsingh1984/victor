@@ -31,7 +31,7 @@ import pytest
 
 from victor.core.events import (
     # Core types
-    Event,
+    MessagingEvent,
     SubscriptionHandle,
     DeliveryGuarantee,
     BackendType,
@@ -55,12 +55,12 @@ from victor.core.events import (
 
 
 @pytest.mark.unit
-class TestEvent:
+class TestMessagingEvent:
     """Tests for Event dataclass."""
 
     def test_event_creation_with_defaults(self):
         """Event should have sensible defaults."""
-        event = Event(topic="test.topic", data={"key": "value"})
+        event = MessagingEvent(topic="test.topic", data={"key": "value"})
 
         assert event.topic == "test.topic"
         assert event.data == {"key": "value"}
@@ -71,7 +71,7 @@ class TestEvent:
 
     def test_event_serialization(self):
         """Event should serialize to and from dict."""
-        event = Event(
+        event = MessagingEvent(
             topic="tool.call",
             data={"name": "read", "args": {"file": "test.txt"}},
             source="agent_1",
@@ -85,14 +85,14 @@ class TestEvent:
         assert data["correlation_id"] == "task_123"
 
         # Deserialize
-        restored = Event.from_dict(data)
+        restored = MessagingEvent.from_dict(data)
         assert restored.topic == event.topic
         assert restored.data == event.data
         assert restored.source == event.source
 
     def test_event_pattern_matching_exact(self):
         """Event should match exact topic patterns."""
-        event = Event(topic="tool.call")
+        event = MessagingEvent(topic="tool.call")
 
         assert event.matches_pattern("tool.call") is True
         assert event.matches_pattern("tool.result") is False
@@ -100,7 +100,7 @@ class TestEvent:
 
     def test_event_pattern_matching_wildcard(self):
         """Event should match wildcard patterns."""
-        event = Event(topic="tool.call")
+        event = MessagingEvent(topic="tool.call")
 
         assert event.matches_pattern("tool.*") is True
         assert event.matches_pattern("*.call") is True
@@ -109,7 +109,7 @@ class TestEvent:
 
     def test_event_pattern_matching_nested(self):
         """Event should match nested topic patterns."""
-        event = Event(topic="agent.researcher.task")
+        event = MessagingEvent(topic="agent.researcher.task")
 
         assert event.matches_pattern("agent.researcher.task") is True
         assert event.matches_pattern("agent.researcher.*") is True
@@ -160,9 +160,9 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_publish_subscribe_basic(self, backend):
         """Basic pub/sub should work."""
-        received: List[Event] = []
+        received: List[MessagingEvent] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         # Subscribe
@@ -170,7 +170,7 @@ class TestInMemoryEventBackend:
         assert handle.is_active is True
 
         # Publish
-        event = Event(topic="test.topic", data={"msg": "hello"})
+        event = MessagingEvent(topic="test.topic", data={"msg": "hello"})
         result = await backend.publish(event)
         assert result is True
 
@@ -184,13 +184,13 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_subscribe_with_pattern(self, backend):
         """Subscriptions should filter by pattern."""
-        tool_events: List[Event] = []
-        agent_events: List[Event] = []
+        tool_events: List[MessagingEvent] = []
+        agent_events: List[MessagingEvent] = []
 
-        async def tool_handler(event: Event):
+        async def tool_handler(event: MessagingEvent):
             tool_events.append(event)
 
-        async def agent_handler(event: Event):
+        async def agent_handler(event: MessagingEvent):
             agent_events.append(event)
 
         # Subscribe to different patterns
@@ -198,9 +198,9 @@ class TestInMemoryEventBackend:
         await backend.subscribe("agent.*", agent_handler)
 
         # Publish events
-        await backend.publish(Event(topic="tool.call", data={}))
-        await backend.publish(Event(topic="agent.message", data={}))
-        await backend.publish(Event(topic="tool.result", data={}))
+        await backend.publish(MessagingEvent(topic="tool.call", data={}))
+        await backend.publish(MessagingEvent(topic="agent.message", data={}))
+        await backend.publish(MessagingEvent(topic="tool.result", data={}))
 
         await asyncio.sleep(0.3)
 
@@ -211,15 +211,15 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_unsubscribe(self, backend):
         """Unsubscribe should stop event delivery."""
-        received: List[Event] = []
+        received: List[MessagingEvent] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         handle = await backend.subscribe("test.*", handler)
 
         # First event should be received
-        await backend.publish(Event(topic="test.1"))
+        await backend.publish(MessagingEvent(topic="test.1"))
         await asyncio.sleep(0.2)
         assert len(received) == 1
 
@@ -228,26 +228,26 @@ class TestInMemoryEventBackend:
         assert handle.is_active is False
 
         # Second event should NOT be received
-        await backend.publish(Event(topic="test.2"))
+        await backend.publish(MessagingEvent(topic="test.2"))
         await asyncio.sleep(0.2)
         assert len(received) == 1  # Still 1
 
     @pytest.mark.asyncio
     async def test_multiple_subscribers(self, backend):
         """Multiple subscribers should all receive events."""
-        handler1_events: List[Event] = []
-        handler2_events: List[Event] = []
+        handler1_events: List[MessagingEvent] = []
+        handler2_events: List[MessagingEvent] = []
 
-        async def handler1(event: Event):
+        async def handler1(event: MessagingEvent):
             handler1_events.append(event)
 
-        async def handler2(event: Event):
+        async def handler2(event: MessagingEvent):
             handler2_events.append(event)
 
         await backend.subscribe("test.*", handler1)
         await backend.subscribe("test.*", handler2)
 
-        await backend.publish(Event(topic="test.event"))
+        await backend.publish(MessagingEvent(topic="test.event"))
         await asyncio.sleep(0.2)
 
         assert len(handler1_events) == 1
@@ -256,17 +256,17 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_publish_batch(self, backend):
         """Batch publish should deliver all events."""
-        received: List[Event] = []
+        received: List[MessagingEvent] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         await backend.subscribe("batch.*", handler)
 
         events = [
-            Event(topic="batch.1", data={"i": 1}),
-            Event(topic="batch.2", data={"i": 2}),
-            Event(topic="batch.3", data={"i": 3}),
+            MessagingEvent(topic="batch.1", data={"i": 1}),
+            MessagingEvent(topic="batch.2", data={"i": 2}),
+            MessagingEvent(topic="batch.3", data={"i": 3}),
         ]
 
         count = await backend.publish_batch(events)
@@ -310,9 +310,9 @@ class TestObservabilityBus:
     @pytest.mark.asyncio
     async def test_emit_event(self, bus):
         """Emit should publish events."""
-        received: List[Event] = []
+        received: List[MessagingEvent] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         await bus.subscribe("metric.*", handler)
@@ -331,9 +331,9 @@ class TestObservabilityBus:
     @pytest.mark.asyncio
     async def test_emit_with_correlation(self, bus):
         """Emit should support correlation IDs."""
-        received: List[Event] = []
+        received: List[MessagingEvent] = []
 
-        async def handler(event: Event):
+        async def handler(event: MessagingEvent):
             received.append(event)
 
         await bus.subscribe("trace.*", handler)
@@ -368,13 +368,13 @@ class TestAgentMessageBus:
     @pytest.mark.asyncio
     async def test_send_to_agent(self, bus):
         """Send should deliver to specific agent."""
-        researcher_msgs: List[Event] = []
-        executor_msgs: List[Event] = []
+        researcher_msgs: List[MessagingEvent] = []
+        executor_msgs: List[MessagingEvent] = []
 
-        async def researcher_handler(event: Event):
+        async def researcher_handler(event: MessagingEvent):
             researcher_msgs.append(event)
 
-        async def executor_handler(event: Event):
+        async def executor_handler(event: MessagingEvent):
             executor_msgs.append(event)
 
         await bus.subscribe_agent("researcher", researcher_handler)
@@ -398,13 +398,13 @@ class TestAgentMessageBus:
     @pytest.mark.asyncio
     async def test_broadcast_to_all(self, bus):
         """Broadcast should reach all agents."""
-        agent1_msgs: List[Event] = []
-        agent2_msgs: List[Event] = []
+        agent1_msgs: List[MessagingEvent] = []
+        agent2_msgs: List[MessagingEvent] = []
 
-        async def agent1_handler(event: Event):
+        async def agent1_handler(event: MessagingEvent):
             agent1_msgs.append(event)
 
-        async def agent2_handler(event: Event):
+        async def agent2_handler(event: MessagingEvent):
             agent2_msgs.append(event)
 
         await bus.subscribe_agent("agent1", agent1_handler)

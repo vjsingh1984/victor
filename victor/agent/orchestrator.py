@@ -64,6 +64,12 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CH
 
 from rich.console import Console
 
+# Coordinators (Phase 2 refactoring - being integrated)
+# NOTE: These are runtime imports, not type-checking only
+from victor.agent.coordinators.metrics_coordinator import (
+    MetricsCoordinator,
+)  # noqa: F401  # imported for runtime use
+
 if TYPE_CHECKING:
     # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
@@ -159,7 +165,7 @@ from victor.agent.context_manager import (
 )
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
-from victor.agent.rl.coordinator import get_rl_coordinator
+from victor.framework.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
 from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
@@ -577,6 +583,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.intent_detector = self._factory.create_action_authorizer()
         self.search_router = self._factory.create_search_router()
 
+        # Presentation adapter for icon/emoji rendering (via factory, DI)
+        # Decouples agent layer from direct UI dependencies
+        self._presentation = self._factory.create_presentation_adapter()
+
         # Task Completion Detection: Signal-based completion detection
         # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
         from victor.agent.task_completion import TaskCompletionDetector
@@ -629,6 +639,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._session_cost_tracker = SessionCostTracker(
             provider=self.provider.name,
             model=self.model,
+        )
+
+        # Metrics coordinator (Phase 2 refactoring - aggregates metrics/cost/token tracking)
+        from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+
+        self._metrics_coordinator = MetricsCoordinator(
+            metrics_collector=self._metrics_collector,
+            session_cost_tracker=self._session_cost_tracker,
+            cumulative_token_usage=self._cumulative_token_usage,
         )
 
         # Result cache for pure/idempotent tools (via factory)
@@ -924,7 +943,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Initialize ObservabilityIntegration for unified event bus (via factory)
         self._observability = self._factory.create_observability()
 
-        # Initialize CheckpointManager for time-travel debugging (via factory)
+        # Initialize ConversationCheckpointManager for time-travel debugging (via factory)
         # Provides save/restore/fork capabilities for conversation state
         self._checkpoint_manager = self._factory.create_checkpoint_manager()
 
@@ -1114,8 +1133,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         based on session outcome (success, latency, throughput, tool usage).
         """
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
 
             if not self._rl_coordinator:
                 return
@@ -1653,7 +1672,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         - Comparing state differences
 
         Returns:
-            CheckpointManager instance or None if disabled
+            ConversationCheckpointManager instance or None if disabled
         """
         return self._checkpoint_manager
 
@@ -2408,43 +2427,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Args:
             usage_data: Optional cumulative token usage from provider API.
                        When provided, enables accurate token counts.
         """
-        metrics = self._metrics_collector.finalize_stream_metrics(usage_data)
-
-        # Record to session cost tracker for cumulative tracking
-        if metrics and hasattr(self, "_session_cost_tracker"):
-            self._session_cost_tracker.record_request(
-                prompt_tokens=metrics.prompt_tokens,
-                completion_tokens=metrics.completion_tokens,
-                cache_read_tokens=metrics.cache_read_tokens,
-                cache_write_tokens=metrics.cache_write_tokens,
-                duration_seconds=metrics.total_duration,
-                tool_calls=metrics.tool_calls_count,
-            )
-
-        return metrics
+        return self._metrics_coordinator.finalize_stream_metrics(usage_data)
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns:
             StreamMetrics from the last session or None if no metrics available
         """
-        return self._metrics_collector.get_last_stream_metrics()
+        return self._metrics_coordinator.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
         """
-        return self._metrics_collector.get_streaming_metrics_summary()
+        return self._metrics_coordinator.get_streaming_metrics_summary()
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
+
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
 
         Args:
             limit: Maximum number of recent metrics to return
@@ -2452,45 +2466,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of recent metrics dictionaries
         """
-        return self._metrics_collector.get_streaming_metrics_history(limit)
+        return self._metrics_coordinator.get_streaming_metrics_history(limit)
 
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns:
             Dictionary with session cost statistics
         """
-        if hasattr(self, "_session_cost_tracker"):
-            return self._session_cost_tracker.get_summary()
-        return {}
+        return self._metrics_coordinator.get_session_cost_summary()
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns:
             Cost string like "$0.0123" or "cost n/a"
         """
-        if hasattr(self, "_session_cost_tracker"):
-            return self._session_cost_tracker.format_inline_cost()
-        return "cost n/a"
+        return self._metrics_coordinator.get_session_cost_formatted()
 
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file.
+
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
 
         Args:
             path: Output file path
             format: Export format ("json" or "csv")
         """
-        from pathlib import Path
-
-        if not hasattr(self, "_session_cost_tracker"):
-            return
-
-        output_path = Path(path)
-        if format == "csv":
-            self._session_cost_tracker.export_csv(output_path)
-        else:
-            self._session_cost_tracker.export_json(output_path)
+        self._metrics_coordinator.export_session_costs(path, format)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.
@@ -2512,7 +2519,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             await self.semantic_selector.initialize_tool_embeddings(self.tools)
             # Mark initialization complete in ToolSelector (single source of truth)
             self.tool_selector._embeddings_initialized = True
-            logger.info("✓ Tool embeddings preloaded successfully in background")
+            logger.info(
+                f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
+            )
         except Exception as e:
             logger.warning(
                 f"Failed to preload embeddings in background: {e}. "
@@ -2668,7 +2677,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Record to RL tool_selector learner for Q-learning optimization
         if self._rl_coordinator:
             try:
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.base import RLOutcome
 
                 # Get current context
                 provider_name = getattr(self.current_provider, "name", "unknown")
@@ -2713,25 +2722,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns cumulative tokens used across all stream_chat calls.
         Used by VictorAgentAdapter for benchmark token tracking.
 
         Returns:
             TokenUsage dataclass with input/output/total token counts
         """
-        from victor.evaluation.protocol import TokenUsage
-
-        return TokenUsage(
-            input_tokens=self._cumulative_token_usage.get("prompt_tokens", 0),
-            output_tokens=self._cumulative_token_usage.get("completion_tokens", 0),
-            total_tokens=self._cumulative_token_usage.get("total_tokens", 0),
-        )
+        return self._metrics_coordinator.get_token_usage()
 
     def reset_token_usage(self) -> None:
         """Reset cumulative token usage tracking.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Call this at the start of a new evaluation task to get fresh counts.
         """
+        # Reset through coordinator (which updates the cumulative dict)
         for key in self._cumulative_token_usage:
             self._cumulative_token_usage[key] = 0
 
@@ -2973,11 +2981,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> bool:
         """Switch to a different provider mid-conversation.
 
-        This method reinitializes the provider, tool calling adapter, and
-        prompt builder while preserving the conversation history.
+        .. deprecated::
+            This method is deprecated. Use the async version instead:
+            await orchestrator.switch_provider(provider_name, model)
 
-        Delegates core switching to ProviderManager while handling
-        orchestrator-specific post-switch hooks.
+        This synchronous method is kept for backward compatibility but
+        delegates to ProviderCoordinator (Phase 2 refactoring).
 
         Args:
             provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
@@ -2986,87 +2995,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Returns:
             True if switch was successful, False otherwise
-
-        Example:
-            # Switch from ollama to lmstudio
-            orchestrator.switch_provider("lmstudio", "qwen2.5-coder:14b", base_url="http://localhost:1234")
-
-            # Switch provider with profile config
-            orchestrator.switch_provider("anthropic", "claude-sonnet-4-20250514")
         """
+        import warnings
+
+        warnings.warn(
+            "switch_provider() is deprecated and will be removed. "
+            "Use async switch_provider() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        # For backward compatibility, run the async version in an event loop
         try:
-            # Get provider settings from settings if not provided
-            if not provider_kwargs:
-                provider_kwargs = self.settings.get_provider_settings(provider_name)
-
-            # Create new provider instance
-            new_provider = ProviderRegistry.create(provider_name, **provider_kwargs)
-
-            # Determine model to use
-            new_model = model or self.model
-
-            # Store old state for analytics
-            old_provider_name = self.provider_name
-            old_model = self.model
-
-            # Update ProviderManager internal state directly
-            # (Using sync update instead of async switch_provider for backward compatibility)
-            # Update both _current_state (legacy) and ProviderSwitcher state
-            self._provider_manager._current_state = ProviderState(
-                provider=new_provider,
-                provider_name=provider_name.lower(),
-                model=new_model,
-            )
-
-            # Also update ProviderSwitcher's state (the source of truth)
-            from victor.agent.provider.switcher import ProviderSwitcherState
-
-            switcher_state = self._provider_manager._provider_switcher.get_current_state()
-            old_switch_count = switcher_state.switch_count if switcher_state else 0
-
-            self._provider_manager._provider_switcher._current_state = ProviderSwitcherState(
-                provider=new_provider,
-                provider_name=provider_name.lower(),
-                model=new_model,
-                switch_count=old_switch_count + 1,
-            )
-
-            self._provider_manager.initialize_tool_adapter()
-
-            # Sync local attributes from ProviderManager
-            self.provider = self._provider_manager.provider
-            self.model = self._provider_manager.model
-            self.provider_name = self._provider_manager.provider_name
-            self.tool_adapter = self._provider_manager.tool_adapter
-            self.tool_calling_caps = self._provider_manager.capabilities
-
-            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
-            self._apply_post_switch_hooks(respect_sticky_budget=True)
-
-            # Log the switch
-            logger.info(
-                f"Switched provider: {old_provider_name}:{old_model} -> "
-                f"{self.provider_name}:{new_model} "
-                f"(native_tools={self.tool_calling_caps.native_tool_calls})"
-            )
-
-            # Log analytics event
-            self.usage_logger.log_event(
-                "provider_switch",
-                {
-                    "old_provider": old_provider_name,
-                    "old_model": old_model,
-                    "new_provider": self.provider_name,
-                    "new_model": new_model,
-                    "native_tool_calls": self.tool_calling_caps.native_tool_calls,
-                },
-            )
-
-            # Update metrics collector with new model info
-            self._metrics_collector.update_model_info(new_model, self.provider_name)
-
-            return True
-
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is already running, we can't use run_until_complete
+                # Fall back to the old implementation for now
+                logger.warning(
+                    "switch_provider() called from async context - "
+                    "deprecated sync path will be removed in future version"
+                )
+                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
+            else:
+                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
             return False
@@ -3074,11 +3025,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def switch_model(self, model: str) -> bool:
         """Switch to a different model on the current provider.
 
+        Delegates to ProviderCoordinator (Phase 2 refactoring).
+
         This is a lighter-weight switch than switch_provider() - it only
         updates the model and reinitializes the tool adapter.
-
-        Delegates core switching to ProviderManager while handling
-        orchestrator-specific post-switch hooks.
 
         Args:
             model: New model name
@@ -3089,49 +3039,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Example:
             orchestrator.switch_model("qwen2.5-coder:32b")
         """
+        import warnings
+
+        # For backward compatibility with sync API, run the async version
         try:
-            old_model = self.model
-
-            # Update ProviderManager's model and reinitialize adapter
-            if self._provider_manager._current_state:
-                # Update both _current_state (legacy) and ProviderSwitcher state
-                self._provider_manager._current_state.model = model
-
-                # Also update ProviderSwitcher's state (the source of truth)
-                switcher_state = self._provider_manager._provider_switcher.get_current_state()
-                if switcher_state:
-                    switcher_state.model = model
-
-                self._provider_manager.initialize_tool_adapter()
-
-            # Sync local attributes from ProviderManager
-            self.model = self._provider_manager.model
-            self.tool_adapter = self._provider_manager.tool_adapter
-            self.tool_calling_caps = self._provider_manager.capabilities
-
-            # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
-            self._apply_post_switch_hooks()
-
-            logger.info(
-                f"Switched model: {old_model} -> {model} "
-                f"(native_tools={self.tool_calling_caps.native_tool_calls})"
-            )
-
-            self.usage_logger.log_event(
-                "model_switch",
-                {
-                    "provider": self.provider_name,
-                    "old_model": old_model,
-                    "new_model": model,
-                    "native_tool_calls": self.tool_calling_caps.native_tool_calls,
-                },
-            )
-
-            # Update metrics collector with new model info
-            self._metrics_collector.update_model_info(model, self.provider_name)
-
-            return True
-
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is already running, we can't use run_until_complete
+                # Fall back to a simpler implementation
+                logger.warning(
+                    "switch_model() called from async context - "
+                    "consider using await coordinator.switch_model() instead"
+                )
+                return asyncio.run(self._provider_coordinator.switch_model(model))
+            else:
+                return asyncio.run(self._provider_coordinator.switch_model(model))
         except Exception as e:
             logger.error(f"Failed to switch model to {model}: {e}")
             return False
@@ -3287,7 +3209,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             prompt: The final system prompt that was built
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:
@@ -3620,7 +3542,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 f"Known tool-capable models: {known}"
             )
             self.console.print(
-                f"[yellow]⚠ Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
+                f"[yellow]{self._presentation.icon('warning', with_color=False)} Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
                 f"Running without tools.[/]"
             )
             self._tool_capability_warned = True
@@ -3716,6 +3638,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if self.thinking:
                 provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 
+            # Check context and compact before API call to prevent overflow
+            if self._context_compactor:
+                compaction_action = self._context_compactor.check_and_compact(
+                    current_query=user_message,
+                    force=False,
+                    tool_call_count=self.tool_calls_used,
+                    task_complexity=task_classification.complexity.value,
+                )
+                if compaction_action.action_taken:
+                    logger.info(
+                        f"Compacted context before API call: {compaction_action.messages_removed} messages removed, "
+                        f"{compaction_action.tokens_freed} tokens freed"
+                    )
+
             # Get response from provider
             response = await self.provider.chat(
                 messages=self.messages,
@@ -3741,6 +3677,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Add assistant response to history if has content
             if response.content:
                 self.add_message("assistant", response.content)
+
+                # Check compaction after adding assistant response
+                if self._context_compactor:
+                    compaction_action = self._context_compactor.check_and_compact(
+                        current_query=user_message,
+                        force=False,
+                        tool_call_count=self.tool_calls_used,
+                        task_complexity=task_classification.complexity.value,
+                    )
+                    if compaction_action.action_taken:
+                        logger.info(
+                            f"Compacted context after response: {compaction_action.messages_removed} messages removed, "
+                            f"{compaction_action.tokens_freed} tokens freed"
+                        )
 
             # Check if model wants to use tools
             if response.tool_calls:
@@ -3860,7 +3810,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if self._check_context_overflow(max_context):
                 logger.warning("Still overflowing after compaction. Forcing completion.")
                 chunk = StreamChunk(
-                    content="\n[tool] ⚠ Context size limit reached. Providing summary.\n"
+                    content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Context size limit reached. Providing summary.\n"
                 )
                 completion_prompt = self._get_thinking_disabled_prompt(
                     "Context limit reached. Summarize in 2-3 sentences."
@@ -3913,7 +3863,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
 
             chunk = StreamChunk(
-                content=f"\n[tool] ⚠ Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+                content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
             )
 
             try:
@@ -4480,7 +4430,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Show status to user
         yield self._chunk_generator.generate_tool_start_chunk(
             tool_name=tool_name,
-            status_msg=f"🔧 Auto-executing {tool_name} from model intent...",
+            status_msg=f"{self._presentation.icon('running', with_color=False)} Auto-executing {tool_name} from model intent...",
         )
 
         # Emit extracted tool execution event
@@ -6075,13 +6025,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Validate tool call structure
             if not isinstance(tool_call, dict):
                 self.console.print(
-                    f"[yellow]⚠ Skipping invalid tool call (not a dict): {tool_call}[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid tool call (not a dict): {tool_call}[/]"
                 )
                 continue
 
             tool_name = tool_call.get("name")
             if not tool_name:
-                self.console.print(f"[yellow]⚠ Skipping tool call without name: {tool_call}[/]")
+                self.console.print(
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping tool call without name: {tool_call}[/]"
+                )
                 # GAP-5 FIX: Add feedback so model learns from missing tool name
                 results.append(
                     {
@@ -6097,7 +6049,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Validate tool name format (reject hallucinated/malformed names)
             if not self.sanitizer.is_valid_tool_name(tool_name):
                 self.console.print(
-                    f"[yellow]⚠ Skipping invalid/hallucinated tool name: {tool_name}[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid/hallucinated tool name: {tool_name}[/]"
                 )
                 # GAP-5 FIX: Add feedback so model learns from invalid tool name
                 # Instead of silently dropping, return an error result the model can learn from
@@ -6126,7 +6078,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if not self.is_tool_enabled(canonical_tool_name):
                 # Log original and canonical names to aid debugging in tests
                 self.console.print(
-                    f"[yellow]⚠ Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
                 )
                 # GAP-5 FIX: Add feedback so model learns from unknown/disabled tool
                 # Instead of silently dropping, return an error result the model can learn from
@@ -6144,7 +6096,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             if self.tool_calls_used >= self.tool_budget:
                 self.console.print(
-                    f"[yellow]⚠ Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
                 )
                 break
 
@@ -6205,7 +6157,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 signature = (tool_name, str(normalized_args))
             if signature in self.failed_tool_signatures:
                 self.console.print(
-                    f"[yellow]⚠ Skipping repeated failing call to '{tool_name}' with same arguments[/]"
+                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
                 )
                 continue
 
@@ -6215,7 +6167,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     f"Applied {strategy.value} normalization to {tool_name} arguments. "
                     f"Original: {tool_args} → Normalized: {normalized_args}"
                 )
-                self.console.print(f"[yellow]⚙ Normalized arguments via {strategy.value}[/]")
+                gear_icon = self._presentation.icon("gear", with_color=False)
+                self.console.print(
+                    f"[yellow]{gear_icon} Normalized arguments via {strategy.value}[/]"
+                )
             else:
                 # Log type coercion even when strategy is DIRECT
                 args_changed = tool_args != normalized_args
@@ -6358,7 +6313,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.failed_tool_signatures.add(signature)
                 # error_display was already set above from exec_result.error or semantic failure
                 self.console.print(
-                    f"[red]✗ Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
+                    f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
 
                 # ALWAYS pass error details back to the model so it can understand and continue
@@ -6706,89 +6661,56 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         provider: str,
         model: Optional[str] = None,
         on_switch: Optional[Any] = None,
-    ) -> None:
+    ) -> bool:
         """Switch to a different provider/model (protocol method).
 
-        This is an async protocol method that delegates to the sync implementation.
+        Delegates to ProviderManager's async switch_provider directly
+        for proper exception handling in async context (Phase 2 refactoring fix).
 
         Args:
             provider: Target provider name
             model: Optional specific model
             on_switch: Optional callback(provider, model) after switch
+
+        Returns:
+            True if switch was successful, False otherwise
+
+        Raises:
+            ProviderNotFoundError: If provider not found
         """
-        # Import ProviderSwitcherState for state update
-        from victor.agent.provider.switcher import ProviderSwitcherState
-
-        # Get provider settings from settings if not provided
-        provider_kwargs = self.settings.get_provider_settings(provider)
-
-        # Create new provider instance
-        # Note: ProviderRegistry is already imported at module level (line 210)
-        # This ensures patches work correctly
-        new_provider = ProviderRegistry.create(provider, **provider_kwargs)
-
-        # Determine model to use
-        new_model = model or self.model
-
-        # Store old state for analytics
-        old_provider_name = self.provider_name
-        old_model = self.model
-
-        # Update ProviderManager internal state directly
-        # Update both _current_state (legacy) and ProviderSwitcher state
-        self._provider_manager._current_state = ProviderState(
-            provider=new_provider,
-            provider_name=provider.lower(),
-            model=new_model,
+        result = await self._provider_coordinator._manager.switch_provider(
+            provider_name=provider,
+            model=model,
         )
 
-        # Also update ProviderSwitcher's state (the source of truth)
-        switcher_state = self._provider_manager._provider_switcher.get_current_state()
-        old_switch_count = switcher_state.switch_count if switcher_state else 0
+        if result:
+            self._provider_coordinator._notify_post_switch_hooks()
+            # Sync orchestrator's attributes with provider manager state
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
+            if on_switch:
+                on_switch(self.provider_name, self.model)
 
-        self._provider_manager._provider_switcher._current_state = ProviderSwitcherState(
-            provider=new_provider,
-            provider_name=provider.lower(),
-            model=new_model,
-            switch_count=old_switch_count + 1,
-        )
+        return result
 
-        self._provider_manager.initialize_tool_adapter()
+    async def switch_model(self, model: str) -> bool:
+        """Switch to a different model on the current provider (protocol method).
 
-        # Sync local attributes from ProviderManager
-        self.provider = self._provider_manager.provider
-        self.model = self._provider_manager.model
-        self.provider_name = self._provider_manager.provider_name
-        self.tool_adapter = self._provider_manager.tool_adapter
-        self.tool_calling_caps = self._provider_manager.capabilities
+        Delegates to ProviderManager's async switch_model directly
+        for proper exception handling in async context (Phase 2 refactoring fix).
 
-        # Apply post-switch hooks (exploration settings, prompt builder, system prompt, tool budget)
-        self._apply_post_switch_hooks(respect_sticky_budget=True)
+        Args:
+            model: Target model name
 
-        # Log the switch
-        logger.info(
-            f"Switched provider: {old_provider_name}:{old_model} -> "
-            f"{self.provider_name}:{new_model} "
-            f"(native_tools={self.tool_calling_caps.native_tool_calls})"
-        )
-
-        # Log analytics event
-        self.usage_logger.log_event(
-            "provider_switch",
-            {
-                "old_provider": old_provider_name,
-                "old_model": old_model,
-                "new_provider": self.provider_name,
-                "new_model": new_model,
-                "native_tool_calls": self.tool_calling_caps.native_tool_calls,
-            },
-        )
-
-        # Update metrics collector with new model info
-        self._metrics_collector.update_model_info(new_model, self.provider_name)
-
-        if on_switch:
-            on_switch(self.provider_name, self.model)
+        Returns:
+            True if switch was successful, False otherwise
+        """
+        result = await self._provider_manager.switch_model(model)
+        if result:
+            self._provider_coordinator._notify_post_switch_hooks()
+            # Sync orchestrator's model attribute with provider manager state
+            self.model = self._provider_manager.model
+        return result
 
     # --- ToolsProtocol ---
 

@@ -115,17 +115,9 @@ class MessageAdderProtocol(Protocol):
     def add_message(self, role: str, content: str) -> None: ...
 
 
-class ProviderProtocol(Protocol):
-    """Protocol for LLM provider calls."""
-
-    async def chat(
-        self,
-        messages: List[Any],
-        model: str,
-        temperature: float,
-        max_tokens: int,
-        tools: Optional[List[Any]] = None,
-    ) -> Any: ...
+# ProviderProtocol imported from core.protocols for consistency
+# Uses **kwargs which accepts model, temperature, max_tokens
+from victor.core.protocols import ProviderProtocol
 
 
 # =============================================================================

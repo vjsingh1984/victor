@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from victor.agent.streaming_controller import StreamingController
 from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
-from victor.core.events.protocols import Event
+from victor.core.events.protocols import MessagingEvent
 
 
 class TestStreamingCoordinator:
@@ -140,9 +140,9 @@ class TestStreamingCoordinator:
     async def test_dispatch_streaming_events(self, coordinator, streaming_controller):
         """Test streaming event dispatch."""
         events = [
-            Event(topic="streaming.chunk", data={"content": "Hello"}),
-            Event(topic="streaming.chunk", data={"content": " World"}),
-            Event(topic="streaming.end", data={}),
+            MessagingEvent(topic="streaming.chunk", data={"content": "Hello"}),
+            MessagingEvent(topic="streaming.chunk", data={"content": " World"}),
+            MessagingEvent(topic="streaming.end", data={}),
         ]
 
         # Mock dispatch

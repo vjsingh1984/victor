@@ -222,6 +222,7 @@ class ProjectPaths:
     def ensure_project_dirs(self) -> None:
         """Create project-local directories if they don't exist."""
         self.project_victor_dir.mkdir(parents=True, exist_ok=True)
+        # embeddings_dir is now at project root, not under .victor
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
         self.graph_dir.mkdir(parents=True, exist_ok=True)
         self.backups_dir.mkdir(parents=True, exist_ok=True)

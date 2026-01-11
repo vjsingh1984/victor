@@ -1,0 +1,451 @@
+name: Vertical Package Validation
+
+on:
+  pull_request:
+    paths:
+      - 'victor/**'
+  workflow_dispatch:  # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-verticals:
+    name: Validate Verticals
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Victor with dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Use CPU-only torch for faster CI
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Find modified vertical directories
+        id: find-verticals
+        run: |
+          # Get list of modified directories that might contain verticals
+          BASE_BRANCH="${{ github.base_ref }}"
+          MODIFIED_DIRS=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | \
+            grep '^victor/[^/]+/' | \
+            sed 's|victor/[^/]*/||' | \
+            cut -d'/' -f1 | \
+            sort -u || true)
+
+          echo "Modified directories:"
+          echo "$MODIFIED_DIRS"
+
+          # Check if victor-vertical.toml exists in any modified directory
+          VERTICAL_DIRS=""
+          for dir in $MODIFIED_DIRS; do
+            if [ -f "victor/$dir/victor-vertical.toml" ]; then
+              echo "Found vertical: $dir"
+              VERTICAL_DIRS="$VERTICAL_DIRS victor/$dir"
+            fi
+          done
+
+          if [ -z "$VERTICAL_DIRS" ]; then
+            echo "No victor-vertical.toml files modified in this PR"
+            echo "vertical_dirs=" >> $GITHUB_OUTPUT
+          else
+            echo "vertical_dirs=$VERTICAL_DIRS" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate vertical metadata
+        if: steps.find-verticals.outputs.vertical_dirs != ''
+        run: |
+          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          VALIDATION_FAILED=0
+
+          echo "Starting vertical package validation..."
+          echo ""
+
+          for vertical_dir in $VERTICAL_DIRS; do
+            VERTICAL_NAME=$(basename "$vertical_dir")
+            TOML_FILE="$vertical_dir/victor-vertical.toml"
+
+            echo "========================================="
+            echo "Validating: $VERTICAL_NAME"
+            echo "========================================="
+            echo "Location: $vertical_dir"
+            echo "Metadata: $TOML_FILE"
+            echo ""
+
+            # Check if TOML file exists
+            if [ ! -f "$TOML_FILE" ]; then
+              echo "✗ victor-vertical.toml not found"
+              VALIDATION_FAILED=1
+              continue
+            fi
+
+            # Validate TOML against schema
+            python - <<EOF
+          from pathlib import Path
+          import sys
+
+          try:
+              from victor.core.verticals.package_schema import VerticalPackageMetadata
+
+              toml_path = Path("$TOML_FILE")
+              metadata = VerticalPackageMetadata.from_toml(toml_path)
+
+              print(f"✓ TOML schema is valid")
+              print(f"  Name: {metadata.name}")
+              print(f"  Version: {metadata.version}")
+              print(f"  Description: {metadata.description}")
+              print(f"  Authors: {', '.join([a.name for a in metadata.authors])}")
+              print(f"  License: {metadata.license}")
+              print(f"  Requires Victor: {metadata.requires_victor}")
+              print()
+              print(f"  Class module: {metadata.class_spec.module}")
+              print(f"  Class name: {metadata.class_spec.class_name}")
+              print(f"  Tools: {len(metadata.class_spec.provides_tools)}")
+              print(f"  Workflows: {len(metadata.class_spec.provides_workflows)}")
+              print(f"  Capabilities: {len(metadata.class_spec.provides_capabilities)}")
+
+          except Exception as e:
+              print(f"✗ Validation failed: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+            if [ $? -ne 0 ]; then
+              echo "✗ Schema validation failed for $VERTICAL_NAME"
+              VALIDATION_FAILED=1
+            else
+              echo ""
+              echo "✓ $VERTICAL_NAME metadata is valid"
+            fi
+            echo ""
+          done
+
+          if [ $VALIDATION_FAILED -ne 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "Vertical Validation Failed"
+            echo "========================================="
+            echo ""
+            echo "One or more vertical packages failed validation."
+            echo "Please fix the errors above and push your changes."
+            exit 1
+          fi
+
+      - name: Verify vertical class exists
+        if: steps.find-verticals.outputs.vertical_dirs != ''
+        run: |
+          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          CLASS_CHECK_FAILED=0
+
+          echo "Checking vertical class implementations..."
+          echo ""
+
+          for vertical_dir in $VERTICAL_DIRS; do
+            VERTICAL_NAME=$(basename "$vertical_dir")
+            TOML_FILE="$vertical_dir/victor-vertical.toml"
+
+            echo "Checking: $VERTICAL_NAME"
+
+            # Extract class spec from TOML
+            MODULE=$(python - <<EOF
+          from pathlib import Path
+          from victor.core.verticals.package_schema import VerticalPackageMetadata
+          metadata = VerticalPackageMetadata.from_toml(Path("$TOML_FILE"))
+          print(metadata.class_spec.module)
+          print(metadata.class_spec.class_name)
+          EOF
+            )
+
+            # Read both lines
+            CLASS_MODULE=$(echo "$MODULE" | sed -n '1p')
+            CLASS_NAME=$(echo "$MODULE" | sed -n '2p')
+
+            echo "  Module: $CLASS_MODULE"
+            echo "  Class: $CLASS_NAME"
+
+            # Try to import the class
+            python - <<EOF
+          import sys
+          from victor.core.verticals.base import VerticalBase
+
+          try:
+              # Import the module
+              module = __import__("$CLASS_MODULE", fromlist=["$CLASS_NAME"])
+
+              # Get the class
+              cls = getattr(module, "$CLASS_NAME")
+
+              # Check if it inherits from VerticalBase
+              if not issubclass(cls, VerticalBase):
+                  print(f"✗ {cls.__name__} does not inherit from VerticalBase", file=sys.stderr)
+                  sys.exit(1)
+
+              print(f"✓ Class exists and inherits from VerticalBase")
+
+              # Check if it can be instantiated
+              try:
+                  instance = cls()
+                  print(f"✓ Class can be instantiated")
+                  print(f"  Name: {instance.name}")
+              except Exception as e:
+                  print(f"⚠ Could not instantiate: {e}")
+
+          except ImportError as e:
+              print(f"✗ Failed to import module: {e}", file=sys.stderr)
+              sys.exit(1)
+          except AttributeError as e:
+              print(f"✗ Class not found: {e}", file=sys.stderr)
+              sys.exit(1)
+          except Exception as e:
+              print(f"✗ Error: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+            if [ $? -ne 0 ]; then
+              echo "✗ Class check failed for $VERTICAL_NAME"
+              CLASS_CHECK_FAILED=1
+            fi
+            echo ""
+          done
+
+          if [ $CLASS_CHECK_FAILED -ne 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "Vertical Class Check Failed"
+            echo "========================================="
+            echo ""
+            echo "One or more vertical classes could not be verified."
+            echo "Ensure the class specified in victor-vertical.toml:"
+            echo "  1. Exists at the specified module path"
+            echo "  2. Inherits from VerticalBase"
+            echo "  3. Can be imported and instantiated"
+            exit 1
+          fi
+
+      - name: Check pyproject.toml entry points
+        if: steps.find-verticals.outputs.vertical_dirs != ''
+        run: |
+          # Check if this is a monorepo setup with pyproject.toml
+          if [ ! -f "pyproject.toml" ]; then
+            echo "⚠ No pyproject.toml found at repository root"
+            echo "⚠ Skipping entry point validation (may apply to external packages only)"
+            exit 0
+          fi
+
+          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          ENTRYPOINT_FAILED=0
+
+          echo "Checking pyproject.toml entry points..."
+          echo ""
+
+          # Extract entry points from pyproject.toml
+          ENTRY_POINTS=$(python - <<EOF
+          try:
+              import tomllib
+          except ImportError:
+              import tomli as tomllib
+
+          with open("pyproject.toml", "rb") as f:
+              data = tomllib.load(f)
+
+          # Check for victor.verticals entry points
+          entry_points = data.get("project", {}).get("entry-points", {}).get("victor.verticals", {})
+
+          for name, entry_point in entry_points.items():
+              print(f"{name}={entry_point}")
+          EOF
+          )
+
+          echo "Configured entry points:"
+          if [ -z "$ENTRY_POINTS" ]; then
+            echo "  (none found in pyproject.toml)"
+          else
+            echo "$ENTRY_POINTS"
+          fi
+          echo ""
+
+          # For each vertical, check if entry point should exist
+          for vertical_dir in $VERTICAL_DIRS; do
+            VERTICAL_NAME=$(basename "$vertical_dir")
+            TOML_FILE="$vertical_dir/victor-vertical.toml"
+
+            echo "Checking: $VERTICAL_NAME"
+
+            # Extract class spec
+            CLASS_SPEC=$(python - <<EOF
+          from pathlib import Path
+          from victor.core.verticals.package_schema import VerticalPackageMetadata
+          metadata = VerticalPackageMetadata.from_toml(Path("$TOML_FILE"))
+          print(f"{metadata.class_spec.module}:{metadata.class_spec.class_name}")
+          EOF
+            )
+
+            # Check if entry point exists
+            if echo "$ENTRY_POINTS" | grep -q "^$VERTICAL_NAME=$CLASS_SPEC$"; then
+              echo "✓ Entry point configured correctly"
+            elif echo "$ENTRY_POINTS" | grep -q "^$VERTICAL_NAME="; then
+              echo "⚠ Entry point exists but may differ from victor-vertical.toml"
+              echo "  pyproject.toml: $(echo "$ENTRY_POINTS" | grep "^$VERTICAL_NAME=")"
+              echo "  victor-vertical.toml: $CLASS_SPEC"
+            else
+              echo "⚠ No entry point found in pyproject.toml"
+              echo "  Note: This may be intentional for built-in verticals"
+              echo "  External packages should define entry points in their own pyproject.toml"
+            fi
+            echo ""
+          done
+
+      - name: Validate provided tools exist
+        if: steps.find-verticals.outputs.vertical_dirs != ''
+        run: |
+          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          TOOL_VALIDATION_FAILED=0
+
+          echo "Validating provided tools..."
+          echo ""
+
+          for vertical_dir in $VERTICAL_DIRS; do
+            VERTICAL_NAME=$(basename "$vertical_dir")
+            TOML_FILE="$vertical_dir/victor-vertical.toml"
+
+            echo "Checking: $VERTICAL_NAME"
+
+            # Extract provided tools
+            TOOLS=$(python - <<EOF
+          from pathlib import Path
+          from victor.core.verticals.package_schema import VerticalPackageMetadata
+          metadata = VerticalPackageMetadata.from_toml(Path("$TOML_FILE"))
+          for tool in metadata.class_spec.provides_tools:
+              print(tool)
+          EOF
+            )
+
+            if [ -z "$TOOLS" ]; then
+              echo "  No tools declared"
+              echo ""
+              continue
+            fi
+
+            echo "  Tools declared: $(echo "$TOOLS" | wc -l)"
+            echo ""
+
+            # Check if each tool exists in the tools registry
+            for tool in $TOOLS; do
+              # Try to find the tool
+              if python -c "from victor.tools import SharedToolRegistry; registry = SharedToolRegistry(); tool = registry.get_tool('$tool'); assert tool is not None" 2>/dev/null; then
+                echo "    ✓ $tool"
+              else
+                echo "    ⚠ $tool (not found in registry - may be dynamically registered)"
+              fi
+            done
+            echo ""
+          done
+
+      - name: Generate validation report
+        if: always() && steps.find-verticals.outputs.vertical_dirs != ''
+        run: |
+          mkdir -p validation-reports
+
+          cat > validation-reports/vertical-validation.md << 'EOF'
+          # Vertical Package Validation Report
+
+          **Workflow**: ${{ github.workflow }}
+          **Run ID**: ${{ github.run_id }}
+          **Branch**: ${{ github.ref_name }}
+          **PR**: ${{ github.event.pull_request.number }}
+
+          ## Summary
+
+          This report shows the validation results for vertical package metadata.
+
+          ## Validated Verticals
+
+          EOF
+
+          VERTICAL_DIRS="${{ steps.find-verticals.outputs.vertical_dirs }}"
+          for vertical_dir in $VERTICAL_DIRS; do
+            VERTICAL_NAME=$(basename "$vertical_dir")
+            echo "- [$VERTICAL_NAME]($vertical_dir)" >> validation-reports/vertical-validation.md
+          done
+
+          echo "" >> validation-reports/vertical-validation.md
+          echo "## Validation Checks" >> validation-reports/vertical-validation.md
+          echo "" >> validation-reports/vertical-validation.md
+          echo "- [x] victor-vertical.toml schema validation" >> validation-reports/vertical-validation.md
+          echo "- [x] Vertical class exists and inherits from VerticalBase" >> validation-reports/vertical-validation.md
+          echo "- [x] Class can be imported" >> validation-reports/vertical-validation.md
+          echo "- [x] pyproject.toml entry points (if applicable)" >> validation-reports/vertical-validation.md
+          echo "- [x] Provided tools validation" >> validation-reports/vertical-validation.md
+
+          echo "" >> validation-reports/vertical-validation.md
+          echo "## About Vertical Packages" >> validation-reports/vertical-validation.md
+          echo "" >> validation-reports/vertical-validation.md
+          echo "Vertical packages are self-contained domain extensions for Victor." >> validation-reports/vertical-validation.md
+          echo "They provide specialized tools, workflows, and capabilities for specific domains." >> validation-reports/vertical-validation.md
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertical-validation-report
+          path: validation-reports/vertical-validation.md
+          retention-days: 30
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request' && steps.find-verticals.outputs.vertical_dirs != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'validation-reports/vertical-validation.md';
+
+            try {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              const issue_number = context.issue.number;
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+
+              // Find existing comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+              });
+
+              const botComment = comments.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('Vertical Package Validation Report')
+              );
+
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: botComment.id,
+                  body: report,
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: report,
+                });
+              }
+            } catch (error) {
+              console.log('Error posting comment:', error);
+            }

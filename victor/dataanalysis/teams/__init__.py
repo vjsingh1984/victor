@@ -609,6 +609,31 @@ class DataAnalysisTeamSpecProvider:
         return list_team_types()
 
 
+# Import personas
+from victor.dataanalysis.teams.personas import (
+    # Framework types (re-exported for convenience)
+    FrameworkPersonaTraits,
+    FrameworkCommunicationStyle,
+    ExpertiseLevel,
+    PersonaTemplate,
+    # Data analysis-specific types
+    ExpertiseCategory,
+    CommunicationStyle,
+    DecisionStyle,
+    DataAnalysisPersonaTraits,
+    PersonaTraits,  # Backward compatibility alias
+    DataAnalysisPersona,
+    # Pre-defined personas
+    DATA_ANALYSIS_PERSONAS,
+    # Helper functions
+    get_persona,
+    get_personas_for_role,
+    get_persona_by_expertise,
+    apply_persona_to_spec,
+    list_personas,
+    register_data_analysis_personas,
+)
+
 __all__ = [
     # Types
     "DataAnalysisRoleConfig",
@@ -624,6 +649,27 @@ __all__ = [
     "get_role_config",
     "list_team_types",
     "list_roles",
+    # Framework types (re-exported for convenience)
+    "FrameworkPersonaTraits",
+    "FrameworkCommunicationStyle",
+    "ExpertiseLevel",
+    "PersonaTemplate",
+    # Data analysis-specific types from personas
+    "ExpertiseCategory",
+    "CommunicationStyle",
+    "DecisionStyle",
+    "DataAnalysisPersonaTraits",
+    "PersonaTraits",  # Backward compatibility alias
+    "DataAnalysisPersona",
+    # Pre-defined personas
+    "DATA_ANALYSIS_PERSONAS",
+    # Helper functions from personas
+    "get_persona",
+    "get_personas_for_role",
+    "get_persona_by_expertise",
+    "apply_persona_to_spec",
+    "list_personas",
+    "register_data_analysis_personas",
 ]
 
 logger = logging.getLogger(__name__)

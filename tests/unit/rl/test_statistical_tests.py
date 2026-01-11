@@ -20,7 +20,7 @@ Tests the A/B experiment statistical testing utilities.
 import pytest
 import math
 
-from victor.agent.rl.statistical_tests import (
+from victor.framework.rl.statistical_tests import (
     SignificanceLevel,
     StatisticalResult,
     welch_t_test,

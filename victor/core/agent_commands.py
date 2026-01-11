@@ -68,7 +68,7 @@ from victor.core.cqrs import (
     LoggingQueryMiddleware,
 )
 from victor.core.event_sourcing import (
-    Event,
+    DomainEvent,
     EventDispatcher,
     InMemoryEventStore,
     Projection,
@@ -296,7 +296,7 @@ class SearchCodeQuery(Query[List[Dict[str, Any]]]):
 
 
 @dataclass
-class SessionStartedEvent(Event):
+class SessionStartedEvent(DomainEvent):
     """Event when a session starts."""
 
     session_id: str = ""
@@ -305,7 +305,7 @@ class SessionStartedEvent(Event):
 
 
 @dataclass
-class ChatMessageSentEvent(Event):
+class ChatMessageSentEvent(DomainEvent):
     """Event when a chat message is sent."""
 
     session_id: str = ""
@@ -314,7 +314,7 @@ class ChatMessageSentEvent(Event):
 
 
 @dataclass
-class ChatResponseReceivedEvent(Event):
+class ChatResponseReceivedEvent(DomainEvent):
     """Event when a chat response is received."""
 
     session_id: str = ""
@@ -324,7 +324,7 @@ class ChatResponseReceivedEvent(Event):
 
 
 @dataclass
-class ToolExecutedEvent(Event):
+class ToolExecutedEvent(DomainEvent):
     """Event when a tool is executed."""
 
     session_id: str = ""
@@ -336,7 +336,7 @@ class ToolExecutedEvent(Event):
 
 
 @dataclass
-class ProviderSwitchedEvent(Event):
+class ProviderSwitchedEvent(DomainEvent):
     """Event when provider is switched."""
 
     session_id: str = ""
@@ -345,7 +345,7 @@ class ProviderSwitchedEvent(Event):
 
 
 @dataclass
-class SessionEndedEvent(Event):
+class SessionEndedEvent(DomainEvent):
     """Event when a session ends."""
 
     session_id: str = ""
@@ -355,7 +355,7 @@ class SessionEndedEvent(Event):
 
 
 @dataclass
-class ErrorOccurredEvent(Event):
+class ErrorOccurredEvent(DomainEvent):
     """Event when an error occurs."""
 
     session_id: str = ""
@@ -484,7 +484,7 @@ class SessionProjection(Projection):
             "error_count": len(session.get("errors", [])),
         }
 
-    async def handle(self, event: Event) -> None:
+    async def handle(self, event: DomainEvent) -> None:
         """Handle an event and update projection.
 
         Routes events to their specific handlers based on event type.
@@ -497,7 +497,7 @@ class SessionProjection(Projection):
         if handler:
             await handler(event)
 
-    async def rebuild(self, events: List[Event]) -> None:
+    async def rebuild(self, events: List[DomainEvent]) -> None:
         """Rebuild projection from event history.
 
         Args:
@@ -914,7 +914,7 @@ class AgentCommandBus:
         """
         return await self.mediator.send(message)
 
-    async def get_events(self, session_id: str) -> List[Event]:
+    async def get_events(self, session_id: str) -> List[DomainEvent]:
         """Get all events for a session.
 
         Args:

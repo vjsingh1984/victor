@@ -22,20 +22,20 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.rl.config import BaseRLConfig
 from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
-class DevOpsRLConfig:
-    """RL configuration for DevOps vertical."""
+class DevOpsRLConfig(BaseRLConfig):
+    """RL configuration for DevOps vertical.
 
-    active_learners: List[LearnerType] = field(
-        default_factory=lambda: [
-            LearnerType.TOOL_SELECTOR,
-            LearnerType.CONTINUATION_PATIENCE,
-            LearnerType.GROUNDING_THRESHOLD,
-        ]
-    )
+    Inherits common RL configuration from BaseRLConfig and extends
+    with DevOps-specific task types and quality thresholds.
+    """
+
+    # active_learners inherited from BaseRLConfig
+    # default_patience inherited from BaseRLConfig
 
     # Uses canonical ToolNames constants for consistency
     task_type_mappings: Dict[str, List[str]] = field(
@@ -69,51 +69,9 @@ class DevOpsRLConfig:
         }
     )
 
-    default_patience: Dict[str, int] = field(
-        default_factory=lambda: {
-            "anthropic": 3,
-            "openai": 3,
-            "ollama": 5,
-        }
-    )
-
-    def get_tools_for_task(self, task_type: str) -> List[str]:
-        return self.task_type_mappings.get(task_type.lower(), [])
-
-    def get_quality_threshold(self, task_type: str) -> float:
-        return self.quality_thresholds.get(task_type.lower(), 0.85)
-
-    def get_patience(self, provider: str) -> int:
-        return self.default_patience.get(provider.lower(), 3)
-
-    def is_learner_active(self, learner: LearnerType) -> bool:
-        return learner in self.active_learners
-
-    def get_rl_config(self) -> Dict[str, Any]:
-        """Return RL configuration as dictionary (protocol compliance).
-
-        Implements RLConfigProviderProtocol.get_rl_config() to enable
-        integration with the vertical framework.
-
-        Returns:
-            Dict with RL configuration including:
-            - active_learners: List of learner type values
-            - task_type_mappings: Map task types to recommended tools
-            - quality_thresholds: Task-specific quality thresholds
-            - default_patience: Provider-specific patience settings
-        """
-        return {
-            "active_learners": [learner.value for learner in self.active_learners],
-            "task_type_mappings": self.task_type_mappings,
-            "quality_thresholds": self.quality_thresholds,
-            "default_patience": self.default_patience,
-        }
-
-    def __repr__(self) -> str:
-        return (
-            f"DevOpsRLConfig(learners={len(self.active_learners)}, "
-            f"task_types={len(self.task_type_mappings)})"
-        )
+    # default_patience inherited from BaseRLConfig
+    # Methods get_tools_for_task, get_quality_threshold, get_patience,
+    # is_learner_active, get_rl_config, __repr__ all inherited
 
 
 class DevOpsRLHooks:

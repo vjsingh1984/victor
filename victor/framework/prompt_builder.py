@@ -52,10 +52,10 @@ import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-# Self type was added in Python 3.11
-if sys.version_info >= (3, 11):
+# Python 3.11+ has typing.Self, 3.10 needs typing_extensions
+try:
     from typing import Self
-else:
+except ImportError:
     from typing_extensions import Self
 
 if TYPE_CHECKING:

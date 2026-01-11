@@ -428,6 +428,12 @@ async def code_search(
         if settings is None:
             return {"success": False, "error": "Settings not available in tool context."}
 
+        # Check if embeddings are disabled for this agent (workflow-level service mode)
+        disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
+        if disable_embeddings:
+            logger.info("Embeddings disabled for this agent, falling back to literal search")
+            return await _literal_search(query, path, k, exts)
+
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
@@ -469,8 +475,8 @@ async def code_search(
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
-                from victor.agent.rl.base import RLOutcome
+                from victor.framework.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.base import RLOutcome
 
                 coordinator = get_rl_coordinator()
 

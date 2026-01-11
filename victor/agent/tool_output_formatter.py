@@ -63,7 +63,10 @@ Extracted from AgentOrchestrator (December 2025) for cleaner separation of conce
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -146,15 +149,24 @@ class ToolOutputFormatter:
         self,
         config: Optional[ToolOutputFormatterConfig] = None,
         truncator: Optional[TruncatorProtocol] = None,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize formatter.
 
         Args:
             config: Configuration options (uses defaults if None)
             truncator: Optional smart truncator for context-aware truncation
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.config = config or ToolOutputFormatterConfig()
         self._truncator = truncator
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def format_tool_output(
         self,
@@ -545,20 +557,22 @@ These are the actual search results. Reference only the files and matches shown 
             tool_args: Arguments passed to the tool
 
         Returns:
-            Status message string with emoji prefix
+            Status message string with icon prefix
         """
+        running_icon = self._presentation.icon("running")
+
         if tool_name == "execute_bash" and "command" in tool_args:
             cmd = tool_args["command"]
             cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-            return f"🔧 Running {tool_name}: `{cmd_display}`"
+            return f"{running_icon} Running {tool_name}: `{cmd_display}`"
 
         if tool_name == "list_directory":
             path = tool_args.get("path", ".")
-            return f"🔧 Listing directory: {path}"
+            return f"{running_icon} Listing directory: {path}"
 
         if tool_name == "read":
             path = tool_args.get("path", "file")
-            return f"🔧 Reading file: {path}"
+            return f"{running_icon} Reading file: {path}"
 
         if tool_name == "edit_files":
             files = tool_args.get("files", [])
@@ -567,19 +581,19 @@ These are the actual search results. Reference only the files and matches shown 
                 path_display = ", ".join(paths)
                 if len(files) > 3:
                     path_display += f" (+{len(files) - 3} more)"
-                return f"🔧 Editing: {path_display}"
-            return f"🔧 Running {tool_name}..."
+                return f"{running_icon} Editing: {path_display}"
+            return f"{running_icon} Running {tool_name}..."
 
         if tool_name == "write":
             path = tool_args.get("path", "file")
-            return f"🔧 Writing file: {path}"
+            return f"{running_icon} Writing file: {path}"
 
         if tool_name == "code_search":
             query = tool_args.get("query", "")
             query_display = query[:50] + "..." if len(query) > 50 else query
-            return f"🔧 Searching: {query_display}"
+            return f"{running_icon} Searching: {query_display}"
 
-        return f"🔧 Running {tool_name}..."
+        return f"{running_icon} Running {tool_name}..."
 
 
 def create_tool_output_formatter(

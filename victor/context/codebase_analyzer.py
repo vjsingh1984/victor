@@ -1702,7 +1702,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
 
         if persist_dir.exists():
             db = lancedb.connect(str(persist_dir))
-            table_names = db.table_names()
+            table_names = db.list_tables().tables
             table_name = getattr(settings, "codebase_embedding_table", None) or (
                 table_names[0] if table_names else None
             )

@@ -8,30 +8,146 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Signal-Based Task Completion Detection** - Deterministic completion using explicit markers
-  - `_DONE_` for file operations (creation, modification, deletion)
-  - `_TASK_DONE_` for bug fixes and task completion
-  - `_SUMMARY_` for analysis and research tasks
-  - `_BLOCKED_` for tasks that cannot be completed
-- **Response Phase Detection** - Distinguishes between EXPLORATION, SYNTHESIS, FINAL_OUTPUT, and BLOCKED phases
-- **Completion Confidence Levels** - HIGH (active signal), MEDIUM (file mods + passive), LOW (passive only), NONE (no signal)
-- **TaskCompletionProtocol** - Protocol-based abstraction for ISP/DIP compliance
-- **Comprehensive Documentation** - User guide at `docs/guides/task_completion.md`
+- **Presentation Abstraction Layer** - Decouples UI concerns from core logic with `PresentationAdapter` protocol
+- **Registry Base Classes** - Centralized registry infrastructure in `victor/core/registry_base.py`
+- **Tool Selector Protocol** - Unified `IToolSelector` protocol for tool selection strategies
 
 ### Changed
-- **Task Completion Detection** - Replaced buffer/size-based heuristics with explicit signal-based detection
-- **ContinuationStrategy** - Now uses TaskCompletionDetector confidence for continuation decisions
-- **IntentClassification** - Priority-based detection (Detector → Intent → Legacy)
-- **Orchestrator** - Always creates TaskCompletionDetector (removed feature flag)
-
-### Removed
-- **Buffer/Size Heuristics** - Legacy completion detection based on response length removed
-- **Feature Flag** - `use_signal_based_completion` setting removed (signal-based is now default)
+- **Architecture Improvements** - Phase 1 and 2 refactoring for cleaner module boundaries
+- **Workflow Compiler** - Infrastructure improvements for reliability
+- **Tool Selection Defaults** - Centralized configuration in settings module
+- **Deprecated Workflow Executor APIs** - Removed legacy execution engine stubs
 
 ### Fixed
-- **False Positive Completions** - Valid output no longer consumed as "thinking content"
-- **Unnecessary Continuation Loops** - Eliminated 27+ iteration loops when completion signals present
-- **Completion Ambiguity** - Clear separation between "thinking" and "output" phases
+- **Integration Test Blocking** - Resolved issues causing test hangs
+- **PersonaProvider Deadlock** - Fixed RLock deadlock in persona provider
+- **Import Errors** - Resolved import errors across integration and unit tests
+- **Service Provider Types** - Correct handling of string service types in DI container
+
+### Removed
+- **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
+- **Backward Compatibility Aliases** - Migrated to canonical names across codebase
+
+## [0.4.0] - 2026-01-03
+
+### Added
+- **TD-002 Orchestrator Refactoring** - Dedicated coordinators for cleaner separation of concerns
+- **YAML-First Workflow Architecture** - Workflows defined in YAML with Python escape hatches for complex logic
+- **CLI Commands**:
+  - `victor vertical create` - Scaffold new verticals
+  - `victor workflow render` - Render workflow diagrams
+  - `victor dashboard` - Interactive dashboard for monitoring
+- **Bedrock Tool Calling Adapter** - AWS Bedrock provider with native tool support
+- **Azure OpenAI Tool Calling Adapter** - Azure-specific tool calling implementation
+- **Session Cost Tracking** - Display cumulative session costs in UI
+- **Entry-Point Plugin System** - External verticals via `pyproject.toml` entry points
+
+### Changed
+- **Documentation Reorganization** - Restructured docs for OSS release
+- **Positive-Only Messaging** - Removed competitor references from documentation
+- **Updated SVG Diagrams** - All architecture diagrams updated for accuracy
+
+### Fixed
+- **CI/CD Pipeline** - Various fixes for reliable builds
+- **Project Hash Isolation** - Embedding cache now isolated per project
+- **Exception Handling** - Specific exception types throughout codebase
+- **LSP Compliance** - Fixed LSP compliance issues in LMStudio provider
+
+## [0.3.0] - 2025-12-31
+
+### BREAKING CHANGES
+- **Tool Selection API** - `use_semantic_tool_selection` setting replaced by `tool_selection_strategy`
+- **ToolSelector.select_tools()** - `use_semantic` parameter removed; strategy configured globally
+- **Protocols Renamed** - `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` replaced by `IToolSelector`
+
+**Migration Guide**:
+```python
+# Old (deprecated)
+settings = Settings(use_semantic_tool_selection=True)
+tools = await selector.select_tools(message, use_semantic=True)
+
+# New (v0.3.0+)
+settings = Settings(tool_selection_strategy="semantic")  # or "keyword", "hybrid", "auto"
+tools = await selector.select_tools(message)
+```
+
+### Added
+
+#### HIGH-002: Unified Tool Selection Architecture
+- **IToolSelector Protocol** - Unified interface for all tool selection strategies with `select_tools()`, `get_supported_features()`, `record_tool_execution()`, and `close()` methods
+- **KeywordToolSelector** - Fast registry-based selection (<1ms, no embeddings required) using tool metadata from @tool decorators
+- **HybridToolSelector** - Blends semantic and keyword strategies with configurable weights (default: 70% semantic, 30% keyword)
+- **Strategy Factory** - `create_tool_selector_strategy()` for creating selectors with auto-selection logic based on air-gapped mode and embedding availability
+- **ToolSelectionContext** - Dataclass encapsulating context (conversation history, stage, vertical mode, etc.) for tool selection
+- **Shared Utilities** - Extracted `selection_filters.py` (pure functions) and `selection_common.py` (stateful utilities) for reuse across strategies
+
+#### Server & Extension Enhancements
+- **FastAPI Server Backend** - New `victor serve --backend fastapi` option with OpenAPI docs at `/docs`
+- **Server Backend Selection** - `--backend` flag for `victor serve` to choose between `aiohttp` (legacy) and `fastapi` (modern)
+- **Profile CRUD Operations** - New `victor profiles create/edit/delete/set-default` commands for full profile management
+- **Lightweight Tool Listing** - `victor tools list --lightweight` for fast tool discovery without agent initialization
+
+#### P4.X Multi-Provider Excellence
+- **Semantic Query Expansion** - Automatic query expansion with synonyms/related terms to fix false negatives in semantic search
+- **Tool Deduplication Tracker** - Prevents redundant tool calls by tracking recent operations and detecting semantic overlap (integrated into ToolPipeline)
+- **Provider-Specific Tool Guidance** - Each provider now boosts tools aligned with their strengths (Gemini -> code analysis, Claude -> reasoning, etc.)
+- **RL-Based Semantic Threshold Learning** - Learns optimal similarity thresholds per (embedding_model, task_type, tool) context (integrated into code_search tool)
+- **Hybrid Search (RRF)** - Combines semantic + keyword search using Reciprocal Rank Fusion for 50-80% better recall (integrated into code_search tool)
+- **Comprehensive Unit Tests** - 66 new unit tests for query expansion and tool deduplication (100% coverage)
+- **Integration Tests** - 16 new integration tests for P4 Multi-Provider Excellence features
+- **Monitoring Script** - `scripts/show_semantic_threshold_rl.py` for viewing threshold learning status and exporting recommendations
+
+### Changed
+
+#### Tool Selection Architecture Refactor
+- **Tool Selection Strategy** - New `tool_selection_strategy` setting (auto/keyword/semantic/hybrid) replaces `use_semantic_tool_selection`
+- **ToolSelector API** - `select_tools()` now delegates to injected strategy instead of `use_semantic` parameter
+- **Strategy Injection** - ToolSelector accepts optional `IToolSelector` strategy for clean dependency injection
+- **Auto-Selection** - "auto" strategy intelligently picks keyword (air-gapped), semantic (embeddings available), or hybrid based on environment
+
+#### Framework & Infrastructure
+- **RL Framework Migration Complete** - Unified all 3 RL learners (continuation prompts, semantic threshold, model selector) into centralized framework with SQLite storage at `~/.victor/graph/graph.db`. Deprecated bespoke implementations moved to `archive/deprecated_rl_modules/`. All 19 import sites across API servers, UI, and scripts updated to use `RLCoordinator`.
+- **VS Code Extension Server Discovery** - Auto-discovers existing servers on multiple ports before spawning new ones
+- **VS Code Port Fallback** - Tries fallback ports (8765, 8766, 8767, 8768, 8000) if primary port is occupied
+- **VS Code Exponential Backoff** - Improved reconnection with exponential backoff (100ms -> 30s max, 10 retries)
+- **VS Code Multi-Window Sharing** - PID file at `~/.victor/server.pid` for server coordination across VS Code windows
+- **VS Code Extension Configuration** - New settings: `victor.serverBackend`, `victor.fallbackPorts`
+- **Semantic Similarity Threshold** - Lowered from 0.7 to 0.5 to reduce false negatives and improve recall
+- **RL Continuation Bounds** - Expanded from [2, 12] to [1, 20] to give RL more liberty for provider-specific tuning
+- **ToolPipeline** - Now supports optional deduplication tracker for preventing redundant calls
+- **Code Search Tool** - Automatically records outcomes for RL threshold learning when enabled
+
+### Removed
+- **Settings**: `use_semantic_tool_selection` (use `tool_selection_strategy` instead)
+- **ToolSelector.select_tools()**: `use_semantic` parameter (strategy now configured globally)
+- **Protocols**: `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` (use `IToolSelector` instead)
+
+### Fixed
+- Added missing `ServerStatus.Reconnecting` state to VS Code extension status bar configuration
+- **Semantic Search False Negatives** - Query expansion now searches with multiple variations (e.g., "tool registration" -> ["register tool", "@tool decorator", "ToolRegistry"])
+- **Google SDK Warning** - Suppressed cosmetic warning about non-text parts (Victor already handles multi-part responses correctly)
+
+### Configuration
+New settings for P4 Multi-Provider Excellence features (all disabled by default for backward compatibility):
+```yaml
+# Hybrid Search (Semantic + Keyword with RRF)
+enable_hybrid_search: false
+hybrid_search_semantic_weight: 0.6
+hybrid_search_keyword_weight: 0.4
+
+# RL-based threshold learning per (embedding_model, task_type, tool_context)
+enable_semantic_threshold_rl_learning: false
+semantic_threshold_overrides: {}  # Format: {"model:task:tool": threshold}
+
+# Tool call deduplication
+enable_tool_deduplication: false
+tool_deduplication_window_size: 10
+
+# Semantic search quality improvements
+semantic_similarity_threshold: 0.5  # Lowered from 0.7
+semantic_query_expansion_enabled: true
+semantic_max_query_expansions: 5
+```
 
 ## [0.2.3] - 2025-12-27
 
@@ -82,98 +198,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Version** - Bumped to 0.2.0 for first public release
 
-## [Unreleased]
-
-### Added
-
-#### HIGH-002: Unified Tool Selection Architecture
-- **IToolSelector Protocol** - Unified interface for all tool selection strategies with `select_tools()`, `get_supported_features()`, `record_tool_execution()`, and `close()` methods
-- **KeywordToolSelector** - Fast registry-based selection (<1ms, no embeddings required) using tool metadata from @tool decorators
-- **HybridToolSelector** - Blends semantic and keyword strategies with configurable weights (default: 70% semantic, 30% keyword)
-- **Strategy Factory** - `create_tool_selector_strategy()` for creating selectors with auto-selection logic based on air-gapped mode and embedding availability
-- **ToolSelectionContext** - Dataclass encapsulating context (conversation history, stage, vertical mode, etc.) for tool selection
-- **Shared Utilities** - Extracted `selection_filters.py` (pure functions) and `selection_common.py` (stateful utilities) for reuse across strategies
-- **Documentation** - Detailed guide at `docs/archive/internal/TOOL_SELECTION.md` (archived) with architecture diagrams, migration guide, and examples
-
-- **FastAPI Server Backend** - New `victor serve --backend fastapi` option with OpenAPI docs at `/docs`
-- **Server Backend Selection** - `--backend` flag for `victor serve` to choose between `aiohttp` (legacy) and `fastapi` (modern)
-- **Profile CRUD Operations** - New `victor profiles create/edit/delete/set-default` commands for full profile management
-- **Lightweight Tool Listing** - `victor tools list --lightweight` for fast tool discovery without agent initialization
-- **Semantic Query Expansion** - Automatic query expansion with synonyms/related terms to fix false negatives in semantic search (P4.X Multi-Provider Excellence)
-- **Tool Deduplication Tracker** - Prevents redundant tool calls by tracking recent operations and detecting semantic overlap (integrated into ToolPipeline)
-- **Provider-Specific Tool Guidance** - Each provider now boosts tools aligned with their strengths (Gemini → code analysis, Claude → reasoning, etc.)
-- **RL-Based Semantic Threshold Learning** - Learns optimal similarity thresholds per (embedding_model, task_type, tool) context (integrated into code_search tool)
-- **Hybrid Search (RRF)** - Combines semantic + keyword search using Reciprocal Rank Fusion for 50-80% better recall (integrated into code_search tool)
-- **Comprehensive Unit Tests** - 66 new unit tests for query expansion and tool deduplication (100% coverage)
-- **Integration Tests** - 16 new integration tests for P4 Multi-Provider Excellence features
-- **Monitoring Script** - `scripts/show_semantic_threshold_rl.py` for viewing threshold learning status and exporting recommendations
-
-### Changed
-
-#### HIGH-002: Tool Selection Architecture Refactor
-- **Tool Selection Strategy** - New `tool_selection_strategy` setting (auto/keyword/semantic/hybrid) replaces `use_semantic_tool_selection`
-- **ToolSelector API** - `select_tools()` now delegates to injected strategy instead of `use_semantic` parameter
-- **Strategy Injection** - ToolSelector accepts optional `IToolSelector` strategy for clean dependency injection
-- **Auto-Selection** - "auto" strategy intelligently picks keyword (air-gapped), semantic (embeddings available), or hybrid based on environment
-
-- **RL Framework Migration Complete** - Unified all 3 RL learners (continuation prompts, semantic threshold, model selector) into centralized framework with SQLite storage at `~/.victor/graph/graph.db`. Deprecated bespoke implementations moved to `archive/deprecated_rl_modules/`. All 19 import sites across API servers, UI, and scripts updated to use `RLCoordinator`.
-- **VS Code Extension Server Discovery** - Auto-discovers existing servers on multiple ports before spawning new ones
-- **VS Code Port Fallback** - Tries fallback ports (8765, 8766, 8767, 8768, 8000) if primary port is occupied
-- **VS Code Exponential Backoff** - Improved reconnection with exponential backoff (100ms → 30s max, 10 retries)
-- **VS Code Multi-Window Sharing** - PID file at `~/.victor/server.pid` for server coordination across VS Code windows
-- **VS Code Extension Configuration** - New settings: `victor.serverBackend`, `victor.fallbackPorts`
-- **Semantic Similarity Threshold** - Lowered from 0.7 to 0.5 to reduce false negatives and improve recall
-- **RL Continuation Bounds** - Expanded from [2, 12] to [1, 20] to give RL more liberty for provider-specific tuning
-- **ToolPipeline** - Now supports optional deduplication tracker for preventing redundant calls
-- **Code Search Tool** - Automatically records outcomes for RL threshold learning when enabled
-
-### Removed (BREAKING CHANGES - v2.0.0)
-
-#### HIGH-002: Deprecated Tool Selection Code
-- **Settings**: `use_semantic_tool_selection` → Use `tool_selection_strategy` instead
-- **ToolSelector.select_tools()**: `use_semantic` parameter → Strategy now configured globally
-- **Protocols**: `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` → Use `IToolSelector` instead
-
-**Migration Guide**:
-```python
-# Old (deprecated)
-settings = Settings(use_semantic_tool_selection=True)
-tools = await selector.select_tools(message, use_semantic=True)
-
-# New (v2.0.0+)
-settings = Settings(tool_selection_strategy="semantic")  # or "keyword", "hybrid", "auto"
-tools = await selector.select_tools(message)
-```
-
-See `docs/archive/internal/TOOL_SELECTION.md` for the archived migration guide.
-
-### Fixed
-- Added missing `ServerStatus.Reconnecting` state to VS Code extension status bar configuration
-- **Semantic Search False Negatives** - Query expansion now searches with multiple variations (e.g., "tool registration" → ["register tool", "@tool decorator", "ToolRegistry"])
-- **Google SDK Warning** - Suppressed cosmetic warning about non-text parts (Victor already handles multi-part responses correctly)
-
-### Configuration
-New settings for P4 Multi-Provider Excellence features (all disabled by default for backward compatibility):
-```yaml
-# Hybrid Search (Semantic + Keyword with RRF)
-enable_hybrid_search: false
-hybrid_search_semantic_weight: 0.6
-hybrid_search_keyword_weight: 0.4
-
-# RL-based threshold learning per (embedding_model, task_type, tool_context)
-enable_semantic_threshold_rl_learning: false
-semantic_threshold_overrides: {}  # Format: {"model:task:tool": threshold}
-
-# Tool call deduplication
-enable_tool_deduplication: false
-tool_deduplication_window_size: 10
-
-# Semantic search quality improvements
-semantic_similarity_threshold: 0.5  # Lowered from 0.7
-semantic_query_expansion_enabled: true
-semantic_max_query_expansions: 5
-```
-
 ## [0.2.0-alpha] - 2025-12-02
 
 ### Added
@@ -187,7 +211,7 @@ semantic_max_query_expansions: 5
 
 ### Changed
 - **Semantic Tool Selection** - `semantic_code_search` added to search tool category alongside `code_search`
-- **Embedding Registry** - Fixed `config.provider` → `config.vector_store` bug in registry.py
+- **Embedding Registry** - Fixed `config.provider` -> `config.vector_store` bug in registry.py
 - **Tool Descriptions** - Improved `code_search` and `semantic_code_search` descriptions to better guide LLM selection
 
 ### Fixed
@@ -203,13 +227,13 @@ semantic_max_query_expansions: 5
 ## [0.1.0-alpha] - 2025-02-27
 
 ### Added
-- GitHub Actions CI matrix (3.10–3.12) running black, ruff, mypy, pytest (unit-only), and a CLI smoke test.
+- GitHub Actions CI matrix (3.10-3.12) running black, ruff, mypy, pytest (unit-only), and a CLI smoke test.
 - Security workflow with gitleaks secret scan and pip-audit dependency check.
 - Support policy (`SUPPORT.md`) and archive notice clarifying `archive/victor-legacy/` is frozen.
 
 ### Changed
 - Scoped Ruff to active packages and cleaned up outstanding lint errors in core modules.
-- Updated onboarding guidance to point at `docs/guides/QUICKSTART.md` and flagged aspirational docs with “planned” status notes.
+- Updated onboarding guidance to point at `docs/guides/QUICKSTART.md` and flagged aspirational docs with "planned" status notes.
 - Expanded `.gitignore` for local artifacts (debug logs, demo workspace, .victor metadata).
 
 ### Fixed
@@ -300,36 +324,6 @@ semantic_max_query_expansions: 5
 
 ---
 
-## Version History
-
-### [0.1.0] - The Foundation Release
-
-This is the first major release of Victor, establishing it as a production-ready
-AI coding assistant with enterprise-grade features.
-
-**Key Highlights**:
-- 15+ tools for comprehensive development workflows
-- MCP protocol support for Claude Desktop integration
-- Multi-file transaction system with atomic edits
-- Advanced database, Docker, and HTTP capabilities
-- Semantic search for intelligent codebase navigation
-- Support for 6 LLM providers (frontier and local)
-
-**Statistics**:
-- ~8,000 lines of code written
-- 26 files created
-- 15+ tools implemented
-- 6 LLM providers supported
-- 90+ commits
-
-**Community**:
-- Open-sourced under MIT license
-- Comprehensive contribution guidelines
-- Professional documentation
-- Ready for community contributions
-
----
-
 ## Types of Changes
 
 - **Added** for new features
@@ -339,8 +333,16 @@ AI coding assistant with enterprise-grade features.
 - **Fixed** for any bug fixes
 - **Security** for vulnerability fixes
 
-## Links
+---
 
-- [Repository](https://github.com/vjsingh1984/victor)
-- [Issues](https://github.com/vjsingh1984/victor/issues)
-- [Discussions](https://github.com/vjsingh1984/victor/discussions)
+[Unreleased]: https://github.com/vjsingh1984/victor/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vjsingh1984/victor/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/vjsingh1984/victor/compare/v0.2.3...v0.3.0
+[0.2.3]: https://github.com/vjsingh1984/victor/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/vjsingh1984/victor/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/vjsingh1984/victor/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/vjsingh1984/victor/compare/v0.2.0-alpha...v0.2.0
+[0.2.0-alpha]: https://github.com/vjsingh1984/victor/compare/v0.1.0-alpha...v0.2.0-alpha
+[0.1.0-alpha]: https://github.com/vjsingh1984/victor/compare/v0.1.0...v0.1.0-alpha
+[0.1.0]: https://github.com/vjsingh1984/victor/compare/v0.0.1...v0.1.0
+[0.0.1]: https://github.com/vjsingh1984/victor/releases/tag/v0.0.1

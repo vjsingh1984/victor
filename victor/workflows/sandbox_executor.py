@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ExecutionResult:
+class SandboxExecutionResult:
     """Result of sandboxed execution.
 
     Attributes:
@@ -139,7 +139,7 @@ class SandboxedExecutor:
         working_dir: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
         input_data: Optional[str] = None,
-    ) -> ExecutionResult:
+    ) -> SandboxExecutionResult:
         """Execute command with specified isolation.
 
         Args:
@@ -150,7 +150,7 @@ class SandboxedExecutor:
             input_data: Data to pipe to stdin
 
         Returns:
-            ExecutionResult with output and status
+            SandboxExecutionResult with output and status
         """
         import time
 
@@ -181,7 +181,7 @@ class SandboxedExecutor:
         working_dir: Optional[str],
         env: Optional[Dict[str, str]],
         input_data: Optional[str],
-    ) -> ExecutionResult:
+    ) -> SandboxExecutionResult:
         """Execute command inline without isolation.
 
         Args:
@@ -192,7 +192,7 @@ class SandboxedExecutor:
             input_data: Stdin data
 
         Returns:
-            ExecutionResult
+            SandboxExecutionResult
         """
         try:
             process = await asyncio.create_subprocess_exec(
@@ -213,7 +213,7 @@ class SandboxedExecutor:
                 timeout=timeout,
             )
 
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
                 error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
@@ -222,13 +222,13 @@ class SandboxedExecutor:
             )
 
         except asyncio.TimeoutError:
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=f"Command timed out after {timeout}s",
                 sandbox_type="none",
             )
         except Exception as e:
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=str(e),
                 sandbox_type="none",
@@ -241,7 +241,7 @@ class SandboxedExecutor:
         working_dir: Optional[str],
         env: Optional[Dict[str, str]],
         input_data: Optional[str],
-    ) -> ExecutionResult:
+    ) -> SandboxExecutionResult:
         """Execute command in sandboxed subprocess with rlimit.
 
         Args:
@@ -252,7 +252,7 @@ class SandboxedExecutor:
             input_data: Stdin data
 
         Returns:
-            ExecutionResult
+            SandboxExecutionResult
         """
         from victor.integrations.mcp.sandbox import SandboxConfig, SandboxedProcess
 
@@ -292,7 +292,7 @@ class SandboxedExecutor:
 
             await sandbox.terminate(process)
 
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace") if stdout else "",
                 error=(
@@ -305,14 +305,14 @@ class SandboxedExecutor:
             )
 
         except asyncio.TimeoutError:
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=f"Command timed out after {limits.timeout_seconds}s",
                 sandbox_type="process",
             )
         except Exception as e:
             logger.error(f"Process sandbox execution failed: {e}")
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=str(e),
                 sandbox_type="process",
@@ -325,7 +325,7 @@ class SandboxedExecutor:
         working_dir: Optional[str],
         env: Optional[Dict[str, str]],
         input_data: Optional[str],
-    ) -> ExecutionResult:
+    ) -> SandboxExecutionResult:
         """Execute command in Docker container.
 
         Args:
@@ -336,7 +336,7 @@ class SandboxedExecutor:
             input_data: Stdin data
 
         Returns:
-            ExecutionResult
+            SandboxExecutionResult
         """
         from victor.tools.code_executor_tool import (
             SANDBOX_CONTAINER_LABEL,
@@ -413,7 +413,7 @@ class SandboxedExecutor:
                 timeout=limits.timeout_seconds + 30,  # Extra time for container startup
             )
 
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
                 error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
@@ -425,7 +425,7 @@ class SandboxedExecutor:
             # On timeout, we need to force-kill the container
             logger.warning(f"Docker execution timed out, killing container {container_name}")
             await self._force_kill_container(container_name)
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=f"Docker execution timed out after {limits.timeout_seconds}s",
                 sandbox_type="docker",
@@ -434,7 +434,7 @@ class SandboxedExecutor:
             logger.error(f"Docker execution failed: {e}")
             # Also try to clean up on any exception
             await self._force_kill_container(container_name)
-            return ExecutionResult(
+            return SandboxExecutionResult(
                 success=False,
                 error=str(e),
                 sandbox_type="docker",
@@ -497,7 +497,7 @@ def get_sandboxed_executor() -> SandboxedExecutor:
 
 
 __all__ = [
-    "ExecutionResult",
+    "SandboxExecutionResult",
     "SandboxedExecutor",
     "get_sandboxed_executor",
 ]

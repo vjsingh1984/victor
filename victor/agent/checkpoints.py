@@ -26,7 +26,7 @@ using git stash as the underlying mechanism for safe state preservation.
 4. Automatic cleanup: Old checkpoints are automatically removed
 
 **Usage**:
-    manager = CheckpointManager()
+    manager = GitCheckpointManager()
 
     # Before making risky changes
     checkpoint = manager.create("Before major refactoring")
@@ -107,7 +107,7 @@ class CheckpointNotFoundError(CheckpointError):
     pass
 
 
-class CheckpointManager:
+class GitCheckpointManager:
     """Manages git-based checkpoints for safe rollback.
 
     This class provides a high-level interface for creating and managing
@@ -115,6 +115,11 @@ class CheckpointManager:
 
     Thread-safety: This class is NOT thread-safe. Use external locking if
     accessing from multiple threads.
+
+    Note: Renamed from CheckpointManager to GitCheckpointManager to be
+    semantically distinct from:
+    - GraphCheckpointManager (victor.framework.graph): Graph state checkpoints
+    - ConversationCheckpointManager (victor.storage.checkpoints): Conversation state
     """
 
     PREFIX = "victor_checkpoint_"  # Prefix for checkpoint stash messages
@@ -137,7 +142,7 @@ class CheckpointManager:
                 "Checkpoints require git for state management."
             )
 
-        logger.debug(f"CheckpointManager initialized for {self.repo_path}")
+        logger.debug(f"GitCheckpointManager initialized for {self.repo_path}")
 
     def _is_git_repo(self) -> bool:
         """Check if the current directory is a git repository.
@@ -201,7 +206,7 @@ class CheckpointManager:
             CheckpointError: If checkpoint creation fails
 
         Example:
-            >>> manager = CheckpointManager()
+            >>> manager = GitCheckpointManager()
             >>> cp = manager.create("Before refactoring user auth")
             >>> print(cp.id)
             'victor_checkpoint_abc123...'

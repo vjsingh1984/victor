@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     # Team member dependencies
     from victor.agent.subagents.base import SubAgentRole
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
+    from victor.agent.presentation import PresentationProtocol
 
 
 class TeamFormation(str, Enum):
@@ -172,11 +173,25 @@ class AgentMessage:
         """Check if this is a reply to another message."""
         return self.reply_to is not None
 
-    def to_context_string(self) -> str:
-        """Format message for inclusion in agent context."""
+    def to_context_string(self, presentation: Optional["PresentationProtocol"] = None) -> str:
+        """Format message for inclusion in agent context.
+
+        Args:
+            presentation: Optional presentation adapter for icons.
+                If None, creates default adapter.
+
+        Returns:
+            Formatted string for agent context.
+        """
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            presentation = create_presentation_adapter()
+
+        arrow = presentation.icon("arrow_right", with_color=False)
         header = f"[{self.message_type.value.upper()}] {self.sender_id}"
         if self.recipient_id:
-            header += f" → {self.recipient_id}"
+            header += f" {arrow} {self.recipient_id}"
         return f"{header}: {self.content}"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -610,6 +625,39 @@ class TeamMember:
             member.attach_memory_coordinator(get_memory_coordinator())
         """
         self.memory_coordinator = coordinator
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert TeamMember to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the member
+
+        Example:
+            member_dict = member.to_dict()
+        """
+        return {
+            "id": self.id,
+            "role": self.role.value,
+            "name": self.name,
+            "goal": self.goal,
+            "tool_budget": self.tool_budget,
+            "allowed_tools": self.allowed_tools,
+            "can_delegate": self.can_delegate,
+            "delegation_targets": self.delegation_targets,
+            "reports_to": self.reports_to,
+            "is_manager": self.is_manager,
+            "priority": self.priority,
+            # Rich persona attributes (CrewAI-compatible)
+            "backstory": self.backstory,
+            "expertise": self.expertise,
+            "personality": self.personality,
+            "max_delegation_depth": self.max_delegation_depth,
+            "memory": self.memory,
+            "memory_config": self.memory_config.to_dict() if self.memory_config else None,
+            "cache": self.cache,
+            "verbose": self.verbose,
+            "max_iterations": self.max_iterations,
+        }
 
 
 @dataclass

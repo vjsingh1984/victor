@@ -399,7 +399,7 @@ class TaskComplexityService:
         """
         if self._rl_learner is None and self.use_rl:
             try:
-                from victor.agent.rl.coordinator import RLCoordinator
+                from victor.framework.rl.coordinator import RLCoordinator
 
                 coordinator = RLCoordinator.get_instance()
                 # Check if complexity learner is registered

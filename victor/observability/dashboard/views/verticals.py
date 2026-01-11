@@ -31,7 +31,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.widgets import DataTable, RichLog, Static, Tree
 from textual.widgets.tree import TreeNode
 
-from victor.core.events import Event
+from victor.core.events import MessagingEvent
 
 
 class VerticalTraceWidget(RichLog):
@@ -49,7 +49,7 @@ class VerticalTraceWidget(RichLog):
         self._trace_count = 0
         self._active_verticals: Dict[str, Dict[str, Any]] = {}
 
-    def add_vertical_event(self, event: Event) -> None:
+    def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event to the trace.
 
         Args:

@@ -74,7 +74,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.framework.graph import CompiledGraph, ExecutionResult, GraphConfig
+    from victor.framework.graph import CompiledGraph, GraphExecutionResult, GraphConfig
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import (
         WorkflowDefinitionCache,
@@ -86,6 +86,7 @@ if TYPE_CHECKING:
         ConditionNode,
         ParallelNode,
         TransformNode,
+        TeamNodeWorkflow,
         WorkflowDefinition,
         WorkflowNode,
     )
@@ -203,6 +204,37 @@ class NodeExecutorFactory:
         self._runner_registry = runner_registry
         self._emitter = emitter
 
+        # Keys that need deep copy for isolation in parallel execution
+        self._mutable_state_keys = frozenset(
+            {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
+        )
+
+    def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Create an isolated copy of state for parallel execution.
+
+        Uses selective copying strategy:
+        - Shallow copy for most keys (user data assumed immutable)
+        - Deep copy only for internal mutable tracking structures
+
+        This is significantly faster than full deepcopy while maintaining
+        isolation for parallel node execution.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            Isolated state copy for child node execution
+        """
+        # Start with shallow copy
+        child_state = dict(state)
+
+        # Deep copy only mutable internal structures
+        for key in self._mutable_state_keys:
+            if key in child_state:
+                child_state[key] = copy.deepcopy(child_state[key])
+
+        return child_state
+
     def create_executor(
         self,
         node: "WorkflowNode",
@@ -221,6 +253,7 @@ class NodeExecutorFactory:
             ConditionNode,
             ParallelNode,
             TransformNode,
+            TeamNodeWorkflow,
         )
 
         if isinstance(node, AgentNode):
@@ -233,6 +266,8 @@ class NodeExecutorFactory:
             return self.create_parallel_executor(node)
         elif isinstance(node, TransformNode):
             return self.create_transform_executor(node)
+        elif isinstance(node, TeamNodeWorkflow):
+            return self.create_team_executor(node)
         else:
             return self._create_passthrough_executor(node)
 
@@ -700,7 +735,9 @@ class NodeExecutorFactory:
                 if child_executors:
                     # Execute all child nodes in true parallel with asyncio.gather
                     async def run_child(child_node: "WorkflowNode", executor: Callable) -> tuple:
-                        child_state = copy.deepcopy(state)
+                        # Use selective copy instead of full deepcopy for performance
+                        # Shallow copies most keys, deep copies only mutable internal structures
+                        child_state = factory._copy_state_for_parallel(state)
                         try:
                             result_state = await executor(child_state)
                             return (child_node.id, True, result_state)
@@ -856,6 +893,161 @@ class NodeExecutorFactory:
 
         return execute_transform
 
+    def create_team_executor(
+        self,
+        node: "TeamNodeWorkflow",
+    ) -> Callable[[Dict[str, Any]], Any]:
+        """Create executor for a TeamNode.
+
+        Spawns an ad-hoc multi-agent team using victor/teams/ infrastructure
+        and merges the result back into the workflow state.
+        """
+        from victor.framework.workflows.nodes import TeamNode
+        from victor.framework.state_merging import MergeMode
+        from victor.agent.subagents import SubAgentRole
+        from victor.teams.types import TeamMember, TeamFormation
+
+        orchestrator = self.orchestrator
+        emitter = self._emitter
+
+        async def execute_team(state: Dict[str, Any]) -> Dict[str, Any]:
+            start_time = time.time()
+            state = dict(state)
+            node_name = node.name
+
+            # Emit NODE_START if emitter is configured
+            if emitter and hasattr(emitter, "emit_node_start"):
+                emitter.emit_node_start(node.id, node_name)
+
+            try:
+                # Convert team members from dict to TeamMember objects
+                role_map = {
+                    "researcher": SubAgentRole.RESEARCHER,
+                    "planner": SubAgentRole.PLANNER,
+                    "executor": SubAgentRole.EXECUTOR,
+                    "reviewer": SubAgentRole.REVIEWER,
+                    "writer": SubAgentRole.WRITER,
+                    "analyst": SubAgentRole.RESEARCHER,
+                }
+
+                members = []
+                for member_dict in node.members:
+                    role = role_map.get(
+                        member_dict.get("role", "executor").lower(), SubAgentRole.EXECUTOR
+                    )
+                    member = TeamMember(
+                        id=member_dict.get("id", f"{role.value}_{len(members)}"),
+                        role=role,
+                        name=member_dict.get("name", member_dict.get("id", "Member")),
+                        goal=member_dict.get("goal", ""),
+                        tool_budget=member_dict.get("tool_budget", 15),
+                        allowed_tools=member_dict.get("allowed_tools"),
+                        can_delegate=member_dict.get("can_delegate", False),
+                        delegation_targets=member_dict.get("delegation_targets"),
+                        is_manager=member_dict.get("is_manager", False),
+                        backstory=member_dict.get("backstory", ""),
+                        expertise=member_dict.get("expertise", []),
+                        personality=member_dict.get("personality", ""),
+                    )
+                    members.append(member)
+
+                # Map formation string to enum
+                formation_map = {
+                    "sequential": TeamFormation.SEQUENTIAL,
+                    "parallel": TeamFormation.PARALLEL,
+                    "hierarchical": TeamFormation.HIERARCHICAL,
+                    "pipeline": TeamFormation.PIPELINE,
+                    "consensus": TeamFormation.CONSENSUS,
+                }
+                formation = formation_map.get(node.team_formation.lower(), TeamFormation.SEQUENTIAL)
+
+                # Map merge mode string to enum
+                merge_mode_map = {
+                    "team_wins": MergeMode.TEAM_WINS,
+                    "graph_wins": MergeMode.GRAPH_WINS,
+                    "merge": MergeMode.MERGE,
+                    "error": MergeMode.ERROR,
+                }
+                merge_mode = merge_mode_map.get(node.merge_mode.lower(), MergeMode.TEAM_WINS)
+
+                # Create TeamNode config
+                from victor.framework.workflows.nodes import TeamNodeConfig
+
+                config = TeamNodeConfig(
+                    timeout_seconds=node.timeout_seconds,
+                    merge_strategy=node.merge_strategy,
+                    merge_mode=merge_mode,
+                    output_key=node.output_key,
+                    continue_on_error=node.continue_on_error,
+                )
+
+                # Create TeamNode and execute
+                team_node = TeamNode(
+                    id=node.id,
+                    name=node.name,
+                    goal=node.goal,
+                    team_formation=formation,
+                    members=members,
+                    config=config,
+                    shared_context=node.shared_context,
+                    max_iterations=node.max_iterations,
+                    total_tool_budget=node.total_tool_budget,
+                )
+
+                # Execute team (async)
+                merged_state = await team_node.execute_async(orchestrator, state)
+
+                # Update node results
+                duration = time.time() - start_time
+                if "_node_results" not in merged_state:
+                    merged_state["_node_results"] = {}
+
+                team_result = merged_state.get(node.output_key, {})
+                merged_state["_node_results"][node.id] = NodeExecutionResult(
+                    node_id=node.id,
+                    success=team_result.get("success", True),
+                    output=team_result,
+                    duration_seconds=duration,
+                )
+
+                # Emit NODE_COMPLETE if emitter is configured
+                if emitter and hasattr(emitter, "emit_node_complete"):
+                    emitter.emit_node_complete(
+                        node.id,
+                        node_name,
+                        duration=duration,
+                        output=team_result,
+                    )
+
+                return merged_state
+
+            except Exception as e:
+                logger.error(f"Team node '{node.id}' failed: {e}", exc_info=True)
+                duration = time.time() - start_time
+                state["_error"] = f"Team node '{node.id}' failed: {e}"
+                if "_node_results" not in state:
+                    state["_node_results"] = {}
+                state["_node_results"][node.id] = NodeExecutionResult(
+                    node_id=node.id,
+                    success=False,
+                    error=str(e),
+                    duration_seconds=duration,
+                )
+
+                # Emit NODE_ERROR if emitter is configured
+                if emitter and hasattr(emitter, "emit_node_error"):
+                    emitter.emit_node_error(
+                        node.id,
+                        error=str(e),
+                        node_name=node_name,
+                        duration=duration,
+                    )
+
+                # Return state with error
+                return state if node.continue_on_error else state
+
+        return execute_team
+
     def _create_passthrough_executor(
         self,
         node: "WorkflowNode",
@@ -919,7 +1111,7 @@ class CachedCompiledGraph:
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
         use_cache: bool = True,
-    ) -> "ExecutionResult":
+    ) -> "GraphExecutionResult":
         """Execute the compiled workflow.
 
         Args:
@@ -929,9 +1121,9 @@ class CachedCompiledGraph:
             use_cache: Whether to use execution cache (for future use)
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
         """
-        from victor.framework.graph import ExecutionResult
+        from victor.framework.graph import GraphExecutionResult
 
         # Prepare state with metadata
         exec_state = self._prepare_state(input_state)
@@ -954,12 +1146,13 @@ class CachedCompiledGraph:
                     f"Workflow '{self.workflow_name}' timed out after "
                     f"{self.max_execution_timeout_seconds}s"
                 )
-                return ExecutionResult(
+                return GraphExecutionResult(
+                    state=exec_state,
                     success=False,
-                    final_state=exec_state,
-                    nodes_executed=[],
-                    duration_seconds=self.max_execution_timeout_seconds,
                     error=f"Workflow execution timed out after {self.max_execution_timeout_seconds}s",
+                    iterations=0,
+                    duration=self.max_execution_timeout_seconds,
+                    node_history=[],
                 )
         else:
             return await self.compiled_graph.invoke(
@@ -1069,6 +1262,19 @@ class UnifiedWorkflowCompiler:
     ) -> None:
         """Initialize the unified compiler.
 
+        .. deprecated::
+            Consider using the plugin architecture instead:
+                from victor.workflows.create import create_compiler
+                compiler = create_compiler("yaml://", enable_caching=True)
+
+            The plugin architecture provides:
+            - Third-party friendly extensibility
+            - URI-based compiler selection (like SQLAlchemy)
+            - Consistent protocol-based API
+
+            UnifiedWorkflowCompiler continues to work and will be supported
+            through v0.7.0. Migration guide: see MIGRATION_GUIDE.md
+
         Args:
             definition_cache: Cache for parsed YAML definitions
             execution_cache: Cache for execution results
@@ -1080,6 +1286,20 @@ class UnifiedWorkflowCompiler:
             cache_ttl: Cache TTL in seconds (default: 3600)
             config: Full compiler configuration (overrides other params)
         """
+        import warnings
+
+        warnings.warn(
+            "UnifiedWorkflowCompiler is deprecated but remains supported. "
+            "Consider migrating to the plugin architecture for better extensibility: "
+            "from victor.workflows.create import create_compiler; "
+            "compiler = create_compiler('yaml://', enable_caching=True). "
+            "See MIGRATION_GUIDE.md for details. "
+            "This deprecation is informational only - UnifiedWorkflowCompiler will "
+            "continue to work through v0.7.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # Use config if provided, otherwise build from params
         if config:
             self._config = config
@@ -1631,7 +1851,7 @@ async def compile_and_execute(
     initial_state: Optional[Dict[str, Any]] = None,
     workflow_name: Optional[str] = None,
     **kwargs: Any,
-) -> "ExecutionResult":
+) -> "GraphExecutionResult":
     """Compile and execute a workflow in one step.
 
     Convenience function for one-off execution.
@@ -1643,7 +1863,7 @@ async def compile_and_execute(
         **kwargs: Additional compilation/execution options
 
     Returns:
-        ExecutionResult with final state
+        GraphExecutionResult with final state
     """
     graph = compile_workflow(source, workflow_name, **kwargs)
     return await graph.invoke(initial_state or {})

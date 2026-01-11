@@ -96,6 +96,16 @@ from typing import (
 
 logger = logging.getLogger(__name__)
 
+# Import focused configs for ISP compliance
+from victor.framework.config import (
+    GraphConfig as GraphConfig,
+    ExecutionConfig,
+    CheckpointConfig,
+    InterruptConfig,
+    PerformanceConfig,
+    ObservabilityConfig,
+)
+
 # Type variables for generic state
 StateType = TypeVar("StateType", bound=Dict[str, Any])
 T = TypeVar("T")
@@ -115,6 +125,28 @@ class CopyOnWriteState(Generic[StateType]):
 
     CopyOnWriteState is kept as a performance optimization for workflow graphs,
     providing copy-on-write semantics for state within a single execution.
+
+    ⚠️ THREAD SAFETY WARNING ⚠️:
+        This class is NOT thread-safe and must NOT be shared across threads.
+
+        Each thread MUST have its own CopyOnWriteState wrapper instance.
+        Sharing the same wrapper instance between threads will lead to
+        race conditions, data corruption, and undefined behavior.
+
+        Example of CORRECT usage:
+            # Thread 1
+            cow_state_1 = CopyOnWriteState(shared_state_dict)
+            result_1 = await node1.execute(cow_state_1)
+
+            # Thread 2 (different wrapper!)
+            cow_state_2 = CopyOnWriteState(shared_state_dict)
+            result_2 = await node2.execute(cow_state_2)
+
+        Example of INCORRECT usage (will cause race conditions):
+            cow_state = CopyOnWriteState(shared_state_dict)
+            # ❌ DO NOT share cow_state between threads
+            await thread1.run(cow_state)  # UNSAFE!
+            await thread2.run(cow_state)  # UNSAFE!
 
     ---
 
@@ -164,10 +196,6 @@ class CopyOnWriteState(Generic[StateType]):
         - Read operations: O(1), no copy overhead
         - First write: O(n) deep copy where n is state size
         - Subsequent writes: O(1), no additional copy
-
-    Thread safety:
-        This class is NOT thread-safe. Each thread should have its own
-        CopyOnWriteState wrapper if concurrent access is needed.
     """
 
     __slots__ = ("_source", "_copy", "_modified")
@@ -633,7 +661,7 @@ class RLCheckpointerAdapter:
     def _get_store(self):
         """Lazy load checkpoint store."""
         if self._store is None:
-            from victor.agent.rl.checkpoint_store import get_checkpoint_store
+            from victor.framework.rl.checkpoint_store import get_checkpoint_store
 
             self._store = get_checkpoint_store()
         return self._store
@@ -687,35 +715,18 @@ class RLCheckpointerAdapter:
         ]
 
 
-@dataclass
-class GraphConfig:
-    """Configuration for graph execution.
-
-    Attributes:
-        max_iterations: Maximum cycles allowed (default: 25)
-        timeout: Overall execution timeout in seconds
-        checkpointer: Optional checkpointer for persistence
-        recursion_limit: Maximum recursion depth
-        interrupt_before: Nodes to interrupt before execution
-        interrupt_after: Nodes to interrupt after execution
-        use_copy_on_write: Enable copy-on-write state optimization (default: None uses settings)
-        emit_events: Enable EventBus integration for observability (default: True)
-        graph_id: Optional identifier for this graph execution
-    """
-
-    max_iterations: int = 25
-    timeout: Optional[float] = None
-    checkpointer: Optional[CheckpointerProtocol] = None
-    recursion_limit: int = 100
-    interrupt_before: List[str] = field(default_factory=list)
-    interrupt_after: List[str] = field(default_factory=list)
-    use_copy_on_write: Optional[bool] = None  # None = use settings default
-    emit_events: bool = True  # Enable EventBus observability integration
-    graph_id: Optional[str] = None  # Optional identifier for event correlation
+# Note: GraphConfig is now imported from victor.framework.graph.config
+# This provides ISP compliance through focused config classes:
+# - ExecutionConfig: execution limits
+# - CheckpointConfig: state persistence
+# - InterruptConfig: interrupt behavior
+# - PerformanceConfig: performance optimizations
+# - ObservabilityConfig: observability and eventing
+# GraphConfig remains as a facade composing these focused configs
 
 
 @dataclass
-class ExecutionResult(Generic[StateType]):
+class GraphExecutionResult(Generic[StateType]):
     """Result from graph execution.
 
     Attributes:
@@ -733,6 +744,414 @@ class ExecutionResult(Generic[StateType]):
     iterations: int = 0
     duration: float = 0.0
     node_history: List[str] = field(default_factory=list)
+
+
+# =============================================================================
+# Graph Execution Helpers (SRP Compliance)
+# =============================================================================
+
+
+class IterationController:
+    """Controls graph iteration logic (SRP: Single Responsibility).
+
+    Manages iteration limits and recursion tracking to prevent infinite loops.
+    """
+
+    def __init__(self, max_iterations: int, recursion_limit: int):
+        """Initialize iteration controller.
+
+        Args:
+            max_iterations: Maximum total iterations allowed
+            recursion_limit: Maximum visits to same node (recursion depth)
+        """
+        self.max_iterations = max_iterations
+        self.recursion_limit = recursion_limit
+        self.iterations = 0
+        self.visited_count: Dict[str, int] = {}
+
+    def should_continue(self, current_node: str) -> tuple[bool, Optional[str]]:
+        """Check if execution should continue.
+
+        Args:
+            current_node: Current node being executed
+
+        Returns:
+            Tuple of (should_continue, error_message)
+            - (True, None) if execution should continue
+            - (False, error_message) if limit exceeded
+        """
+        # Check iteration limit
+        self.iterations += 1
+        if self.iterations > self.max_iterations:
+            return False, f"Max iterations ({self.max_iterations}) exceeded"
+
+        # Track cycles
+        self.visited_count[current_node] = self.visited_count.get(current_node, 0) + 1
+        if self.visited_count[current_node] > self.recursion_limit:
+            return False, f"Recursion limit exceeded at node: {current_node}"
+
+        return True, None
+
+    def reset(self):
+        """Reset iteration state."""
+        self.iterations = 0
+        self.visited_count.clear()
+
+
+class TimeoutManager:
+    """Manages execution timeouts (SRP: Single Responsibility).
+
+    Tracks elapsed time and enforces timeout limits.
+    """
+
+    def __init__(self, timeout: Optional[float]):
+        """Initialize timeout manager.
+
+        Args:
+            timeout: Overall execution timeout in seconds (None = no limit)
+        """
+        self.timeout = timeout
+        self.start_time: Optional[float] = None
+
+    def start(self):
+        """Start timeout tracking."""
+        self.start_time = time.time()
+
+    def get_remaining(self) -> Optional[float]:
+        """Get remaining time before timeout.
+
+        Returns:
+            Remaining seconds, or None if no timeout configured
+        """
+        if self.timeout is None or self.start_time is None:
+            return None
+        return self.timeout - (time.time() - self.start_time)
+
+    def is_expired(self) -> bool:
+        """Check if timeout has expired.
+
+        Returns:
+            True if timeout has been exceeded
+        """
+        remaining = self.get_remaining()
+        return remaining is not None and remaining <= 0
+
+    def get_elapsed(self) -> float:
+        """Get elapsed time since start.
+
+        Returns:
+            Elapsed seconds, or 0.0 if not started
+        """
+        if self.start_time is None:
+            return 0.0
+        return time.time() - self.start_time
+
+
+class InterruptHandler:
+    """Handles graph interrupts for human-in-the-loop workflows (SRP)."""
+
+    def __init__(self, interrupt_before: List[str], interrupt_after: List[str]):
+        """Initialize interrupt handler.
+
+        Args:
+            interrupt_before: List of node IDs to interrupt before execution
+            interrupt_after: List of node IDs to interrupt after execution
+        """
+        self.interrupt_before = set(interrupt_before)
+        self.interrupt_after = set(interrupt_after)
+
+    def should_interrupt_before(self, node_id: str) -> bool:
+        """Check if should interrupt before node execution.
+
+        Args:
+            node_id: Node to check
+
+        Returns:
+            True if execution should interrupt before this node
+        """
+        return node_id in self.interrupt_before
+
+    def should_interrupt_after(self, node_id: str) -> bool:
+        """Check if should interrupt after node execution.
+
+        Args:
+            node_id: Node to check
+
+        Returns:
+            True if execution should interrupt after this node
+        """
+        return node_id in self.interrupt_after
+
+
+class NodeExecutor:
+    """Executes individual graph nodes (SRP: Single Responsibility).
+
+    Handles node lookup, execution with timeout, and copy-on-write state management.
+    """
+
+    def __init__(self, nodes: Dict[str, Node], use_copy_on_write: bool):
+        """Initialize node executor.
+
+        Args:
+            nodes: Dictionary of available nodes
+            use_copy_on_write: Whether to use copy-on-write optimization
+        """
+        self.nodes = nodes
+        self.use_copy_on_write = use_copy_on_write
+
+    async def execute(
+        self,
+        node_id: str,
+        state: StateType,
+        timeout_manager: TimeoutManager,
+    ) -> tuple[bool, Optional[str], StateType]:
+        """Execute a node.
+
+        Args:
+            node_id: ID of node to execute
+            state: Current state
+            timeout_manager: Timeout manager for execution limits
+
+        Returns:
+            Tuple of (success, error_message, new_state)
+        """
+        node = self.nodes.get(node_id)
+        if not node:
+            return False, f"Node not found: {node_id}", state
+
+        try:
+            # Check timeout before execution
+            if timeout_manager.is_expired():
+                return False, "Execution timeout", state
+
+            remaining = timeout_manager.get_remaining()
+
+            # Execute with copy-on-write or traditional approach
+            if self.use_copy_on_write:
+                cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
+                if remaining is not None:
+                    result = await asyncio.wait_for(
+                        node.execute(cow_state), timeout=remaining  # type: ignore
+                    )
+                else:
+                    result = await node.execute(cow_state)  # type: ignore
+
+                # Extract final state from COW wrapper or result
+                if isinstance(result, CopyOnWriteState):
+                    state = result.get_state()
+                elif isinstance(result, dict):
+                    state = result
+                else:
+                    # Node returned something else, use COW state
+                    state = cow_state.get_state()
+            else:
+                # Traditional deep copy approach
+                if remaining is not None:
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
+                else:
+                    state = await node.execute(state)
+
+            return True, None, state
+
+        except asyncio.TimeoutError:
+            return False, "Execution timeout", state
+        except Exception as e:
+            return False, str(e), state
+
+
+class GraphCheckpointManager:
+    """Manages state checkpointing for graph workflows (SRP: Single Responsibility).
+
+    Handles loading initial state from checkpoints and saving checkpoints.
+
+    Note: Renamed from CheckpointManager to GraphCheckpointManager to be
+    semantically distinct from:
+    - GitCheckpointManager (victor.agent.checkpoints): Git stash-based checkpoints
+    - ConversationCheckpointManager (victor.storage.checkpoints): Conversation state
+    """
+
+    def __init__(self, checkpointer: Optional[CheckpointerProtocol]):
+        """Initialize checkpoint manager.
+
+        Args:
+            checkpointer: Checkpointer for persistence (None = no checkpointing)
+        """
+        self.checkpointer = checkpointer
+
+    async def load_initial_state(
+        self,
+        thread_id: str,
+        input_state: StateType,
+        entry_point: str,
+    ) -> tuple[StateType, str]:
+        """Load initial state from checkpoint or use input state.
+
+        Args:
+            thread_id: Thread ID for checkpoint lookup
+            input_state: Input state if no checkpoint exists
+            entry_point: Default entry point if no checkpoint exists
+
+        Returns:
+            Tuple of (initial_state, starting_node)
+        """
+        if self.checkpointer:
+            checkpoint = await self.checkpointer.load(thread_id)
+            if checkpoint:
+                logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
+                return checkpoint.state.copy(), checkpoint.node_id
+
+        # No checkpoint, use input state
+        return copy.deepcopy(input_state), entry_point
+
+    async def save_checkpoint(
+        self,
+        thread_id: str,
+        node_id: str,
+        state: StateType,
+    ) -> None:
+        """Save checkpoint.
+
+        Args:
+            thread_id: Thread ID for checkpoint
+            node_id: Current node ID
+            state: Current state to checkpoint
+        """
+        if self.checkpointer:
+            checkpoint = WorkflowCheckpoint(
+                checkpoint_id=f"{thread_id}_{node_id}_{time.time()}",
+                thread_id=thread_id,
+                node_id=node_id,
+                state=state,
+                timestamp=time.time(),
+            )
+            await self.checkpointer.save(checkpoint)
+
+
+class GraphEventEmitter:
+    """Emits graph execution events for observability (SRP: Single Responsibility)."""
+
+    def __init__(self, graph_id: str, emit_events: bool):
+        """Initialize event emitter.
+
+        Args:
+            graph_id: Graph identifier for event correlation
+            emit_events: Whether to emit events (or silently no-op)
+        """
+        self.graph_id = graph_id
+        self.emit_events = emit_events
+
+    def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str):
+        """Emit graph started event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "graph_started",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "entry_point": entry_point,
+                    "node_count": node_count,
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit graph_started event: {e}")
+
+    def emit_node_start(self, node_id: str, iteration: int):
+        """Emit node start event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "node_start",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "node_id": node_id,
+                    "iteration": iteration,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit node_start event: {e}")
+
+    def emit_node_complete(self, node_id: str, iteration: int, duration: float):
+        """Emit node complete event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "node_end",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "node_id": node_id,
+                    "iteration": iteration,
+                    "duration": duration,
+                    "success": True,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit node_end event: {e}")
+
+    def emit_graph_completed(
+        self, success: bool, iterations: int, duration: float, node_count: int
+    ):
+        """Emit graph completed event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "graph_completed",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "success": success,
+                    "iterations": iterations,
+                    "duration": duration,
+                    "node_count": node_count,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit graph_completed event: {e}")
+
+    def emit_graph_error(self, error: str, iterations: int, duration: float):
+        """Emit graph error event."""
+        if not self.emit_events:
+            return
+
+        try:
+            from victor.core.events import get_observability_bus as get_event_bus
+
+            bus = get_event_bus()
+            bus.emit_lifecycle_event(
+                "graph_error",
+                {
+                    "graph_id": self.graph_id,
+                    "source": "StateGraph",
+                    "error": error,
+                    "iterations": iterations,
+                    "duration": duration,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit graph_error event: {e}")
 
 
 class CompiledGraph(Generic[StateType]):
@@ -764,19 +1183,40 @@ class CompiledGraph(Generic[StateType]):
         self._entry_point = entry_point
         self._state_schema = state_schema
         self._config = config or GraphConfig()
+        self._debug_hook: Optional[Any] = None  # DebugHook for debugging
+
+    def set_debug_hook(self, hook: Optional[Any]) -> None:
+        """Set debug hook for execution.
+
+        Args:
+            hook: DebugHook instance or None to disable debugging
+        """
+        self._debug_hook = hook
+
+    @property
+    def graph(self) -> "CompiledGraph[StateType]":
+        """Return the compiled graph itself.
+
+        This property provides a self-reference for compatibility
+        with APIs that expect a .graph attribute.
+
+        Returns:
+            Self reference to the compiled graph
+        """
+        return self
 
     def _should_use_cow(self, exec_config: GraphConfig) -> bool:
         """Determine if copy-on-write should be used.
 
         Args:
-            exec_config: Execution configuration
+            exec_config: Execution configuration (with focused configs)
 
         Returns:
             True if COW should be enabled
         """
         # Explicit config takes precedence
-        if exec_config.use_copy_on_write is not None:
-            return exec_config.use_copy_on_write
+        if exec_config.performance.use_copy_on_write is not None:
+            return exec_config.performance.use_copy_on_write
 
         # Fall back to settings
         try:
@@ -828,196 +1268,153 @@ class CompiledGraph(Generic[StateType]):
         *,
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
-    ) -> ExecutionResult[StateType]:
-        """Execute the graph.
+        debug_hook: Optional[Any] = None,
+    ) -> GraphExecutionResult[StateType]:
+        """Execute the graph (SRP: Orchestrates focused helpers).
+
+        Delegates to specialized helper classes for:
+        - IterationController: iteration/recursion limits
+        - TimeoutManager: timeout tracking
+        - InterruptHandler: human-in-the-loop interrupts
+        - NodeExecutor: node execution with COW optimization
+        - GraphCheckpointManager: state persistence
+        - GraphEventEmitter: observability events
+        - DebugHook: breakpoint and execution control (optional)
 
         Args:
             input_state: Initial state
             config: Override execution config
             thread_id: Thread ID for checkpointing
+            debug_hook: Optional DebugHook for debugging
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
         """
         exec_config = config or self._config
         thread_id = thread_id or uuid.uuid4().hex
         use_cow = self._should_use_cow(exec_config)
+        graph_id = exec_config.observability.graph_id or thread_id
 
-        # Check for checkpoint to resume from
-        if exec_config.checkpointer:
-            checkpoint = await exec_config.checkpointer.load(thread_id)
-            if checkpoint:
-                logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
-                state = checkpoint.state.copy()
-                current_node = checkpoint.node_id
-            else:
-                state = copy.deepcopy(input_state)
-                current_node = self._entry_point
-        else:
-            state = copy.deepcopy(input_state)
-            current_node = self._entry_point
+        # Use parameter debug hook or instance debug hook
+        hook = debug_hook or self._debug_hook
 
-        start_time = time.time()
-        iterations = 0
-        node_history: List[str] = []
-        visited_count: Dict[str, int] = {}
-        graph_id = exec_config.graph_id or thread_id
-
-        # Emit graph started event for observability
-        self._emit_event(
-            "graph_started",
-            graph_id,
-            {
-                "entry_point": self._entry_point,
-                "node_count": len(self._nodes),
-                "thread_id": thread_id,
-            },
-            exec_config.emit_events,
+        # Create helper instances (Dependency Injection)
+        iteration_controller = IterationController(
+            max_iterations=exec_config.execution.max_iterations,
+            recursion_limit=exec_config.execution.recursion_limit,
         )
+        timeout_manager = TimeoutManager(timeout=exec_config.execution.timeout)
+        interrupt_handler = InterruptHandler(
+            interrupt_before=exec_config.interrupt.interrupt_before,
+            interrupt_after=exec_config.interrupt.interrupt_after,
+        )
+        node_executor = NodeExecutor(nodes=self._nodes, use_copy_on_write=use_cow)
+        checkpoint_manager = GraphCheckpointManager(
+            checkpointer=exec_config.checkpoint.checkpointer
+        )
+        event_emitter = GraphEventEmitter(
+            graph_id=graph_id,
+            emit_events=exec_config.observability.emit_events,
+        )
+
+        # Load initial state (from checkpoint or input)
+        state, current_node = await checkpoint_manager.load_initial_state(
+            thread_id=thread_id,
+            input_state=input_state,
+            entry_point=self._entry_point,
+        )
+
+        # Start timeout tracking and emit graph started event
+        timeout_manager.start()
+        event_emitter.emit_graph_started(
+            entry_point=self._entry_point,
+            node_count=len(self._nodes),
+            thread_id=thread_id,
+        )
+
+        node_history: List[str] = []
 
         try:
             while current_node != END:
-                # Check iteration limit
-                iterations += 1
-                if iterations > exec_config.max_iterations:
-                    logger.warning(f"Max iterations ({exec_config.max_iterations}) reached")
-                    return ExecutionResult(
+                # Check iteration limits (delegated to IterationController)
+                should_continue, error = iteration_controller.should_continue(current_node)
+                if not should_continue:
+                    logger.warning(f"Iteration limit reached: {error}")
+                    return GraphExecutionResult(
                         state=state,
                         success=False,
-                        error=f"Max iterations ({exec_config.max_iterations}) exceeded",
-                        iterations=iterations,
-                        duration=time.time() - start_time,
+                        error=error,
+                        iterations=iteration_controller.iterations,
+                        duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
                     )
 
-                # Track cycles
-                visited_count[current_node] = visited_count.get(current_node, 0) + 1
-                if visited_count[current_node] > exec_config.recursion_limit:
-                    return ExecutionResult(
-                        state=state,
-                        success=False,
-                        error=f"Recursion limit exceeded at node: {current_node}",
-                        iterations=iterations,
-                        duration=time.time() - start_time,
-                        node_history=node_history,
-                    )
-
-                # Check for interrupt before
-                if current_node in exec_config.interrupt_before:
+                # Check interrupt before (delegated to InterruptHandler)
+                if interrupt_handler.should_interrupt_before(current_node):
                     logger.info(f"Interrupt before node: {current_node}")
-                    # Save checkpoint and return for human intervention
-                    if exec_config.checkpointer:
-                        await self._save_checkpoint(
-                            exec_config.checkpointer, thread_id, current_node, state
-                        )
-                    return ExecutionResult(
+                    await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
+                    return GraphExecutionResult(
                         state=state,
                         success=True,
-                        iterations=iterations,
-                        duration=time.time() - start_time,
+                        iterations=iteration_controller.iterations,
+                        duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
                     )
 
-                # Execute node
-                node = self._nodes.get(current_node)
-                if not node:
-                    return ExecutionResult(
+                # Debug hook - before node
+                if hook:
+                    await hook.before_node(current_node, state)
+
+                # Emit node start event
+                node_start_time = time.time()
+                event_emitter.emit_node_start(
+                    node_id=current_node,
+                    iteration=iteration_controller.iterations,
+                )
+
+                # Execute node (delegated to NodeExecutor)
+                success, error, state = await node_executor.execute(
+                    node_id=current_node,
+                    state=state,
+                    timeout_manager=timeout_manager,
+                )
+
+                # Debug hook - after node
+                if hook:
+                    await hook.after_node(current_node, state, error if not success else None)
+
+                if not success:
+                    return GraphExecutionResult(
                         state=state,
                         success=False,
-                        error=f"Node not found: {current_node}",
-                        iterations=iterations,
-                        duration=time.time() - start_time,
+                        error=error,
+                        iterations=iteration_controller.iterations,
+                        duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
                     )
 
-                logger.debug(f"Executing node: {current_node}")
+                # Track execution
+                logger.debug(f"Executed node: {current_node}")
                 node_history.append(current_node)
 
-                # Emit node_start event for observability
-                node_start_time = time.time()
-                self._emit_event(
-                    "node_start",
-                    graph_id,
-                    {
-                        "node_id": current_node,
-                        "iteration": iterations,
-                    },
-                    exec_config.emit_events,
+                # Emit node complete event
+                event_emitter.emit_node_complete(
+                    node_id=current_node,
+                    iteration=iteration_controller.iterations,
+                    duration=time.time() - node_start_time,
                 )
 
-                # Execute with timeout, optionally using copy-on-write
-                if use_cow:
-                    # Wrap state in COW wrapper for efficient read-heavy nodes
-                    cow_state: CopyOnWriteState[StateType] = CopyOnWriteState(state)
-                    if exec_config.timeout:
-                        remaining = exec_config.timeout - (time.time() - start_time)
-                        if remaining <= 0:
-                            return ExecutionResult(
-                                state=state,
-                                success=False,
-                                error="Execution timeout",
-                                iterations=iterations,
-                                duration=time.time() - start_time,
-                                node_history=node_history,
-                            )
-                        result = await asyncio.wait_for(
-                            node.execute(cow_state), timeout=remaining  # type: ignore
-                        )
-                    else:
-                        result = await node.execute(cow_state)  # type: ignore
+                # Save checkpoint after node execution
+                await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
 
-                    # Extract final state from COW wrapper or result
-                    if isinstance(result, CopyOnWriteState):
-                        state = result.get_state()
-                    elif isinstance(result, dict):
-                        state = result
-                    else:
-                        # Node returned something else, use COW state
-                        state = cow_state.get_state()
-                else:
-                    # Traditional deep copy approach
-                    if exec_config.timeout:
-                        remaining = exec_config.timeout - (time.time() - start_time)
-                        if remaining <= 0:
-                            return ExecutionResult(
-                                state=state,
-                                success=False,
-                                error="Execution timeout",
-                                iterations=iterations,
-                                duration=time.time() - start_time,
-                                node_history=node_history,
-                            )
-                        state = await asyncio.wait_for(node.execute(state), timeout=remaining)
-                    else:
-                        state = await node.execute(state)
-
-                # Emit node_end event for observability
-                self._emit_event(
-                    "node_end",
-                    graph_id,
-                    {
-                        "node_id": current_node,
-                        "iteration": iterations,
-                        "duration": time.time() - node_start_time,
-                        "success": True,
-                    },
-                    exec_config.emit_events,
-                )
-
-                # WorkflowCheckpoint after execution
-                if exec_config.checkpointer:
-                    await self._save_checkpoint(
-                        exec_config.checkpointer, thread_id, current_node, state
-                    )
-
-                # Check for interrupt after
-                if current_node in exec_config.interrupt_after:
+                # Check interrupt after
+                if interrupt_handler.should_interrupt_after(current_node):
                     logger.info(f"Interrupt after node: {current_node}")
-                    return ExecutionResult(
+                    return GraphExecutionResult(
                         state=state,
                         success=True,
-                        iterations=iterations,
-                        duration=time.time() - start_time,
+                        iterations=iteration_controller.iterations,
+                        duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
                     )
 
@@ -1027,71 +1424,54 @@ class CompiledGraph(Generic[StateType]):
             # Emit RL event for successful completion
             self._emit_graph_completed_event(
                 success=True,
-                iterations=iterations,
-                duration=time.time() - start_time,
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
             )
 
-            # Emit graph_completed event for observability
-            self._emit_event(
-                "graph_completed",
-                graph_id,
-                {
-                    "success": True,
-                    "iterations": iterations,
-                    "duration": time.time() - start_time,
-                    "node_count": len(node_history),
-                },
-                exec_config.emit_events,
+            # Emit graph completed event
+            event_emitter.emit_graph_completed(
+                success=True,
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
+                node_count=len(node_history),
             )
 
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=True,
-                iterations=iterations,
-                duration=time.time() - start_time,
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
             )
 
         except asyncio.TimeoutError:
-            # Emit graph_error event for observability
-            self._emit_event(
-                "graph_error",
-                graph_id,
-                {
-                    "error": "Execution timeout",
-                    "iterations": iterations,
-                    "duration": time.time() - start_time,
-                },
-                exec_config.emit_events,
+            event_emitter.emit_graph_error(
+                error="Execution timeout",
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
             )
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=False,
                 error="Execution timeout",
-                iterations=iterations,
-                duration=time.time() - start_time,
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
             )
 
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
-            # Emit graph_error event for observability
-            self._emit_event(
-                "graph_error",
-                graph_id,
-                {
-                    "error": str(e),
-                    "iterations": iterations,
-                    "duration": time.time() - start_time,
-                },
-                exec_config.emit_events,
+            event_emitter.emit_graph_error(
+                error=str(e),
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
             )
-            return ExecutionResult(
+            return GraphExecutionResult(
                 state=state,
                 success=False,
                 error=str(e),
-                iterations=iterations,
-                duration=time.time() - start_time,
+                iterations=iteration_controller.iterations,
+                duration=timeout_manager.get_elapsed(),
                 node_history=node_history,
             )
 
@@ -1152,7 +1532,7 @@ class CompiledGraph(Generic[StateType]):
     ) -> None:
         """Emit RL event for graph completion."""
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:
@@ -1207,11 +1587,11 @@ class CompiledGraph(Generic[StateType]):
 
         while current_node != END:
             iterations += 1
-            if iterations > exec_config.max_iterations:
+            if iterations > exec_config.execution.max_iterations:
                 break
 
             visited_count[current_node] = visited_count.get(current_node, 0) + 1
-            if visited_count[current_node] > exec_config.recursion_limit:
+            if visited_count[current_node] > exec_config.execution.recursion_limit:
                 break
 
             node = self._nodes.get(current_node)
@@ -1410,8 +1790,8 @@ class StateGraph(Generic[StateType]):
         if errors:
             raise ValueError(f"Invalid graph: {'; '.join(errors)}")
 
-        # Create config
-        config = GraphConfig(
+        # Create config (use from_legacy to support both legacy and focused config formats)
+        config = GraphConfig.from_legacy(
             checkpointer=checkpointer,
             **config_kwargs,
         )
@@ -1487,6 +1867,254 @@ class StateGraph(Generic[StateType]):
 
         return reachable
 
+    @classmethod
+    def from_schema(
+        cls,
+        schema: Union[Dict[str, Any], str],
+        state_schema: Optional[Type[StateType]] = None,
+        node_registry: Optional[Dict[str, Callable]] = None,
+        condition_registry: Optional[Dict[str, Callable]] = None,
+    ) -> "StateGraph[StateType]":
+        """Create StateGraph from schema dictionary or YAML string.
+
+        This enables dynamic graph generation from serialized schemas,
+        supporting Phase 3.0 requirements for workflow persistence and
+        external graph definition.
+
+        Args:
+            schema: Either a dictionary schema or YAML string containing:
+                - nodes: List of node definitions with id and type
+                - edges: List of edge definitions with source, target, type
+                - entry_point: Starting node ID
+                - Optional: state_schema, metadata
+            state_schema: Optional TypedDict type for state validation
+            node_registry: Registry of node functions (for 'function' type nodes)
+                Maps node function names to callable functions
+            condition_registry: Registry of condition functions (for conditional edges)
+                Maps condition function names to callable functions
+
+        Returns:
+            StateGraph instance ready for compilation
+
+        Raises:
+            ValueError: If schema is invalid or missing required fields
+            TypeError: If node/condition types are unsupported
+
+        Example:
+            # Define schema
+            schema = {
+                "nodes": [
+                    {"id": "analyze", "type": "function", "func": "analyze_task"},
+                    {"id": "execute", "type": "function", "func": "execute_task"},
+                ],
+                "edges": [
+                    {"source": "analyze", "target": "execute", "type": "normal"},
+                    {
+                        "source": "execute",
+                        "target": {"retry": "analyze", "done": "__end__"},
+                        "type": "conditional",
+                        "condition": "should_retry"
+                    }
+                ],
+                "entry_point": "analyze"
+            }
+
+            # Create registries
+            node_registry = {
+                "analyze_task": analyze_task_func,
+                "execute_task": execute_task_func,
+            }
+            condition_registry = {
+                "should_retry": should_retry_func,
+            }
+
+            # Deserialize
+            graph = StateGraph.from_schema(
+                schema,
+                state_schema=AgentState,
+                node_registry=node_registry,
+                condition_registry=condition_registry
+            )
+
+            # Compile and execute
+            app = graph.compile()
+            result = await app.invoke(initial_state)
+
+        Example with YAML:
+            yaml_schema = \"""
+            nodes:
+              - id: analyze
+                type: function
+                func: analyze_task
+              - id: execute
+                type: function
+                func: execute_task
+            edges:
+              - source: analyze
+                target: execute
+                type: normal
+              - source: execute
+                target:
+                  retry: analyze
+                  done: __end__
+                type: conditional
+                condition: should_retry
+            entry_point: analyze
+            \"""
+
+            graph = StateGraph.from_schema(
+                yaml_schema,
+                node_registry=node_registry,
+                condition_registry=condition_registry
+            )
+        """
+        import yaml
+
+        # Parse YAML if string input
+        if isinstance(schema, str):
+            try:
+                schema_dict = yaml.safe_load(schema)
+            except yaml.YAMLError as e:
+                raise ValueError(f"Invalid YAML schema: {e}") from e
+        else:
+            schema_dict = schema
+
+        # Validate required fields
+        required_fields = ["nodes", "edges", "entry_point"]
+        missing_fields = [f for f in required_fields if f not in schema_dict]
+        if missing_fields:
+            raise ValueError(f"Schema missing required fields: {missing_fields}")
+
+        # Initialize registries with defaults
+        node_registry = node_registry or {}
+        condition_registry = condition_registry or {}
+
+        # Create StateGraph instance
+        graph = cls(state_schema=state_schema)
+
+        # Add nodes
+        for node_def in schema_dict["nodes"]:
+            if not isinstance(node_def, dict):
+                raise ValueError(f"Invalid node definition: {node_def}")
+
+            node_id = node_def.get("id")
+            if not node_id:
+                raise ValueError("Node definition must have 'id' field")
+
+            node_type = node_def.get("type", "function")
+
+            if node_type == "function":
+                # Function node - look up in registry
+                func_name = node_def.get("func")
+                if not func_name:
+                    raise ValueError(f"Function node '{node_id}' must specify 'func'")
+
+                if func_name not in node_registry:
+                    raise ValueError(
+                        f"Node function '{func_name}' not found in node_registry. "
+                        f"Available: {list(node_registry.keys())}"
+                    )
+
+                node_func = node_registry[func_name]
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type", "func"]}
+                graph.add_node(node_id, node_func, **metadata)
+
+            elif node_type == "passthrough":
+                # Passthrough node (identity function)
+                def passthrough_func(state):
+                    return state
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, passthrough_func, **metadata)
+
+            elif node_type == "agent":
+                # Agent node - placeholder for workflow execution
+                # The actual agent execution is handled by the workflow executor
+                def create_agent_placeholder(node_config):
+                    def agent_placeholder(state):
+                        # Store node config in state for executor to use
+                        return {
+                            **state,
+                            "_pending_agent": node_config,
+                        }
+
+                    return agent_placeholder
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, create_agent_placeholder(node_def), **metadata)
+
+            elif node_type == "compute":
+                # Compute node - placeholder for handler execution
+                # The actual compute execution is handled by the workflow executor
+                def create_compute_placeholder(node_config):
+                    def compute_placeholder(state):
+                        # Store node config in state for executor to use
+                        return {
+                            **state,
+                            "_pending_compute": node_config,
+                        }
+
+                    return compute_placeholder
+
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, create_compute_placeholder(node_def), **metadata)
+
+            else:
+                raise TypeError(f"Unsupported node type: {node_type}")
+
+        # Add edges
+        for edge_def in schema_dict["edges"]:
+            if not isinstance(edge_def, dict):
+                raise ValueError(f"Invalid edge definition: {edge_def}")
+
+            source = edge_def.get("source")
+            if not source:
+                raise ValueError("Edge definition must have 'source' field")
+
+            target = edge_def.get("target")
+            if target is None:
+                raise ValueError("Edge definition must have 'target' field")
+
+            edge_type = edge_def.get("type", "normal")
+
+            if edge_type == "normal":
+                graph.add_edge(source, target)
+
+            elif edge_type == "conditional":
+                condition_name = edge_def.get("condition")
+                if not condition_name:
+                    raise ValueError(f"Conditional edge from '{source}' must specify 'condition'")
+
+                if condition_name not in condition_registry:
+                    raise ValueError(
+                        f"Condition function '{condition_name}' not found in "
+                        f"condition_registry. Available: {list(condition_registry.keys())}"
+                    )
+
+                if not isinstance(target, dict):
+                    raise ValueError(
+                        f"Conditional edge target must be dict mapping branches to nodes, "
+                        f"got: {type(target)}"
+                    )
+
+                condition_func = condition_registry[condition_name]
+                graph.add_conditional_edge(source, condition_func, target)
+
+            else:
+                raise TypeError(f"Unsupported edge type: {edge_type}")
+
+        # Set entry point
+        entry_point = schema_dict["entry_point"]
+        if entry_point not in graph._nodes:
+            raise ValueError(
+                f"Entry point '{entry_point}' not found in nodes. "
+                f"Available nodes: {list(graph._nodes.keys())}"
+            )
+
+        graph.set_entry_point(entry_point)
+
+        return graph
+
 
 # Convenience factory functions
 def create_graph(
@@ -1514,7 +2142,7 @@ __all__ = [
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     # Execution
-    "ExecutionResult",
+    "GraphExecutionResult",
     "GraphConfig",
     # Checkpointing
     "WorkflowCheckpoint",

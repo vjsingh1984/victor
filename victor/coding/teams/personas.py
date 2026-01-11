@@ -736,6 +736,89 @@ def list_personas() -> List[str]:
     return list(CODING_PERSONAS.keys())
 
 
+# =============================================================================
+# Framework Registration
+# =============================================================================
+
+
+def _register_personas_with_framework() -> None:
+    """Register all coding personas with FrameworkPersonaProvider.
+
+    This function is called at module import time to automatically register
+    all coding personas with the framework-level persona provider, enabling
+    cross-vertical persona discovery and reuse.
+    """
+    from victor.framework.multi_agent.persona_provider import FrameworkPersonaProvider
+
+    provider = FrameworkPersonaProvider()
+
+    # Category mappings based on persona roles and expertise
+    category_mappings = {
+        "code_archaeologist": "research",
+        "security_auditor": "review",
+        "architect": "planning",
+        "refactoring_strategist": "planning",
+        "craftsman": "execution",
+        "debugger": "execution",
+        "quality_guardian": "review",
+        "test_specialist": "review",
+    }
+
+    # Tag mappings for persona discovery
+    tag_mappings = {
+        "code_archaeologist": [
+            "code-analysis",
+            "legacy-code",
+            "patterns",
+            "dependencies",
+            "archaeology",
+        ],
+        "security_auditor": ["security", "vulnerability", "audit", "owasp"],
+        "architect": ["architecture", "design", "scalability", "api-design"],
+        "refactoring_strategist": [
+            "refactoring",
+            "restructuring",
+            "code-quality",
+            "patterns",
+        ],
+        "craftsman": ["code-writing", "clean-code", "implementation"],
+        "debugger": ["debugging", "troubleshooting", "root-cause"],
+        "quality_guardian": ["code-review", "quality", "testing"],
+        "test_specialist": ["testing", "tdd", "coverage", "quality"],
+    }
+
+    # Register each persona
+    for persona_id, persona in CODING_PERSONAS.items():
+        # Convert CodingPersona to FrameworkPersonaTraits
+        framework_traits = persona.traits.to_framework_traits(
+            name=persona.name,
+            role=persona.role,
+            description=persona.approach,
+            strengths=persona.strengths,
+            preferred_tools=persona.get_expertise_list(),
+        )
+
+        # Get category and tags
+        category = category_mappings.get(persona_id, "other")
+        tags = tag_mappings.get(persona_id, [])
+
+        # Register with framework
+        provider.register_persona(
+            name=persona_id,
+            version="1.0.0",
+            persona=framework_traits,
+            category=category,
+            description=f"{persona.name} - {persona.role}",
+            tags=tags,
+            author="victor",
+            vertical="coding",
+        )
+
+
+# Auto-register on import
+_register_personas_with_framework()
+
+
 __all__ = [
     # Framework types (re-exported for convenience)
     "FrameworkPersonaTraits",
@@ -757,4 +840,6 @@ __all__ = [
     "get_persona_by_expertise",
     "apply_persona_to_spec",
     "list_personas",
+    # Framework registration
+    "_register_personas_with_framework",
 ]

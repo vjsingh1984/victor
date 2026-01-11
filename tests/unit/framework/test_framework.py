@@ -11,11 +11,11 @@ from victor.framework import (
     Agent,
     AgentConfig,
     AgentError,
+    AgentExecutionEvent,
     BudgetExhaustedError,
     CancellationError,
     ChatSession,
     ConfigurationError,
-    Event,
     EventType,
     ProviderError,
     Stage,
@@ -134,7 +134,7 @@ class TestEvent:
 
     def test_content_event(self):
         """Content event should have correct properties."""
-        event = Event(type=EventType.CONTENT, content="Hello world")
+        event = AgentExecutionEvent(type=EventType.CONTENT, content="Hello world")
         assert event.type == EventType.CONTENT
         assert event.content == "Hello world"
         assert event.is_content_event
@@ -143,7 +143,7 @@ class TestEvent:
 
     def test_tool_call_event(self):
         """Tool call event should have correct properties."""
-        event = Event(
+        event = AgentExecutionEvent(
             type=EventType.TOOL_CALL,
             tool_name="read",
             arguments={"path": "/tmp/test.txt"},
@@ -156,14 +156,14 @@ class TestEvent:
 
     def test_error_event(self):
         """Error event should have correct properties."""
-        event = Event(type=EventType.ERROR, error="Something went wrong")
+        event = AgentExecutionEvent(type=EventType.ERROR, error="Something went wrong")
         assert event.type == EventType.ERROR
         assert event.error == "Something went wrong"
         assert event.is_error_event
 
     def test_to_dict(self):
         """Event.to_dict() should return dictionary representation."""
-        event = Event(type=EventType.CONTENT, content="Hello")
+        event = AgentExecutionEvent(type=EventType.CONTENT, content="Hello")
         d = event.to_dict()
         assert d["type"] == "content"
         assert d["content"] == "Hello"

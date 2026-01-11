@@ -72,7 +72,7 @@ class LanguageRegistry:
             factory = plugin
 
         self._plugins[name] = factory
-        logger.info(f"Registered language plugin: {name}")
+        logger.debug(f"Registered language plugin: {name}")
 
         # Create instance to get config
         instance = self._get_or_create_instance(name)

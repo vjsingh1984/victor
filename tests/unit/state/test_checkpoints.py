@@ -22,7 +22,7 @@ import pytest
 
 from victor.agent.checkpoints import (
     GitCheckpoint,
-    CheckpointManager,
+    GitCheckpointManager,
     CheckpointNotFoundError,
     NotAGitRepositoryError,
 )
@@ -77,17 +77,17 @@ def git_repo(tmp_path):
 
 
 class TestGitCheckpointManagerInit:
-    """Tests for CheckpointManager initialization."""
+    """Tests for GitCheckpointManager initialization."""
 
     def test_init_in_git_repo(self, git_repo):
         """Test initialization in a git repository."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         assert manager.repo_path == git_repo
 
     def test_init_not_git_repo(self, tmp_path):
         """Test initialization fails outside git repository."""
         with pytest.raises(NotAGitRepositoryError):
-            CheckpointManager(str(tmp_path))
+            GitCheckpointManager(str(tmp_path))
 
 
 class TestGitCheckpointCreation:
@@ -95,7 +95,7 @@ class TestGitCheckpointCreation:
 
     def test_create_checkpoint_no_changes(self, git_repo):
         """Test creating checkpoint with no changes."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         checkpoint = manager.create("Clean state")
 
         assert checkpoint.id.startswith(manager.PREFIX)
@@ -108,7 +108,7 @@ class TestGitCheckpointCreation:
         test_file = git_repo / "test.txt"
         test_file.write_text("modified content\n")
 
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         checkpoint = manager.create("After modifications")
 
         assert checkpoint.id.startswith(manager.PREFIX)
@@ -120,7 +120,7 @@ class TestGitCheckpointCreation:
 
     def test_create_multiple_checkpoints(self, git_repo):
         """Test creating multiple checkpoints."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create first checkpoint
@@ -141,7 +141,7 @@ class TestGitCheckpointRollback:
 
     def test_rollback_to_checkpoint(self, git_repo):
         """Test rolling back to a checkpoint."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Save original content
@@ -162,14 +162,14 @@ class TestGitCheckpointRollback:
 
     def test_rollback_nonexistent_checkpoint(self, git_repo):
         """Test rollback fails for non-existent checkpoint."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
 
         with pytest.raises(CheckpointNotFoundError):
             manager.rollback("victor_checkpoint_nonexistent")
 
     def test_rollback_with_drop(self, git_repo):
         """Test rollback with stash drop."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create checkpoint
@@ -192,13 +192,13 @@ class TestGitCheckpointListing:
 
     def test_list_empty(self, git_repo):
         """Test listing checkpoints when none exist."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         checkpoints = manager.list_checkpoints()
         assert checkpoints == []
 
     def test_list_multiple_checkpoints(self, git_repo):
         """Test listing multiple checkpoints."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create checkpoints
@@ -223,7 +223,7 @@ class TestGitCheckpointListing:
 
     def test_get_specific_checkpoint(self, git_repo):
         """Test getting a specific checkpoint by ID."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create checkpoint
@@ -238,7 +238,7 @@ class TestGitCheckpointListing:
 
     def test_get_nonexistent_checkpoint(self, git_repo):
         """Test getting non-existent checkpoint returns None."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         retrieved = manager.get_checkpoint("victor_checkpoint_nonexistent")
         assert retrieved is None
 
@@ -248,7 +248,7 @@ class TestGitCheckpointCleanup:
 
     def test_cleanup_keeps_recent(self, git_repo):
         """Test cleanup keeps recent checkpoints."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create many checkpoints
@@ -265,7 +265,7 @@ class TestGitCheckpointCleanup:
 
     def test_cleanup_no_action_when_few(self, git_repo):
         """Test cleanup does nothing when few checkpoints exist."""
-        manager = CheckpointManager(str(git_repo))
+        manager = GitCheckpointManager(str(git_repo))
         test_file = git_repo / "test.txt"
 
         # Create only 3 checkpoints

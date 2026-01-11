@@ -114,7 +114,7 @@ from victor.core.middleware import (
 from victor.core.event_sourcing import (
     Aggregate,
     ConcurrencyError,
-    Event,
+    DomainEvent,
     EventDispatcher,
     EventEnvelope,
     EventSourcedRepository,
@@ -369,7 +369,7 @@ __all__ = [
     # Event Sourcing
     "Aggregate",
     "ConcurrencyError",
-    "Event",
+    "DomainEvent",
     "EventDispatcher",
     "EventEnvelope",
     "EventSourcedRepository",

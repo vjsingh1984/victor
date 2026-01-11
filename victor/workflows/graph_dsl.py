@@ -911,31 +911,11 @@ def compile_graph(graph: WorkflowGraph[S], name: Optional[str] = None) -> Workfl
     return graph.compile(name=name)
 
 
-# Deprecation alias for backward compatibility
-import warnings as _warnings
-
-
-def __getattr__(name: str):
-    """Provide deprecation warning for StateGraph alias."""
-    if name == "StateGraph":
-        _warnings.warn(
-            "StateGraph is deprecated and will be removed in v1.0. "
-            "Use WorkflowGraph instead (compiles to WorkflowDefinition). "
-            "For LangGraph-compatible StateGraph that compiles to CompiledGraph, "
-            "use victor.framework.graph.StateGraph.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return WorkflowGraph
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 # Export all public symbols
 __all__ = [
     # Core classes
     "State",
     "WorkflowGraph",
-    "StateGraph",  # noqa: F822 - Deprecated alias handled by __getattr__
     "GraphNode",
     "GraphNodeType",
     # Type variables

@@ -23,7 +23,7 @@ capabilities, enabling:
 - Branch comparison and visualization
 
 Design Philosophy:
-- Builds on existing CheckpointManager and backends
+- Builds on existing ConversationCheckpointManager and backends
 - Checkpoints form an immutable DAG (directed acyclic graph)
 - Branches are lightweight pointers to head checkpoints
 - Tree structure enables time-travel and parallel exploration

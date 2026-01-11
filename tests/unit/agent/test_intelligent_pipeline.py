@@ -436,7 +436,7 @@ class TestLazyModeController:
             "sys.modules",
             {
                 "victor.agent.adaptive_mode_controller": MagicMock(),
-                "victor.agent.rl.coordinator": MagicMock(),
+                "victor.framework.rl.coordinator": MagicMock(),
             },
         ):
             import sys
@@ -444,7 +444,7 @@ class TestLazyModeController:
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
             mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
 
-            mock_coord_module = sys.modules["victor.agent.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
             mock_coord_module.get_rl_coordinator.return_value.get_learner.return_value = (
                 mock_learner
             )
@@ -461,7 +461,7 @@ class TestLazyModeController:
             "sys.modules",
             {
                 "victor.agent.adaptive_mode_controller": MagicMock(),
-                "victor.agent.rl.coordinator": MagicMock(),
+                "victor.framework.rl.coordinator": MagicMock(),
             },
         ):
             import sys
@@ -469,7 +469,7 @@ class TestLazyModeController:
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
             mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
 
-            mock_coord_module = sys.modules["victor.agent.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
             mock_coord_module.get_rl_coordinator.side_effect = Exception("No coordinator")
 
             result = pipeline._get_mode_controller()
@@ -565,7 +565,7 @@ class TestLazyGroundingVerifier:
             "sys.modules",
             {
                 "victor.agent.grounding_verifier": MagicMock(),
-                "victor.agent.rl.coordinator": MagicMock(),
+                "victor.framework.rl.coordinator": MagicMock(),
             },
         ):
             import sys
@@ -573,7 +573,7 @@ class TestLazyGroundingVerifier:
             mock_gv_module = sys.modules["victor.agent.grounding_verifier"]
             mock_gv_module.GroundingVerifier.return_value = mock_verifier_instance
 
-            mock_coord_module = sys.modules["victor.agent.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
             mock_coord_module.get_rl_coordinator.return_value.get_learner.return_value = (
                 mock_learner
             )
@@ -700,12 +700,12 @@ class TestGroundingEventEmission:
         with patch.dict(
             "sys.modules",
             {
-                "victor.agent.rl.hooks": MagicMock(),
+                "victor.framework.rl.hooks": MagicMock(),
             },
         ):
             import sys
 
-            mock_hooks_module = sys.modules["victor.agent.rl.hooks"]
+            mock_hooks_module = sys.modules["victor.framework.rl.hooks"]
             mock_hooks = MagicMock()
             mock_hooks_module.get_rl_hooks.return_value = mock_hooks
             mock_hooks_module.RLEvent = MagicMock()
@@ -724,12 +724,12 @@ class TestGroundingEventEmission:
         with patch.dict(
             "sys.modules",
             {
-                "victor.agent.rl.hooks": MagicMock(),
+                "victor.framework.rl.hooks": MagicMock(),
             },
         ):
             import sys
 
-            mock_hooks_module = sys.modules["victor.agent.rl.hooks"]
+            mock_hooks_module = sys.modules["victor.framework.rl.hooks"]
             mock_hooks_module.get_rl_hooks.return_value = None
             mock_hooks_module.RLEvent = MagicMock()
             mock_hooks_module.RLEventType = MagicMock()
@@ -746,12 +746,12 @@ class TestGroundingEventEmission:
         with patch.dict(
             "sys.modules",
             {
-                "victor.agent.rl.hooks": MagicMock(),
+                "victor.framework.rl.hooks": MagicMock(),
             },
         ):
             import sys
 
-            mock_hooks_module = sys.modules["victor.agent.rl.hooks"]
+            mock_hooks_module = sys.modules["victor.framework.rl.hooks"]
             mock_hooks_module.get_rl_hooks.side_effect = Exception("Hook error")
 
             # Should not raise, just log

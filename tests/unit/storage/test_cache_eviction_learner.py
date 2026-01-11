@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Tuple
 from unittest.mock import patch
 
-from victor.agent.rl.base import RLOutcome
-from victor.agent.rl.coordinator import RLCoordinator
-from victor.agent.rl.learners.cache_eviction import (
+from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.coordinator import RLCoordinator
+from victor.framework.rl.learners.cache_eviction import (
     CacheEvictionLearner,
     CacheEvictionAction,
 )

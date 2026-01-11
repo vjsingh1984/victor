@@ -133,6 +133,44 @@ Use 15-20 tool calls minimum. Prioritize by architectural importance.""",
         tool_budget=8,
         priority_tools=["read", "grep", "ls"],
     ),
+    "bug_fix": TaskTypeHint(
+        task_type="bug_fix",
+        hint="""[BUG FIX] Resolve a GitHub issue or bug report. CRITICAL WORKFLOW:
+
+PHASE 1 - UNDERSTAND (max 5 file reads):
+1. Read the file(s) mentioned in the error traceback/issue
+2. Read related imports and dependencies (1-2 files max)
+3. Identify the root cause from the code
+
+PHASE 2 - FIX (MANDATORY after Phase 1):
+4. Use edit_file or write_file to make the fix
+5. The fix should be minimal and surgical - only change what's necessary
+6. If the issue suggests a fix (e.g., "add quiet=True"), implement exactly that
+
+PHASE 3 - VERIFY (optional):
+7. If tests exist, run them to verify the fix
+
+CRITICAL RULES:
+- DO NOT read more than 5-7 files before making an edit
+- After reading the traceback/error location, you have enough context to edit
+- Prefer SMALL, FOCUSED changes over large refactors
+- If unsure, make the minimal fix that addresses the reported issue
+- Say "Fix applied" when done editing
+
+ANTI-PATTERNS TO AVOID:
+- Reading the entire codebase before editing
+- Exploring tangential files not in the error trace
+- Waiting for "perfect understanding" before acting
+- Re-reading files you've already read""",
+        tool_budget=12,
+        priority_tools=["read", "edit", "test", "shell"],
+    ),
+    "issue_resolution": TaskTypeHint(
+        task_type="issue_resolution",
+        hint="[ISSUE] Same as bug_fix - resolve GitHub issue with focused edits after minimal exploration.",
+        tool_budget=12,
+        priority_tools=["read", "edit", "test", "shell"],
+    ),
 }
 
 

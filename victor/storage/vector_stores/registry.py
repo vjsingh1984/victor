@@ -14,9 +14,14 @@
 
 """Registry for embedding providers."""
 
-from typing import Dict, List, Type
+import hashlib
+import logging
+import threading
+from typing import Dict, List, Optional, Type
 
 from victor.storage.vector_stores.base import BaseEmbeddingProvider, EmbeddingConfig
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingRegistry:
@@ -25,16 +30,28 @@ class EmbeddingRegistry:
     Similar to the LLM provider registry, this allows plugins to register
     themselves and be discovered/created by name.
 
+    **Singleton Pattern**: Providers are cached per unique configuration to
+    prevent concurrent access issues with file-based databases like LanceDB.
+    Multiple orchestrators/agents will share the same provider instance for
+    a given persist_directory.
+
     Usage:
         # Register a provider
         EmbeddingRegistry.register("chromadb", ChromaDBProvider)
 
-        # Create a provider
-        config = EmbeddingConfig(vector_store="chromadb")
+        # Create a provider (cached - returns same instance for same config)
+        config = EmbeddingConfig(vector_store="chromadb", persist_directory="~/.victor/embeddings")
         provider = EmbeddingRegistry.create(config)
+
+        # Clear cache (mainly for testing)
+        EmbeddingRegistry.reset()
     """
 
     _providers: Dict[str, Type[BaseEmbeddingProvider]] = {}
+
+    # Singleton cache: {config_key: provider_instance}
+    _provider_cache: Dict[str, BaseEmbeddingProvider] = {}
+    _cache_lock = threading.Lock()
 
     @classmethod
     def register(cls, name: str, provider_class: Type[BaseEmbeddingProvider]) -> None:
@@ -73,17 +90,76 @@ class EmbeddingRegistry:
         return cls._providers[name]
 
     @classmethod
-    def create(cls, config: EmbeddingConfig) -> BaseEmbeddingProvider:
-        """Create a provider instance from configuration.
+    def _get_config_key(cls, config: EmbeddingConfig) -> str:
+        """Generate a unique cache key for the configuration.
+
+        Key components:
+        - vector_store: The provider type (lancedb, chromadb, etc.)
+        - persist_directory: The database path (critical for singleton)
+        - embedding_model_type: Model type (sentence-transformers, ollama, etc.)
+        - embedding_model_name: Model name (affects embedding dimension)
 
         Args:
             config: Embedding configuration
 
         Returns:
-            Initialized provider instance
+            SHA256 hash of the configuration key components
         """
-        provider_class = cls.get(config.vector_store)
-        return provider_class(config)
+        # Normalize the persist directory path
+        persist_dir = config.persist_directory or "default"
+
+        # Create key from critical configuration elements
+        key_parts = [
+            config.vector_store,
+            persist_dir,
+            config.embedding_model_type,
+            config.embedding_model_name,
+            config.distance_metric,
+        ]
+
+        # Join and hash
+        key_str = "|".join(str(part) for part in key_parts)
+        return hashlib.sha256(key_str.encode()).hexdigest()[:16]
+
+    @classmethod
+    def create(cls, config: EmbeddingConfig) -> BaseEmbeddingProvider:
+        """Create or retrieve a cached provider instance from configuration.
+
+        **Singleton Pattern**: Returns the same provider instance for identical
+        configurations to prevent concurrent access issues with file-based databases.
+
+        Args:
+            config: Embedding configuration
+
+        Returns:
+            Initialized provider instance (cached if exists)
+        """
+        # Generate cache key from configuration
+        cache_key = cls._get_config_key(config)
+
+        # Check cache first (fast path, no lock)
+        if cache_key in cls._provider_cache:
+            logger.debug(f"[EmbeddingRegistry] Cache hit for key: {cache_key}")
+            return cls._provider_cache[cache_key]
+
+        # Cache miss - acquire lock and create instance
+        with cls._cache_lock:
+            # Double-checked locking pattern
+            if cache_key in cls._provider_cache:
+                return cls._provider_cache[cache_key]
+
+            # Create new provider instance
+            provider_class = cls.get(config.vector_store)
+            provider = provider_class(config)
+
+            # Cache the instance
+            cls._provider_cache[cache_key] = provider
+            logger.info(
+                f"[EmbeddingRegistry] Created and cached {config.vector_store} provider "
+                f"(key: {cache_key}, cache size: {len(cls._provider_cache)})"
+            )
+
+            return provider
 
     @classmethod
     def list_providers(cls) -> List[str]:
@@ -105,6 +181,38 @@ class EmbeddingRegistry:
             True if registered, False otherwise
         """
         return name in cls._providers
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the provider cache (mainly for testing).
+
+        This clears all cached provider instances. Next call to create()
+        will create fresh instances.
+
+        Warning: This does NOT call close() on cached providers. Callers
+        should close providers explicitly before calling reset() if needed.
+        """
+        with cls._cache_lock:
+            cls._provider_cache.clear()
+            logger.info("[EmbeddingRegistry] Provider cache cleared")
+
+    @classmethod
+    def get_cache_stats(cls) -> Dict[str, int]:
+        """Get statistics about the provider cache.
+
+        Returns:
+            Dictionary with cache size and provider breakdown
+        """
+        with cls._cache_lock:
+            provider_types = {}
+            for provider in cls._provider_cache.values():
+                provider_type = provider.__class__.__name__
+                provider_types[provider_type] = provider_types.get(provider_type, 0) + 1
+
+            return {
+                "total_cached_providers": len(cls._provider_cache),
+                "provider_types": provider_types,
+            }
 
 
 # Auto-discovery: Import and register all providers

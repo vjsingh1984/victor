@@ -442,15 +442,33 @@ class EmbeddingCacheManager:
         self,
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> int:
-        """Sync version of rebuild_task_classifiers."""
+        """Sync version of rebuild_task_classifiers.
+
+        This method can only be called from synchronous contexts.
+        If called from an async context, it will raise a RuntimeError.
+
+        Raises:
+            RuntimeError: If called from an async context (use await rebuild_task_classifiers() instead)
+
+        Returns:
+            Number of phrases indexed
+        """
         import asyncio
 
         try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context, create a future
-            return loop.run_until_complete(self.rebuild_task_classifiers(progress_callback))
-        except RuntimeError:
-            # No running loop, we're in sync context
+            # Check if we're in an async context
+            asyncio.get_running_loop()
+            # We are - this is an error, caller must use async API
+            raise RuntimeError(
+                "Cannot call rebuild_task_classifiers_sync from async context. "
+                "Use 'await rebuild_task_classifiers()' instead."
+            )
+        except RuntimeError as e:
+            # Check if this is our error or the "no running loop" error
+            if "Cannot call rebuild_task_classifiers_sync" in str(e):
+                # Our error - re-raise it
+                raise
+            # No running loop, we're in sync context - safe to use asyncio.run
             return asyncio.run(self.rebuild_task_classifiers(progress_callback))
 
     def needs_rebuild(self, cache_type: CacheType, max_age_hours: int = 24) -> bool:

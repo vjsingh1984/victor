@@ -50,7 +50,7 @@ def dashboard(
     live: bool = typer.Option(
         True,
         "--live/--no-live",
-        help="Enable/disable live event streaming from EventBus.",
+        help="Enable/disable live event streaming from ObservabilityBus.",
     ),
     demo: bool = typer.Option(
         False,
@@ -66,7 +66,7 @@ def dashboard(
     """Launch the Victor observability dashboard.
 
     The dashboard provides a TUI for visualizing:
-    - Real-time events from the EventBus
+    - Real-time events from the ObservabilityBus
     - Historical events from JSONL log files
     - Tool execution statistics and history
     - Vertical integration traces
@@ -161,8 +161,7 @@ async def run_demo_dashboard(
     from datetime import datetime, timezone
 
     from victor.observability.dashboard import ObservabilityDashboard
-
-    # TODO: MIGRATION - OLD IMPORT REMOVED
+    from victor.core.events import get_observability_bus
 
     # Create dashboard
     app = ObservabilityDashboard(
@@ -170,11 +169,13 @@ async def run_demo_dashboard(
         subscribe_to_bus=live,
     )
 
+    # Get the ObservabilityBus singleton instance
+    bus = get_observability_bus()
+    await bus.connect()
+
     # Demo event generator
     async def generate_demo_events() -> None:
         """Generate simulated events for demo mode."""
-        bus = EventBus.get_instance()
-
         tool_names = [
             "read_file",
             "write_file",
@@ -210,32 +211,26 @@ async def run_demo_dashboard(
                 if event_type == "tool":
                     tool = random.choice(tool_names)
                     # Start event
-                    bus.publish(
-                        VictorEvent(
-                            category=EventCategory.TOOL,
-                            name=f"{tool}.start",
-                            data={
-                                "tool_name": tool,
-                                "arguments": {"path": "/demo/file.py"},
-                            },
-                        )
+                    await bus.emit(
+                        f"tool.{tool}.start",
+                        {
+                            "tool_name": tool,
+                            "arguments": {"path": "/demo/file.py"},
+                        },
                     )
                     await asyncio.sleep(random.uniform(0.1, 0.5))
 
                     # End event
                     success = random.random() > 0.1
-                    bus.publish(
-                        VictorEvent(
-                            category=EventCategory.TOOL,
-                            name=f"{tool}.end",
-                            data={
-                                "tool_name": tool,
-                                "success": success,
-                                "duration_ms": random.uniform(10, 500),
-                                "result": "Demo result" if success else None,
-                                "error": "Demo error" if not success else None,
-                            },
-                        )
+                    await bus.emit(
+                        f"tool.{tool}.end",
+                        {
+                            "tool_name": tool,
+                            "success": success,
+                            "duration_ms": random.uniform(10, 500),
+                            "result": "Demo result" if success else None,
+                            "error": "Demo error" if not success else None,
+                        },
                     )
 
                 elif event_type == "state":
@@ -246,9 +241,9 @@ async def run_demo_dashboard(
                         new_stage = stages[0]
 
                     # Emit state transition event
-                    bus.emit(
-                        topic="state.stage_changed",
-                        data={
+                    await bus.emit(
+                        "state.stage_changed",
+                        {
                             "old_stage": current_stage,
                             "new_stage": new_stage,
                             "confidence": random.uniform(0.7, 1.0),
@@ -257,41 +252,38 @@ async def run_demo_dashboard(
                     current_stage = new_stage
 
                 elif event_type == "model":
-                    bus.publish(
-                        VictorEvent(
-                            category=EventCategory.MODEL,
-                            name="response",
-                            data={
-                                "provider": "anthropic",
-                                "model": "claude-3-5-sonnet",
-                                "tokens_used": random.randint(100, 2000),
-                                "latency_ms": random.uniform(200, 2000),
-                            },
-                        )
+                    await bus.emit(
+                        "model.response",
+                        {
+                            "provider": "anthropic",
+                            "model": "claude-3-5-sonnet",
+                            "tokens_used": random.randint(100, 2000),
+                            "latency_ms": random.uniform(200, 2000),
+                        },
                     )
 
                 elif event_type == "vertical":
                     vertical = random.choice(verticals)
-                    bus.publish(
-                        VictorEvent(
-                            category=EventCategory.VERTICAL,
-                            name="vertical.applied",
-                            data={
-                                "vertical": vertical,
-                                "action": "applied",
-                                "config": {
-                                    "mode": "build",
-                                    "tool_budget": 25,
-                                },
+                    await bus.emit(
+                        "vertical.applied",
+                        {
+                            "vertical": vertical,
+                            "action": "applied",
+                            "config": {
+                                "mode": "build",
+                                "tool_budget": 25,
                             },
-                        )
+                        },
                     )
 
                 elif event_type == "error":
-                    bus.emit_error(
-                        Exception("Demo error for testing"),
-                        context={"component": "demo"},
-                        recoverable=True,
+                    await bus.emit(
+                        "error.demo",
+                        {
+                            "error_message": "Demo error for testing",
+                            "component": "demo",
+                            "recoverable": True,
+                        },
                     )
 
                 await asyncio.sleep(random.uniform(0.5, 2.0))
@@ -322,37 +314,16 @@ async def run_demo_dashboard(
 def dashboard_status() -> None:
     """Show current event bus status and statistics."""
     try:
-        from victor.core.events import ObservabilityBus as EventBus
+        from victor.core.events import get_observability_bus
     except ImportError:
-        console.print("[red]Error: Could not import EventBus[/]")
+        console.print("[red]Error: Could not import ObservabilityBus[/]")
         raise typer.Exit(1)
 
-    bus = EventBus.get_instance()
+    bus = get_observability_bus()
 
-    console.print("\n[bold]EventBus Status[/]\n")
-    console.print(f"  Queue Depth: {bus.get_queue_depth()}")
-    console.print(f"  Queue Capacity: {bus.get_queue_capacity()}")
-    console.print(f"  Queue Full: {bus.is_queue_full()}")
-    console.print(f"  Pending Tasks: {bus.get_pending_task_count()}")
-
-    # Subscription counts
-    console.print("\n[bold]Subscriptions[/]\n")
-    total_subs = bus.get_subscription_count()
-    console.print(f"  Total: {total_subs}")
-
-    # Backpressure metrics
-    metrics = bus.get_backpressure_metrics()
-    console.print("\n[bold]Backpressure Metrics[/]\n")
-    console.print(f"  Events Dropped: {metrics.events_dropped}")
-    console.print(f"  Events Rejected: {metrics.events_rejected}")
-    console.print(f"  Peak Queue Depth: {metrics.peak_queue_depth}")
-    console.print(f"  Backpressure Events: {metrics.backpressure_events}")
-
-    # Sampling metrics if configured
-    sampling_metrics = bus.get_sampling_metrics()
-    if sampling_metrics.events_sampled > 0 or sampling_metrics.events_dropped > 0:
-        console.print("\n[bold]Sampling Metrics[/]\n")
-        console.print(f"  Sampled: {sampling_metrics.events_sampled}")
-        console.print(f"  Dropped: {sampling_metrics.events_dropped}")
-
-    console.print("")
+    console.print("\n[bold]ObservabilityBus Status[/]\n")
+    console.print("  Status: Running")
+    console.print("  Type: In-memory backend")
+    console.print("\n[dim]Note: The new ObservabilityBus uses topic-based routing[/]")
+    console.print("[dim]instead of category-based routing. See victor.core.events[/]")
+    console.print("[dim]for more details on the unified event system.[/]\n")

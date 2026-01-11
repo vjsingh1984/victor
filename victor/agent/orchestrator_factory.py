@@ -335,6 +335,19 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return self.container.get(SearchRouterProtocol)
 
+    def create_presentation_adapter(self) -> Any:
+        """Create presentation adapter for icon/emoji rendering.
+
+        The presentation adapter provides a clean abstraction for presentation
+        concerns, decoupling the agent layer from direct UI dependencies.
+
+        Returns:
+            PresentationProtocol implementation (EmojiPresentationAdapter by default)
+        """
+        from victor.agent.presentation import PresentationProtocol
+
+        return self.container.get(PresentationProtocol)
+
     def create_core_services(
         self,
         tool_adapter: "BaseToolCallingAdapter",
@@ -1294,10 +1307,13 @@ class OrchestratorFactory(ModeAwareMixin):
         from victor.agent.streaming import StreamingChatHandler
 
         session_idle_timeout = getattr(self.settings, "session_idle_timeout", 180.0)
+        # Get presentation adapter from message_adder (orchestrator) if available
+        presentation = getattr(message_adder, "_presentation", None)
         handler = StreamingChatHandler(
             settings=self.settings,
             message_adder=message_adder,
             session_idle_timeout=session_idle_timeout,
+            presentation=presentation,
         )
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
@@ -2160,20 +2176,23 @@ class OrchestratorFactory(ModeAwareMixin):
         return criteria
 
     def create_checkpoint_manager(self) -> Optional[Any]:
-        """Create CheckpointManager for time-travel debugging.
+        """Create ConversationCheckpointManager for time-travel debugging.
 
         Creates the checkpoint manager based on settings configuration.
         Returns None if checkpointing is disabled.
 
         Returns:
-            CheckpointManager instance or None if disabled
+            ConversationCheckpointManager instance or None if disabled
         """
         if not getattr(self.settings, "checkpoint_enabled", True):
             logger.debug("Checkpoint system disabled via settings")
             return None
 
         try:
-            from victor.storage.checkpoints import CheckpointManager, SQLiteCheckpointBackend
+            from victor.storage.checkpoints import (
+                ConversationCheckpointManager,
+                SQLiteCheckpointBackend,
+            )
             from victor.config.settings import get_project_paths
 
             # Get project paths for checkpoint storage
@@ -2190,20 +2209,20 @@ class OrchestratorFactory(ModeAwareMixin):
             auto_interval = getattr(self.settings, "checkpoint_auto_interval", 5)
             max_per_session = getattr(self.settings, "checkpoint_max_per_session", 50)
 
-            manager = CheckpointManager(
+            manager = ConversationCheckpointManager(
                 backend=backend,
                 auto_checkpoint_interval=auto_interval,
                 max_checkpoints_per_session=max_per_session,
             )
 
             logger.info(
-                f"CheckpointManager created (auto_interval={auto_interval}, "
+                f"ConversationCheckpointManager created (auto_interval={auto_interval}, "
                 f"max_per_session={max_per_session})"
             )
             return manager
 
         except Exception as e:
-            logger.warning(f"Failed to create CheckpointManager: {e}")
+            logger.warning(f"Failed to create ConversationCheckpointManager: {e}")
             return None
 
     def create_workflow_optimization_components(

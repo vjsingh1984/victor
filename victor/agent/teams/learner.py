@@ -512,7 +512,7 @@ class TeamCompositionLearner:
         Args:
             outcome: RLOutcome object with team metadata
         """
-        from victor.agent.rl.base import RLOutcome
+        from victor.framework.rl.base import RLOutcome
 
         if isinstance(outcome, RLOutcome):
             # Extract team info from metadata

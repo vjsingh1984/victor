@@ -14,23 +14,25 @@
 
 """Document Chunker - Intelligent document chunking for RAG.
 
-This module provides semantic chunking strategies for documents:
-- Sentence-boundary aware chunking
-- Code-aware chunking (preserves functions/classes)
-- Markdown-aware chunking (preserves structure)
-- HTML-aware chunking (preserves paragraphs, sections, tables)
-- JSON/YAML-aware chunking (preserves object boundaries)
-- Configurable overlap for context continuity
+This module provides RAG-specific document chunking that builds on the
+framework's BaseChunker. The generic chunking algorithms are in
+victor/framework/ingestion/chunker.py.
+
+This vertical-specific module:
+- Provides DocumentChunker class with RAG-specific embedding integration
+- Wraps framework's BaseChunker for core chunking strategies
+- Maintains backward-compatible API (ChunkingConfig, detect_document_type)
+- Adds RAG-specific metadata and document type handling
 
 Design:
-    - ChunkingConfig: Configuration dataclass
-    - DocumentChunker: Main chunking class with strategy pattern
-    - Automatic document type detection from source URL/extension and content
+    - ChunkingConfig: Configuration dataclass (re-exported from framework)
+    - DocumentChunker: RAG-specific chunker with embedding support
+    - detect_document_type: Document type detection (from framework)
 
 Example:
     chunker = DocumentChunker(ChunkingConfig(chunk_size=512, overlap=50))
 
-    # Chunk a document
+    # Chunk a document with embeddings
     doc = Document(id="1", content="...", source="doc.md", doc_type="markdown")
     chunks = await chunker.chunk_document(doc, embedding_fn)
 

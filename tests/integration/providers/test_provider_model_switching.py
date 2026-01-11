@@ -26,7 +26,7 @@ Coverage:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings, ProfileConfig
@@ -35,26 +35,60 @@ from victor.config.settings import Settings, ProfileConfig
 @pytest.fixture
 def settings():
     """Create test settings."""
-    return Settings(analytics_enabled=False, tool_cache_enabled=False)
+    return Settings(analytics_enabled=False, tool_cache_enabled=False, provider_health_checks=False)
 
 
 @pytest.fixture
 def mock_provider():
     """Create a mock provider for testing."""
+    from unittest.mock import AsyncMock
+
     provider = MagicMock()
     provider.name = "mock"
     provider.supports_tools.return_value = True
     provider.supports_streaming.return_value = True
+    # Mock async methods
+    provider.discover_capabilities = AsyncMock()
+    provider.discover_capabilities.return_value = MagicMock(
+        provider="mock",
+        model="test-model",
+        context_window=128000,
+        supports_tools=True,
+        supports_streaming=True,
+        native_tool_calls=True,
+        source="discovery",
+    )
+    # Mock health check - needs to be async
+    provider.check_health = AsyncMock(return_value=True)
     return provider
 
 
 @pytest.fixture
 def mock_provider2():
     """Create a second mock provider for switching."""
+    from unittest.mock import AsyncMock
+
     provider = MagicMock()
     provider.name = "mock2"
     provider.supports_tools.return_value = True
     provider.supports_streaming.return_value = True
+    # Mock async methods
+    provider.discover_capabilities = AsyncMock()
+    provider.discover_capabilities.return_value = MagicMock(
+        provider="mock2",
+        model="test-model",
+        context_window=128000,
+        supports_tools=True,
+        supports_streaming=True,
+        native_tool_calls=True,
+        source="discovery",
+    )
+
+    # Mock health check - needs to be async
+    async def mock_health_check():
+        return True
+
+    provider.check_health = AsyncMock(return_value=True)
     return provider
 
 
@@ -80,11 +114,13 @@ class TestModelSwitchingIntegration:
 
     def test_switch_model_same_provider(self, orchestrator, mock_provider):
         """Test switching model on the same provider."""
+        import asyncio
+
         initial_provider = orchestrator.provider_name
         initial_model = orchestrator.model
 
-        # Switch to different model on same provider
-        success = orchestrator.switch_model("different-model")
+        # Switch to different model on same provider (async method, run in sync context)
+        success = asyncio.run(orchestrator.switch_model("different-model"))
 
         assert success is True
         assert orchestrator.model == "different-model"
@@ -93,27 +129,33 @@ class TestModelSwitchingIntegration:
 
     def test_model_switch_updates_provider_manager(self, orchestrator):
         """Test that model switch updates ProviderManager state."""
-        # Switch model
-        orchestrator.switch_model("new-model")
+        import asyncio
+
+        # Switch model - async method, run in sync context
+        asyncio.run(orchestrator.switch_model("new-model"))
 
         # ProviderManager should have updated model
         assert orchestrator._provider_manager.model == "new-model"
 
     def test_multiple_model_switches(self, orchestrator):
         """Test multiple consecutive model switches."""
+        import asyncio
+
         models = ["model1", "model2", "model3"]
 
         for model in models:
-            success = orchestrator.switch_model(model)
+            success = asyncio.run(orchestrator.switch_model(model))
             assert success is True
             assert orchestrator.model == model
 
     def test_model_switch_updates_tool_adapter(self, orchestrator):
         """Test that model switch updates tool adapter."""
+        import asyncio
+
         original_adapter = orchestrator.tool_adapter
 
-        # Switch model
-        orchestrator.switch_model("new-model")
+        # Switch model - async method, run in sync context
+        asyncio.run(orchestrator.switch_model("new-model"))
 
         # Tool adapter should be updated
         assert orchestrator.tool_adapter is not None
@@ -127,7 +169,8 @@ class TestProviderSwitchingIntegration:
         """Test switching provider while keeping the same model."""
         initial_model = orchestrator.model
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        # Patch at the location where it's used (provider switcher imports from registry)
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch provider (keep same model) - note: async call
@@ -142,7 +185,7 @@ class TestProviderSwitchingIntegration:
         """Test switching provider with a new model."""
         new_model = "new-provider-model"
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch provider with different model - note: async call
@@ -158,7 +201,7 @@ class TestProviderSwitchingIntegration:
         # This test verifies that the sync implementation handles custom settings correctly
         custom_settings = {"base_url": "http://localhost:8080", "timeout": 60}
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch with custom settings using the sync implementation
@@ -198,7 +241,7 @@ class TestProviderModelCombinedSwitching:
         initial_provider = orchestrator.provider_name
         initial_model = orchestrator.model
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch both provider and model - note: async call
@@ -219,7 +262,7 @@ class TestProviderModelCombinedSwitching:
             max_tokens=2048,
         )
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch to profile (both provider and model) - note: async call
@@ -255,7 +298,7 @@ class TestProfileBasedSwitching:
     @pytest.mark.asyncio
     async def test_switch_between_profiles(self, orchestrator, profiles_config, mock_provider2):
         """Test switching between different profiles."""
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Start with fast profile - note: async call
@@ -294,14 +337,16 @@ class TestSwitchSequencePreservation:
 
     def test_model_switch_preserves_conversation_state(self, orchestrator):
         """Test that model switch preserves conversation state."""
+        import asyncio
+
         # Add messages to conversation using the correct API
         orchestrator.add_message("user", "Question 1")
         orchestrator.add_message("assistant", "Answer 1")
 
         initial_count = orchestrator.get_message_count()
 
-        # Switch model (sync method)
-        orchestrator.switch_model("new-model")
+        # Switch model (async method, run in sync context)
+        asyncio.run(orchestrator.switch_model("new-model"))
 
         # Conversation should be preserved
         assert orchestrator.get_message_count() == initial_count
@@ -320,7 +365,7 @@ class TestSwitchSequencePreservation:
 
         initial_count = orchestrator.get_message_count()
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
             # Switch provider - note: async call
@@ -340,15 +385,15 @@ class TestSwitchSequencePreservation:
         orchestrator.add_message("user", "Initial question")
         orchestrator.add_message("assistant", "Initial answer")
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
+        with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # First switch (model - sync)
-            orchestrator.switch_model("model1")
+            # First switch (model - use async version in async context)
+            await orchestrator.switch_model("model1")
             assert orchestrator.get_message_count() == 2
 
-            # Second switch (model - sync)
-            orchestrator.switch_model("model2")
+            # Second switch (model - use async version in async context)
+            await orchestrator.switch_model("model2")
             assert orchestrator.get_message_count() == 2
 
             # Provider switch - note: async call

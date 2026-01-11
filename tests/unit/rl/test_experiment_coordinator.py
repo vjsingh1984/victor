@@ -19,7 +19,7 @@ Tests the A/B testing framework for RL policies.
 
 import pytest
 
-from victor.agent.rl.experiment_coordinator import (
+from victor.framework.rl.experiment_coordinator import (
     ExperimentConfig,
     ExperimentCoordinator,
     ExperimentResult,
