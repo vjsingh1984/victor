@@ -11,18 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Presentation Abstraction Layer** - Decouples UI concerns from core logic with `PresentationAdapter` protocol
 - **Registry Base Classes** - Centralized registry infrastructure in `victor/core/registry_base.py`
 - **Tool Selector Protocol** - Unified `IToolSelector` protocol for tool selection strategies
+- **SOLID Consolidation (Complete)** - 8-phase architectural refactoring for vertical configuration:
+  - **Universal Registry System** - Type-safe generic registry with cache strategies (TTL, LRU, Manual, None)
+  - **Data-Driven Mode Configuration** - YAML-based mode configs in `victor/config/modes/` for all verticals
+  - **RL Configuration Consolidation** - Centralized RL configs in `victor/config/rl/` with task mappings and quality thresholds
+  - **Capability System** - YAML-based capability registry in `victor/config/capabilities/` with 5 types (tool, workflow, middleware, validator, observer)
+  - **Team Specifications** - YAML-based team configs in `victor/config/teams/` with 5 formations (pipeline, parallel, sequential, hierarchical, consensus)
+  - **VerticalBase API** - New methods: `get_mode_config()`, `list_modes()`, `get_rl_config()`, `get_capabilities()`, `list_capability_names()`, `get_capability_provider()`, `get_team_provider()`, `get_team()`, `list_teams()`
+  - **Core Modules** - `victor/core/capabilities/` with CapabilityLoader, `victor/core/teams/` with BaseYAMLTeamProvider
+  - **Mode-Aware Loop Detection** - Context-aware LoopSignature class for mode-specific loop detection
+  - **Database Migration System** - Version-based schema evolution with safe column addition
 
 ### Changed
 - **Architecture Improvements** - Phase 1 and 2 refactoring for cleaner module boundaries
 - **Workflow Compiler** - Infrastructure improvements for reliability
 - **Tool Selection Defaults** - Centralized configuration in settings module
 - **Deprecated Workflow Executor APIs** - Removed legacy execution engine stubs
+- **Configuration System** - All vertical configurations now YAML-first with Python extensions
+- **Grounding Verifier** - Enhanced path validation for nested project structures
 
 ### Fixed
 - **Integration Test Blocking** - Resolved issues causing test hangs
 - **PersonaProvider Deadlock** - Fixed RLock deadlock in persona provider
 - **Import Errors** - Resolved import errors across integration and unit tests
 - **Service Provider Types** - Correct handling of string service types in DI container
+- **Nested Path Validation** - Fixed logic to properly validate suffix-based path references
+- **Loop Detection** - Mode-aware loop detection now uses exploration multipliers correctly
 
 ### Removed
 - **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
