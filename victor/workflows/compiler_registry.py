@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple registry for third-party workflow compiler plugins.
+"""Thread-safe registry for third-party workflow compiler plugins.
 
 Purpose:
     Allow third-party verticals to register custom workflow compilers
     without modifying Victor's core code.
+
+Refactored in Phase 4 to use ItemRegistry base class for:
+- Thread-safe singleton pattern
+- Consistent registry interface
+- Proper test isolation via reset_instance()
 
 Example (Third-party package):
     from victor.workflows.plugins import WorkflowCompilerPlugin
@@ -39,15 +44,110 @@ Example (Third-party package):
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, List, Type
+
+from victor.core.registry_base import ItemRegistry
 
 logger = logging.getLogger(__name__)
 
-# Global registry: name -> compiler class
-_compilers: Dict[str, type] = {}
+
+class WorkflowCompilerRegistry(ItemRegistry["WorkflowCompilerRegistry"]):
+    """Thread-safe singleton registry for workflow compiler plugins.
+
+    Provides centralized registration and retrieval of third-party
+    workflow compilers. Inherits thread-safe singleton pattern from
+    ItemRegistry.
+
+    Example:
+        registry = WorkflowCompilerRegistry.get_instance()
+        registry.register_compiler("security", SecurityCompilerPlugin)
+        compiler = registry.get_compiler("security", enable_caching=True)
+    """
+
+    def register_compiler(self, name: str, compiler_class: Type[Any]) -> None:
+        """Register a third-party workflow compiler plugin.
+
+        Args:
+            name: Unique name for the compiler (e.g., "security", "ml-pipeline")
+            compiler_class: Plugin class implementing WorkflowCompilerPlugin protocol
+
+        Example:
+            registry.register_compiler("security", SecurityCompilerPlugin)
+        """
+        if self.contains(name):
+            logger.warning(f"Compiler plugin '{name}' already registered, overwriting")
+
+        self.register(name, compiler_class)
+        logger.info(f"Registered compiler plugin: {name} -> {compiler_class.__name__}")
+
+    def unregister_compiler(self, name: str) -> None:
+        """Unregister a compiler plugin.
+
+        Args:
+            name: Name of the compiler to unregister
+
+        Raises:
+            KeyError: If name is not registered
+        """
+        if not self.contains(name):
+            raise KeyError(f"No compiler plugin registered for: {name}")
+
+        self.unregister(name)
+        logger.info(f"Unregistered compiler plugin: {name}")
+
+    def get_compiler(self, name: str, **options: Any) -> Any:
+        """Get an instance of a registered compiler plugin.
+
+        Args:
+            name: Name of the registered compiler
+            **options: Options to pass to the compiler constructor
+
+        Returns:
+            Compiler instance
+
+        Raises:
+            ValueError: If name is not registered
+
+        Example:
+            compiler = registry.get_compiler("security", enable_caching=True)
+            compiled = compiler.compile("workflow.yaml")
+        """
+        compiler_class = self.get(name)
+        if compiler_class is None:
+            registered = ", ".join(self.list_names())
+            raise ValueError(
+                f"Unknown compiler plugin: '{name}'. "
+                f"Registered compilers: {registered or '(none)'}"
+            )
+
+        return compiler_class(**options)
+
+    def is_compiler_registered(self, name: str) -> bool:
+        """Check if a compiler plugin is registered.
+
+        Args:
+            name: Name of the compiler to check
+
+        Returns:
+            True if registered, False otherwise
+        """
+        return self.contains(name)
+
+    def list_compilers(self) -> List[str]:
+        """List all registered compiler plugin names.
+
+        Returns:
+            List of registered compiler names
+        """
+        return self.list_names()
 
 
-def register_compiler(name: str, compiler_class: type) -> None:
+# =============================================================================
+# Module-level convenience functions (backward compatibility)
+# =============================================================================
+
+
+def register_compiler(name: str, compiler_class: Type[Any]) -> None:
     """Register a third-party workflow compiler plugin.
 
     Args:
@@ -65,11 +165,7 @@ def register_compiler(name: str, compiler_class: type) -> None:
 
         register_compiler("my_custom", MyCustomPlugin)
     """
-    if name in _compilers:
-        logger.warning(f"Compiler plugin '{name}' already registered, overwriting")
-
-    _compilers[name] = compiler_class
-    logger.info(f"Registered compiler plugin: {name} -> {compiler_class.__name__}")
+    WorkflowCompilerRegistry.get_instance().register_compiler(name, compiler_class)
 
 
 def unregister_compiler(name: str) -> None:
@@ -81,11 +177,7 @@ def unregister_compiler(name: str) -> None:
     Raises:
         KeyError: If name is not registered
     """
-    if name not in _compilers:
-        raise KeyError(f"No compiler plugin registered for: {name}")
-
-    del _compilers[name]
-    logger.info(f"Unregistered compiler plugin: {name}")
+    WorkflowCompilerRegistry.get_instance().unregister_compiler(name)
 
 
 def get_compiler(name: str, **options: Any) -> Any:
@@ -107,15 +199,7 @@ def get_compiler(name: str, **options: Any) -> Any:
         compiler = get_compiler("security", enable_caching=True)
         compiled = compiler.compile("workflow.yaml")
     """
-    if name not in _compilers:
-        registered = ", ".join(_compilers.keys())
-        raise ValueError(
-            f"Unknown compiler plugin: '{name}'. "
-            f"Registered compilers: {registered or '(none)'}"
-        )
-
-    compiler_class = _compilers[name]
-    return compiler_class(**options)
+    return WorkflowCompilerRegistry.get_instance().get_compiler(name, **options)
 
 
 def is_registered(name: str) -> bool:
@@ -127,19 +211,22 @@ def is_registered(name: str) -> bool:
     Returns:
         True if registered, False otherwise
     """
-    return name in _compilers
+    return WorkflowCompilerRegistry.get_instance().is_compiler_registered(name)
 
 
-def list_compilers() -> list[str]:
+def list_compilers() -> List[str]:
     """List all registered compiler plugin names.
 
     Returns:
         List of registered compiler names
     """
-    return list(_compilers.keys())
+    return WorkflowCompilerRegistry.get_instance().list_compilers()
 
 
 __all__ = [
+    # Class-based API
+    "WorkflowCompilerRegistry",
+    # Function-based API (backward compatibility)
     "register_compiler",
     "unregister_compiler",
     "get_compiler",
