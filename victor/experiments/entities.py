@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -145,7 +145,7 @@ class Experiment:
     hypothesis: str = ""
     tags: List[str] = field(default_factory=list)
     parameters: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     status: ExperimentStatus = ExperimentStatus.DRAFT
     git_commit_sha: str = ""
     git_branch: str = ""
@@ -232,7 +232,7 @@ class Run:
     experiment_id: str = ""
     name: str = ""
     status: RunStatus = RunStatus.QUEUED
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     metrics_summary: Dict[str, float] = field(default_factory=dict)
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -334,7 +334,7 @@ class Artifact:
     filename: str = ""
     file_path: str = ""
     file_size_bytes: int = 0
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

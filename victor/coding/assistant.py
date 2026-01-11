@@ -536,6 +536,23 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
         return HANDLERS
 
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Get coding capability configurations for centralized storage.
+
+        Returns coding capability configurations for VerticalContext storage.
+        This replaces direct orchestrator attribute assignment patterns like:
+        - orchestrator.code_style = {...}
+        - orchestrator.test_config = {...}
+        - orchestrator.lsp_config = {...}
+
+        Returns:
+            Dict with coding capability configurations
+        """
+        from victor.coding.capabilities import get_capability_configs
+
+        return get_capability_configs()
+
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.
     # To clear all caches, use cls.clear_config_cache().

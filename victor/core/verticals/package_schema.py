@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from victor.core.verticals.base import VerticalBase
 
@@ -110,7 +110,8 @@ class VerticalPackageMetadata(BaseModel):
     security: VerticalSecurity = Field(default_factory=VerticalSecurity)
     installation: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, v: str) -> str:
         """Validate that the vertical name is not reserved."""
         reserved = {
@@ -129,7 +130,8 @@ class VerticalPackageMetadata(BaseModel):
             raise ValueError(f"'{v}' is a reserved name")
         return v
 
-    @validator("version")
+    @field_validator("version")
+    @classmethod
     def validate_version(cls, v: str) -> str:
         """Validate that the version is a valid semantic version."""
         try:
@@ -140,7 +142,8 @@ class VerticalPackageMetadata(BaseModel):
             raise ValueError(f"Invalid version '{v}': {e}") from e
         return v
 
-    @validator("requires_victor")
+    @field_validator("requires_victor")
+    @classmethod
     def validate_requires_victor(cls, v: str) -> str:
         """Validate that the Victor version requirement is valid."""
         try:

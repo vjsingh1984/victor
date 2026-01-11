@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -129,7 +129,7 @@ class ArtifactManager:
             filename=source_path.name,
             file_path=str(dest_path),
             file_size_bytes=file_size,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             metadata=metadata or {},
         )
 

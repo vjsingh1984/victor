@@ -152,15 +152,9 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
         return mapping.get(task_type.lower())
 
 
-# Register Benchmark domain handlers when this module is loaded
-# Note: handlers.py is optional for benchmark vertical
-try:
-    from victor.benchmark.handlers import register_handlers as _register_handlers
-
-    _register_handlers()
-except ImportError:
-    # Handlers not yet implemented
-    pass
+# Note: Handlers are now registered via BenchmarkVertical.get_handlers()
+# instead of import-side-effect registration. This follows SRP by making
+# registration explicit through the vertical protocol.
 
 __all__ = [
     # YAML-first workflow provider

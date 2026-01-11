@@ -46,4 +46,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def register_builtin_plugins() -> None:
+    """Register built-in workflow compiler plugins.
+
+    This is a no-op function provided for compatibility with the bootstrap
+    process. There are currently no built-in plugins - all workflow
+    compilation is handled by UnifiedWorkflowCompiler directly.
+
+    Third-party packages should register their plugins through their
+    own initialization code.
+    """
+    pass
+
+
 __all__ = []

@@ -15,7 +15,7 @@
 """Unit tests for experiment tracking module."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from victor.experiments import (
     ExperimentTracker,
@@ -201,7 +201,7 @@ def test_run_duration(tracker: ExperimentTracker):
 
     experiment = tracker.create_experiment(name="test-experiment")
 
-    start = datetime.utcnow()
+    start = datetime.now(timezone.utc)
     run = tracker.start_run(experiment_id=experiment.experiment_id)
     time.sleep(0.1)  # Small delay
     run.end_run()

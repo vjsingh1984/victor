@@ -46,7 +46,7 @@ import victor.framework.middleware as middleware_module
 # =============================================================================
 
 
-@dataclass
+@dataclass(frozen=True)
 class MiddlewareProfile:
     """A middleware profile with pre-configured middleware list.
 

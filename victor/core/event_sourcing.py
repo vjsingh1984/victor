@@ -114,7 +114,7 @@ class DomainEvent:
 
     # Metadata
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = 1
     correlation_id: Optional[str] = None
     causation_id: Optional[str] = None
@@ -216,7 +216,7 @@ class EventEnvelope:
     stream_id: str
     stream_version: int
     event: DomainEvent
-    stored_at: datetime = field(default_factory=datetime.utcnow)
+    stored_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize envelope to dictionary."""

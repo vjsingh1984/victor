@@ -137,7 +137,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         print(f"📚 Table: {table_name}")
 
         # Check if table exists
-        existing_tables = self.db.table_names()
+        existing_tables = self.db.list_tables().tables
         if table_name not in existing_tables:
             # Create empty table with schema
             # We'll add data later when indexing
@@ -373,7 +373,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Drop and recreate table
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        if table_name in self.db.table_names():
+        if table_name in self.db.list_tables().tables:
             self.db.drop_table(table_name)
 
         self.table = None

@@ -278,3 +278,22 @@ You are being evaluated on:
         from victor.benchmark.mode_config import BenchmarkModeConfigProvider
 
         return BenchmarkModeConfigProvider()
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get benchmark compute handlers for workflow execution.
+
+        Provides handlers for benchmark-specific workflow nodes like:
+        - passk_generation: Multi-attempt code generation with pass@k metrics
+        - git_diff_generator: Create git diffs from code changes
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        try:
+            from victor.benchmark.handlers import HANDLERS
+
+            return HANDLERS
+        except ImportError:
+            # Handlers not yet implemented
+            return {}

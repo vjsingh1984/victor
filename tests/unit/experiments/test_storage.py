@@ -15,7 +15,7 @@
 """Unit tests for SQLite storage backend."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from victor.experiments import (
@@ -197,7 +197,7 @@ def test_log_metric(temp_db: SQLiteStorage):
         run_id=run.run_id,
         key="accuracy",
         value=0.95,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
     )
 
     temp_db.log_metric(metric)
@@ -220,9 +220,9 @@ def test_get_metrics(temp_db: SQLiteStorage):
     temp_db.create_run(run)
 
     # Log multiple metrics
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.0, timestamp=datetime.utcnow()))
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m2", value=2.0, timestamp=datetime.utcnow()))
-    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.5, timestamp=datetime.utcnow()))
+    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.0, timestamp=datetime.now(timezone.utc)))
+    temp_db.log_metric(Metric(run_id=run.run_id, key="m2", value=2.0, timestamp=datetime.now(timezone.utc)))
+    temp_db.log_metric(Metric(run_id=run.run_id, key="m1", value=1.5, timestamp=datetime.now(timezone.utc)))
 
     # Retrieve all metrics
     metrics = temp_db.get_metrics(run.run_id)

@@ -27,7 +27,7 @@ import platform
 import subprocess
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
@@ -107,7 +107,7 @@ class ActiveRun:
             run_id=self._run.run_id,
             key=key,
             value=value,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             step=step,
         )
 
@@ -223,7 +223,7 @@ class ActiveRun:
 
         self._ended = True
         self._run.status = status
-        self._run.completed_at = datetime.utcnow()
+        self._run.completed_at = datetime.now(timezone.utc)
 
         self._storage.update_run(
             self._run.run_id,
@@ -397,7 +397,7 @@ class ExperimentTracker:
 
         run = Run(
             experiment_id=experiment_id,
-            name=run_name or f"run-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+            name=run_name or f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
             status=RunStatus.RUNNING,
             parameters=parameters or {},
             python_version=env_info["python_version"],
