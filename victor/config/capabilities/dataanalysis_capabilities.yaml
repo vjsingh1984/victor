@@ -1,0 +1,73 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for DataAnalysis Vertical
+
+vertical_name: dataanalysis
+
+capabilities:
+  - name: data_profiling
+    capability_type: tool
+    version: "1.0"
+    description: Data profiling and statistics generation
+    tags:
+      - profiling
+      - statistics
+      - exploration
+    handler_module: victor.dataanalysis.capabilities
+    handler_function: configure_data_profiling
+    default_config:
+      include_visualizations: true
+      compute_correlations: true
+      detect_outliers: true
+
+  - name: visualization_settings
+    capability_type: mode
+    version: "1.0"
+    description: Visualization style and format configuration
+    tags:
+      - visualization
+      - charts
+      - plotting
+    handler_module: victor.dataanalysis.capabilities
+    handler_function: configure_visualization
+    getter_function: get_visualization_config
+    default_config:
+      default_style: seaborn
+      figure_size:
+        width: 10
+        height: 6
+      dpi: 100
+      color_palette: tab10
+
+  - name: statistical_analysis
+    capability_type: tool
+    version: "1.0"
+    description: Statistical testing and analysis
+    tags:
+      - statistics
+      - testing
+      - analysis
+    handler_module: victor.dataanalysis.capabilities
+    handler_function: configure_statistical_analysis
+    default_config:
+      significance_level: 0.05
+      multiple_testing_correction: bonferroni
+      include_effect_size: true
+    dependencies:
+      - data_profiling
+
+  - name: ml_pipeline
+    capability_type: tool
+    version: "1.0"
+    description: Machine learning pipeline configuration
+    tags:
+      - ml
+      - pipeline
+      - modeling
+    handler_module: victor.dataanalysis.capabilities
+    handler_function: configure_ml_pipeline
+    default_config:
+      default_framework: scikit-learn
+      enable_hyperparameter_tuning: true
+      cross_validation_folds: 5
+      enable_feature_importance: true

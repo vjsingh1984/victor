@@ -1,0 +1,72 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for RAG Vertical
+
+vertical_name: rag
+
+capabilities:
+  - name: vector_search
+    capability_type: tool
+    version: "1.0"
+    description: Vector similarity search capabilities
+    tags:
+      - search
+      - vector
+      - semantic
+    handler_module: victor.rag.capabilities
+    handler_function: configure_vector_search
+    default_config:
+      similarity_threshold: 0.75
+      max_results: 10
+      search_mode: hybrid
+
+  - name: document_ingestion
+    capability_type: tool
+    version: "1.0"
+    description: Document ingestion and processing
+    tags:
+      - ingestion
+      - processing
+      - indexing
+    handler_module: victor.rag.capabilities
+    handler_function: configure_document_ingestion
+    default_config:
+      chunk_size: 512
+      chunk_overlap: 50
+      supported_formats:
+        - pdf
+        - txt
+        - md
+        - html
+
+  - name: query_enhancement
+    capability_type: mode
+    version: "1.0"
+    description: Query expansion and enhancement
+    tags:
+      - query
+      - enhancement
+      - retrieval
+    handler_module: victor.rag.capabilities
+    handler_function: configure_query_enhancement
+    default_config:
+      enable_query_expansion: true
+      enable_reranking: true
+      max_hyde_queries: 3
+    dependencies:
+      - vector_search
+
+  - name: knowledge_base_management
+    capability_type: tool
+    version: "1.0"
+    description: Knowledge base creation and management
+    tags:
+      - management
+      - knowledge-base
+      - indexing
+    handler_module: victor.rag.capabilities
+    handler_function: configure_knowledge_base
+    default_config:
+      enable_versioning: true
+      auto_update: false
+      max_kb_size_mb: 1000

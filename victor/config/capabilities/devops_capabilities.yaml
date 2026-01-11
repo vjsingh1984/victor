@@ -1,0 +1,73 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for DevOps Vertical
+
+vertical_name: devops
+
+capabilities:
+  - name: deployment_safety
+    capability_type: safety
+    version: "1.0"
+    description: Deployment safety rules and checks
+    tags:
+      - deployment
+      - safety
+      - production
+    handler_module: victor.devops.capabilities
+    handler_function: configure_deployment_safety
+    default_config:
+      require_approval_for_production: true
+      require_backup_before_deploy: true
+      enable_rollback: true
+      protected_environments:
+        - production
+        - staging
+
+  - name: container_settings
+    capability_type: mode
+    version: "1.0"
+    description: Container runtime and registry configuration
+    tags:
+      - container
+      - docker
+      - runtime
+    handler_module: victor.devops.capabilities
+    handler_function: configure_container_settings
+    getter_function: get_container_settings
+    default_config:
+      runtime: docker
+      default_registry: null
+      security_scan_enabled: true
+      max_image_size_mb: 2000
+
+  - name: infrastructure_settings
+    capability_type: mode
+    version: "1.0"
+    description: Infrastructure as Code configuration
+    tags:
+      - iac
+      - terraform
+      - infrastructure
+    handler_module: victor.devops.capabilities
+    handler_function: configure_infrastructure_settings
+    default_config:
+      iac_tool: terraform
+      auto_approve_non_destructive: false
+      require_plan_before_apply: true
+      state_backend: null
+
+  - name: ci_cd_integration
+    capability_type: tool
+    version: "1.0"
+    description: CI/CD pipeline integration
+    tags:
+      - ci-cd
+      - pipeline
+      - automation
+    handler_module: victor.devops.capabilities
+    handler_function: configure_ci_cd
+    default_config:
+      platform: github
+      require_tests: true
+      require_review: true
+      auto_deploy_on_success: false

@@ -1,0 +1,96 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for Coding Vertical
+
+vertical_name: coding
+
+capabilities:
+  - name: git_safety
+    capability_type: safety
+    version: "1.0"
+    description: Git safety rules for preventing dangerous operations
+    tags:
+      - safety
+      - git
+      - version-control
+    handler_module: victor.coding.capabilities
+    handler_function: configure_git_safety
+    default_config:
+      block_force_push: true
+      block_main_push: true
+      require_tests_before_commit: false
+      allowed_branches: []
+
+  - name: code_style
+    capability_type: mode
+    version: "1.0"
+    description: Code style and formatting configuration
+    tags:
+      - style
+      - formatting
+      - linting
+    handler_module: victor.coding.capabilities
+    handler_function: configure_code_style
+    getter_function: get_code_style
+    default_config:
+      formatter: black
+      linter: ruff
+      max_line_length: 100
+      enforce_type_hints: true
+
+  - name: test_requirements
+    capability_type: mode
+    version: "1.0"
+    description: Test configuration and requirements
+    tags:
+      - testing
+      - coverage
+      - quality
+    handler_module: victor.coding.capabilities
+    handler_function: configure_test_requirements
+    default_config:
+      min_coverage: 0.0
+      required_patterns: []
+      test_framework: pytest
+      run_on_edit: false
+
+  - name: language_server
+    capability_type: tool
+    version: "1.0"
+    description: Language server protocol configuration
+    tags:
+      - lsp
+      - ide
+      - code-intelligence
+    handler_module: victor.coding.capabilities
+    handler_function: configure_language_server
+    default_config:
+      languages:
+        - python
+        - typescript
+        - javascript
+        - rust
+        - go
+      features:
+        hover: true
+        references: true
+        symbols: true
+    dependencies:
+      - code_intelligence
+
+  - name: refactoring
+    capability_type: tool
+    version: "1.0"
+    description: Refactoring tool configuration
+    tags:
+      - refactoring
+      - code-transformation
+    handler_module: victor.coding.capabilities
+    handler_function: configure_refactoring
+    default_config:
+      enable_rename: true
+      enable_extract: true
+      enable_inline: true
+      require_tests: true
+    dependencies:
+      - language_server

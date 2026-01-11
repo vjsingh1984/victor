@@ -24,9 +24,15 @@ Exports:
     EditPermission: Edit permission enum
     RLConfigRegistry: Registry for RL configurations
     RLConfig: RL configuration dataclass
+    CapabilityConfigRegistry: Registry for capability configurations
+    CapabilityConfig: Capability configuration dataclass
 
 Example:
-    from victor.core.config import ModeConfigRegistry, RLConfigRegistry
+    from victor.core.config import (
+        ModeConfigRegistry,
+        RLConfigRegistry,
+        CapabilityConfigRegistry,
+    )
 
     # Mode configuration
     mode_registry = ModeConfigRegistry.get_instance()
@@ -37,8 +43,19 @@ Example:
     rl_registry = RLConfigRegistry.get_instance()
     rl_config = rl_registry.get_rl_config("coding")
     print(rl_config.task_type_mappings)
+
+    # Capability configuration
+    cap_registry = CapabilityConfigRegistry.get_instance()
+    caps = cap_registry.get_capabilities("coding")
+    for cap in caps.capabilities:
+        print(f"{cap.name}: {cap.description}")
 """
 
+from victor.core.config.capability_config import (
+    CapabilityConfig,
+    CapabilityConfigRegistry,
+    VerticalCapabilities,
+)
 from victor.core.config.mode_config import (
     AgentMode,
     EditPermission,
@@ -63,4 +80,8 @@ __all__ = [
     # RL configuration
     "RLConfigRegistry",
     "RLConfig",
+    # Capability configuration
+    "CapabilityConfigRegistry",
+    "CapabilityConfig",
+    "VerticalCapabilities",
 ]

@@ -568,6 +568,43 @@ class VerticalBase(
         registry = RLConfigRegistry.get_instance()
         return registry.get_rl_config(cls.name)
 
+    # =========================================================================
+    # Capability Configuration (Canonical - using CapabilityConfigRegistry)
+    # =========================================================================
+
+    @classmethod
+    def get_capabilities(cls):
+        """Get capability configurations from centralized registry.
+
+        This provides data-driven capability configuration that complements
+        the existing BaseCapabilityProvider pattern.
+
+        Returns:
+            VerticalCapabilities instance with capability configurations
+
+        Example:
+            caps = CodingVertical.get_capabilities()
+            for cap in caps.capabilities:
+                print(f"{cap.name}: {cap.description}")
+                handler = cap.import_handler()
+                if handler:
+                    handler(orchestrator, **cap.default_config)
+        """
+        from victor.core.config import CapabilityConfigRegistry
+
+        registry = CapabilityConfigRegistry.get_instance()
+        return registry.get_capabilities(cls.name)
+
+    @classmethod
+    def list_capability_names(cls) -> List[str]:
+        """List available capability names for this vertical.
+
+        Returns:
+            List of capability names available for this vertical.
+        """
+        caps = cls.get_capabilities()
+        return caps.list_capabilities()
+
     @classmethod
     async def create_agent(
         cls,

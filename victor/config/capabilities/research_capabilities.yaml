@@ -1,0 +1,73 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Capability Configuration for Research Vertical
+
+vertical_name: research
+
+capabilities:
+  - name: source_verification
+    capability_type: safety
+    version: "1.0"
+    description: Source credibility verification and validation
+    tags:
+      - research
+      - verification
+      - credibility
+    handler_module: victor.research.capabilities
+    handler_function: configure_source_verification
+    getter_function: get_source_verification
+    default_config:
+      min_credibility: 0.7
+      min_source_count: 3
+      require_diverse_sources: true
+      validate_urls: true
+
+  - name: citation_management
+    capability_type: mode
+    version: "1.0"
+    description: Citation and bibliography management
+    tags:
+      - citation
+      - bibliography
+      - academic
+    handler_module: victor.research.capabilities
+    handler_function: configure_citation_management
+    getter_function: get_citation_config
+    default_config:
+      default_style: apa
+      require_urls: true
+      include_authors: true
+      include_dates: true
+
+  - name: web_search_integration
+    capability_type: tool
+    version: "1.0"
+    description: Web search capabilities for research
+    tags:
+      - search
+      - web
+      - discovery
+    handler_module: victor.research.capabilities
+    handler_function: configure_web_search
+    default_config:
+      max_results: 10
+      search_depth: standard
+      include_snippets: true
+
+  - name: synthesis_assistant
+    capability_type: tool
+    version: "1.0"
+    description: Research synthesis and summary capabilities
+    tags:
+      - synthesis
+      - summary
+      - analysis
+    handler_module: victor.research.capabilities
+    handler_function: configure_synthesis
+    default_config:
+      synthesis_length: medium
+      include_key_findings: true
+      include_citations: true
+    dependencies:
+      - source_verification
+      - citation_management
