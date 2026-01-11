@@ -180,15 +180,17 @@ def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
     return result
 
 
-# Backward compatibility: module-level exports
-# These are loaded lazily to avoid circular imports and improve startup time
-RAG_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = None  # type: ignore
-RAG_TOOL_CLUSTERS: Dict[str, Set[str]] = None  # type: ignore
-RAG_TOOL_SEQUENCES: Dict[str, List[str]] = None  # type: ignore
-RAG_TOOL_DEPENDENCIES: List[ToolDependency] = None  # type: ignore
-RAG_REQUIRED_TOOLS: Set[str] = None  # type: ignore
-RAG_OPTIONAL_TOOLS: Set[str] = None  # type: ignore
-RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = None  # type: ignore
+# Backward compatibility: module-level exports accessed via __getattr__
+# These constants are deprecated and will emit warnings when accessed.
+_DEPRECATED_CONSTANTS = {
+    "RAG_TOOL_TRANSITIONS": _get_transitions,
+    "RAG_TOOL_CLUSTERS": _get_clusters,
+    "RAG_TOOL_SEQUENCES": _get_sequences,
+    "RAG_TOOL_DEPENDENCIES": _get_dependencies,
+    "RAG_REQUIRED_TOOLS": _get_required_tools,
+    "RAG_OPTIONAL_TOOLS": _get_optional_tools,
+    "RAG_COMPOSED_PATTERNS": _get_composed_patterns,
+}
 
 
 def _warn_deprecated(name: str) -> None:
@@ -213,51 +215,9 @@ def __getattr__(name: str) -> Any:
         These constants are deprecated. Use RAGToolDependencyProvider() or
         create_vertical_tool_dependency_provider('rag') instead.
     """
-    global RAG_TOOL_TRANSITIONS, RAG_TOOL_CLUSTERS, RAG_TOOL_SEQUENCES
-    global RAG_TOOL_DEPENDENCIES, RAG_REQUIRED_TOOLS, RAG_OPTIONAL_TOOLS
-    global RAG_COMPOSED_PATTERNS
-
-    if name == "RAG_TOOL_TRANSITIONS":
+    if name in _DEPRECATED_CONSTANTS:
         _warn_deprecated(name)
-        if RAG_TOOL_TRANSITIONS is None:
-            RAG_TOOL_TRANSITIONS = _get_transitions()
-        return RAG_TOOL_TRANSITIONS
-
-    if name == "RAG_TOOL_CLUSTERS":
-        _warn_deprecated(name)
-        if RAG_TOOL_CLUSTERS is None:
-            RAG_TOOL_CLUSTERS = _get_clusters()
-        return RAG_TOOL_CLUSTERS
-
-    if name == "RAG_TOOL_SEQUENCES":
-        _warn_deprecated(name)
-        if RAG_TOOL_SEQUENCES is None:
-            RAG_TOOL_SEQUENCES = _get_sequences()
-        return RAG_TOOL_SEQUENCES
-
-    if name == "RAG_TOOL_DEPENDENCIES":
-        _warn_deprecated(name)
-        if RAG_TOOL_DEPENDENCIES is None:
-            RAG_TOOL_DEPENDENCIES = _get_dependencies()
-        return RAG_TOOL_DEPENDENCIES
-
-    if name == "RAG_REQUIRED_TOOLS":
-        _warn_deprecated(name)
-        if RAG_REQUIRED_TOOLS is None:
-            RAG_REQUIRED_TOOLS = _get_required_tools()
-        return RAG_REQUIRED_TOOLS
-
-    if name == "RAG_OPTIONAL_TOOLS":
-        _warn_deprecated(name)
-        if RAG_OPTIONAL_TOOLS is None:
-            RAG_OPTIONAL_TOOLS = _get_optional_tools()
-        return RAG_OPTIONAL_TOOLS
-
-    if name == "RAG_COMPOSED_PATTERNS":
-        _warn_deprecated(name)
-        if RAG_COMPOSED_PATTERNS is None:
-            RAG_COMPOSED_PATTERNS = _get_composed_patterns()
-        return RAG_COMPOSED_PATTERNS
+        return _DEPRECATED_CONSTANTS[name]()
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
