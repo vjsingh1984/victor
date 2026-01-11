@@ -83,6 +83,7 @@ from victor.agent.teams.communication import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -141,12 +142,14 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         orchestrator: "AgentOrchestrator",
         sub_agent_orchestrator: Optional[SubAgentOrchestrator] = None,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize team coordinator.
 
         Args:
             orchestrator: Parent orchestrator
             sub_agent_orchestrator: Optional sub-agent orchestrator (created if not provided)
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.orchestrator = orchestrator
         self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
@@ -163,6 +166,14 @@ class TeamCoordinator(ITeamCoordinator):
         self._vertical_name: str = "coding"
         self._trigger: str = "auto"  # auto, manual, suggestion
         self._rl_coordinator: Optional[Any] = None
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
         logger.info("TeamCoordinator initialized")
 
@@ -438,7 +449,7 @@ class TeamCoordinator(ITeamCoordinator):
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.base import RLOutcome
 
             # Compute quality score based on success and efficiency
             quality_score = 0.5  # Baseline
@@ -509,7 +520,7 @@ class TeamCoordinator(ITeamCoordinator):
             quality_score: Computed quality score
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:
@@ -1165,7 +1176,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
         for member in config.members:
             result = member_results.get(member.id)
             if result:
-                status = "✓" if result.success else "✗"
+                status = self._presentation.icon(
+                    "success" if result.success else "error", with_color=False
+                )
                 lines.append(f"## {status} {member.name}")
                 lines.append(result.output if result.output else "(no output)")
                 lines.append("")

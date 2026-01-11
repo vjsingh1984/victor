@@ -72,4 +72,24 @@ __all__ = [
     "create_embedding_model",
     # Registry
     "EmbeddingRegistry",
+    "reset_embedding_registry",
+    "get_embedding_registry_stats",
 ]
+
+
+def reset_embedding_registry() -> None:
+    """Reset the embedding provider cache.
+
+    This is a convenience function that calls EmbeddingRegistry.reset().
+    Mainly useful for testing to clear cached provider instances.
+    """
+    EmbeddingRegistry.reset()
+
+
+def get_embedding_registry_stats() -> dict:
+    """Get statistics about the embedding provider cache.
+
+    Returns:
+        Dictionary with cache size and provider breakdown
+    """
+    return EmbeddingRegistry.get_cache_stats()

@@ -19,7 +19,7 @@ from victor.framework._internal import (
     setup_observability_integration,
     stream_with_events,
 )
-from victor.framework.events import Event, EventType
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.tools import ToolSet
 
 
@@ -349,15 +349,15 @@ class TestCollectToolCalls:
     def test_collect_ignores_non_tool_events(self):
         """Test that non-tool events are ignored."""
         events = [
-            Event(type=EventType.CONTENT, content="hello"),
-            Event(type=EventType.STREAM_START),
+            AgentExecutionEvent(type=EventType.CONTENT, content="hello"),
+            AgentExecutionEvent(type=EventType.STREAM_START),
         ]
         assert collect_tool_calls(events) == []
 
     def test_collect_tool_results(self):
         """Test collecting tool result events."""
         events = [
-            Event(
+            AgentExecutionEvent(
                 type=EventType.TOOL_RESULT,
                 tool_name="read",
                 tool_id="call_1",
@@ -365,8 +365,8 @@ class TestCollectToolCalls:
                 result="file contents",
                 success=True,
             ),
-            Event(type=EventType.CONTENT, content="Done"),
-            Event(
+            AgentExecutionEvent(type=EventType.CONTENT, content="Done"),
+            AgentExecutionEvent(
                 type=EventType.TOOL_RESULT,
                 tool_name="write",
                 tool_id="call_2",

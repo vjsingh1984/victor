@@ -108,6 +108,29 @@ from victor.protocols.team import (
     TeamMemberProtocol,
 )
 
+# Search Protocols
+from victor.protocols.search import (
+    ISemanticSearch,
+    IIndexable,
+    ISemanticSearchWithIndexing,
+)
+
+# Agent Orchestrator Protocol (breaks circular dependencies)
+from victor.protocols.agent import (
+    IAgentOrchestrator,
+    IAgentOrchestratorFactory,
+)
+
+# Tool Selector Protocol (unifies tool selection interfaces)
+from victor.protocols.tool_selector import (
+    IToolSelector,
+    IConfigurableToolSelector,
+    IToolSelectorFactory,
+    ToolSelectionResult,
+    ToolSelectionContext,
+    ToolSelectionStrategy,
+)
+
 __all__ = [
     # Provider Adapter
     "IProviderAdapter",
@@ -182,4 +205,18 @@ __all__ = [
     "IEnhancedTeamCoordinator",
     "TeamCoordinatorProtocol",
     "TeamMemberProtocol",
+    # Search Protocols
+    "ISemanticSearch",
+    "IIndexable",
+    "ISemanticSearchWithIndexing",
+    # Agent Orchestrator Protocol
+    "IAgentOrchestrator",
+    "IAgentOrchestratorFactory",
+    # Tool Selector Protocol
+    "IToolSelector",
+    "IConfigurableToolSelector",
+    "IToolSelectorFactory",
+    "ToolSelectionResult",
+    "ToolSelectionContext",
+    "ToolSelectionStrategy",
 ]

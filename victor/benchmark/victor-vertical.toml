@@ -1,0 +1,59 @@
+[vertical]
+name = "benchmark"
+version = "0.5.1"
+description = "Benchmark vertical for SWE-bench, HumanEval, and code generation evaluation"
+authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
+license = "Apache-2.0"
+requires_victor = ">=0.5.0"
+
+python_package = "victor-ai"
+homepage = "https://github.com/vijay-singh/codingagent"
+repository = "https://github.com/vijay-singh/codingagent"
+documentation = "https://docs.victor.dev"
+issues = "https://github.com/vijay-singh/codingagent/issues"
+
+category = "evaluation"
+tags = ["benchmark", "swe-bench", "humaneval", "evaluation", "testing"]
+
+[vertical.class]
+module = "victor.benchmark.benchmark_assistant"
+class_name = "BenchmarkAssistant"
+provides_tools = [
+    "run_benchmark",
+    "evaluate_results",
+    "generate_report",
+]
+provides_workflows = [
+    "swe_bench",
+    "humaneval",
+    "passk_generation",
+    "benchmark_suite",
+    "evaluation_pipeline",
+    "report_generation",
+    "comparative_analysis",
+    "performance_tracking",
+]
+provides_capabilities = [
+    "benchmark_execution",
+    "performance_evaluation",
+    "result_analysis",
+]
+
+[vertical.dependencies]
+python = ["datasets>=2.14.0", "evaluate>=0.4.0"]
+verticals = ["coding"]
+
+[vertical.compatibility]
+requires_tool_calling = true
+preferred_providers = ["anthropic", "openai"]
+min_context_window = 100000
+python_version = ">=3.10"
+
+[vertical.security]
+signed = false
+verified_author = false
+permissions = ["filesystem:read", "filesystem:write", "network", "shell"]
+
+[vertical.installation]
+install_command = "pip install victor-ai[benchmark]"
+extras = ["benchmark"]

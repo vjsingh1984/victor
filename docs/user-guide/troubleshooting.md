@@ -1025,10 +1025,10 @@ logging:
 
 ### Documentation
 
-- **Full Docs**: [docs/README.md](../README.md)
-- **User Guide**: [User Guide →](../user-guide/)
-- **Reference**: [Provider Reference →](../reference/providers/)
-- **Configuration**: [Configuration →](../reference/configuration/)
+- **Full Docs**: [Documentation Home](/index.md)
+- **User Guide**: [User Guide](/user-guide/index.md)
+- **Reference**: [Provider Reference](/user-guide/providers.md)
+- **Configuration**: [Configuration Options](/reference/configuration-options.md)
 
 ### Community
 
@@ -1109,4 +1109,4 @@ CLAUDE.md                   # AI instructions
 
 **Still stuck?** [Open an issue →](https://github.com/vjsingh1984/victor/issues/new)
 
-**Next**: [User Guide →](../user-guide/) | [Provider Reference →](../reference/providers/) | [Configuration →](../reference/configuration/)
+**Next**: [User Guide](/user-guide/index.md) | [Provider Reference](/user-guide/providers.md) | [Configuration Options](/reference/configuration-options.md)

@@ -18,7 +18,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework.workflow_engine import (
-    ExecutionResult,
+    WorkflowExecutionResult,
     WorkflowEngine,
     WorkflowEngineConfig,
     WorkflowEngineProtocol,
@@ -66,12 +66,12 @@ class TestWorkflowEngineConfig:
         assert config.parallel_execution is False
 
 
-class TestExecutionResult:
-    """Tests for ExecutionResult."""
+class TestWorkflowExecutionResult:
+    """Tests for WorkflowExecutionResult."""
 
     def test_successful_result(self):
         """Test creating a successful result."""
-        result = ExecutionResult(
+        result = WorkflowExecutionResult(
             success=True,
             final_state={"output": "data"},
             nodes_executed=["node1", "node2"],
@@ -86,7 +86,7 @@ class TestExecutionResult:
 
     def test_failed_result(self):
         """Test creating a failed result."""
-        result = ExecutionResult(
+        result = WorkflowExecutionResult(
             success=False,
             error="Something went wrong",
             duration_seconds=0.5,
@@ -98,7 +98,7 @@ class TestExecutionResult:
 
     def test_cached_result(self):
         """Test a cached result."""
-        result = ExecutionResult(
+        result = WorkflowExecutionResult(
             success=True,
             cached=True,
             final_state={"cached": True},

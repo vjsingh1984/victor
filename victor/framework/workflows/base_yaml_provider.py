@@ -32,15 +32,14 @@ Example:
 
     # Usage
     provider = ResearchWorkflowProvider()
-    async for chunk in provider.astream("deep_research", orchestrator, {}):
-        print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+    async for node_id, state in provider.stream_compiled_workflow("deep_research", {}):
+        print(f"Completed: {node_id}")
 """
 
 from __future__ import annotations
 
 import importlib
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
@@ -51,24 +50,9 @@ from victor.workflows.definition import WorkflowDefinition
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
-    from victor.framework.graph import ExecutionResult
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
-    from victor.workflows.streaming import WorkflowStreamChunk
-    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
+    from victor.framework.graph import GraphExecutionResult
     from victor.workflows.unified_compiler import CachedCompiledGraph, UnifiedWorkflowCompiler
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
-
-
-class _MinimalOrchestrator:
-    """Minimal orchestrator mock for compute-only workflow execution.
-
-    This class provides the minimal interface required by WorkflowExecutor
-    for workflows that only contain compute nodes (no agent nodes).
-    Agent nodes require a full orchestrator with LLM capabilities.
-    """
-
-    pass
 
 
 class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
@@ -130,6 +114,89 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                 return "victor.research.escape_hatches"
         """
         ...
+
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the capability provider.
+
+        This optional method allows subclasses to specify their capability
+        provider module for automatic registration. This enables workflows
+        to access vertical-specific capabilities without manual configuration.
+
+        Returns:
+            Fully qualified module path string or None if not applicable
+
+        Example:
+            def _get_capability_provider_module(self) -> Optional[str]:
+                return "victor.research.capabilities"
+
+        Note:
+            Returning None indicates this vertical doesn't have a capability
+            provider or doesn't want automatic registration.
+        """
+        return None
+
+    def get_capability_provider(self) -> Optional[Any]:
+        """Get the capability provider for this vertical.
+
+        This convenience method loads and returns the capability provider
+        if the vertical has defined one via _get_capability_provider_module().
+
+        Returns:
+            Capability provider instance or None if not configured
+
+        Raises:
+            ImportError: If the capability provider module cannot be imported
+            AttributeError: If the module doesn't have the expected provider
+
+        Example:
+            provider = ResearchWorkflowProvider()
+            capabilities = provider.get_capability_provider()
+            if capabilities:
+                print(f"Capabilities: {list(capabilities.get_capabilities().keys())}")
+        """
+        module_path = self._get_capability_provider_module()
+        if not module_path:
+            return None
+
+        try:
+            module = importlib.import_module(module_path)
+            # Look for concrete capability provider classes (not abstract base)
+            for attr_name in dir(module):
+                # Skip private attributes and the abstract base
+                if attr_name.startswith("_"):
+                    continue
+                if attr_name == "BaseCapabilityProvider":
+                    continue
+
+                attr = getattr(module, attr_name)
+                # Check if it's a concrete class (not abstract) with "CapabilityProvider" in the name
+                if (
+                    isinstance(attr, type)
+                    and "CapabilityProvider" in attr_name
+                    and not attr_name.startswith("Base")
+                    and hasattr(attr, "get_capabilities")
+                    and hasattr(attr, "get_capability_metadata")
+                ):
+                    try:
+                        # Try to instantiate - this will fail for abstract classes
+                        instance = attr()
+                        # Verify it has the required methods
+                        if hasattr(instance, "get_capabilities") and hasattr(
+                            instance, "get_capability_metadata"
+                        ):
+                            return instance
+                    except TypeError:
+                        # Abstract class or can't be instantiated, skip
+                        continue
+
+            logger.warning(f"No concrete capability provider class found in {module_path}")
+            return None
+        except ImportError as e:
+            logger.warning(f"Failed to import capability provider from {module_path}: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to instantiate capability provider from {module_path}: {e}")
+            return None
 
     def _get_workflows_directory(self) -> Path:
         """Return the directory containing YAML workflow files.
@@ -331,6 +398,15 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         creating it lazily on first access. The compiler provides consistent
         caching across all workflow compilations.
 
+        **Architecture Note**: This uses UnifiedWorkflowCompiler (not the plugin API)
+        because vertical providers need:
+        - Escape hatch integration (condition_registry, transform_registry)
+        - Two-level caching (definition + execution)
+        - Cache management APIs (get_cache_stats, clear_cache)
+
+        For simple workflow compilation without these features, consider using
+        the plugin API: create_compiler("workflow.yaml", enable_caching=True)
+
         Returns:
             UnifiedWorkflowCompiler configured with escape hatches
 
@@ -407,7 +483,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         workflow_name: str,
         context: Optional[Dict[str, Any]] = None,
         thread_id: Optional[str] = None,
-    ) -> "ExecutionResult":
+    ) -> "GraphExecutionResult":
         """Execute a workflow using the unified compiler.
 
         This method compiles the workflow using the UnifiedWorkflowCompiler
@@ -419,7 +495,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             thread_id: Thread ID for checkpointing
 
         Returns:
-            ExecutionResult with final state
+            GraphExecutionResult with final state
 
         Raises:
             ValueError: If workflow not found
@@ -469,191 +545,6 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         compiled = self.compile_workflow(workflow_name)
         async for node_id, state in compiled.stream(context or {}, thread_id=thread_id):
             yield node_id, state
-
-    # =========================================================================
-    # Legacy Executor Methods (Deprecated)
-    # =========================================================================
-
-    def create_executor(
-        self,
-        orchestrator: "AgentOrchestrator",
-    ) -> "WorkflowExecutor":
-        """Create a standard workflow executor.
-
-        .. deprecated::
-            Use compile_workflow() and invoke() instead for consistent caching.
-
-        Args:
-            orchestrator: Agent orchestrator instance for LLM interactions
-
-        Returns:
-            WorkflowExecutor configured for this orchestrator
-        """
-        warnings.warn(
-            "create_executor() is deprecated. Use compile_workflow() and invoke() "
-            "for consistent caching via UnifiedWorkflowCompiler.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        from victor.workflows.executor import WorkflowExecutor
-
-        return WorkflowExecutor(orchestrator)
-
-    def create_streaming_executor(
-        self,
-        orchestrator: "AgentOrchestrator",
-    ) -> "StreamingWorkflowExecutor":
-        """Create a streaming workflow executor.
-
-        .. deprecated::
-            Use compile_workflow() and stream() instead for consistent caching.
-
-        Args:
-            orchestrator: Agent orchestrator instance for LLM interactions
-
-        Returns:
-            StreamingWorkflowExecutor for real-time progress streaming
-        """
-        warnings.warn(
-            "create_streaming_executor() is deprecated. Use compile_workflow() and stream() "
-            "for consistent caching via UnifiedWorkflowCompiler.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-        return StreamingWorkflowExecutor(orchestrator)
-
-    async def astream(
-        self,
-        workflow_name: str,
-        orchestrator: "AgentOrchestrator",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator["WorkflowStreamChunk"]:
-        """Stream workflow execution with real-time events.
-
-        .. deprecated::
-            Use stream_compiled_workflow() instead for consistent caching.
-
-        Convenience method that creates a streaming executor and
-        streams the specified workflow. Yields progress events
-        as the workflow executes.
-
-        Args:
-            workflow_name: Name of the workflow to execute
-            orchestrator: Agent orchestrator instance
-            context: Initial context data for the workflow
-
-        Yields:
-            WorkflowStreamChunk events during execution
-
-        Raises:
-            ValueError: If workflow_name is not found
-
-        Example:
-            provider = ResearchWorkflowProvider()
-            async for chunk in provider.astream("fact_check", orchestrator, {}):
-                if chunk.event_type == WorkflowEventType.NODE_START:
-                    print(f"Starting: {chunk.node_name}")
-                elif chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-                    print(f"Completed: {chunk.node_name}")
-        """
-        warnings.warn(
-            "astream() is deprecated. Use stream_compiled_workflow() "
-            "for consistent caching via UnifiedWorkflowCompiler.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        workflow = self.get_workflow(workflow_name)
-        if not workflow:
-            raise ValueError(f"Unknown workflow: {workflow_name}")
-
-        # Suppress deprecation warning for internal call
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            executor = self.create_streaming_executor(orchestrator)
-        async for chunk in executor.astream(workflow, context or {}):
-            yield chunk
-
-    async def run_workflow(
-        self,
-        workflow_name: str,
-        context: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> "WorkflowResult":
-        """Execute a YAML workflow directly without requiring a full orchestrator.
-
-        .. deprecated::
-            Use run_compiled_workflow() instead for consistent caching.
-
-        This method is designed for compute-only workflows that use registered
-        handlers. For workflows with agent nodes, use create_executor() with
-        a proper orchestrator or astream().
-
-        The workflow DAG is executed with:
-        - Compute nodes: Invoke registered handlers
-        - Parallel nodes: Execute child nodes concurrently
-        - Condition nodes: Evaluate escape hatches for branching
-        - Transform nodes: Apply data transformations
-
-        Note: Agent nodes will fail with this method. Use astream() or
-        create_executor() with a proper orchestrator for workflows
-        containing agent nodes.
-
-        Args:
-            workflow_name: Name of the YAML workflow to execute
-            context: Initial context data (e.g., {"symbol": "AAPL"})
-            timeout: Optional overall timeout in seconds (default: 300)
-
-        Returns:
-            WorkflowResult with execution outcome and outputs
-
-        Raises:
-            ValueError: If workflow_name is not found
-
-        Example:
-            provider = InvestmentWorkflowProvider()
-            result = await provider.run_workflow(
-                "comprehensive",
-                {"symbol": "AAPL"}
-            )
-            if result.success:
-                synthesis = result.context.get("synthesis")
-                print(f"Recommendation: {synthesis.get('recommendation')}")
-        """
-        warnings.warn(
-            "run_workflow() is deprecated. Use run_compiled_workflow() "
-            "for consistent caching via UnifiedWorkflowCompiler.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        from victor.workflows.executor import WorkflowExecutor
-        from victor.tools.registry import ToolRegistry
-
-        workflow = self.get_workflow(workflow_name)
-        if not workflow:
-            raise ValueError(f"Unknown workflow: {workflow_name}")
-
-        # Create minimal orchestrator for compute-only workflows
-        # Agent nodes would fail with this mock, but compute handlers work fine
-        orchestrator = _MinimalOrchestrator()
-
-        # Create tool registry for handlers that need it
-        tool_registry = ToolRegistry()
-
-        # Create executor with minimal orchestrator and explicit tool registry
-        executor = WorkflowExecutor(
-            orchestrator,
-            tool_registry=tool_registry,
-            default_timeout=timeout or 300.0,
-        )
-
-        # Execute workflow with initial context
-        return await executor.execute(
-            workflow,
-            initial_context=context or {},
-            timeout=timeout,
-        )
 
     def __repr__(self) -> str:
         """Return a string representation of this provider."""

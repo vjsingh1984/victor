@@ -463,10 +463,6 @@ class TestVerticalLoaderSwitch:
         loader.load("data_analysis")
         assert loader.active_vertical_name == "data_analysis"
 
-    @pytest.mark.xfail(
-        reason="Flaky in full test suite due to singleton state pollution",
-        strict=False,
-    )
     def test_loader_get_tools_per_vertical(self):
         """Each vertical should have distinct tool sets."""
         from victor.core.verticals import get_vertical_loader

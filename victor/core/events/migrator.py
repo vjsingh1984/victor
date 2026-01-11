@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, Tuple
 
-from victor.core.events.protocols import Event
+from victor.core.events.protocols import MessagingEvent
 
 # Migration complete - VictorEvent and EventCategory have been removed
 # TOPIC_MAPPING kept for reference only

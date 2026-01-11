@@ -109,7 +109,7 @@ from victor.workflows.yaml_loader import (
 )
 from victor.workflows.cache import (
     WorkflowCacheConfig,
-    CacheEntry,
+    WorkflowNodeCacheEntry,
     WorkflowCache,
     WorkflowCacheManager,
     get_workflow_cache_manager,
@@ -167,7 +167,7 @@ from victor.workflows.cost_router import (
     route_for_cost,
 )
 from victor.workflows.sandbox_executor import (
-    ExecutionResult,
+    SandboxExecutionResult,
     SandboxedExecutor,
     get_sandboxed_executor,
 )
@@ -403,7 +403,7 @@ __all__ = [
     "get_default_router",
     "route_for_cost",
     # Sandbox Execution
-    "ExecutionResult",
+    "SandboxExecutionResult",
     "SandboxedExecutor",
     "get_sandboxed_executor",
     # Batch Execution
@@ -439,7 +439,7 @@ __all__ = [
     "load_and_validate",
     # Cache
     "WorkflowCacheConfig",
-    "CacheEntry",
+    "WorkflowNodeCacheEntry",
     "WorkflowCache",
     "WorkflowCacheManager",
     "get_workflow_cache_manager",

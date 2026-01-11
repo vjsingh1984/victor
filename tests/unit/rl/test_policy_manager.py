@@ -22,14 +22,14 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from victor.agent.rl.policy_manager import (
+from victor.framework.rl.policy_manager import (
     PolicyManager,
     PolicyState,
     PolicyStage,
     RollbackEvent,
     get_policy_manager,
 )
-from victor.agent.rl.checkpoint_store import CheckpointStore
+from victor.framework.rl.checkpoint_store import CheckpointStore
 
 
 @pytest.fixture
@@ -505,7 +505,7 @@ class TestGlobalSingleton:
 
     def test_get_policy_manager(self) -> None:
         """Test getting global singleton."""
-        import victor.agent.rl.policy_manager as module
+        import victor.framework.rl.policy_manager as module
 
         module._policy_manager = None
 
@@ -516,7 +516,7 @@ class TestGlobalSingleton:
 
     def test_singleton_with_coordinator(self, mock_coordinator: MagicMock) -> None:
         """Test singleton initialization with coordinator."""
-        import victor.agent.rl.policy_manager as module
+        import victor.framework.rl.policy_manager as module
 
         module._policy_manager = None
 

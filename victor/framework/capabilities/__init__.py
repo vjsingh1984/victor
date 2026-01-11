@@ -12,37 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Capability provider framework for verticals.
+"""Generic capability providers for vertical extensions.
 
-This module provides the base classes for vertical capability providers,
-enabling consistent capability registration and discovery across all verticals.
+This module contains framework-level capability providers that can be reused
+across all verticals to promote code reuse and maintain SOLID principles.
 
-Exports:
-    BaseCapabilityProvider: Abstract base class for capability providers.
-    CapabilityMetadata: Dataclass for capability metadata.
+Phase 3: Generic Capabilities - Framework Layer
 
-Example:
-    from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
-
-    class MyCapabilityProvider(BaseCapabilityProvider[MyCapability]):
-        def get_capabilities(self) -> Dict[str, MyCapability]:
-            return {"my_cap": self._my_capability}
-
-        def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
-            return {
-                "my_cap": CapabilityMetadata(
-                    name="my_cap",
-                    description="My custom capability"
-                )
-            }
+Capabilities:
+- BaseCapabilityProvider: Abstract base for vertical capability providers
+- CapabilityMetadata: Metadata for capability registration
+- FileOperationsCapability: Common file operation tools (read, write, edit, grep)
+- PromptContributionCapability: Common prompt hints for task types
+- PrivacyCapabilityProvider: Framework-level privacy and PII management (cross-vertical)
 """
 
-from victor.framework.capabilities.base import (
-    BaseCapabilityProvider,
-    CapabilityMetadata,
-)
+# Base classes for capability providers
+from .base import BaseCapabilityProvider, CapabilityMetadata
+
+# Concrete capability implementations
+from .file_operations import FileOperationsCapability
+from .prompt_contributions import PromptContributionCapability
+from .privacy import PrivacyCapabilityProvider
 
 __all__ = [
+    # Base classes
     "BaseCapabilityProvider",
     "CapabilityMetadata",
+    # Concrete implementations
+    "FileOperationsCapability",
+    "PromptContributionCapability",
+    "PrivacyCapabilityProvider",
 ]

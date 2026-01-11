@@ -23,11 +23,12 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,11 @@ def infer_git_operation(
     return args
 
 
-def get_tool_status_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
+def get_tool_status_message(
+    tool_name: str,
+    tool_args: Dict[str, Any],
+    presentation: Optional["PresentationProtocol"] = None,
+) -> str:
     """Generate a user-friendly status message for a tool execution.
 
     Provides context-aware status messages showing relevant details
@@ -141,22 +146,31 @@ def get_tool_status_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
     Args:
         tool_name: Name of the tool being executed
         tool_args: Arguments passed to the tool
+        presentation: Optional presentation adapter for icons (creates default if not provided)
 
     Returns:
-        Status message string with emoji prefix
+        Status message string with icon prefix
     """
+    # Get presentation adapter (lazy init for backward compatibility)
+    if presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        presentation = create_presentation_adapter()
+
+    running_icon = presentation.icon("running")
+
     if tool_name == "execute_bash" and "command" in tool_args:
         cmd = tool_args["command"]
         cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-        return f"🔧 Running {tool_name}: `{cmd_display}`"
+        return f"{running_icon} Running {tool_name}: `{cmd_display}`"
 
     if tool_name == "list_directory":
         path = tool_args.get("path", ".")
-        return f"🔧 Listing directory: {path}"
+        return f"{running_icon} Listing directory: {path}"
 
     if tool_name == "read":
         path = tool_args.get("path", "file")
-        return f"🔧 Reading file: {path}"
+        return f"{running_icon} Reading file: {path}"
 
     if tool_name == "edit_files":
         files = tool_args.get("files", [])
@@ -165,19 +179,19 @@ def get_tool_status_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
             path_display = ", ".join(paths)
             if len(files) > 3:
                 path_display += f" (+{len(files) - 3} more)"
-            return f"🔧 Editing: {path_display}"
-        return f"🔧 Running {tool_name}..."
+            return f"{running_icon} Editing: {path_display}"
+        return f"{running_icon} Running {tool_name}..."
 
     if tool_name == "write":
         path = tool_args.get("path", "file")
-        return f"🔧 Writing file: {path}"
+        return f"{running_icon} Writing file: {path}"
 
     if tool_name == "code_search":
         query = tool_args.get("query", "")
         query_display = query[:50] + "..." if len(query) > 50 else query
-        return f"🔧 Searching: {query_display}"
+        return f"{running_icon} Searching: {query_display}"
 
-    return f"🔧 Running {tool_name}..."
+    return f"{running_icon} Running {tool_name}..."
 
 
 # Aliases for backward compatibility during migration

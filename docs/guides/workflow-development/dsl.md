@@ -636,8 +636,8 @@ graph.add_edge("final_node", END)
 ---
 
 **Related Documentation**:
-- [User Guide: Workflows](../USER_GUIDE.md#workflows)
-- [Developer Guide: Phase 4 Features](../DEVELOPER_GUIDE.md#phase-4-features)
-- [Tool Catalog: Tool Composition](../TOOL_CATALOG.md#tool-composition)
+- [User Guide: Workflows](../../user-guide/index.md#4-workflows)
+- [Developer Guide](../../development/index.md)
+- [Tool Catalog](../../reference/tools/catalog.md)
 
 *Last Updated: 2025-12-29*

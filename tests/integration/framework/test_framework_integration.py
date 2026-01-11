@@ -60,10 +60,13 @@ from victor.workflows.hitl import (
 )
 
 # Checkpoint imports
-from victor.storage.checkpoints import (
-    CheckpointManager,
-    SQLiteCheckpointBackend,
-)
+from victor.storage.checkpoints import ConversationCheckpointManager
+
+# SQLiteCheckpointBackend requires optional aiosqlite dependency
+try:
+    from victor.storage.checkpoints import SQLiteCheckpointBackend
+except ImportError:
+    SQLiteCheckpointBackend = None  # type: ignore
 
 
 class TestEntityMemoryWithExtraction:
@@ -329,10 +332,11 @@ class TestCheckpointIntegration:
             yield Path(tmpdir)
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_checkpoint_save_restore(self, temp_dir):
         """Test saving and restoring checkpoints."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
-        manager = CheckpointManager(backend=backend)
+        manager = ConversationCheckpointManager(backend=backend)
 
         session_id = "test_session"
 
@@ -364,10 +368,11 @@ class TestCheckpointIntegration:
         assert restored["context"]["project"] == "victor"
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_checkpoint_list_and_diff(self, temp_dir):
         """Test listing checkpoints and comparing."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
-        manager = CheckpointManager(backend=backend)
+        manager = ConversationCheckpointManager(backend=backend)
 
         session_id = "test"
 
@@ -430,6 +435,7 @@ class TestCrossComponentIntegration:
         assert len(agent.metadata["entities"]) > 0
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_pipeline_with_hitl_checkpoint(self):
         """Test pipeline execution with HITL and checkpoint integration."""
         # This simulates a real workflow:
@@ -461,7 +467,7 @@ class TestCrossComponentIntegration:
         # Simulate checkpoint after successful execution
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = SQLiteCheckpointBackend(storage_path=Path(tmpdir))
-            manager = CheckpointManager(backend=backend)
+            manager = ConversationCheckpointManager(backend=backend)
 
             state = {
                 "messages": [{"role": "system", "content": "Pipeline completed"}],

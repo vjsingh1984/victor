@@ -40,7 +40,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
-from victor.core.events.protocols import Event, DeliveryGuarantee
+from victor.core.events.protocols import MessagingEvent, DeliveryGuarantee
 
 if TYPE_CHECKING:
     from victor.core.events import ObservabilityBus as EventBus, VictorEvent, EventCategory
@@ -50,16 +50,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def victor_event_to_event(victor_event: "VictorEvent") -> Event:
-    """Convert VictorEvent (legacy) to Event (protocol-based).
+def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
+    """Convert VictorEvent (legacy) to MessagingEvent (protocol-based).
 
     Args:
         victor_event: Legacy VictorEvent from observability module
 
     Returns:
-        Protocol-based Event
+        Protocol-based MessagingEvent
     """
-    return Event(
+    return MessagingEvent(
         id=victor_event.id,
         topic=f"{victor_event.category.value}.{victor_event.name}",
         data=victor_event.data,
@@ -70,16 +70,16 @@ def victor_event_to_event(victor_event: "VictorEvent") -> Event:
     )
 
 
-def event_to_victor_event(event: Event) -> None:
-    """Convert Event (protocol-based) to VictorEvent (legacy).
+def event_to_victor_event(event: MessagingEvent) -> None:
+    """Convert MessagingEvent (protocol-based) to VictorEvent (legacy).
 
     NOTE: VictorEvent has been removed. This function is kept for
     backward compatibility but is no longer functional.
 
     TODO: Remove this function once all migration is complete.
     """
-    # VictorEvent, EventCategory, EventPriority removed - use canonical Event
-    # This conversion is no longer needed as we've migrated to Event
+    # VictorEvent, EventCategory, EventPriority removed - use canonical MessagingEvent
+    # This conversion is no longer needed as we've migrated to MessagingEvent
     pass
 
 
@@ -92,7 +92,7 @@ class EventBusAdapter:
     Features:
     - Bidirectional event forwarding (optional)
     - Event filtering by category
-    - Conversion between VictorEvent and Event formats
+    - Conversion between VictorEvent and MessagingEvent formats
 
     Example:
         from victor.core.events import ObservabilityBus as EventBus

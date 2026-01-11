@@ -48,7 +48,7 @@ from typing import Any, AsyncIterator, Dict, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.streaming_controller import StreamingController
-    from victor.core.events.protocols import Event
+    from victor.core.events.protocols import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ class StreamingCoordinator:
 
     async def dispatch_events(
         self,
-        events: List["Event"],
+        events: List["MessagingEvent"],
         context: Dict[str, Any],
     ) -> None:
         """Dispatch streaming events for observability.
@@ -200,8 +200,8 @@ class StreamingCoordinator:
 
         Example:
             events = [
-                Event(topic="streaming.chunk", data={"content": "Hello"}),
-                Event(topic="streaming.done", data={}),
+                MessagingEvent(topic="streaming.chunk", data={"content": "Hello"}),
+                MessagingEvent(topic="streaming.done", data={}),
             ]
             await coordinator.dispatch_events(events, context)
         """

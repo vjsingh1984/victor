@@ -625,7 +625,7 @@ event = Event(
 
 ## Related Resources
 
-- [Workflow DSL Guide](WORKFLOW_DSL.md) - Workflow observability
+- [Workflow DSL Guide](workflow-development/dsl.md) - Workflow observability
 - [Workflow Scheduler Guide](WORKFLOW_SCHEDULER.md) - Scheduled workflow monitoring
 - [Multi-Agent Teams Guide](MULTI_AGENT_TEAMS.md) - Team coordination
-- [User Guide](../USER_GUIDE.md) - General usage
+- [User Guide](../user-guide/index.md) - General usage

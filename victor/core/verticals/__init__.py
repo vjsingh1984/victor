@@ -20,6 +20,12 @@ This module provides the base infrastructure for Victor verticals:
 - VerticalRegistry: Registry for vertical discovery
 - StageDefinition: Stage definitions for conversation flow
 
+Phase 2.3 SRP Compliance:
+VerticalBase now composes functionality from focused classes:
+- VerticalMetadataProvider: Metadata capabilities
+- VerticalExtensionLoader: Extension loading and caching
+- VerticalWorkflowProvider: Workflow and handler providers
+
 Verticals (coding, rag, devops, research, dataanalysis) are separate
 modules at the same level as core in the victor namespace.
 """
@@ -29,6 +35,17 @@ from victor.core.verticals.base import (
     VerticalBase,
     VerticalConfig,
     VerticalRegistry,
+)
+from victor.core.verticals.metadata import (
+    VerticalMetadataProvider,
+    VerticalMetadata,
+)
+from victor.core.verticals.extension_loader import (
+    VerticalExtensionLoader,
+)
+from victor.core.verticals.workflow_provider import (
+    VerticalWorkflowProvider,
+    VerticalWorkflowMixin,
 )
 from victor.core.verticals.protocols import (
     VerticalExtensions,
@@ -73,6 +90,12 @@ __all__ = [
     "VerticalConfig",
     "VerticalRegistry",
     "StageDefinition",
+    # Phase 2.3 SRP Compliance - Focused capability providers
+    "VerticalMetadataProvider",
+    "VerticalMetadata",
+    "VerticalExtensionLoader",
+    "VerticalWorkflowProvider",
+    "VerticalWorkflowMixin",
     # Protocols
     "VerticalExtensions",
     "ModeConfigProviderProtocol",

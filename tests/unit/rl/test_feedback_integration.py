@@ -20,11 +20,11 @@ Tests the integration layer for implicit feedback collection.
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.rl.feedback_integration import (
+from victor.framework.rl.feedback_integration import (
     FeedbackIntegration,
     get_feedback_integration,
 )
-from victor.agent.rl.implicit_feedback import SessionContext
+from victor.framework.rl.implicit_feedback import SessionContext
 
 
 @pytest.fixture

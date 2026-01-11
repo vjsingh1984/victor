@@ -34,6 +34,20 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
+
 # Workflow templates
 GITHUB_ACTIONS_TEMPLATES = {
     "python-test": {
@@ -396,19 +410,19 @@ async def cicd(
         report.append("")
 
         if not issues and not warnings:
-            report.append("✅ Configuration is valid!")
+            report.append(f"{_get_icon('success')} Configuration is valid!")
             report.append("\nNo issues or warnings found.")
         else:
             if issues:
-                report.append(f"❌ {len(issues)} issue(s) found:")
+                report.append(f"{_get_icon('error')} {len(issues)} issue(s) found:")
                 for issue in issues:
-                    report.append(f"  • {issue}")
+                    report.append(f"  {_get_icon('bullet')} {issue}")
                 report.append("")
 
             if warnings:
-                report.append(f"⚠️  {len(warnings)} warning(s):")
+                report.append(f"{_get_icon('warning')}  {len(warnings)} warning(s):")
                 for warning in warnings:
-                    report.append(f"  • {warning}")
+                    report.append(f"  {_get_icon('bullet')} {warning}")
                 report.append("")
 
         # Configuration summary
@@ -456,7 +470,7 @@ async def cicd(
             }
             templates.append(template_info)
 
-            report.append(f"📋 {name}")
+            report.append(f"{_get_icon('clipboard')} {name}")
             report.append(f"   Name: {template['name']}")
 
             # List jobs

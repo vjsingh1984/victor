@@ -103,11 +103,11 @@ Or manually create in `victor/{vertical}/` with:
 
 ## Releasing
 
-See [../RELEASING.md](../RELEASING.md) for version bumping and publishing.
+See [releasing/publishing.md](releasing/publishing.md) for version bumping and publishing.
 
 ## More Details
 
-- [Testing Strategy](../TESTING_STRATEGY.md) - Fixtures, mocking patterns
-- [Architecture Deep Dive](../ARCHITECTURE_DEEP_DIVE.md) - System internals
-- [Plugin Guide](../guides/PLUGIN_GUIDE.md) - External verticals
-- [Vertical Development](../guides/VERTICAL_DEVELOPMENT.md) - Custom verticals
+- [Testing Strategy](testing/strategy.md) - Fixtures and mocking patterns
+- [Architecture Deep Dive](architecture/deep-dive.md) - System internals
+- [Plugin Guide](extending/plugins.md) - External extensions
+- [Vertical Development](extending/verticals.md) - Custom verticals

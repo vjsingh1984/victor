@@ -31,9 +31,12 @@ Logging Levels (Victor convention):
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.providers.base import Message
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 # Custom TRACE level for very verbose logging (below DEBUG)
 TRACE = 5
@@ -145,6 +148,7 @@ class DebugLogger:
         name: str = "victor.debug",
         max_preview: int = 80,
         enabled: bool = True,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize debug logger.
 
@@ -152,12 +156,20 @@ class DebugLogger:
             name: Logger name
             max_preview: Max characters for inline previews
             enabled: Whether logging is enabled
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.logger = logging.getLogger(name)
         self.max_preview = max_preview
         self.enabled = enabled
         self._last_iteration = 0
         self.stats = ConversationStats()
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def reset(self) -> None:
         """Reset state for new conversation."""
@@ -192,7 +204,8 @@ class DebugLogger:
         if not self.enabled:
             return
 
-        status = "→ tools" if has_tool_calls else "→ done"
+        arrow = self._presentation.icon("arrow_right", with_color=False)
+        status = f"{arrow} tools" if has_tool_calls else f"{arrow} done"
         self.logger.info(f"   {self.stats.summary()} {status}")
 
     def log_tool_call(
@@ -212,7 +225,8 @@ class DebugLogger:
         if len(args) > 3:
             args_str += f", +{len(args)-3} more"
 
-        self.logger.info(f"   🔧 {tool_name}({args_str})")
+        running_icon = self._presentation.icon("running", with_color=False)
+        self.logger.info(f"   {running_icon} {tool_name}({args_str})")
 
     def log_tool_result(
         self,
@@ -225,7 +239,7 @@ class DebugLogger:
         if not self.enabled:
             return
 
-        icon = "✓" if success else "✗"
+        icon = self._presentation.icon("success" if success else "error", with_color=False)
         output_str = str(output) if output else ""
         size = f"{len(output_str):,} chars" if output_str else "empty"
 
@@ -283,11 +297,15 @@ class DebugLogger:
             return
 
         if char_count > 100000:
+            warning_icon = self._presentation.icon("warning", with_color=False)
             self.logger.warning(
-                f"   ⚠️ Large context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+                f"   {warning_icon} Large context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
             )
         elif char_count > 50000:
-            self.logger.info(f"   📊 Context: {char_count:,} chars (~{estimated_tokens:,} tokens)")
+            chart_icon = self._presentation.icon("chart", with_color=False)
+            self.logger.info(
+                f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+            )
 
     def log_conversation_summary(self, messages: List[Message]) -> None:
         """Log final conversation summary."""

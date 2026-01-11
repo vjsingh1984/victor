@@ -32,12 +32,15 @@ Addresses GAP-8: Missing task completion signal
 """
 
 from abc import ABC, abstractmethod
-from typing import Protocol, List, Dict, Any, Optional, Set
+from typing import TYPE_CHECKING, Protocol, List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
 from enum import Enum
 import time
 import logging
 import hashlib
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +185,7 @@ class OutputAggregator:
         max_results: int = 10,
         stale_threshold_seconds: float = 30.0,
         loop_detection_window: int = 5,
+        presentation: Optional["PresentationProtocol"] = None,
     ) -> None:
         """
         Initialize the output aggregator.
@@ -190,6 +194,7 @@ class OutputAggregator:
             max_results: Max results before forcing synthesis
             stale_threshold_seconds: Seconds of inactivity before marking stuck
             loop_detection_window: Number of recent results to check for loops
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self._results: List[ToolOutput] = []
         self._observers: List[OutputAggregatorObserver] = []
@@ -200,6 +205,14 @@ class OutputAggregator:
         self._loop_detection_window = loop_detection_window
         self._seen_hashes: Set[str] = set()
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     @property
     def state(self) -> AggregationState:
@@ -350,7 +363,7 @@ class OutputAggregator:
 
         result_summaries = []
         for i, r in enumerate(self._results, 1):
-            status = "✓" if r.success else "✗"
+            status = self._presentation.icon("success" if r.success else "error", with_color=False)
             result_str = str(r.result)
             if len(result_str) > 200:
                 result_str = result_str[:200] + "..."

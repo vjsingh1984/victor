@@ -381,8 +381,9 @@ victor benchmark compare           # Framework comparison
 
 ## Related Documentation
 
-- [STATE_MACHINE.md](./STATE_MACHINE.md) - Conversation state details
-- [TOOL_SELECTION.md](./archive/internal/TOOL_SELECTION.md) - Tool selection strategies (archived)
-- [CORE_PATTERNS.md](./archive/internal/CORE_PATTERNS.md) - Design patterns (archived)
-- [VERTICALS.md](./VERTICALS.md) - Domain-specific assistants
-- [BENCHMARK_EVALUATION.md](./archive/internal/BENCHMARK_EVALUATION.md) - Benchmark evaluation details (archived)
+- [Overview](overview.md) - Architecture overview
+- [Components](components.md) - Core components
+- [Component Details](component-details.md) - Deep component reference
+- [State Machine](state-machine.md) - Conversation stages
+- [Data Flow](data-flow.md) - Request/response flow
+- [Framework + Verticals](framework-vertical-integration.md) - Integration points

@@ -40,7 +40,7 @@ Available workflows (all YAML-defined):
 - container_quick: Quick container build
 """
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from victor.framework.workflows import BaseYAMLWorkflowProvider
 
@@ -78,6 +78,14 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.devops.escape_hatches"
 
+    def _get_capability_provider_module(self) -> Optional[str]:
+        """Return the module path for the DevOps capability provider.
+
+        Returns:
+            Module path string for DevOpsCapabilityProvider
+        """
+        return "victor.devops.capabilities"
+
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
         """Get automatic workflow triggers for DevOps tasks.
 
@@ -94,11 +102,6 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
             (r"github\s+actions", "cicd_pipeline"),
         ]
 
-
-# Register DevOps domain handlers when this module is loaded
-from victor.devops.handlers import register_handlers as _register_handlers
-
-_register_handlers()
 
 __all__ = [
     # YAML-first workflow provider

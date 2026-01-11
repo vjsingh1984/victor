@@ -537,6 +537,13 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SCOPED,
         )
 
+        # =========================================================================
+        # Presentation Abstraction Layer
+        # =========================================================================
+
+        # PresentationAdapter - singleton for icon/formatting concerns
+        self._register_presentation_adapter(container)
+
         logger.debug("Registered singleton orchestrator services")
 
     def register_scoped_services(self, container: ServiceContainer) -> None:
@@ -1020,7 +1027,7 @@ class OrchestratorServiceProvider:
 
     def _create_rl_coordinator(self) -> Any:
         """Create RLCoordinator instance."""
-        from victor.agent.rl.coordinator import get_rl_coordinator
+        from victor.framework.rl.coordinator import get_rl_coordinator
 
         return get_rl_coordinator()
 
@@ -1479,7 +1486,7 @@ class OrchestratorServiceProvider:
         Returns:
             ToolCoordinator instance
         """
-        from victor.agent.tool_coordinator import (
+        from victor.agent.coordinators import (
             ToolCoordinator,
             ToolCoordinatorConfig,
         )
@@ -1590,6 +1597,30 @@ class OrchestratorServiceProvider:
             prompt_builder=PromptBuilder(),
             config=config,
             base_identity=base_identity,
+        )
+
+    # =========================================================================
+    # Presentation Abstraction Layer Factory Methods
+    # =========================================================================
+
+    def _register_presentation_adapter(self, container: ServiceContainer) -> None:
+        """Register PresentationAdapter as singleton.
+
+        The PresentationAdapter provides a clean abstraction for icon/emoji
+        rendering, decoupling the agent layer from direct UI dependencies.
+
+        Uses EmojiPresentationAdapter by default, which respects the
+        `use_emojis` setting from configuration.
+        """
+        from victor.agent.presentation import (
+            PresentationProtocol,
+            EmojiPresentationAdapter,
+        )
+
+        container.register(
+            PresentationProtocol,
+            lambda c: EmojiPresentationAdapter(),
+            ServiceLifetime.SINGLETON,
         )
 
 

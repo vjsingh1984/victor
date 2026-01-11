@@ -30,7 +30,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.widgets import DataTable, RichLog, Static
 from textual.reactive import reactive
 
-from victor.core.events import Event
+from victor.core.events import MessagingEvent
 
 
 @dataclass
@@ -120,7 +120,7 @@ class ToolStatsWidget(DataTable):
         self.cursor_type = "row"
         self.zebra_stripes = True
 
-    def add_tool_event(self, event: Event) -> None:
+    def add_tool_event(self, event: MessagingEvent) -> None:
         """Process a tool event and update statistics.
 
         Args:
@@ -235,7 +235,7 @@ class ToolHistoryWidget(RichLog):
         self._max_entries = max_entries
         self._entry_count = 0
 
-    def add_tool_event(self, event: Event) -> None:
+    def add_tool_event(self, event: MessagingEvent) -> None:
         """Add a tool event to the history.
 
         Args:

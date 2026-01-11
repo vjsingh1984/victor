@@ -52,7 +52,15 @@ def mock_lancedb():
         mock_db = MagicMock()
         mock_table = MagicMock()
         mock_table.count_rows.return_value = 0
+
+        # Mock list_tables() API (new)
+        mock_list_response = MagicMock()
+        mock_list_response.tables = []
+        mock_db.list_tables.return_value = mock_list_response
+
+        # Keep old table_names for backward compatibility in tests
         mock_db.table_names.return_value = []
+
         mock_db.open_table.return_value = mock_table
         mock_db.create_table.return_value = mock_table
         mock_connect.return_value = mock_db
@@ -211,7 +219,7 @@ class TestLanceDBProvider:
     async def test_index_document_add_to_existing(self, lancedb_config, mock_lancedb):
         """Test indexing document when table exists."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.table_names.return_value = ["test_table"]  # Table exists
+        mock_db.list_tables.return_value.tables = ["test_table"]
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -272,7 +280,7 @@ class TestLanceDBProvider:
     async def test_search_similar(self, lancedb_config, mock_lancedb):
         """Test semantic similarity search."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.table_names.return_value = ["test_table"]
+        mock_db.list_tables.return_value.tables = ["test_table"]
 
         # Mock search results
         mock_search = MagicMock()
@@ -343,7 +351,7 @@ class TestLanceDBProvider:
     async def test_delete_document(self, lancedb_config, mock_lancedb):
         """Test deleting document."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.table_names.return_value = ["test_table"]
+        mock_db.list_tables.return_value.tables = ["test_table"]
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -383,7 +391,7 @@ class TestLanceDBProvider:
     async def test_clear_index(self, lancedb_config, mock_lancedb):
         """Test clearing entire index."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.table_names.return_value = ["test_table"]
+        mock_db.list_tables.return_value.tables = ["test_table"]
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -406,7 +414,7 @@ class TestLanceDBProvider:
     async def test_get_stats(self, lancedb_config, mock_lancedb):
         """Test getting index statistics."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.table_names.return_value = ["test_table"]
+        mock_db.list_tables.return_value.tables = ["test_table"]
         mock_table.count_rows.return_value = 42
 
         with patch(

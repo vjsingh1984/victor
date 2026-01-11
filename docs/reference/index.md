@@ -22,20 +22,20 @@ Complete reference for all 21 supported LLM providers.
 
 | Provider | Description | Quick Start |
 |----------|-------------|-------------|
-| [Ollama](providers/local/ollama.md) | Local model execution | `ollama pull qwen2.5-coder:7b` |
-| [LM Studio](providers/local/lm-studio.md) | Local model UI | Install LM Studio app |
-| [vLLM](providers/local/vllm.md) | Fast local inference | `vllm serve qwen2.5-coder:7b` |
-| [llama.cpp](providers/local/llama-cpp.md) | Lightweight inference | `llama-cli model -p prompt` |
+| Ollama | Local model execution | `ollama pull qwen2.5-coder:7b` |
+| LM Studio | Local model UI | Install LM Studio app |
+| vLLM | Fast local inference | `vllm serve qwen2.5-coder:7b` |
+| llama.cpp | Lightweight inference | `llama-cli model -p prompt` |
 
 ### Cloud Providers (API Key Required)
 
 | Provider | Models | Pricing | Setup |
 |----------|--------|--------|------|
-| [Anthropic](providers/cloud/anthropic.md) | Claude 3.5, Opus, Haiku | Pay-per-use | `export ANTHROPIC_API_KEY=sk-...` |
-| [OpenAI](providers/cloud/openai.md) | GPT-4, o1 | Pay-per-use | `export OPENAI_API_KEY=sk-...` |
-| [Google](providers/cloud/google.md) | Gemini 2.0 | Pay-per-use | `export GOOGLE_API_KEY=...` |
-| [Azure](providers/cloud/azure.md) | Azure OpenAI | Pay-per-use | Azure portal setup |
-| [And 17 more...](providers/) | See full list | See full list | See full list |
+| Anthropic | Claude 3.5, Opus, Haiku | Pay-per-use | `export ANTHROPIC_API_KEY=sk-...` |
+| OpenAI | GPT-4, o1 | Pay-per-use | `export OPENAI_API_KEY=sk-...` |
+| Google | Gemini 2.0 | Pay-per-use | `export GOOGLE_API_KEY=...` |
+| Azure | Azure OpenAI | Pay-per-use | Azure portal setup |
+| And 17 more... | See full list | See full list | See full list |
 
 [**Full Provider Reference →**](providers/)
 
@@ -69,11 +69,11 @@ Complete configuration for Victor's behavior and integrations.
 
 | File | Purpose | Reference |
 |------|---------|----------|
-| `profiles.yaml` | Provider and model profiles | [profiles.md →](configuration/profiles.md) |
-| `config.yaml` | Global settings and options | [config.md →](configuration/) |
-| `mcp.yaml` | MCP server configuration | [mcp.md →](configuration/mcp.md) |
-| `.victor.md` | Project context and instructions | [.victor.md →](../user-guide/project-context.md) |
-| `CLAUDE.md` | AI assistant project instructions | [CLAUDE.md →](../CLAUDE.md) |
+| `profiles.yaml` | Provider and model profiles | [profiles.yaml →](configuration/index.md#profilesyaml) |
+| `config.yaml` | Global settings and options | [config.yaml →](configuration/index.md#configyaml) |
+| `mcp.yaml` | MCP server configuration | [mcp.yaml →](configuration/index.md#mcpyaml) |
+| `.victor.md` | Project context and instructions | [.victor.md →](../user-guide/index.md#5-project-context) |
+| `CLAUDE.md` | AI assistant project instructions | [CLAUDE.md →](../../CLAUDE.md) |
 
 ### Quick Configuration
 
@@ -143,11 +143,11 @@ Domain-specific assistants for specialized tasks.
 
 | Vertical | Description | Usage |
 |----------|-------------|-------|
-| [**Coding**](verticals/coding.md) | Software development | `victor --vertical coding` |
-| [**DevOps**](verticals/devops.md) | DevOps and infrastructure | `victor --vertical devops` |
-| [**RAG**](verticals/rag.md) | Retrieval-augmented generation | `victor --vertical rag` |
-| [**Data Analysis**](verticals/data-analysis.md) | Data science workflows | `victor --vertical dataanalysis` |
-| [**Research**](verticals/research.md) | Research and analysis | `victor --vertical research` |
+| **Coding** | Software development | `victor --vertical coding` |
+| **DevOps** | DevOps and infrastructure | `victor --vertical devops` |
+| **RAG** | Retrieval-augmented generation | `victor --vertical rag` |
+| **Data Analysis** | Data science workflows | `victor --vertical dataanalysis` |
+| **Research** | Research and analysis | `victor --vertical research` |
 
 [**Full Vertical Reference →**](verticals/)
 
@@ -204,7 +204,7 @@ victor workflow schedule code-review --cron "0 9 * * 1"
 | **Refactoring** | `victor "Refactor to use DI"` | [User Guide →](../user-guide/) |
 | **Testing** | `victor "Write unit tests"` | [User Guide →](../user-guide/) |
 | **Git Operations** | `victor "Create commit for changes"` | [Tool Catalog →](tools/catalog.md) |
-| **CI/CD** | See integration guide | [CI/CD Integration →](../guides/integration/ci-cd.md) |
+| **CI/CD** | See guides overview | [Guides →](../guides/index.md) |
 
 ---
 

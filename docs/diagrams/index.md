@@ -7,7 +7,7 @@ Visual documentation for Victor's architecture, workflows, and data flow.
 | Diagram Type | Count | Location |
 |--------------|-------|----------|
 | **Architecture** | 4 Mermaid | [Architecture →](architecture/) |
-| **Workflows** | 55 SVG | [Workflows →](workflows/) |
+| **Workflows** | 55 SVG | [Workflows →](../workflow-diagrams/) |
 | **Sequences** | 3 Mermaid | [Sequences →](sequences/) |
 
 ---
@@ -18,7 +18,7 @@ High-level architecture and system design diagrams.
 
 ### System Architecture
 
-**File**: [architecture/system-overview.mmd](system-overview.mmd)
+**File**: [architecture/system-overview.mmd](architecture/system-overview.mmd)
 
 Victor's layered architecture with clear separation of concerns.
 
@@ -32,7 +32,7 @@ Victor's layered architecture with clear separation of concerns.
 
 ### Provider System
 
-**File**: [architecture/provider-system.mmd](provider-system.mmd)
+**File**: [architecture/provider-system.mmd](architecture/provider-system.mmd)
 
 Provider abstraction and switching mechanism.
 
@@ -47,7 +47,7 @@ Provider abstraction and switching mechanism.
 
 ### Tool Execution Flow
 
-**File**: [sequences/tool-execution.mmd](../sequences/tool-execution.mmd)
+**File**: [sequences/tool-execution.mmd](sequences/tool-execution.mmd)
 
 Sequence diagram for tool execution.
 
@@ -62,7 +62,7 @@ Sequence diagram for tool execution.
 
 ### Configuration System
 
-**File**: [architecture/config-system.mmd](config-system.mmd)
+**File**: [architecture/config-system.mmd](architecture/config-system.mmd)
 
 Configuration loading and priority.
 
@@ -78,7 +78,7 @@ Configuration loading and priority.
 
 ### Multi-Agent Coordination
 
-**File**: [architecture/multi-agent.mmd](multi-agent.mmd)
+**File**: [architecture/multi-agent.mmd](architecture/multi-agent.mmd)
 
 Multi-agent team formations and coordination.
 
@@ -96,7 +96,7 @@ Multi-agent team formations and coordination.
 
 Auto-generated SVG diagrams for 55 workflows.
 
-**Location**: [workflows/](workflows/)
+**Location**: [workflow-diagrams/](../workflow-diagrams/)
 
 **Naming Convention**: `{workflow-name}.svg`
 
@@ -190,7 +190,7 @@ mmdc -i diagram.mmd -o diagram.png
 
 **Markdown**: Embed in markdown
 ```markdown
-![Workflow](workflows/code-review.svg)
+![Workflow](../workflow-diagrams/benchmark_code_generation.svg)
 ```
 
 **VS Code**: Built-in SVG preview
@@ -401,7 +401,7 @@ code --install-extension bierner.markdown-mermaid
 Always provide alt text for diagrams:
 
 ```markdown
-![System architecture diagram showing Victor's layered architecture](system-overview.mmd "System Architecture")
+![System architecture diagram showing Victor's layered architecture](architecture/system-overview.mmd "System Architecture")
 ```
 
 ### Descriptions
@@ -418,7 +418,7 @@ The system architecture consists of four layers:
 3. **Core Layer**: Providers, tools, workflows, verticals
 4. **Infrastructure Layer**: DI container, event bus, configuration
 
-[Diagram](system-overview.mmd)
+[Diagram](architecture/system-overview.mmd)
 ```
 
 ### High Contrast
@@ -467,10 +467,10 @@ Use high contrast colors for accessibility:
 ## Additional Resources
 
 - **Architecture**: [Architecture Deep Dive →](../development/architecture/deep-dive.md)
-- **Design Patterns**: [Design Patterns →](../development/architecture/design-patterns.md)
+- **Design Patterns**: [Architecture Overview →](../development/architecture/overview.md)
 - **Data Flow**: [Data Flow →](../development/architecture/data-flow.md)
-- **Contributing**: [Contributing Guide →](../development/contributing/)
+- **Contributing**: [Contributing Guide →](../../CONTRIBUTING.md)
 
 ---
 
-**Next**: [Architecture Diagrams →](architecture/) | [Workflow Diagrams →](workflows/) | [Sequence Diagrams →](sequences/)
+**Next**: [Architecture Diagrams →](architecture/) | [Workflow Diagrams →](../workflow-diagrams/) | [Sequence Diagrams →](sequences/)

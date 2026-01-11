@@ -230,3 +230,4 @@ docs/PROMOTION_SPECIFICATION.md
 models/
 **/sentence-transformers/
 **/bge-*/
+embeddings/

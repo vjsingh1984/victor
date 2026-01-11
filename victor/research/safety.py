@@ -133,3 +133,220 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
         # Deduplicate while preserving order
         all_reminders = list(dict.fromkeys(framework_reminders + research_reminders))
         return all_reminders
+
+
+__all__ = [
+    "ResearchSafetyExtension",
+    "HIGH",
+    "MEDIUM",
+    "LOW",
+    # New framework-based safety rules
+    "create_research_source_safety_rules",
+    "create_research_content_safety_rules",
+    "create_all_research_safety_rules",
+]
+
+
+# =============================================================================
+# Framework-Based Safety Rules (New)
+# =============================================================================
+
+"""Framework-based safety rules for research operations.
+
+This section provides factory functions that register safety rules
+with the framework-level SafetyEnforcer. This is the new recommended
+approach for safety enforcement in research workflows.
+
+Example:
+    from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+    from victor.research.safety import create_all_research_safety_rules
+
+    enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+    create_all_research_safety_rules(enforcer)
+
+    # Check operations
+    allowed, reason = enforcer.check_operation("cite unreliable source")
+    if not allowed:
+        print(f"Blocked: {reason}")
+"""
+
+from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+
+
+def create_research_source_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    block_low_credibility_sources: bool = True,
+    require_source_verification: bool = False,
+    blocked_domains: list[str] | None = None,
+) -> None:
+    """Register research source safety rules.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        block_low_credibility_sources: Block sources from low-credibility domains
+        require_source_verification: Require verification for non-.edu/.gov sources
+        blocked_domains: List of specific domains to block
+
+    Example:
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.MEDIUM))
+        create_research_source_safety_rules(
+            enforcer,
+            block_low_credibility_sources=True,
+            blocked_domains=["fake-news-site.com"]
+        )
+    """
+    if block_low_credibility_sources:
+        enforcer.add_rule(
+            SafetyRule(
+                name="research_block_low_credibility",
+                description="Block low-credibility sources (.blogspot, tumblr, etc.)",
+                check_fn=lambda op: any(
+                    domain in op.lower()
+                    for domain in [
+                        ".blogspot.",
+                        "wordpress.com/",
+                        "tumblr.com",
+                        "fake-news",
+                        "conspiracy",
+                    ]
+                )
+                and ("cite" in op.lower() or "source" in op.lower()),
+                level=SafetyLevel.MEDIUM,
+                allow_override=True,
+            )
+        )
+
+    if require_source_verification:
+        enforcer.add_rule(
+            SafetyRule(
+                name="research_require_source_verification",
+                description="Require verification for non-.edu/.gov sources",
+                check_fn=lambda op: ("cite" in op.lower() or "source" in op.lower())
+                and not any(
+                    domain in op.lower() for domain in [".edu", ".gov", "arxiv.org", "doi.org"]
+                ),
+                level=SafetyLevel.LOW,  # Warn only
+                allow_override=True,
+            )
+        )
+
+    if blocked_domains:
+        for domain in blocked_domains:
+            enforcer.add_rule(
+                SafetyRule(
+                    name=f"research_block_{domain.replace('.', '_')}",
+                    description=f"Block sources from {domain}",
+                    check_fn=lambda op, d=domain: d in op.lower(),
+                    level=SafetyLevel.HIGH,
+                    allow_override=False,
+                )
+            )
+
+
+def create_research_content_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    block_fabricated_content: bool = True,
+    warn_absolute_claims: bool = True,
+    block_plagiarism_risk: bool = True,
+) -> None:
+    """Register research content safety rules.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        block_fabricated_content: Block fabricating sources/citations
+        warn_absolute_claims: Warn about absolute claims (always, never, proven)
+        block_plagiarism_risk: Block plagiarism risks
+
+    Example:
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
+        create_research_content_safety_rules(
+            enforcer,
+            block_fabricated_content=True,
+            warn_absolute_claims=True
+        )
+    """
+    if block_fabricated_content:
+        enforcer.add_rule(
+            SafetyRule(
+                name="research_block_fabricated",
+                description="Block fabricating sources or citations",
+                check_fn=lambda op: any(
+                    phrase in op.lower()
+                    for phrase in [
+                        "fake source",
+                        "fabricat",
+                        "invent citation",
+                        "fake citation",
+                    ]
+                ),
+                level=SafetyLevel.HIGH,
+                allow_override=False,
+            )
+        )
+
+    if warn_absolute_claims:
+        enforcer.add_rule(
+            SafetyRule(
+                name="research_warn_absolute_claims",
+                description="Warn about absolute claims (always, never, proven)",
+                check_fn=lambda op: any(
+                    phrase in op.lower()
+                    for phrase in [
+                        "always ",
+                        "never ",
+                        "guaranteed",
+                        "proven fact",
+                        "everyone knows",
+                    ]
+                ),
+                level=SafetyLevel.LOW,  # Warn only
+                allow_override=True,
+            )
+        )
+
+    if block_plagiarism_risk:
+        enforcer.add_rule(
+            SafetyRule(
+                name="research_warn_plagiarism",
+                description="Warn about plagiarism risk",
+                check_fn=lambda op: any(
+                    phrase in op.lower()
+                    for phrase in [
+                        "plagiar",
+                        "copy without attribution",
+                        "unattributed",
+                    ]
+                ),
+                level=SafetyLevel.MEDIUM,
+                allow_override=True,
+            )
+        )
+
+
+def create_all_research_safety_rules(
+    enforcer: SafetyEnforcer,
+    *,
+    blocked_domains: list[str] | None = None,
+) -> None:
+    """Register all research safety rules at once.
+
+    This is a convenience function that registers all research-specific
+    safety rules with appropriate defaults.
+
+    Args:
+        enforcer: SafetyEnforcer to register rules with
+        blocked_domains: Specific domains to block
+
+    Example:
+        from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
+
+        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.MEDIUM))
+        create_all_research_safety_rules(enforcer)
+
+        # Now all operations are checked
+        allowed, reason = enforcer.check_operation("cite unreliable source")
+    """
+    create_research_source_safety_rules(enforcer, blocked_domains=blocked_domains)
+    create_research_content_safety_rules(enforcer)

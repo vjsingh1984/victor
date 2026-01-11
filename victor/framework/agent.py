@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Opti
 
 from victor.framework.config import AgentConfig
 from victor.framework.errors import AgentError, CancellationError, ProviderError
-from victor.framework.events import Event, EventType
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State, StateObserver
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from victor.framework.agent_components import AgentSession
     from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
-    from victor.observability import EventBus, ObservabilityIntegration
+    from victor.observability.integration import ObservabilityIntegration
     from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
 
@@ -394,7 +394,7 @@ class Agent:
         from victor.framework._internal import collect_tool_calls, format_context_message
 
         # Collect all events
-        events: List[Event] = []
+        events: List[AgentExecutionEvent] = []
         content_parts: List[str] = []
         final_success = True
         final_error: Optional[str] = None
@@ -436,7 +436,7 @@ class Agent:
         prompt: str,
         *,
         context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator[Event]:
+    ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream events as the agent processes a task.
 
         This provides real-time visibility into the agent's reasoning
@@ -447,7 +447,7 @@ class Agent:
             context: Optional context dict
 
         Yields:
-            Event objects representing agent actions
+            AgentExecutionEvent objects representing agent actions
 
         Example:
             async for event in agent.stream("Analyze this codebase"):
@@ -839,13 +839,13 @@ class Agent:
 
         return await self._cqrs_bridge.get_metrics(self._cqrs_session_id)
 
-    def _forward_event_to_cqrs(self, event: Event) -> None:
+    def _forward_event_to_cqrs(self, event: AgentExecutionEvent) -> None:
         """Forward a framework event to CQRS subsystem.
 
         Called internally during streaming to source events.
 
         Args:
-            event: Framework Event to forward.
+            event: Framework AgentExecutionEvent to forward.
         """
         if self._cqrs_adapter:
             self._cqrs_adapter.forward(event)
@@ -1124,14 +1124,14 @@ class ChatSession:
         """
         return await self._delegate.send(message)
 
-    async def stream(self, message: str) -> AsyncIterator[Event]:
+    async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response in the conversation.
 
         Args:
             message: User message
 
         Yields:
-            Event objects
+            AgentExecutionEvent objects
         """
         async for event in self._delegate.stream(message):
             yield event

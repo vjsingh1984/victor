@@ -96,13 +96,13 @@ class TestDashboardEventSubscription:
     @pytest.mark.asyncio
     async def test_dashboard_subscribes_to_all_events(self, event_bus):
         """Test that dashboard can subscribe to all event patterns."""
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         import asyncio
 
         # Track received events
         received_events = []
 
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             received_events.append(event)
 
         # Subscribe to all patterns
@@ -132,12 +132,12 @@ class TestDashboardEventSubscription:
     @pytest.mark.asyncio
     async def test_dashboard_unsubscribes_on_unmount(self, event_bus):
         """Test that dashboard properly unsubscribes on unmount."""
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         import asyncio
 
         received_events = []
 
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             received_events.append(event)
 
         # Subscribe
@@ -164,7 +164,7 @@ class TestDashboardEventProcessing:
     @pytest.mark.asyncio
     async def test_dashboard_processes_tool_events(self, event_bus):
         """Test that dashboard processes tool events correctly."""
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         from victor.observability.dashboard.app import ObservabilityDashboard
 
         dashboard = ObservabilityDashboard()
@@ -179,7 +179,7 @@ class TestDashboardEventProcessing:
         dashboard._performance_metrics_view = MagicMock()
 
         # Process a tool event
-        event = Event(
+        event = MessagingEvent(
             topic="tool.start",
             data={
                 "tool": "read_file",
@@ -200,7 +200,7 @@ class TestDashboardEventProcessing:
     @pytest.mark.asyncio
     async def test_dashboard_processes_state_events(self, event_bus):
         """Test that dashboard processes state events correctly."""
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         from victor.observability.dashboard.app import ObservabilityDashboard
 
         dashboard = ObservabilityDashboard()
@@ -214,7 +214,7 @@ class TestDashboardEventProcessing:
         dashboard._performance_metrics_view = MagicMock()
 
         # Process a state event
-        event = Event(
+        event = MessagingEvent(
             topic="state.transition",
             data={
                 "from_stage": "idle",
@@ -237,7 +237,7 @@ class TestDashboardWithRealEvents:
     @pytest.mark.asyncio
     async def test_end_to_end_event_flow(self, event_bus):
         """Test complete event flow from emission to dashboard processing."""
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         from victor.observability.dashboard.app import ObservabilityDashboard
         import asyncio
 
@@ -249,7 +249,7 @@ class TestDashboardWithRealEvents:
         processed_events = []
 
         # Subscribe handler that tracks events
-        async def event_handler(event: Event):
+        async def event_handler(event: MessagingEvent):
             processed_events.append(event)
 
         # Subscribe to all patterns
@@ -299,7 +299,7 @@ class TestDashboardJSONLLoading:
     def test_dashboard_parses_jsonl_event(self):
         """Test that dashboard can parse JSONL event lines."""
         from victor.observability.dashboard.app import ObservabilityDashboard
-        from victor.core.events import Event
+        from victor.core.events import MessagingEvent
         import json
 
         dashboard = ObservabilityDashboard()
@@ -318,7 +318,7 @@ class TestDashboardJSONLLoading:
 
         # Event should be parsed successfully
         assert event is not None
-        assert isinstance(event, Event)
+        assert isinstance(event, MessagingEvent)
         # Old format (category + name) should be converted to topic
         assert event.topic == "tool.tool.start"
         assert event.data == {"tool": "read_file", "path": "/test"}

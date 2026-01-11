@@ -52,7 +52,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterator, List, Optional, Union
 
-from victor.core.events import Event, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 from victor.observability.exporters import BaseExporter
 
 logger = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ class OpenTelemetryExporter(BaseExporter):
         trace.set_tracer_provider(self._provider)
         self._tracer = trace.get_tracer(__name__, self._service_version)
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Export event as OTEL span.
 
         Simplified generic approach - all events become spans with
@@ -321,7 +321,7 @@ class AsyncBatchingExporter(BaseExporter):
         batch_size: int = 100,
         flush_interval: float = 5.0,
         max_queue_size: int = 10000,
-        on_export_error: Optional[Callable[[Exception, List[Event]], None]] = None,
+        on_export_error: Optional[Callable[[Exception, List[MessagingEvent]], None]] = None,
     ) -> None:
         """Initialize async batching exporter.
 
@@ -346,11 +346,11 @@ class AsyncBatchingExporter(BaseExporter):
         self._thread = threading.Thread(target=self._export_loop, daemon=True)
         self._thread.start()
 
-    def export(self, event: Event) -> None:
+    def export(self, event: MessagingEvent) -> None:
         """Queue event for async export.
 
         Args:
-            event: Event to export.
+            event: MessagingEvent to export.
         """
         try:
             self._queue.put_nowait(event)
@@ -362,7 +362,7 @@ class AsyncBatchingExporter(BaseExporter):
         """Background export loop."""
         import time
 
-        batch: List[Event] = []
+        batch: List[MessagingEvent] = []
         last_flush = time.time()
 
         while not self._shutdown.is_set():
@@ -392,7 +392,7 @@ class AsyncBatchingExporter(BaseExporter):
         if batch:
             self._flush_batch(batch)
 
-    def _flush_batch(self, batch: List[Event]) -> None:
+    def _flush_batch(self, batch: List[MessagingEvent]) -> None:
         """Flush batch of events to target.
 
         Args:

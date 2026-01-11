@@ -113,13 +113,23 @@ class VertexAIProvider(BaseProvider):
         Args:
             project_id: GCP project ID (or set GOOGLE_CLOUD_PROJECT env var)
             location: GCP region (default: us-central1)
-            api_key: Optional API key (alternative to service account)
+            api_key: Optional API key (alternative to service account, or use keyring)
             timeout: Request timeout
             **kwargs: Additional configuration
         """
+        # Resolution order: parameter → env var → keyring → warning
+        resolved_key = api_key or os.environ.get("VERTEX_API_KEY", "")
+        if not resolved_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                resolved_key = get_api_key("vertex") or get_api_key("gcp") or ""
+            except ImportError:
+                pass
+
         self._project_id = project_id or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
         self._location = location
-        self._api_key = api_key or os.environ.get("VERTEX_API_KEY", "")
+        self._api_key = resolved_key
         self._access_token: Optional[str] = None
 
         if not self._project_id:

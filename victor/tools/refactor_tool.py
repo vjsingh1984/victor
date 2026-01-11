@@ -33,6 +33,19 @@ from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 # Helper functions
 
@@ -454,12 +467,14 @@ async def rename(
 
         report.append("")
         if applied_count == len(all_file_changes):
-            report.append(f"✅ All {applied_count} files updated successfully")
+            report.append(f"{_get_icon('success')} All {applied_count} files updated successfully")
         else:
-            report.append(f"⚠️  {applied_count}/{len(all_file_changes)} files updated (some failed)")
+            report.append(
+                f"{_get_icon('warning')}  {applied_count}/{len(all_file_changes)} files updated (some failed)"
+            )
     else:
         report.append("")
-        report.append("⚠️  PREVIEW MODE - no changes were made")
+        report.append(f"{_get_icon('warning')}  PREVIEW MODE - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -613,10 +628,10 @@ async def extract(
     if not preview:
         file_obj.write_text(new_content)
         report.append("")
-        report.append("✅ Function extracted successfully")
+        report.append(f"{_get_icon('success')} Function extracted successfully")
     else:
         report.append("")
-        report.append("⚠️  This is a PREVIEW - no changes were made")
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -746,10 +761,10 @@ async def inline(
     if not preview:
         file_obj.write_text(new_content)
         report.append("")
-        report.append("✅ Variable inlined successfully")
+        report.append(f"{_get_icon('success')} Variable inlined successfully")
     else:
         report.append("")
-        report.append("⚠️  This is a PREVIEW - no changes were made")
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -926,10 +941,10 @@ async def organize_imports(
     if not preview:
         file_obj.write_text(new_content)
         report.append("")
-        report.append("✅ Imports organized successfully")
+        report.append(f"{_get_icon('success')} Imports organized successfully")
     else:
         report.append("")
-        report.append("⚠️  This is a PREVIEW - no changes were made")
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {

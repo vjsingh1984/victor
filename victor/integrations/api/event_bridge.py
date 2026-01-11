@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from victor.core.events import ObservabilityBus as EventBus, Event
+from victor.core.events import ObservabilityBus as EventBus, MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -372,7 +372,7 @@ class EventBusAdapter:
                     pass
             self._subscriptions.clear()
 
-    def _on_event(self, event: Event) -> None:
+    def _on_event(self, event: MessagingEvent) -> None:
         """Handle an internal EventBus event."""
         # Map event topic to bridge event type
         bridge_type = self.EVENT_MAPPING.get(event.topic)

@@ -34,6 +34,7 @@ from victor.agent.protocols import (
     IToolAdapterCoordinator,
     IProviderHealthMonitor,
 )
+from victor.core.errors import ProviderNotFoundError
 from victor.providers.base import BaseProvider
 from victor.providers.registry import ProviderRegistry
 
@@ -185,8 +186,8 @@ class ProviderSwitcher(IProviderSwitcher):
             if self._health_monitor:
                 is_healthy = await self._health_monitor.check_health(new_provider)
                 if not is_healthy:
-                    logger.warning(f"Provider {provider_name} failed health check")
-                    # Could attempt fallback here in the future
+                    logger.warning(f"Provider {provider_name} failed health check, aborting switch")
+                    return False
 
             # Store old state for switch tracking
             old_state = self._current_state
@@ -250,6 +251,9 @@ class ProviderSwitcher(IProviderSwitcher):
 
             return True
 
+        except ProviderNotFoundError:
+            # Let ProviderNotFoundError propagate to caller
+            raise
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
             if self._current_state:

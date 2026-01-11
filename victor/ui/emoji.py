@@ -119,6 +119,37 @@ ICONS = {
     "bulb": IconSet("💡", "*", "yellow"),
     "note": IconSet("📝", "#", None),
     "refresh": IconSet("🔄", "~", None),
+    # Safety/risk level icons
+    "risk_high": IconSet("🔴", "!!", "red"),
+    "risk_critical": IconSet("⛔", "!!!", "red"),
+    "unknown": IconSet("❓", "?", None),
+    # Step status icons
+    "skipped": IconSet("⏭️", ">>", "dim"),
+    "blocked": IconSet("🔒", "[X]", "yellow"),
+    # Additional UI icons
+    "thinking": IconSet("💭", "...", "dim"),
+    "gear": IconSet("⚙️", "[*]", "cyan"),
+    "clipboard": IconSet("📋", "[=]", None),
+    "stop": IconSet("⛔", "[!]", "red"),
+    "clock": IconSet("⏰", "[T]", "yellow"),
+    "stop_sign": IconSet("🛑", "[X]", "red"),
+    # Severity/complexity indicators
+    "level_low": IconSet("🟢", "[L]", "green"),
+    "level_medium": IconSet("🟡", "[M]", "yellow"),
+    "level_high": IconSet("🟠", "[H]", "yellow"),
+    "level_critical": IconSet("🔴", "[!]", "red"),
+    "level_info": IconSet("🔵", "[I]", "blue"),
+    "level_unknown": IconSet("⚪", "[?]", None),
+    "person": IconSet("👤", "[P]", None),
+    # Platform/technology icons
+    "terraform": IconSet("🏗️", "[TF]", None),
+    "docker": IconSet("🐳", "[DK]", None),
+    "kubernetes": IconSet("☸️", "[K8]", None),
+    # Miscellaneous
+    "hint": IconSet("💡", "*", "yellow"),
+    "alert": IconSet("🚨", "(!)", "red"),
+    "trend_up": IconSet("📈", "^", "green"),
+    "trend_down": IconSet("📉", "v", "red"),
 }
 
 

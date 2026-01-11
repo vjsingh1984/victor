@@ -55,6 +55,16 @@ from victor.benchmark.harness_integration import (
     HighLevelEvaluationRunner,
 )
 from victor.benchmark.workflows import BenchmarkWorkflowProvider
+from victor.benchmark.capabilities import (
+    BenchmarkCapabilityProvider,
+    get_benchmark_capabilities,
+    create_benchmark_capability_loader,
+    get_capability_configs,
+)
+from victor.benchmark.prompts import (
+    BenchmarkPromptContributor,
+    get_task_type_hint,
+)
 
 __all__ = [
     # Vertical
@@ -73,4 +83,12 @@ __all__ = [
     "HighLevelEvaluationRunner",
     # Workflow provider
     "BenchmarkWorkflowProvider",
+    # Capabilities
+    "BenchmarkCapabilityProvider",
+    "get_benchmark_capabilities",
+    "create_benchmark_capability_loader",
+    "get_capability_configs",
+    # Prompts
+    "BenchmarkPromptContributor",
+    "get_task_type_hint",
 ]

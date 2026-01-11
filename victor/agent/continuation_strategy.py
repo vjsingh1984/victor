@@ -649,6 +649,32 @@ class ContinuationStrategy:
                     "extraction_failed": True,
                 },
             )
+            # Escalation: after 3+ continuation prompts with hallucinated tools, request summary
+            if continuation_prompts >= 3:
+                logger.warning(
+                    f"Model resistant to tool calling after {continuation_prompts} attempts - "
+                    "requesting summary instead of forcing"
+                )
+                # Emit STATE event for escalation
+                self._emit_event(
+                    topic="state.continuation.escalate_to_summary",
+                    data={
+                        "reason": "tool_calling_resistance",
+                        "hallucinated_tools": mentioned_tools,
+                        "continuation_prompts": continuation_prompts,
+                    },
+                )
+                return {
+                    "action": "request_summary",
+                    "message": (
+                        "You've mentioned tools multiple times without executing them. "
+                        "Please provide your response based on what you already know, "
+                        "or make a single tool call now if needed."
+                    ),
+                    "reason": "Tool calling resistance detected - escalating to summary",
+                    "updates": {"continuation_prompts": continuation_prompts + 1},
+                }
+
             return {
                 "action": "force_tool_execution",
                 "message": (

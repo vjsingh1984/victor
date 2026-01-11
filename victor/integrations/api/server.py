@@ -82,6 +82,7 @@ class VictorAPIServer:
 
         self._app = web.Application(middlewares=middleware_stack.build())
         self._orchestrator = None
+        self._shutting_down = False
         self._setup_routes()
 
     def _setup_routes(self) -> None:
@@ -987,7 +988,16 @@ class VictorAPIServer:
                 pass  # Ignore send errors
 
     async def _shutdown(self, request: Request) -> Response:
-        """Shutdown the server."""
+        """Shutdown the server gracefully.
+
+        This endpoint initiates a graceful shutdown of the server without
+        forcefully stopping the event loop, which prevents system-wide issues.
+        """
+        # Check if shutdown is already in progress
+        if self._shutting_down:
+            return web.json_response({"status": "already_shutting_down"})
+
+        self._shutting_down = True
         logger.info("Shutdown requested")
 
         # Record RL feedback before shutdown
@@ -997,8 +1007,34 @@ class VictorAPIServer:
         for ws in self._ws_clients:
             await ws.close()
 
-        asyncio.get_event_loop().call_later(0.5, asyncio.get_event_loop().stop)
+        # Use safer shutdown mechanism instead of loop.stop()
+        # Schedule graceful shutdown after response is sent
+        asyncio.create_task(self._delayed_shutdown())
+
         return web.json_response({"status": "shutting_down"})
+
+    async def _delayed_shutdown(self) -> None:
+        """Delayed shutdown helper for /shutdown endpoint.
+
+        This method is called asynchronously after the shutdown response is sent,
+        allowing the HTTP response to complete before the server actually shuts down.
+        For aiohttp, we use the app's on_shutdown signal mechanism.
+        """
+        # Check if shutdown is already in progress
+        if self._shutting_down:
+            return
+
+        # Small delay to ensure response is sent
+        await asyncio.sleep(0.5)
+
+        # Trigger graceful shutdown via the application
+        # The aiohttp runner will handle cleanup
+        try:
+            # Store a flag that can be checked by the runner
+            self._app["_shutdown_requested"] = True
+            logger.info("Graceful shutdown initiated")
+        except Exception as e:
+            logger.warning(f"Delayed shutdown encountered error: {e}")
 
     async def _get_orchestrator(self) -> Any:
         """Get or create the orchestrator."""
@@ -1022,8 +1058,8 @@ class VictorAPIServer:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1796,7 +1832,7 @@ class VictorAPIServer:
     async def _rl_stats(self, request: Request) -> Response:
         """Get RL model selector statistics."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1852,7 +1888,7 @@ class VictorAPIServer:
                        (simple, complex, action, generation, analysis)
         """
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
             import json
 
             coordinator = get_rl_coordinator()
@@ -1907,7 +1943,7 @@ class VictorAPIServer:
     async def _rl_explore(self, request: Request) -> Response:
         """Set exploration rate for RL model selector."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1949,8 +1985,8 @@ class VictorAPIServer:
     async def _rl_strategy(self, request: Request) -> Response:
         """Set selection strategy for RL model selector."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
-            from victor.agent.rl.learners.model_selector import SelectionStrategy
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.learners.model_selector import SelectionStrategy
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -1995,7 +2031,7 @@ class VictorAPIServer:
     async def _rl_reset(self, request: Request) -> Response:
         """Reset RL model selector Q-values to initial state."""
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")

@@ -31,7 +31,10 @@ Design Principles:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +160,7 @@ class ContextReminderManager:
         provider: str = "unknown",
         configs: Optional[Dict[ReminderType, ReminderConfig]] = None,
         custom_formatters: Optional[Dict[ReminderType, Callable[[ContextState], str]]] = None,
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize the context reminder manager.
 
@@ -164,12 +168,20 @@ class ContextReminderManager:
             provider: The LLM provider name (affects reminder frequency)
             configs: Custom reminder configurations
             custom_formatters: Custom formatter functions per reminder type
+            presentation: Optional presentation adapter for icons (creates default if None)
         """
         self.provider = provider.lower()
         self.configs = configs or self.DEFAULT_CONFIGS.copy()
         self.custom_formatters = custom_formatters or {}
         self.state = ContextState()
         self._reminder_count = 0
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
     def reset(self) -> None:
         """Reset state for a new conversation turn."""
@@ -260,7 +272,8 @@ class ContextReminderManager:
         """Format the budget reminder."""
         remaining = self.state.tool_budget - self.state.tool_calls_made
         if remaining <= 3:
-            return f"[⚠️ {remaining} tool calls remaining - wrap up soon]"
+            warning_icon = self._presentation.icon("warning", with_color=False)
+            return f"[{warning_icon} {remaining} tool calls remaining - wrap up soon]"
         elif remaining <= 5:
             return f"[{remaining} tool calls remaining]"
         return ""
@@ -378,7 +391,8 @@ class ContextReminderManager:
         # Budget warning is critical
         remaining = self.state.tool_budget - self.state.tool_calls_made
         if remaining <= 3:
-            parts.append(f"⚠️ {remaining} calls left")
+            warning_icon = self._presentation.icon("warning", with_color=False)
+            parts.append(f"{warning_icon} {remaining} calls left")
 
         # File count
         if self.state.observed_files:

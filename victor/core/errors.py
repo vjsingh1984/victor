@@ -553,7 +553,7 @@ class ErrorInfo:
     category: ErrorCategory
     severity: ErrorSeverity
     correlation_id: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     details: Dict[str, Any] = field(default_factory=dict)
     recovery_hint: Optional[str] = None
     traceback: Optional[str] = None

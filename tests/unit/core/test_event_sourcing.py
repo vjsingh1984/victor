@@ -24,7 +24,7 @@ from typing import Dict, Any, List
 from victor.core.event_sourcing import (
     Aggregate,
     ConcurrencyError,
-    Event,
+    DomainEvent,
     EventDispatcher,
     EventEnvelope,
     EventSourcedRepository,
@@ -46,7 +46,7 @@ from victor.core.event_sourcing import (
 
 
 @dataclass
-class OrderCreated(Event):
+class OrderCreated(DomainEvent):
     """Test event for order creation."""
 
     order_id: str = ""
@@ -54,7 +54,7 @@ class OrderCreated(Event):
 
 
 @dataclass
-class ItemAdded(Event):
+class ItemAdded(DomainEvent):
     """Test event for adding item."""
 
     item: str = ""
@@ -63,7 +63,7 @@ class ItemAdded(Event):
 
 
 @dataclass
-class OrderCompleted(Event):
+class OrderCompleted(DomainEvent):
     """Test event for order completion."""
 
     total: float = 0.0
@@ -119,12 +119,12 @@ class OrderAggregate(Aggregate):
 # =============================================================================
 
 
-class TestEvent:
-    """Tests for Event base class."""
+class TestDomainEvent:
+    """Tests for DomainEvent base class."""
 
     def test_event_creation(self):
         """Test basic event creation."""
-        event = Event()
+        event = DomainEvent()
 
         assert event.event_id is not None
         assert event.timestamp is not None
@@ -162,7 +162,7 @@ class TestEvent:
 
     def test_correlation_id(self):
         """Test correlation ID."""
-        event = Event(correlation_id="corr-123")
+        event = DomainEvent(correlation_id="corr-123")
 
         assert event.correlation_id == "corr-123"
 

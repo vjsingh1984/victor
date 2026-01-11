@@ -22,15 +22,19 @@ across RL Q-values, workflow patterns, and vertical configurations.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 from victor.framework.rl import LearnerType
+from victor.framework.rl.config import BaseRLConfig
 from victor.framework.tool_naming import ToolNames
 
 
 @dataclass
-class CodingRLConfig:
+class CodingRLConfig(BaseRLConfig):
     """RL configuration for coding vertical.
+
+    Inherits common RL configuration from BaseRLConfig and extends
+    with coding-specific task types, quality thresholds, and tool conflicts.
 
     This configuration customizes RL behavior for software development
     tasks, including which learners are active, tool recommendations
@@ -42,6 +46,7 @@ class CodingRLConfig:
         quality_thresholds: Quality thresholds by task type
         default_patience: Default continuation patience by provider
         exploration_bonus: Bonus weight for less-used tools
+        conflicting_tools: Tools that should not be recommended together
 
     Example:
         config = CodingRLConfig()
@@ -49,7 +54,7 @@ class CodingRLConfig:
         # Returns: ["read", "grep", "shell", "run_tests", "git_log"]
     """
 
-    # Learners to activate
+    # Coding uses additional learners (MODE_TRANSITION, QUALITY_WEIGHTS)
     active_learners: List[LearnerType] = field(
         default_factory=lambda: [
             LearnerType.TOOL_SELECTOR,
@@ -140,7 +145,8 @@ class CodingRLConfig:
         }
     )
 
-    # Continuation patience by provider (retries before giving up)
+    # Coding-specific: different patience values (3 for cloud, 7 for local)
+    # This overrides the BaseRLConfig default
     default_patience: Dict[str, int] = field(
         default_factory=lambda: {
             "anthropic": 3,
@@ -153,8 +159,7 @@ class CodingRLConfig:
         }
     )
 
-    # Exploration bonus for tool selection (encourage trying different tools)
-    exploration_bonus: float = 0.15
+    # exploration_bonus inherited from BaseRLConfig (0.15)
 
     # Tools that should never be recommended together (conflicting)
     # Uses canonical ToolNames constants for consistency
@@ -165,75 +170,8 @@ class CodingRLConfig:
         }
     )
 
-    def get_tools_for_task(self, task_type: str) -> List[str]:
-        """Get recommended tools for a task type.
-
-        Args:
-            task_type: Type of task
-
-        Returns:
-            List of recommended tool names
-        """
-        return self.task_type_mappings.get(task_type.lower(), [])
-
-    def get_quality_threshold(self, task_type: str) -> float:
-        """Get quality threshold for a task type.
-
-        Args:
-            task_type: Type of task
-
-        Returns:
-            Quality threshold (0.0-1.0)
-        """
-        return self.quality_thresholds.get(task_type.lower(), 0.80)
-
-    def get_patience(self, provider: str) -> int:
-        """Get continuation patience for a provider.
-
-        Args:
-            provider: Provider name
-
-        Returns:
-            Number of retry attempts
-        """
-        return self.default_patience.get(provider.lower(), 3)
-
-    def is_learner_active(self, learner: LearnerType) -> bool:
-        """Check if a learner is active.
-
-        Args:
-            learner: Learner type to check
-
-        Returns:
-            True if learner is active
-        """
-        return learner in self.active_learners
-
-    def get_rl_config(self) -> Dict[str, Any]:
-        """Return RL configuration as dictionary (protocol compliance).
-
-        Implements RLConfigProviderProtocol.get_rl_config() to enable
-        integration with the vertical framework.
-
-        Returns:
-            Dict with RL configuration including:
-            - active_learners: List of learner type values
-            - task_type_mappings: Map task types to recommended tools
-            - quality_thresholds: Task-specific quality thresholds
-            - default_patience: Provider-specific patience settings
-        """
-        return {
-            "active_learners": [learner.value for learner in self.active_learners],
-            "task_type_mappings": self.task_type_mappings,
-            "quality_thresholds": self.quality_thresholds,
-            "default_patience": self.default_patience,
-        }
-
-    def __repr__(self) -> str:
-        return (
-            f"CodingRLConfig(learners={len(self.active_learners)}, "
-            f"task_types={len(self.task_type_mappings)})"
-        )
+    # Methods get_tools_for_task, get_quality_threshold, get_patience,
+    # is_learner_active, get_rl_config, __repr__ all inherited
 
 
 # Default singleton instance

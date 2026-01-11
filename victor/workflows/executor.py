@@ -54,7 +54,7 @@ CHAIN_HANDLER_PREFIX = "chain:"
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents import SubAgentOrchestrator
-    from victor.agent.rl.checkpoint_store import CheckpointStore
+    from victor.framework.rl.checkpoint_store import CheckpointStore
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
     from victor.workflows.services import ServiceRegistry, ServiceConfig
@@ -421,7 +421,7 @@ class WorkflowExecutor:
             print(result.get_output("analyze"))
 
         # With checkpointing for resumption:
-        from victor.agent.rl.checkpoint_store import get_checkpoint_store
+        from victor.framework.rl.checkpoint_store import get_checkpoint_store
         executor = WorkflowExecutor(orchestrator, checkpointer=get_checkpoint_store())
         result = await executor.execute(
             workflow,
@@ -1640,7 +1640,7 @@ class WorkflowExecutor:
             duration: Duration in seconds
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:
@@ -1684,7 +1684,7 @@ class WorkflowExecutor:
             tool_calls: Total tool calls used
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

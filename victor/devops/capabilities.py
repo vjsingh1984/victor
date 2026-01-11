@@ -627,6 +627,54 @@ def create_devops_capability_loader() -> Any:
     return loader
 
 
+# =============================================================================
+# SOLID: Centralized Config Storage
+# =============================================================================
+
+
+def get_capability_configs() -> Dict[str, Any]:
+    """Get DevOps capability configurations for centralized storage.
+
+    Returns default DevOps configuration for VerticalContext storage.
+    This replaces direct orchestrator deployment/container/cicd_config assignment.
+
+    Returns:
+        Dict with default DevOps capability configurations
+    """
+    return {
+        "deployment_safety": {
+            "require_approval_for_production": True,
+            "require_backup_before_deploy": True,
+            "enable_rollback": True,
+            "protected_environments": ["production", "staging"],
+        },
+        "container_config": {
+            "runtime": "docker",
+            "default_registry": None,
+            "security_scan_enabled": True,
+            "max_image_size_mb": 2000,
+        },
+        "infrastructure_config": {
+            "iac_tool": "terraform",
+            "auto_approve_non_destructive": False,
+            "require_plan_before_apply": True,
+            "state_backend": None,
+        },
+        "cicd_config": {
+            "platform": "github_actions",
+            "run_tests_before_deploy": True,
+            "require_passing_checks": True,
+            "enable_security_scan": True,
+        },
+        "monitoring_config": {
+            "metrics_backend": "prometheus",
+            "logging_backend": "loki",
+            "alerting_enabled": True,
+            "dashboard_tool": "grafana",
+        },
+    }
+
+
 __all__ = [
     # Handlers
     "configure_deployment_safety",
@@ -643,4 +691,6 @@ __all__ = [
     # Convenience functions
     "get_devops_capabilities",
     "create_devops_capability_loader",
+    # SOLID: Centralized config storage
+    "get_capability_configs",
 ]

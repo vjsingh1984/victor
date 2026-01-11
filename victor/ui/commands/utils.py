@@ -293,8 +293,8 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
     if agent is None:
         return
     try:
-        from victor.agent.rl.base import RLOutcome
-        from victor.agent.rl.coordinator import get_rl_coordinator
+        from victor.framework.rl.base import RLOutcome
+        from victor.framework.rl.coordinator import get_rl_coordinator
 
         coordinator = get_rl_coordinator()
         learner = coordinator.get_learner("model_selector")
@@ -496,7 +496,7 @@ def get_rl_profile_suggestion(
 ) -> Optional[tuple[str, str, float]]:
     """Get RL-based profile suggestion if different from current."""
     try:
-        from victor.agent.rl.coordinator import get_rl_coordinator
+        from victor.framework.rl.coordinator import get_rl_coordinator
         import json
 
         coordinator = get_rl_coordinator()

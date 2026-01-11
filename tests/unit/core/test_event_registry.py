@@ -26,7 +26,7 @@ Tests cover:
 import pytest
 
 from victor.framework.events import (
-    Event,
+    AgentExecutionEvent,
     EventType,
     content_event,
     error_event,

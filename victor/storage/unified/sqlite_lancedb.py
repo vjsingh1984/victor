@@ -146,7 +146,7 @@ class SqliteLanceDBStore:
             self._vector_table = None
 
             # Check if table exists
-            if "symbols" in self._vector_store.table_names():
+            if "symbols" in self._vector_store.list_tables().tables:
                 self._vector_table = self._vector_store.open_table("symbols")
         except ImportError:
             logger.warning("LanceDB not available. Semantic search disabled.")
@@ -749,7 +749,7 @@ class SqliteLanceDBStore:
 
         await self._graph_store.delete_by_repo()
 
-        if self._vector_store and "symbols" in self._vector_store.table_names():
+        if self._vector_store and "symbols" in self._vector_store.list_tables().tables:
             self._vector_store.drop_table("symbols")
             self._vector_table = None
 

@@ -24,7 +24,7 @@ from victor.framework.agent_components import (
 )
 from victor.framework.config import AgentConfig
 from victor.framework.errors import AgentError, ConfigurationError
-from victor.framework.events import Event, EventType
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet
 
@@ -56,8 +56,8 @@ def mock_agent():
         return TaskResult(content="Mock response", success=True)
 
     async def mock_stream(prompt, context=None):
-        yield Event(type=EventType.CONTENT, content="Mock ")
-        yield Event(type=EventType.CONTENT, content="response")
+        yield AgentExecutionEvent(type=EventType.CONTENT, content="Mock ")
+        yield AgentExecutionEvent(type=EventType.CONTENT, content="response")
 
     async def mock_reset():
         pass

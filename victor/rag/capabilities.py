@@ -715,6 +715,52 @@ def create_rag_capability_loader() -> Any:
     return loader
 
 
+# =============================================================================
+# SOLID: Centralized Config Storage
+# =============================================================================
+
+
+def get_capability_configs() -> Dict[str, Any]:
+    """Get RAG capability configurations for centralized storage.
+
+    Returns default RAG configuration for VerticalContext storage.
+    This replaces direct orchestrator.rag_config assignment.
+
+    Returns:
+        Dict with default RAG capability configurations
+    """
+    return {
+        "rag_config": {
+            "indexing": {
+                "chunk_size": 512,
+                "chunk_overlap": 50,
+                "chunk_strategy": "recursive",
+            },
+            "retrieval": {
+                "top_k": 5,
+                "search_type": "hybrid",
+                "min_similarity_score": 0.7,
+            },
+            "synthesis": {
+                "citation_style": "inline",
+                "include_sources": True,
+                "max_context_length": 4000,
+            },
+            "safety": {
+                "max_sources": 10,
+                "enable_source_verification": True,
+                "enable_fact_checking": False,
+            },
+            "query_enhancement": {
+                "enable_expansion": True,
+                "enable_decomposition": False,
+                "max_query_variants": 3,
+                "use_synonyms": True,
+            },
+        }
+    }
+
+
 __all__ = [
     # Handlers
     "configure_indexing",
@@ -733,4 +779,6 @@ __all__ = [
     # Convenience functions
     "get_rag_capabilities",
     "create_rag_capability_loader",
+    # SOLID: Centralized config storage
+    "get_capability_configs",
 ]

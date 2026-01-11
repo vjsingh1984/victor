@@ -80,17 +80,57 @@ def _load_yaml_config():
     return config
 
 
-# Load config once at module import
-_config = _load_yaml_config()
+# Load config lazily to support deprecation warnings
+_config = None
 
-# Export transitions, clusters, sequences for backward compatibility
-# Code using these constants will get the same data, now from YAML
-DEVOPS_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = _config.transitions
-DEVOPS_TOOL_CLUSTERS: Dict[str, Set[str]] = _config.clusters
-DEVOPS_TOOL_SEQUENCES: Dict[str, List[str]] = _config.sequences
-DEVOPS_TOOL_DEPENDENCIES = _config.dependencies
-DEVOPS_REQUIRED_TOOLS: Set[str] = _config.required_tools
-DEVOPS_OPTIONAL_TOOLS: Set[str] = _config.optional_tools
+
+def _get_config():
+    """Get or load the YAML config lazily."""
+    global _config
+    if _config is None:
+        _config = _load_yaml_config()
+    return _config
+
+
+def _warn_deprecated(name: str) -> None:
+    """Emit deprecation warning for legacy constant access."""
+    import warnings
+
+    warnings.warn(
+        f"{name} is deprecated. Use DevOpsToolDependencyProvider() or "
+        f"create_vertical_tool_dependency_provider('devops') instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+# Backward compatibility: module-level exports accessed via __getattr__
+# These are deprecated and will emit warnings when accessed
+_DEPRECATED_CONSTANTS = {
+    "DEVOPS_TOOL_TRANSITIONS": lambda: _get_config().transitions,
+    "DEVOPS_TOOL_CLUSTERS": lambda: _get_config().clusters,
+    "DEVOPS_TOOL_SEQUENCES": lambda: _get_config().sequences,
+    "DEVOPS_TOOL_DEPENDENCIES": lambda: _get_config().dependencies,
+    "DEVOPS_REQUIRED_TOOLS": lambda: _get_config().required_tools,
+    "DEVOPS_OPTIONAL_TOOLS": lambda: _get_config().optional_tools,
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy loading of module-level exports for backward compatibility.
+
+    This allows existing code to import the module-level constants
+    while actually loading them from the YAML file.
+
+    .. deprecated::
+        These constants are deprecated. Use DevOpsToolDependencyProvider() or
+        create_vertical_tool_dependency_provider('devops') instead.
+    """
+    if name in _DEPRECATED_CONSTANTS:
+        _warn_deprecated(name)
+        return _DEPRECATED_CONSTANTS[name]()
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # =============================================================================
@@ -260,26 +300,29 @@ def get_devops_tool_graph() -> ToolExecutionGraph:
     if _devops_tool_graph is not None:
         return _devops_tool_graph
 
+    # Use config directly to avoid deprecation warnings internally
+    config = _get_config()
+
     graph = ToolExecutionGraph(name="devops")
 
     # Add dependencies
-    for dep in DEVOPS_TOOL_DEPENDENCIES:
+    for dep in config.dependencies:
         graph.add_dependency(
-            tool_name=dep.tool_name,
+            dep.tool_name,
             depends_on=dep.depends_on,
             enables=dep.enables,
             weight=dep.weight,
         )
 
     # Add transitions
-    graph.add_transitions(DEVOPS_TOOL_TRANSITIONS)
+    graph.add_transitions(config.transitions)
 
     # Add sequences
-    for name, sequence in DEVOPS_TOOL_SEQUENCES.items():
+    for name, sequence in config.sequences.items():
         graph.add_sequence(sequence, weight=0.7)
 
     # Add clusters
-    for name, tools in DEVOPS_TOOL_CLUSTERS.items():
+    for name, tools in config.clusters.items():
         graph.add_cluster(name, tools)
 
     # Add composed patterns as sequences with higher weights
@@ -326,10 +369,10 @@ def list_composed_patterns() -> List[str]:
     return list(DEVOPS_COMPOSED_PATTERNS.keys())
 
 
-__all__ = [
+__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
     # Provider class
     "DevOpsToolDependencyProvider",
-    # Data exports
+    # Data exports (lazy-loaded with deprecation warnings)
     "DEVOPS_TOOL_DEPENDENCIES",
     "DEVOPS_TOOL_TRANSITIONS",
     "DEVOPS_TOOL_CLUSTERS",

@@ -20,9 +20,12 @@ enabling clean control flow and testable iteration logic.
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.providers.base import StreamChunk
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 
 class IterationAction(Enum):
@@ -182,9 +185,27 @@ def create_continue_result(
     )
 
 
-def create_force_completion_result(reason: str = "") -> IterationResult:
-    """Create an iteration result that forces completion."""
+def create_force_completion_result(
+    reason: str = "",
+    presentation: Optional["PresentationProtocol"] = None,
+) -> IterationResult:
+    """Create an iteration result that forces completion.
+
+    Args:
+        reason: Optional reason for forcing completion.
+        presentation: Optional presentation adapter for icons.
+            If None, creates default adapter.
+
+    Returns:
+        IterationResult configured for forced completion.
+    """
     result = IterationResult(action=IterationAction.FORCE_COMPLETION)
     if reason:
-        result.add_chunk(StreamChunk(content=f"\n\n⚠️ {reason}\n"))
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            presentation = create_presentation_adapter()
+
+        warning_icon = presentation.icon("warning", with_color=False)
+        result.add_chunk(StreamChunk(content=f"\n\n{warning_icon} {reason}\n"))
     return result

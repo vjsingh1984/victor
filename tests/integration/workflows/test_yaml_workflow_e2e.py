@@ -249,8 +249,8 @@ class TestCrossVerticalConsistency:
             assert hasattr(config, "condition_registry"), f"{provider} missing condition_registry"
             assert hasattr(config, "transform_registry"), f"{provider} missing transform_registry"
 
-    def test_all_providers_have_astream_method(self):
-        """Test all providers support streaming via astream()."""
+    def test_all_providers_have_canonical_streaming_methods(self):
+        """Test all providers support streaming via canonical API."""
         from victor.research.workflows import ResearchWorkflowProvider
         from victor.devops.workflows import DevOpsWorkflowProvider
         from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -262,8 +262,10 @@ class TestCrossVerticalConsistency:
         ]
 
         for provider in providers:
-            assert hasattr(provider, "astream"), f"{provider} missing astream method"
-            assert hasattr(provider, "create_streaming_executor")
+            assert hasattr(provider, "compile_workflow"), f"{provider} missing compile_workflow"
+            assert hasattr(
+                provider, "stream_compiled_workflow"
+            ), f"{provider} missing stream_compiled_workflow"
 
     def test_workflow_yaml_files_exist(self):
         """Test YAML workflow files exist for each vertical."""

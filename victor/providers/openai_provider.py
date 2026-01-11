@@ -14,6 +14,7 @@
 
 """OpenAI GPT provider implementation."""
 
+import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from openai import AsyncOpenAI
@@ -42,7 +43,7 @@ class OpenAIProvider(BaseProvider):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str] = None,
         organization: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: int = 60,
@@ -52,18 +53,40 @@ class OpenAIProvider(BaseProvider):
         """Initialize OpenAI provider.
 
         Args:
-            api_key: OpenAI API key
+            api_key: OpenAI API key (or set OPENAI_API_KEY env var, or use keyring)
             organization: OpenAI organization ID (optional)
             base_url: Optional base URL for API
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
         """
+        # Resolution order: parameter → env var → keyring → warning
+        resolved_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        if not resolved_key:
+            try:
+                from victor.config.api_keys import get_api_key
+
+                resolved_key = get_api_key("openai") or ""
+            except ImportError:
+                pass
+
+        if not resolved_key:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable, "
+                "use 'victor keys --set openai --keyring', or pass api_key parameter."
+            )
+
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=resolved_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.client = AsyncOpenAI(
-            api_key=api_key,
+            api_key=resolved_key,
             organization=organization,
             base_url=base_url,
             timeout=timeout,

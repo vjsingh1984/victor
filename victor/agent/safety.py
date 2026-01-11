@@ -24,13 +24,47 @@ This module provides:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Awaitable, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Awaitable, Set
 import re
 import logging
 
 from victor.tools.metadata_registry import get_write_tools as registry_get_write_tools
 
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
+
 logger = logging.getLogger(__name__)
+
+
+def _get_risk_icon(
+    risk_level: "OperationalRiskLevel",
+    presentation: Optional["PresentationProtocol"] = None,
+) -> str:
+    """Get icon for a risk level using presentation adapter.
+
+    Args:
+        risk_level: The operational risk level
+        presentation: Optional presentation adapter (creates default if None)
+
+    Returns:
+        Icon string for the risk level
+    """
+    if presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        presentation = create_presentation_adapter()
+
+    # Map risk levels to icon names
+    icon_map = {
+        OperationalRiskLevel.SAFE: "success",
+        OperationalRiskLevel.LOW: "note",
+        OperationalRiskLevel.MEDIUM: "warning",
+        OperationalRiskLevel.HIGH: "risk_high",
+        OperationalRiskLevel.CRITICAL: "risk_critical",
+    }
+
+    icon_name = icon_map.get(risk_level, "unknown")
+    return presentation.icon(icon_name, with_color=False)
 
 
 class OperationalRiskLevel(Enum):
@@ -128,15 +162,13 @@ class ConfirmationRequest:
     details: List[str]
     arguments: Dict[str, Any]
 
-    def format_message(self) -> str:
-        """Format confirmation request as a user-friendly message."""
-        icon = {
-            OperationalRiskLevel.SAFE: "✅",
-            OperationalRiskLevel.LOW: "📝",
-            OperationalRiskLevel.MEDIUM: "⚠️",
-            OperationalRiskLevel.HIGH: "🔴",
-            OperationalRiskLevel.CRITICAL: "⛔",
-        }.get(self.risk_level, "❓")
+    def format_message(self, presentation: Optional["PresentationProtocol"] = None) -> str:
+        """Format confirmation request as a user-friendly message.
+
+        Args:
+            presentation: Optional presentation adapter for icons (creates default if None)
+        """
+        icon = _get_risk_icon(self.risk_level, presentation)
 
         lines = [
             f"{icon} **{self.risk_level.value.upper()} RISK OPERATION**",
@@ -638,14 +670,8 @@ def create_hitl_confirmation_callback(
 
     async def hitl_confirmation_callback(request: ConfirmationRequest) -> bool:
         """Convert SafetyChecker request to HITL and get response."""
-        # Map risk level to context for display
-        risk_icon = {
-            OperationalRiskLevel.SAFE: "✅",
-            OperationalRiskLevel.LOW: "📝",
-            OperationalRiskLevel.MEDIUM: "⚠️",
-            OperationalRiskLevel.HIGH: "🔴",
-            OperationalRiskLevel.CRITICAL: "⛔",
-        }.get(request.risk_level, "❓")
+        # Get risk icon using presentation adapter
+        risk_icon = _get_risk_icon(request.risk_level)
 
         # Create HITL request
         hitl_request = HITLRequest(

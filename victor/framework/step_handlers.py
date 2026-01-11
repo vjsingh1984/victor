@@ -25,33 +25,75 @@ Design Philosophy:
 - Interface Segregation: Minimal protocol for step handlers
 - Dependency Inversion: Handlers depend on protocols, not implementations
 
+Step Handler Execution Order:
+    The handlers execute in a specific order to ensure dependencies are
+    satisfied. Lower order numbers execute first.
+
+    Order | Handler             | Class                    | Purpose                                    | Dependencies
+    ------|---------------------|--------------------------|--------------------------------------------|-------------
+    5     | capability_config   | CapabilityConfigStepHandler | Centralized capability config storage    | None
+    10    | tools               | ToolStepHandler          | Tool filter application                    | None
+    15    | tiered_config       | TieredConfigStepHandler  | Tiered tool config (mandatory/core/pool)   | Tool
+    20    | prompt              | PromptStepHandler        | System prompt and prompt contributors      | None
+    30    | safety              | SafetyStepHandler        | Safety patterns and extensions             | None
+    40    | config              | ConfigStepHandler        | Stages, mode configs, tool dependencies    | None
+    45    | extensions          | ExtensionsStepHandler    | Coordinated extension application          | Config
+    50    | middleware          | MiddlewareStepHandler    | Middleware chain application               | Extensions
+    60    | framework           | FrameworkStepHandler     | Workflows, RL, teams, chains, personas     | All prior
+    100   | context             | ContextStepHandler       | Attach context to orchestrator             | All prior
+
+    Dependencies Explained:
+    - TieredConfig (15) runs after Tool (10) because it applies access
+      rules to the tools that were just registered
+    - Extensions (45) runs after Config (40) because it needs the stages
+      and mode configuration to be available for extension handlers
+    - Middleware (50) runs after Extensions (45) as it's part of the
+      extensions system but needs to apply after core extensions
+    - Framework (60) runs last because it registers workflows and teams
+      that may depend on tools, prompts, and configurations being
+      fully initialized
+    - Context (100) runs last as a finalization step to attach the
+      complete context to the orchestrator
+
 Architecture:
     StepHandlerProtocol
+    ├── CapabilityConfigStepHandler - Centralized capability config storage
     ├── ToolStepHandler - Tool filter application
+    ├── TieredConfigStepHandler - Tiered tool config (Phase 1 fix)
     ├── PromptStepHandler - System prompt and prompt contributors
     ├── SafetyStepHandler - Safety patterns and extensions
     ├── ConfigStepHandler - Stages, modes, and tool dependencies
+    ├── ExtensionsStepHandler - Coordinated extension application
     ├── MiddlewareStepHandler - Middleware chain application
-    └── FrameworkStepHandler - Workflows, RL config, and team specs
+    ├── FrameworkStepHandler - Workflows, RL config, and team specs
+    └── ContextStepHandler - Final context attachment
 
 Usage:
     from victor.framework.step_handlers import (
+        CapabilityConfigStepHandler,
         ToolStepHandler,
+        TieredConfigStepHandler,
         PromptStepHandler,
         SafetyStepHandler,
         ConfigStepHandler,
+        ExtensionsStepHandler,
         MiddlewareStepHandler,
         FrameworkStepHandler,
+        ContextStepHandler,
     )
 
-    # Create handlers
+    # Create handlers (or use StepHandlerRegistry.default())
     handlers = [
+        CapabilityConfigStepHandler(),
         ToolStepHandler(),
+        TieredConfigStepHandler(),
         PromptStepHandler(),
         SafetyStepHandler(),
         ConfigStepHandler(),
+        ExtensionsStepHandler(),
         MiddlewareStepHandler(),
         FrameworkStepHandler(),
+        ContextStepHandler(),
     ]
 
     # Apply in pipeline
@@ -82,15 +124,8 @@ if TYPE_CHECKING:
     from victor.framework.vertical_integration import IntegrationResult
     from victor.core.verticals.base import VerticalBase
     from victor.core.verticals.protocols import (
-        MiddlewareProtocol,
-        ModeConfigProviderProtocol,
-        PromptContributorProtocol,
         RLConfigProviderProtocol,
-        SafetyExtensionProtocol,
         TeamSpecProviderProtocol,
-        ToolDependencyProviderProtocol,
-        VerticalExtensions,
-        WorkflowProviderProtocol,
     )
 
 # Import protocols for runtime isinstance checks
@@ -98,7 +133,6 @@ from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
     TaskTypeHint,
     TeamSpecProviderProtocol,
-    WorkflowProviderProtocol,
 )
 
 # Import PromptContributorAdapter for hint normalization
@@ -807,17 +841,79 @@ class ConfigStepHandler(BaseStepHandler):
             _invoke_capability(orchestrator, "tool_sequences", sequences)
             logger.debug("Applied tool sequences via capability")
 
-        # Fallback: try tool sequence tracker directly
+        # If capability not available, log warning (no private attribute fallback)
         if not _check_capability(orchestrator, "tool_dependencies"):
-            tracker = getattr(orchestrator, "tool_sequence_tracker", None) or getattr(
-                orchestrator, "_sequence_tracker", None
+            logger.warning(
+                "Orchestrator does not implement tool_dependencies capability; "
+                "dependencies stored in context only"
             )
-            if tracker:
-                if hasattr(tracker, "set_dependencies"):
-                    tracker.set_dependencies(dependencies)
-                if hasattr(tracker, "set_sequences"):
-                    tracker.set_sequences(sequences)
-                logger.debug("Applied tool deps via fallback")
+
+
+# =============================================================================
+# Capability Config Step Handler (SOLID: Centralized Config Storage)
+# =============================================================================
+
+
+class CapabilityConfigStepHandler(BaseStepHandler):
+    """Handler for applying capability configs to VerticalContext.
+
+    Replaces direct orchestrator attribute assignment pattern:
+    - OLD: orchestrator.rag_config = {...}
+    - NEW: context.set_capability_config("rag_config", {...})
+
+    This handler centralizes all vertical capability configurations
+    in VerticalContext instead of scattered orchestrator attributes.
+    """
+
+    @property
+    def name(self) -> str:
+        return "capability_config"
+
+    @property
+    def order(self) -> int:
+        return 5  # Early, before tools (10)
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply capability configs from vertical to VerticalContext."""
+        configs = self._get_capability_configs(vertical)
+        if not configs:
+            return
+
+        # Store in VerticalContext
+        context.apply_capability_configs(configs)
+        result.add_info(f"Applied {len(configs)} capability configs")
+        logger.debug(f"Applied capability configs: {list(configs.keys())}")
+
+    def _get_capability_configs(self, vertical: Type["VerticalBase"]) -> Dict[str, Any]:
+        """Get capability configs from vertical.
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            Dict of config names to configuration values
+        """
+        # Try get_capability_configs() method on vertical
+        if hasattr(vertical, "get_capability_configs"):
+            return vertical.get_capability_configs()
+
+        # Fallback: try importing from capabilities module
+        try:
+            module = __import__(
+                f"victor.{vertical.name}.capabilities", fromlist=["get_capability_configs"]
+            )
+            if hasattr(module, "get_capability_configs"):
+                return module.get_capability_configs()
+        except (ImportError, AttributeError):
+            pass
+
+        return {}
 
 
 # =============================================================================
@@ -1396,8 +1492,9 @@ class FrameworkStepHandler(BaseStepHandler):
     ) -> None:
         """Explicitly register vertical compute handlers.
 
-        Phase 2: Gap fix - Handlers were registered via import side effects.
-        This method makes handler registration explicit and traceable.
+        SOLID: Replaces import-side-effect registration pattern with explicit
+        registration via vertical.get_handlers(). This makes registration
+        traceable and testable.
 
         Args:
             orchestrator: Orchestrator instance
@@ -1405,7 +1502,7 @@ class FrameworkStepHandler(BaseStepHandler):
             context: Vertical context
             result: Result to update
         """
-        # Check if vertical provides handlers
+        # Check if vertical provides handlers (NEW: use get_handlers())
         if not hasattr(vertical, "get_handlers"):
             return
 
@@ -1423,6 +1520,12 @@ class FrameworkStepHandler(BaseStepHandler):
             for name, handler in handlers.items():
                 registry.register(name, handler, vertical=vertical.name, replace=True)
                 logger.debug(f"Registered handler: {vertical.name}:{name}")
+
+            # Sync to executor for backward compatibility
+            try:
+                registry.sync_with_executor(direction="to_executor", replace=True)
+            except Exception:
+                pass  # Sync is optional
 
             result.add_info(f"Registered {handler_count} handlers: {', '.join(handlers.keys())}")
             logger.debug(f"Applied {handler_count} handlers from vertical")
@@ -2018,6 +2121,7 @@ class StepHandlerRegistry:
         """
         return cls(
             handlers=[
+                CapabilityConfigStepHandler(),  # SOLID: Centralized config storage
                 ToolStepHandler(),
                 TieredConfigStepHandler(),  # Phase 1: Gap fix
                 PromptStepHandler(),
@@ -2092,6 +2196,7 @@ __all__ = [
     # Concrete handlers
     "ToolStepHandler",
     "TieredConfigStepHandler",  # Phase 1: Gap fix
+    "CapabilityConfigStepHandler",  # SOLID: Centralized config storage
     "PromptStepHandler",
     "SafetyStepHandler",
     "ConfigStepHandler",

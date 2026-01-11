@@ -39,7 +39,7 @@ import uuid
 
 from victor.framework.config import AgentConfig
 from victor.framework.errors import AgentError, ConfigurationError
-from victor.framework.events import Event, EventType
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
@@ -52,7 +52,8 @@ if TYPE_CHECKING:
         EventRegistryService,
         ToolConfiguratorService,
     )
-    from victor.observability import EventBus, ObservabilityIntegration
+    from victor.observability.integration import ObservabilityIntegration
+    from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
 
 
@@ -74,7 +75,7 @@ class AgentProtocol(Protocol):
 
     async def stream(
         self, prompt: str, *, context: Optional[Dict[str, Any]] = None
-    ) -> AsyncIterator[Event]:
+    ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream events as the agent processes a task."""
         ...
 
@@ -96,7 +97,7 @@ class SessionProtocol(Protocol):
         """Send a message and get a response."""
         ...
 
-    async def stream(self, message: str) -> AsyncIterator[Event]:
+    async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response."""
         ...
 
@@ -1162,14 +1163,14 @@ class AgentSession:
 
         return result
 
-    async def stream(self, message: str) -> AsyncIterator[Event]:
+    async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response.
 
         Args:
             message: User message
 
         Yields:
-            Event objects
+            AgentExecutionEvent objects
         """
         async for event in self.stream_with_context(message):
             yield event
@@ -1179,7 +1180,7 @@ class AgentSession:
         message: str,
         *,
         context: Optional[Dict[str, Any]] = None,
-    ) -> AsyncIterator[Event]:
+    ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response with optional context.
 
         Args:
@@ -1187,7 +1188,7 @@ class AgentSession:
             context: Optional context dict
 
         Yields:
-            Event objects
+            AgentExecutionEvent objects
         """
         import time
 
@@ -1584,11 +1585,11 @@ class AgentBridge:
     # Event Forwarding
     # -------------------------------------------------------------------------
 
-    def forward_event(self, event: Event) -> None:
+    def forward_event(self, event: AgentExecutionEvent) -> None:
         """Manually forward an event to CQRS.
 
         Args:
-            event: Event to forward
+            event: AgentExecutionEvent to forward
         """
         if self._event_adapter:
             self._event_adapter.forward(event)

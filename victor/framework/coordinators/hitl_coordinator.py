@@ -40,7 +40,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.workflow_engine import ExecutionResult
+    from victor.framework.workflow_engine import WorkflowExecutionResult
     from victor.workflows.hitl import HITLHandler, HITLExecutor
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ class HITLCoordinator:
         initial_state: Optional[Dict[str, Any]] = None,
         approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute workflow with HITL approval nodes.
 
         Loads and executes a YAML-defined workflow, pausing at HITL
@@ -131,9 +131,9 @@ class HITLCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with HITL request history
+            WorkflowExecutionResult with HITL request history
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
         from victor.workflows.yaml_loader import load_workflow_from_file
         from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
 
@@ -164,7 +164,7 @@ class HITLCoordinator:
 
             duration = time.time() - start_time
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=result.success,
                 final_state=result.final_state,
                 nodes_executed=result.nodes_executed,
@@ -174,7 +174,7 @@ class HITLCoordinator:
 
         except Exception as e:
             logger.error(f"HITL workflow failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,
@@ -185,7 +185,7 @@ class HITLCoordinator:
         workflow: Any,
         initial_state: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> "ExecutionResult":
+    ) -> "WorkflowExecutionResult":
         """Execute a WorkflowDefinition with HITL nodes.
 
         Args:
@@ -194,9 +194,9 @@ class HITLCoordinator:
             **kwargs: Additional execution parameters
 
         Returns:
-            ExecutionResult with HITL request history
+            WorkflowExecutionResult with HITL request history
         """
-        from victor.framework.workflow_engine import ExecutionResult
+        from victor.framework.workflow_engine import WorkflowExecutionResult
         from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
 
         start_time = time.time()
@@ -217,7 +217,7 @@ class HITLCoordinator:
 
             duration = time.time() - start_time
 
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=result.success,
                 final_state=result.final_state,
                 nodes_executed=result.nodes_executed,
@@ -227,7 +227,7 @@ class HITLCoordinator:
 
         except Exception as e:
             logger.error(f"HITL workflow failed: {e}")
-            return ExecutionResult(
+            return WorkflowExecutionResult(
                 success=False,
                 error=str(e),
                 duration_seconds=time.time() - start_time,

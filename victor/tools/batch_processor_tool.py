@@ -39,6 +39,19 @@ logger = logging.getLogger(__name__)
 # Constants
 _DEFAULT_MAX_WORKERS: int = 4
 
+# Lazy-loaded presentation adapter for icons
+_presentation = None
+
+
+def _get_icon(name: str) -> str:
+    """Get icon from presentation adapter (lazy initialization)."""
+    global _presentation
+    if _presentation is None:
+        from victor.agent.presentation import create_presentation_adapter
+
+        _presentation = create_presentation_adapter()
+    return _presentation.icon(name, with_color=False)
+
 
 # Helper functions for parallel processing
 
@@ -359,16 +372,16 @@ async def batch(
                 else Path(result["file"]).name
             )
             if "error" in result:
-                report.append(f"❌ {rel_path}: {result['error']}")
+                report.append(f"{_get_icon('error')} {rel_path}: {result['error']}")
             else:
                 status = "Preview" if dry_run else "Modified"
                 report.append(
-                    f"✓ {rel_path}: {result.get('replacements', 0)} replacements ({status})"
+                    f"{_get_icon('success')} {rel_path}: {result.get('replacements', 0)} replacements ({status})"
                 )
 
         if dry_run:
             report.append("")
-            report.append("⚠️  This was a DRY RUN - no files were modified")
+            report.append(f"{_get_icon('warning')}  This was a DRY RUN - no files were modified")
             report.append("   Run with dry_run=False to apply changes")
 
         return {

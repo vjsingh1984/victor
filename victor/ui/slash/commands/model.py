@@ -170,7 +170,7 @@ class ProfileCommand(BaseSlashCommand):
         rl_rankings = {}
         rl_best_provider = None
         try:
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -249,7 +249,7 @@ class ProviderCommand(BaseSlashCommand):
 
             # Show RL rankings
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")

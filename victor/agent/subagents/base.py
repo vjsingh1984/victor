@@ -47,6 +47,7 @@ Example Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -55,6 +56,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
+
+if TYPE_CHECKING:
+    from victor.agent.presentation import PresentationProtocol
 
 # Import from canonical location to avoid circular dependencies
 from victor.protocols.team import IAgent
@@ -104,6 +108,7 @@ class SubAgentConfig:
         working_directory: Optional working directory override
         timeout_seconds: Maximum execution time in seconds
         system_prompt_override: Optional custom system prompt (overrides role default)
+        disable_embeddings: Disable codebase embeddings for this sub-agent (workflow service mode)
     """
 
     role: SubAgentRole
@@ -115,6 +120,7 @@ class SubAgentConfig:
     working_directory: Optional[str] = None
     timeout_seconds: int = 300
     system_prompt_override: Optional[str] = None
+    disable_embeddings: bool = False
 
 
 @dataclass
@@ -191,6 +197,7 @@ class SubAgent(IAgent):
         self,
         config: SubAgentConfig,
         parent: Union["AgentOrchestrator", SubAgentContext],
+        presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize sub-agent with configuration and parent context.
 
@@ -199,6 +206,7 @@ class SubAgent(IAgent):
             parent: Parent context providing settings, provider, model, and tools.
                 Can be either a full AgentOrchestrator (for backward compatibility)
                 or any object implementing the SubAgentContext protocol.
+            presentation: Optional presentation adapter for icons (creates default if None)
 
         Note:
             If a full AgentOrchestrator is passed, it will be automatically
@@ -208,6 +216,14 @@ class SubAgent(IAgent):
         """
         self.config = config
         self._id = uuid.uuid4().hex[:12]
+
+        # Lazy init for backward compatibility
+        if presentation is None:
+            from victor.agent.presentation import create_presentation_adapter
+
+            self._presentation = create_presentation_adapter()
+        else:
+            self._presentation = presentation
 
         # Auto-adapt full orchestrator to SubAgentContext for ISP compliance
         # Check if it's already a SubAgentContext (including adapters)
@@ -277,6 +293,7 @@ class SubAgent(IAgent):
         - Constrained budget and context
         - Role-specific system prompt
         - Shared provider and settings from parent context
+        - disable_embeddings flag for workflow service mode
 
         Returns:
             Constrained orchestrator instance
@@ -300,6 +317,15 @@ class SubAgent(IAgent):
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
+
+        # Set disable_embeddings flag for workflow service mode
+        if self.config.disable_embeddings:
+            gear_icon = self._presentation.icon("gear", with_color=False)
+            logger.debug(
+                f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
+            )
+            if hasattr(orchestrator, "_session_state_manager"):
+                orchestrator._session_state_manager.execution_state.disable_embeddings = True
 
         # Set role-specific system prompt
         system_prompt = self._get_role_prompt()
@@ -352,6 +378,94 @@ class SubAgent(IAgent):
 
         return get_role_prompt(self.config.role)
 
+    async def _execute_with_retry(self) -> Any:
+        """Execute orchestrator.chat() with exponential backoff retry.
+
+        Implements retry logic with exponential backoff for handling transient errors
+        like rate limits, timeouts, and connection issues.
+
+        Returns:
+            Response from orchestrator.chat()
+
+        Raises:
+            Exception: If all retries are exhausted
+        """
+        from victor.core.errors import (
+            ProviderConnectionError,
+            ProviderError,
+            ProviderRateLimitError,
+            ProviderTimeoutError,
+        )
+
+        max_attempts = 3
+        base_delay = 1.0  # Start with 1 second
+        max_delay = 60.0  # Cap at 60 seconds
+
+        last_exception = None
+
+        refresh_icon = self._presentation.icon("refresh", with_color=False)
+        success_icon = self._presentation.icon("success", with_color=False)
+        error_icon = self._presentation.icon("error", with_color=False)
+
+        logger.debug(
+            f"   {refresh_icon} Starting execution with retry logic (max {max_attempts} attempts)"
+        )
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                if attempt > 1:
+                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
+
+                # Try to execute the chat
+                response = await self.orchestrator.chat(self.config.task)
+
+                if attempt > 1:
+                    logger.debug(
+                        f"   {success_icon} Retry attempt {attempt}/{max_attempts} succeeded!"
+                    )
+
+                return response
+
+            except (
+                ProviderRateLimitError,
+                ProviderTimeoutError,
+                ProviderConnectionError,
+                ProviderError,  # Generic provider errors (e.g., server disconnects)
+                ConnectionError,
+                TimeoutError,
+                OSError,  # Network-level errors
+            ) as e:
+                last_exception = e
+
+                if attempt >= max_attempts:
+                    # Final attempt failed, will raise after loop
+                    logger.warning(
+                        f"Sub-agent {self.config.role.value}: All {max_attempts} attempts failed. Last error: {type(e).__name__}: {e}"
+                    )
+                    break
+
+                # Calculate exponential backoff delay: 2^(attempt-1) * base_delay
+                # This is similar to Fibonacci: 1, 2, 4, 8, 16, 32...
+                delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+
+                logger.info(
+                    f"Sub-agent {self.config.role.value}: Attempt {attempt}/{max_attempts} failed with "
+                    f"{type(e).__name__}. Retrying in {delay:.1f}s..."
+                )
+
+                await asyncio.sleep(delay)
+
+            except Exception as e:
+                # Non-retriable error, raise immediately
+                logger.error(
+                    f"Sub-agent {self.config.role.value}: Non-retriable error: {type(e).__name__}: {e}"
+                )
+                raise
+
+        # All retries exhausted
+        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
+        raise last_exception
+
     async def execute(self) -> SubAgentResult:
         """Execute the sub-agent task.
 
@@ -371,8 +485,8 @@ class SubAgent(IAgent):
 
             logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
 
-            # Run the task
-            response = await self.orchestrator.chat(self.config.task)
+            # Run the task with retry on rate limits
+            response = await self._execute_with_retry()
 
             # Extract metrics
             tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)

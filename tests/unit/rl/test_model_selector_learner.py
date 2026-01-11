@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 from typing import Optional, Tuple
 
-from victor.agent.rl.base import RLOutcome, RLRecommendation
-from victor.agent.rl.coordinator import RLCoordinator
-from victor.agent.rl.learners.model_selector import ModelSelectorLearner, SelectionStrategy
+from victor.framework.rl.base import RLOutcome, RLRecommendation
+from victor.framework.rl.coordinator import RLCoordinator
+from victor.framework.rl.learners.model_selector import ModelSelectorLearner, SelectionStrategy
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 

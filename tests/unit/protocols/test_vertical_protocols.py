@@ -655,10 +655,14 @@ class TestVerticalIntegrationWithProtocols:
     """Tests for vertical integration using isinstance() checks."""
 
     def test_integration_imports_new_protocols(self):
-        """vertical_integration should import the new protocols."""
-        from victor.framework.vertical_integration import (
+        """Core verticals protocols should be importable."""
+        from victor.core.verticals.protocols.rl_provider import (
             VerticalRLProviderProtocol,
+        )
+        from victor.core.verticals.protocols.team_provider import (
             VerticalTeamProviderProtocol,
+        )
+        from victor.core.verticals.protocols.workflow_provider import (
             VerticalWorkflowProviderProtocol,
         )
 

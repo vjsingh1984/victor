@@ -392,7 +392,7 @@ class TieredCache:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.base import RLOutcome
 
             # Get current utilization
             utilization = self._get_utilization()
@@ -428,7 +428,7 @@ class TieredCache:
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
+            from victor.framework.rl.base import RLOutcome
 
             outcome = RLOutcome(
                 success=False,
@@ -458,7 +458,7 @@ class TieredCache:
             cache_hit: Whether this was a cache hit
         """
         try:
-            from victor.agent.rl.hooks import get_rl_hooks, RLEvent, RLEventType
+            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
             if hooks is None:

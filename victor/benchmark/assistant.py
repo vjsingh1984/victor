@@ -25,6 +25,7 @@ from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import ModeConfigProviderProtocol
+    from victor.core.vertical_types import TieredToolConfig
 
 
 class BenchmarkVertical(VerticalBase):
@@ -198,35 +199,40 @@ You are being evaluated on:
         ]
 
     @classmethod
-    def get_tiered_tools(cls) -> Optional[Dict[str, Any]]:
+    def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:
         """Tiered tool configuration for benchmark evaluation.
 
         Returns tool tiers optimized for benchmark task execution:
         - Mandatory: Always available (read, ls, grep)
         - Core: Vertical-specific essentials (code_search, edit)
         - Semantic: Selected based on task similarity
+
+        Returns:
+            TieredToolConfig with proper tool tiers for benchmark evaluation
         """
-        return {
-            "mandatory": {
+        from victor.core.vertical_types import TieredToolConfig
+
+        return TieredToolConfig(
+            mandatory={
                 ToolNames.READ,
                 ToolNames.LS,
                 ToolNames.GREP,
             },
-            "vertical_core": {
+            vertical_core={
                 ToolNames.CODE_SEARCH,
                 ToolNames.EDIT,
                 ToolNames.WRITE,
                 ToolNames.SHELL,
             },
-            "semantic_pool": {
+            semantic_pool={
                 ToolNames.SYMBOL,
                 ToolNames.REFS,
                 ToolNames.TEST,
                 ToolNames.GIT,
                 ToolNames.DIFF,
             },
-            "readonly_only_for_analysis": False,
-        }
+            readonly_only_for_analysis=False,
+        )
 
     @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
@@ -272,3 +278,22 @@ You are being evaluated on:
         from victor.benchmark.mode_config import BenchmarkModeConfigProvider
 
         return BenchmarkModeConfigProvider()
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Get benchmark compute handlers for workflow execution.
+
+        Provides handlers for benchmark-specific workflow nodes like:
+        - passk_generation: Multi-attempt code generation with pass@k metrics
+        - git_diff_generator: Create git diffs from code changes
+
+        Returns:
+            Dict mapping handler name to handler instance
+        """
+        try:
+            from victor.benchmark.handlers import HANDLERS
+
+            return HANDLERS
+        except ImportError:
+            # Handlers not yet implemented
+            return {}

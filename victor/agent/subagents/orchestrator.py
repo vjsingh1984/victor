@@ -235,6 +235,7 @@ class SubAgentOrchestrator:
         context_limit: Optional[int] = None,
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,
+        disable_embeddings: bool = False,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -249,6 +250,7 @@ class SubAgentOrchestrator:
             context_limit: Maximum context size (default: role-specific)
             can_spawn_subagents: Whether sub-agent can spawn children
             timeout_seconds: Maximum execution time
+            disable_embeddings: Disable codebase embeddings (workflow service mode)
 
         Returns:
             SubAgentResult with execution outcome
@@ -284,6 +286,7 @@ class SubAgentOrchestrator:
             context_limit=effective_context,
             can_spawn_subagents=can_spawn_subagents,
             timeout_seconds=timeout_seconds,
+            disable_embeddings=disable_embeddings,
         )
 
         # Create and execute sub-agent

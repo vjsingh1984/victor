@@ -43,6 +43,12 @@ from victor.core.verticals.protocols import (
     VerticalExtensions,
 )
 
+# Phase 3: Import framework capabilities
+from victor.framework.capabilities import (
+    FileOperationsCapability,
+    PromptContributionCapability,
+)
+
 
 class CodingAssistant(VerticalBase):
     """Software development assistant vertical.
@@ -83,6 +89,17 @@ class CodingAssistant(VerticalBase):
     version = "2.0.0"  # Extension support
 
     # =========================================================================
+    # Phase 3: Framework Capabilities
+    # =========================================================================
+    # Reuse framework capabilities to reduce code duplication
+
+    # Framework file operations capability (read, write, edit, grep)
+    _file_ops = FileOperationsCapability()
+
+    # Framework prompt contributions (common hints like read_first, verify_changes)
+    _prompt_contrib = PromptContributionCapability()
+
+    # =========================================================================
     # Extension Caching
     # =========================================================================
     # Individual extension caching is provided by VerticalBase._get_cached_extension()
@@ -93,6 +110,9 @@ class CodingAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools optimized for software development.
 
+        Phase 3: Uses framework FileOperationsCapability for common file operations
+        to reduce code duplication and maintain consistency across verticals.
+
         Uses canonical tool names from victor.tools.tool_names.
 
         Returns:
@@ -100,36 +120,41 @@ class CodingAssistant(VerticalBase):
         """
         from victor.tools.tool_names import ToolNames
 
-        return [
-            # Core filesystem
-            ToolNames.READ,  # read_file -> read
-            ToolNames.WRITE,  # write_file -> write
-            ToolNames.EDIT,  # edit_files -> edit
-            ToolNames.LS,  # list_directory -> ls
-            ToolNames.OVERVIEW,  # get_project_overview -> overview
-            # Search
-            ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
-            ToolNames.GREP,  # code_search (keyword) -> grep
-            ToolNames.PLAN,  # plan_files -> plan
-            # Git (unified git tool handles all operations)
-            ToolNames.GIT,  # Git operations
-            # Shell
-            ToolNames.SHELL,  # execute_bash -> shell
-            # Code intelligence
-            ToolNames.LSP,  # lsp operations
-            ToolNames.SYMBOL,  # find_symbol -> symbol
-            ToolNames.REFS,  # find_references -> refs
-            # Refactoring
-            ToolNames.RENAME,  # refactor_rename_symbol -> rename
-            ToolNames.EXTRACT,  # refactor_extract_function -> extract
-            # Testing
-            ToolNames.TEST,  # run_tests -> test
-            # Docker
-            ToolNames.DOCKER,  # docker operations
-            # Web (for documentation)
-            ToolNames.WEB_SEARCH,  # web_search
-            ToolNames.WEB_FETCH,  # web_fetch
-        ]
+        # Phase 3: Start with framework file operations (read, write, edit, grep)
+        # This reduces duplication and ensures consistency across verticals
+        tools = cls._file_ops.get_tool_list()
+
+        # Add coding-specific tools
+        tools.extend(
+            [
+                # Core filesystem (beyond framework basics)
+                ToolNames.LS,  # list_directory -> ls
+                ToolNames.OVERVIEW,  # get_project_overview -> overview
+                # Search
+                ToolNames.CODE_SEARCH,  # semantic_code_search -> code_search
+                ToolNames.PLAN,  # plan_files -> plan
+                # Git (unified git tool handles all operations)
+                ToolNames.GIT,  # Git operations
+                # Shell
+                ToolNames.SHELL,  # execute_bash -> shell
+                # Code intelligence
+                ToolNames.LSP,  # lsp operations
+                ToolNames.SYMBOL,  # find_symbol -> symbol
+                ToolNames.REFS,  # find_references -> refs
+                # Refactoring
+                ToolNames.RENAME,  # refactor_rename_symbol -> rename
+                ToolNames.EXTRACT,  # refactor_extract_function -> extract
+                # Testing
+                ToolNames.TEST,  # run_tests -> test
+                # Docker
+                ToolNames.DOCKER,  # docker operations
+                # Web (for documentation)
+                ToolNames.WEB_SEARCH,  # web_search
+                ToolNames.WEB_FETCH,  # web_fetch
+            ]
+        )
+
+        return tools
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -510,6 +535,23 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         from victor.coding.handlers import HANDLERS
 
         return HANDLERS
+
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Get coding capability configurations for centralized storage.
+
+        Returns coding capability configurations for VerticalContext storage.
+        This replaces direct orchestrator attribute assignment patterns like:
+        - orchestrator.code_style = {...}
+        - orchestrator.test_config = {...}
+        - orchestrator.lsp_config = {...}
+
+        Returns:
+            Dict with coding capability configurations
+        """
+        from victor.coding.capabilities import get_capability_configs
+
+        return get_capability_configs()
 
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.

@@ -1,0 +1,402 @@
+[
+  {
+    "rank": 1,
+    "node_id": "symbol:victor/ui/emoji.py:get",
+    "in_degree": 2569,
+    "name": "get",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
+    "rank": 2,
+    "node_id": "symbol:victor/core/event_sourcing.py:append",
+    "in_degree": 2188,
+    "name": "append",
+    "type": "function",
+    "module": "victor.core.event_sourcing"
+  },
+  {
+    "rank": 3,
+    "node_id": "symbol:victor/ui/emoji.py:warning",
+    "in_degree": 1275,
+    "name": "warning",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
+    "rank": 4,
+    "node_id": "symbol:victor/ui/emoji.py:info",
+    "in_degree": 1175,
+    "name": "info",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
+    "rank": 5,
+    "node_id": "symbol:victor/framework/graph.py:items",
+    "in_degree": 1129,
+    "name": "items",
+    "type": "function",
+    "module": "victor.framework.graph"
+  },
+  {
+    "rank": 6,
+    "node_id": "symbol:victor/core/repository.py:list",
+    "in_degree": 1048,
+    "name": "list",
+    "type": "function",
+    "module": "victor.core.repository"
+  },
+  {
+    "rank": 7,
+    "node_id": "symbol:victor/tools/cache_manager.py:set",
+    "in_degree": 850,
+    "name": "set",
+    "type": "function",
+    "module": "victor.tools.cache_manager"
+  },
+  {
+    "rank": 8,
+    "node_id": "symbol:victor/ui/emoji.py:error",
+    "in_degree": 701,
+    "name": "error",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
+    "rank": 9,
+    "node_id": "symbol:victor/observability/metrics.py:time",
+    "in_degree": 567,
+    "name": "time",
+    "type": "function",
+    "module": "victor.observability.metrics"
+  },
+  {
+    "rank": 10,
+    "node_id": "symbol:victor/tools/cache_manager.py:keys",
+    "in_degree": 546,
+    "name": "keys",
+    "type": "function",
+    "module": "victor.tools.cache_manager"
+  },
+  {
+    "rank": 11,
+    "node_id": "symbol:victor/framework/graph.py:values",
+    "in_degree": 512,
+    "name": "values",
+    "type": "function",
+    "module": "victor.framework.graph"
+  },
+  {
+    "rank": 12,
+    "node_id": "symbol:victor/core/event_sourcing.py:exists",
+    "in_degree": 458,
+    "name": "exists",
+    "type": "function",
+    "module": "victor.core.event_sourcing"
+  },
+  {
+    "rank": 13,
+    "node_id": "symbol:victor/framework/teams.py:result",
+    "in_degree": 441,
+    "name": "result",
+    "type": "function",
+    "module": "victor.framework.teams"
+  },
+  {
+    "rank": 14,
+    "node_id": "symbol:victor/observability/metrics.py:value",
+    "in_degree": 432,
+    "name": "value",
+    "type": "function",
+    "module": "victor.observability.metrics"
+  },
+  {
+    "rank": 15,
+    "node_id": "symbol:victor/ui/tui/app.py:print",
+    "in_degree": 378,
+    "name": "print",
+    "type": "function",
+    "module": "victor.ui.tui"
+  },
+  {
+    "rank": 16,
+    "node_id": "symbol:victor/benchmark/agent.py:config",
+    "in_degree": 376,
+    "name": "config",
+    "type": "function",
+    "module": "victor.benchmark.agent"
+  },
+  {
+    "rank": 17,
+    "node_id": "symbol:victor/observability/metrics.py:sum",
+    "in_degree": 376,
+    "name": "sum",
+    "type": "function",
+    "module": "victor.observability.metrics"
+  },
+  {
+    "rank": 18,
+    "node_id": "symbol:victor/core/tool_tier_registry.py:extend",
+    "in_degree": 349,
+    "name": "extend",
+    "type": "function",
+    "module": "victor.core.tool_tier_registry"
+  },
+  {
+    "rank": 19,
+    "node_id": "symbol:victor/tools/merge_tool.py:metadata",
+    "in_degree": 343,
+    "name": "metadata",
+    "type": "function",
+    "module": "victor.tools.merge_tool"
+  },
+  {
+    "rank": 20,
+    "node_id": "symbol:victor/core/repository.py:update",
+    "in_degree": 335,
+    "name": "update",
+    "type": "function",
+    "module": "victor.core.repository"
+  },
+  {
+    "rank": 21,
+    "node_id": "symbol:victor/framework/graph.py:copy",
+    "in_degree": 327,
+    "name": "copy",
+    "type": "function",
+    "module": "victor.framework.graph"
+  },
+  {
+    "rank": 22,
+    "node_id": "symbol:victor/context/project_context.py:content",
+    "in_degree": 310,
+    "name": "content",
+    "type": "function",
+    "module": "victor.context.project_context"
+  },
+  {
+    "rank": 23,
+    "node_id": "symbol:victor/teams/types.py:type",
+    "in_degree": 301,
+    "name": "type",
+    "type": "function",
+    "module": "victor.teams.types"
+  },
+  {
+    "rank": 24,
+    "node_id": "symbol:victor/workflows/registry.py:search",
+    "in_degree": 294,
+    "name": "search",
+    "type": "function",
+    "module": "victor.workflows.registry"
+  },
+  {
+    "rank": 25,
+    "node_id": "symbol:victor/ui/emoji.py:success",
+    "in_degree": 260,
+    "name": "success",
+    "type": "function",
+    "module": "victor.ui.emoji"
+  },
+  {
+    "rank": 26,
+    "node_id": "symbol:victor/workflows/compiler_protocols/compiler_protocols.py:data",
+    "in_degree": 246,
+    "name": "data",
+    "type": "function",
+    "module": "victor.workflows.compiler_protocols"
+  },
+  {
+    "rank": 27,
+    "node_id": "symbol:victor/framework/service_provider.py:provider",
+    "in_degree": 235,
+    "name": "provider",
+    "type": "function",
+    "module": "victor.framework.service_provider"
+  },
+  {
+    "rank": 28,
+    "node_id": "symbol:victor/framework/graph.py:pop",
+    "in_degree": 229,
+    "name": "pop",
+    "type": "function",
+    "module": "victor.framework.graph"
+  },
+  {
+    "rank": 29,
+    "node_id": "symbol:victor/framework/agent_components.py:tools",
+    "in_degree": 225,
+    "name": "tools",
+    "type": "function",
+    "module": "victor.framework.agent_components"
+  },
+  {
+    "rank": 30,
+    "node_id": "symbol:victor/benchmark/agent.py:agent",
+    "in_degree": 224,
+    "name": "agent",
+    "type": "function",
+    "module": "victor.benchmark.agent"
+  },
+  {
+    "rank": 31,
+    "node_id": "symbol:victor/core/protocols.py:model",
+    "in_degree": 204,
+    "name": "model",
+    "type": "function",
+    "module": "victor.core.protocols"
+  },
+  {
+    "rank": 32,
+    "node_id": "symbol:victor/core/unit_of_work.py:commit",
+    "in_degree": 204,
+    "name": "commit",
+    "type": "function",
+    "module": "victor.core.unit_of_work"
+  },
+  {
+    "rank": 33,
+    "node_id": "symbol:victor/core/repository.py:count",
+    "in_degree": 191,
+    "name": "count",
+    "type": "function",
+    "module": "victor.core.repository"
+  },
+  {
+    "rank": 34,
+    "node_id": "symbol:victor/workflows/protocols.py:id",
+    "in_degree": 191,
+    "name": "id",
+    "type": "function",
+    "module": "victor.workflows.protocols"
+  },
+  {
+    "rank": 35,
+    "node_id": "symbol:victor/framework/teams.py:run",
+    "in_degree": 180,
+    "name": "run",
+    "type": "function",
+    "module": "victor.framework.teams"
+  },
+  {
+    "rank": 36,
+    "node_id": "symbol:victor/framework/agent_components.py:connect",
+    "in_degree": 176,
+    "name": "connect",
+    "type": "function",
+    "module": "victor.framework.agent_components"
+  },
+  {
+    "rank": 37,
+    "node_id": "symbol:victor/framework/rl/shared_encoder.py:encode",
+    "in_degree": 166,
+    "name": "encode",
+    "type": "function",
+    "module": "victor.framework.rl"
+  },
+  {
+    "rank": 38,
+    "node_id": "symbol:victor/core/events/protocols.py:datetime",
+    "in_degree": 163,
+    "name": "datetime",
+    "type": "function",
+    "module": "victor.core.events"
+  },
+  {
+    "rank": 39,
+    "node_id": "symbol:victor/workflows/protocols.py:status",
+    "in_degree": 162,
+    "name": "status",
+    "type": "function",
+    "module": "victor.workflows.protocols"
+  },
+  {
+    "rank": 40,
+    "node_id": "symbol:victor/tools/code_executor_tool.py:start",
+    "in_degree": 158,
+    "name": "start",
+    "type": "function",
+    "module": "victor.tools.code_executor_tool"
+  },
+  {
+    "rank": 41,
+    "node_id": "symbol:victor/classification/protocols.py:match",
+    "in_degree": 155,
+    "name": "match",
+    "type": "function",
+    "module": "victor.classification.protocols"
+  },
+  {
+    "rank": 42,
+    "node_id": "symbol:victor/workflows/definition.py:timeout",
+    "in_degree": 149,
+    "name": "timeout",
+    "type": "function",
+    "module": "victor.workflows.definition"
+  },
+  {
+    "rank": 43,
+    "node_id": "symbol:victor/tools/decorators.py:category",
+    "in_degree": 146,
+    "name": "category",
+    "type": "function",
+    "module": "victor.tools.decorators"
+  },
+  {
+    "rank": 44,
+    "node_id": "symbol:victor/ui/slash/handler.py:registry",
+    "in_degree": 138,
+    "name": "registry",
+    "type": "function",
+    "module": "victor.ui.slash"
+  },
+  {
+    "rank": 45,
+    "node_id": "symbol:victor/core/protocols.py:confidence",
+    "in_degree": 137,
+    "name": "confidence",
+    "type": "function",
+    "module": "victor.core.protocols"
+  },
+  {
+    "rank": 46,
+    "node_id": "symbol:victor/workflows/execution_context.py:settings",
+    "in_degree": 137,
+    "name": "settings",
+    "type": "function",
+    "module": "victor.workflows.execution_context"
+  },
+  {
+    "rank": 47,
+    "node_id": "symbol:victor/teams/unified_coordinator.py:role",
+    "in_degree": 135,
+    "name": "role",
+    "type": "function",
+    "module": "victor.teams.unified_coordinator"
+  },
+  {
+    "rank": 48,
+    "node_id": "symbol:victor/tools/browser_tool.py:wait_for",
+    "in_degree": 133,
+    "name": "wait_for",
+    "type": "function",
+    "module": "victor.tools.browser_tool"
+  },
+  {
+    "rank": 49,
+    "node_id": "symbol:victor/core/protocols.py:task_type",
+    "in_degree": 133,
+    "name": "task_type",
+    "type": "function",
+    "module": "victor.core.protocols"
+  },
+  {
+    "rank": 50,
+    "node_id": "symbol:victor/core/database.py:query",
+    "in_degree": 132,
+    "name": "query",
+    "type": "function",
+    "module": "victor.core.database"
+  }
+]

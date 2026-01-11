@@ -50,7 +50,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
+from victor.integrations.api.graph_export import (
+    export_graph_schema,
+    get_execution_state,
+    WorkflowExecutionState,
+)
+from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import ObservabilityBus as EventBus, get_observability_bus
+from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +367,9 @@ class VictorFastAPIServer:
         self._hitl_store = None
         self._event_bridge: Optional[EventBridge] = None
         self._event_clients: List[WebSocket] = []
+        self._workflow_event_bridge: Optional[WorkflowEventBridge] = None
+        self._workflow_executions: Dict[str, Dict[str, Any]] = {}
+        self._shutting_down = False
 
         # Create FastAPI app with lifespan
         self.app = FastAPI(
@@ -406,11 +416,18 @@ class VictorFastAPIServer:
         self._event_bridge.start()
         logger.info("EventBridge started for real-time event streaming")
 
+        # Initialize WorkflowEventBridge for workflow visualization
+        self._workflow_event_bridge = WorkflowEventBridge(event_bus)
+        await self._workflow_event_bridge.start()
+        logger.info("WorkflowEventBridge started for workflow visualization")
+
         yield
 
         # Cleanup
         if self._event_bridge:
             self._event_bridge.stop()
+        if self._workflow_event_bridge:
+            await self._workflow_event_bridge.stop()
         if self._orchestrator:
             await self._orchestrator.graceful_shutdown()
         # Close WebSocket connections
@@ -1775,7 +1792,7 @@ Respond with just the command to run."""
         async def rl_stats() -> JSONResponse:
             """Get RL model selector statistics."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1827,7 +1844,7 @@ Respond with just the command to run."""
         async def rl_recommend(task_type: Optional[str] = Query(None)) -> JSONResponse:
             """Get model recommendation based on Q-values."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
                 import json
 
                 coordinator = get_rl_coordinator()
@@ -1886,7 +1903,7 @@ Respond with just the command to run."""
         async def rl_explore(request: RLExploreRequest) -> JSONResponse:
             """Set exploration rate for RL model selector."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1915,8 +1932,8 @@ Respond with just the command to run."""
         async def rl_strategy(request: RLStrategyRequest) -> JSONResponse:
             """Set selection strategy for RL model selector."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
-                from victor.agent.rl.learners.model_selector import SelectionStrategy
+                from victor.framework.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.learners.model_selector import SelectionStrategy
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -1956,7 +1973,7 @@ Respond with just the command to run."""
         async def rl_reset() -> JSONResponse:
             """Reset RL model selector Q-values."""
             try:
-                from victor.agent.rl.coordinator import get_rl_coordinator
+                from victor.framework.rl.coordinator import get_rl_coordinator
 
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
@@ -2878,18 +2895,207 @@ Respond with just the command to run."""
         # Server shutdown
         @app.post("/shutdown", tags=["System"])
         async def shutdown() -> JSONResponse:
-            """Shutdown the server."""
+            """Shutdown the server gracefully.
+
+            This endpoint initiates a graceful shutdown of the server without
+            forcefully stopping the event loop, which prevents system-wide issues.
+            """
+            # Check if shutdown is already in progress
+            if self._shutting_down:
+                return JSONResponse({"status": "already_shutting_down"})
+
+            self._shutting_down = True
             logger.info("Shutdown requested")
             await self._record_rl_feedback()
 
+            # Close all WebSocket connections
             for ws in self._ws_clients:
                 try:
                     await ws.close()
                 except Exception:
                     pass
 
-            asyncio.get_event_loop().call_later(0.5, asyncio.get_event_loop().stop)
+            # Use server's built-in shutdown mechanism instead of loop.stop()
+            # This prevents event loop corruption and system-wide issues
+            if hasattr(self, "_server") and self._server is not None:
+                self._server.should_exit = True
+                # Schedule actual shutdown after response is sent
+                asyncio.create_task(self._delayed_shutdown())
+
             return JSONResponse({"status": "shutting_down"})
+
+        # =============================================================================
+        # Workflow Visualization Endpoints
+        # =============================================================================
+
+        @app.get("/workflows/{workflow_id}/graph", tags=["Workflows"])
+        async def get_workflow_graph(workflow_id: str) -> JSONResponse:
+            """Get static workflow graph structure for visualization.
+
+            Returns the workflow DAG structure (nodes + edges) in Cytoscape.js format.
+            This endpoint provides the initial graph structure for rendering.
+
+            Args:
+                workflow_id: Workflow identifier
+
+            Returns:
+                Graph schema with nodes and edges in Cytoscape.js format
+
+            Raises:
+                HTTPException 404: If workflow not found
+                HTTPException 500: If graph export fails
+            """
+            try:
+                # Try to get from execution store first
+                if workflow_id in self._workflow_executions:
+                    exec_data = self._workflow_executions[workflow_id]
+                    if "graph" in exec_data:
+                        return JSONResponse(exec_data["graph"])
+
+                # If not in execution store, return 404
+                # In production, you might load from workflow registry
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Workflow {workflow_id} not found. Execute the workflow first.",
+                )
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Failed to get graph for workflow {workflow_id}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to export graph: {str(e)}")
+
+        @app.get("/workflows/{workflow_id}/execution", tags=["Workflows"])
+        async def get_workflow_execution_status(workflow_id: str) -> JSONResponse:
+            """Get current workflow execution status.
+
+            Returns detailed execution state including which nodes have executed,
+            current progress, timing metrics, and tool/token usage.
+
+            Args:
+                workflow_id: Workflow identifier
+
+            Returns:
+                WorkflowExecutionState with detailed execution information
+
+            Raises:
+                HTTPException 404: If workflow execution not found
+            """
+            try:
+                if workflow_id not in self._workflow_executions:
+                    raise HTTPException(
+                        status_code=404, detail=f"Workflow execution {workflow_id} not found"
+                    )
+
+                # Get execution state
+                exec_state = get_execution_state(workflow_id, self._workflow_executions)
+
+                return JSONResponse(exec_state.to_dict())
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Failed to get execution state for {workflow_id}: {e}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to get execution state: {str(e)}"
+                )
+
+        @app.websocket("/workflows/{workflow_id}/stream")
+        async def workflow_websocket_stream(websocket: WebSocket, workflow_id: str) -> None:
+            """Real-time workflow execution event stream via WebSocket.
+
+            Provides live updates for workflow execution including:
+            - Node start/complete/error events
+            - Progress updates
+            - Workflow completion
+
+            Args:
+                websocket: WebSocket connection
+                workflow_id: Workflow identifier to stream events for
+
+            Example client usage:
+                const ws = new WebSocket(`ws://localhost:8000/workflows/wf_123/stream`);
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('Event:', data);
+                };
+            """
+            await websocket.accept()
+
+            if not self._workflow_event_bridge:
+                await websocket.close(code=1011, reason="Workflow event bridge not initialized")
+                return
+
+            try:
+                # Handle connection through event bridge
+                await self._workflow_event_bridge.handle_websocket_connection(
+                    websocket, workflow_id, client_id=uuid.uuid4().hex[:12]
+                )
+            except WebSocketDisconnect:
+                logger.info(f"WebSocket disconnected for workflow {workflow_id}")
+            except Exception as e:
+                logger.error(f"WebSocket error for workflow {workflow_id}: {e}")
+                try:
+                    await websocket.close(code=1011, reason=str(e))
+                except Exception:
+                    pass
+
+        @app.get(
+            "/workflows/visualize/{workflow_id}", response_class=HTMLResponse, tags=["Workflows"]
+        )
+        async def visualize_workflow(workflow_id: str) -> HTMLResponse:
+            """Serve HTML page with interactive workflow visualization.
+
+            Returns a single-page HTML application with Cytoscape.js for
+            interactive workflow graph visualization with real-time updates.
+
+            Args:
+                workflow_id: Workflow identifier to visualize
+
+            Returns:
+                HTML page with embedded Cytoscape.js visualization
+
+            Example:
+                Open in browser: http://localhost:8000/workflows/visualize/wf_123
+            """
+            try:
+                # Read template
+                template_path = Path(__file__).parent / "templates" / "workflow_visualizer.html"
+
+                if not template_path.exists():
+                    # Fallback: Return simple HTML if template not found
+                    html_content = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Victor Workflow Visualization</title>
+                        <style>
+                            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                            .error {{ color: red; }}
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Workflow Visualization Not Available</h1>
+                        <p class="error">Template file not found: {template_path}</p>
+                        <p>The workflow visualization feature requires the template file to be installed.</p>
+                    </body>
+                    </html>
+                    """
+                    return HTMLResponse(content=html_content, status_code=200)
+
+                with open(template_path, "r", encoding="utf-8") as f:
+                    template_html = f.read()
+
+                # In production, you might use Jinja2 templates for variable substitution
+                # For MVP, we're using client-side JS to fetch data
+                return HTMLResponse(content=template_html)
+
+            except Exception as e:
+                logger.error(f"Failed to serve visualization for {workflow_id}: {e}")
+                return HTMLResponse(
+                    content=f"<html><body><h1>Error</h1><p>{str(e)}</p></body></html>",
+                    status_code=500,
+                )
 
         # WebSocket endpoint
         @app.websocket("/ws")
@@ -3040,8 +3246,8 @@ Respond with just the command to run."""
             return
 
         try:
-            from victor.agent.rl.base import RLOutcome
-            from victor.agent.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
@@ -3250,9 +3456,48 @@ Respond with just the command to run."""
         return self
 
     async def shutdown(self) -> None:
-        """Shutdown the server."""
-        if hasattr(self, "_server"):
+        """Shutdown the server gracefully.
+
+        This uses uvicorn's built-in shutdown mechanism to properly terminate
+        the server without affecting the asyncio event loop or causing system issues.
+        """
+        if hasattr(self, "_server") and self._server is not None:
+            # Signal the server to exit gracefully
             self._server.should_exit = True
+
+            # Use uvicorn's built-in shutdown if available
+            if hasattr(self._server, "shutdown"):
+                try:
+                    await asyncio.wait_for(self._server.shutdown(), timeout=3.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    # Timeout is acceptable - server will exit on its own
+                    pass
+                except Exception as e:
+                    logger.warning(f"Server shutdown encountered error: {e}")
+
+            # Small delay to ensure port is released (not for event loop stability)
+            await asyncio.sleep(0.1)
+
+    async def _delayed_shutdown(self) -> None:
+        """Delayed shutdown helper for /shutdown endpoint.
+
+        This method is called asynchronously after the shutdown response is sent,
+        allowing the HTTP response to complete before the server actually shuts down.
+        """
+        # Check if shutdown is already in progress
+        if self._shutting_down:
+            return
+
+        # Small delay to ensure response is sent
+        await asyncio.sleep(0.5)
+
+        # Perform actual shutdown
+        if hasattr(self, "_server") and self._server is not None:
+            if hasattr(self._server, "shutdown"):
+                try:
+                    await asyncio.wait_for(self._server.shutdown(), timeout=3.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
+                    logger.warning(f"Delayed shutdown encountered error: {e}")
 
 
 def create_fastapi_app(workspace_root: Optional[str] = None) -> FastAPI:

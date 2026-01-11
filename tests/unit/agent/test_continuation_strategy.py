@@ -232,7 +232,6 @@ class TestDetermineContinuationAction:
             "model": "gpt-4",
             "tool_budget": 50,
             "unified_tracker_config": {"max_total_iterations": 50},
-            "task_completion_detector": detector,
         }
 
     def test_finish_when_summary_already_requested(self, strategy, base_kwargs):
@@ -426,7 +425,6 @@ class TestRLCoordinator:
             "model": "gpt-4",
             "tool_budget": 50,
             "unified_tracker_config": {"max_total_iterations": 50},
-            "task_completion_detector": detector,
         }
 
         mock_intent = MagicMock()
