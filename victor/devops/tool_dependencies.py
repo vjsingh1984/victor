@@ -369,10 +369,10 @@ def list_composed_patterns() -> List[str]:
     return list(DEVOPS_COMPOSED_PATTERNS.keys())
 
 
-__all__ = [
+__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
     # Provider class
     "DevOpsToolDependencyProvider",
-    # Data exports
+    # Data exports (lazy-loaded with deprecation warnings)
     "DEVOPS_TOOL_DEPENDENCIES",
     "DEVOPS_TOOL_TRANSITIONS",
     "DEVOPS_TOOL_CLUSTERS",

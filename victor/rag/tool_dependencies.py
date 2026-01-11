@@ -331,10 +331,10 @@ def list_composed_patterns() -> List[str]:
     return list(patterns.keys())
 
 
-__all__ = [
+__all__ = [  # noqa: F822 - constants defined via __getattr__ for lazy loading
     # Provider class
     "RAGToolDependencyProvider",
-    # Data exports (backward compatibility)
+    # Data exports (lazy-loaded with deprecation warnings)
     "RAG_TOOL_DEPENDENCIES",
     "RAG_TOOL_TRANSITIONS",
     "RAG_TOOL_CLUSTERS",
