@@ -245,14 +245,12 @@ class TestCapabilityProviderCrossVerticalReuse:
         # Import research capabilities without coding
         import sys
 
-        # Ensure coding not imported
-        coding_modules = [m for m in sys.modules.keys() if "victor.coding" in m]
-        original_modules = coding_modules.copy()
+        # Save coding modules before removing them
+        coding_modules = {m: sys.modules[m] for m in list(sys.modules.keys()) if "victor.coding" in m}
 
-        # Remove coding modules
+        # Remove coding modules temporarily
         for mod in coding_modules:
-            if mod in sys.modules:
-                del sys.modules[mod]
+            del sys.modules[mod]
 
         try:
             from victor.research.capabilities import ResearchCapabilityProvider
@@ -261,10 +259,9 @@ class TestCapabilityProviderCrossVerticalReuse:
             provider = ResearchCapabilityProvider()
             assert len(provider.get_capabilities()) == 5
         finally:
-            # Restore coding modules
-            for mod in original_modules:
-                if mod not in sys.modules:
-                    sys.modules[mod] = None  # Will be re-imported if needed
+            # Restore the actual coding modules (not None!)
+            for mod, module_obj in coding_modules.items():
+                sys.modules[mod] = module_obj
 
     def test_capability_provider_interface_consistency(self):
         """All capability providers follow the same interface."""
