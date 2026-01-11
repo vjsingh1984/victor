@@ -12,14 +12,72 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Vertical extension loading capabilities.
+"""Vertical Extension Loading Capabilities.
 
-This module provides extension loading functionality for verticals, including:
-- Extension caching infrastructure
-- Individual extension getters (middleware, safety, prompt, etc.)
-- Extension aggregation with error handling
+This module provides a comprehensive extension loading system for Victor verticals,
+enabling modular integration with framework components through lazy loading and
+caching infrastructure.
 
-Extracted from VerticalBase for SRP compliance.
+Key Features:
+- Fine-grained extension caching with composite keys to prevent collisions
+- Lazy loading with auto-generated class names for reduced boilerplate
+- Strict error handling with configurable extension requirements
+- Support for 10+ extension types (middleware, safety, prompt, workflow, etc.)
+
+Extension Types:
+    - Middleware: Tool execution pipeline processing
+    - Safety Extension: Dangerous operation pattern detection
+    - Prompt Contributor: Task hints and prompt sections
+    - Mode Config Provider: Operational mode configurations
+    - Tool Dependency Provider: Tool execution patterns
+    - Workflow Provider: Vertical-specific workflow definitions
+    - Service Provider: DI container integration
+    - RL Config Provider: Reinforcement learning configurations
+    - Team Spec Provider: Multi-agent team formations
+    - Enrichment Strategy: DSPy-like prompt optimization
+    - Tiered Tool Config: Context-aware tool selection
+
+Design Principles:
+    - SRP Compliance: Extracted from VerticalBase for focused responsibility
+    - Lazy Loading: Extensions loaded only when first accessed
+    - Caching: Fine-grained cache with composite keys (ClassName:extension_key)
+    - Error Tolerance: Graceful degradation with strict mode optional
+    - Auto-Discovery: Auto-generated class names reduce boilerplate
+
+Usage:
+    from victor.core.verticals.extension_loader import VerticalExtensionLoader
+
+    class MyVertical(VerticalExtensionLoader):
+        @classmethod
+        def get_safety_extension(cls):
+            # Use generic factory (auto-generates "MyVerticalSafetyExtension")
+            return cls._get_extension_factory(
+                "safety_extension",
+                "myvertical.safety",
+            )
+
+        @classmethod
+        def get_prompt_contributor(cls):
+            # Custom class name
+            return cls._get_extension_factory(
+                "prompt_contributor",
+                "myvertical.prompts",
+                "MyCustomPromptContributor",
+            )
+
+Error Handling:
+    # Strict mode (any failure raises ExtensionLoadError)
+    class StrictVertical(VerticalExtensionLoader):
+        strict_extension_loading = True
+
+    # Required extensions (must succeed even in non-strict mode)
+    class CriticalVertical(VerticalExtensionLoader):
+        required_extensions = {"safety", "middleware"}
+
+Related Modules:
+    - victor.core.verticals.base: VerticalBase (uses this loader)
+    - victor.core.verticals.protocols: Extension protocol definitions
+    - victor.core.verticals.metadata: Metadata provider
 """
 
 from __future__ import annotations

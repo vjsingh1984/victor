@@ -42,7 +42,7 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   logo: assets/victor-banner.png
-  # favicon: assets/images/victor-logo-icon.png  # Uncomment when logo icon is created
+  favicon: assets/images/victor-logo-icon.svg
   icon:
     repo: fontawesome/brands/github
     edit: material/pencil
